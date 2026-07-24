@@ -28,12 +28,17 @@ uuid.workspace = true
 jiff.workspace = true
 sqlx.workspace = true
 anyhow.workspace = true
+argon2.workspace = true
+sha2.workspace = true
+base64.workspace = true
+rand_core.workspace = true
 
-# serde_json is bench-only: the shipped binary never needs a JSON encoder of
-# its own, and the size-optimized release profile should not pay for one.
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+# serde_json drives the benches directly; tower::ServiceExt::oneshot drives the
+# auth HTTP round-trip test in-process without binding a socket.
 serde_json = "1"
+tower = { version = "0.5", features = ["util"] }
 
 [[bench]]
 name = "hot_paths"

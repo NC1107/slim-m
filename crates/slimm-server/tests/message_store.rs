@@ -11,6 +11,7 @@ async fn store() -> Store {
     let config = Config {
         port: 0,
         database_path: path,
+        hash_concurrency: 2,
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)

@@ -4,6 +4,7 @@
 //! The binary in `main.rs` is a thin wrapper; the server logic lives here as a
 //! library so it can be exercised by integration tests.
 
+pub mod auth;
 pub mod config;
 pub mod db;
 pub mod http;
@@ -22,7 +23,9 @@ pub async fn run() -> anyhow::Result<()> {
     let config = config::Config::from_env()?;
     let pool = db::connect(&config).await?;
 
-    let app = http::router(pool);
+    let store = store::Store::new(pool);
+    let auth = auth::Auth::new(config.hash_concurrency)?;
+    let app = http::router(http::AppState { store, auth });
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;
     tracing::info!(%addr, version = env!("CARGO_PKG_VERSION"), "slim-m server listening");

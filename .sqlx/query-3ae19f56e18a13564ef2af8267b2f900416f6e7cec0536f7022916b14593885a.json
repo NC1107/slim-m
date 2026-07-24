@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT revoked_at FROM sessions WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "revoked_at",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "3ae19f56e18a13564ef2af8267b2f900416f6e7cec0536f7022916b14593885a"
+}
