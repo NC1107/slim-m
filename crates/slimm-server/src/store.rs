@@ -19,6 +19,10 @@ use sqlx::{SqliteExecutor, SqlitePool};
 
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
+mod sessions;
+
+pub use sessions::{Account, IssuedTokens, RefreshOutcome, RegisterError, SessionContext};
+
 fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -57,18 +61,42 @@ pub struct Message {
     pub edited_at: Option<i64>,
 }
 
+/// How recently a spent refresh token may be replayed before it counts as reuse
+/// rather than the honest client racing itself. See [`Store::rotate_refresh`].
+const DEFAULT_REUSE_GRACE_MS: i64 = 10 * 1000;
+
 /// The persistence layer over one embedded SQLite database.
 #[derive(Clone)]
 pub struct Store {
     pool: SqlitePool,
+    reuse_grace_ms: i64,
 }
 
 impl Store {
     pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            reuse_grace_ms: DEFAULT_REUSE_GRACE_MS,
+        }
     }
 
-    /// Creates a user. Password and auth land in a later phase.
+    /// Builds a store with an explicit refresh-reuse grace window. Mainly for
+    /// tests that need to exercise the out-of-grace reuse path deterministically.
+    pub fn with_reuse_grace_ms(pool: SqlitePool, reuse_grace_ms: i64) -> Self {
+        Self {
+            pool,
+            reuse_grace_ms,
+        }
+    }
+
+    /// Confirms the database answers a trivial query. Backs the liveness probe.
+    pub async fn ping(&self) -> anyhow::Result<()> {
+        sqlx::query("SELECT 1").execute(&self.pool).await?;
+        Ok(())
+    }
+
+    /// Creates a passwordless user. Used by tests and internal fixtures; the
+    /// authenticated registration path is [`Store::create_account`].
     pub async fn create_user(&self, username: &str, display_name: &str) -> anyhow::Result<User> {
         let id = UserId::generate();
         let now = now_ms();

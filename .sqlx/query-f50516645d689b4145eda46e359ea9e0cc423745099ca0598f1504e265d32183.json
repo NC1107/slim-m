@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT user_id AS \"user_id!: UserId\",\n                      session_id AS \"session_id!: SessionId\",\n                      device_id AS \"device_id!: DeviceId\"\n               FROM access_tokens\n               WHERE token_hash = ? AND expires_at > ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "session_id!: SessionId",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "device_id!: DeviceId",
+        "ordinal": 2,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f50516645d689b4145eda46e359ea9e0cc423745099ca0598f1504e265d32183"
+}

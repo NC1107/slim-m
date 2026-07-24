@@ -1,27 +1,37 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! HTTP surface. Phase 0 liveness and version endpoints; the messaging and auth
-//! routes are added as the protocol is built.
+//! HTTP surface: liveness, version, and the auth routes. The messaging and
+//! WebSocket routes are added as the protocol is built.
 
 use axum::{Json, Router, extract::State, routing::get};
 use serde::Serialize;
-use sqlx::SqlitePool;
 use tower_http::trace::TraceLayer;
 
-/// Builds the router with the database pool as shared state.
-pub fn router(pool: SqlitePool) -> Router {
+use crate::auth::Auth;
+use crate::store::Store;
+
+mod auth;
+
+/// What every handler shares: the persistence layer and the auth service.
+/// Cloning is cheap (a pool handle and a couple of `Arc`s).
+#[derive(Clone)]
+pub struct AppState {
+    pub store: Store,
+    pub auth: Auth,
+}
+
+/// Builds the router over the shared application state.
+pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
         .route("/version", get(version))
+        .merge(auth::routes())
         .layer(TraceLayer::new_for_http())
-        .with_state(pool)
+        .with_state(state)
 }
 
 /// Liveness probe: 200 while the process is serving and the database answers.
-async fn healthz(State(pool): State<SqlitePool>) -> Result<&'static str, StatusError> {
-    sqlx::query("SELECT 1")
-        .execute(&pool)
-        .await
-        .map_err(|_| StatusError)?;
+async fn healthz(State(state): State<AppState>) -> Result<&'static str, StatusError> {
+    state.store.ping().await.map_err(|_| StatusError)?;
     Ok("ok")
 }
 

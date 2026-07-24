@@ -16,6 +16,12 @@ pub struct Config {
     /// Filesystem path to the embedded SQLite database file.
     #[serde(default = "default_database_path")]
     pub database_path: String,
+
+    /// How many Argon2id password hashes may run at once. Each costs ~19 MiB, so
+    /// this caps the transient memory a burst of logins can claim; requests over
+    /// the limit wait on the semaphore rather than piling that memory up.
+    #[serde(default = "default_hash_concurrency")]
+    pub hash_concurrency: usize,
 }
 
 fn default_port() -> u16 {
@@ -24,6 +30,10 @@ fn default_port() -> u16 {
 
 fn default_database_path() -> String {
     "data/slimm.db".to_owned()
+}
+
+fn default_hash_concurrency() -> usize {
+    4
 }
 
 impl Config {

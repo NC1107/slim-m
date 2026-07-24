@@ -12,7 +12,7 @@ repository = "https://github.com/NC1107/slim-m"
 # Shared dependency versions live here so every crate stays in lockstep.
 [workspace.dependencies]
 axum = "0.8"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net", "io-util"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net", "io-util", "sync", "time"] }
 tower-http = { version = "0.6", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
@@ -22,6 +22,16 @@ uuid = { version = "1", features = ["v7"] }
 jiff = "0.2"
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate", "uuid"] }
 anyhow = "1"
+# Auth primitives, all long-established audited crates (RustCrypto + BurntSushi),
+# not fresh single-maintainer projects: Argon2id password hashing, SHA-256 token
+# hashing, and URL-safe base64 for opaque token secrets.
+argon2 = "0.5"
+sha2 = "0.10"
+base64 = "0.22"
+# The `getrandom` feature turns on rand_core's OS entropy source (OsRng), which
+# both the Argon2 salt and the opaque token secrets draw from. This is the same
+# rand_core that argon2's password-hash uses, so the feature simply unifies onto it.
+rand_core = { version = "0.6", features = ["getrandom"] }
 
 [profile.release]
 # Small, fast self-host binary: the brief treats binary size as a budget.

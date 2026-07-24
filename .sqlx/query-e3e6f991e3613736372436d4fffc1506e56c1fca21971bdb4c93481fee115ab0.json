@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO ws_tickets (ticket_hash, session_id, user_id, device_id, issued_at, expires_at)\n             VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "e3e6f991e3613736372436d4fffc1506e56c1fca21971bdb4c93481fee115ab0"
+}

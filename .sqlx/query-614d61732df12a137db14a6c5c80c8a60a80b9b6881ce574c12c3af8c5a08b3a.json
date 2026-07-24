@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT user_id AS \"user_id!: UserId\",\n                      device_id AS \"device_id!: DeviceId\",\n                      revoked_at\n               FROM sessions WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "device_id!: DeviceId",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "revoked_at",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "614d61732df12a137db14a6c5c80c8a60a80b9b6881ce574c12c3af8c5a08b3a"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM ws_tickets\n             WHERE session_id IN (SELECT id FROM sessions WHERE device_id = ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "ab4358f26ceaef3dfc58d1e6abf1c67070540175fff6dce80466abb1863e43dc"
+}

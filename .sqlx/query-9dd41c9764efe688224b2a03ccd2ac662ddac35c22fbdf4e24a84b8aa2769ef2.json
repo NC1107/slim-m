@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE ws_tickets SET used_at = ?\n               WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?\n               RETURNING user_id AS \"user_id!: UserId\",\n                         session_id AS \"session_id!: SessionId\",\n                         device_id AS \"device_id!: DeviceId\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "session_id!: SessionId",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "device_id!: DeviceId",
+        "ordinal": 2,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9dd41c9764efe688224b2a03ccd2ac662ddac35c22fbdf4e24a84b8aa2769ef2"
+}

@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT session_id AS \"session_id!: SessionId\",\n                  family_id AS \"family_id!: FamilyId\",\n                  used_at, revoked_at\n           FROM refresh_tokens WHERE token_hash = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "session_id!: SessionId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "family_id!: FamilyId",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "used_at",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "revoked_at",
+        "ordinal": 3,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "5cfbd385c1ef265973266c085f2239ae39976b0ced7c47a8bf62cf0f3bd01f30"
+}

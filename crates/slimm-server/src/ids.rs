@@ -34,6 +34,12 @@ macro_rules! uuid_id {
 uuid_id!(UserId, "A user identity.");
 uuid_id!(ChannelId, "A channel identity.");
 uuid_id!(MessageId, "A message identity.");
+uuid_id!(DeviceId, "A device identity.");
+uuid_id!(SessionId, "A login-session identity.");
+uuid_id!(
+    FamilyId,
+    "A refresh-token family identity: rotation keeps the id, reuse revokes it."
+);
 
 /// A per-scope monotonic order key. Deliberately a distinct type from identity:
 /// it answers "in what order", not "which one".
