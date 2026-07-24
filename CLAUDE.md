@@ -39,7 +39,20 @@ Phase 1 merged so far:
 
 **Phase 1 is complete**, including the rate-limiting deliverable. Server 0.5.0 is released and deployed.
 
-Next by the roadmap is Phase 2, the Flutter client shell and text messaging. Note the constraint: the Flutter toolchain is NOT installed in this environment, so client code can only be verified through CI (analyze, test, golden matrix), not run locally. Plan client work in small CI-verifiable slices rather than large unverified drops.
+**Phase 2 (client shell and text messaging) is merged.** What landed, in order:
+- Wire protocol documented and the Dart API client (PR #21). The schema had drifted to 2 of 15 endpoints; it now documents the real surface.
+- Local store (PR #22): Drift, idempotent by message id and order-safe by seq, so live push and catch-up can interleave.
+- App shell (PR #23): width-driven adaptive layout, sync that catches up before attaching the socket, optimistic sends.
+- Devices, blocking, report intake (PR #24) and invites (PR #27) on the server.
+- Settings, safety UI, GoRouter, true-black theme, golden matrix (PR #26).
+- Onboarding with the three entry points, invite redemption, unread badges (PR #28).
+- Key-storage seam, remappable shortcuts, permessage-deflate interop (PR #29).
+
+Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 leans on them:
+- **The UI has never been driven by a human.** It builds, runs, and passes tests, but nobody has clicked through sign-up to sending a message in a real window. The owner intends to.
+- **Golden images are not committed.** The matrix asserts no overflow at any scale (machine-independent, runs everywhere); the pixel comparison is behind `SLIMM_GOLDENS` with no reference images, because images generated off-CI would never match the runner and would mean a permanently red build. Generate them once on the CI runner and enable the flag there.
+- Reactions, the shared context menu, the quick switcher, haptics, and history pagination are not built. Reactions also need a server verb.
+- The shortcut table exists but is not yet bound into the widget tree.
 
 Open follow-ups noted during reviews: malformed query/JSON bodies still return axum's default error rather than the uniform JSON error contract (low); `revoke_device` does not itself publish `SessionRevoked` (the logout and deletion paths do).
 
