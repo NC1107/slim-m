@@ -1,13 +1,22 @@
 # SPDX-License-Identifier: Apache-2.0
 name: slimm_data
-description: Local Drift store, the client source of truth.
+description: Local store and the sync logic that keeps it consistent with the server.
 publish_to: none
 resolution: workspace
 environment:
   sdk: ^3.6.0
-  flutter: ">=3.27.0"
 dependencies:
+  drift: ^2.20.0
+  slimm_api:
+  sqlite3_flutter_libs: ^0.5.0
+  path: ^1.9.0
+  path_provider: ^2.1.0
   flutter:
     sdk: flutter
 dev_dependencies:
+  build_runner: ^2.4.0
+  drift_dev: ^2.20.0
   flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+  sqlite3: ^2.4.0
