@@ -45,10 +45,11 @@ Open follow-ups noted during reviews: auth still needs real per-IP/per-account r
 A pinned instance runs on the owner's homelab box, deployed 2026-07-24.
 
 - Host `npc@10.0.0.100` (Ubuntu, Docker). Stack at `/home/npc/docker-server/npc_projects/slim-m/` (`docker-compose.yml` + `.env`), following that host's one-directory-per-stack convention.
-- Image `ghcr.io/nc1107/slim-m-server:0.3.0` (pinned, not `latest`), SQLite on the named volume `slim-m_slimm_data`, reachable at `http://10.0.0.100:8095`.
-- LAN only on purpose: it is deliberately NOT enrolled on `traefik_proxy`, because publishing it needs a hostname and a DNS record, which is an owner decision. The Traefik labels to add are commented at the bottom of that compose file.
-- Verified live: `/healthz`, `/version`, and a 13-check end-to-end smoke run (register, duplicate and bidi rejection, wrong password, refresh rotation, ws ticket, bearer rejection, deny-by-default on an unknown channel, a real WebSocket hello handshake, deletion, and post-deletion refusal).
-- Operate it with `docker compose` from that directory; bump `SLIMM_VERSION` in `.env` and `docker compose up -d` to move to a new release.
+- Image `ghcr.io/nc1107/slim-m-server:latest` (the release now publishes a rolling `latest` alongside the version and sha tags), SQLite on the named volume `slim-m_slimm_data`, reachable at `http://10.0.0.100:8095`.
+- Auto-updates are on: the container carries `com.centurylinklabs.watchtower.enable=true`. That host runs **exactly one** Watchtower, `scw-watchtower` in `npc_projects/scw_server/`, in label mode across every stack. Do NOT add a second Watchtower to this stack: a new instance stops the existing one on startup, which is how `scw-watchtower` briefly got killed on 2026-07-24 before being restored.
+- LAN only for now: deliberately NOT on `traefik_proxy`. The owner's standing instruction is to publish it at **`slim-npc-server.top`** once a UI exists; the Traefik labels are commented at the bottom of that compose file.
+- Verified live against 0.4.0: `/healthz`, `/version`, a 13-check auth and WebSocket smoke run (including a real ws hello handshake and post-deletion refusal), and a 17-check messaging run (bootstrap seeding, send, idempotent retry, list, edit, read state, sync, and the member-versus-admin permission split).
+- Operate it with `docker compose` from that directory. It tracks `latest`; set `SLIMM_VERSION` in `.env` to a version to freeze it.
 
 ## Repository layout
 
