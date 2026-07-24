@@ -6,20 +6,37 @@ A lightweight, cross-platform, open source messaging platform with optional self
 
 ## Status
 
-Pre-implementation planning.
-No code exists yet by design: the project favors thoughtful architecture over a rushed MVP.
+Phase 0 (foundations) is underway.
+The server skeleton compiles, runs, migrates its embedded SQLite database, and serves liveness and version endpoints; the surrounding build, CI, and release machinery is being stood up.
+See the [roadmap](docs/ROADMAP.md) for phases and exit criteria.
+
+## Layout
+
+```
+crates/slimm-server   Rust home server (Axum + embedded SQLite via sqlx)
+schema/               OpenAPI + JSON Schema, the single source of record for the wire protocol
+client/               Flutter client (Dart pub workspace of small packages)
+docker/               Production container image for the server
+docs/                 Brief, strategy, roadmap, decisions, and research
+```
+
+The push relay is a separate repository, adapted from [check-in-relay](https://github.com/NC1107/check-in-relay).
+
+## Running the server
+
+```bash
+cp .env.example .env
+cargo run --bin slimm-server
+curl localhost:8080/healthz     # -> ok
+curl localhost:8080/version     # -> {"name":"slim-m",...}
+```
 
 ## Documents
 
-- [Project brief](docs/BRIEF.md) - the founding requirements.
-- [Implementation strategy](docs/STRATEGY.md) - compiled technical decisions and rationale.
-- [Roadmap](docs/ROADMAP.md) - phased delivery plan with exit criteria per phase.
-- [Research](docs/research/) - per-domain specialist reports and adversarial reviews that fed the strategy.
+- [Brief](docs/BRIEF.md), [strategy](docs/STRATEGY.md), [roadmap](docs/ROADMAP.md)
+- [Decisions of record](docs/decisions/), [backlog](docs/BACKLOG.md)
+- [Licensing](LICENSING.md) (AGPL-3.0 server, Apache-2.0 client and schema), [contributing](CONTRIBUTING.md)
 
-## What it will be
+## License
 
-- Discord-style core: group chats and DMs with text, voice calls, and screen sharing.
-- An infinite collaborative Voice Canvas during calls as the signature feature.
-- Flutter client for iOS, Android, and Linux desktop.
-- A lightweight self-hostable server with an official hosted instance.
-- An official push relay so self-hosted servers can reach mobile devices.
+Multi-licensed by component; see [LICENSING.md](LICENSING.md).

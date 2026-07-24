@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: Apache-2.0
+# Single source of record for the slim-m wire protocol.
+# Rust (server) and Dart (client) types are generated from this file; CI fails
+# on any drift between the schema and the generated code. Evolution is
+# additive-only, enforced by an oasdiff breaking-change gate.
+openapi: 3.1.0
+info:
+  title: slim-m API
+  version: 0.0.0
+  description: >
+    Phase 0 surface. The messaging protocol, auth, RBAC, sync, and the
+    WebSocket event envelope are specified here as they are built in Phase 1.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: https://{host}
+    variables:
+      host:
+        default: localhost:8080
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Liveness probe.
+      responses:
+        "200":
+          description: The server is serving requests.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+        "503":
+          description: The server is not ready.
+  /version:
+    get:
+      operationId: getVersion
+      summary: Build and wire-protocol version.
+      responses:
+        "200":
+          description: Version information.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Version"
+components:
+  schemas:
+    Version:
+      type: object
+      required: [name, version, protocol]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        protocol:
+          type: integer
+          format: int32
+          description: Wire-protocol envelope version a client negotiates against.

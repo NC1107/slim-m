@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+name: slimm_app
+description: slim-m client application shell.
+publish_to: none
+resolution: workspace
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  slimm_design_system:
+    path: ../design_system
+dev_dependencies:
+  flutter_lints: ^5.0.0
+flutter:
+  uses-material-design: true

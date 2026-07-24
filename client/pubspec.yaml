@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+# Dart native pub workspace (no third-party monorepo manager).
+# Each package resolves against this shared workspace.
+name: slim_m_workspace
+publish_to: none
+environment:
+  sdk: ^3.6.0
+workspace:
+  - packages/api
+  - packages/design_system
+  - packages/data
+  - packages/platform
+  - packages/rtc
+  - packages/voice_canvas
+  - packages/app

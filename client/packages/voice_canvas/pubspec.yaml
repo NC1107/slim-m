@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+name: slimm_voice_canvas
+description: The infinite Voice Canvas, isolated so its complexity is contained.
+publish_to: none
+resolution: workspace
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+dependencies:
+  flutter:
+    sdk: flutter
+dev_dependencies:
+  flutter_lints: ^5.0.0

@@ -6,3 +6,25 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Rust
+/target
+**/*.rs.bk
+
+# Runtime data (embedded SQLite lives here)
+/data
+*.db
+*.db-shm
+*.db-wal
+
+# Env
+.env
+.env.local
+
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
