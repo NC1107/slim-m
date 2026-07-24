@@ -6,11 +6,6 @@
       "release-type": "rust",
       "component": "server",
       "package-name": "slimm-server"
-    },
-    "client": {
-      "release-type": "dart",
-      "component": "client",
-      "package-name": "slim-m-client"
     }
   }
 }
