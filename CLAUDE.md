@@ -34,11 +34,14 @@ Phase 1 merged so far:
 - Read state and bundled sync (PR #14): monotonic last-read seq with derived unread, and `POST /sync` taking per-scope cursors with per-scope, aggregate, and snapshot-gap caps. A nonexistent channel now grants no permissions, so channel existence is not observable.
 - Account deletion (PR #15): purge personal data, anonymize authored content, tombstone and free the username, revoke sessions and close sockets, with the login-versus-delete race closed by a write-locked liveness check in `open_session`.
 
-**Phase 1 is complete.** Server 0.3.0 is released and deployed (see the deployment section above).
+- First-run bootstrap and channel routes (PR #16): the first account to register claims the deployment, seeding @everyone, an admin role, and a general channel, plus GET/POST /channels. Found by deploying and discovering a fresh server could authenticate but not message.
+- In-process rate limiting (PR #19): token buckets per (class, key) with sweeping and a hard ceiling, keyed by user when authenticated and peer address otherwise, over-budget callers get 429.
 
-Next up, discovered by deploying: a fresh server has no `@everyone` role and no channels, and no HTTP route creates either, so a new deployment can authenticate but cannot message at all. The next increment is a first-run bootstrap (first registered account becomes admin, seeding `@everyone` and a default channel) plus minimal channel and role endpoints. After that, Phase 2 (the Flutter client shell and text messaging) is next by the roadmap, but the Flutter toolchain is not installed in this environment, so client work is CI-verified only.
+**Phase 1 is complete**, including the rate-limiting deliverable. Server 0.5.0 is released and deployed.
 
-Open follow-ups noted during reviews: auth still needs real per-IP/per-account rate limiting (its own roadmap item; only the hashing-permit timeout ships so far); malformed query/JSON bodies still return axum's default error rather than the uniform JSON error contract (low); `revoke_device` does not itself publish `SessionRevoked` (the logout and deletion paths do).
+Next by the roadmap is Phase 2, the Flutter client shell and text messaging. Note the constraint: the Flutter toolchain is NOT installed in this environment, so client code can only be verified through CI (analyze, test, golden matrix), not run locally. Plan client work in small CI-verifiable slices rather than large unverified drops.
+
+Open follow-ups noted during reviews: malformed query/JSON bodies still return axum's default error rather than the uniform JSON error contract (low); `revoke_device` does not itself publish `SessionRevoked` (the logout and deletion paths do).
 
 ## Running deployment (LAN test instance)
 
@@ -48,7 +51,7 @@ A pinned instance runs on the owner's homelab box, deployed 2026-07-24.
 - Image `ghcr.io/nc1107/slim-m-server:latest` (the release now publishes a rolling `latest` alongside the version and sha tags), SQLite on the named volume `slim-m_slimm_data`, reachable at `http://10.0.0.100:8095`.
 - Auto-updates are on: the container carries `com.centurylinklabs.watchtower.enable=true`. That host runs **exactly one** Watchtower, `scw-watchtower` in `npc_projects/scw_server/`, in label mode across every stack. Do NOT add a second Watchtower to this stack: a new instance stops the existing one on startup, which is how `scw-watchtower` briefly got killed on 2026-07-24 before being restored.
 - LAN only for now: deliberately NOT on `traefik_proxy`. The owner's standing instruction is to publish it at **`slim-npc-server.top`** once a UI exists; the Traefik labels are commented at the bottom of that compose file.
-- Verified live against 0.4.0: `/healthz`, `/version`, a 13-check auth and WebSocket smoke run (including a real ws hello handshake and post-deletion refusal), and a 17-check messaging run (bootstrap seeding, send, idempotent retry, list, edit, read state, sync, and the member-versus-admin permission split).
+- Verified live against 0.5.0 (auto-updated from 0.4.0 by Watchtower with no manual step, proving the pipeline): `/healthz`, `/version`, a 13-check auth and WebSocket smoke run (including a real ws hello handshake and post-deletion refusal), and a 17-check messaging run (bootstrap seeding, send, idempotent retry, list, edit, read state, sync, and the member-versus-admin permission split), plus rate limiting confirmed live (5 answered, then 429).
 - Operate it with `docker compose` from that directory. It tracks `latest`; set `SLIMM_VERSION` in `.env` to a version to freeze it.
 
 ## Repository layout
