@@ -10,6 +10,7 @@ use slimm_server::auth::Auth;
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
 use slimm_server::ids::UserId;
 use slimm_server::permissions::Permissions;
 use slimm_server::store::Store;
@@ -31,7 +32,11 @@ async fn new_store() -> Store {
 /// store are visible to the handlers.
 fn app(store: Store) -> Router {
     let auth = Auth::new(2).expect("auth service");
-    http::router(AppState { store, auth })
+    http::router(AppState {
+        store,
+        auth,
+        hub: Hub::new(),
+    })
 }
 
 fn request(method: &str, uri: &str, token: Option<&str>, body: Option<Value>) -> Request<Body> {
