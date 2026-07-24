@@ -6,10 +6,21 @@
 openapi: 3.1.0
 info:
   title: slim-m API
-  version: 0.0.0
+  version: 0.5.0
   description: >
-    Phase 0 surface. The messaging protocol, auth, RBAC, sync, and the
-    WebSocket event envelope are specified here as they are built in Phase 1.
+    The Phase 1 server surface: liveness, auth with opaque rotating tokens,
+    channels, text messaging, read state, bundled catch-up sync, account
+    deletion, and the WebSocket event envelope.
+
+    Identity and ordering are separate concerns. A message's identity is a
+    client-generated UUIDv7, which also makes sending idempotent; its order is a
+    per-channel monotonic `seq` assigned by the server, which is the
+    authoritative cursor for pagination and sync.
+
+    Authentication is a bearer access token. Access tokens are short-lived and
+    exchanged at `/auth/refresh`, which rotates the refresh token. Opening a
+    WebSocket uses a single-use ticket from `/auth/ws-ticket`, because an
+    upgrade request cannot reliably carry an Authorization header.
   license:
     name: Apache-2.0
     identifier: Apache-2.0
@@ -18,14 +29,32 @@ servers:
     variables:
       host:
         default: localhost:8080
+
+tags:
+  - name: system
+    description: Liveness, version, and the event socket.
+  - name: auth
+    description: Registration, sessions, tokens, and account deletion.
+  - name: channels
+    description: Channel listing and creation.
+  - name: messages
+    description: Sending, reading, and editing messages.
+  - name: sync
+    description: Read state and reconnect catch-up.
+
+security:
+  - bearerAuth: []
+
 paths:
   /healthz:
     get:
       operationId: getHealth
+      tags: [system]
       summary: Liveness probe.
+      security: []
       responses:
         "200":
-          description: The server is serving requests.
+          description: The server is serving and the database answers.
           content:
             text/plain:
               schema:
@@ -33,10 +62,17 @@ paths:
                 example: ok
         "503":
           description: The server is not ready.
+          content:
+            text/plain:
+              schema:
+                type: string
+
   /version:
     get:
       operationId: getVersion
+      tags: [system]
       summary: Build and wire-protocol version.
+      security: []
       responses:
         "200":
           description: Version information.
@@ -44,8 +80,445 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Version"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Create an account and open a session.
+      description: >
+        The first account to register on an unclaimed deployment also claims it,
+        seeding the @everyone role, an admin role granted to that account, and a
+        general channel.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Tokens"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Open a session with a username and password.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Tokens"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /auth/refresh:
+    post:
+      operationId: refresh
+      tags: [auth]
+      summary: Exchange a refresh token for a new pair.
+      description: >
+        Rotation is single-use: the presented token is spent and a new pair
+        issued. Replaying a long-spent token is treated as a leak and revokes
+        the whole family and its session. A replay moments after a successful
+        rotation is treated as the client racing itself and is denied without
+        revoking anything.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Tokens"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/ws-ticket:
+    post:
+      operationId: createWsTicket
+      tags: [auth]
+      summary: Mint a single-use WebSocket connect ticket.
+      responses:
+        "200":
+          description: A short-lived, single-use ticket.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Revoke the calling session.
+      description: >
+        Revocation is immediate: the session's bearer token stops resolving on
+        the next request and any live WebSocket on that session is closed.
+      responses:
+        "204":
+          description: The session was revoked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /account:
+    delete:
+      operationId: deleteAccount
+      tags: [auth]
+      summary: Delete the calling account.
+      description: >
+        Purges personal data, clears authorship from content left in shared
+        channels, frees the username, and revokes every session. Irreversible.
+      responses:
+        "204":
+          description: The account was deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /channels:
+    get:
+      operationId: listChannels
+      tags: [channels]
+      summary: List the channels the caller can view.
+      responses:
+        "200":
+          description: The visible channels.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Channel"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createChannel
+      tags: [channels]
+      summary: Create a channel.
+      description: Requires the MANAGE_CHANNELS permission.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChannelRequest"
+      responses:
+        "200":
+          description: The created channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Channel"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /channels/{channelId}/messages:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: Read a channel's history, newest first.
+      description: >
+        Keyset paginated on `seq`. Pass the smallest `seq` already seen as
+        `before` to page backwards.
+      parameters:
+        - name: before
+          in: query
+          description: Return only messages with a `seq` strictly below this.
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          description: Page size; the server clamps it.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: A page of messages, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message.
+      description: >
+        Idempotent by the client-supplied `id` within its channel and author, so
+        a retry after an uncertain failure never duplicates. Reusing an id from
+        a different channel or author is a conflict.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "200":
+          description: The stored message.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /channels/{channelId}/messages/{messageId}:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+      - name: messageId
+        in: path
+        required: true
+        description: The message's UUID.
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: editMessage
+      tags: [messages]
+      summary: Edit a message.
+      description: Allowed for the author, or a member with MANAGE_MESSAGES.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditMessageRequest"
+      responses:
+        "200":
+          description: The updated message.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /channels/{channelId}/read:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: getReadState
+      tags: [sync]
+      summary: Read the caller's last-read marker and unread count.
+      responses:
+        "200":
+          $ref: "#/components/responses/ReadStateResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      operationId: markRead
+      tags: [sync]
+      summary: Advance the caller's last-read marker.
+      description: Monotonic; a lower `seq` never moves the marker backwards.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkReadRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ReadStateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /sync:
+    post:
+      operationId: sync
+      tags: [sync]
+      summary: Catch several scopes up in one request.
+      description: >
+        The reconnect path: send every per-scope cursor at once rather than one
+        request per channel. Scopes the caller cannot view are omitted rather
+        than refused, so the response never reveals a hidden channel. The
+        response is capped per scope and in aggregate, and a cursor too far
+        behind returns `reset`, meaning discard local state for that scope and
+        refetch it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncRequest"
+      responses:
+        "200":
+          description: Per-scope deltas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /ws:
+    get:
+      operationId: connectWebSocket
+      tags: [system]
+      summary: Open the event WebSocket.
+      security: []
+      description: >
+        Upgrade, then send a `hello` frame carrying a ticket from
+        `/auth/ws-ticket` and the protocol version. The server redeems the
+        ticket and replies with its own `hello`. After that the connection
+        carries server-to-client events, authorized per event, plus a ping and
+        pong keepalive. See the ClientFrame and ServerFrame schemas.
+      responses:
+        "101":
+          description: Switching protocols.
+        "503":
+          description: The connection ceiling was reached.
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: An opaque access token from register, login, or refresh.
+
+  parameters:
+    ChannelId:
+      name: channelId
+      in: path
+      required: true
+      description: The channel's UUID.
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Tokens:
+      description: A new access and refresh token pair.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TokenPair"
+    ReadStateResponse:
+      description: The caller's read state in a channel.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ReadState"
+    BadRequest:
+      description: The request was malformed or failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing, invalid, expired, or revoked credentials.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: >
+        The caller lacks the required permission. A channel that does not exist
+        is refused identically, so its existence is not observable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: The resource does not exist within a scope the caller can see.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: The request collided with existing state.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TooManyRequests:
+      description: The caller is over its rate budget for this traffic class.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unavailable:
+      description: The server shed the request under load; retry shortly.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
   schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: A short, stable, human-readable reason.
+
     Version:
       type: object
       required: [name, version, protocol]
@@ -54,7 +527,337 @@ components:
           type: string
         version:
           type: string
+          description: The server's release version.
         protocol:
           type: integer
           format: int32
           description: Wire-protocol envelope version a client negotiates against.
+
+    TokenPair:
+      type: object
+      required: [user_id, access_token, refresh_token, access_expires_at]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        access_token:
+          type: string
+          description: Bearer token for authenticated requests. Short-lived.
+        refresh_token:
+          type: string
+          description: Single-use token that rotates on each refresh.
+        access_expires_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds at which the access token expires.
+
+    Ticket:
+      type: object
+      required: [ticket, expires_at]
+      properties:
+        ticket:
+          type: string
+          description: Single-use secret redeemed by the WebSocket hello frame.
+        expires_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds at which the ticket expires.
+
+    RegisterRequest:
+      type: object
+      required: [username, display_name, password, device_name]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_.-]+$"
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: >
+            Must not contain control characters or text-direction overrides,
+            which could be used to spoof how a name renders to other members.
+        password:
+          type: string
+          minLength: 8
+          maxLength: 1024
+        device_name:
+          type: string
+          minLength: 1
+          maxLength: 64
+
+    LoginRequest:
+      type: object
+      required: [username, password, device_name]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        device_name:
+          type: string
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    Channel:
+      type: object
+      required: [id, name, kind, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [text, voice]
+        created_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds.
+
+    CreateChannelRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        kind:
+          type: string
+          enum: [text, voice]
+          default: text
+
+    Message:
+      type: object
+      required: [id, channel_id, seq, content, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Client-generated UUIDv7; also the idempotency key.
+        channel_id:
+          type: string
+          format: uuid
+        author_id:
+          type: [string, "null"]
+          format: uuid
+          description: Null once the author's account has been deleted.
+        seq:
+          type: integer
+          format: int64
+          description: Per-channel monotonic order key, and the sync cursor.
+        content:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+        edited_at:
+          type: [integer, "null"]
+          format: int64
+
+    SendMessageRequest:
+      type: object
+      required: [id, content]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: >
+            Client-generated UUIDv7. Retrying with the same id returns the
+            stored message instead of sending twice.
+        content:
+          type: string
+          minLength: 1
+          maxLength: 4000
+
+    EditMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 4000
+
+    ReadState:
+      type: object
+      required: [last_read_seq, unread]
+      properties:
+        last_read_seq:
+          type: integer
+          format: int64
+        unread:
+          type: integer
+          format: int64
+          description: Live count of messages past the marker.
+
+    MarkReadRequest:
+      type: object
+      required: [seq]
+      properties:
+        seq:
+          type: integer
+          format: int64
+          minimum: 0
+
+    SyncRequest:
+      type: object
+      required: [scopes]
+      properties:
+        scopes:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/ScopeCursor"
+
+    ScopeCursor:
+      type: object
+      required: [channel_id, after_seq]
+      properties:
+        channel_id:
+          type: string
+          format: uuid
+        after_seq:
+          type: integer
+          format: int64
+          description: The highest `seq` this client already holds for the scope.
+
+    SyncResponse:
+      type: object
+      required: [scopes]
+      properties:
+        scopes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScopeDelta"
+
+    ScopeDelta:
+      type: object
+      required: [channel_id, messages, has_more, reset]
+      properties:
+        channel_id:
+          type: string
+          format: uuid
+        messages:
+          type: array
+          description: Messages after the cursor, oldest first.
+          items:
+            $ref: "#/components/schemas/Message"
+        has_more:
+          type: boolean
+          description: More remains past what this response carried.
+        reset:
+          type: boolean
+          description: >
+            The cursor was too far behind to stream. Discard local state for
+            this scope and refetch it.
+
+    ClientFrame:
+      description: A frame sent by the client over the WebSocket.
+      oneOf:
+        - $ref: "#/components/schemas/ClientHello"
+        - $ref: "#/components/schemas/ClientPing"
+
+    ClientHello:
+      type: object
+      required: [type, ticket, protocol]
+      properties:
+        type:
+          type: string
+          enum: [hello]
+        ticket:
+          type: string
+        protocol:
+          type: integer
+          format: int32
+          description: Must match the server's protocol version.
+
+    ClientPing:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [ping]
+
+    ServerFrame:
+      description: A frame sent by the server over the WebSocket.
+      oneOf:
+        - $ref: "#/components/schemas/ServerHello"
+        - $ref: "#/components/schemas/MessageCreated"
+        - $ref: "#/components/schemas/MessageEdited"
+        - $ref: "#/components/schemas/ServerPong"
+        - $ref: "#/components/schemas/ServerError"
+
+    ServerHello:
+      type: object
+      required: [type, protocol]
+      properties:
+        type:
+          type: string
+          enum: [hello]
+        protocol:
+          type: integer
+          format: int32
+
+    MessageCreated:
+      type: object
+      required: [type, channel_id, seq, message]
+      properties:
+        type:
+          type: string
+          enum: [message.created]
+        channel_id:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          format: int64
+        message:
+          $ref: "#/components/schemas/Message"
+
+    MessageEdited:
+      type: object
+      required: [type, channel_id, seq, message]
+      properties:
+        type:
+          type: string
+          enum: [message.edited]
+        channel_id:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          format: int64
+        message:
+          $ref: "#/components/schemas/Message"
+
+    ServerPong:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [pong]
+
+    ServerError:
+      type: object
+      required: [type, message]
+      properties:
+        type:
+          type: string
+          enum: [error]
+        message:
+          type: string
+          description: >
+            A terminal condition. `resync` means the connection fell behind and
+            was closed; reconnect and catch up over /sync.
