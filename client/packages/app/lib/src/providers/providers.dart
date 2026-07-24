@@ -24,6 +24,9 @@ final serverUrlProvider = StateProvider<Uri>(
   (ref) => Uri.parse('http://localhost:8080'),
 );
 
+/// An invite code chosen during onboarding, redeemed once an account exists.
+final pendingInviteProvider = StateProvider<String?>((ref) => null);
+
 /// The session, shared by everything that talks to the server so a refresh in
 /// one place is seen everywhere.
 final sessionProvider = Provider<SessionStore>((ref) {
