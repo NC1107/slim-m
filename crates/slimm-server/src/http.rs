@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! HTTP surface: liveness, version, and the auth routes. The messaging and
+//! HTTP surface: liveness, version, the auth routes, and the message routes. The
 //! WebSocket routes are added as the protocol is built.
 
 use axum::{Json, Router, extract::State, routing::get};
@@ -10,6 +10,9 @@ use crate::auth::Auth;
 use crate::store::Store;
 
 mod auth;
+mod error;
+mod extract;
+mod messages;
 
 /// What every handler shares: the persistence layer and the auth service.
 /// Cloning is cheap (a pool handle and a couple of `Arc`s).
@@ -25,6 +28,7 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(healthz))
         .route("/version", get(version))
         .merge(auth::routes())
+        .merge(messages::routes())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

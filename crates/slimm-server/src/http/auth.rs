@@ -5,18 +5,16 @@
 //! module is the thin REST skin over them, plus input validation, the bearer
 //! extractor, and the error-to-status mapping.
 
-use axum::extract::{DefaultBodyLimit, FromRequestParts, State};
+use axum::extract::{DefaultBodyLimit, State};
 use axum::http::StatusCode;
-use axum::http::header::AUTHORIZATION;
-use axum::http::request::Parts;
-use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
-use crate::auth::HashError;
-use crate::store::{IssuedTokens, RefreshOutcome, RegisterError, SessionContext};
+use super::error::ApiError;
+use super::extract::Authed;
+use crate::store::{IssuedTokens, RefreshOutcome, RegisterError};
 
 /// Auth payloads are a handful of short fields; cap the body well below any
 /// realistic request so an oversized body is rejected before it is buffered.
@@ -178,37 +176,6 @@ async fn logout(
 }
 
 // ---------------------------------------------------------------------------
-// Bearer extractor
-// ---------------------------------------------------------------------------
-
-/// Extracts the session a request is authenticated as from its bearer access
-/// token, rejecting with 401 when the header is absent or the token is invalid.
-struct Authed(SessionContext);
-
-impl FromRequestParts<AppState> for Authed {
-    type Rejection = ApiError;
-
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
-        let token = parts
-            .headers
-            .get(AUTHORIZATION)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|header| header.strip_prefix("Bearer "))
-            .map(str::to_owned)
-            .ok_or(ApiError::Unauthorized)?;
-        let ctx = state
-            .store
-            .authenticate(&token)
-            .await?
-            .ok_or(ApiError::Unauthorized)?;
-        Ok(Authed(ctx))
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
 
@@ -265,57 +232,4 @@ fn is_disallowed_label_char(c: char) -> bool {
             | '\u{2066}'..='\u{2069}' // bidi isolates
             | '\u{FEFF}'              // zero-width no-break space / BOM
         )
-}
-
-// ---------------------------------------------------------------------------
-// Errors
-// ---------------------------------------------------------------------------
-
-enum ApiError {
-    BadRequest(&'static str),
-    Unauthorized,
-    Conflict(&'static str),
-    Unavailable,
-    Internal,
-}
-
-#[derive(Serialize)]
-struct ErrorBody {
-    error: &'static str,
-}
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        let (status, error) = match self {
-            ApiError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
-            ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "invalid credentials"),
-            ApiError::Conflict(message) => (StatusCode::CONFLICT, message),
-            ApiError::Unavailable => (
-                StatusCode::SERVICE_UNAVAILABLE,
-                "server busy, retry shortly",
-            ),
-            ApiError::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
-        };
-        (status, Json(ErrorBody { error })).into_response()
-    }
-}
-
-impl From<anyhow::Error> for ApiError {
-    fn from(err: anyhow::Error) -> Self {
-        tracing::error!(error = %err, "auth request failed");
-        ApiError::Internal
-    }
-}
-
-impl From<HashError> for ApiError {
-    fn from(err: HashError) -> Self {
-        match err {
-            // Shed load past the hashing deadline instead of hanging the caller.
-            HashError::Busy => ApiError::Unavailable,
-            HashError::Internal(e) => {
-                tracing::error!(error = %e, "password hashing failed");
-                ApiError::Internal
-            }
-        }
-    }
 }
