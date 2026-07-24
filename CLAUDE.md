@@ -99,7 +99,12 @@ Join and leave sounds default off above roughly 8 participants. The official ins
 ## Local development
 
 Toolchains present in this environment: cargo/rustc 1.94, go 1.26, docker, node, gh (authenticated as NC1107).
-Dart and Flutter are NOT installed here; the client is verified through CI (GitHub has the Flutter runner).
+Flutter 3.44.8 stable (Dart 3.12.2) is installed at `~/development/flutter`, on PATH via `.zshrc` and `.bashrc`. `flutter doctor` reports no issues.
+The host is Fedora 44 **KDE Plasma** on Wayland with an NVIDIA GPU, and the Android SDK 35 is present with licences accepted, so Linux desktop and Android can both be built and run locally.
+Two things still cannot be verified here:
+- **iOS** needs macOS and Xcode, so it stays CI and TestFlight only (and that job still needs the Apple secrets).
+- **Golden files** are sensitive to the engine build and font rendering, and CI generates and checks them on `ubuntu-latest` / `stable`. Run goldens locally to see failures, but regenerate them only in CI, or local and CI renders will disagree.
+The roadmap names GNOME Wayland as the Linux target while this box is KDE Wayland, so compositor-specific behaviour (notably the Phase 4 screen-share portal) still needs checking on GNOME.
 `sqlx-cli` 0.8 is installed at `~/.cargo/bin`.
 
 Everyday commands:
@@ -118,6 +123,13 @@ SQLX_OFFLINE=true cargo test --all
 
 # Container image (builds offline)
 docker build -f docker/server.Dockerfile -t slimm-server:dev .
+
+# Client (Dart pub workspace; mirrors what client-ci runs)
+cd client
+flutter pub get
+dart analyze
+dart format --output=none --set-exit-if-changed .
+(cd packages/design_system && flutter test)   # tests live per package, not at the root
 ```
 
 sqlx query workflow (IMPORTANT): the `query!` and `query_as!` macros are compile-time checked.
