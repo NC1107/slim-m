@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT last_read_seq AS \"seq!: i64\"\n               FROM read_states WHERE user_id = ? AND channel_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "seq!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d43e312570f72ccb0919fc554819eef875036feea268418e07953ed7aab375f0"
+}

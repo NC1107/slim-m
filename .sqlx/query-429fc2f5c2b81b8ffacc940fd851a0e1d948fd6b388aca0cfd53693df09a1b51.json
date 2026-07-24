@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO read_states (user_id, channel_id, last_read_seq, updated_at)\n             VALUES (?, ?, ?, ?)\n             ON CONFLICT(user_id, channel_id) DO UPDATE SET\n                 last_read_seq = MAX(last_read_seq, excluded.last_read_seq),\n                 updated_at = excluded.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "429fc2f5c2b81b8ffacc940fd851a0e1d948fd6b388aca0cfd53693df09a1b51"
+}

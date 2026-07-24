@@ -136,6 +136,14 @@ impl Store {
         user_id: UserId,
         channel_id: ChannelId,
     ) -> anyhow::Result<Permissions> {
+        // A channel that does not exist grants nothing. Without this, a probe for
+        // a fabricated channel id would inherit the base @everyone permissions
+        // (it has no overwrites) and be distinguishable from a real channel the
+        // caller may not view, which would leak channel existence.
+        if self.channel(channel_id).await?.is_none() {
+            return Ok(Permissions::NONE);
+        }
+
         let roles = self.load_roles(user_id).await?;
 
         let rows = sqlx::query!(
