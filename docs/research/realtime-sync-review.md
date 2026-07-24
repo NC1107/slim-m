@@ -1,104 +1,131 @@
-# Realtime Sync and Messaging Protocol Plan: Adversarial Review
+# Realtime Sync and Messaging Protocol: Adversarial Review
 
 Target document: `docs/research/realtime-sync.md`.
-Cross-checked against `docs/BRIEF.md`, the sibling reports in `docs/research/` (`backend.md`, `database.md`, `security.md`, `voice-canvas.md`, `performance.md`, `networking-relay.md`), the echo-messenger reference notes (`decentralized-chat-app/reference-echo-messenger.md` and `decentralized-chat-app/CLAUDE.md`), and the check-in-relay reference notes (`check-in-relay/reference-check-in-relay.md`).
+Cross-checked against `docs/BRIEF.md`, the owner decisions, the stack decision, and the sibling research reports in `docs/research/` (`voice-canvas.md`, `database.md`, `security.md`, `networking-relay.md`, `flutter-client.md`, `performance.md`, `reference-check-in-relay.md`).
+The off-limits echo-messenger repository was not read and no finding below relies on it.
+Where this review checks for a quietly reintroduced echo-messenger pattern, it does so only by testing whether the specialist report supplies its own first-principles rationale, not by comparing structure to the forbidden reference.
 
-Severity key: critical findings would force a redesign of the plan as written.
+Severity key: critical findings would force a redesign of the decision as written.
 Major findings are real defects that should block sign-off until addressed.
 Minor findings are worth fixing but do not block the overall direction.
 
 ## Critical findings
 
-### 1. The push-trigger "live WS connection" check does not match how iOS actually suspends backgrounded apps
+### 1. The push-trigger "live connection" check misclassifies suspended iOS clients as reachable, and there is no fallback re-check
 
-The plan's push-trigger logic is: after an event is fanned out, check whether each recipient device has a live WS connection, and only push to devices that do not.
-The gateway lifecycle section sets the liveness signal at a 30s heartbeat with a 60s client-reconnect threshold, and a 90s resume window during which the hub still tracks the session.
-On iOS, a backgrounded app without a special background mode (VoIP, background audio, etc.) is suspended by the OS well before either of those windows elapses, so the process cannot run any Dart code to receive, decrypt, or display anything arriving over an already-open socket.
-The TCP connection itself is not necessarily torn down the instant the app suspends; it can sit idle, unacknowledged, and still present in the hub's connection registry until the heartbeat or reconnect timeout eventually notices it is dead.
-Concrete failure: user A backgrounds the app, user B sends a message ten seconds later, the server sees user A's connection as "live" (no heartbeat has failed yet) and suppresses the push, but user A's OS has already suspended the process, so the WS frame is never processed and no local notification fires.
-The message becomes silently undeliverable until the next foreground open or the next heartbeat failure forces a reconnect, which can be tens of seconds away.
-This is not a narrow edge case: it is the exact scenario the brief calls out as the reason the relay exists at all ("mobile applications cannot reliably receive incoming connections or maintain persistent connections while backgrounded").
-`networking-relay.md`'s own wake-push design shares the same blind spot, since it also gates the "wake" push kind on "the WebSocket is not already live," so this is a design gap shared across two sibling reports, not a typo in one.
-Fixing this requires the push-trigger decision to use an explicit client-reported lifecycle signal (foreground and backgrounded and terminated) rather than raw socket presence, or a push-trigger-specific liveness check with a much tighter timeout than the general-purpose 30s or 60s heartbeat, and that is a real redesign of the push-trigger decision, not a constant tweak.
+The push-trigger decision is a single-shot check performed at commit-and-fan-out time: if a recipient device shows a live WebSocket connection, no push is sent, full stop.
+The gateway section sets heartbeat at roughly every 20 seconds with two missed heartbeats before the server treats a connection as dead.
+That gives a window of on the order of 40 seconds, possibly longer depending on implementation, during which an iOS app that has been backgrounded and suspended by the OS still looks "live" in the server's connection table, because the TCP socket can sit open and unacknowledged for a while after the process itself stops running Dart code.
+Concrete failure: user A backgrounds the app, user B sends a message twelve seconds later, the server sees user A's connection as live, no push fires, and because the push decision is made once at commit time with no later re-check, that specific message is never pushed at all.
+User A only sees it on next foreground open or the next unrelated event that happens to trigger a reconnect.
+This is not a rare edge case, it is the exact scenario the brief itself names as the reason the relay exists: "mobile applications cannot reliably receive incoming connections or maintain persistent connections while backgrounded."
+`networking-relay.md` inherits the identical blind spot, since its wake-push kind is also gated on "the WebSocket is not already live," so the gap spans two sibling reports, not one.
+Linux does not have this problem, a desktop socket is not suspended by the OS the way an iOS app is, so the design is well calibrated for the brief's secondary platform and miscalibrated for iOS, the brief's stated primary initial testing platform.
+Fixing this needs either a client-reported foreground and backgrounded lifecycle signal that actively closes or marks the socket on backgrounding, or a second, short-timeout liveness check decoupled from the general-purpose heartbeat, or a delayed re-verification before a push decision is treated as final.
+Any of those is a real change to the push-trigger decision, not a constant tweak.
 
-### 2. The flat 20 canvas-ops/s rate limit conflicts with the canvas's own continuous relay-only drawing traffic
+### 2. The shared backpressure channel is never reconciled with Voice Canvas fan-out, and its "closing is always safe" claim does not hold under the canvas's own stated traffic budget
 
-`realtime-sync.md`'s rate-limiting section sets a single number, 20 canvas ops/s per user per channel, with no distinction between persisted, discrete ops (a completed stroke, an image add) and ephemeral, high-frequency relay-only preview frames (`stroke_partial`, `avatar_move`, in-flight `image_move` with `commit:false`).
-`voice-canvas.md`, the sibling report that owns the canvas feature, targets "steady-state WS traffic per actively-drawing user under 20KB/s," which is only achievable with a continuous stream of small preview frames sent far more often than 20 per second, and echo-messenger's own precedent mutates the committed-strokes list roughly 30 times per second during a single drag.
-Applying the stated limit literally means any user actively dragging a stroke for more than about one second exceeds the cap and starts receiving the plan's own specified `retry_after_ms` error frames mid-gesture, which is a visible stutter or an outright dropped stroke in the app's flagship feature, not an abuse scenario.
-The plan does acknowledge canvas needs its own silent-drop semantics for stale non-authority writes, so it is aware canvas traffic is different in kind, but the numeric rate limit itself was not adjusted to match.
-The fix is a genuine redesign of this limit into at least two classes: a low, strict cap on persisted ops, and either a much higher cap or a bytes/sec throttle (matching the 20KB/s budget already set elsewhere) on ephemeral relay-only frames, not a single events/sec number applied uniformly.
+The backpressure decision bounds each connection's outbound channel by bytes, for example a 1 MB cap by the document's own example, and closes the connection on overflow rather than dropping or blocking.
+The stated justification is that because resync is always correct, closing a slow connection is "a safe control valve, not a special case."
+`realtime-sync.md` never states whether Voice Canvas traffic rides this same physical connection and outbound channel, and nothing in the client architecture (`flutter-client.md` describes one WebSocket socket per client, not several) suggests a separate one exists.
+`voice-canvas.md` sets its own steady-state budget at under 20 KB per second per actively-drawing user, fanned out to every other connected participant.
+Using both documents' own numbers: four people drawing at once in a call, fanned out to a fifth participant on a temporarily slow mobile link, is roughly 80 KB per second of legitimate canvas traffic alone arriving for that one recipient, filling a 1 MB channel in about twelve seconds.
+At that point the stated policy closes the connection, during the app's own flagship feature, for a participant who did nothing wrong.
+The "closing is always safe" claim is true for chat, where losing a connection just means a slightly stale reload, but it is not true for an in-progress collaborative canvas session, where a forced reconnect mid-drag is a visible, disruptive UX failure, not a harmless resync.
+This needs a real fix in the backpressure decision itself, such as a traffic-class-aware channel (durable ordered events get the hard-close policy, ephemeral high-frequency events get coalesce-or-drop-newest instead), not a bigger constant.
 
-### 3. The 64-bit snowflake ID has no reserved node or shard bits, which blocks horizontal scaling without a breaking migration
+### 3. Stateless resume prices out at zero, but a synchronized reconnect burst against dozens of scopes is not modeled anywhere and threatens the self-host lightweight target
 
-The plan describes the ID as "timestamp plus in-process counter" only.
-No bits are set aside for a machine or node identifier, which is the standard reason snowflake-style schemes reserve space for it from the first ID ever issued, even when only one process exists on day one.
-`realtime-sync.md`'s own open questions ask whether the official instance's WS-hub and rate-limit state should move to a shared store "on day one, or only when horizontal scaling actually becomes necessary," and `database.md` separately flags that "if [the official instance runs more than one application-server process], snowflake ID generation needs an assigned node-id range per process, a small addition, decided before launch, not retrofitted."
-As specified, that addition is not small: because no space was reserved, adding a node identifier later means shrinking either the timestamp or counter portion of an ID format that has already been used as a primary key, referenced by clients for local-echo reconciliation, and embedded in every sync cursor, so a later fix either breaks the sort-order guarantee for already-issued IDs or requires a parallel ID-version scheme.
-This directly conflicts with the brief's "future scalability" goal for the database layer and with the plan's own stated uncertainty about whether the official instance stays single-process.
-The fix (reserving a small node-id field, defaulting to zero on self-hosted single-process deployments) costs nothing today and should be specified now, not left implicit.
+The resume decision is justified as removing a class of state rather than adding one, with the only acknowledged cost being "slightly more payload on instant reconnects."
+That framing understates the real cost.
+The catch-up sync section describes the bundled sync call as running "per scope runs an indexed range scan," phrasing that reads as one query per scope in a loop rather than one grouped statement, and the document never confirms which.
+For a user in dozens of channels, an ordinary reconnect blip, a phone moving between WiFi and cellular, a home router hiccup, now costs dozens of read-pool queries instead of a lightweight in-memory resume check.
+The failure mode that matters is not one user reconnecting, it is many: a self-hosted friend-group server's WiFi access point reboots, every connected client's socket drops within the same few seconds, and every one of them reconnects and issues its own multi-scope catch-up burst against the single serialized-writer-adjacent SQLite read pool at the same moment, on exactly the "handful of users, extremely lightweight" box the whole stack was chosen to protect.
+Nothing in `realtime-sync.md` or `performance.md` prices this reconnect-storm cost; `performance.md`'s per-event budget covers a single persisted write, not a synchronized N-scope read burst across many simultaneously reconnecting sessions.
+This undercuts owner decision 7's rationale for the single-process, in-memory design ("simplest and lightest") precisely at the scale that decision was meant to serve.
+The fix is a real one: either confirm and enforce a single grouped query across a user's scopes instead of N sequential ones, or add reconnect coalescing or per-connection resync debounce, or both; "the client already needs a durable local cursor anyway" does not by itself bound the burst this creates under correlated reconnects.
 
 ## Major findings
 
-### 4. The 90s resume-session state appears to duplicate the stateless catch-up endpoint it is described as using
+### 4. In-process rate-limit state has no eviction policy, and the connection-attempt bucket is keyed by an attacker-controlled value
 
-The gateway lifecycle section adds a stateful, in-memory, per-connection session record (`session_id`, `last_sent_id`) that survives 90 seconds after disconnect, with its own sizing risk ("too short reduces resume value, too long grows memory per stalled session").
-The same section then says a reconnecting client "replays only the gap via the same mechanism used for cold-start catch-up," which is the stateless `GET /api/sync?after=<id>` cursor endpoint the client already needs for ordinary offline catch-up.
-If resume and cold-start use the identical mechanism, the client already carries everything it needs to catch up on any reconnect, resumed or not, since it must already track its own last-received ID locally to call that endpoint at all.
-Nothing in the plan states what capability the server-side session record adds over a client that always calls the sync cursor on every reconnect: no faster in-memory replay path is described, no re-authentication skip is described, only the same DB-backed query.
-As written this reads as maintained server state (with its own sweep policy and a tuning knob later flagged as "a guess") solving a problem the plan's own catch-up design already solves for free, which is exactly the kind of unrequired complexity the brief warns against for a self-hosted, lightweight default.
-Either the resume path needs a stated, concrete benefit over stateless reconnect-and-resync, or it should be dropped in favor of always using the sync cursor.
+The rate-limiting decision is in-process token buckets keyed by user and limit class, with a trait for a later shared-store swap.
+Nothing in the document describes sweeping or evicting idle buckets.
+The per-IP connection-attempt bucket is the sharp case: IP is attacker-controlled in the sense that a client can present many different source addresses over time (rotating mobile carrier NAT addresses, or a deliberate attacker), and every novel IP that hits the connect path plausibly allocates a new bucket entry that nothing here ever removes.
+Over the "many years of unattended operation" horizon the stack decision explicitly designs for, this is a slow, unbounded memory growth path on exactly the long-running single process the official instance and every self-host both run.
+The allowed check-in-relay reference already solved this exact problem, sweeping idle buckets on a ten-minute cutoff, and this document does not reconcile with or even mention that precedent, despite `networking-relay.md` drawing on the same reference elsewhere in this research pass.
 
-### 5. The WS auth story is inherited from echo's JWT model even though this project's security report rejects JWTs
+### 5. The ticket-minting REST call is not clearly covered by any of the enumerated rate-limit classes
 
-The gateway lifecycle section states the connect flow almost verbatim from echo-messenger: "REST login issues a 30-second single-use WS ticket... JWT never touches the URL."
-`security.md`, the report that owns this project's authentication decision, states the opposite verdict for the underlying credential: "opaque server-side session tokens, not stateless JWTs," specifically to get instant per-device revocation, which the brief's admin and device-management goals depend on.
-A short-lived, single-use, off-URL ticket works equally well whether the credential behind it is a JWT or an opaque session token, so the ticket mechanism itself is not wrong, but the plan never says which one it mints the ticket from, and the sentence it borrowed from echo only makes sense if a JWT exists to keep out of the URL in the first place.
-Left as written, a reader implementing this section from `realtime-sync.md` alone would build the wrong credential type and lose the revocation property `security.md` already committed to.
-`database.md` shows the discipline this report should have followed: when it reused `realtime-sync.md`'s own snowflake ID over `voice-canvas.md`'s per-channel counter, it said so explicitly and gave the reason.
-This section needs the same explicit reconciliation with `security.md`'s token model, not a copied sentence from a different project's auth design.
+The gateway decision mints the WebSocket connection ticket "over an authenticated REST call," separate from the WebSocket upgrade itself.
+The rate-limiting section enumerates connection attempts per IP, message sends per user per scope, typing events, and sync requests as the limited classes.
+Ticket minting is not obviously any of these: it is not the WS upgrade (that is a separate step), it is not a message send, and it is authenticated, so an attacker only needs one valid session, not a fresh connection each time, to loop the mint endpoint.
+If the per-IP connection-attempt bucket is only charged at actual WS upgrade, a client or a hijacked session can mint tickets in a tight loop with no stated budget at all.
+This should be an explicit limit class, not an implicit assumption that it falls under an existing one.
 
-### 6. E2E-conversation handling is described as current v1 scope, but the security report defers E2E to a later opt-in feature
+### 6. Neither the message-send path nor the catch-up sync call states its transport, despite later sections assuming both are settled
 
-The wire-format section frames base64-wrapped ciphertext as a present-tense need ("Binary payloads (E2E ciphertext) stay base64 strings inside it"), and the push-triggering section designs a full content-free wake-push path "for E2E-encrypted conversations."
-`security.md`'s verdict is that v1 ships transport encryption only, with end-to-end encryption "explicitly deferred, not adopted," and `database.md`'s schema reflects that by giving `messages.content` a plaintext default with an `is_encrypted` escape hatch for a future feature, not a live one.
-Nothing about designing the wire format and push path to be E2E-ready is wrong on its own, forward-compatible design is good practice, but the report presents this as an existing routing concern rather than a documented accommodation for a feature that does not exist in v1, which risks a reader treating E2E DM handling as in-scope work for the initial build.
-This should be reframed explicitly as "pre-wired for a future feature per `security.md`," matching the reconciliation discipline `database.md` already modeled elsewhere in this same research pass.
+`realtime-sync.md` states its own scope as the gateway lifecycle, ordering, catch-up sync, read state, typing and presence, rate limiting, and the push hook.
+It never states whether a client sends a new message over an HTTP POST or as a WebSocket frame, yet the ordering section already assumes idempotent retries and an acknowledgment path exist, and the rate-limiting section already assumes a "typed error frame with a retry hint" exists as the rejection channel for a send.
+Symmetrically, the catch-up sync section describes "one bundled sync call per reconnect" without stating REST or WebSocket-framed.
+This matters concretely: if the sync call rides the same connection as finding 2's backpressure channel, a client badly behind across many channels could trip its own overflow cap while trying to resync, closing the very connection it needed to catch up on, an outcome that directly defeats the mechanism's own purpose.
+Both transports should be stated explicitly rather than left to be inferred from adjacent sections that assume an answer already exists.
 
-### 7. The unified sync cursor's `canvas_op` kind is not reconciled with the canvas report's separate join-time fetch protocol
+### 7. Presence visibility has no privacy toggle, an unflagged gap parallel to the one the specialist correctly caught for read receipts
 
-`realtime-sync.md` proposes that a reconnecting or catching-up client replays canvas history through the same global, chronologically ordered `GET /api/sync?after=<id>&kinds=...,canvas_op` cursor used for messages and reactions.
-`voice-canvas.md` independently specifies a different mechanism for the same need: late joiners "fetch current materialized state, keyset-paginated by seq, viewport-first," a snapshot-plus-viewport model, not a chronological op replay.
-Chat messages and reactions are append-only, so replaying them in received order is always safe, but canvas ops include destructive operations (`clear`, object deletion) that echo's own reference notes document as the source of real divergence bugs when replayed naively (the "clear-resurrection" case).
-The plan does not say whether a client reconnecting mid-session should apply raw `canvas_op` deltas from the global cursor directly on top of its last-known canvas state, or discard them and re-fetch a fresh materialized snapshot from the canvas-specific endpoint instead, and those two choices require different client logic and give different consistency guarantees.
-This is a second, distinct catch-up mechanism for canvas data sitting next to the one `voice-canvas.md` already specifies, and the two are not reconciled anywhere in either report.
+Owner decision 5 defers visible read receipts specifically for privacy: "less presence fan-out, and simpler."
+The presence decision in this same document broadcasts online and offline state to every user sharing a scope with the subject, on by default, with no mention of an opt-out or of it being a deferred, later-opt-in feature the way read receipts explicitly are.
+Presence is a smaller information leak than read receipts, but it is the same category of leak (activity metadata visible to other users), and the document that got the read-receipts precedent right does not apply the same scrutiny to its sibling.
+This is the same class of gap the specialist correctly caught elsewhere in this same report (see the cross-deployment DM flag), just not caught here; it deserves the same explicit "flag for a product decision" treatment rather than being decided implicitly by omission.
 
-### 8. The 256-message bounded channel size is not checked against the canvas's own worst-case fan-out
+### 8. The backpressure byte cap does not state whether it is measured before or after permessage-deflate
 
-The gateway lifecycle section bounds each connection's outbound channel at 256 messages and closes the connection on overflow, framed as protection against one wedged client.
-That same channel also carries canvas fan-out, and finding 2 above establishes that a single actively-drawing user can legitimately emit well more than 20 events/s of relay-only preview traffic; a multi-participant canvas session fans that out to every other connected device in the channel.
-A receiver on a slower or lossy mobile link only needs its outbound send to lag briefly during a burst from several simultaneously drawing peers for the 256-slot buffer to fill, at which point the plan's own design closes that user's connection rather than dropping or coalescing the stale ephemeral frames.
-The practical effect is repeated forced disconnects for exactly the participants on weaker connections during the highest-value moments of the feature the brief calls out as its defining one.
-The number needs to be sized against the rate-limit fix in finding 2, or the overflow policy needs to coalesce or drop superseded ephemeral events (a newer `avatar_move` supersedes an older one for the same actor) before falling back to closing the connection.
+The wire format is decided elsewhere to use permessage-deflate on the socket.
+The backpressure decision sets a byte cap on the per-connection outbound channel but never states whether that cap counts pre-compression logical payload size, which is what actually occupies heap while queued, or post-compression wire bytes, which is what the network actually carries and is typically smaller.
+An implementer who sizes the queue against wire bytes will under-provision real memory headroom relative to what is actually held resident while queued.
+This is a small clarification, but it directly affects whether the finding 2 math holds in an implementation, since real queued bytes are the pre-compression figure.
+
+### 9. A user's simultaneous devices share one rate-limit bucket per scope, so one device can starve another
+
+The message-send limit is described as keyed by user and scope, not by user, device, and scope.
+`database.md`'s schema is explicitly multi-device native, and the project's own multi-year horizon makes multiple concurrently active devices per user (phone plus laptop, or a future bridge or bot account) a real case, not a hypothetical.
+A burst from one of a user's devices can consume the shared bucket and cause an unrelated, idle-until-now device belonging to the same person to get throttled for activity it did not generate.
+This is a narrow case today but worth a deliberate choice (per-device sub-buckets under a shared ceiling, or an explicit accepted trade-off) rather than an implicit one.
 
 ## Minor findings
 
-### 9. A third, unreconciled idle-RSS figure is introduced for the same server process
+### 10. The catch-up sync per-scope and aggregate cap has no concrete number
 
-`backend.md` sets the server process idle RSS budget at under 30MB.
-`voice-canvas.md` separately states 150MB "for the whole process," a conflict `performance.md` already caught and proposed to resolve by relabeling the 150MB figure as a light-activity ceiling rather than a true idle baseline.
-`realtime-sync.md` adds a third figure for what is the same process, "an idle self-hosted gateway process (handful of users) should stay well under 50MB RSS," without referencing either the 30MB baseline or `performance.md`'s reconciliation note.
-This does not contradict either existing number outright since "well under 50MB" is compatible with a 30MB baseline, but it is a third independently chosen number for a metric the project has already had to reconcile once, and it should point at the existing 30MB figure rather than restating a new one.
+The byte cap for backpressure gets an illustrative number, "for example a 1 MB cap."
+The catch-up sync cap, described only as "capped per scope and in aggregate," gets none, even as an example, which makes it harder to reason about the finding 3 reconnect-storm cost or to size the snapshot-pointer fallback threshold the open questions already ask about.
 
-### 10. The unread-count query shape is asserted, not shown, for a user in many conversations
+### 11. The typing self-clear window is left vaguer than other tunable constants and is not listed among the specialist's own open questions
 
-The read-state section states the unread count is "computed once inside the sync-summary query" without showing whether that is a single set-based aggregate across every conversation the user belongs to, or a per-conversation lookup issued once per conversation inside one request handler.
-`database.md`'s supporting index, `(channel_id, id DESC)` partial on `deleted_at IS NULL`, makes each individual per-channel count cheap, but a user who belongs to many channels (an active public-instance user, not just the brief's "handful of users" self-hosted case) still needs that confirmed as a single grouped query rather than N sequential index range-counts inside the sync-summary handler before the "sub-millisecond at this scale" resource target can be trusted at anything beyond the small self-hosted case.
+The document specifies the heartbeat interval, the backpressure byte cap example, and the ticket TTL as concrete numbers, and separately lists several of its own open questions about tuning those numbers.
+The typing-indicator self-clear timeout is described only as "a short silence window" with no number at all, and unlike the other constants it is not included in the open-questions list, so it reads as decided when it is not.
 
-## Open questions the specialist should have raised but did not
+### 12. The overflow-churn risk is flagged but has no monitoring mechanism this document or its self-host tier actually provides
 
-- How should the push-trigger decision account for iOS's actual backgrounding and suspension behavior instead of raw WS-connection presence, given the brief's own stated reason for the relay's existence (see finding 1).
-- Should canvas rate limiting be split into a persisted-op class and an ephemeral relay-only class with materially different numeric limits, and does the 20KB/s steady-state traffic budget already set in `voice-canvas.md` set the real ceiling for the latter (see finding 2).
-- Does the 64-bit snowflake reserve any bits for a node or shard identifier, and if not, what is the migration plan for the official instance if it ever runs more than one writer process (see finding 3).
-- What concrete capability does the 90s in-memory resume-session record provide beyond what the stateless global catch-up cursor already provides on any reconnect (see finding 4).
-- Is the WS ticket minted from an opaque server-side session token per `security.md`, or from a JWT as the borrowed echo phrasing implies, and if opaque, does the ticket-issuance flow still need updating to match (see finding 5).
+The backpressure section's own risk note says a persistently slow client could churn reconnect cycles and that this is "worth monitoring close-code rate per connection."
+Nothing in this document, and nothing in `performance.md`'s admin metrics section (which is scoped to a Prometheus endpoint and a built-in time-series store, not close-code-specific tracking), commits to actually surfacing this signal.
+For a self-hosted admin with no dashboard tooling on day one, a persistently churning connection is invisible; "worth monitoring" names a good instinct without naming an owner or a mechanism.
+
+### 13. Sequence-ordering discipline is sound, but nothing enforces it outside code review
+
+The ordering decision correctly relies on there being exactly one writer per scope, and the stack decision separately notes the risk that any query ordering by identity instead of sequence would silently misorder and recommends a lint or automated check.
+`realtime-sync.md` restates the ordering rule but does not itself carry that automated-check recommendation forward or assign it, so it is easy for this specific report's own guarantee to quietly depend on a check that lives only as an aspiration in a different document.
+
+## On reintroduced echo-messenger patterns
+
+Working only from whether each decision in `realtime-sync.md` carries its own first-principles rationale, since the reference itself is off-limits, no section reads as an unjustified copy.
+Every decision states a concrete reason grounded in this project's own constraints (single writer per scope, single-process official instance, self-host lightness).
+The one place a prior draft of this same document was previously found to have borrowed unreconciled phrasing from an outside pattern, the gateway ticket-auth flow, now states its own rationale (reverse-proxy URL logging) and no longer implies a JWT the way an earlier version of this document did; that specific concern appears to already be resolved and is not re-raised here.
+The stronger residual risk in this pass is not a copied pattern, it is the opposite: finding 4 shows a place where the specialist did not reuse a good pattern already solved in the allowed check-in-relay reference (idle bucket eviction), which would have been the correct kind of reuse to make.
+
+## Gaps the specialist should flag for an explicit decision
+
+- Whether Voice Canvas traffic shares the chat gateway's physical connection, backpressure channel, and rate limiter, or gets its own, since finding 2 shows the current shared-channel assumption breaks under the canvas report's own stated traffic budget.
+- Whether presence visibility needs the same explicit opt-in-later treatment owner decision 5 already gave read receipts, per finding 7.
+- Whether the message-send path and the catch-up sync call are REST or WebSocket-framed, per finding 6, since the answer changes how findings 2 and 4 interact.
+- Whether per-scope catch-up queries are batched into one statement or issued in a per-scope loop, per finding 3, since this decides how expensive a correlated reconnect burst actually is.

@@ -1,192 +1,186 @@
 # Database Plan: Adversarial Review
 
 Target document: `docs/research/database.md`.
-Cross-checked against `docs/BRIEF.md` and the sibling reports in `docs/research/` (`security.md`, `backend.md`, `realtime-sync.md`, `voice-canvas.md`, `flutter-client.md`, `performance.md`, `appstore.md`, `devops.md`, `media.md`).
+This is a fresh review pass, cross-checked against `docs/BRIEF.md`, `docs/decisions/0001-owner-decisions.md`, `docs/research/stack-decision.md`, and the sibling reports `docs/research/security.md`, `docs/research/realtime-sync.md`, `docs/research/voice-canvas.md`, and `docs/research/appstore.md`.
+The echo-messenger repository was not read and no finding below is based on it.
 
-Severity key: critical findings would force a redesign of the plan as written.
+Severity key: critical findings would force a redesign of a foundational piece of the plan as written.
 Major findings are real defects that should block sign-off until addressed.
 Minor findings are worth fixing but do not block the overall direction.
 
 ## Critical findings
 
-### 1. The permission model `security.md` designed cannot be represented by this schema
+### 1. `channel_seq_counters` cannot actually serve the two scopes Section 4 says it serves
 
-Target: Section 2's core schema, specifically `group_members(group_id, user_id, role, joined_at)` and `invites(..., role_grant, ...)`.
+Target: Section 4, "Every ordered stream (a channel's messages, a channel's canvas ops) is its own scope, with `seq` assigned from `channel_seq_counters` inside the same transaction as the insert," against the schema `channel_seq_counters(channel_id, next_seq)`.
 
-Weakness: `security.md`'s permission model section is explicit about the shape it needs: "@everyone base, then the union of member roles, then per-channel role overrides, then per-member overrides, with deny winning and ADMINISTRATOR bypassing all checks."
-That sentence alone requires four things the schema does not have: a `roles` table (group-scoped, named, each carrying its own permission bitfield), a many-to-many member-to-role assignment ("union of member roles" is plural by design, one member can hold several roles at once), a per-channel role-override table, and a per-member override table.
-`database.md`'s `group_members` table instead stores a single scalar `role` column per member, one role, not a union of several, and there is no channel-scoped or member-scoped override table anywhere in the schema.
-`invites.role_grant` is likewise singular, consistent with the same one-role-per-member assumption, not with the multi-role model `security.md` actually designed.
+Weakness: the prose names two distinct scopes per channel, a channel's messages and a channel's canvas ops, and calls each "its own scope."
+A scope needs its own independent, gap-free counter for that claim to hold.
+The table given has one row per `channel_id` with a single `next_seq` column, no stream discriminator, and no way to hold two independent counters for one channel.
+As written, `messages.seq` and `canvas_ops.seq` for the same channel can only be drawing from the same shared counter, interleaved across two different tables, or the table is simply incomplete.
 
-Failure mode: implemented literally, every permission check in the system, viewing, sending, managing messages, kicking, banning, canvas-edit, everything `security.md`'s flag list defines, has nowhere to read a per-channel or per-member override from, and no member can ever hold more than one role.
-A guild owner who wants a "moderator" role and a separate "voice-only" role stacked on the same person, ordinary Discord-parity behavior the brief explicitly asks for, cannot be modeled.
+Failure mode: if the counter is shared, every canvas op committed in a channel consumes a number that never appears in `messages.seq`, so a client tracking only the message stream sees non-contiguous values, for example 1, 2, 5, 6, whenever canvas activity happened in between.
+`realtime-sync.md`'s own resync trigger is explicit and depends on exactly the guarantee this breaks: "because sequence is contiguous per scope, a client that sees a jump greater than one in a scope it believes is caught up knows unambiguously it missed something... and should issue a targeted resync."
+On any channel with concurrent canvas activity, that heuristic fires constantly on ordinary, correct state, producing needless resync storms, or forces every client to special-case "gaps are normal here," quietly abandoning the missed-event detection the sequencing scheme exists to provide.
 
-Resolution: add `roles`, `member_roles`, `channel_role_overrides`, and `channel_member_overrides` tables (or an equivalent normalized shape) to the core schema section, and update `group_members` to drop the single `role` column in favor of the join table.
-This is exactly the kind of foundational, hard-to-retrofit choice `database.md` itself argues for getting right on day one elsewhere in the report; the permission model deserves the same treatment.
+Resolution: give `channel_seq_counters` a composite key of `(channel_id, stream_type)` with one row and one independent counter per stream, or split it into `message_seq_counters` and `canvas_seq_counters`, matching the "its own scope" language literally.
+Whichever is chosen, state explicitly whether message and canvas-op sequences share a numeric space or not, since `realtime-sync.md`'s gap-detection logic behaves correctly under only one of those two readings.
 
-### 2. The case against SQLite conflates a locking-model difference with the specific bug it invokes, and is not quantified against the brief's own scale target
+### 2. No account-identity model exists for a user who wants one login across multiple official-instance communities
 
-Target: Section 1's verdict and rationale, "PostgreSQL is the single storage engine... with no SQLite option."
+Target: Section 1's framing, "the official service is therefore not one large multi-tenant database, it is a fleet of small single-community processes," against `BRIEF.md`'s Account Model section, which lists "Official hosted service: Standard account creation" as a model distinct from the self-hosted invite flow.
 
-Weakness: the stated rationale is that SQLite's write model "serializes at the database or `BEGIN IMMEDIATE` transaction level, not per row," and calls this "a correctness and latency risk, not just a scale risk," explicitly invoking echo-messenger's canvas TOCTOU bug as the failure this is meant to prevent.
-But the TOCTOU bug cited elsewhere in this same report (Section 3) and independently in `realtime-sync.md` was an application-level bug: a shared per-channel counter row that concurrent writers had to `SELECT ... FOR UPDATE` and increment, racing on that specific lock-then-append pattern.
-A single-writer, whole-database lock, which is what SQLite actually provides, cannot produce that class of bug; it enforces a strict global write order, which is the opposite of a race condition, not a milder version of one.
-What SQLite's coarser locking actually costs is throughput and latency under concurrent write load, a real and fair concern, but a different one than "correctness," and the report never quantifies it: no benchmark, no rows-per-second figure, no comparison against the brief's own stated self-host scale ("a handful of active users").
-SQLite in WAL mode routinely sustains thousands of small writes per second on ordinary disks; the canvas op rate this report is worried about (`realtime-sync.md`'s own limit is 20 ops/second/user) is well inside that range for a "handful of users" session.
+Weakness: owner decision 4 settles that one backend deployment is one community, and `database.md` correctly, faithfully applies that to the official instance: each community, official or self-hosted, runs its own server image with its own SQLite file and its own independent `users` table.
+Nothing in the schema, or in `stack-decision.md`, provides any cross-deployment identity, directory, or federation layer.
+That means an official-instance user account, as modeled, is scoped to exactly one community with no mechanism for the same login to exist on a second official community, self-hosted or otherwise.
+"Standard account creation" on a company-run hosted service ordinarily implies a single portable identity a user can bring to many servers, the way Discord or Slack accounts work; this schema cannot offer that, only a fresh, siloed account per community even on the official service.
 
-Failure mode: this is the single largest cost the report imposes on every self-hoster, an admitted second stateful container instead of one embedded file, a real DBMS to patch, upgrade across major versions, and back up, for the exact deployment profile the brief says should "remain extremely lightweight" and where the Database section explicitly asks to "avoid premature complexity."
-If the underlying premise turns out wrong once actually measured, correcting it later means retrofitting a second storage backend after every query has been written against SQLx's single-schema compile-time checking, the exact dual-maintenance burden this same section argues is unacceptable.
+Failure mode: a user signs up for one official community, wants to join a second official community a friend runs, and discovers they must create an entirely separate account with its own password and identity keys, indistinguishable from onboarding onto an unrelated self-hosted server.
+This is not a hypothetical edge case, it is the default expected behavior of "official hosted service" as most users will read that phrase, and nothing in `database.md`'s open questions flags the gap for an owner decision, even though `realtime-sync.md` independently flagged the closely related direct-message consequence of the same owner decision ("direct messages assume a shared home server, and nothing says so") as needing an explicit product decision rather than silent implementation.
 
-Resolution: before treating this as settled, run the actual benchmark: concurrent canvas writers against SQLite WAL mode at the brief's own stated scale, and report real p99 write latency, not an assumption.
-If Postgres is still the right call once measured, restate the rationale in terms of the real cost (operational and maintenance burden of a second stateful service) rather than a correctness claim the cited bug does not actually support.
-
-### 3. Account deletion, a mandatory App Store requirement, has no data-model story
-
-Target: the `users` table and every table with a foreign key into it (`messages.author_id`, `groups.owner_id`, `attachments`, `group_members`, `devices`), against `appstore.md`'s verdict.
-
-Weakness: `appstore.md` is unambiguous: "if your app supports account creation, you must also offer account deletion within the app... promote account deletion from an implementation detail to a mandatory verb in the wire protocol itself, implemented in the reference server from day one."
-`database.md` never mentions account deletion, a tombstone or anonymization mechanism, or `ON DELETE` behavior for any foreign key into `users`, even though the retention section covers message, attachment, and canvas-op deletion in some detail.
-Messages default to keep-forever per this same report's own retention verdict, which means a deleted user's message history is expected to persist for everyone else in a shared channel, the same "deleted user" placeholder pattern Discord and Slack use, but nothing in the schema supports it: there is no way to sever a `users` row from its personal data (`password_hash`, `public_identity_key`) while preserving the messages, group ownership, and attachments other users still depend on.
-
-Failure mode: implemented literally, either account deletion cascades and silently destroys other members' shared conversation history and any group the deleted user owned, a real data-loss bug triggered by a single user exercising a right Apple requires the app to offer, or deletion is blocked entirely by foreign key constraints and the feature does not actually work, an App Store rejection risk for the platform the brief names as the primary initial testing target.
-
-Resolution: add an anonymization path to the `users` table (a `deleted_at` flag, cleared PII columns, a placeholder display name) rather than a hard delete, define `ON DELETE` behavior explicitly for every foreign key into `users`, and decide what happens to `groups.owner_id` when an owner deletes their account (transfer, orphan-and-archive, or block deletion behind a required ownership-transfer step).
+Resolution: raise this explicitly as an open question requiring an owner decision, mirroring how `realtime-sync.md` handled its DM finding, rather than letting the fleet-of-processes framing quietly foreclose portable official accounts.
+If per-community accounts are the accepted model even on the official instance, say so plainly in the schema section so nobody discovers the limitation downstream in the client or in app store copy.
 
 ## Major findings
 
-### 4. The `devices` table does not store what `backend.md` and `security.md` actually need it to
+### 3. The RBAC resolution order in Section 3 contradicts `security.md`'s stated invariant
 
-Target: `devices(id, user_id, platform, push_token_ref, last_seen_at, revoked_at)`, added specifically "since the backend and security reports already commit to per-device refresh tokens and device session records."
+Target: Section 3, "the channel's role-level overwrites applied in role `position` order," against `security.md`'s permission model, "per-channel role overrides, then per-member overrides, with deny winning."
 
-Weakness: `security.md`'s actual device session record is "device id, platform, name, last-seen, push registration, identity key," and separately describes refresh-token rotation with reuse detection, "a replayed old token revokes the whole family," which requires storing a token hash and a token-family identifier somewhere.
-The `devices` table as specified has none of this: no `name` column for the in-app device list the brief's admin section and `security.md` both call for, no refresh-token hash, and no family identifier for reuse detection.
-Adding this table was the right instinct, closing a real gap the entity list left out, but the columns chosen only cover push-routing metadata, not the session and revocation state the sibling reports actually need a home for.
+Weakness: "applied in role position order" describes sequential application, where each subsequent role's overwrite can overwrite the previous one's bits.
+Under that reading, if a lower-position role denies a permission and a higher-position role's channel overwrite allows it, the higher-position role's allow wins because it is applied last, not because deny is defined to always win.
+That is a different, and looser, algorithm than "deny winning," which `security.md` treats as an unconditional property of the single evaluator function it calls out as needing to be "exhaustively tested."
 
-Failure mode: a device is revoked from the admin device list, but with nowhere to store a token hash or family id, there is no schema-level way to actually invalidate that device's refresh token family, the exact "instant revocation" property `security.md` chose opaque tokens specifically to get.
+Failure mode: a moderator stacks a restrictive role on a problem member expecting an absolute per-channel deny, but a different, higher-position role the same member also holds grants the same permission at the channel level, and the higher-position role's allow silently wins, an escalation path in exactly the function `security.md` singled out for exhaustive testing.
 
-Resolution: add a `sessions` or `refresh_tokens` table (`token_hash`, `device_id`, `family_id`, `issued_at`, `rotated_at`, `revoked_at`) alongside `devices`, and add a `name` column to `devices` for the in-app device list.
+Resolution: state explicitly whether channel role-overwrites are combined by union across all of a member's roles with deny taking precedence across that whole union (matching `security.md`), or truly applied sequentially by position, and make the schema and the effective-permission function agree with whichever is chosen.
 
-### 5. Content-addressed attachment dedup has no uniqueness guarantee and no path for future encrypted attachments
+### 4. Owner decision 6's admin-issued one-time reset code has no schema representation anywhere
 
-Target: `attachments(id, sha256, size_bytes, mime, storage_key, encrypted, created_at)`.
+Target: the core schema block in Section 2, against owner decision 6, "self-hosted account recovery: admin-issued one-time reset code only for v1."
 
-Weakness: dedup by content hash only works if a lookup-before-write happens under a uniqueness guarantee; nothing in the schema states a unique constraint on `sha256`, so two concurrent uploads of the same file (a popular GIF pasted by five people during one canvas session) can race past a check-then-insert and create duplicate stored blobs, silently defeating the dedup rationale the report gives for this design.
-Separately, the report's own description of the write path, "encrypted at rest under a server key before the hash is stored," does not say whether the hash is computed before or after encryption, and the two orders produce opposite outcomes: hashing plaintext preserves dedup but requires the server to see plaintext, while hashing ciphertext with a properly random IV makes every upload of identical content look unique and breaks dedup entirely.
-Unlike `messages.is_encrypted`, `attachments` has no per-row flag distinguishing content that must stay server-visible from content that has opted into future E2EE, so when opt-in E2EE DMs eventually ship, attachments in those conversations have no schema-level way to be excluded from the plaintext-hashing dedup path the rest of the design depends on.
+Weakness: `invites` gets a full table with a hashed code, issuer, use limits, and expiry.
+The reset-code mechanism, an owner-mandated, already-accepted product decision with the same shape (a hashed one-time secret with an issuer and an expiry), has no equivalent table, column, or mention anywhere in the schema.
 
-Failure mode: storage grows unboundedly duplicated under concurrent upload load, undermining the stated goal of keeping "table and backup size small," and attachments become a permanent server-visible exception once E2EE DMs ship, an undisclosed privacy gap of exactly the kind `voice-canvas-review.md` already flagged for canvas content.
+Failure mode: the mechanism the owner explicitly chose over recovery email has nowhere to store the code hash, which admin issued it, when it expires, or whether it has been redeemed, so it cannot be implemented from this schema without inventing the missing table from scratch during coding, the exact kind of foundational, hard-to-retrofit gap this report elsewhere argues should be caught before implementation.
 
-Resolution: add a unique constraint on `sha256`, specify hash-before-encrypt explicitly, and add an `is_encrypted` or `e2e_pending` column to `attachments` mirroring the one on `messages`.
+Resolution: add a `password_reset_codes` table (or equivalent) with `user_id`, `code_hash`, `issued_by`, `issued_at`, `expires_at`, `used_at`, matching the rigor already given to `invites`.
 
-### 6. `realtime-sync.md`'s own sync protocol names a synced kind this schema never defines
+### 5. Account-deletion tombstoning only specifies `messages.author_id`; every other foreign key into `users` is silent, and `groups.owner_id` is the dangerous one
 
-Target: the core schema in Section 2, against `realtime-sync.md`'s catch-up endpoint, `GET /api/sync?after=<last_id>&kinds=message,reaction,canvas_op&limit=500`.
+Target: Section 6, "account deletion tombstones the `users` row... but authored messages are kept with the author shown as removed," against `groups.owner_id`, `invites.created_by`, `canvas_objects.created_by`, and `canvas_ops.actor_id`.
 
-Weakness: `reaction` is listed as a first-class synced event kind in the sibling report this document explicitly reconciles with elsewhere, but no `reactions` table, or any reaction-related column, appears anywhere in `database.md`'s schema.
-This is a base Discord-parity feature the brief asks for ("replicate the base level functionality of Discord"), and the report's own stated methodology is to catch exactly this kind of cross-report gap, as demonstrated by the `devices` table addition in the same section.
+Weakness: the report works out the one foreign key most visible to the reader, messages, in detail, but says nothing about what happens to a group when its owner's account is tombstoned, nor about the other, lower-stakes references into `users`.
+Unlike an author field on a message, `owner_id` on a group is not just an attribution label, it is very likely the seat that carries exclusive administrative capability such as deleting the community or reassigning roles that nothing else in the schema can grant.
 
-Failure mode: implementers reach the sync protocol section, find `kinds=message,reaction,canvas_op` already assumed, and have to reverse-engineer a reactions table's shape (`message_id`, `user_id`, `emoji`, an ordering id) with no design guidance on indexing, ordering, or how it participates in the same global snowflake id space every other persisted row uses.
+Failure mode: a group's owner deletes their own account under the App Store-mandated deletion flow `appstore.md` requires, and the community they created has no path back to an owner, no defined transfer, and potentially no user left who can perform owner-only actions, since the RBAC model in Section 3 never establishes that any role short of ownership can substitute for it.
 
-Resolution: add a `reactions` table to the core schema section with the same id-as-ordering-key treatment given to every other row.
+Resolution: define `ON DELETE` or application-level behavior for every foreign key into `users`, and specifically require an ownership-transfer step before a group owner's account deletion completes, or define an explicit orphaned-group policy (auto-transfer to the next-senior admin role, or archive-read-only) rather than leaving the state undefined.
 
-### 7. The global snowflake id's cross-table ordering guarantee is not safe during a rolling deploy, a transient risk distinct from the steady-state multi-process question already flagged as open
+### 6. Server-held attachment encryption has no key-management data model, and the backup plan does not say the key must live outside the file it protects
 
-Target: Section 3's verdict, "one global 64-bit snowflake id as both primary key and total-order key," against `realtime-sync.md`'s assumption that "each server process is the sole writer for its own database, so no worker/datacenter coordination bits are needed."
+Target: Section 6, "content is encrypted at rest under a server-held key," and Section 7's `VACUUM INTO` backup of the SQLite database file.
 
-Weakness: the open questions section flags multi-process node-id assignment as a future concern only if "the official instance needs more than one application-server process for v1," framing it as a steady-state scaling decision.
-That framing misses a narrower, transient version of the same risk: `devops.md`'s own open questions raise "watchtower-style auto-update from `:latest`" as a live candidate deployment model for the official instance, and any standard zero-downtime rolling update (start a new instance, health-check it, then stop the old one) runs two processes with independent in-process id counters concurrently for the overlap window, by design, not by misconfiguration.
-A plain single-container self-hosted `docker compose up -d` recreate is sequential and not at risk by default, but the official instance, or any self-hoster running a load-balanced or orchestrated setup (Kubernetes, Swarm, Nomad), is exactly the case this report should have covered and did not.
-Because the ordering guarantee this scheme provides is explicitly cross-table (the unified sync cursor merges message, reaction, and canvas_op by id across different tables), a collision during that window is not caught by any single table's own primary-key uniqueness constraint, since the colliding rows can live in two different tables entirely.
+Weakness: there is no column anywhere on `attachments` for a key id or key version, no mention of per-file nonce or IV storage, and no statement of where the server-held key itself is stored relative to the database file being backed up.
+Without a key id or version column, rotating the key later, standard practice after any suspected compromise, has no way to tell old-key blobs from new-key blobs mid-migration, meaning rotation can only ever be an all-at-once, whole-corpus decrypt-and-reencrypt operation with no incremental path.
+Separately, Section 7's backup plan describes backing up the database file with `VACUUM INTO` and attachment blobs separately by tarball, but never states that the encryption key must live outside both artifacts, so a careless implementation that stores the key in a config table inside the same SQLite file would ship the key inside every single backup, making "encrypted at rest" provide no protection against exactly the threat, a stolen backup, that it exists to defend against.
 
-Failure mode: two events, say a message and a canvas op, generated by the outgoing and incoming process within the same overlap window, get the same id value; the unified sync cursor's total-order contract silently breaks for any client whose catch-up page happens to span that id, with no error raised anywhere, since the id constraint is per-table, not global.
+Failure mode: a future key rotation has no incremental path and becomes a risky big-bang migration, and if the key is ever colocated with the database file by an implementer with no guidance against it, every backup silently carries both the ciphertext and the key needed to read it.
 
-Resolution: reserve at least one bit for a coarse instance/generation identifier even in the default single-process design, or require an explicit startup handshake ensuring only one process mints ids at a time before any rolling-update deployment model is adopted for the official instance.
+Resolution: add a `key_version` column to `attachments`, document nonce or IV storage explicitly, and state plainly in the backup section that the server-held key must be stored and backed up separately from the database file and the attachment tarball.
 
-### 8. Auto-applied forward migrations at startup have no zero-downtime story for the official instance
+### 7. Excluding reactions from the `seq` stream removes the only offline catch-up mechanism the sync design has for them
 
-Target: Section 5's verdict, "`sqlx migrate`, versioned forward-only `.sql` files... auto-applied at startup," against the official instance's real production traffic and `devops.md`'s deploy model.
+Target: Section 4, "reactions are deliberately left out of the seq stream... forcing them through the same total order would add write contention for no client-visible benefit," against `realtime-sync.md`'s catch-up sync, which works by "an indexed range scan on scope and sequence greater than the supplied cursor."
 
-Weakness: for a self-hosted instance with a handful of users and small tables, blocking startup on a migration is harmless.
-For the official instance, which the brief and `devops.md` both treat as a real, continuously-running production deployment, a migration that adds a `NOT NULL` column, builds a non-concurrent index, or rewrites a large `messages` table can run long enough to fail a container health check.
-Nothing in the migration section discusses `CREATE INDEX CONCURRENTLY`, multi-step backward-compatible column additions, or what happens when an orchestrator kills a container mid-migration because it missed its readiness window.
+Weakness: the write-contention argument is real for live, connected clients, since reactions are small and idempotent and do not need strict ordering against messages while a session is live.
+But `realtime-sync.md`'s entire offline catch-up mechanism is built around per-scope sequence cursors, and a table with no sequence has no cursor a reconnecting client can use to ask "what changed here since I was last online."
+Nothing in either report describes an alternative path, such as re-sending full reaction state whenever the parent message is resynced, for a client to learn about reactions added or removed while it was offline.
 
-Failure mode: a routine schema change on the official instance gets killed mid-migration by the deploy tooling, leaving the schema in a partially applied state with no documented recovery procedure, turning a planned deploy into an incident.
+Failure mode: a user goes offline for a day, reconnects, runs the documented catch-up sync, and has no documented way to learn that three reactions were added to a message they already have cached locally, since the table that changed carries no sequence for the sync protocol to query against.
 
-Resolution: document a zero-downtime migration discipline for the official instance specifically (concurrent index builds, additive-then-backfill-then-constrain column changes), even if the self-hosted default keeps the simpler auto-apply-at-startup model.
+Resolution: either give reactions their own lightweight per-channel sequence purely for catch-up purposes (not for live ordering), or explicitly document that reaction state is always refreshed as part of resyncing the parent message, and say which.
 
-### 9. The server schema and the client's independent Drift schema are never reconciled
+### 8. The R-Tree virtual table is presented as a simple index but is a separate shadow table needing explicit sync, with an undocumented integer-key constraint
 
-Target: `database.md`'s silence on `flutter-client.md`'s decision, "Drift (SQLite) as the single source of truth for conversations, messages, channels, and canvas cache," with its own codegen pipeline.
+Target: Section 6, "`canvas_objects` gets explicit `x, y, w, h` columns backed by a SQLite R-Tree virtual table."
 
-Weakness: the brief lists "fast synchronization" and "future scalability" as explicit database goals, and `database.md` positions itself as the report that owns schema and sync-supporting indexing, but it never once discusses how a server-side schema change (a new column, a new table like the missing `reactions` table above) propagates to the client's independently versioned Drift schema, or how a fleet of self-hosted servers running different schema versions against one official client release stays compatible.
+Weakness: unlike a real SQLite index, an R-Tree virtual table is not automatically maintained by the engine; it is a second table the application must insert into, update, and delete from in step with every write to `canvas_objects`, exactly the kind of synchronization discipline this same document names explicitly for FTS5 ("kept in sync by insert and update triggers") but never mentions for the R-Tree table at all.
+Separately, SQLite's R-Tree module requires its id column to hold plain 64-bit integers; `canvas_objects.id` is a UUID by the same identity convention used everywhere else in this schema, so the R-Tree table cannot use it directly and must instead be keyed off `canvas_objects`'s implicit rowid, which only exists if the table is not declared `WITHOUT ROWID`, an easy and reasonable-looking choice for a table with an explicit non-integer primary key that would silently make this whole design unimplementable if chosen.
+`voice-canvas.md`'s own rendering section considered and explicitly rejected an R-tree for the closely related client-side viewport-culling problem, "a uniform grid spatial index... not an R-tree, favoring simplicity," without this document acknowledging or reconciling why the server-side answer differs.
 
-Failure mode: a self-hoster runs an older server version against a newer official client release, or the reverse, a common self-host reality this project explicitly supports, and there is no documented mechanism, schema version negotiation, capability flags, or otherwise, for the client to know which columns or tables it can rely on.
+Failure mode: a missed or buggy sync path between `canvas_objects` and its R-Tree shadow table produces objects that silently vanish from or incorrectly appear in viewport queries after a move or resize, the kind of drift bug that is invisible until a user reports an object that will not show up, and an implementer who reaches for `WITHOUT ROWID` on `canvas_objects` for its UUID primary key breaks the R-Tree integration entirely with no compiler or runtime error pointing at why.
 
-Resolution: add a short cross-reference between `database.md` and `flutter-client.md` specifying how protocol or schema versioning is communicated to the client, even if the detailed design belongs to a different report.
+Resolution: state the same trigger-based sync discipline for the R-Tree table as is already specified for FTS5, explicitly forbid `WITHOUT ROWID` on `canvas_objects` with a one-line comment explaining why, and briefly reconcile the divergence from `voice-canvas.md`'s client-side rejection of R-Tree, even if the answer is simply that SQLite ships it for free server-side while Flutter has no equivalent library.
+
+### 9. The already-flagged "trivial" second permissions column understates its own blast radius
+
+Target: Section 3's risk note, "a second column is a trivial additive migration if ever outgrown," against `stack-decision.md` Section 5's schema-first, code-generated wire format shared by Dart and Rust.
+
+Weakness: because the wire protocol is generated from one schema of record for both the Flutter client and the Rust server, widening the permission representation is not a SQL `ALTER TABLE` plus a server recompile.
+It is a coordinated change to the shared schema, regenerated Dart and Rust types, every permission-check call site on both ends including the client-side UX checks `security.md` describes, and a compatibility window where self-hosted servers on the old single-column format and clients expecting two columns, or the reverse, must both behave sensibly.
+
+Failure mode: the risk is treated as "a rushed schema change under pressure," when the actual event is a cross-language, cross-repository flag day across every self-hosted server in the field at once, a materially larger and riskier operation than the report's own wording suggests.
+
+Resolution: reword the risk to reflect the true scope, and consider reserving the second permissions column, or at least the wire-format field slot for it, from day one even if it is always zero, so the day it is needed is a data migration only, not a protocol migration too.
 
 ## Minor findings
 
-### 10. Small-instance Postgres tuning is not reconciled with the write-heavy tables the schema itself creates
+### 10. `VACUUM INTO` defers WAL checkpointing for its full run, which can grow the WAL file during exactly the operation meant to protect a disk-constrained self-host
 
-Target: the `postgresql.conf` tuned for under 80MB idle (Section 1's risk mitigation), against `read_states` (updated on every read-state change) and `canvas_ops` (frequent small inserts plus periodic compaction).
+Target: Section 7, "SQLite's `VACUUM INTO` for an atomic hot backup under WAL mode, scheduled by cron."
 
-Weakness: aggressive small-instance tuning typically reduces autovacuum workers and frequency alongside `shared_buffers`, but `read_states` rows get updated, not inserted, on every read-state change, and `canvas_ops` both inserts constantly and later deletes in bulk during 30-day compaction, both classic bloat sources that need active autovacuum to control, a tension the report never mentions.
+Weakness: `VACUUM INTO` holds a read snapshot open for as long as the copy takes, and WAL checkpointing cannot fully reclaim the WAL file while any reader holds an old snapshot open, so a slow backup on a busy channel can let the WAL file grow substantially for the duration of the backup itself.
 
-Failure mode: a small self-hosted instance's Postgres slowly bloats on these two tables over months of use, and the "under 80MB idle" figure quietly stops holding as dead tuples accumulate, discovered only once someone measures disk use, not flagged anywhere as a risk today.
+Failure mode: a self-host with tight disk headroom, the exact profile the brief targets, sees a disk-usage spike during its own backup job, worse the busier the channel and the slower the underlying disk, with nothing in the report flagging it as a thing to monitor.
 
-Resolution: state autovacuum settings explicitly in the tuned config rather than leaving them as a side effect of the memory-focused tuning pass.
+Resolution: note this tradeoff explicitly and recommend scheduling backups during low-activity windows, or monitoring WAL file size as a backup-health signal.
 
-### 11. GIN write-cost risk is flagged but never checked against the project's own latency budget
+### 11. FTS5 sync via "insert and update triggers" does not confirm soft deletes are excluded from search results
 
-Target: Section 4's risk note, "GIN indexes add write cost per insert... worth measuring once message volume is realistic," against `performance.md`'s "p99 server-side processing time... under 5ms at small scale" for the same write path.
+Target: Section 5, "kept in sync by insert and update triggers."
 
-Weakness: two reports set a number and a risk for the identical operation (persisting a message) without cross-referencing each other; it is not stated whether the 5ms budget already accounts for the generated `tsvector` and GIN maintenance cost, or whether that cost is expected to come out of headroom nobody has confirmed exists.
+Weakness: messages are soft-deleted via `deleted_at`, per Section 4's retention model, not hard-deleted, so removing a deleted message from search results depends on the update trigger explicitly reacting to a `deleted_at` transition, not just to content edits.
+The report never confirms this case is handled, only that update triggers exist in general.
 
-Failure mode: the 5ms budget gets adopted as a CI regression gate before anyone validates it against real GIN write cost, and the first load test either fails a gate that was never realistic or passes only because FTS was accidentally excluded from the measured path.
+Failure mode: a deleted message keeps surfacing in full-text search results indefinitely, since nothing states that the trigger logic treats a soft delete as a reason to remove the row from the FTS index.
 
-Resolution: have `performance.md`'s benchmark suite explicitly include the FTS write path, and have `database.md` reference the resulting number instead of restating an independent "worth measuring" note.
+Resolution: state explicitly that the update trigger removes a row from the FTS index when `deleted_at` transitions from null to non-null, not only when `content` changes.
 
-### 12. Full-text search uses a single, unstated language configuration
+### 12. `invites.role_grant` is a single scalar while the RBAC model it feeds is explicitly many-to-many
 
-Target: the generated `tsvector` column implied in Section 4; no text search configuration is named beyond the implicit default.
+Target: Section 2's `invites(..., role_grant, ...)`, against `member_roles(group_id, user_id, role_id)` being an explicit many-to-many join table.
 
-Weakness: `to_tsvector` requires a language configuration for stemming and tokenization; an unstated default typically resolves to English, which degrades relevance for non-English content in a project with no stated restriction to English-speaking self-hosters.
+Weakness: every other part of the RBAC design in Section 3 supports a member holding several roles at once, but an invite can only grant exactly one role on redemption, an unexplained asymmetry.
 
-Failure mode: a self-hosted instance used primarily in another language gets poor search relevance with no indication why, since the indexing choice was never surfaced as a decision.
+Failure mode: an admin who wants a single invite link to grant two roles at once, for example both a base "member" role and a "beta-tester" role, cannot express that with this table and must instead manually add the second role after each redemption.
 
-Resolution: state the FTS language configuration explicitly, either a language-agnostic default (`simple`) or a per-message language field, and note it as a deliberate v1 limitation if English-only stemming is kept.
+Resolution: either state this is an intentional v1 simplification, or change `role_grant` to a small join table so invites can grant more than one role.
 
-### 13. Self-hosted backup snapshot coordination is unstated
+### 13. The retention section's "lighter audit record" for canvas moderation history has no accompanying schema
 
-Target: Section 7's self-hosted backup script, "scripted `pg_dump` plus attachment-directory tarball on a cron."
+Target: Section 7, "a lighter audit record of who created or removed which object is kept independently and longer," against the rest of the document, which pairs every other retention decision with a concrete table or column.
 
-Weakness: the two artifacts are captured independently with no stated ordering or locking between them; content-addressed, immutable attachments make this low-risk in practice, but the report does not say so, leaving a reader to wonder whether a restore could reference attachments the tarball does not yet contain.
+Weakness: this is stated as policy with nothing backing it in the schema, unlike the `deleted_at` columns, partial indexes, and dedicated tables given to every other retention decision in the document.
 
-Failure mode: minor in practice given content-addressing, but worth one sentence in the report rather than leaving it implicit.
+Failure mode: an implementer reaches this sentence with no guidance on what the audit record actually looks like, and has to design it from scratch, silently reintroducing exactly the compaction-versus-audit-trail tension this report is trying to resolve if the ad hoc design gets it wrong.
 
-Resolution: state explicitly that the ordering is safe because attachments are immutable and content-addressed, so a slightly stale tarball only means a not-yet-backed-up attachment, never a corrupted one.
-
-### 14. Canvas op-log compaction conflicts with the same log's role as a moderation audit trail
-
-Target: Section 6, "raw ops older than roughly thirty days may be compacted," against `voice-canvas.md`'s framing of the same log as the source for "who drew what, when," the moderation audit trail the brief asks for.
-
-Weakness: a report filed more than a month after an incident, an entirely plausible delay for harassment or abuse reports, loses its evidentiary trail once compaction runs, and there is no flag in the design distinguishing "nothing happened in this range" from "this range was compacted," so the gap is invisible to whoever investigates later.
-
-Failure mode: a moderator investigating a stale report finds an empty canvas history and cannot tell whether that means innocence or lost evidence.
-
-Resolution: either exempt op-log rows tied to an open or recent moderation report from compaction, or explicitly document the audit-trail limitation created by the 30-day window so moderators know its boundaries.
+Resolution: add a minimal `canvas_audit_log` table (`channel_id`, `object_id`, `actor_id`, `action`, `created_at`) explicitly exempted from the 30-day compaction window, so the policy has a schema to point at.
 
 ## Closing note
 
-Most of these findings share one root cause.
-This report did the hard work of reconciling with `realtime-sync.md` and `voice-canvas.md` on ordering, and says so explicitly, but the same discipline was not applied evenly to `security.md`'s permission model, `appstore.md`'s account-deletion requirement, or `flutter-client.md`'s independent schema, three sibling documents whose decisions land directly on the tables this report owns.
-The schema section's own stated methodology, "divergences from a sibling report are called out, not silently overridden," is the right standard.
-The permission model and account deletion gaps are not divergences that were called out; they are commitments from sibling reports this schema does not yet support at all.
+The schema in this pass is substantially stronger than a naive rebuild: multi-role RBAC, keyset pagination, the sha256-first attachment dedup order, and the account-deletion tombstone story are all real, well-reasoned answers to problems a fresh design has to solve.
+The findings above cluster around two patterns worth naming directly.
+First, two places where the document's own prose promises more than its own schema delivers in the same section: the two-scope claim in Section 4 that one counters table cannot satisfy, and the FTS5-grade sync discipline named for search but not extended to the R-Tree table doing the analogous job for canvas.
+Second, several owner-mandated or App-Store-mandated commitments that have rationale and precedent elsewhere in the document but no schema of their own: the reset-code mechanism, attachment key rotation, and account-deletion's effect on group ownership.
+Both patterns are the same kind of gap this report itself is good at catching elsewhere, just not turned on every section evenly.
 
 ## Open questions the specialist should have raised but did not
 
-- How does the schema represent `security.md`'s per-channel and per-member permission overrides, and multi-role membership (see finding 1)?
-- What data is actually retained, transferred, or anonymized when a user exercises the mandatory account-deletion right, and what happens to groups they own (see finding 3)?
-- Where do refresh-token hashes and reuse-detection family state actually live, given the `devices` table as specified does not hold them (see finding 4)?
-- Is the `sha256` dedup hash computed before or after at-rest encryption, and how does dedup interact with attachments in a future end-to-end-encrypted conversation (see finding 5)?
-- How does a client know which server-side schema version or capabilities it is talking to, given the server and client schemas evolve independently (see finding 9)?
+- Do `messages` and `canvas_ops` share one interleaved per-channel sequence space or two independent ones, and does `channel_seq_counters` need a second key column either way (see finding 1)?
+- Should the official instance offer one portable account across multiple official communities, and if so what identity layer sits above the per-deployment `users` table (see finding 2)?
+- Does channel role-overwrite resolution truly apply sequentially by role position, or does deny unconditionally win across the union of a member's roles as `security.md` states (see finding 3)?
+- Where does the admin-issued one-time reset code from owner decision 6 actually live in the schema (see finding 4)?
+- What happens to a group when its owner's account is deleted, and is an ownership-transfer step required before deletion completes (see finding 5)?
+- How is the server-held attachment encryption key rotated, and is it guaranteed to be stored and backed up separately from the database file it protects (see finding 6)?
+- How does a client discover reactions added or removed while it was offline, given reactions carry no sequence for catch-up sync to query against (see finding 7)?
