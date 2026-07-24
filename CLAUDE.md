@@ -30,12 +30,25 @@ Phase 1 merged so far:
 - Permission evaluator (PR #11): a 63-bit `Permissions` bitmask and a pure `evaluate()`: @everyone base, role union, ADMINISTRATOR bypass, then channel overwrites (@everyone, role tier deny-wins, member overwrite absolute). Store loading (create_role/assign_role/set_*_overwrite, permissions_in_channel/base_permissions/has_permission). Migration 0004 enforces a single @everyone role.
 - Message endpoints (PR #12): authenticated + authorized REST send/list/edit (`POST`/`GET /channels/{id}/messages`, `PATCH .../{message_id}`), wiring the evaluator (view to read, view+send to post, authorship-or-manage to edit). Shared http `error`/`extract` modules. Send idempotency scoped to (channel, author) so a reused id cannot leak a foreign message.
 
-Phase 1 next increments, each its own PR:
-1. The JSON-over-WebSocket envelope and fan-out: connect via a redeemed WS ticket, a single typed envelope (discriminated type, protocol version, per-scope seq), server-to-client fan-out plus ephemeral client-to-server signals, protocol/capability negotiation.
-2. Read state (monotonic last-read seq, unread as an indexed range count) plus the bundled per-scope catch-up sync cursor (capped per scope and in aggregate, continuation flag, snapshot-pointer fallback).
-3. Account deletion end to end (purge personal data, tombstone the user, transfer group ownership, revoke devices and tokens).
+- WebSocket envelope and fan-out (PR #13): `/ws` authenticated by a redeemed connect ticket in a hello frame with protocol negotiation, a typed JSON envelope, a broadcast hub with per-event authorization, backpressure close, a bounded write timeout, a connection cap, 4 KiB frame limits, and logout closing live sockets.
+- Read state and bundled sync (PR #14): monotonic last-read seq with derived unread, and `POST /sync` taking per-scope cursors with per-scope, aggregate, and snapshot-gap caps. A nonexistent channel now grants no permissions, so channel existence is not observable.
+- Account deletion (PR #15): purge personal data, anonymize authored content, tombstone and free the username, revoke sessions and close sockets, with the login-versus-delete race closed by a write-locked liveness check in `open_session`.
 
-Open follow-ups noted during review: auth still needs real per-IP/per-account rate limiting (its own roadmap item; only the hashing-permit timeout ships so far); malformed query/JSON bodies still return axum's default error rather than the uniform JSON error contract (low).
+**Phase 1 is complete.** Server 0.3.0 is released and deployed (see the deployment section above).
+
+Next up, discovered by deploying: a fresh server has no `@everyone` role and no channels, and no HTTP route creates either, so a new deployment can authenticate but cannot message at all. The next increment is a first-run bootstrap (first registered account becomes admin, seeding `@everyone` and a default channel) plus minimal channel and role endpoints. After that, Phase 2 (the Flutter client shell and text messaging) is next by the roadmap, but the Flutter toolchain is not installed in this environment, so client work is CI-verified only.
+
+Open follow-ups noted during reviews: auth still needs real per-IP/per-account rate limiting (its own roadmap item; only the hashing-permit timeout ships so far); malformed query/JSON bodies still return axum's default error rather than the uniform JSON error contract (low); `revoke_device` does not itself publish `SessionRevoked` (the logout and deletion paths do).
+
+## Running deployment (LAN test instance)
+
+A pinned instance runs on the owner's homelab box, deployed 2026-07-24.
+
+- Host `npc@10.0.0.100` (Ubuntu, Docker). Stack at `/home/npc/docker-server/npc_projects/slim-m/` (`docker-compose.yml` + `.env`), following that host's one-directory-per-stack convention.
+- Image `ghcr.io/nc1107/slim-m-server:0.3.0` (pinned, not `latest`), SQLite on the named volume `slim-m_slimm_data`, reachable at `http://10.0.0.100:8095`.
+- LAN only on purpose: it is deliberately NOT enrolled on `traefik_proxy`, because publishing it needs a hostname and a DNS record, which is an owner decision. The Traefik labels to add are commented at the bottom of that compose file.
+- Verified live: `/healthz`, `/version`, and a 13-check end-to-end smoke run (register, duplicate and bidi rejection, wrong password, refresh rotation, ws ticket, bearer rejection, deny-by-default on an unknown channel, a real WebSocket hello handshake, deletion, and post-deletion refusal).
+- Operate it with `docker compose` from that directory; bump `SLIMM_VERSION` in `.env` and `docker compose up -d` to move to a new release.
 
 ## Repository layout
 
