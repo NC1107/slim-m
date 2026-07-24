@@ -14,6 +14,7 @@ mod auth;
 mod error;
 mod extract;
 mod messages;
+mod sync;
 mod ws;
 
 /// The wire-protocol envelope version a client negotiates on connect. Bumped
@@ -36,6 +37,7 @@ pub fn router(state: AppState) -> Router {
         .route("/version", get(version))
         .merge(auth::routes())
         .merge(messages::routes())
+        .merge(sync::routes())
         .merge(ws::routes())
         .layer(TraceLayer::new_for_http())
         .with_state(state)

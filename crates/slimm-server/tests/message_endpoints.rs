@@ -397,7 +397,9 @@ async fn validation_and_missing_resources() {
         .unwrap();
     assert_eq!(empty.status(), StatusCode::BAD_REQUEST);
 
-    // A member with send rights posting to a missing channel gets a 404.
+    // Posting to a channel that does not exist is refused the same way as one
+    // the caller cannot see (a nonexistent channel grants no permissions), so it
+    // reveals nothing about whether the channel is real.
     let missing = app
         .clone()
         .oneshot(request(
@@ -408,7 +410,7 @@ async fn validation_and_missing_resources() {
         ))
         .await
         .unwrap();
-    assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+    assert_eq!(missing.status(), StatusCode::FORBIDDEN);
 
     // No bearer token is a 401.
     let anon = app

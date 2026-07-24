@@ -96,8 +96,8 @@ async fn send(
 ) -> Result<Json<MessageDto>, ApiError> {
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
 
-    // Authorize before confirming the channel exists, so a caller who cannot
-    // post learns nothing about whether the channel is real.
+    // A nonexistent channel grants no permissions, so this refuses both "you
+    // cannot post here" and "no such channel" identically, revealing neither.
     let needed = Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES);
     if !state
         .store
@@ -105,9 +105,6 @@ async fn send(
         .await?
     {
         return Err(ApiError::Forbidden);
-    }
-    if state.store.channel(channel_id).await?.is_none() {
-        return Err(ApiError::NotFound("channel not found"));
     }
 
     let content = validate_content(&req.content)?;
@@ -203,6 +200,6 @@ fn validate_content(content: &str) -> Result<&str, ApiError> {
     Ok(content)
 }
 
-fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {
+pub(crate) fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {
     Uuid::parse_str(value).map_err(|_| ApiError::BadRequest("invalid uuid"))
 }
