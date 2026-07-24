@@ -176,7 +176,7 @@ jobs:
           digest="$(docker buildx imagetools inspect "${IMAGE}:${version}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
-      - uses: sigstore/cosign-installer@v4 # pin to commit SHA before public
+      - uses: sigstore/cosign-installer@v4.1.2 # pin to commit SHA before public
 
       # Sign the manifest-list digest, which covers both arch images and every
       # tag that resolves to it.
