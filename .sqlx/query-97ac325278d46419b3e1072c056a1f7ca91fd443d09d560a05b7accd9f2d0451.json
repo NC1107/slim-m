@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: RoleId\", permissions AS \"permissions!: Permissions\"\n               FROM roles WHERE is_everyone = 1 LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: RoleId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "permissions!: Permissions",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "97ac325278d46419b3e1072c056a1f7ca91fd443d09d560a05b7accd9f2d0451"
+}
