@@ -23,6 +23,10 @@ concurrency:
   group: perf-${{ github.ref }}
   cancel-in-progress: true
 
+# Compiling the crate needs the committed .sqlx query cache, no database.
+env:
+  SQLX_OFFLINE: "true"
+
 jobs:
   # Fast compile-only gate on every pull request: proves the benchmarks still
   # build without paying for a full measurement run on each push.

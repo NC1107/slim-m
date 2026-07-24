@@ -15,6 +15,8 @@
 
 FROM rust:1-alpine AS builder
 RUN apk add --no-cache musl-dev
+# Build against the committed .sqlx query cache; no database at build time.
+ENV SQLX_OFFLINE=true
 WORKDIR /build
 COPY . .
 RUN cargo build --release --bin slimm-server \

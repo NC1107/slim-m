@@ -1,0 +1,245 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! The message write path and reads over embedded SQLite.
+//!
+//! Two invariants live here and are covered by tests:
+//!
+//! - Ordering. Every message takes the next value from a per-(channel, stream)
+//!   counter, allocated inside the same transaction as the insert, so a
+//!   channel's messages get a gap-free monotonic `seq` that is independent of
+//!   any other channel or of the canvas stream.
+//! - Idempotent send. A send is keyed by a client-generated [`MessageId`]; a
+//!   retry with the same id returns the stored message and consumes no new
+//!   sequence, so an at-least-once client never duplicates or reorders.
+//!
+//! This is inherent on [`Store`] for now; it lifts to a repository trait when a
+//! second backend (Postgres) actually needs one.
+
+use anyhow::Context;
+use sqlx::{SqliteExecutor, SqlitePool};
+
+use crate::ids::{ChannelId, MessageId, Seq, UserId};
+
+fn now_ms() -> i64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// A channel (a text or voice room).
+#[derive(Debug, Clone)]
+pub struct Channel {
+    pub id: ChannelId,
+    pub name: String,
+    pub kind: String,
+    pub created_at: i64,
+}
+
+/// A user account.
+#[derive(Debug, Clone)]
+pub struct User {
+    pub id: UserId,
+    pub username: String,
+    pub display_name: String,
+    pub created_at: i64,
+}
+
+/// A message. `author_id` is null once the author's account is anonymized.
+#[derive(Debug, Clone)]
+pub struct Message {
+    pub id: MessageId,
+    pub channel_id: ChannelId,
+    pub author_id: Option<UserId>,
+    pub seq: Seq,
+    pub content: String,
+    pub created_at: i64,
+    pub edited_at: Option<i64>,
+}
+
+/// The persistence layer over one embedded SQLite database.
+#[derive(Clone)]
+pub struct Store {
+    pool: SqlitePool,
+}
+
+impl Store {
+    pub fn new(pool: SqlitePool) -> Self {
+        Self { pool }
+    }
+
+    /// Creates a user. Password and auth land in a later phase.
+    pub async fn create_user(&self, username: &str, display_name: &str) -> anyhow::Result<User> {
+        let id = UserId::generate();
+        let now = now_ms();
+        sqlx::query!(
+            "INSERT INTO users (id, username, display_name, created_at) VALUES (?, ?, ?, ?)",
+            id,
+            username,
+            display_name,
+            now
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(User {
+            id,
+            username: username.to_owned(),
+            display_name: display_name.to_owned(),
+            created_at: now,
+        })
+    }
+
+    /// Creates a channel and seeds its message and canvas sequence counters.
+    pub async fn create_channel(&self, name: &str, kind: &str) -> anyhow::Result<Channel> {
+        let id = ChannelId::generate();
+        let now = now_ms();
+        let mut tx = self.pool.begin().await?;
+        sqlx::query!(
+            "INSERT INTO channels (id, name, kind, created_at) VALUES (?, ?, ?, ?)",
+            id,
+            name,
+            kind,
+            now
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "INSERT INTO channel_seq_counters (channel_id, stream, next_seq)
+             VALUES (?, 'message', 1), (?, 'canvas', 1)",
+            id,
+            id
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(Channel {
+            id,
+            name: name.to_owned(),
+            kind: kind.to_owned(),
+            created_at: now,
+        })
+    }
+
+    /// Sends a message. Idempotent by `id`; the per-scope `seq` is allocated in
+    /// the same transaction as the insert.
+    pub async fn send_message(
+        &self,
+        channel_id: ChannelId,
+        author_id: UserId,
+        id: MessageId,
+        content: &str,
+    ) -> anyhow::Result<Message> {
+        let mut tx = self.pool.begin().await?;
+
+        if let Some(existing) = fetch_message(&mut *tx, id).await? {
+            tx.commit().await?;
+            return Ok(existing);
+        }
+
+        // RETURNING runs on the updated row, so `next_seq - 1` is the value this
+        // message takes and `next_seq` is left pointing at the following one.
+        let seq = sqlx::query_scalar!(
+            r#"UPDATE channel_seq_counters SET next_seq = next_seq + 1
+               WHERE channel_id = ? AND stream = 'message'
+               RETURNING next_seq - 1 AS "seq!: i64""#,
+            channel_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .context("channel has no message sequence counter")?;
+
+        let now = now_ms();
+        sqlx::query!(
+            r#"INSERT INTO messages (id, channel_id, author_id, seq, content, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)"#,
+            id,
+            channel_id,
+            author_id,
+            seq,
+            content,
+            now
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(Message {
+            id,
+            channel_id,
+            author_id: Some(author_id),
+            seq: Seq(seq),
+            content: content.to_owned(),
+            created_at: now,
+            edited_at: None,
+        })
+    }
+
+    /// Edits a message's content. Returns `None` if it does not exist or is
+    /// deleted. The FTS index is kept current by a database trigger.
+    pub async fn edit_message(
+        &self,
+        id: MessageId,
+        content: &str,
+    ) -> anyhow::Result<Option<Message>> {
+        let now = now_ms();
+        let affected = sqlx::query!(
+            "UPDATE messages SET content = ?, edited_at = ? WHERE id = ? AND deleted_at IS NULL",
+            content,
+            now,
+            id
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        if affected == 0 {
+            return Ok(None);
+        }
+        fetch_message(&self.pool, id).await
+    }
+
+    /// Lists a channel's live messages newest-first, using keyset pagination on
+    /// `seq` (never OFFSET). Pass the smallest `seq` seen so far as `before_seq`
+    /// to page backwards.
+    pub async fn list_messages(
+        &self,
+        channel_id: ChannelId,
+        before_seq: Option<i64>,
+        limit: i64,
+    ) -> anyhow::Result<Vec<Message>> {
+        let before = before_seq.unwrap_or(i64::MAX);
+        let rows = sqlx::query_as!(
+            Message,
+            r#"SELECT id AS "id!: MessageId", channel_id AS "channel_id!: ChannelId",
+                      author_id AS "author_id: UserId", seq AS "seq!: Seq",
+                      content AS "content!", created_at AS "created_at!", edited_at
+               FROM messages
+               WHERE channel_id = ? AND deleted_at IS NULL AND seq < ?
+               ORDER BY seq DESC
+               LIMIT ?"#,
+            channel_id,
+            before,
+            limit
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+}
+
+/// Fetches one live message by id against any executor (pool or transaction).
+async fn fetch_message<'e, E>(executor: E, id: MessageId) -> anyhow::Result<Option<Message>>
+where
+    E: SqliteExecutor<'e>,
+{
+    let message = sqlx::query_as!(
+        Message,
+        r#"SELECT id AS "id!: MessageId", channel_id AS "channel_id!: ChannelId",
+                  author_id AS "author_id: UserId", seq AS "seq!: Seq",
+                  content AS "content!", created_at AS "created_at!", edited_at
+           FROM messages WHERE id = ? AND deleted_at IS NULL"#,
+        id
+    )
+    .fetch_optional(executor)
+    .await?;
+    Ok(message)
+}
