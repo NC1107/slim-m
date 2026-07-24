@@ -267,7 +267,7 @@ The per-user-per-scope message limit uses per-device sub-buckets under a shared 
 Rejected alternatives: an in-memory resume-token session table (adds expiry races and a window a restart silently invalidates, for a benefit limited to sub-few-second reconnects the stateless path already replays for near-free); one REST call per conversation on reconnect (N round trips, each a radio wake on mobile); a separately incremented unread counter; an explicit typing-stop protocol message; Protobuf or MessagePack as the default control-plane encoding (codegen and debuggability cost for a surface where permessage-deflate already captures most of the byte saving); unbounded per-connection queues or blocking sends in the fan-out loop.
 
 Accepted risks: JSON decode CPU could matter at very large public-instance scale, profiled and revisited rather than pre-optimized.
-Presence visibility is broadcast to shared-scope co-members by default with no per-user opt-out in v1, a privacy surface parallel to read receipts; this is flagged for an explicit owner decision on whether presence should receive the same deferred opt-in treatment.
+Presence visibility is broadcast to shared-scope co-members by default, but v1 includes a hide-online-status option so a user can appear offline or invisible (owner decision), matching the privacy stance behind deferring read receipts to other users.
 Direct messages work only between users on the same deployment in v1, because the per-scope single-writer model presumes both participants' accounts live in one deployment; this is documented as a deliberate v1 scope decision, and cross-deployment DMs or federation are a distinct future design, not an extension of this one.
 
 ### Media Stack
