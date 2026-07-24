@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: MessageId\", channel_id AS \"channel_id!: ChannelId\",\n                  author_id AS \"author_id: UserId\", seq AS \"seq!: Seq\",\n                  content AS \"content!\", created_at AS \"created_at!\", edited_at\n           FROM messages WHERE id = ? AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: MessageId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "channel_id!: ChannelId",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "author_id: UserId",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "seq!: Seq",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "content!",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "edited_at",
+        "ordinal": 6,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "e990ad652e07c3f53b77eb2e3e1e956530ca6537a1f9466e5e0aaabc4504959a"
+}

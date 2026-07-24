@@ -28,6 +28,10 @@ concurrency:
   group: server-ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Build against the committed .sqlx query cache; no database needed in CI.
+env:
+  SQLX_OFFLINE: "true"
+
 jobs:
   check:
     runs-on: ubuntu-latest
