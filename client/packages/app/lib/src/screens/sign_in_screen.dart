@@ -73,6 +73,17 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           deviceName: 'desktop',
         );
       }
+      // Redeem the invite that brought them here, now that an account exists.
+      final invite = ref.read(pendingInviteProvider);
+      if (invite != null) {
+        try {
+          await api.redeemInvite(invite);
+        } on ApiException {
+          // The account is real either way; a spent code should not strand
+          // someone on the sign-in screen with no way forward.
+        }
+        ref.read(pendingInviteProvider.notifier).state = null;
+      }
       await ref.read(syncControllerProvider.notifier).start();
     } on ApiException catch (e) {
       // Say what actually happened. "Something went wrong" tells the user

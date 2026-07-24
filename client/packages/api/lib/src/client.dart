@@ -325,6 +325,21 @@ class SlimmApi {
   Future<void> unblockUser(String userId) =>
       _send('DELETE', '/blocks/$userId', expectNoContent: true);
 
+  /// Whether an invite code can be used. Unauthenticated, because the person
+  /// holding a code does not have an account yet. Answers only usable or not.
+  Future<bool> checkInvite(String code) async {
+    final json = await _send(
+      'GET',
+      '/invites/$code/check',
+      authenticated: false,
+    );
+    return (json as Map<String, dynamic>)['usable'] as bool;
+  }
+
+  /// Spends an invite for the signed-in account.
+  Future<void> redeemInvite(String code) =>
+      _send('POST', '/invites/$code/redeem', expectNoContent: true);
+
   /// Files a report for a human to review.
   Future<String> report({
     required ReportSubject subject,

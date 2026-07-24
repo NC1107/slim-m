@@ -6,6 +6,7 @@
 library;
 
 abstract final class Routes {
+  static const onboarding = '/join';
   static const signIn = '/sign-in';
   static const channels = '/channels';
   static const settings = '/settings';

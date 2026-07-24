@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 import '../screens/home_shell.dart';
 import '../screens/settings_screen.dart';
+import '../screens/onboarding_screen.dart';
 import '../screens/sign_in_screen.dart';
 import 'routes.dart';
 
@@ -24,18 +25,31 @@ final routerProvider = Provider<GoRouter>((ref) {
   final session = ref.watch(sessionProvider);
 
   return GoRouter(
-    initialLocation: Routes.channels,
+    initialLocation: Routes.onboarding,
     // Rebuilds the redirect whenever the session changes, which is what makes
     // sign-out and revocation take effect immediately.
     refreshListenable: _SessionListenable(ref),
     redirect: (context, state) {
       final signedIn = session.isSignedIn;
-      final atSignIn = state.matchedLocation == Routes.signIn;
-      if (!signedIn) return atSignIn ? null : Routes.signIn;
-      if (atSignIn) return Routes.channels;
+      final location = state.matchedLocation;
+      final onJoinFlow =
+          location == Routes.signIn || location == Routes.onboarding;
+      // Signed out belongs in the join flow; signed in never does.
+      if (!signedIn) return onJoinFlow ? null : Routes.onboarding;
+      if (onJoinFlow) return Routes.channels;
       return null;
     },
     routes: [
+      GoRoute(
+        path: Routes.onboarding,
+        builder: (context, state) => OnboardingScreen(
+          onServerChosen: (server, invite) {
+            ref.read(serverUrlProvider.notifier).state = server;
+            ref.read(pendingInviteProvider.notifier).state = invite;
+            context.go(Routes.signIn);
+          },
+        ),
+      ),
       GoRoute(
         path: Routes.signIn,
         builder: (context, state) => const SignInScreen(),

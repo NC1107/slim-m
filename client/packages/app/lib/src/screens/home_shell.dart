@@ -222,6 +222,10 @@ class _ChannelList extends ConsumerWidget {
                       return _ChannelTile(
                         channel: channel,
                         selected: channel.id == selected,
+                        // Derived from the read marker, so it cannot drift.
+                        unread: channel.cursor > channel.lastReadSeq
+                            ? channel.cursor - channel.lastReadSeq
+                            : 0,
                         onTap: () => context.go(Routes.channel(channel.id)),
                       );
                     },
@@ -263,11 +267,13 @@ class _ChannelTile extends StatelessWidget {
   const _ChannelTile({
     required this.channel,
     required this.selected,
+    required this.unread,
     required this.onTap,
   });
 
   final Channel channel;
   final bool selected;
+  final int unread;
   final VoidCallback onTap;
 
   @override
@@ -301,6 +307,7 @@ class _ChannelTile extends StatelessWidget {
                   ),
                 ),
               ),
+              if (unread > 0) _UnreadBadge(count: unread),
             ],
           ),
         ),
@@ -340,6 +347,41 @@ class _ConnectionBar extends ConsumerWidget {
         child: Text(
           label,
           style: TextStyle(color: tokens.textSecondary, fontSize: 12),
+        ),
+      ),
+    );
+  }
+}
+
+/// A count of messages past the read marker. Capped in presentation, because
+/// "99+" is as actionable as an exact four-digit number and much easier to read.
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Semantics(
+      label: '$count unread',
+      child: Container(
+        margin: const EdgeInsets.only(left: AppSpacing.s8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s8,
+          vertical: 2,
+        ),
+        decoration: BoxDecoration(
+          color: tokens.accent,
+          borderRadius: BorderRadius.circular(AppRadii.chip),
+        ),
+        child: Text(
+          count > 99 ? '99+' : '$count',
+          style: TextStyle(
+            color: tokens.surfaceBase,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
