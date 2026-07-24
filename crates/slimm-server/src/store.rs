@@ -19,6 +19,7 @@ use sqlx::{SqliteExecutor, SqlitePool};
 
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
+mod permissions;
 mod sessions;
 
 pub use sessions::{Account, IssuedTokens, RefreshOutcome, RegisterError, SessionContext};

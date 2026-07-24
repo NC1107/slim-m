@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT r.id AS \"id!: RoleId\", r.permissions AS \"permissions!: Permissions\"\n               FROM roles r\n               JOIN member_roles mr ON mr.role_id = r.id\n               WHERE mr.user_id = ? AND r.is_everyone = 0",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: RoleId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "permissions!: Permissions",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "ee7e8970d576b0e6c7d28ecc52090a0f5af987f3d169dc82dd224a62cb4d32cd"
+}

@@ -9,6 +9,7 @@ pub mod config;
 pub mod db;
 pub mod http;
 pub mod ids;
+pub mod permissions;
 pub mod store;
 
 use std::net::SocketAddr;
