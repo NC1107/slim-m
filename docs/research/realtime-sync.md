@@ -1,86 +1,79 @@
 # Realtime Sync and Messaging Protocol
 
-This report covers the WebSocket gateway, message identity and ordering, catch-up sync, read state, typing and presence, rate limiting, and how push notifications hook into the event flow.
-It assumes the given stack: Rust/Axum, Postgres, Flutter/Riverpod, JSON-over-WebSocket with ticket-based auth, and an official push relay modeled on check-in-relay.
-The single biggest lesson from echo-messenger is that its Voice Canvas shipped with no server-assigned ordering, which produced real, user-visible divergence bugs.
-Every decision below treats ordering as a day-one architectural concern, not a follow-up.
+This report designs the WebSocket gateway lifecycle, strict event ordering, offline catch-up sync, read state, typing and presence, rate limiting, and the push-notification trigger hook, on the already-decided stack: Rust and Axum on Tokio, SQLite in WAL mode behind a single serialized writer, UUIDv7 event identity paired with a server-assigned per-scope monotonic sequence, and schema-first JSON over HTTP and WebSocket.
+A scope, as used here, is one independently ordered event stream: a text channel or a direct-message conversation, each backed by its own durable sequence counter.
+Presence and typing are not scoped events and are addressed separately below.
 
-## Wire format: JSON confirmed, not protobuf or msgpack
+## Gateway: connect, authenticate, heartbeat
 
-JSON-over-WebSocket is already the given stack decision, and it is the right one.
-A single JSON envelope (`op`, `t`, `d`, plus a sequence field for resume) keeps one schema shape in both Rust and Dart with no codegen step.
-Rejected: protobuf, whose build-toolchain and schema-sync burden is not worth it for a small team, and whose bandwidth win is irrelevant since voice and video never touch this channel (LiveKit's SFU carries that separately).
-Rejected: msgpack, which saves bytes over JSON but loses human debuggability for a marginal win.
-Binary sub-payloads, such as E2E ciphertext, stay base64-wrapped strings inside the envelope, matching echo's proven pattern, so every frame is text and the client never demuxes frame types.
-Risk: JSON decode cost could matter on a very large public instance; that is a profile-and-revisit case, not a day-one concern.
+Decision: the client mints a short-lived, single-use connection ticket over an authenticated REST call, then opens the WebSocket with that ticket, not its long-lived session credential.
+Reverse proxies commonly log full request URLs, so a durable credential there widens the leak surface for no benefit; a 30-second TTL plus single-use redemption bounds it.
+On redemption the server sends a `hello` frame with protocol version and heartbeat interval.
+Heartbeat is an application-level ping and pong around every 20 seconds, not bare TCP keepalive, because mobile carrier NAT and many proxies silently drop idle connections inside typical keepalive timers.
+Two missed heartbeats trigger reconnect with backoff and jitter.
 
-## WebSocket gateway lifecycle
+## Resume is stateless, not session-based
 
-Connect: REST login issues a 30-second single-use WS ticket, client connects with `?ticket=`, JWT never touches the URL.
-This is proven in echo-messenger and should be kept unchanged.
-Server sends `hello` with a 30s heartbeat interval on connect; client reconnects if it sees no traffic for 60s.
-Resume: the hub keeps a short-lived (90s) in-memory session record per connection (`session_id`, `last_sent_id`) after disconnect.
-A client reconnecting inside that window replays only the gap via the same mechanism used for cold-start catch-up, instead of re-sending full state, which matters for battery and network use since a backgrounded phone reconnects constantly.
-Backpressure: each connection has a bounded channel (256 messages).
-A slow consumer's channel filling closes that connection rather than blocking the fanout loop, so one stalled client never affects any other connected user.
-Rejected: unbounded per-connection queues (unbounded memory risk from one wedged client) and blocking sends in the fanout path (head-of-line blocking, a real denial-of-service risk).
+Decision: the server keeps no per-connection resume state.
+Every reconnect, after two seconds or two weeks offline, is handled by the same mechanism: a client-driven catch-up sync against a durably stored per-scope cursor.
+Rejected: an in-memory session table keyed by a resume token, the more conventional approach, since it adds expiry races and a resume window a restart silently invalidates, for a benefit limited to sub-few-second reconnects that already replay almost nothing under the stateless path.
+This follows directly from the per-scope sequence being durable and gap-free: the client already needs a durable local cursor for cold start and long-offline cases, so reusing it for every reconnect removes a class of state instead of adding one.
 
-## Message identity and ordering: snowflake, not ULID
+## Backpressure
 
-Verdict: server-generated 64-bit snowflake IDs (timestamp plus in-process counter), used as the identity and ordering key for every persisted event in the system, not just messages.
-Each server process is the sole writer for its own database, so no worker/datacenter coordination bits are needed, only a monotonic-clock guard against backward time jumps.
-Rejected: ULID, whose strengths (client-side generation, coordination-free uniqueness) matter for multi-writer or offline-first systems; here the server is the single ordering authority by design, so client-generated authoritative IDs would reintroduce the ambiguity that caused echo's canvas divergence bugs.
-Optimistic local echo still works with an opaque local UUID placeholder reconciled to the real ID on ack, so ULID's offline-compose benefit is not actually lost.
-The key move: apply this same server-assigned ID scheme to Voice Canvas ops (strokes, image moves, clears), not just chat messages.
-This is the direct fix for echo's documented gap, "no sequence numbers, vector clocks, OT, or CRDT," and it also applies echo's per-object-row lesson, since each canvas op becomes its own row keyed by this ID instead of an entry in a flat capped JSON array.
-Risk: a 64-bit ID exposes approximate creation time, a pre-existing property of timestamp-ordered IDs generally, including ULID, and not a new leak.
+Decision: each connection has a bounded outbound channel sized in bytes, not message count, for example a 1 MB cap, since message sizes vary widely.
+On overflow the server closes that connection with a distinct close code rather than dropping frames.
+This composes cleanly with stateless resume: because resync is always correct regardless of how far behind a client fell, closing a slow connection is an ordinary control valve, not a special case.
+Rejected: unbounded queues, a memory risk from one wedged client, and blocking sends in the fan-out path, letting one slow socket stall every other client.
+The fan-out loop sends non-blocking per subscriber channel, drained by a dedicated writer task per connection, so a slow writer only affects its own connection.
 
-## Catch-up sync after offline periods
+## Applying events strictly by total order
 
-Because every event shares one global monotonic ID space, catch-up is a single cursor: `GET /api/sync?after=<last_id>&kinds=message,reaction,canvas_op&limit=500`, returning one chronologically ordered page across every conversation the user belongs to.
-This replaces a per-conversation fan-out of REST calls on reconnect, which matters directly for mobile battery and network use.
-A `kinds` filter lets a client skip canvas backlog for channels it is not currently viewing.
-Long gaps (weeks offline) are capped at page size and paginated with `has_more`, falling back to lazy per-conversation history loading instead of eagerly downloading everything, the same pattern Discord and Slack use.
-Resource target: a typical daily reconnect gap should resolve as one indexed range scan returning well under 100 rows, sub-millisecond at this scale.
+Decision: clients apply events ordered by scope and sequence, never by WebSocket arrival order, tracking a per-scope high-water sequence locally.
+Because there is exactly one writer per scope, no vector clocks, Lamport timestamps, or merge logic are needed.
+Optimistic local echo renders the client's own UUIDv7-identified event immediately, then reconciles it to the durable identity-and-sequence pair once acknowledged.
+A unique constraint on scope plus client event id makes retries idempotent, so a resend after a dropped ack returns the original sequence, not a duplicate row.
+Because sequence is contiguous per scope, a client seeing a jump greater than one in a scope it believes caught up knows unambiguously it missed something, for example a dropped frame during too brief a blip to trigger reconnect, and resyncs that scope immediately.
+
+## Catch-up sync
+
+Decision: one bundled sync call per reconnect, not one request per conversation.
+The client sends its stored per-scope cursors for every scope it belongs to in a single request; the server validates membership, then per scope runs an indexed range scan on scope and sequence greater than the cursor, capped per scope and in aggregate, returning a continuation flag when truncated.
+For a member of dozens of channels, one round trip instead of many is a direct win for the brief's network and battery goals, since each round trip is a radio wake on mobile.
+The composite index the sequence counter already needs for uniqueness serves this query with no addition.
+For a cursor so far behind that walking the full gap is wasteful, the server instead returns a snapshot pointer to the latest window, relying on ordinary scroll-back pagination for older history.
 
 ## Read state and unread counts
 
-Store one column per (user, conversation): `last_read_message_id`, updated with `GREATEST(existing, new)` so it can never move backward from a stale or racing update.
-Unread count is derived on demand, `COUNT(*) WHERE conversation_id = X AND message_id > last_read_message_id`, computed once inside the sync-summary query, not as a separately mutated counter.
-Rejected: a materialized counter incremented on every send, which adds write amplification to every fan-out and can drift from the source of truth.
-After initial sync, the client increments its local count as new messages stream over WS and resets it locally on read, so the server is only queried again on full resync.
-Read-state updates fan out to the user's other devices; per-conversation read receipts visible to other users are a product opt-in, not a protocol requirement.
+Decision: one row per user and scope storing a last-read sequence, updated only through a monotonic guard so a racing or stale update can never move it backward.
+Unread count is computed on demand from an indexed range count, not maintained as a separately incremented counter.
+A counter incremented on every fan-out multiplies write load against the single serialized writer path, the resource this architecture protects most, and can drift after a bug; a derived count from an already-indexed column is correct by construction and cheap here.
+Read-state updates fan out only to the same user's other live connections, never to other users, matching the deferral of visible read receipts, keeping this channel smaller than messages themselves.
 
 ## Typing and presence
 
-Both stay fully ephemeral, never persisted, matching what echo already got right for canvas avatar and stroke-preview events.
-Typing: client-debounced, server-relayed only to conversation members, auto-expired client-side after 8-10s of silence instead of relying on an explicit stop event, avoiding the flap-prone start/stop desync class seen in canvas authority handoff.
-Presence: derived directly from live WS connections in the hub, broadcast only to users sharing a conversation, with a short grace period before announcing "offline" so background/foreground bounces within the resume window never surface as a flicker.
-Server-side rate limiting applies regardless of client throttling, since client cooperation cannot be assumed.
+Decision: both stay fully ephemeral, never assigned a sequence, never persisted, and excluded from catch-up sync, since neither carries meaning after the fact.
+Typing is client-debounced and server-relayed only to current members, with no explicit stop event; the client clears its own indicator after a short silence window, around 8 to 10 seconds, since an explicit stop event creates a stuck indicator whenever that one frame is lost.
+Presence is derived, not stored: a pure function of whether the process holds a live connection for a user, computed from the same connection table fan-out already needs, broadcast only to users sharing a scope with the subject, so cost scales with a social graph, not server population.
+A short grace period delays "went offline" announcements so an ordinary backgrounded reconnect never flickers a presence indicator.
 
 ## Rate limiting
 
-In-memory, per-process token buckets, matching check-in-relay's own proven approach for a single-instance deployment; this is the right call for the brief's "handful of users, extremely lightweight" default and should not force a Redis dependency onto self-hosters.
-The limiter should be an injectable interface so the official hosted instance can swap in a shared-store implementation only if and when it scales past one process.
-Starting limits: 10 WS connects/min/IP, roughly 1 message/s sustained per user with burst headroom, 1 typing event/3s per conversation, 20 canvas ops/s per user per channel (canvas is expected to be chattier), 30 sync requests/min per user.
-Exceeding a limit returns a typed error frame with `retry_after_ms` rather than a silent drop; silently dropping ordinary messages is an undetectable correctness bug, unlike canvas's deliberate silent-drop for stale non-authority writes, which is a narrower, intentional case.
+Decision: in-process token buckets keyed by user and limit class, with no external dependency, matching the single-process architecture chosen for the official instance and required for a lightweight self-host default.
+The limiter sits behind a trait so a shared-store implementation can be substituted at one seam if the official instance ever needs multiple processes, but only in-process ships for v1.
+Separate budgets apply to connection attempts per IP, message sends per user per scope with burst plus sustained rates, typing events kept loose, and sync requests kept global since it is one bundled call.
+On any breach the server returns a typed error frame with a retry hint rather than silently dropping it, since a dropped message is indistinguishable from data loss and local echo needs a definite accept-or-reject, not a guess.
 
 ## Push notification triggering
 
-The self-hosted server owns all device and mute-state knowledge; the relay stays a dumb, scoped forwarder, exactly as check-in-relay is designed.
-After an event is committed and fanned out over WS, the server checks each recipient device for a live connection; if one exists, no push is sent, the biggest single win against redundant battery drain.
-Only devices with no live connection outside the resume grace window get a push, via the relay, using its proven scoped-key model (one revocable, hashed key per self-hosted server).
-Push payloads never carry message content for E2E-encrypted conversations, since the server never has plaintext to send; the client wakes, reconnects directly to the self-hosted server, decrypts, and posts its own local notification, the same two-phase pattern Signal uses.
-For plaintext conversations only, a short preview can ride in the push payload itself.
-Bursts of messages while backgrounded are debounced per device (3-5s window) into one wake or summary push rather than one push per message.
+Decision: the trigger for a push is the same commit-and-fan-out step that delivers an event over the socket, not a separate path.
+After an event's sequence is assigned and persisted, the server checks each scope member's device set; any device with a live connection is served and never generates a push, the majority case and the largest lever against redundant push volume and battery drain.
+Devices with no live connection are queued after a short debounce window of a few seconds, so a burst of messages collapses into one wake, also protecting the relay's per-device send limits from an ordinary fast conversation.
+Because a push is only a wake trigger and never a source of truth, a woken client runs the identical stateless catch-up sync described above, so push introduces no separate delivery path.
 
-## Resource targets
+## Flag: direct messages assume a shared home server, and nothing says so
 
-An idle self-hosted gateway process (handful of users) should stay well under 50MB RSS.
-Each connected WS client should add well under 100KB of server-side state (bounded channel plus a small struct), so 100 concurrent connections cost low single-digit MB total.
-
-## Flag: the brief should state multi-device support explicitly
-
-The brief's push-relay section refers to "the user's mobile devices" in the plural, implying multi-device support, but no section in Features or Account Model states it as a requirement.
-Every decision above (WS resume per session, per-device push tokens, cross-device read-state fan-out) assumes multi-device-per-user from day one, because echo-messenger shows what happens when it is retrofitted late: refresh tokens never got bound per device, so "log out all other devices" only affects sessions currently connected.
-Recommend adding an explicit multi-device requirement to the strategy doc.
+Owner decision 4 makes one backend deployment one community, and nothing in the brief or the decisions describes federation between deployments.
+The scope model here, one durable sequence counter per conversation in a single writer's database, only works when both participants' accounts live in the same deployment.
+That means Direct Messages, listed as core functionality, cannot work between users on different self-hosted servers, or between a self-hosted user and an official-instance user, under the current account model.
+This deserves an explicit decision rather than discovery mid-build: either document DMs as same-deployment-only for v1, the option this report assumes, or scope federation as a deliberate future item.

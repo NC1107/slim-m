@@ -1,97 +1,81 @@
 # CI/CD and Release Automation
 
-Status: pre-implementation research.
-Scope: repo topology and pipeline structure for the client, server, and relay, conventional commit enforcement, automated versioning and GitHub Releases, GHCR multi-arch image publishing, a production Dockerfile and docker-compose example, Linux and iOS artifact building and signing, and CI caching.
+Status: pre-implementation research, against the finalized server stack (Rust/Axum/Tokio, embedded SQLite, UUIDv7 plus per-scope sequence, schema-first JSON over HTTP/WS).
+Scope: repo topology, pipeline structure, conventional-commit enforcement, versioning and GitHub Releases, GHCR multi-arch publishing, a production Dockerfile and compose example that runs voice, Linux artifacts for Fedora, an iOS TestFlight path, supply-chain hardening, and CI caching.
 
-## 1. Repo topology: one monorepo for client and server, the relay stays separate
+## 1. Repo topology
 
-Verdict: client and server live in one repository, following echo's `apps/server` / `apps/client` layout (Rust workspace, Melos-managed Flutter workspace).
-The relay is a separate repository, mirroring check-in-relay's real relationship to check-in.
+One monorepo holds the Flutter client and the Rust server: a Cargo workspace, a Dart/Flutter workspace using Dart's native `pub` workspace support, and a `schema/` directory holding the OpenAPI plus JSON Schema source of truth both sides codegen from.
+The wire protocol is the tightest coupling in the system: a new WebSocket event kind touches the schema, the generated Rust types, and the generated Dart client together, and version-skew rules are easier to hold when that change lands as one PR against one CI run rather than hand-coordinated across repos.
+The relay stays separate: its public surface (register, send, healthz, admin) is small and changes rarely, and coupling its release cadence to Rust plus Flutter CI would only add unrelated flakiness to a service whose design goal is staying minimal.
 
-Rationale: client and server change together constantly, since a new WS event kind touches both sides of the wire protocol in one PR, so one repo keeps changes atomic, the same problem echo's monorepo already solves.
-The relay should stay a dumb, minimal forwarder that changes rarely on its own schedule; coupling its release cadence to Flutter/Rust CI would fight its own "kept intentionally minimal" design goal.
+## 2. Pipeline structure and conventional-commit enforcement
 
-Alternatives rejected: three separate repos turns every wire-protocol change into a multi-repo PR, a real tax for no benefit at this size.
-One repo for all three was rejected for the reason above; check-in-relay's own separation from check-in is direct precedent for the split.
+One `ci.yml` runs on every PR: `dorny/paths-filter` (pinned by commit SHA, as is every third-party action below) gates Rust and Flutter jobs by files touched, a schema job regenerates Rust and Dart types from `schema/` and fails on any diff against the committed output, and format/lint/test jobs run per language (`cargo fmt --check`, `clippy -D warnings`, `cargo test --workspace`; `dart format --set-exit-if-changed`, `dart analyze`, `flutter test`).
+Because SQLite is embedded, Rust integration tests need no external database container or wait-for-healthy step, a CI simplification the stack decision buys for free.
+Conventional Commits are enforced on the PR title, not every commit, via a pinned semantic-PR-title action: squash-merge collapses commit history anyway, so the squash message is what actually becomes the changelog entry, avoiding blocked PRs over messy in-progress commits.
+The relay repository runs its own equivalent Go pipeline (`go build`, `go vet`, `go test ./...`, `golangci-lint`, `govulncheck`) independently.
 
-Risk: client-only PRs still pay a small, fixed repo-wide CI overhead even when path-gating skips the build jobs.
+## 3. Versioning and GitHub Releases
 
-## 2. Pipeline structure: echo's path-gated shape, minus its two real gaps
+Evaluated semantic-release, release-please, cocogitto, and a hand-rolled tag script.
+Semantic-release's plugin ecosystem is npm-centric; nothing here is JavaScript, so it would need Node purely as release tooling plus workaround plugins for every non-npm artifact.
+Cocogitto is a clean Rust-native option but is tag-driven rather than PR-gated, dropping the deliberate human review point a release should have.
+A hand-rolled script is rejected as least-tested, most likely to silently drift from the brief's own mapping.
+Decision: `release-please` in manifest mode, with two independently versioned packages inside the monorepo, server and client, plus a third standalone instance in the relay repository.
+Independent versioning matters because the two ship on different clocks: the server can release the moment a merge lands, while the client sits behind App Store and TestFlight review.
+Each package accumulates conventional commits into a release PR with a real changelog; merging it is the deliberate act that cuts the tag and GitHub Release, matching "GitHub Releases driven versioning" literally.
+Pre-1.0, set `bump-minor-pre-major` and `bump-breaking-pre-major` true, overriding release-please's default of freezing the major digit at 0: self-hosters upgrading a running server need a real compatibility signal from day one, which SemVer's 0.x convention would otherwise hide from that audience.
+Every artifact job (Docker, Linux packages, TestFlight) triggers off its own package's `release: published` event, so a slow App Store review never blocks a same-day server release.
 
-Verdict: copy echo's `dev-build.yml` / `release.yml` structure almost unchanged: a `paths` job (`dorny/paths-filter`) gates each `build-*` job by files actually touched, `lint-test-rust`/`lint-test-flutter` run independently and gate only their own platform, and iOS dev builds stay cost-gated behind `workflow_dispatch` or a `[ci-ios]` marker since macOS runners cost roughly 10x Linux.
-This shape is production-proven and serves the brief's "strong CI/CD" principle directly.
+## 4. GHCR multi-arch publishing
 
-Two gaps should not carry forward: echo's version job always bumps patch regardless of commit type, matching neither its own commit-type table nor this brief's "feat bumps feature, fix: patch, breaking: major" (Section 3 fixes this), and echo's Docker publish jobs never set `platforms:`, so its images are amd64-only despite Buildx being wired up (Section 4 fixes this).
-
-Relay CI: `go build`, `go vet`, `go test ./...`, `golangci-lint`, `govulncheck` on every push, no path gating needed given the repo's small size, finishing in well under two minutes.
-
-## 3. Versioning: release-please, not semantic-release, not a hand-rolled tag script
-
-Verdict: `googleapis/release-please-action`, one instance per repository (client/server monorepo shares one version number; the relay versions independently).
-
-Rationale: release-please parses conventional commits into the exact `feat`/`fix`/`breaking` to `minor`/`patch`/`major` mapping the brief describes, via a merge-gated release PR that accumulates a changelog rather than tagging silently on push.
-That merge gate suits a project valuing maintainability over speed: merging "Release vX.Y.Z" is a deliberate act, and a natural point to edit release notes before they reach users.
-It needs no custom tag-reservation bash and creates the GitHub Release directly, so "GitHub Releases driven versioning" is literal rather than glued together.
-
-Alternatives rejected: semantic-release is heavier for no added benefit; its Node-centric plugin chain and changelog-first bias fit a JS project better than a Rust/Flutter/Go one.
-Echo's hand-rolled tag script was rejected as a template: it works, but per the gap above it does not branch on commit type, so it would need a rewrite anyway.
-
-Concrete pre-1.0 call the brief leaves implicit: set `bump-minor-pre-major: true` and `bump-breaking-pre-major: true`, so `feat`/breaking commits bump minor/major even before 1.0.0, overriding release-please's default of freezing the major digit at 0.
-Rationale: self-hosters need real compatibility-break signals from day one, the brief's own intent.
-Risk: a deliberate deviation from strict SemVer convention; document it once in `CONTRIBUTING.md`.
-
-Publishing stays decoupled from the tag, following echo's own `linux-packages.yml` principle that a packaging hiccup must never block the main release: the tag/Release job is one step, each artifact job triggers independently off `release: published`, so a slow TestFlight review never blocks a Linux user's release.
-
-## 4. GHCR publishing: real multi-arch, not echo's amd64-only default
-
-Verdict: publish `linux/amd64` and `linux/arm64` manifests for both server and relay images.
-
-Rationale: the brief's target self-hoster ("a handful of users") very often means a Raspberry Pi or other arm64 board, so amd64-only is a real gap.
-For the Rust server, build each arch natively on GitHub's free-tier `ubuntu-24.04-arm` runners rather than cross-compiling under QEMU, commonly 5 to 10x slower for Rust; a matrix of native per-arch builds pushes per-arch tags, then a final job merges them with `docker buildx imagetools create`.
-For the Go relay, native cross-compilation (`GOARCH=arm64 CGO_ENABLED=0`) is fast enough that one amd64 runner with `docker buildx build --platform linux/amd64,linux/arm64 --push` is sufficient.
-
-Risk: native arm64 runners are newer than amd64 with less operational history; QEMU emulation remains a working, slower fallback for the server image.
+Both images publish `linux/amd64` and `linux/arm64` manifests: "a handful of users" often means a Raspberry Pi or an ARM VPS, so arm64 is not optional.
+The server build runs natively on GitHub's free-tier `ubuntu-24.04-arm` runner alongside the amd64 runner, per-arch tags pushed independently and merged with `docker buildx imagetools create`.
+Native per-arch builds beat QEMU emulation (5 to 10x slower for Rust) and a cross-compilation toolchain like `cross` or `cargo-zigbuild`, adding a second build system for marginal gain now that free arm64 runners exist.
+The Go relay cross-compiles fast enough that one amd64 runner with `docker buildx build --platform linux/amd64,linux/arm64 --push` suffices.
 
 ## 5. Production Dockerfile and docker-compose
 
-Server image: two-stage build, `rust:<pinned>-bookworm` builder targeting the musl target (`x86_64`/`aarch64-unknown-linux-musl`) with `rustls`, no OpenSSL, reusing echo's dummy-skeleton dependency-caching trick.
-Runtime: `gcr.io/distroless/static-debian12:nonroot`, the base check-in-relay already validates, non-root, no shell.
-If a subprocess (ffmpeg-style media handling, as echo needs) turns out to be required, switch to `distroless/cc-debian12` plus `tini`; otherwise Axum's own graceful shutdown is enough and tini can be dropped.
-Target: sub-20 MB compressed, under backend.md's 40 MB ceiling.
+The server Dockerfile is a two-stage musl build: `cargo-chef` separates the dependency layer from the application layer for cache reuse, `rustls` replaces OpenSSL so the binary has no C TLS dependency, and SQLite links in statically via the bundled feature against the musl target.
+The runtime stage is `distroless/static-debian12:nonroot`: non-root, no shell, no package manager, with a `--healthcheck` subcommand baked into the same binary backing the container `HEALTHCHECK`, since a shell-less image has no `curl` to invoke one externally.
+Because SQLite is embedded and single-writer, the server owns its data on a named volume directly; there is no separate database container to run or back up, meaningfully lighter than a typical Postgres-backed compose file.
+The compose example that actually runs voice adds LiveKit (the already-decided self-hosted SFU), pinned by digest, plus Caddy for automatic TLS.
+LiveKit needs explicit UDP port range publishing (or host networking) for its TURN/media path, distinct from the plain TCP proxying Caddy does for the app server; misconfigured SFU networking is the most common self-host failure for any WebRTC service behind Docker, so the example documents it concretely.
+Memory limits follow the per-service budgets already set in the media and backend research.
 
-Compose example: `server`, `postgres` (small-instance-tuned `postgresql.conf`), and Caddy for automatic TLS, matching the check-in-relay pattern the security research already commits to, rather than Traefik's extra surface for a single-instance self-hoster.
-`mem_limit` values reflect backend.md's under-150 MB combined idle target; document a Traefik fallback in the README, mirroring check-in-relay's own.
+## 6. Linux artifacts for Fedora
 
-## 6. Linux artifacts: AppImage first, rpm alongside, signed with cosign
+Evaluated rpm, AppImage, and flatpak on Fedora's own idiom, not "works everywhere."
+Fedora Workstation's default install path is GNOME Software wired to Flathub, and the client already needs xdg-desktop-portal integration for screen capture; flatpak's sandboxing targets that same surface, so its overhead is largely work already owed.
+Flatpak is the primary artifact: published to a self-hosted static Flatpak remote from day one, with Flathub submission as a later, non-blocking step so review latency never gates a release.
+A plain `.rpm`, built from a hand-written spec rather than a generic packager, ships alongside it for users wanting a native, non-sandboxed install.
+AppImage is deferred: it solves cross-distro portability, which matters once distros beyond Fedora are targeted, not this phase's priority; three formats before one is done well is the premature breadth the brief warns against.
+Risk: flatpak sandboxing can clip global hotkeys or tray integration; validate the needed portals early.
 
-Verdict: AppImage as the primary artifact, .rpm alongside it, defer .deb and flatpak.
+## 7. iOS TestFlight path
 
-Rationale: AppImage needs no per-distro packaging maintenance and runs unmodified on Fedora, the brief's stated primary test environment, without existing in any repository, the lowest-maintenance path to every Linux user.
-.rpm ships alongside it because Fedora users expect a native `dnf`-installable package; echo's `fpm`-based script is a reasonable base to extend with AppImage generation.
-Flatpak is rejected for now: Flathub submission and sandboxing add real CI and maintenance overhead, and LiveKit's native device and screen-share portal access would need extra permission work, for a discoverability benefit that matters more once the app has an established base; revisit post-1.0.
+Fastlane `match` stores certificates and profiles in a separate encrypted private git repository rather than raw files in Actions secrets; fastlane `pilot` uploads to TestFlight using an App Store Connect API key, on GitHub-hosted macOS runners.
+Every client-package release triggers a TestFlight build, since iOS is a primary testing platform; day-to-day PR CI keeps iOS builds behind manual dispatch, since macOS runners cost roughly ten times a Linux runner.
 
-Signing: `cosign` keyless signing (Sigstore, OIDC-backed to the GitHub Actions identity) across every artifact type, images, AppImage, and rpm, one signing story instead of three, and no long-lived private key sitting in Actions secrets.
-Also generate SLSA provenance via `actions/attest-build-provenance`, low effort for meaningfully higher trust.
-Risk: cosign verification is not yet a habit for most Linux desktop users; publish a conventional detached GPG signature and SHA256SUMS alongside it so both paths exist.
+## 8. Supply-chain hardening
 
-## 7. iOS artifacts: fastlane match plus pilot to TestFlight
+Every third-party action is pinned to a full commit SHA, not a floating tag, closing the mutable-trust-anchor gap a tag pin leaves open.
+Every published artifact, images, flatpak, rpm, is signed with `cosign` in keyless mode (Sigstore/Fulcio, bound to the GitHub Actions OIDC identity), plus SLSA provenance via `actions/attest-build-provenance`; no long-lived signing key sits in secrets.
+SBOMs come from Buildx's native `--sbom`/`--provenance` flags, not a separate tool, attached as SPDX output to each release.
+`cargo audit` and `cargo deny` gate Rust, `osv-scanner` covers Dart, `govulncheck` covers the relay, and Dependabot keeps all three current; a pipeline with no update mechanism just accumulates silent CVE debt.
 
-Verdict: fastlane `match` for certificates/profiles (encrypted in a private git repo, not raw files in GitHub secrets), fastlane `pilot` to upload to TestFlight, authenticated with an App Store Connect API key rather than a personal Apple ID, on GitHub-hosted macOS runners.
-Unlike dev builds, release-pipeline iOS builds are never cost-gated: the brief names iOS a primary testing platform, so every tagged release should produce a TestFlight build, while dev-branch cost-gating stays for day-to-day pushes.
-Full App Store review readiness, including the invite-only account model backend.md flags as an open guideline question, is separate from TestFlight and does not block this pipeline.
+## 9. Caching
 
-## 8. Caching
+`Swatinem/rust-cache` for the Cargo workspace, `subosito/flutter-action`'s built-in cache plus a `~/.pub-cache` key on `pubspec.lock`, Buildx `type=gha` layer caching (pairing with `cargo-chef`'s split layer), and Go's built-in module cache for the relay.
+Bigger or self-hosted runners are deliberately not adopted up front; standard caches should cover a small OSS project's CI budget, and paying for capacity ahead of a measured bottleneck is premature complexity.
 
-Reuse echo's validated shape as-is: `Swatinem/rust-cache`, `~/.pub-cache` plus `.dart_tool` keyed on `pubspec.lock`, Gradle caches, CocoaPods caches, and `type=gha` Docker layer caching.
-Add Go's built-in module/build cache (`actions/setup-go`'s `cache: true`) for the relay.
-Do not reach for self-hosted or larger runners at project start; echo's own numbers (5 to 10 minutes saved on warm Rust jobs) show standard caches already solve most of the cost, and paying for bigger runners before queue time is a proven bottleneck is the premature complexity the brief warns against.
+## Stack interaction note
 
-## A brief mistake worth flagging
-
-The brief's versioning examples describe full SemVer behavior but never state a starting version or pre-1.0 behavior, and echo's own reference implementation, read closely, does not actually implement commit-type-aware bumping at all.
-Copying echo's version job verbatim would silently fail to deliver what the brief itself asks for; Section 3 resolves this concretely rather than leaving it as a surprise discovered after the first breaking change ships as a patch release.
+No real conflict with the foundational stack surfaced; embedded SQLite simplifies CI (no database container, no readiness race) and the compose file (no separate DB service).
+The repository trait's future Postgres implementation does not need its own CI lane until it exists.
+One point outside this scope: since the official instance runs the identical published image, its deploy step is just "pull the new tag, restart," better suited to an operations runbook than this pipeline.
 
 ## Open questions
 
-- Whether the official hosted instance's deployment (watchtower-style auto-update from `:latest` versus an explicit deploy step gated on the release PR merge) belongs in this pipeline or is a separate operations concern.
-- Whether flatpak should be scheduled for a specific post-1.0 milestone now, or decided once real Flathub demand appears.
+Whether the official instance's deploy trigger (an update-checking sidecar versus a manual step gated on release publish) belongs here or in a separate operations document.

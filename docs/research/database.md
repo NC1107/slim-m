@@ -1,108 +1,92 @@
 # Database and Storage Layer
 
-Status: pre-implementation research.
-Scope: storage engine choice for the official and self-hosted instances, core schema, indexing and pagination for message history, full-text search, migration tooling, retention, and backup.
-Assumes the stack already committed in `backend.md` (Rust, Axum, SQLx, PostgreSQL), and reconciles with `voice-canvas.md`, `realtime-sync.md`, and `security.md` where their decisions touch storage.
-Divergences from a sibling report are called out, not silently overridden.
+Status: pre-implementation research, fresh pass.
+Scope: schema for users, devices, sessions and refresh tokens, RBAC, groups, channels, messages, reactions, attachments, invites, and canvas objects, plus indexing, keyset pagination, full-text search, forward-only migrations, retention, and backup.
+Builds on the already-decided stack: Rust, Axum, Tokio, SQLite in WAL mode via sqlx, a single serialized writer path with a read-only pool, and UUIDv7 identity paired with a per-scope monotonic i64 sequence.
 
-## 1. Storage engine: Postgres only, for every deployment size
+## 1. Engine role: SQLite for the official instance and every self-host, one tier
 
-Verdict: PostgreSQL is the single storage engine for the official instance and every self-hosted instance, with no SQLite option and no dual-backend abstraction layer.
-The push relay keeps its own separate SQLite store, as `backend.md` already decided.
-That is a different, simpler data shape and is not affected by this verdict.
-
-Rationale: the schema below needs row-level locking for concurrent canvas and message writes, JSONB with GIN indexing, generated tsvector columns, and partial indexes.
-SQLite has none of these in a form strong enough for this workload.
-Its write model serializes at the database or `BEGIN IMMEDIATE` transaction level, not per row, so a lively voice-canvas session with several people drawing at once would serialize onto one lock even on spare hardware.
-That is a correctness and latency risk, not just a scale risk, and it hits exactly the self-hosted "handful of users" case the brief cares about, since a small friend-group call is still a bursty multi-writer workload.
-
-Alternatives rejected:
-
-- **SQLite-first, Postgres for the official instance only.** Rejected because it means designing two concurrency models and shipping the weaker one to every self-hoster, the deployment the brief wants to be lightweight and pleasant, not the one where correctness matters less.
-- **One SQL abstraction targeting both engines.** Rejected because SQLx's compile-time query verification, one of the stated reasons for choosing Rust, checks queries against one real schema at build time.
-Supporting two engines means two parallel query implementations forever, or dropping to a dynamic query builder that gives up the safety that motivated the choice.
-It would also force the schema down to the weaker engine's feature set, against the brief's "future scalability" goal.
-
-Risk: a from-scratch self-host needs two containers instead of one embedded file, and a real DBMS to back up.
-Mitigated by a `postgresql.conf` tuned for a tiny instance in the example compose (`backend.md` targets under 80 MB idle Postgres at this scale), and a single `docker-compose up` onboarding path.
+SQLite is not a concession for tiny self-hosts, it is right for the official instance too, because the owner decisions already establish that one backend deployment is one community.
+The official service is therefore not one large multi-tenant database, it is a fleet of small single-community processes, each with its own SQLite file.
+That is exactly the shape SQLite is strong at: perfect tenant isolation, no noisy-neighbor contention between communities, and a backup or migration of one community never touches another.
+The usual objection to SQLite, that a busy multi-writer workload serializes on one file lock, does not apply here, because the architecture already funnels every write for a given process through one serialized writer task before it reaches the database.
+SQLite's single-writer model is not a new constraint the database imposes on the app, it is the same constraint the app's own write path already chose, so the two line up instead of fighting each other.
+Reads, including message history scans and canvas viewport queries, go through the separate read-only pool that WAL mode supports concurrently with the writer.
+Escape hatch: the repository trait already required by the stack decision makes a future move to Postgres possible for a single community that genuinely outgrows one process, without a schema rewrite for everyone else.
+Risk to flag now, not later: FTS5 and the R-Tree module used below are optional SQLite compile-time features, so the build must explicitly enable them in the sqlx/libsqlite3-sys feature flags, or search and canvas indexing silently degrade to table scans.
 
 ## 2. Core schema
 
-The entity list in this assignment omits a `devices` table, but `backend.md` already commits to per-device refresh tokens and `security.md` to a device session record.
-Both need somewhere to live, so a `devices` table is added here rather than silently left out.
-An instance, official or self-hosted, can host more than one group, the same way one Discord deployment hosts many guilds.
-DMs are channels with no group, gated by a membership join table instead of role permissions.
-
 ```
-users(id, username, display_name, password_hash, public_identity_key, created_at)
-devices(id, user_id, platform, push_token_ref, last_seen_at, revoked_at)
+users(id, username, display_name, password_hash, deleted_at, created_at)
+devices(id, user_id, platform, identity_pubkey, push_registration_id, created_at, last_seen_at, revoked_at)
+refresh_tokens(id, device_id, token_hash, family_id, issued_at, expires_at, revoked_at, replaced_by)
 groups(id, name, owner_id, created_at)
-group_members(group_id, user_id, role, joined_at)           pk(group_id, user_id)
-channels(id, group_id nullable, kind, name, position, created_at)
-dm_participants(channel_id, user_id)                        pk(channel_id, user_id)
-messages(id, channel_id, author_id, content, content_tsv,
-         is_encrypted, reply_to_id, created_at, edited_at, deleted_at)
-attachments(id, sha256, size_bytes, mime, storage_key, encrypted, created_at)
-message_attachments(message_id, attachment_id, position)    pk(message_id, attachment_id)
-read_states(user_id, channel_id, last_read_message_id, updated_at)  pk(user_id, channel_id)
-invites(id, group_id, code_hash, created_by, max_uses, use_count, role_grant, expires_at, revoked_at)
-canvas_objects(id, channel_id, kind, z_index, transform, props, from_user_id, created_at, updated_at, deleted_at)
-canvas_ops(id, channel_id, actor_user_id, op_type, object_id, patch, created_at)
+roles(id, group_id, name, color, position, permissions, is_default, created_at)
+group_members(group_id, user_id, nickname, joined_at)          pk(group_id, user_id)
+member_roles(group_id, user_id, role_id)                       pk(group_id, user_id, role_id)
+channels(id, group_id nullable, kind, name, position, created_at, archived_at)
+channel_overwrites(channel_id, subject_type, subject_id, allow, deny)   pk(channel_id, subject_type, subject_id)
+channel_members(channel_id, user_id, joined_at)                 pk(channel_id, user_id)   -- DMs and group DMs
+messages(event_id, channel_id, seq, author_id, device_id, content, is_encrypted, reply_to_id, created_at, edited_at, deleted_at)
+reactions(message_id, user_id, emoji, created_at)                pk(message_id, user_id, emoji)
+attachments(sha256, size_bytes, mime, storage_key, encrypted, created_at)   pk(sha256)
+message_attachments(message_id, attachment_id, position)         pk(message_id, attachment_id)
+read_states(user_id, channel_id, last_read_seq, updated_at)      pk(user_id, channel_id)
+invites(id, group_id, code_hash, created_by, role_grant, max_uses, use_count, expires_at, revoked_at)
+canvas_objects(id, channel_id, kind, x, y, w, h, z_index, transform, props, created_by, created_at, updated_at, deleted_at)
+canvas_ops(event_id, channel_id, seq, actor_id, op_type, object_id, patch, created_at)
+channel_seq_counters(channel_id, next_seq)
 ```
 
-A few choices reuse or reconcile sibling reports rather than reinvent them.
-Message content is server-visible plaintext with an `is_encrypted` escape hatch, matching `security.md`'s verdict that v1 is transport-encrypted only, with end-to-end DMs deferred and pre-wired, not shipped.
-Attachments are content-addressed by `sha256` for dedup and encrypted at rest under a server key before the hash is stored, matching `security.md`.
-The database stores only metadata and a storage key, never blob bytes, keeping table and backup size small.
-`canvas_objects` and `canvas_ops` reuse `voice-canvas.md`'s materialized-state-plus-op-log split unchanged, except that `id` supersedes that report's separate per-channel `seq` counter, for the reason given next.
-Invites store a hashed code, never plaintext, matching `security.md`.
+There is deliberately no email column anywhere in v1, matching the no-email invite model for self-hosts and the admin-issued reset code decision for recovery, which needs no address to send anything to.
+The official instance uses the same schema, so it does not collect an email address either unless a later, separate decision adds a nullable column through a forward-only migration.
 
-## 3. Ordering, indexing, and pagination for message history
+## 3. RBAC with per-channel and per-member overrides
 
-Verdict: every persisted row, across messages, canvas ops, and any future event type, uses one global 64-bit snowflake `id` as both primary key and total-order key, adopting `realtime-sync.md`'s ID scheme rather than proposing a second one.
-This is a deliberate reconciliation.
-`voice-canvas.md` proposed a per-channel `seq bigint` assigned via `SELECT ... FOR UPDATE`, the same lock-then-append pattern that caused echo-messenger's TOCTOU bug, because every write still contends on one counter row per channel.
-A snowflake ID is generated in-process with no database round trip and no shared counter, so concurrent writes to the same channel no longer serialize on ID allocation, only on the row insert itself, which Postgres already handles well.
+`roles.permissions` is a single 63-bit bitmask in a SQLite INTEGER, chosen over a wider bitset because a typical permission list fits comfortably under 63 flags, and adding a second column later is a trivial additive migration, so there is no reason to pay for headroom today.
+A member's effective permission set is the union of their assigned roles' base bits, then the channel's role-level overwrites applied in role `position` order, then the channel's member-level overwrite applied last and absolute.
+`channel_overwrites` is one polymorphic table keyed on `(channel_id, subject_type, subject_id)` rather than two near-identical tables, because the allow/deny resolution logic is identical for both subject kinds and a single table keeps that logic in one place.
 
-Message history pagination is keyset-based, cursor on `id`, never `OFFSET`/`LIMIT`: `WHERE channel_id = $1 AND id < $cursor ORDER BY id DESC LIMIT 50`.
-Offset pagination is rejected: its cost grows with depth, and its results visibly shift under concurrent inserts, a real defect in a live chat log.
-The supporting index is `(channel_id, id DESC)`, partial on `deleted_at IS NULL` so soft-deleted rows never enter the hot scan path, and it serves `realtime-sync.md`'s unread count directly, so `read_states` needs no index beyond its primary key.
-Canvas ops use the identical index shape.
-`canvas_objects`, the mutable materialized table, keeps `voice-canvas.md`'s viewport-first pagination for live rendering, with `id` only as a stable tiebreaker.
+## 4. Event identity, ordering, and keyset pagination
 
-## 4. Full-text search
+Every ordered stream (a channel's messages, a channel's canvas ops) is its own scope, with `seq` assigned from `channel_seq_counters` inside the same transaction as the insert.
+Because only one writer task ever touches the database, that increment-then-insert is not a race the way a multi-writer `SELECT ... FOR UPDATE` counter would be, it is ordinary sequential code, which removes an entire class of bug rather than papering over it.
+History pagination is keyset-based on `(channel_id, seq)`, never offset-based, since offset cost grows with scroll depth and its results shift under concurrent inserts.
+The supporting index is `(channel_id, seq DESC)`, partial on `deleted_at IS NULL`, and it also backs `read_states.last_read_seq` unread counts without a second index.
+Reactions are deliberately left out of the seq stream, they are small, commutative, idempotent set operations on `(message_id, user_id, emoji)`, and forcing them through the same total order would add write contention for no client-visible benefit.
 
-Verdict: server-side Postgres full-text search, a generated `tsvector` column on `messages.content` with a GIN index, partial on `is_encrypted = false`.
-This is a clean call, not an open question, because `security.md` resolves the brief's ambiguous "lightweight encryption" phrase to transport-only for v1, so the server holds plaintext and indexing it server-side is legitimate today.
-The partial index means that once opt-in E2EE DMs ship, per `security.md`'s pre-wiring, those rows are simply never indexed, no migration needed; encrypted search becomes a client-side concern at that point, most naturally Drift's own SQLite FTS5.
-Rejected: Elasticsearch or Meilisearch, correct at large scale but a second heavyweight service that fails the "extremely lightweight" self-hosted bar for something Postgres already does well here.
-Also rejected: client-side search as the v1 default even for plaintext content, forgoing cheap indexed server-side search for no benefit while nothing is actually encrypted yet.
-Risk: GIN indexes add write cost per insert; the generated column computes once at write time, not query time, but insert latency is worth measuring once volume is realistic.
+## 5. Full-text search
 
-## 5. Migration tooling
+SQLite FTS5 in external-content mode over `messages.content`, kept in sync by insert and update triggers rather than a generated column, since SQLite has no native tsvector equivalent.
+The trigger only indexes rows where `is_encrypted = 0`, so once opt-in E2EE DMs ship, per the transport-only v1 stance, those rows simply stop entering the index, with no migration required.
+The `unicode61` tokenizer is used for a dependency-free, good-enough default.
+It has no real stemming, an accepted v1 limitation, not an oversight.
 
-Verdict: `sqlx migrate`, versioned forward-only `.sql` files embedded in the binary and auto-applied at startup, matching echo-messenger's proven pattern.
-Rejected: a second tool such as `refinery` or `sea-orm-migration`, duplicating what SQLx already provides.
-Also rejected: down-migrations as the primary rollback path, since a fleet of independently operated self-hosts cannot roll back in lockstep; a bad migration is fixed forward instead.
-Every migration is hand-written and reviewed, not generated, since the schema leans on Postgres-specific features generators frequently get wrong.
-Risk: a bad forward-only migration ships before it is caught, mitigated by running the full suite against a real ephemeral Postgres in CI, already part of `backend.md`'s testing strategy.
+## 6. Attachments, canvas objects, deletion, and multi-device
 
-## 6. Retention
+Attachments are keyed by `sha256` as the primary key, giving instance-wide dedup for free: two users pasting the same image only ever store it once.
+Content is encrypted at rest under a server-held key, not a per-content key, so dedup on the plaintext hash still works.
+Convergent per-content encryption was rejected: it leaks presence via confirmation attacks, and in a small trusted-operator deployment that trade buys nothing.
+`canvas_objects` gets explicit `x, y, w, h` columns backed by a SQLite R-Tree virtual table, rather than coordinates buried in the `transform` JSON blob, because the bounded five-million-pixel world needs fast bounding-box viewport queries, and R-Tree is a built-in, purpose-fit answer to exactly that query shape.
+Account deletion tombstones the `users` row: PII fields are scrubbed and `deleted_at` is set, all devices and refresh tokens are revoked, but authored messages are kept with the author shown as removed, since a message is also part of other participants' history, and erasing it unilaterally is worse than what the deletion actually asked for.
+Multi-device is native to the schema: `devices` and `refresh_tokens` are per-device, while `read_states` is per-user, so read position syncs across a user's own devices as decided, without exposing it to anyone else.
+Refresh tokens rotate on every use and carry a `family_id`.
+A reused, already-rotated token revokes the whole family, cheap breach detection with no server-side session state beyond one row per device.
 
-Messages default to keep-forever, matching Discord and Slack scrollback expectations, with soft delete via `deleted_at` filtered at query time, echo-messenger's proven pattern.
-Group and channel admins get an explicit, off-by-default disappearing-messages toggle, per the brief's admin goals; a background sweep hard-deletes rows past TTL on a schedule, not inline on every read.
-Attachments are swept by an orphan job removing blobs with no remaining `message_attachments` reference.
-Canvas op-log retention follows `voice-canvas.md`'s guidance unchanged: raw ops older than roughly thirty days may be compacted once no client needs to replay from an arbitrary point, a v1.x job, not a launch blocker.
+## 7. Migrations, retention, backup
 
-## 7. Backup strategy
-
-Official instance: continuous WAL archiving plus periodic `pg_basebackup` for point-in-time recovery, with scheduled restore drills, since an untested backup is not a backup.
-Self-hosted instance: a documented, scripted `pg_dump` plus attachment-directory tarball on a cron, reusing echo-messenger's grandfather retention (seven daily, four weekly, six monthly).
-Shipped as an optional compose service, not a mandatory sidecar, so a tiny instance is not forced to run it, but documented strongly enough that skipping it is a deliberate choice.
-A periodic automated restore-and-checksum job is recommended for both tiers, worth flagging explicitly since most self-hosted setups skip backup verification and a backup nobody has restored is a false sense of safety.
+Forward-only `.sql` files via sqlx's migrator, embedded in the binary, applied at startup.
+Because both the official and self-hosted instance are single-process by decision, startup migration means a brief restart window rather than true zero-downtime, which is an honest trade-off given the lightweight goal, not an oversight.
+Messages default to keep-forever with soft delete.
+A per-group disappearing-message TTL is an explicit, off-by-default admin toggle swept by a background job.
+Canvas replay ops and moderation-relevant audit facts are treated as two different retention classes: the fine-grained op log may be compacted for sync efficiency once no client needs full replay, while a lighter audit record of who created or removed which object is kept independently and longer.
+Backup uses SQLite's `VACUUM INTO` for an atomic hot copy under WAL, far simpler than Postgres's WAL archiving for a self-hoster, scheduled by cron with grandfather retention.
+Attachment blobs live on disk outside the database file and are backed up separately by tarball, keeping the database file itself small enough to snapshot quickly.
 
 ## Open questions
 
-- Whether the official instance needs more than one application-server process for v1: if so, snowflake ID generation needs an assigned node-id range per process, a small addition, decided before launch, not retrofitted.
-- Default attachment storage backend for self-hosters, local disk versus an S3-compatible target: jointly a database and deployment-infrastructure decision, left to whichever report owns deployment defaults.
-- Default disappearing-message and canvas-op-log retention windows are product policy, not technical, and are deliberately left open, matching `voice-canvas.md`'s own framing of the same question.
+- Whether `roles.permissions` needs a second 64-bit column before v1 ships, once the exact permission list is finalized.
+- Default disappearing-message and canvas-op compaction windows are product policy, left open here.
+- Whether the official instance needs a lightweight per-tenant supervisor process to manage the fleet of single-community SQLite processes.
+  That is a deployment-layer decision, not a schema one.

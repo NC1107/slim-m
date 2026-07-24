@@ -64,11 +64,12 @@ Risk: border-only separation can feel flat on dense screens, mitigated by pairin
 
 ## Iconography
 
-Base set: Phosphor Icons (regular weight default, bold for active/selected), not a fully custom-drawn set, since an open, MIT-licensed, actively maintained library covers the generic UI icons a community project keeps needing without commissioning new artwork per feature.
+Base set: Lucide Icons (owner decision), an open, ISC-licensed, actively maintained line-icon library that covers the generic UI icons a community project keeps needing without commissioning new artwork per feature.
+The interface never uses emoji as chrome (owner decision); emoji appear only as user-chosen message content such as reactions.
 Custom icons are reserved for surfaces where distinctiveness matters: the app mark and the Voice Canvas toolbar (pen, sticky note, shape, window).
-Sizes are tokenized at 16, 20, 24 (default), 32dp, 1.5px stroke at the 24dp reference; active state is conveyed by weight as well as color.
-Rejected: Material Icons, which would read as an unstyled default Flutter app; a full custom icon set, an ongoing maintenance liability outweighing the distinctiveness it buys.
-Risk: Phosphor's language will drift slightly from the custom toolbar icons, mitigated by matching stroke width and corner logic across both.
+Sizes are tokenized at 16, 20, 24 (default), 32dp, 1.5px stroke at the 24dp reference; active state is conveyed by weight and the accent as well as never by color alone.
+Rejected: Material Icons, which would read as an unstyled default Flutter app; emoji as UI chrome, which is inconsistent across platforms and off-brand for an understated product; a full custom icon set, an ongoing maintenance liability outweighing the distinctiveness it buys.
+Risk: Lucide's language will drift slightly from the custom toolbar icons, mitigated by matching stroke width and corner logic across both.
 
 ## Motion
 

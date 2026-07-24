@@ -1,85 +1,83 @@
 # Open Source Strategy and Repository Structure
 
 Status: pre-implementation research, feeds into STRATEGY.md.
-Scope: repository layout, licensing per component, contribution workflow, documentation structure, issue and PR templates, governance, and guardrails that keep the codebase componentized as outside contributors join.
-Assumes the stack already committed in the sibling reports: Rust/Axum server, Go relay extending check-in-relay, Flutter/Melos client.
+Scope: repository layout, per-component licensing, contribution workflow, documentation structure, governance, and guardrails against file bloat and coupling.
+Builds on the stack already committed this pass: Rust/Axum/Tokio over SQLite, a Flutter client, a schema-first JSON protocol with CI-enforced Dart and Rust codegen, and a Go push relay adapted from check-in-relay.
+Every decision below is argued from the brief, the owner decisions, and that stack alone.
 
-## 1. Repository layout: two repositories, not one and not three
+## 1. Repository layout: two repositories
 
 Verdict: two repositories.
-A core monorepo, this repository, growing to hold `server/`, `client/`, and any shared protocol definitions alongside the existing `docs/`, holds the Rust server and the Flutter client together.
-A second, separate repository holds the push relay, extending `check-in-relay` directly rather than folding it into the core repo.
+One core repository holds the Rust server, the Flutter client, and the OpenAPI plus JSON Schema protocol definitions both consume.
+A second, separate repository holds the push relay, forked and extended directly from check-in-relay.
 
-Rationale for keeping client and server together: the WebSocket wire protocol is the one artifact both sides must change atomically.
-realtime-sync.md already treats ordering and sequencing as a day-one contract, not a follow-up.
-A protocol change split across a server PR and a separately merged client PR reintroduces the cross-side version skew that produced echo-messenger's canvas divergence bugs, moved from a data-sync problem into a release-choreography problem.
-Echo-messenger already proved a single Cargo-workspace-plus-Flutter monorepo works at this scale, keeping CI fast through path-gated builds where only changed platforms get built; that pattern transfers directly.
+Server and client stay together because the committed stack requires one schema-first source of truth with CI-enforced codegen for both Dart and Rust, plus additive-only version-skew rules, and that codegen only enforces anything if it runs against one schema in one CI job.
+Splitting client and server across repositories turns an atomic schema-plus-handler-plus-screen change into coordinated two-repo releases, the choreography schema-first codegen exists to prevent.
+A monorepo with real crate and package boundaries, not a flat namespace, keeps the coupling that actually matters, the wire protocol, reviewable in one pull request.
 
-Rationale for keeping the relay separate: it is a different language, a different release cadence since it should change rarely once APNs/FCM integration is stable, and a different trust boundary since it carries live push credentials.
-Its own repository keeps those secrets out of the CI environment that builds client and server artifacts, and keeps most contributors, who never touch push infrastructure, away from that operational risk.
-This also matches the brief's instruction to model the relay on `check-in-relay` directly rather than as a new subsystem of the main product.
+The relay stays apart because it is a different language and toolchain by construction, adapted from check-in-relay's existing Go codebase, and it holds live push credentials, an APNs key and an FCM service account, that most contributors never need to see.
+It also has a different distribution model: the relay is only ever officially operated, never cloned and run by a self-hoster, unlike the server image every self-hosted deployment pulls, so folding it in adds a third language to every checkout for a component almost no contributor touches.
 
-Alternatives rejected: one repository for everything, including the relay, rejected on the secrets-exposure grounds above since most self-hosters and contributors never need relay code; and three fully separate repositories, rejected because it forces two-PR choreography for every client/server protocol change, the one place atomic co-review matters most, with no separate release cadences yet to justify the overhead.
+The server-relay boundary is still a real contract, not a free pass: the push envelope must stay additive-only and versioned with the same discipline applied to the client/server WebSocket envelope, with a contract test against a real relay instance before the surface is called stable, so drift fails loudly in CI rather than as silently missed pushes.
 
-Risk: the core repo will grow large over years; path-gated CI and workspace boundaries must be maintained deliberately, not left to happen. See guardrails below.
+Alternatives rejected: one repository for everything, which drags relay secrets and a third toolchain into every checkout for no shared-schema benefit; three separate repositories, which forces two-PR choreography on every protocol change, the exact overhead schema-first codegen removes.
+
+Risk: a monorepo can grow unbounded scope over years if nothing prunes it; path-gated CI, workspace boundaries, and a periodic docs and dependency pruning pass need to be a named recurring task, not assumed.
 
 ## 2. Licensing: network copyleft for services, permissive for the client
 
-Verdict: the server and the relay ship under AGPL-3.0.
-The Flutter client, and any shared protocol or schema definitions consumed by both client and server, ship under Apache-2.0.
+Verdict: the server and relay ship under AGPL-3.0.
+The Flutter client and the shared protocol and schema package ship under Apache-2.0.
 
-Echo-messenger used PolyForm Noncommercial, a source-available license, not an OSI-approved open license.
-That directly contradicts the brief's own stated principle, "open source friendly," and it discourages outside contribution: a contributor whose patch gets relicensed into a noncommercial-only codebase has good reason to hesitate, and companies with any legal review process will not touch it at all.
-Continuing that choice for slim-m would be a mistake, not a neutral default.
+The project ships an official hosted instance alongside encouraged self-hosting, exactly the shape that makes the SaaS loophole real: plain GPL only triggers source disclosure on distribution, and running a modified server as a hosted service is not distribution, so a well-resourced operator could rehost it as a competing service and never publish a line back.
+AGPL's network-use clause is the one option among Apache-2.0, MIT, and GPL-3.0 that closes that gap, and it applies equally to the relay, itself a network service rather than something end users install.
 
-The harder question is permissive versus copyleft for the parts that are genuinely open.
-The brief describes an official hosted instance alongside encouraged self-hosting, the shape well-known self-hostable server products use AGPL for, to close the SaaS loophole: ordinary GPL only triggers source-sharing on distribution, so a well-funded operator can run GPL server code as a competing hosted service and never publish a line back, since running a service is not distributing software.
-AGPL's network clause closes that gap; it is the only option among Apache-2.0, MIT, and GPL-3.0 that does.
-For the client the calculus flips: AGPL on client code shipped through app stores has caused real friction historically, since copyleft terms forbidding additional restrictions can conflict with app store terms, and there is no SaaS-rehosting risk on a binary users install themselves.
-Apache-2.0 beats plain MIT for the client and shared libraries for its explicit patent grant, meaningful once compiled binaries reach end users through app stores.
+For the client the calculus differs: there is no rehosting risk on a binary a user installs on their own device, and AGPL terms have historically caused real friction against app store restrictions, a risk with no offsetting benefit here.
+Apache-2.0 beats plain MIT for the client and the shared schema package for its explicit patent grant, which matters once compiled binaries reach end users through app stores.
+The shared schema package stays permissive rather than inheriting the server's AGPL, since its generated code compiles directly into the client; a copyleft schema package would embed an AGPL artifact inside a permissively licensed app.
 
-Alternatives rejected: Apache-2.0 or MIT for the whole project, which gives up the one lever, network copyleft, that protects the official-hosted-instance model from a rehoster; GPL-3.0 for the server, which has the same SaaS loophole AGPL exists to close; and keeping PolyForm Noncommercial, which contradicts the brief and suppresses contribution outright.
+Alternatives rejected: Apache-2.0 or MIT project-wide, which gives up the lever protecting the hosted instance from an uncontributing rehoster; GPL-3.0 for the server, which carries the same SaaS loophole AGPL closes; AGPL for the client, rejected for app-store friction with no offsetting benefit.
 
-On contributor provenance, use a Developer Certificate of Origin sign-off, `git commit -s`, bot-enforced, not a full Contributor License Agreement.
-A CLA matters mainly if the owner wants a future proprietary or dual-licensed offering; nothing in the brief states that intent, and "easy to contribute to" outweighs a hypothetical.
-This is a real open question, flagged below.
+Risk: a mixed-license monorepo needs active enforcement, since nothing stops server-only logic from being pasted into the shared schema package during a refactor.
+Use per-package SPDX headers, a root license map following the REUSE convention rather than one ambiguous LICENSE file, and a CI check verifying each package's declared license against an allowlist, with mandatory review on any change to the shared schema package.
 
-Risk: AGPL is unfamiliar to some corporate contributors, and self-hosters who modify the server must understand they owe their own users source access, an obligation many do not expect from copyleft; document it plainly in the self-hosting guide rather than relying on the license text.
+Separate finding: check-in-relay ships with no LICENSE file anywhere in its tree today, confirmed by direct inspection, which under default copyright makes it all-rights-reserved rather than open.
+Add an explicit AGPL-3.0 LICENSE to check-in-relay as part of the fork, before external contribution to the relay repository is invited.
 
-## 3. Contribution workflow
+## 3. Contribution workflow: DCO, not a CLA
 
-Reuse echo-messenger's proven shape: work happens on `dev` or `feature/**`/`fix/**` branches, merges to `main` via pull request, conventional commits enforced by commitlint and a pre-commit hook runner, and path-gated CI so a Dart-only change never rebuilds the relay.
-External contributors fork and branch normally; trusted contributors, once promoted under the governance criteria below, get direct push to `feature/**`, mirroring echo's own trust tiers.
-Conventional commit types drive automated semantic versioning and GitHub Releases, matching the brief's explicit requirement: `feat` bumps minor, `fix` bumps patch, a `BREAKING CHANGE` footer bumps major.
+Verdict: a Developer Certificate of Origin sign-off, `git commit -s`, checked by CI, not a Contributor License Agreement.
+A CLA earns its cost mainly when the maintainer wants a future proprietary or dual-licensed offering, and nothing in the brief or owner decisions states that intent; "open source friendly" and "easy to contribute to" argue against friction for a hypothetical.
+Revisit only if a commercial dual-license plan is later adopted, since retrofitting a CLA after contributions exist is harder than starting with one.
+
+Beyond provenance: conventional commits enforced by commit-lint, feature and fix branches merging to a protected main branch through pull request, and path-gated CI so a client-only change never triggers a server or relay build.
+Conventional commit types drive the automated semantic versioning and GitHub Releases the brief requires.
 
 ## 4. Documentation structure
 
-Root-level `README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` using the Contributor Covenant unmodified, `SECURITY.md` with a vulnerability disclosure contact and response window, and a short `ARCHITECTURE.md` mapping the codebase rather than duplicating the research reports.
-`docs/research/` keeps the specialist reports as living reference, exactly as they exist today.
-`docs/decisions/` replaces echo's `docs/voice-lounge/` naming with a subsystem-agnostic decision-of-record folder, one file per contract such as coordinate policy, sync ordering, or multi-device authority, each with status quo, options considered, a dated decision, and open questions, reusing the template the reference notes call unusually good practice.
-The enforcement rule travels unchanged: a PR that changes a documented gesture, sync, or coordinate contract must update its doc in the same PR, not a follow-up.
+A root `README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and `SECURITY.md` with a vulnerability disclosure contact, plus a short `ARCHITECTURE.md` mapping the codebase rather than duplicating the research reports.
+`docs/decisions/` continues as the existing decision-record home, extended to cover technical decisions alongside owner product decisions, one file per contract, dated, with options considered and an explicit status.
+A pull request changing a documented contract, the wire protocol, an ordering rule, a coordinate policy, updates the matching decision file in the same pull request.
 
-## 5. Issue and PR templates
+## 5. Governance
 
-Three issue templates: bug report (repro steps, platform, version, logs); feature request requiring a problem statement before any proposed solution; and a template redirecting open-ended design discussion to GitHub Discussions rather than the tracker.
-One PR template checklist: tests included, docs updated if a documented contract changed, a conventional-commit title (PR titles become release notes verbatim, proven in echo), and a DCO sign-off reminder.
-Labels stay small: `good-first-issue`, `help-wanted`, per-component labels matching package boundaries, and bug severity.
+Verdict: a single maintainer today, formalized as `MAINTAINERS.md` and a `CODEOWNERS` file mapping directories to required reviewers, with a written, criteria-based path to add maintainers, sustained quality contributions plus nomination, rather than governance by informal trust.
+This matches the owner's own posture on the moderation-SLA decision: single-maintainer governance at friend-group scale, where heavier process is an overcommitment.
+A formal foundation or steering committee is out of scope until contributors span multiple organizations with competing priorities, the point where informal governance actually breaks down.
 
-## 6. Governance
+## 6. Guardrails against file bloat and coupling
 
-Verdict: a single owner acting as maintainer today, formalized as `MAINTAINERS.md` and a `CODEOWNERS` file mapping directories to required reviewers, with a documented, criteria-based path to add maintainers (sustained quality contributions plus owner nomination) rather than governance by informal trust.
-Reject a formal foundation or steering committee now; that is process weight the project has not earned, and it fights the brief's own instinct to avoid premature complexity.
-Revisit once the contributor base spans multiple organizations with competing priorities, the point where informal governance actually breaks down.
+The brief's goal is componentized, low-coupling code that stays maintainable as strangers submit patches, so guardrails need tooling, not memory.
+On Rust, workspace crate boundaries with deliberately narrow `pub` surfaces are the strongest guardrail, since a crate boundary is compiler-checked, unlike a style-guide sentence; route `CODEOWNERS` review at those boundaries so a cross-crate change always gets a second reviewer.
+Dart has no folder-level access control: nothing stops one feature reaching into another's internals unless the client is split into packages with path dependencies, real engineering work and cost, not a free guardrail, and the Flutter client's own decision to make.
 
-## 7. Guardrails that keep the codebase componentized
+Day one, regardless of language: a CI-enforced maximum file length with a reviewable override for the rare justified exception, and a complexity lint, clippy's complexity lints on Rust and `dart analyze` plus a custom lint set on Dart, rather than an external dashboard depended on immediately.
+A dependency-license check, `cargo-deny` for Rust and an equivalent allowlist for Dart, keeps AGPL-incompatible licenses out of the Apache-2.0 client; this is also where a UI dependency such as the Lucide icon set gets its license verified once, not assumed.
 
-Reuse and extend echo's proven SonarCloud budgets (cognitive complexity of 15, parameter count of 7, no nested ternaries) across every package, not just the client.
-Turn flutter-client.md's soft 300-line file budget into a CI-enforced lint rule requiring an explicit override comment to exceed it, so the guardrail survives past the point where the owner can review every PR personally.
-Treat package and workspace boundaries (Cargo crates, Melos packages) as the primary enforcement mechanism, since a compiler-checked public API is a stronger guardrail than a style-guide sentence, and route `CODEOWNERS` review at those same boundaries so a cross-package change always gets a second reviewer.
-Keep a living "componentize before you paste twice" list of shared widgets and helpers, the same discipline echo's own `CLAUDE.md` already documents well.
+Proportionality matters as much here as in governance: not everything needs to exist before the first external contributor shows up.
+Day one needs only DCO enforcement, commit-lint, path-gated CI, and file-length plus complexity linting, cheap checks that catch real problems immediately.
+A formal per-package license CI matrix and a cross-repo contract test can phase in once outside contributions land.
 
-## 8. A note on the brief's wording
+## Open questions
 
-The brief's "avoid a giant monolithic codebase" principle is about coupling and responsibility separation inside the code, not repository count.
-Read literally, it would argue for splitting client and server apart, which section 1 rejects for good reason.
-A monorepo with real workspace boundaries and path-gated CI is not what "monolithic" means; a repository split for its own sake would only move today's coupling problems into slower cross-repo choreography.
+Whether a future commercial offering is wanted, which would change the DCO-versus-CLA call, and whether the relay needs a published API compatibility policy once more instances depend on it.
