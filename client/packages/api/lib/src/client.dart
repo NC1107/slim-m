@@ -296,6 +296,54 @@ class SlimmApi {
   }
 
   // ---------------------------------------------------------------------------
+  // Devices, blocking, and reporting
+  // ---------------------------------------------------------------------------
+
+  /// The account's own devices, with the current one flagged.
+  Future<List<Device>> listDevices() async {
+    final json = await _send('GET', '/devices');
+    return (json as List<dynamic>)
+        .map((d) => Device.fromJson(d as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  /// Signs a device out. Its tokens die immediately and its socket is closed.
+  Future<void> removeDevice(String deviceId) =>
+      _send('DELETE', '/devices/$deviceId', expectNoContent: true);
+
+  /// The users this account has blocked. Blocking is a client-side view filter,
+  /// so the caller applies this rather than the server stripping messages.
+  Future<List<String>> listBlocks() async {
+    final json = await _send('GET', '/blocks');
+    return (json as List<dynamic>).cast<String>();
+  }
+
+  /// Blocks a user. Idempotent, and the blocked user is never told.
+  Future<void> blockUser(String userId) =>
+      _send('POST', '/blocks/$userId', expectNoContent: true);
+
+  Future<void> unblockUser(String userId) =>
+      _send('DELETE', '/blocks/$userId', expectNoContent: true);
+
+  /// Files a report for a human to review.
+  Future<String> report({
+    required ReportSubject subject,
+    required String subjectId,
+    required String reason,
+  }) async {
+    final json = await _send(
+      'POST',
+      '/reports',
+      body: {
+        'subject_kind': subject.wire,
+        'subject_id': subjectId,
+        'reason': reason,
+      },
+    );
+    return (json as Map<String, dynamic>)['id'] as String;
+  }
+
+  // ---------------------------------------------------------------------------
   // Transport
   // ---------------------------------------------------------------------------
 

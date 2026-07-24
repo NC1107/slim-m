@@ -7,25 +7,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
 import '../routing/breakpoints.dart';
+import '../routing/routes.dart';
 import 'channel_screen.dart';
-
-/// Which channel is open. Null means none is selected yet, which on a narrow
-/// window is the list on its own.
-final selectedChannelProvider = StateProvider<String?>((ref) => null);
 
 /// The shell. One widget handles every width: at compact widths it shows one
 /// pane at a time, and above that both at once. The panes themselves are the
 /// same widgets either way, so behaviour cannot drift between layouts.
 class HomeShell extends ConsumerWidget {
-  const HomeShell({super.key});
+  const HomeShell({required this.child, super.key});
+
+  /// The routed pane: either the empty state or a conversation.
+  final Widget child;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final layout = LayoutClass.of(context);
-    final selected = ref.watch(selectedChannelProvider);
+    final selected = _selectedChannel(context);
 
     if (layout.showsBothPanes) {
       return Scaffold(
@@ -36,11 +38,7 @@ class HomeShell extends ConsumerWidget {
               child: const _ChannelList(),
             ),
             const VerticalDivider(width: 1),
-            Expanded(
-              child: selected == null
-                  ? const _NothingSelected()
-                  : _Conversation(channelId: selected),
-            ),
+            Expanded(child: child),
           ],
         ),
       );
@@ -53,15 +51,47 @@ class HomeShell extends ConsumerWidget {
           leading: IconButton(
             icon: const Icon(AppIcons.back),
             tooltip: 'Back to channels',
-            onPressed: () =>
-                ref.read(selectedChannelProvider.notifier).state = null,
+            onPressed: () => context.go(Routes.channels),
           ),
           title: _ChannelTitle(channelId: selected),
         ),
-        body: ChannelScreen(channelId: selected),
+        body: child,
       );
     }
     return const Scaffold(body: _ChannelList());
+  }
+
+  /// The open channel, read from the route rather than held in state, so a
+  /// deep link and an in-app tap land in exactly the same place.
+  static String? _selectedChannel(BuildContext context) {
+    final path = GoRouterState.of(context).uri.path;
+    final prefix = '${Routes.channels}/';
+    if (!path.startsWith(prefix)) return null;
+    final id = path.substring(prefix.length);
+    return id.isEmpty ? null : id;
+  }
+}
+
+/// Shown in the conversation pane when nothing is open.
+class NoChannelSelected extends StatelessWidget {
+  const NoChannelSelected({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _NothingSelected();
+}
+
+/// The routed conversation pane.
+class ConversationPane extends StatelessWidget {
+  const ConversationPane({required this.channelId, super.key});
+
+  final String channelId;
+
+  @override
+  Widget build(BuildContext context) {
+    // On a narrow window the shell supplies its own header via the app bar.
+    final layout = LayoutClass.of(context);
+    if (!layout.showsBothPanes) return ChannelScreen(channelId: channelId);
+    return _Conversation(channelId: channelId);
   }
 }
 
@@ -159,7 +189,7 @@ class _ChannelList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final storeAsync = ref.watch(storeProvider);
-    final selected = ref.watch(selectedChannelProvider);
+    final selected = HomeShell._selectedChannel(context);
 
     return Container(
       color: tokens.surfaceRaised,
@@ -192,9 +222,7 @@ class _ChannelList extends ConsumerWidget {
                       return _ChannelTile(
                         channel: channel,
                         selected: channel.id == selected,
-                        onTap: () => ref
-                            .read(selectedChannelProvider.notifier)
-                            .state = channel.id,
+                        onTap: () => context.go(Routes.channel(channel.id)),
                       );
                     },
                   );
