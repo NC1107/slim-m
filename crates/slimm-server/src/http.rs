@@ -11,6 +11,7 @@ use crate::hub::Hub;
 use crate::store::Store;
 
 mod auth;
+mod channels;
 mod error;
 mod extract;
 mod messages;
@@ -36,6 +37,7 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(healthz))
         .route("/version", get(version))
         .merge(auth::routes())
+        .merge(channels::routes())
         .merge(messages::routes())
         .merge(sync::routes())
         .merge(ws::routes())

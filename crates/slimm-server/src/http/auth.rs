@@ -15,7 +15,7 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::Authed;
 use crate::hub::Event;
-use crate::store::{IssuedTokens, RefreshOutcome, RegisterError};
+use crate::store::{Bootstrap, IssuedTokens, RefreshOutcome, RegisterError};
 
 /// Auth payloads are a handful of short fields; cap the body well below any
 /// realistic request so an oversized body is rejected before it is buffered.
@@ -107,6 +107,14 @@ async fn register(
         }
         Err(RegisterError::Internal(err)) => return Err(err.into()),
     };
+
+    // The first account to register claims an unclaimed deployment, seeding the
+    // @everyone and admin roles and a general channel. Without this a fresh
+    // server has no roles and no channels, so nobody could do anything.
+    if let Bootstrap::Claimed = state.store.bootstrap_deployment(account.id).await? {
+        tracing::info!(user_id = %account.id, "deployment claimed by its first account");
+    }
+
     let tokens = state
         .store
         .open_session(account.id, &req.device_name)
