@@ -173,9 +173,13 @@ jobs:
           for f in /tmp/digests/*; do
             refs="${refs} ${IMAGE}@$(cat "$f")"
           done
+          # `latest` is the rolling tag deployments track for auto-updates
+          # (Watchtower polls a mutable tag); the version and sha tags stay for
+          # pinning and for tracing an image back to its commit.
           docker buildx imagetools create \
             -t "${IMAGE}:${version}" \
             -t "${IMAGE}:sha-${GITHUB_SHA}" \
+            -t "${IMAGE}:latest" \
             ${refs}
           digest="$(docker buildx imagetools inspect "${IMAGE}:${version}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
