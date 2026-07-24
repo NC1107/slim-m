@@ -7,19 +7,26 @@ use serde::Serialize;
 use tower_http::trace::TraceLayer;
 
 use crate::auth::Auth;
+use crate::hub::Hub;
 use crate::store::Store;
 
 mod auth;
 mod error;
 mod extract;
 mod messages;
+mod ws;
 
-/// What every handler shares: the persistence layer and the auth service.
-/// Cloning is cheap (a pool handle and a couple of `Arc`s).
+/// The wire-protocol envelope version a client negotiates on connect. Bumped
+/// only for a breaking change to the envelope; additive changes keep it.
+pub(crate) const PROTOCOL_VERSION: u32 = 1;
+
+/// What every handler shares: the persistence layer, the auth service, and the
+/// fan-out hub. Cloning is cheap (a pool handle and a couple of `Arc`s).
 #[derive(Clone)]
 pub struct AppState {
     pub store: Store,
     pub auth: Auth,
+    pub hub: Hub,
 }
 
 /// Builds the router over the shared application state.
@@ -29,6 +36,7 @@ pub fn router(state: AppState) -> Router {
         .route("/version", get(version))
         .merge(auth::routes())
         .merge(messages::routes())
+        .merge(ws::routes())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
@@ -51,7 +59,7 @@ async fn version() -> Json<Version> {
     Json(Version {
         name: "slim-m",
         version: env!("CARGO_PKG_VERSION"),
-        protocol: 1,
+        protocol: PROTOCOL_VERSION,
     })
 }
 

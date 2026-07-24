@@ -10,6 +10,7 @@ use slimm_server::auth::Auth;
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
 use slimm_server::store::{RefreshOutcome, RegisterError, Store};
 use tower::ServiceExt;
 
@@ -289,7 +290,11 @@ async fn ws_ticket_is_single_use_and_session_bound() {
 async fn http_register_ticket_and_logout() {
     let store = store().await;
     let auth = Auth::new(2).expect("auth service");
-    let app = http::router(AppState { store, auth });
+    let app = http::router(AppState {
+        store,
+        auth,
+        hub: Hub::new(),
+    });
 
     // Register.
     let body = serde_json::json!({
@@ -367,7 +372,11 @@ async fn http_register_ticket_and_logout() {
 #[tokio::test]
 async fn http_login_rejects_bad_credentials() {
     let (store, auth, _user_id) = with_alice().await;
-    let app = http::router(AppState { store, auth });
+    let app = http::router(AppState {
+        store,
+        auth,
+        hub: Hub::new(),
+    });
 
     let wrong_password = app
         .clone()
@@ -456,7 +465,11 @@ async fn concurrent_refresh_of_same_token_never_errors() {
 async fn http_register_rejects_spoofing_display_name() {
     let store = store().await;
     let auth = Auth::new(2).expect("auth service");
-    let app = http::router(AppState { store, auth });
+    let app = http::router(AppState {
+        store,
+        auth,
+        hub: Hub::new(),
+    });
 
     let response = app
         .oneshot(

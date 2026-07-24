@@ -8,6 +8,7 @@ pub mod auth;
 pub mod config;
 pub mod db;
 pub mod http;
+pub mod hub;
 pub mod ids;
 pub mod permissions;
 pub mod store;
@@ -26,7 +27,8 @@ pub async fn run() -> anyhow::Result<()> {
 
     let store = store::Store::new(pool);
     let auth = auth::Auth::new(config.hash_concurrency)?;
-    let app = http::router(http::AppState { store, auth });
+    let hub = hub::Hub::new();
+    let app = http::router(http::AppState { store, auth, hub });
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;
     tracing::info!(%addr, version = env!("CARGO_PKG_VERSION"), "slim-m server listening");

@@ -16,6 +16,7 @@ use uuid::Uuid;
 use super::AppState;
 use super::error::ApiError;
 use super::extract::Authed;
+use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::permissions::Permissions;
 use crate::store::Message;
@@ -41,7 +42,7 @@ pub fn routes() -> Router<AppState> {
 // ---------------------------------------------------------------------------
 
 #[derive(Serialize)]
-struct MessageDto {
+pub(crate) struct MessageDto {
     id: String,
     channel_id: String,
     author_id: Option<String>,
@@ -115,6 +116,7 @@ async fn send(
         .store
         .send_message(channel_id, ctx.user_id, id, content)
         .await?;
+    state.hub.publish(Event::MessageCreated(message.clone()));
     Ok(Json(message.into()))
 }
 
@@ -183,6 +185,7 @@ async fn edit(
         .edit_message(message_id, content)
         .await?
         .ok_or(ApiError::NotFound("message not found"))?;
+    state.hub.publish(Event::MessageEdited(updated.clone()));
     Ok(Json(updated.into()))
 }
 

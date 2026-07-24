@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use super::AppState;
 use super::error::ApiError;
 use super::extract::Authed;
+use crate::hub::Event;
 use crate::store::{IssuedTokens, RefreshOutcome, RegisterError};
 
 /// Auth payloads are a handful of short fields; cap the body well below any
@@ -172,6 +173,9 @@ async fn logout(
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
     state.store.revoke_session(ctx.session_id).await?;
+    // Drop any live WebSocket on this session at once, so revocation is instant
+    // over the socket too, not just for the next REST call.
+    state.hub.publish(Event::SessionRevoked(ctx.session_id));
     Ok(StatusCode::NO_CONTENT)
 }
 

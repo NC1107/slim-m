@@ -406,6 +406,8 @@ impl Store {
     }
 
     /// Revokes every live session for a device (device removed from the account).
+    /// A caller that wants any open WebSocket on those sessions closed at once
+    /// must also publish `Event::SessionRevoked`, the way the logout handler does.
     pub async fn revoke_device(&self, device_id: DeviceId) -> anyhow::Result<()> {
         let now = now_ms();
         let mut tx = self.pool.begin().await?;
