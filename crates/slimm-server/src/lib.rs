@@ -11,6 +11,7 @@ pub mod http;
 pub mod hub;
 pub mod ids;
 pub mod permissions;
+pub mod ratelimit;
 pub mod store;
 
 use std::net::SocketAddr;
@@ -28,14 +29,23 @@ pub async fn run() -> anyhow::Result<()> {
     let store = store::Store::new(pool);
     let auth = auth::Auth::new(config.hash_concurrency)?;
     let hub = hub::Hub::new();
-    let app = http::router(http::AppState { store, auth, hub });
+    let limiter = ratelimit::RateLimiter::new();
+    let app = http::router(http::AppState {
+        store,
+        auth,
+        hub,
+        limiter,
+    });
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;
     tracing::info!(%addr, version = env!("CARGO_PKG_VERSION"), "slim-m server listening");
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     Ok(())
 }
 

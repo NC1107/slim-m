@@ -8,6 +8,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::auth::Auth;
 use crate::hub::Hub;
+use crate::ratelimit::RateLimiter;
 use crate::store::Store;
 
 mod auth;
@@ -29,6 +30,7 @@ pub struct AppState {
     pub store: Store,
     pub auth: Auth,
     pub hub: Hub,
+    pub limiter: RateLimiter,
 }
 
 /// Builds the router over the shared application state.

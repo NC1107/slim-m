@@ -16,6 +16,7 @@ pub(crate) enum ApiError {
     Forbidden,
     NotFound(&'static str),
     Conflict(&'static str),
+    TooManyRequests,
     Unavailable,
     Internal,
 }
@@ -33,6 +34,7 @@ impl IntoResponse for ApiError {
             ApiError::Forbidden => (StatusCode::FORBIDDEN, "insufficient permissions"),
             ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message),
             ApiError::Conflict(message) => (StatusCode::CONFLICT, message),
+            ApiError::TooManyRequests => (StatusCode::TOO_MANY_REQUESTS, "slow down and retry"),
             ApiError::Unavailable => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "server busy, retry shortly",

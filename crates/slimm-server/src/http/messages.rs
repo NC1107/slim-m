@@ -8,6 +8,7 @@
 //! post, and authorship or manage-messages to edit.
 
 use axum::extract::{DefaultBodyLimit, Path, Query, State};
+use axum::http::request::Parts;
 use axum::routing::{get, patch};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
@@ -15,10 +16,11 @@ use uuid::Uuid;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::Authed;
+use super::extract::{Authed, enforce};
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::permissions::Permissions;
+use crate::ratelimit::Class;
 use crate::store::Message;
 
 /// Message bodies carry one text field; cap it generously but bounded.
@@ -91,9 +93,11 @@ struct ListParams {
 async fn send(
     Authed(ctx): Authed,
     Path(channel_id): Path<String>,
+    parts: Parts,
     State(state): State<AppState>,
     Json(req): Json<SendRequest>,
 ) -> Result<Json<MessageDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
 
     // A nonexistent channel grants no permissions, so this refuses both "you

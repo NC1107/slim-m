@@ -13,6 +13,7 @@ use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
 use slimm_server::ids::UserId;
 use slimm_server::permissions::Permissions;
+use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -36,6 +37,7 @@ fn app(store: Store) -> Router {
         store,
         auth,
         hub: Hub::new(),
+        limiter: RateLimiter::new(),
     })
 }
 

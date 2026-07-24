@@ -12,6 +12,7 @@ use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
 use slimm_server::ids::MessageId;
 use slimm_server::permissions::Permissions;
+use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::{OpenError, RefreshOutcome, Store};
 use tower::ServiceExt;
 
@@ -151,6 +152,7 @@ async fn http_delete_account_rejects_the_token_afterward() {
         store,
         auth: Auth::new(2).unwrap(),
         hub: Hub::new(),
+        limiter: RateLimiter::new(),
     });
 
     // Register and grab the access token.

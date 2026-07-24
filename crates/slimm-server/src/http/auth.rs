@@ -7,14 +7,16 @@
 
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use axum::routing::{delete, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::Authed;
+use super::extract::{Authed, PASSWORD, REFRESH, RateLimited, enforce};
 use crate::hub::Event;
+use crate::ratelimit::Class;
 use crate::store::{Bootstrap, IssuedTokens, RefreshOutcome, RegisterError};
 
 /// Auth payloads are a handful of short fields; cap the body well below any
@@ -87,6 +89,7 @@ fn token_response(tokens: &IssuedTokens) -> TokenResponse {
 // TODO(phase 2): gate registration behind invite redemption or an admin
 // bootstrap once the invite flow exists; it is open now for server-core work.
 async fn register(
+    _limited: RateLimited<PASSWORD>,
     State(state): State<AppState>,
     Json(req): Json<RegisterRequest>,
 ) -> Result<Json<TokenResponse>, ApiError> {
@@ -123,6 +126,7 @@ async fn register(
 }
 
 async fn login(
+    _limited: RateLimited<PASSWORD>,
     State(state): State<AppState>,
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<TokenResponse>, ApiError> {
@@ -158,6 +162,7 @@ async fn login(
 }
 
 async fn refresh(
+    _limited: RateLimited<REFRESH>,
     State(state): State<AppState>,
     Json(req): Json<RefreshRequest>,
 ) -> Result<Json<TokenResponse>, ApiError> {
@@ -171,8 +176,10 @@ async fn refresh(
 
 async fn ws_ticket(
     Authed(ctx): Authed,
+    parts: Parts,
     State(state): State<AppState>,
 ) -> Result<Json<TicketResponse>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Ticket)?;
     let (ticket, expires_at) = state.store.mint_ws_ticket(&ctx).await?;
     Ok(Json(TicketResponse { ticket, expires_at }))
 }

@@ -15,6 +15,7 @@ use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
 use slimm_server::permissions::Permissions;
+use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tokio::net::TcpListener;
 use tokio_tungstenite::connect_async;
@@ -41,6 +42,7 @@ fn state_for(store: &Store) -> AppState {
         store: store.clone(),
         auth: Auth::new(2).unwrap(),
         hub: Hub::new(),
+        limiter: RateLimiter::new(),
     }
 }
 
