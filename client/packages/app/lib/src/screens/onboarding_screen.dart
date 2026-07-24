@@ -16,6 +16,28 @@ import 'package:slimm_design_system/design_system.dart';
 /// still needs somewhere to land.
 const officialServer = 'https://slim-npc-server.top';
 
+/// Whether an address is on the loopback interface or a private network.
+///
+/// These are the ranges where plain http is reasonable: a self-hosted box on a
+/// home network cannot get a public certificate for an address that does not
+/// resolve publicly, and the traffic never crosses the internet anyway.
+bool isLocalAddress(Uri address) {
+  final host = address.host;
+  if (host == 'localhost' || host.endsWith('.local')) return true;
+
+  final parts = host.split('.');
+  if (parts.length != 4) return false;
+  final octets = parts.map(int.tryParse).toList();
+  if (octets.any((o) => o == null || o < 0 || o > 255)) return false;
+
+  final [a, b, _, _] = octets.cast<int>();
+  // 127/8 loopback, 10/8, 192.168/16, and 172.16/12 private ranges.
+  return a == 127 ||
+      a == 10 ||
+      (a == 192 && b == 168) ||
+      (a == 172 && b >= 16 && b <= 31);
+}
+
 class OnboardingScreen extends ConsumerWidget {
   const OnboardingScreen({required this.onServerChosen, super.key});
 
@@ -300,9 +322,15 @@ class _ManualServerDialogState extends State<_ManualServerDialog> {
     }
     // Typing a server address by hand is a trust decision, so it is stated
     // rather than implied: whoever runs it can read everything sent there.
-    if (address.scheme != 'https') {
-      setState(() => _error = 'Only https addresses are accepted, so traffic '
-          'cannot be read in transit.');
+    //
+    // https is required over the internet, but not on a local network. A box on
+    // your own LAN has no public hostname to get a certificate for, and
+    // refusing http there would make self-hosting, the normal case for this
+    // app, impossible without a pile of certificate work.
+    if (address.scheme != 'https' && !isLocalAddress(address)) {
+      setState(() => _error = 'Use https for a server on the internet, so '
+          'traffic cannot be read in transit. Plain http is only accepted for '
+          'an address on your own network.');
       return;
     }
     Navigator.of(context).pop(address);
