@@ -32,9 +32,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      # NOTE: pin all actions to a commit SHA before this repository is public.
-      - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions/checkout@v7 # pin to commit SHA before public
+      - uses: actions-rust-lang/setup-rust-toolchain@v1 # pin to commit SHA before public
         with:
           components: rustfmt, clippy
       - name: format
@@ -45,3 +44,6 @@ jobs:
         run: cargo test --all
       - name: build (release)
         run: cargo build --release --bin slimm-server
+      - name: binary size budget
+        # The brief treats binary size as a first-class budget; gate it in CI.
+        run: node scripts/check-size.mjs target/release/slimm-server 20MB

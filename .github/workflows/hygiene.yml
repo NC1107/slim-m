@@ -1,16 +1,23 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 name: hygiene
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 permissions:
   contents: read
+
+concurrency:
+  group: hygiene-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   hygiene:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7 # pin to commit SHA before public
 
       - name: no emoji in UI source
         run: |

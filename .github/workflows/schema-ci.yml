@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: Apache-2.0
+name: schema-ci
+
+# Path-gated: a server-only or client-only change never triggers the schema checks.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "schema/**"
+      - ".github/workflows/schema-ci.yml"
+  pull_request:
+    paths:
+      - "schema/**"
+      - ".github/workflows/schema-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: schema-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint openapi schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7 # pin to commit SHA before public
+
+      - uses: actions/setup-node@v6 # pin to commit SHA before public
+        with:
+          node-version: lts/*
+
+      - name: redocly lint
+        run: npx @redocly/cli lint schema/openapi.yaml
+
+  breaking-change-gate:
+    name: breaking-change gate (additive-only)
+    # Diffing only makes sense against a PR's base branch. A push to main has no "other
+    # side" to diff against here, so this job runs only for pull_request events; a push
+    # to main is covered by the lint job above and skips the diff entirely.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      # Check out the PR's head commit explicitly (rather than the default merge-ref
+      # checkout) so `HEAD:schema/openapi.yaml` below is exactly the schema the PR
+      # proposes, with no synthetic merge commit in between.
+      - name: checkout PR head
+        uses: actions/checkout@v7 # pin to commit SHA before public
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # oasdiff also needs the base branch's schema content, but the checkout above only
+      # fetched the PR head commit. Fetch just that one base commit, shallowly, by its
+      # exact SHA (from the pull_request event payload) so it lands in the local object
+      # database without cloning the base branch's history; oasdiff then reads it
+      # straight out of git as `<base-sha>:schema/openapi.yaml` below.
+      - name: fetch base commit for diff
+        run: git fetch --depth=1 origin ${{ github.event.pull_request.base.sha }}
+
+      # `oasdiff breaking` reports only changes that break existing clients (removed
+      # paths/fields, narrowed types, newly required properties, and similar). Purely
+      # additive changes, such as a new optional field or a new endpoint, are not
+      # breaking and pass, which is what makes this gate "additive-only" by construction.
+      - name: oasdiff breaking-change check
+        uses: oasdiff/oasdiff-action/breaking@v0 # pin to commit SHA before public
+        with:
+          base: "${{ github.event.pull_request.base.sha }}:schema/openapi.yaml"
+          revision: "HEAD:schema/openapi.yaml"
+          fail-on: ERR

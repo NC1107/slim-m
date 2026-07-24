@@ -6,17 +6,20 @@
 # embedded SQLite database, and uses the binary's own --healthcheck subcommand
 # since distroless has no shell.
 #
-# Multi-arch: build with `docker buildx build --platform linux/amd64,linux/arm64`
-# on native runners per architecture so buildx never falls back to slow QEMU.
+# Multi-arch: this Dockerfile builds natively for whatever platform it is invoked
+# with (buildx pulls the matching target-arch base image), so `--platform
+# linux/arm64` produces a real arm64 binary. Release builds one image per
+# architecture on a native runner and merges them into one manifest (see
+# .github/workflows/release.yml), so there is no slow QEMU cross-compilation and
+# no cross-linking toolchain to maintain.
 
-FROM --platform=$BUILDPLATFORM rust:1-alpine AS builder
-ARG TARGETARCH
+FROM rust:1-alpine AS builder
 RUN apk add --no-cache musl-dev
 WORKDIR /build
 COPY . .
 RUN cargo build --release --bin slimm-server \
-    && mkdir -p /out/data
-RUN cp target/release/slimm-server /out/slimm-server
+    && mkdir -p /out/data \
+    && cp target/release/slimm-server /out/slimm-server
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=builder /out/slimm-server /usr/local/bin/slimm-server

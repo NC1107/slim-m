@@ -1,0 +1,15 @@
+{
+  "version": "0.0.0",
+  "metrics": [
+    {
+      "name": "uuid_now_v7",
+      "value": 119.14,
+      "unit": "ns"
+    },
+    {
+      "name": "version_json_serialize",
+      "value": 131.15,
+      "unit": "ns"
+    }
+  ]
+}

@@ -1,0 +1,500 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: release
+
+# Full release and publish pipeline for slim-m.
+#
+# Canonical path: release-please maintains release PRs on push to main. When a
+# release PR is merged, that same push run cuts the GitHub Release plus tag and
+# sets the per-package `release_created` outputs, which gate every downstream
+# publish job. A direct tag push (server-v* / client-v*) is also honored so a
+# release can be re-published without another release-please run.
+#
+# Independent versions: server (AGPL-3.0-only) and client (Apache-2.0) are
+# released separately, each with its own tag and its own set of jobs.
+#
+# Every job that pushes to GHCR, signs, attaches release assets, or touches
+# TestFlight runs under a reviewer-gated GitHub Environment and requests only
+# the permissions it needs. Secrets are referenced by name only and never
+# invented; jobs stay inert (a visible warning, no fake artifact) until the
+# corresponding secrets and packaging inputs exist.
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "server-v*"
+      - "client-v*"
+
+# Minimal default. Individual jobs widen this to exactly what they require.
+permissions:
+  contents: read
+
+# Never cancel an in-flight release run; a half-published release is worse than
+# a queued one.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # release-please: open and maintain release PRs, and cut releases on merge.
+  # Manifest mode using the existing release-please-config.json and
+  # .release-please-manifest.json. Runs only on main-branch pushes; on a tag
+  # push it is a no-op so downstream jobs can still resolve via `needs`.
+  # ---------------------------------------------------------------------------
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      server_released: ${{ steps.rp.outputs['crates/slimm-server--release_created'] }}
+      server_tag: ${{ steps.rp.outputs['crates/slimm-server--tag_name'] }}
+      server_version: ${{ steps.rp.outputs['crates/slimm-server--version'] }}
+      client_released: ${{ steps.rp.outputs['client--release_created'] }}
+      client_tag: ${{ steps.rp.outputs['client--tag_name'] }}
+      client_version: ${{ steps.rp.outputs['client--version'] }}
+    steps:
+      - uses: googleapis/release-please-action@v4 # pin to commit SHA before public
+        id: rp
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          manifest-file: .release-please-manifest.json
+          config-file: release-please-config.json
+
+  # ---------------------------------------------------------------------------
+  # server-image: build one single-arch image per architecture on a NATIVE
+  # runner (amd64 on ubuntu-latest, arm64 on ubuntu-24.04-arm), each pushed to
+  # GHCR by digest with an SBOM and max provenance. No QEMU cross-compilation.
+  # server-image-merge then assembles the multi-arch manifest and signs it.
+  #
+  # Secrets: none beyond the automatic GITHUB_TOKEN (packages:write to push to
+  # GHCR). No cosign key material is stored.
+  # ---------------------------------------------------------------------------
+  server-image:
+    needs: [release-please]
+    if: >-
+      needs.release-please.result == 'success' &&
+      (needs.release-please.outputs.server_released == 'true' ||
+       startsWith(github.ref, 'refs/tags/server-v'))
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    environment: release
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/nc1107/slim-m-server
+    steps:
+      - uses: actions/checkout@v7 # pin to commit SHA before public
+      - uses: docker/setup-buildx-action@v4 # pin to commit SHA before public
+      - uses: docker/login-action@v4 # pin to commit SHA before public
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7 # pin to commit SHA before public
+        id: build
+        with:
+          context: .
+          file: docker/server.Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          # Push by digest; the tagged manifest is assembled in the merge job.
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+
+      - name: export digest
+        run: |
+          mkdir -p /tmp/digests
+          echo "${{ steps.build.outputs.digest }}" > "/tmp/digests/${{ matrix.arch }}"
+
+      - uses: actions/upload-artifact@v7 # pin to commit SHA before public
+        with:
+          name: server-image-digest-${{ matrix.arch }}
+          path: /tmp/digests/${{ matrix.arch }}
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # server-image-merge: assemble the per-arch digests into one multi-arch
+  # manifest tag and cosign-sign it (keyless / OIDC). Reviewer-gated.
+  # ---------------------------------------------------------------------------
+  server-image-merge:
+    needs: [release-please, server-image]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      IMAGE: ghcr.io/nc1107/slim-m-server
+    steps:
+      - name: resolve version
+        id: ver
+        run: |
+          if [ -n "${{ needs.release-please.outputs.server_version }}" ]; then
+            version="${{ needs.release-please.outputs.server_version }}"
+          else
+            version="${GITHUB_REF_NAME#server-v}"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v7 # pin to commit SHA before public
+        with:
+          pattern: server-image-digest-*
+          path: /tmp/digests
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v4 # pin to commit SHA before public
+      - uses: docker/login-action@v4 # pin to commit SHA before public
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create and inspect manifest
+        id: manifest
+        run: |
+          version="${{ steps.ver.outputs.version }}"
+          refs=""
+          for f in /tmp/digests/*; do
+            refs="${refs} ${IMAGE}@$(cat "$f")"
+          done
+          docker buildx imagetools create \
+            -t "${IMAGE}:${version}" \
+            -t "${IMAGE}:sha-${GITHUB_SHA}" \
+            ${refs}
+          digest="$(docker buildx imagetools inspect "${IMAGE}:${version}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - uses: sigstore/cosign-installer@v4 # pin to commit SHA before public
+
+      # Sign the manifest-list digest, which covers both arch images and every
+      # tag that resolves to it.
+      - name: cosign sign (keyless)
+        run: cosign sign --yes "${IMAGE}@${{ steps.manifest.outputs.digest }}"
+
+  # ---------------------------------------------------------------------------
+  # server-binaries: static musl binaries for direct download. Built per arch
+  # into artifacts; aggregated and attached by server-release-assets.
+  # ---------------------------------------------------------------------------
+  server-binaries:
+    needs: [release-please]
+    if: >-
+      needs.release-please.result == 'success' &&
+      (needs.release-please.outputs.server_released == 'true' ||
+       startsWith(github.ref, 'refs/tags/server-v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            arch: amd64
+          - target: aarch64-unknown-linux-musl
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v7 # pin to commit SHA before public
+
+      - name: resolve version
+        id: ver
+        run: |
+          if [ -n "${{ needs.release-please.outputs.server_version }}" ]; then
+            version="${{ needs.release-please.outputs.server_version }}"
+          else
+            version="${GITHUB_REF_NAME#server-v}"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1 # pin to commit SHA before public
+        with:
+          target: ${{ matrix.target }}
+
+      # cross gives a correct musl toolchain for both host and foreign arch, so
+      # the size-optimized release profile builds identically per target.
+      - name: install cross
+        run: cargo install cross --locked
+
+      - name: build static binary
+        run: cross build --release --target ${{ matrix.target }} --bin slimm-server
+
+      - name: stage binary
+        id: stage
+        run: |
+          name="slimm-server-${{ steps.ver.outputs.version }}-linux-${{ matrix.arch }}"
+          install -Dm755 "target/${{ matrix.target }}/release/slimm-server" "dist/${name}"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7 # pin to commit SHA before public
+        with:
+          name: server-binary-${{ matrix.arch }}
+          path: dist/${{ steps.stage.outputs.name }}
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # server-release-assets: GPG-signable SHA256SUMS plus the raw binaries,
+  # attached to the server GitHub Release. Reviewer-gated environment.
+  #
+  # Optional secrets (attach still works without them; the .asc is just
+  # skipped): GPG_PRIVATE_KEY (ASCII-armored private key), GPG_PASSPHRASE.
+  # ---------------------------------------------------------------------------
+  server-release-assets:
+    needs: [release-please, server-binaries]
+    if: >-
+      needs.release-please.result == 'success' &&
+      (needs.release-please.outputs.server_released == 'true' ||
+       startsWith(github.ref, 'refs/tags/server-v'))
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+    steps:
+      - name: resolve tag
+        id: ver
+        run: |
+          if [ -n "${{ needs.release-please.outputs.server_tag }}" ]; then
+            echo "tag=${{ needs.release-please.outputs.server_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v7 # pin to commit SHA before public
+        with:
+          pattern: server-binary-*
+          path: dist
+          merge-multiple: true
+
+      - name: checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+
+      - name: sign checksums (optional)
+        if: env.GPG_PRIVATE_KEY != ''
+        working-directory: dist
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+            --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
+
+      - uses: softprops/action-gh-release@v3 # pin to commit SHA before public
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          files: |
+            dist/slimm-server-*
+            dist/SHA256SUMS
+            dist/SHA256SUMS.asc
+
+  # ---------------------------------------------------------------------------
+  # linux-client: Flatpak and rpm for the Flutter Linux client, attached to the
+  # client GitHub Release with a GPG-signable SHA256SUMS. Reviewer-gated.
+  #
+  # SKELETON: the Flutter Linux build is real and wired. Packaging is gated on
+  # two repo files that do not exist yet:
+  #   TODO: packaging/flatpak/org.slimm.Client.yaml  (flatpak-builder manifest)
+  #   TODO: packaging/rpm/slim-m-client.spec         (rpmbuild spec)
+  # Until both exist the job emits a warning and uploads nothing; it never fakes
+  # a package. Once added, the gated steps produce and attach the real bundles.
+  #
+  # Optional secrets (for signing the checksums only): GPG_PRIVATE_KEY,
+  # GPG_PASSPHRASE.
+  # ---------------------------------------------------------------------------
+  linux-client:
+    needs: [release-please]
+    if: >-
+      needs.release-please.result == 'success' &&
+      (needs.release-please.outputs.client_released == 'true' ||
+       startsWith(github.ref, 'refs/tags/client-v'))
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v7 # pin to commit SHA before public
+
+      - name: resolve version
+        id: ver
+        run: |
+          if [ -n "${{ needs.release-please.outputs.client_version }}" ]; then
+            echo "version=${{ needs.release-please.outputs.client_version }}" >> "$GITHUB_OUTPUT"
+            echo "tag=${{ needs.release-please.outputs.client_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#client-v}" >> "$GITHUB_OUTPUT"
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev
+
+      - uses: subosito/flutter-action@v2 # pin to commit SHA before public
+        with:
+          channel: stable
+
+      - name: build linux release
+        run: |
+          flutter config --enable-linux-desktop
+          dart pub get
+          flutter build linux --release
+        working-directory: client/packages/app
+
+      # Gate packaging on the manifest and spec. Honest skeleton: no inputs, no
+      # artifact, and a clearly visible warning rather than a green lie.
+      - name: check packaging inputs
+        id: pkg
+        run: |
+          if [ -f packaging/flatpak/org.slimm.Client.yaml ] && [ -f packaging/rpm/slim-m-client.spec ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Linux client packaging not wired yet. Add packaging/flatpak/org.slimm.Client.yaml and packaging/rpm/slim-m-client.spec to enable Flatpak and rpm builds. Skipping."
+          fi
+
+      - name: build flatpak
+        if: steps.pkg.outputs.ready == 'true'
+        run: |
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub \
+            https://flathub.org/repo/flathub.flatpakrepo
+          # TODO: the manifest must reference the flutter build output in
+          # client/packages/app/build/linux/*/release/bundle as the app source.
+          flatpak-builder --user --install-deps-from=flathub --force-clean \
+            --repo=dist/flatpak-repo build-dir \
+            packaging/flatpak/org.slimm.Client.yaml
+          flatpak build-bundle dist/flatpak-repo \
+            "dist/slim-m-client-${{ steps.ver.outputs.version }}.flatpak" \
+            org.slimm.Client
+
+      - name: build rpm
+        if: steps.pkg.outputs.ready == 'true'
+        run: |
+          sudo apt-get install -y --no-install-recommends rpm
+          # TODO: the spec %install stage must stage the flutter bundle from
+          # client/packages/app/build/linux/*/release/bundle into the buildroot.
+          rpmbuild -bb \
+            --define "_topdir ${PWD}/rpmbuild" \
+            --define "_rpmdir ${PWD}/dist" \
+            --define "app_version ${{ steps.ver.outputs.version }}" \
+            packaging/rpm/slim-m-client.spec
+
+      - name: checksums
+        if: steps.pkg.outputs.ready == 'true'
+        working-directory: dist
+        run: |
+          shopt -s nullglob
+          sha256sum *.flatpak **/*.rpm > SHA256SUMS
+
+      - name: sign checksums (optional)
+        if: steps.pkg.outputs.ready == 'true' && env.GPG_PRIVATE_KEY != ''
+        working-directory: dist
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+            --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
+
+      - uses: softprops/action-gh-release@v3 # pin to commit SHA before public
+        if: steps.pkg.outputs.ready == 'true'
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          files: |
+            dist/*.flatpak
+            dist/**/*.rpm
+            dist/SHA256SUMS
+            dist/SHA256SUMS.asc
+
+  # ---------------------------------------------------------------------------
+  # ios-testflight: build the signed ipa and upload to TestFlight. Reviewer-
+  # gated environment; intentionally inert until the signing and App Store
+  # Connect secrets exist. It warns and stops rather than faking an upload.
+  #
+  # Required secrets (all must be present for the job to do real work):
+  #   APP_STORE_CONNECT_KEY_ID       - App Store Connect API key id
+  #   APP_STORE_CONNECT_ISSUER_ID    - App Store Connect issuer id
+  #   APP_STORE_CONNECT_PRIVATE_KEY  - contents of the .p8 API private key
+  #   IOS_SIGNING_CERTIFICATE_P12    - base64 of the distribution cert (.p12)
+  #   IOS_SIGNING_CERTIFICATE_PASSWORD - password for the .p12
+  #   IOS_PROVISIONING_PROFILE       - base64 of the .mobileprovision profile
+  # ---------------------------------------------------------------------------
+  ios-testflight:
+    needs: [release-please]
+    if: >-
+      needs.release-please.result == 'success' &&
+      (needs.release-please.outputs.client_released == 'true' ||
+       startsWith(github.ref, 'refs/tags/client-v'))
+    runs-on: macos-latest
+    environment: testflight
+    permissions:
+      contents: read
+    env:
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      IOS_SIGNING_CERTIFICATE_P12: ${{ secrets.IOS_SIGNING_CERTIFICATE_P12 }}
+      IOS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.IOS_SIGNING_CERTIFICATE_PASSWORD }}
+      IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+    steps:
+      - name: check secrets
+        id: gate
+        run: |
+          if [ -n "$APP_STORE_CONNECT_KEY_ID" ] && [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] \
+             && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ] && [ -n "$IOS_SIGNING_CERTIFICATE_P12" ] \
+             && [ -n "$IOS_SIGNING_CERTIFICATE_PASSWORD" ] && [ -n "$IOS_PROVISIONING_PROFILE" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::iOS TestFlight secrets are not configured. Add the App Store Connect API key, signing certificate, and provisioning profile secrets to enable the build and upload. Skipping."
+          fi
+
+      - uses: actions/checkout@v7 # pin to commit SHA before public
+        if: steps.gate.outputs.ready == 'true'
+
+      - name: import signing assets
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          # TODO: import the .p12 into a temporary keychain and install the
+          # provisioning profile before building. The cert password and profile
+          # come from IOS_SIGNING_CERTIFICATE_PASSWORD / IOS_PROVISIONING_PROFILE.
+          KEYDIR="${HOME}/.appstoreconnect/private_keys"
+          mkdir -p "$KEYDIR"
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            > "${KEYDIR}/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+
+      - uses: subosito/flutter-action@v2 # pin to commit SHA before public
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          channel: stable
+
+      - name: build ipa
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: client/packages/app
+        run: |
+          dart pub get
+          # TODO: provide ios/ExportOptions.plist referencing the imported
+          # provisioning profile and distribution signing identity.
+          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+
+      - name: upload to TestFlight
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: client/packages/app
+        run: |
+          xcrun altool --upload-app --type ios \
+            --file "$(ls build/ios/ipa/*.ipa | head -n1)" \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"

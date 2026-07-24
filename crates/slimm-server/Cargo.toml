@@ -25,6 +25,16 @@ jiff.workspace = true
 sqlx.workspace = true
 anyhow.workspace = true
 
+# serde_json is bench-only: the shipped binary never needs a JSON encoder of
+# its own, and the size-optimized release profile should not pay for one.
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+serde_json = "1"
+
+[[bench]]
+name = "hot_paths"
+harness = false
+
 [lints.clippy]
 # Componentization and clarity are enforced, not just encouraged.
 all = { level = "warn", priority = -1 }

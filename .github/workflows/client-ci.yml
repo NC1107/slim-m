@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: Apache-2.0
+name: client-ci
+
+# Path-gated: a server-only or schema-only change never triggers the Flutter client build.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - ".github/workflows/client-ci.yml"
+  pull_request:
+    paths:
+      - "client/**"
+      - ".github/workflows/client-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-format-test:
+    name: analyze, format check, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7 # pin to commit SHA before public
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@v2 # pin to commit SHA before public
+        with:
+          channel: stable
+          cache: true
+
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get
+
+      - name: analyze (workspace-wide)
+        working-directory: client
+        run: dart analyze
+
+      - name: format check (workspace-wide)
+        working-directory: client
+        run: dart format --output=none --set-exit-if-changed .
+
+      # Golden-test note: golden-file assertions (matchesGoldenFile) live inside each
+      # package's ordinary `flutter test` suite below; they are not a separate job here.
+      # Golden PNGs are sensitive to the exact Flutter engine/Skia build and to font
+      # rendering, so keep goldens generated and verified on this same `stable` channel
+      # on ubuntu-latest. If goldens start flaking across runs, pin an exact Flutter
+      # version here (instead of floating on `stable`) and regenerate goldens with
+      # `flutter test --update-goldens` on that same pinned version, so both sides
+      # render identically.
+      - name: test (every workspace package)
+        working-directory: client
+        run: |
+          set -euo pipefail
+          status=0
+          for pkg in . packages/*/; do
+            dir="${pkg%/}"
+            if [ -d "$dir/test" ]; then
+              echo "::group::flutter test - $dir"
+              (cd "$dir" && flutter test) || status=$?
+              echo "::endgroup::"
+            fi
+          done
+          exit "$status"

@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Production Caddyfile for the slim-m self-host example.
+#
+# Caddy is the only thing bound to port 443 in this stack. It terminates TLS
+# for both the slim-m API domain and LiveKit's WebSocket signaling domain,
+# obtaining and renewing Let's Encrypt certificates automatically for
+# whatever domains are configured below.
+#
+# {$VAR} is Caddy's own environment-variable syntax, resolved from the
+# `environment:` block of the `caddy` service in docker-compose.yml (which is
+# in turn filled in from your `.env`). That is a separate substitution pass
+# from docker compose's own ${VAR} handling elsewhere in this repo.
+
+{
+	email {$ACME_EMAIL}
+}
+
+# The slim-m server: REST API plus its WebSocket event stream.
+{$SLIMM_API_DOMAIN} {
+	reverse_proxy server:8080
+}
+
+# LiveKit routing note: this block only fronts LiveKit's WebSocket signaling
+# channel, which is plain HTTPS/WSS - Caddy reverse-proxies it exactly like
+# any other HTTP traffic and passes the Upgrade: websocket handshake through
+# with no special configuration. Call media never goes through this
+# Caddyfile or port 443: LiveKit's TURN (UDP) and TURN/TLS listeners bind
+# their own documented ports directly on the host, and the UDP media range
+# is published straight through to the livekit container. See
+# docker-compose.yml (the livekit service) for those ports and the
+# TURN/TLS trade-off notes. Caddy is not, and cannot be, in that path.
+{$LIVEKIT_DOMAIN} {
+	reverse_proxy livekit:7880
+}
