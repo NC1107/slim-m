@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 /// Semantic design tokens for slim-m, exposed as a [ThemeExtension] so a widget
 /// does one lookup (`Theme.of(context).extension<AppTokens>()`).

@@ -7,10 +7,12 @@ on:
     branches: [main]
     paths:
       - "schema/**"
+      - "redocly.yaml"
       - ".github/workflows/schema-ci.yml"
   pull_request:
     paths:
       - "schema/**"
+      - "redocly.yaml"
       - ".github/workflows/schema-ci.yml"
 
 permissions:
