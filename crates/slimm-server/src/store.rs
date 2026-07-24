@@ -20,12 +20,14 @@ use sqlx::{SqliteExecutor, SqlitePool};
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
 mod bootstrap;
+mod invites;
 mod permissions;
 mod read_state;
 mod safety;
 mod sessions;
 
 pub use bootstrap::Bootstrap;
+pub use invites::{Invite, RedeemError};
 pub use safety::{Device, ReportError, ReportSubject};
 pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext,
