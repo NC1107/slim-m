@@ -11,6 +11,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
+use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::{Bootstrap, Store};
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -31,6 +32,7 @@ fn app(store: Store) -> Router {
         store,
         auth: Auth::new(2).unwrap(),
         hub: Hub::new(),
+        limiter: RateLimiter::new(),
     })
 }
 
@@ -209,4 +211,42 @@ async fn channel_list_requires_authentication() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+/// The password class refuses a caller past its burst, so a flood cannot keep
+/// the Argon2id permits saturated.
+#[tokio::test]
+async fn password_endpoints_are_rate_limited() {
+    let store = new_store().await;
+    let app = app(store);
+
+    let mut statuses = Vec::new();
+    for i in 0..8 {
+        let response = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/auth/login",
+                None,
+                Some(json!({
+                    "username": format!("nobody{i}"),
+                    "password": "hunter2hunter2",
+                    "device_name": "cli"
+                })),
+            ))
+            .await
+            .unwrap();
+        statuses.push(response.status());
+    }
+
+    // The early attempts are answered normally (401, no such user); once the
+    // burst is spent the limiter takes over.
+    assert!(
+        statuses.contains(&StatusCode::UNAUTHORIZED),
+        "early attempts are answered: {statuses:?}"
+    );
+    assert!(
+        statuses.contains(&StatusCode::TOO_MANY_REQUESTS),
+        "a sustained flood is refused: {statuses:?}"
+    );
 }

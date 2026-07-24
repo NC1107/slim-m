@@ -11,6 +11,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
+use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::{RefreshOutcome, RegisterError, Store};
 use tower::ServiceExt;
 
@@ -294,6 +295,7 @@ async fn http_register_ticket_and_logout() {
         store,
         auth,
         hub: Hub::new(),
+        limiter: RateLimiter::new(),
     });
 
     // Register.
@@ -376,6 +378,7 @@ async fn http_login_rejects_bad_credentials() {
         store,
         auth,
         hub: Hub::new(),
+        limiter: RateLimiter::new(),
     });
 
     let wrong_password = app
@@ -469,6 +472,7 @@ async fn http_register_rejects_spoofing_display_name() {
         store,
         auth,
         hub: Hub::new(),
+        limiter: RateLimiter::new(),
     });
 
     let response = app
