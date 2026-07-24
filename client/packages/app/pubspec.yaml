@@ -9,9 +9,18 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_riverpod: ^2.5.0
+  go_router: ^14.0.0
+  slimm_api:
+  slimm_data:
   slimm_design_system:
-    path: ../design_system
+  drift: ^2.20.0
+  path: ^1.9.0
+  path_provider: ^2.1.0
+  shared_preferences: ^2.3.0
 dev_dependencies:
   flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
 flutter:
   uses-material-design: true

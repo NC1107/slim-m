@@ -1,45 +1,36 @@
 // SPDX-License-Identifier: Apache-2.0
+/// The slim-m client.
+library;
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-void main() => runApp(const SlimMApp());
+import 'src/providers/providers.dart';
+import 'src/screens/home_shell.dart';
+import 'src/screens/sign_in_screen.dart';
 
-/// Phase 0 shell: proves the design tokens flow through the theme. The adaptive
-/// layout, routing, and messaging surfaces arrive in Phase 2.
-class SlimMApp extends StatelessWidget {
+void main() => runApp(const ProviderScope(child: SlimMApp()));
+
+/// The root. Which surface is shown follows the session: signed in gets the
+/// shell, signed out gets sign-in, and a revoked session drops back
+/// automatically because the session is a stream rather than a snapshot.
+class SlimMApp extends ConsumerWidget {
   const SlimMApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final signedIn = ref.watch(signedInProvider);
+
     return MaterialApp(
       title: 'slim-m',
-      theme: _theme(Brightness.light, AppTokens.light),
-      darkTheme: _theme(Brightness.dark, AppTokens.dark),
-      home: const _Placeholder(),
-    );
-  }
-
-  ThemeData _theme(Brightness brightness, AppTokens tokens) {
-    return ThemeData(
-      brightness: brightness,
-      scaffoldBackgroundColor: tokens.surfaceBase,
-      extensions: [tokens],
-    );
-  }
-}
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder();
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Scaffold(
-      body: Center(
-        child: Text(
-          'slim-m',
-          style: TextStyle(color: tokens.accent, fontSize: 24),
-        ),
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(Brightness.light, AppTokens.light),
+      darkTheme: buildTheme(Brightness.dark, AppTokens.dark),
+      home: signedIn.maybeWhen(
+        orElse: () => const SignInScreen(),
+        data: (isSignedIn) =>
+            isSignedIn ? const HomeShell() : const SignInScreen(),
       ),
     );
   }

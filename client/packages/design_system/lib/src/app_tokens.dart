@@ -97,3 +97,22 @@ abstract final class AppRadii {
   static const double card = 10;
   static const double window = 16;
 }
+
+/// Builds a theme from the token set, so widgets read colours from tokens and
+/// never from raw literals. Shared by the app and the golden tests, which is
+/// what keeps goldens representative of what ships.
+ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
+  final scheme = ColorScheme.fromSeed(
+    seedColor: tokens.accent,
+    brightness: brightness,
+  ).copyWith(surface: tokens.surfaceBase);
+
+  return ThemeData(
+    useMaterial3: true,
+    brightness: brightness,
+    colorScheme: scheme,
+    scaffoldBackgroundColor: tokens.surfaceBase,
+    extensions: [tokens],
+    dividerTheme: DividerThemeData(color: tokens.borderSubtle, space: 1),
+  );
+}

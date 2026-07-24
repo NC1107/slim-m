@@ -28,3 +28,7 @@ build/
 .flutter-plugins
 .flutter-plugins-dependencies
 *.iml
+
+# Flutter build output
+client/**/build/
+client/**/.dart_tool/
