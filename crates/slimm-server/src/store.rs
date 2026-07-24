@@ -19,10 +19,12 @@ use sqlx::{SqliteExecutor, SqlitePool};
 
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
+mod bootstrap;
 mod permissions;
 mod read_state;
 mod sessions;
 
+pub use bootstrap::Bootstrap;
 pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext,
 };

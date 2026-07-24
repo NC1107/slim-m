@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 AS \"one!: i64\" FROM roles WHERE is_everyone = 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "one!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "43ce853828a13f1ed0801dd2e696428f5c9e79e1f0fca96756fda44187f5a498"
+}
