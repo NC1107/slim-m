@@ -46,4 +46,11 @@ jobs:
         run: cargo build --release --bin slimm-server
       - name: binary size budget
         # The brief treats binary size as a first-class budget; gate it in CI.
-        run: node scripts/check-size.mjs target/release/slimm-server 20MB
+        run: |
+          max=20971520   # 20 MiB
+          size=$(stat -c%s target/release/slimm-server)
+          echo "slimm-server: ${size} bytes (budget ${max})"
+          if [ "$size" -gt "$max" ]; then
+            echo "::error::release binary exceeds the 20 MiB budget"
+            exit 1
+          fi
