@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM password_reset_codes WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "82e00db6af751968f5c2989bdd16c72aeb8a5ca168ab76dad513bc4f382c9f13"
+}
