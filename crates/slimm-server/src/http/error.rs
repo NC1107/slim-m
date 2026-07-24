@@ -8,7 +8,7 @@ use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
 use crate::auth::HashError;
-use crate::store::SendError;
+use crate::store::{OpenError, SendError};
 
 pub(crate) enum ApiError {
     BadRequest(&'static str),
@@ -69,6 +69,19 @@ impl From<SendError> for ApiError {
             SendError::IdConflict => ApiError::Conflict("message id already used"),
             SendError::Internal(e) => {
                 tracing::error!(error = %e, "message send failed");
+                ApiError::Internal
+            }
+        }
+    }
+}
+
+impl From<OpenError> for ApiError {
+    fn from(err: OpenError) -> Self {
+        match err {
+            // The account vanished mid-login; treat it as a failed credential.
+            OpenError::AccountGone => ApiError::Unauthorized,
+            OpenError::Internal(e) => {
+                tracing::error!(error = %e, "opening a session failed");
                 ApiError::Internal
             }
         }

@@ -79,6 +79,21 @@ pub enum RegisterError {
     Internal(anyhow::Error),
 }
 
+/// Why opening a session failed.
+#[derive(Debug)]
+pub enum OpenError {
+    /// The account was deleted between the credential check and session creation,
+    /// so no session may be issued for it.
+    AccountGone,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for OpenError {
+    fn from(err: sqlx::Error) -> Self {
+        OpenError::Internal(err.into())
+    }
+}
+
 impl Store {
     /// Registers an account with an Argon2id password hash. A duplicate live
     /// username is reported as [`RegisterError::UsernameTaken`], not a 500.
@@ -133,11 +148,17 @@ impl Store {
 
     /// Opens a session for a user: a new device, a session, a refresh token in a
     /// fresh family, and the first access token, all in one transaction.
+    ///
+    /// The device insert is the transaction's first statement and is conditional
+    /// on the account still being live, so it takes the write lock up front and a
+    /// login that races an account deletion cannot mint a session for a
+    /// tombstoned account: whichever of the two commits first wins, and a loser
+    /// login gets [`OpenError::AccountGone`].
     pub async fn open_session(
         &self,
         user_id: UserId,
         device_name: &str,
-    ) -> anyhow::Result<IssuedTokens> {
+    ) -> Result<IssuedTokens, OpenError> {
         let device_id = DeviceId::generate();
         let session_id = SessionId::generate();
         let family_id = FamilyId::generate();
@@ -152,15 +173,21 @@ impl Store {
         let refresh_expires_at = now + REFRESH_TTL_MS;
 
         let mut tx = self.pool.begin().await?;
-        sqlx::query!(
-            "INSERT INTO devices (id, user_id, name, created_at) VALUES (?, ?, ?, ?)",
+        let created = sqlx::query!(
+            "INSERT INTO devices (id, user_id, name, created_at)
+             SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)",
             device_id,
             user_id,
             device_name,
-            now
+            now,
+            user_id
         )
         .execute(&mut *tx)
-        .await?;
+        .await?
+        .rows_affected();
+        if created == 0 {
+            return Err(OpenError::AccountGone);
+        }
         sqlx::query!(
             "INSERT INTO sessions (id, user_id, device_id, created_at) VALUES (?, ?, ?, ?)",
             session_id,
@@ -443,6 +470,120 @@ impl Store {
         .await?;
         tx.commit().await?;
         Ok(())
+    }
+
+    /// Deletes an account end to end. Personal data (devices, sessions, tokens,
+    /// reactions, read state, role memberships, member channel overwrites, reset
+    /// codes) is purged; content left in shared scopes (messages, canvas) is kept
+    /// but its authorship is cleared; and the user row is tombstoned and
+    /// anonymized so the username frees up and login is impossible. Returns the
+    /// sessions that were revoked so the caller can close their live sockets.
+    ///
+    /// Concurrency: the first statement is a write, so the transaction takes the
+    /// write lock immediately (no stale-snapshot race) and a login racing this
+    /// deletion serializes against it (see [`Store::open_session`]). A request
+    /// already in flight on a still-valid token could commit one write just after
+    /// this transaction; that content stays attributed to the now-anonymized
+    /// tombstone, so it carries no identity, and the session is revoked so no
+    /// further writes follow. Closing that last-write window fully would need a
+    /// liveness check inside every write verb, left for later.
+    ///
+    /// Group-ownership transfer is a no-op until an ownership model exists; the
+    /// current schema has no owner column, so nothing can be orphaned.
+    pub async fn delete_account(&self, user_id: UserId) -> anyhow::Result<Vec<SessionId>> {
+        let now = now_ms();
+        let mut tx = self.pool.begin().await?;
+
+        // Write-first: this UPDATE takes the write lock up front (matching the
+        // rest of this module) and captures the sessions to close in one shot.
+        // Deleting devices below cascades the session rows away.
+        let revoked: Vec<SessionId> = sqlx::query!(
+            r#"UPDATE sessions SET revoked_at = ? WHERE user_id = ?
+               RETURNING id AS "id!: SessionId""#,
+            now,
+            user_id
+        )
+        .fetch_all(&mut *tx)
+        .await?
+        .into_iter()
+        .map(|row| row.id)
+        .collect();
+
+        // Anonymize authored content that stays visible to others.
+        sqlx::query!(
+            "UPDATE messages SET author_id = NULL WHERE author_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE canvas_objects SET author_id = NULL WHERE author_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE canvas_ops SET author_id = NULL WHERE author_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE invites SET created_by = NULL WHERE created_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE password_reset_codes SET issued_by = NULL WHERE issued_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        // Purge personal data. Deleting devices cascades sessions and their tokens.
+        sqlx::query!("DELETE FROM devices WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query!("DELETE FROM reactions WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query!("DELETE FROM read_states WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query!("DELETE FROM member_roles WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query!(
+            "DELETE FROM channel_overwrites WHERE target_type = 'member' AND target_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "DELETE FROM password_reset_codes WHERE user_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        // Tombstone and anonymize the account. The username frees up because the
+        // live-username unique index excludes rows with `deleted_at` set.
+        let tombstone = format!("deleted-{user_id}");
+        sqlx::query!(
+            "UPDATE users
+             SET deleted_at = ?, is_anonymized = 1, password_hash = NULL,
+                 username = ?, display_name = 'Deleted User'
+             WHERE id = ?",
+            now,
+            tombstone,
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(revoked)
     }
 }
 

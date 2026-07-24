@@ -7,7 +7,7 @@
 
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::StatusCode;
-use axum::routing::post;
+use axum::routing::{delete, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
@@ -29,6 +29,7 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/refresh", post(refresh))
         .route("/auth/ws-ticket", post(ws_ticket))
         .route("/auth/logout", post(logout))
+        .route("/account", delete(delete_account))
         .layer(DefaultBodyLimit::max(AUTH_BODY_LIMIT))
 }
 
@@ -176,6 +177,19 @@ async fn logout(
     // Drop any live WebSocket on this session at once, so revocation is instant
     // over the socket too, not just for the next REST call.
     state.hub.publish(Event::SessionRevoked(ctx.session_id));
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Deletes the caller's own account: purge personal data, anonymize authored
+/// content, tombstone the user, and revoke every session (closing live sockets).
+async fn delete_account(
+    Authed(ctx): Authed,
+    State(state): State<AppState>,
+) -> Result<StatusCode, ApiError> {
+    let revoked = state.store.delete_account(ctx.user_id).await?;
+    for session_id in revoked {
+        state.hub.publish(Event::SessionRevoked(session_id));
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

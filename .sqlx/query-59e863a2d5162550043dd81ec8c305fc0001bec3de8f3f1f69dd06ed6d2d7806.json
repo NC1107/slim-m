@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE password_reset_codes SET issued_by = NULL WHERE issued_by = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "59e863a2d5162550043dd81ec8c305fc0001bec3de8f3f1f69dd06ed6d2d7806"
+}

@@ -23,7 +23,9 @@ mod permissions;
 mod read_state;
 mod sessions;
 
-pub use sessions::{Account, IssuedTokens, RefreshOutcome, RegisterError, SessionContext};
+pub use sessions::{
+    Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext,
+};
 
 fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};

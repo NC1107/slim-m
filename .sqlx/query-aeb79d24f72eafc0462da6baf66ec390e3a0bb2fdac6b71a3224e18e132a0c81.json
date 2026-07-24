@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM read_states WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "aeb79d24f72eafc0462da6baf66ec390e3a0bb2fdac6b71a3224e18e132a0c81"
+}

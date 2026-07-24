@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE invites SET created_by = NULL WHERE created_by = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "632d62a9c046eb988a5c85e714d82a91453c910e4988c57ba90b946f1eef034f"
+}
