@@ -15,6 +15,7 @@ mod auth;
 mod channels;
 mod error;
 mod extract;
+mod invites;
 mod messages;
 mod safety;
 mod sync;
@@ -41,6 +42,7 @@ pub fn router(state: AppState) -> Router {
         .route("/version", get(version))
         .merge(auth::routes())
         .merge(channels::routes())
+        .merge(invites::routes())
         .merge(messages::routes())
         .merge(safety::routes())
         .merge(sync::routes())

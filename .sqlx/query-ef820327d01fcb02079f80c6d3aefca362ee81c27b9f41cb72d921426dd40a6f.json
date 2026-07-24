@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT code AS \"code!\", max_uses, uses AS \"uses!\", expires_at,\n                      created_at AS \"created_at!\", revoked_at\n               FROM invites ORDER BY created_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "code!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "max_uses",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "uses!",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "expires_at",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "revoked_at",
+        "ordinal": 5,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "ef820327d01fcb02079f80c6d3aefca362ee81c27b9f41cb72d921426dd40a6f"
+}
