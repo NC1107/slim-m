@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! The shared HTTP error type and its status mapping. Every route returns this
+//! so error responses are uniform across the API.
+
+use axum::Json;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use serde::Serialize;
+
+use crate::auth::HashError;
+use crate::store::SendError;
+
+pub(crate) enum ApiError {
+    BadRequest(&'static str),
+    Unauthorized,
+    Forbidden,
+    NotFound(&'static str),
+    Conflict(&'static str),
+    Unavailable,
+    Internal,
+}
+
+#[derive(Serialize)]
+struct ErrorBody {
+    error: &'static str,
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        let (status, error) = match self {
+            ApiError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
+            ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "invalid credentials"),
+            ApiError::Forbidden => (StatusCode::FORBIDDEN, "insufficient permissions"),
+            ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message),
+            ApiError::Conflict(message) => (StatusCode::CONFLICT, message),
+            ApiError::Unavailable => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "server busy, retry shortly",
+            ),
+            ApiError::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
+        };
+        (status, Json(ErrorBody { error })).into_response()
+    }
+}
+
+impl From<anyhow::Error> for ApiError {
+    fn from(err: anyhow::Error) -> Self {
+        tracing::error!(error = %err, "request failed");
+        ApiError::Internal
+    }
+}
+
+impl From<HashError> for ApiError {
+    fn from(err: HashError) -> Self {
+        match err {
+            // Shed load past the hashing deadline instead of hanging the caller.
+            HashError::Busy => ApiError::Unavailable,
+            HashError::Internal(e) => {
+                tracing::error!(error = %e, "password hashing failed");
+                ApiError::Internal
+            }
+        }
+    }
+}
+
+impl From<SendError> for ApiError {
+    fn from(err: SendError) -> Self {
+        match err {
+            SendError::IdConflict => ApiError::Conflict("message id already used"),
+            SendError::Internal(e) => {
+                tracing::error!(error = %e, "message send failed");
+                ApiError::Internal
+            }
+        }
+    }
+}

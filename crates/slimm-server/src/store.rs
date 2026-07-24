@@ -66,6 +66,27 @@ pub struct Message {
 /// rather than the honest client racing itself. See [`Store::rotate_refresh`].
 const DEFAULT_REUSE_GRACE_MS: i64 = 10 * 1000;
 
+/// Why a message send failed.
+#[derive(Debug)]
+pub enum SendError {
+    /// A message with this id already exists for a different channel or author.
+    /// Idempotency is scoped so a colliding id never returns a foreign message.
+    IdConflict,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for SendError {
+    fn from(err: sqlx::Error) -> Self {
+        SendError::Internal(err.into())
+    }
+}
+
+impl From<anyhow::Error> for SendError {
+    fn from(err: anyhow::Error) -> Self {
+        SendError::Internal(err)
+    }
+}
+
 /// The persistence layer over one embedded SQLite database.
 #[derive(Clone)]
 pub struct Store {
@@ -149,20 +170,25 @@ impl Store {
         })
     }
 
-    /// Sends a message. Idempotent by `id`; the per-scope `seq` is allocated in
-    /// the same transaction as the insert.
+    /// Sends a message. Idempotent by `id` within its `(channel, author)` scope;
+    /// the per-scope `seq` is allocated in the same transaction as the insert. A
+    /// reused id that belongs to a different channel or author is rejected rather
+    /// than returned, so the idempotency path cannot leak a foreign message.
     pub async fn send_message(
         &self,
         channel_id: ChannelId,
         author_id: UserId,
         id: MessageId,
         content: &str,
-    ) -> anyhow::Result<Message> {
+    ) -> Result<Message, SendError> {
         let mut tx = self.pool.begin().await?;
 
         if let Some(existing) = fetch_message(&mut *tx, id).await? {
             tx.commit().await?;
-            return Ok(existing);
+            if existing.channel_id == channel_id && existing.author_id == Some(author_id) {
+                return Ok(existing);
+            }
+            return Err(SendError::IdConflict);
         }
 
         // RETURNING runs on the updated row, so `next_seq - 1` is the value this
@@ -252,6 +278,29 @@ impl Store {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
+    }
+
+    /// Fetches a live channel by id, or `None` if it is missing or deleted.
+    pub async fn channel(&self, id: ChannelId) -> anyhow::Result<Option<Channel>> {
+        let row = sqlx::query!(
+            r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!",
+                      created_at AS "created_at!"
+               FROM channels WHERE id = ? AND deleted_at IS NULL"#,
+            id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| Channel {
+            id: r.id,
+            name: r.name,
+            kind: r.kind,
+            created_at: r.created_at,
+        }))
+    }
+
+    /// Fetches a live message by id, or `None` if it is missing or deleted.
+    pub async fn message(&self, id: MessageId) -> anyhow::Result<Option<Message>> {
+        fetch_message(&self.pool, id).await
     }
 }
 
