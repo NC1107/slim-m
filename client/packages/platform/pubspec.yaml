@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 name: slimm_platform
-description: Per-OS integration behind abstract interfaces (push, calls, notifications).
+description: "Platform-facing seams: key storage, shortcuts, and context menus."
 publish_to: none
 resolution: workspace
 environment:
@@ -11,3 +11,5 @@ dependencies:
     sdk: flutter
 dev_dependencies:
   flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
