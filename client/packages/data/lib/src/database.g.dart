@@ -1,0 +1,1254 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'database.dart';
+
+// ignore_for_file: type=lint
+class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ChannelsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+      'kind', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _cursorMeta = const VerificationMeta('cursor');
+  @override
+  late final GeneratedColumn<int> cursor = GeneratedColumn<int>(
+      'cursor', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _lastReadSeqMeta =
+      const VerificationMeta('lastReadSeq');
+  @override
+  late final GeneratedColumn<int> lastReadSeq = GeneratedColumn<int>(
+      'last_read_seq', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, name, kind, createdAt, cursor, lastReadSeq];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'channels';
+  @override
+  VerificationContext validateIntegrity(Insertable<Channel> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+          _kindMeta, kind.isAcceptableOrUnknown(data['kind']!, _kindMeta));
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('cursor')) {
+      context.handle(_cursorMeta,
+          cursor.isAcceptableOrUnknown(data['cursor']!, _cursorMeta));
+    }
+    if (data.containsKey('last_read_seq')) {
+      context.handle(
+          _lastReadSeqMeta,
+          lastReadSeq.isAcceptableOrUnknown(
+              data['last_read_seq']!, _lastReadSeqMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Channel map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Channel(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      kind: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}kind'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}created_at'])!,
+      cursor: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}cursor'])!,
+      lastReadSeq: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}last_read_seq'])!,
+    );
+  }
+
+  @override
+  $ChannelsTable createAlias(String alias) {
+    return $ChannelsTable(attachedDatabase, alias);
+  }
+}
+
+class Channel extends DataClass implements Insertable<Channel> {
+  final String id;
+  final String name;
+  final String kind;
+  final int createdAt;
+
+  /// The highest `seq` this client holds for the channel: the sync cursor.
+  final int cursor;
+
+  /// How far the user has read, mirrored from the server.
+  final int lastReadSeq;
+  const Channel(
+      {required this.id,
+      required this.name,
+      required this.kind,
+      required this.createdAt,
+      required this.cursor,
+      required this.lastReadSeq});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['kind'] = Variable<String>(kind);
+    map['created_at'] = Variable<int>(createdAt);
+    map['cursor'] = Variable<int>(cursor);
+    map['last_read_seq'] = Variable<int>(lastReadSeq);
+    return map;
+  }
+
+  ChannelsCompanion toCompanion(bool nullToAbsent) {
+    return ChannelsCompanion(
+      id: Value(id),
+      name: Value(name),
+      kind: Value(kind),
+      createdAt: Value(createdAt),
+      cursor: Value(cursor),
+      lastReadSeq: Value(lastReadSeq),
+    );
+  }
+
+  factory Channel.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Channel(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      kind: serializer.fromJson<String>(json['kind']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      cursor: serializer.fromJson<int>(json['cursor']),
+      lastReadSeq: serializer.fromJson<int>(json['lastReadSeq']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'kind': serializer.toJson<String>(kind),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'cursor': serializer.toJson<int>(cursor),
+      'lastReadSeq': serializer.toJson<int>(lastReadSeq),
+    };
+  }
+
+  Channel copyWith(
+          {String? id,
+          String? name,
+          String? kind,
+          int? createdAt,
+          int? cursor,
+          int? lastReadSeq}) =>
+      Channel(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        kind: kind ?? this.kind,
+        createdAt: createdAt ?? this.createdAt,
+        cursor: cursor ?? this.cursor,
+        lastReadSeq: lastReadSeq ?? this.lastReadSeq,
+      );
+  Channel copyWithCompanion(ChannelsCompanion data) {
+    return Channel(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      cursor: data.cursor.present ? data.cursor.value : this.cursor,
+      lastReadSeq:
+          data.lastReadSeq.present ? data.lastReadSeq.value : this.lastReadSeq,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Channel(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('kind: $kind, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('cursor: $cursor, ')
+          ..write('lastReadSeq: $lastReadSeq')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, name, kind, createdAt, cursor, lastReadSeq);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Channel &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.kind == this.kind &&
+          other.createdAt == this.createdAt &&
+          other.cursor == this.cursor &&
+          other.lastReadSeq == this.lastReadSeq);
+}
+
+class ChannelsCompanion extends UpdateCompanion<Channel> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> kind;
+  final Value<int> createdAt;
+  final Value<int> cursor;
+  final Value<int> lastReadSeq;
+  final Value<int> rowid;
+  const ChannelsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.cursor = const Value.absent(),
+    this.lastReadSeq = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ChannelsCompanion.insert({
+    required String id,
+    required String name,
+    required String kind,
+    required int createdAt,
+    this.cursor = const Value.absent(),
+    this.lastReadSeq = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        name = Value(name),
+        kind = Value(kind),
+        createdAt = Value(createdAt);
+  static Insertable<Channel> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? kind,
+    Expression<int>? createdAt,
+    Expression<int>? cursor,
+    Expression<int>? lastReadSeq,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (kind != null) 'kind': kind,
+      if (createdAt != null) 'created_at': createdAt,
+      if (cursor != null) 'cursor': cursor,
+      if (lastReadSeq != null) 'last_read_seq': lastReadSeq,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ChannelsCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? name,
+      Value<String>? kind,
+      Value<int>? createdAt,
+      Value<int>? cursor,
+      Value<int>? lastReadSeq,
+      Value<int>? rowid}) {
+    return ChannelsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      kind: kind ?? this.kind,
+      createdAt: createdAt ?? this.createdAt,
+      cursor: cursor ?? this.cursor,
+      lastReadSeq: lastReadSeq ?? this.lastReadSeq,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (cursor.present) {
+      map['cursor'] = Variable<int>(cursor.value);
+    }
+    if (lastReadSeq.present) {
+      map['last_read_seq'] = Variable<int>(lastReadSeq.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChannelsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('kind: $kind, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('cursor: $cursor, ')
+          ..write('lastReadSeq: $lastReadSeq, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MessagesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _channelIdMeta =
+      const VerificationMeta('channelId');
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+      'channel_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _authorIdMeta =
+      const VerificationMeta('authorId');
+  @override
+  late final GeneratedColumn<String> authorId = GeneratedColumn<String>(
+      'author_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _seqMeta = const VerificationMeta('seq');
+  @override
+  late final GeneratedColumn<int> seq = GeneratedColumn<int>(
+      'seq', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _contentMeta =
+      const VerificationMeta('content');
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+      'content', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _editedAtMeta =
+      const VerificationMeta('editedAt');
+  @override
+  late final GeneratedColumn<int> editedAt = GeneratedColumn<int>(
+      'edited_at', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _pendingMeta =
+      const VerificationMeta('pending');
+  @override
+  late final GeneratedColumn<bool> pending = GeneratedColumn<bool>(
+      'pending', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("pending" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _failedMeta = const VerificationMeta('failed');
+  @override
+  late final GeneratedColumn<bool> failed = GeneratedColumn<bool>(
+      'failed', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("failed" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        channelId,
+        authorId,
+        seq,
+        content,
+        createdAt,
+        editedAt,
+        pending,
+        failed
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'messages';
+  @override
+  VerificationContext validateIntegrity(Insertable<Message> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('channel_id')) {
+      context.handle(_channelIdMeta,
+          channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta));
+    } else if (isInserting) {
+      context.missing(_channelIdMeta);
+    }
+    if (data.containsKey('author_id')) {
+      context.handle(_authorIdMeta,
+          authorId.isAcceptableOrUnknown(data['author_id']!, _authorIdMeta));
+    }
+    if (data.containsKey('seq')) {
+      context.handle(
+          _seqMeta, seq.isAcceptableOrUnknown(data['seq']!, _seqMeta));
+    }
+    if (data.containsKey('content')) {
+      context.handle(_contentMeta,
+          content.isAcceptableOrUnknown(data['content']!, _contentMeta));
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('edited_at')) {
+      context.handle(_editedAtMeta,
+          editedAt.isAcceptableOrUnknown(data['edited_at']!, _editedAtMeta));
+    }
+    if (data.containsKey('pending')) {
+      context.handle(_pendingMeta,
+          pending.isAcceptableOrUnknown(data['pending']!, _pendingMeta));
+    }
+    if (data.containsKey('failed')) {
+      context.handle(_failedMeta,
+          failed.isAcceptableOrUnknown(data['failed']!, _failedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Message map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Message(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      channelId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}channel_id'])!,
+      authorId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}author_id']),
+      seq: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}seq'])!,
+      content: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}content'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}created_at'])!,
+      editedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}edited_at']),
+      pending: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}pending'])!,
+      failed: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}failed'])!,
+    );
+  }
+
+  @override
+  $MessagesTable createAlias(String alias) {
+    return $MessagesTable(attachedDatabase, alias);
+  }
+}
+
+class Message extends DataClass implements Insertable<Message> {
+  final String id;
+  final String channelId;
+  final String? authorId;
+
+  /// Server order key. Zero while a message is only local (an optimistic echo
+  /// that has not been acknowledged yet), so pending messages sort last.
+  final int seq;
+  final String content;
+  final int createdAt;
+  final int? editedAt;
+
+  /// True while the send is in flight. The UI shows these differently and they
+  /// are replaced in place by the server's copy on acknowledgement.
+  final bool pending;
+
+  /// True when the send failed and the user can retry it.
+  final bool failed;
+  const Message(
+      {required this.id,
+      required this.channelId,
+      this.authorId,
+      required this.seq,
+      required this.content,
+      required this.createdAt,
+      this.editedAt,
+      required this.pending,
+      required this.failed});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['channel_id'] = Variable<String>(channelId);
+    if (!nullToAbsent || authorId != null) {
+      map['author_id'] = Variable<String>(authorId);
+    }
+    map['seq'] = Variable<int>(seq);
+    map['content'] = Variable<String>(content);
+    map['created_at'] = Variable<int>(createdAt);
+    if (!nullToAbsent || editedAt != null) {
+      map['edited_at'] = Variable<int>(editedAt);
+    }
+    map['pending'] = Variable<bool>(pending);
+    map['failed'] = Variable<bool>(failed);
+    return map;
+  }
+
+  MessagesCompanion toCompanion(bool nullToAbsent) {
+    return MessagesCompanion(
+      id: Value(id),
+      channelId: Value(channelId),
+      authorId: authorId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(authorId),
+      seq: Value(seq),
+      content: Value(content),
+      createdAt: Value(createdAt),
+      editedAt: editedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(editedAt),
+      pending: Value(pending),
+      failed: Value(failed),
+    );
+  }
+
+  factory Message.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Message(
+      id: serializer.fromJson<String>(json['id']),
+      channelId: serializer.fromJson<String>(json['channelId']),
+      authorId: serializer.fromJson<String?>(json['authorId']),
+      seq: serializer.fromJson<int>(json['seq']),
+      content: serializer.fromJson<String>(json['content']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      editedAt: serializer.fromJson<int?>(json['editedAt']),
+      pending: serializer.fromJson<bool>(json['pending']),
+      failed: serializer.fromJson<bool>(json['failed']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'channelId': serializer.toJson<String>(channelId),
+      'authorId': serializer.toJson<String?>(authorId),
+      'seq': serializer.toJson<int>(seq),
+      'content': serializer.toJson<String>(content),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'editedAt': serializer.toJson<int?>(editedAt),
+      'pending': serializer.toJson<bool>(pending),
+      'failed': serializer.toJson<bool>(failed),
+    };
+  }
+
+  Message copyWith(
+          {String? id,
+          String? channelId,
+          Value<String?> authorId = const Value.absent(),
+          int? seq,
+          String? content,
+          int? createdAt,
+          Value<int?> editedAt = const Value.absent(),
+          bool? pending,
+          bool? failed}) =>
+      Message(
+        id: id ?? this.id,
+        channelId: channelId ?? this.channelId,
+        authorId: authorId.present ? authorId.value : this.authorId,
+        seq: seq ?? this.seq,
+        content: content ?? this.content,
+        createdAt: createdAt ?? this.createdAt,
+        editedAt: editedAt.present ? editedAt.value : this.editedAt,
+        pending: pending ?? this.pending,
+        failed: failed ?? this.failed,
+      );
+  Message copyWithCompanion(MessagesCompanion data) {
+    return Message(
+      id: data.id.present ? data.id.value : this.id,
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      authorId: data.authorId.present ? data.authorId.value : this.authorId,
+      seq: data.seq.present ? data.seq.value : this.seq,
+      content: data.content.present ? data.content.value : this.content,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      editedAt: data.editedAt.present ? data.editedAt.value : this.editedAt,
+      pending: data.pending.present ? data.pending.value : this.pending,
+      failed: data.failed.present ? data.failed.value : this.failed,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Message(')
+          ..write('id: $id, ')
+          ..write('channelId: $channelId, ')
+          ..write('authorId: $authorId, ')
+          ..write('seq: $seq, ')
+          ..write('content: $content, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('editedAt: $editedAt, ')
+          ..write('pending: $pending, ')
+          ..write('failed: $failed')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, channelId, authorId, seq, content,
+      createdAt, editedAt, pending, failed);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Message &&
+          other.id == this.id &&
+          other.channelId == this.channelId &&
+          other.authorId == this.authorId &&
+          other.seq == this.seq &&
+          other.content == this.content &&
+          other.createdAt == this.createdAt &&
+          other.editedAt == this.editedAt &&
+          other.pending == this.pending &&
+          other.failed == this.failed);
+}
+
+class MessagesCompanion extends UpdateCompanion<Message> {
+  final Value<String> id;
+  final Value<String> channelId;
+  final Value<String?> authorId;
+  final Value<int> seq;
+  final Value<String> content;
+  final Value<int> createdAt;
+  final Value<int?> editedAt;
+  final Value<bool> pending;
+  final Value<bool> failed;
+  final Value<int> rowid;
+  const MessagesCompanion({
+    this.id = const Value.absent(),
+    this.channelId = const Value.absent(),
+    this.authorId = const Value.absent(),
+    this.seq = const Value.absent(),
+    this.content = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.editedAt = const Value.absent(),
+    this.pending = const Value.absent(),
+    this.failed = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MessagesCompanion.insert({
+    required String id,
+    required String channelId,
+    this.authorId = const Value.absent(),
+    this.seq = const Value.absent(),
+    required String content,
+    required int createdAt,
+    this.editedAt = const Value.absent(),
+    this.pending = const Value.absent(),
+    this.failed = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        channelId = Value(channelId),
+        content = Value(content),
+        createdAt = Value(createdAt);
+  static Insertable<Message> custom({
+    Expression<String>? id,
+    Expression<String>? channelId,
+    Expression<String>? authorId,
+    Expression<int>? seq,
+    Expression<String>? content,
+    Expression<int>? createdAt,
+    Expression<int>? editedAt,
+    Expression<bool>? pending,
+    Expression<bool>? failed,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (channelId != null) 'channel_id': channelId,
+      if (authorId != null) 'author_id': authorId,
+      if (seq != null) 'seq': seq,
+      if (content != null) 'content': content,
+      if (createdAt != null) 'created_at': createdAt,
+      if (editedAt != null) 'edited_at': editedAt,
+      if (pending != null) 'pending': pending,
+      if (failed != null) 'failed': failed,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MessagesCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? channelId,
+      Value<String?>? authorId,
+      Value<int>? seq,
+      Value<String>? content,
+      Value<int>? createdAt,
+      Value<int?>? editedAt,
+      Value<bool>? pending,
+      Value<bool>? failed,
+      Value<int>? rowid}) {
+    return MessagesCompanion(
+      id: id ?? this.id,
+      channelId: channelId ?? this.channelId,
+      authorId: authorId ?? this.authorId,
+      seq: seq ?? this.seq,
+      content: content ?? this.content,
+      createdAt: createdAt ?? this.createdAt,
+      editedAt: editedAt ?? this.editedAt,
+      pending: pending ?? this.pending,
+      failed: failed ?? this.failed,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
+    }
+    if (authorId.present) {
+      map['author_id'] = Variable<String>(authorId.value);
+    }
+    if (seq.present) {
+      map['seq'] = Variable<int>(seq.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (editedAt.present) {
+      map['edited_at'] = Variable<int>(editedAt.value);
+    }
+    if (pending.present) {
+      map['pending'] = Variable<bool>(pending.value);
+    }
+    if (failed.present) {
+      map['failed'] = Variable<bool>(failed.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessagesCompanion(')
+          ..write('id: $id, ')
+          ..write('channelId: $channelId, ')
+          ..write('authorId: $authorId, ')
+          ..write('seq: $seq, ')
+          ..write('content: $content, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('editedAt: $editedAt, ')
+          ..write('pending: $pending, ')
+          ..write('failed: $failed, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+abstract class _$SlimmDatabase extends GeneratedDatabase {
+  _$SlimmDatabase(QueryExecutor e) : super(e);
+  $SlimmDatabaseManager get managers => $SlimmDatabaseManager(this);
+  late final $ChannelsTable channels = $ChannelsTable(this);
+  late final $MessagesTable messages = $MessagesTable(this);
+  @override
+  Iterable<TableInfo<Table, Object?>> get allTables =>
+      allSchemaEntities.whereType<TableInfo<Table, Object?>>();
+  @override
+  List<DatabaseSchemaEntity> get allSchemaEntities => [channels, messages];
+}
+
+typedef $$ChannelsTableCreateCompanionBuilder = ChannelsCompanion Function({
+  required String id,
+  required String name,
+  required String kind,
+  required int createdAt,
+  Value<int> cursor,
+  Value<int> lastReadSeq,
+  Value<int> rowid,
+});
+typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<String> kind,
+  Value<int> createdAt,
+  Value<int> cursor,
+  Value<int> lastReadSeq,
+  Value<int> rowid,
+});
+
+class $$ChannelsTableFilterComposer
+    extends Composer<_$SlimmDatabase, $ChannelsTable> {
+  $$ChannelsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get cursor => $composableBuilder(
+      column: $table.cursor, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get lastReadSeq => $composableBuilder(
+      column: $table.lastReadSeq, builder: (column) => ColumnFilters(column));
+}
+
+class $$ChannelsTableOrderingComposer
+    extends Composer<_$SlimmDatabase, $ChannelsTable> {
+  $$ChannelsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get cursor => $composableBuilder(
+      column: $table.cursor, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get lastReadSeq => $composableBuilder(
+      column: $table.lastReadSeq, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ChannelsTableAnnotationComposer
+    extends Composer<_$SlimmDatabase, $ChannelsTable> {
+  $$ChannelsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get cursor =>
+      $composableBuilder(column: $table.cursor, builder: (column) => column);
+
+  GeneratedColumn<int> get lastReadSeq => $composableBuilder(
+      column: $table.lastReadSeq, builder: (column) => column);
+}
+
+class $$ChannelsTableTableManager extends RootTableManager<
+    _$SlimmDatabase,
+    $ChannelsTable,
+    Channel,
+    $$ChannelsTableFilterComposer,
+    $$ChannelsTableOrderingComposer,
+    $$ChannelsTableAnnotationComposer,
+    $$ChannelsTableCreateCompanionBuilder,
+    $$ChannelsTableUpdateCompanionBuilder,
+    (Channel, BaseReferences<_$SlimmDatabase, $ChannelsTable, Channel>),
+    Channel,
+    PrefetchHooks Function()> {
+  $$ChannelsTableTableManager(_$SlimmDatabase db, $ChannelsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ChannelsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ChannelsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ChannelsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String> kind = const Value.absent(),
+            Value<int> createdAt = const Value.absent(),
+            Value<int> cursor = const Value.absent(),
+            Value<int> lastReadSeq = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ChannelsCompanion(
+            id: id,
+            name: name,
+            kind: kind,
+            createdAt: createdAt,
+            cursor: cursor,
+            lastReadSeq: lastReadSeq,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String name,
+            required String kind,
+            required int createdAt,
+            Value<int> cursor = const Value.absent(),
+            Value<int> lastReadSeq = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ChannelsCompanion.insert(
+            id: id,
+            name: name,
+            kind: kind,
+            createdAt: createdAt,
+            cursor: cursor,
+            lastReadSeq: lastReadSeq,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ChannelsTableProcessedTableManager = ProcessedTableManager<
+    _$SlimmDatabase,
+    $ChannelsTable,
+    Channel,
+    $$ChannelsTableFilterComposer,
+    $$ChannelsTableOrderingComposer,
+    $$ChannelsTableAnnotationComposer,
+    $$ChannelsTableCreateCompanionBuilder,
+    $$ChannelsTableUpdateCompanionBuilder,
+    (Channel, BaseReferences<_$SlimmDatabase, $ChannelsTable, Channel>),
+    Channel,
+    PrefetchHooks Function()>;
+typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
+  required String id,
+  required String channelId,
+  Value<String?> authorId,
+  Value<int> seq,
+  required String content,
+  required int createdAt,
+  Value<int?> editedAt,
+  Value<bool> pending,
+  Value<bool> failed,
+  Value<int> rowid,
+});
+typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
+  Value<String> id,
+  Value<String> channelId,
+  Value<String?> authorId,
+  Value<int> seq,
+  Value<String> content,
+  Value<int> createdAt,
+  Value<int?> editedAt,
+  Value<bool> pending,
+  Value<bool> failed,
+  Value<int> rowid,
+});
+
+class $$MessagesTableFilterComposer
+    extends Composer<_$SlimmDatabase, $MessagesTable> {
+  $$MessagesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get channelId => $composableBuilder(
+      column: $table.channelId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get authorId => $composableBuilder(
+      column: $table.authorId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get seq => $composableBuilder(
+      column: $table.seq, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get content => $composableBuilder(
+      column: $table.content, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get editedAt => $composableBuilder(
+      column: $table.editedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get pending => $composableBuilder(
+      column: $table.pending, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get failed => $composableBuilder(
+      column: $table.failed, builder: (column) => ColumnFilters(column));
+}
+
+class $$MessagesTableOrderingComposer
+    extends Composer<_$SlimmDatabase, $MessagesTable> {
+  $$MessagesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get channelId => $composableBuilder(
+      column: $table.channelId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get authorId => $composableBuilder(
+      column: $table.authorId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get seq => $composableBuilder(
+      column: $table.seq, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get content => $composableBuilder(
+      column: $table.content, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get editedAt => $composableBuilder(
+      column: $table.editedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get pending => $composableBuilder(
+      column: $table.pending, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get failed => $composableBuilder(
+      column: $table.failed, builder: (column) => ColumnOrderings(column));
+}
+
+class $$MessagesTableAnnotationComposer
+    extends Composer<_$SlimmDatabase, $MessagesTable> {
+  $$MessagesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get channelId =>
+      $composableBuilder(column: $table.channelId, builder: (column) => column);
+
+  GeneratedColumn<String> get authorId =>
+      $composableBuilder(column: $table.authorId, builder: (column) => column);
+
+  GeneratedColumn<int> get seq =>
+      $composableBuilder(column: $table.seq, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get editedAt =>
+      $composableBuilder(column: $table.editedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get pending =>
+      $composableBuilder(column: $table.pending, builder: (column) => column);
+
+  GeneratedColumn<bool> get failed =>
+      $composableBuilder(column: $table.failed, builder: (column) => column);
+}
+
+class $$MessagesTableTableManager extends RootTableManager<
+    _$SlimmDatabase,
+    $MessagesTable,
+    Message,
+    $$MessagesTableFilterComposer,
+    $$MessagesTableOrderingComposer,
+    $$MessagesTableAnnotationComposer,
+    $$MessagesTableCreateCompanionBuilder,
+    $$MessagesTableUpdateCompanionBuilder,
+    (Message, BaseReferences<_$SlimmDatabase, $MessagesTable, Message>),
+    Message,
+    PrefetchHooks Function()> {
+  $$MessagesTableTableManager(_$SlimmDatabase db, $MessagesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MessagesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MessagesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MessagesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> channelId = const Value.absent(),
+            Value<String?> authorId = const Value.absent(),
+            Value<int> seq = const Value.absent(),
+            Value<String> content = const Value.absent(),
+            Value<int> createdAt = const Value.absent(),
+            Value<int?> editedAt = const Value.absent(),
+            Value<bool> pending = const Value.absent(),
+            Value<bool> failed = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              MessagesCompanion(
+            id: id,
+            channelId: channelId,
+            authorId: authorId,
+            seq: seq,
+            content: content,
+            createdAt: createdAt,
+            editedAt: editedAt,
+            pending: pending,
+            failed: failed,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String channelId,
+            Value<String?> authorId = const Value.absent(),
+            Value<int> seq = const Value.absent(),
+            required String content,
+            required int createdAt,
+            Value<int?> editedAt = const Value.absent(),
+            Value<bool> pending = const Value.absent(),
+            Value<bool> failed = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              MessagesCompanion.insert(
+            id: id,
+            channelId: channelId,
+            authorId: authorId,
+            seq: seq,
+            content: content,
+            createdAt: createdAt,
+            editedAt: editedAt,
+            pending: pending,
+            failed: failed,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$MessagesTableProcessedTableManager = ProcessedTableManager<
+    _$SlimmDatabase,
+    $MessagesTable,
+    Message,
+    $$MessagesTableFilterComposer,
+    $$MessagesTableOrderingComposer,
+    $$MessagesTableAnnotationComposer,
+    $$MessagesTableCreateCompanionBuilder,
+    $$MessagesTableUpdateCompanionBuilder,
+    (Message, BaseReferences<_$SlimmDatabase, $MessagesTable, Message>),
+    Message,
+    PrefetchHooks Function()>;
+
+class $SlimmDatabaseManager {
+  final _$SlimmDatabase _db;
+  $SlimmDatabaseManager(this._db);
+  $$ChannelsTableTableManager get channels =>
+      $$ChannelsTableTableManager(_db, _db.channels);
+  $$MessagesTableTableManager get messages =>
+      $$MessagesTableTableManager(_db, _db.messages);
+}
