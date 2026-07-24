@@ -176,15 +176,15 @@ Objective: deliver the administration and moderation tooling the brief mandates 
 Deliverables:
 
 - Admin console information architecture and API: user management, invite management, a roles/permissions editor, diagnostics, logging, and health monitoring.
-- A moderation queue building on the Phase 2 report/block intake, with content-aware flagging for the non-encrypted v1 channels, plus behavioral and report-driven signals; published contact info and an official-instance report-response target.
+- A moderation queue building on the Phase 2 report/block intake, driven by manual user reports (no automated content or media scanning, per owner decision), with published contact info and no fixed official-instance response SLA (illegal-content and safety reports escalated on discovery).
 - Performance metrics: an auth-gated (or network-isolated) /metrics Prometheus endpoint plus a built-in Postgres time-series store (raw 24h, 5-minute averages 30d, daily averages 1y) rendered as admin graphs, with its own measured RAM/CPU/disk budget.
-- The CSAM and legal-reporting design pass for the official instance, and the client capability handshake that verifies a server exposes report/block before connecting.
+- A documented content and legal-reporting policy for the official instance (manual reporting, act on reports, report known CSAM to the relevant authority on discovery, no proactive scanning), and the client capability handshake that verifies a server exposes report/block before connecting.
 
-Risks: the metrics store taxes the same process the idle budget covers and must be measured against it; single-maintainer governance constrains a realistic report-response SLA, stated honestly.
+Risks: the metrics store taxes the same process the idle budget covers and must be measured against it; single-maintainer governance means the official instance publishes no response SLA and escalates only illegal-content and safety reports on discovery, stated honestly.
 
 Dependencies: Phase 0, Phase 1, Phase 2.
 
-Exit criteria: an admin can manage users, invites, and roles, action reports from the queue, and view performance graphs over time; the metrics store stays within its budget; the CSAM/legal-reporting design is documented and the capability handshake is enforced client-side.
+Exit criteria: an admin can manage users, invites, and roles, action reports from the queue, and view performance graphs over time; the metrics store stays within its budget; the content and legal-reporting policy is documented and the capability handshake is enforced client-side.
 
 ## Phase 8 - Audio Design and Interaction Polish
 

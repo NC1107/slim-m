@@ -49,7 +49,7 @@ The most consequential resolutions: snowflake IDs replace the per-conversation s
 - Client-side video effects and background blur.
 - A relay-side devices database, message proxying, fan-out, dedup, or badge counting; the relay stays a stateless forwarder.
 - Multi-process horizontal scaling of a single home server as a shipped default; the snowflake ID scheme and connection hub are designed to allow it later, but v1 ships single-process.
-- Read receipts visible to other users (own-device read-state sync is included); this is deferred pending an owner decision.
+- Read receipts visible to other users (own-device read-state sync is included); deferred by owner decision as a later opt-in.
 - A foundation, steering committee, or CLA; governance is single-maintainer with a documented path to add maintainers, and provenance is DCO sign-off.
 
 ## Architecture Overview
@@ -285,6 +285,7 @@ The official instance persists or centralizes lockout across replicas and adds a
 Attachment safety validates by magic bytes, caps size and pixels, strips EXIF, serves from random keys with attachment disposition and nosniff for any web surface, and disables server-side link unfurling by default; the native client additionally applies dimension and memory decode budgets before decoding attacker-supplied images, since CSP and Content-Disposition do not protect a native decoder.
 
 Account model and App Store adjustments (detailed in the compliance section below): invite links carry a 128-bit token plus server address and identity fingerprint; short human codes are strictly throttled; the app adds mandatory in-app report, block, and account deletion, a terms-of-use gate at invite redemption, and an 18+ rating.
+Account recovery on self-hosted servers is an admin-issued one-time reset code only in v1 (owner decision); there is no recovery email in v1, which fits the no-email invite model and the friend-group self-host case where the admin is reachable, with recovery email addable later if demand appears.
 
 Rejected alternatives: stateless JWTs (un-revocable, alg-confusion footguns); TLS certificate pinning (breaks on rotation); self-signed certs on mobile (hostile under App Transport Security); CAPTCHA as the primary abuse defense (heavy, privacy-hostile).
 
@@ -421,7 +422,7 @@ All masters are uncompressed mono PCM WAV, since the full set is under about 350
 
 Rejected alternatives: DAW-authored or sampled sounds (not reproducible from source); shipping numpy/pyloudnorm as an app runtime dependency (violates the lightweight principle); a distinct synthesis method per sound (breaks family cohesion); integrating libcanberra/freedesktop themes (inconsistent across desktops).
 
-Accepted risks: three iOS integration paths (foreground player, NSE sound, CallKit ringtone) rather than one, mitigated by a CI bundle-check since a missing sound file fails silently to Apple's default tri-tone; default join/leave sounds are off above a small member-count threshold (a product decision left open) to avoid fatigue in busy servers.
+Accepted risks: three iOS integration paths (foreground player, NSE sound, CallKit ringtone) rather than one, mitigated by a CI bundle-check since a missing sound file fails silently to Apple's default tri-tone; default join/leave sounds play only in channels with roughly 8 or fewer participants and are muted above that (owner decision), user-overridable, to avoid fatigue in busy servers.
 
 ## Performance Budgets
 
@@ -482,8 +483,12 @@ Required adjustments:
 - Push tokens are declared as Device ID data in both stores' privacy disclosures, and the app's own privacy policy carries an explicit publisher-visibility disclaimer for the unbounded set of self-hosted servers a user may connect to.
 - A standing demo self-hosted deployment plus App Review Information notes are a release-checklist item, since the invite-only flow is otherwise untestable by a reviewer.
 
-Child-safety and legal reporting (resolves the appstore critical, the single most store-dangerous gap): a dedicated CSAM and legal-reporting design pass is commissioned before v1, covering the official instance's reporting pipeline and hash-matching policy stance; the client verifies via a capability handshake that a server exposes report/block before connecting, and surfaces a warning if absent, since a third-party fork can strip moderation while the official app remains the access point.
-The official instance states an explicit report-response target reconciled honestly against single-maintainer governance.
+Child-safety and content policy (owner decision, see [decisions/0001-owner-decisions.md](decisions/0001-owner-decisions.md)): slim-m does not perform proactive or automated scanning of user content or media, and the platform does not monitor what users post.
+Safety relies on manual user reporting plus the report, block, and moderation-queue tooling both stores require, with published contact info.
+The official US-hosted instance follows the legal baseline for a provider with no proactive-monitoring duty: it acts on reports and reports known child-sexual-abuse material to the relevant authority (in the US, NCMEC) when it obtains actual knowledge, without operating a hash-matching pipeline.
+The client still verifies via a capability handshake that a server exposes report and block before connecting, and surfaces a warning if absent, since a third-party fork can strip moderation while the official app remains the access point.
+The official instance publishes no fixed report-response SLA but escalates illegal-content and safety reports on discovery; self-hosted servers set their own policy.
+The earlier reviewer recommendation to commission a CSAM hash-matching pass is intentionally not adopted, since the owner's target use is small self-hosted friend groups rather than large public communities and the real store concern is the identifying-account requirement, which the no-email invite model already satisfies.
 
 Flathub/OARS content-rating metadata for eventual Linux desktop distribution is noted now as future-scope so it is not rediscovered cold.
 
@@ -545,18 +550,21 @@ account deletion and device list, (4) a moderation/report surface, (5) a
 first-run/empty state with the three onboarding entry points.
 ```
 
-## Open Questions for the Project Owner
+## Resolved Owner Decisions
 
-- What is the final project name, which affects repo naming, license headers, and package namespaces across both repositories?
-- Is E2EE for DMs a committed product promise, or is transport-only privacy with server-visible plaintext acceptable as the long-term stance? (This changes marketing, moderation, and the roadmap.)
-- Should the "infinite" canvas be a very large bounded world (the recommended Figma/Miro interpretation) rather than literally unbounded, confirmed before canvas rendering is finalized?
-- Should the official hosted instance run CSAM hash-matching (for example PhotoDNA), and what is the policy stance for self-hosters who cannot?
-- Should the official instance move rate-limit and WS-hub state to a shared store and run multiple app-server processes on day one, or only when horizontal scaling is actually necessary?
-- Should per-conversation read receipts visible to other users be a v1 feature or deferred as a later opt-in?
-- Should one backend hosting multiple independent communities (Discord-style multi-guild) be added post-v1 if self-hosters request it?
-- What is the default self-hosted account-recovery mechanism with no email: an admin-issued one-time reset code, an optional recovery email, or both?
-- What member-count threshold should default join/leave notification sounds to off, and what is the official instance's target moderation-report response time given single-maintainer governance?
-- Should the accent teal be validated by a real designer/stakeholder review before the primitive tokens are locked?
+All ten planning questions are resolved; the full record with rationale is in [decisions/0001-owner-decisions.md](decisions/0001-owner-decisions.md).
+Summary:
+
+- Encryption: transport-only for v1, with per-user and per-device keys pre-wired for later opt-in E2EE DMs.
+- Voice Canvas: a very large bounded world (Figma/Miro style), not literally unbounded.
+- Child safety: no proactive or automated content or media scanning; manual reporting plus report/block/moderation tooling, with report-on-discovery to authorities for the official instance.
+- Communities: one backend deployment is one community in v1; multi-guild revisited post-v1 only on demand.
+- Read receipts: deferred as a later opt-in; own-device read state syncs in v1.
+- Account recovery: admin-issued one-time reset code only in v1, no recovery email.
+- Official-instance scaling: single-process with in-memory state behind a swappable interface; a shared backplane is added only when scale demands it.
+- Design tokens: a designer/stakeholder review precedes token lock, alongside the CI contrast gate.
+- Project name: keep the working name "slim-m" for now; a final name is chosen before the 1.0 release closeout (the one deliberately deferred item).
+- Join/leave sounds: default off above roughly 8 participants in a channel, user-overridable. Official-instance moderation: no published response SLA, with illegal-content and safety reports escalated on discovery.
 
 ## Reference Research
 
