@@ -197,16 +197,19 @@ jobs:
       (needs.release-please.result == 'success' &&
        needs.release-please.outputs.server_released == 'true') ||
       startsWith(github.ref, 'refs/tags/server-v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-musl
             arch: amd64
+            runner: ubuntu-latest
           - target: aarch64-unknown-linux-musl
             arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7 # pin to commit SHA before public
 
@@ -220,17 +223,17 @@ jobs:
           fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
+      # Each arch builds its own musl target natively on a native runner (no
+      # cross, no QEMU), the same approach the container image uses.
+      - name: musl toolchain
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
+
       - uses: actions-rust-lang/setup-rust-toolchain@v1 # pin to commit SHA before public
         with:
           target: ${{ matrix.target }}
 
-      # cross gives a correct musl toolchain for both host and foreign arch, so
-      # the size-optimized release profile builds identically per target.
-      - name: install cross
-        run: cargo install cross --locked
-
       - name: build static binary
-        run: cross build --release --target ${{ matrix.target }} --bin slimm-server
+        run: cargo build --release --target ${{ matrix.target }} --bin slimm-server
 
       - name: stage binary
         id: stage
