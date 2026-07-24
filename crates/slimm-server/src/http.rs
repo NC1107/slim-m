@@ -16,6 +16,7 @@ mod channels;
 mod error;
 mod extract;
 mod messages;
+mod safety;
 mod sync;
 mod ws;
 
@@ -41,6 +42,7 @@ pub fn router(state: AppState) -> Router {
         .merge(auth::routes())
         .merge(channels::routes())
         .merge(messages::routes())
+        .merge(safety::routes())
         .merge(sync::routes())
         .merge(ws::routes())
         .layer(TraceLayer::new_for_http())

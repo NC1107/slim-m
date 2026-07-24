@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: crate::ids::SessionId\" FROM sessions WHERE device_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: crate::ids::SessionId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1ad5afbfcfe3b88a0c879521fdd98d852c34600cad5cb08a709ba799364666d9"
+}
