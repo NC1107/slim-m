@@ -46,6 +46,18 @@ class AppTokens extends ThemeExtension<AppTokens> {
     accent: Color(0xFF4FBDB4),
   );
 
+  /// True black, for OLED panels where a pure black pixel is genuinely off.
+  /// Not merely "darker dark": the point is the unlit pixel, so the base is
+  /// #000000 and elevation is carried by borders rather than lighter fills.
+  static const AppTokens trueBlack = AppTokens(
+    surfaceBase: Color(0xFF000000),
+    surfaceRaised: Color(0xFF0B0D0F),
+    borderSubtle: Color(0xFF23282D),
+    textPrimary: Color(0xFFF2F5F7),
+    textSecondary: Color(0xFFA8B2BC),
+    accent: Color(0xFF3FBFAE),
+  );
+
   @override
   AppTokens copyWith({
     Color? surfaceBase,

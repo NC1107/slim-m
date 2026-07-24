@@ -186,3 +186,39 @@ class ScopeDelta {
         reset: json['reset'] as bool,
       );
 }
+
+/// A device signed in to the account.
+class Device {
+  const Device({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+    required this.lastSeenAt,
+    required this.isCurrent,
+  });
+
+  final String id;
+  final String name;
+  final int createdAt;
+  final int? lastSeenAt;
+
+  /// True for the device making the request, so the UI can label it and warn
+  /// before someone signs themselves out.
+  final bool isCurrent;
+
+  factory Device.fromJson(Map<String, dynamic> json) => Device(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        createdAt: json['created_at'] as int,
+        lastSeenAt: json['last_seen_at'] as int?,
+        isCurrent: json['is_current'] as bool,
+      );
+}
+
+/// What a report is about.
+enum ReportSubject {
+  message,
+  user;
+
+  String get wire => name;
+}
