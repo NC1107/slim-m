@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO user_blocks (blocker_id, blocked_id, created_at)\n             VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "4ad4eaecfe73b78ed149bc8cb0dd4c3592e669e81104d830fe6178b78ffed7d6"
+}

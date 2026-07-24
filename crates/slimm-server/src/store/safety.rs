@@ -1,0 +1,264 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Blocking, reporting, and the device list.
+//!
+//! This is the safety surface the owner chose: manual reports reviewed by a
+//! person, and per-user blocking. There is no automated content or media
+//! scanning anywhere, by decision, so nothing here inspects message content.
+
+use uuid::Uuid;
+
+use super::{Store, now_ms};
+use crate::ids::{ChannelId, DeviceId, MessageId, UserId};
+
+/// A device on the account, for the settings device list.
+#[derive(Debug, Clone)]
+pub struct Device {
+    pub id: DeviceId,
+    pub name: String,
+    pub created_at: i64,
+    pub last_seen_at: Option<i64>,
+    /// True for the device making the request, so the UI can label it and can
+    /// warn before someone signs themselves out.
+    pub is_current: bool,
+}
+
+/// What a report is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReportSubject {
+    Message(MessageId),
+    User(UserId),
+}
+
+impl ReportSubject {
+    fn kind(&self) -> &'static str {
+        match self {
+            ReportSubject::Message(_) => "message",
+            ReportSubject::User(_) => "user",
+        }
+    }
+
+    fn id(&self) -> Uuid {
+        match self {
+            ReportSubject::Message(id) => id.0,
+            ReportSubject::User(id) => id.0,
+        }
+    }
+}
+
+/// Why filing a report failed.
+#[derive(Debug)]
+pub enum ReportError {
+    /// This reporter already has an open report about this subject.
+    AlreadyOpen,
+    /// The subject does not exist, or is not visible to the reporter.
+    NotFound,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for ReportError {
+    fn from(err: sqlx::Error) -> Self {
+        ReportError::Internal(err.into())
+    }
+}
+
+impl Store {
+    // -------------------------------------------------------------------------
+    // Devices
+    // -------------------------------------------------------------------------
+
+    /// The account's devices, newest first, flagging the caller's own.
+    pub async fn list_devices(
+        &self,
+        user_id: UserId,
+        current: DeviceId,
+    ) -> anyhow::Result<Vec<Device>> {
+        let rows = sqlx::query!(
+            r#"SELECT id AS "id!: DeviceId", name AS "name!",
+                      created_at AS "created_at!", last_seen_at
+               FROM devices WHERE user_id = ? ORDER BY created_at DESC"#,
+            user_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| Device {
+                is_current: r.id == current,
+                id: r.id,
+                name: r.name,
+                created_at: r.created_at,
+                last_seen_at: r.last_seen_at,
+            })
+            .collect())
+    }
+
+    /// Removes a device from the account and revokes its sessions. Returns the
+    /// sessions that were killed so live sockets can be closed. `None` when the
+    /// device is not on this account, so one user cannot sign another out.
+    pub async fn remove_device(
+        &self,
+        user_id: UserId,
+        device_id: DeviceId,
+    ) -> anyhow::Result<Option<Vec<crate::ids::SessionId>>> {
+        let owned = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM devices WHERE id = ? AND user_id = ?"#,
+            device_id,
+            user_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        if owned.is_none() {
+            return Ok(None);
+        }
+
+        let sessions = sqlx::query!(
+            r#"SELECT id AS "id!: crate::ids::SessionId" FROM sessions WHERE device_id = ?"#,
+            device_id
+        )
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .map(|r| r.id)
+        .collect();
+
+        // Revoking cascades the sessions and their tokens away with the device.
+        self.revoke_device(device_id).await?;
+        sqlx::query!("DELETE FROM devices WHERE id = ?", device_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(Some(sessions))
+    }
+
+    // -------------------------------------------------------------------------
+    // Blocking
+    // -------------------------------------------------------------------------
+
+    /// Blocks a user. Idempotent, and deliberately silent: the blocked user is
+    /// never told, because telling them turns blocking into a provocation.
+    pub async fn block_user(&self, blocker: UserId, blocked: UserId) -> anyhow::Result<bool> {
+        if blocker == blocked {
+            return Ok(false);
+        }
+        let now = now_ms();
+        let affected = sqlx::query!(
+            "INSERT OR IGNORE INTO user_blocks (blocker_id, blocked_id, created_at)
+             VALUES (?, ?, ?)",
+            blocker,
+            blocked,
+            now
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        Ok(affected > 0)
+    }
+
+    pub async fn unblock_user(&self, blocker: UserId, blocked: UserId) -> anyhow::Result<()> {
+        sqlx::query!(
+            "DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?",
+            blocker,
+            blocked
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Who this user has blocked. The client filters with this rather than the
+    /// server stripping messages, so blocking stays a client-side view choice
+    /// and the transcript other members see is unaffected.
+    pub async fn blocked_users(&self, blocker: UserId) -> anyhow::Result<Vec<UserId>> {
+        let rows = sqlx::query!(
+            r#"SELECT blocked_id AS "blocked_id!: UserId"
+               FROM user_blocks WHERE blocker_id = ? ORDER BY created_at DESC"#,
+            blocker
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|r| r.blocked_id).collect())
+    }
+
+    pub async fn has_blocked(&self, blocker: UserId, blocked: UserId) -> anyhow::Result<bool> {
+        let found = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM user_blocks
+               WHERE blocker_id = ? AND blocked_id = ?"#,
+            blocker,
+            blocked
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(found.is_some())
+    }
+
+    // -------------------------------------------------------------------------
+    // Reports
+    // -------------------------------------------------------------------------
+
+    /// Files a report for a human to review.
+    ///
+    /// A snapshot of the reported content is stored, because the author can edit
+    /// or delete it afterwards and a report about something that no longer
+    /// exists tells a moderator nothing.
+    pub async fn file_report(
+        &self,
+        reporter: UserId,
+        subject: ReportSubject,
+        reason: &str,
+    ) -> Result<Uuid, ReportError> {
+        let (channel_id, snapshot) = match subject {
+            ReportSubject::Message(message_id) => {
+                let message = self
+                    .message(message_id)
+                    .await
+                    .map_err(ReportError::Internal)?
+                    .ok_or(ReportError::NotFound)?;
+                (Some(message.channel_id), Some(message.content))
+            }
+            ReportSubject::User(_) => (None, None),
+        };
+
+        let id = Uuid::now_v7();
+        let now = now_ms();
+        let kind = subject.kind();
+        let subject_id = subject.id();
+        let channel: Option<ChannelId> = channel_id;
+
+        let result = sqlx::query!(
+            "INSERT INTO reports
+                (id, reporter_id, subject_kind, subject_id, channel_id, reason,
+                 snapshot, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            id,
+            reporter,
+            kind,
+            subject_id,
+            channel,
+            reason,
+            snapshot,
+            now
+        )
+        .execute(&self.pool)
+        .await;
+
+        match result {
+            Ok(_) => Ok(id),
+            // One open report per subject per reporter, so a report button
+            // cannot be used to flood the queue.
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                Err(ReportError::AlreadyOpen)
+            }
+            Err(e) => Err(ReportError::Internal(e.into())),
+        }
+    }
+
+    /// How many reports are waiting. The moderation queue itself lands with the
+    /// admin console in Phase 7; this is enough to show that intake works.
+    pub async fn open_report_count(&self) -> anyhow::Result<i64> {
+        let count = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) AS "count!: i64" FROM reports WHERE resolved_at IS NULL"#
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(count)
+    }
+}

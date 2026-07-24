@@ -22,9 +22,11 @@ use crate::ids::{ChannelId, MessageId, Seq, UserId};
 mod bootstrap;
 mod permissions;
 mod read_state;
+mod safety;
 mod sessions;
 
 pub use bootstrap::Bootstrap;
+pub use safety::{Device, ReportError, ReportSubject};
 pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext,
 };
