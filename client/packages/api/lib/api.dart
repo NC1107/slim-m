@@ -1,5 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Generated wire-protocol client and typed WebSocket envelope.
+/// Typed client for the slim-m wire protocol.
 ///
-/// Phase 0 boundary stub; implemented in a later phase.
+/// The contract lives in `schema/openapi.yaml`; this package is its Dart side.
+/// Two ideas run through it and are worth knowing before use:
+///
+/// - Identity and order are separate. A message's `id` is a client-generated
+///   UUIDv7 that also makes sending idempotent; its `seq` is the server's
+///   per-channel order key and the only correct sync cursor.
+/// - Writes go over REST and events arrive over the WebSocket. The socket is a
+///   fan-out of things that already happened durably, never the write path.
 library;
+
+export 'src/client.dart' show SlimmApi, SessionStore;
+export 'src/events.dart'
+    show
+        EventConnection,
+        EventConnectionRefused,
+        ErrorEvent,
+        HelloEvent,
+        MessageCreated,
+        MessageEdited,
+        PongEvent,
+        ServerEvent,
+        protocolVersion;
+export 'src/exceptions.dart';
+export 'src/models.dart';

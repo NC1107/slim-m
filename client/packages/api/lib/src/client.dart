@@ -1,0 +1,387 @@
+// SPDX-License-Identifier: Apache-2.0
+/// The REST client for the slim-m API.
+library;
+
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import 'exceptions.dart';
+import 'models.dart';
+
+/// Holds the current session and hands out the access token.
+///
+/// Kept separate from the client so storage (secure storage on device, memory
+/// in tests) can vary without the client knowing, and so a refresh performed by
+/// one call is visible to every other.
+class SessionStore {
+  SessionStore({TokenPair? tokens}) : _tokens = tokens;
+
+  TokenPair? _tokens;
+
+  final _changes = StreamController<TokenPair?>.broadcast();
+
+  /// Emits whenever the session changes, including null when it ends.
+  Stream<TokenPair?> get changes => _changes.stream;
+
+  TokenPair? get tokens => _tokens;
+  bool get isSignedIn => _tokens != null;
+
+  void set(TokenPair? tokens) {
+    _tokens = tokens;
+    _changes.add(tokens);
+  }
+
+  void clear() => set(null);
+
+  Future<void> dispose() => _changes.close();
+}
+
+/// A typed client for one server.
+///
+/// Refresh is handled here rather than by callers: when a request comes back
+/// unauthorized and a refresh token is held, the client rotates once and
+/// replays the request. Concurrent calls share a single in-flight refresh, so a
+/// burst of expired requests does not spend the single-use refresh token more
+/// than once (which the server would read as reuse and revoke the session).
+class SlimmApi {
+  SlimmApi({
+    required Uri baseUrl,
+    SessionStore? session,
+    http.Client? httpClient,
+  })  : baseUrl = baseUrl,
+        session = session ?? SessionStore(),
+        _http = httpClient ?? http.Client();
+
+  final Uri baseUrl;
+  final SessionStore session;
+  final http.Client _http;
+
+  Future<TokenPair>? _refreshInFlight;
+
+  /// The WebSocket URL for this server, with the scheme mapped from http(s).
+  Uri get webSocketUrl {
+    final scheme = baseUrl.scheme == 'https' ? 'wss' : 'ws';
+    return baseUrl.replace(scheme: scheme, path: '/ws');
+  }
+
+  void close() => _http.close();
+
+  // ---------------------------------------------------------------------------
+  // System
+  // ---------------------------------------------------------------------------
+
+  Future<Version> version() async {
+    final json = await _send('GET', '/version', authenticated: false);
+    return Version.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<bool> health() async {
+    try {
+      final response = await _http.get(baseUrl.replace(path: '/healthz'));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auth
+  // ---------------------------------------------------------------------------
+
+  /// Creates an account and signs in. On an unclaimed deployment the first
+  /// account also becomes its administrator.
+  Future<TokenPair> register({
+    required String username,
+    required String displayName,
+    required String password,
+    required String deviceName,
+  }) async {
+    final json = await _send(
+      'POST',
+      '/auth/register',
+      authenticated: false,
+      body: {
+        'username': username,
+        'display_name': displayName,
+        'password': password,
+        'device_name': deviceName,
+      },
+    );
+    final tokens = TokenPair.fromJson(json as Map<String, dynamic>);
+    session.set(tokens);
+    return tokens;
+  }
+
+  Future<TokenPair> login({
+    required String username,
+    required String password,
+    required String deviceName,
+  }) async {
+    final json = await _send(
+      'POST',
+      '/auth/login',
+      authenticated: false,
+      body: {
+        'username': username,
+        'password': password,
+        'device_name': deviceName,
+      },
+    );
+    final tokens = TokenPair.fromJson(json as Map<String, dynamic>);
+    session.set(tokens);
+    return tokens;
+  }
+
+  /// Rotates the session. Callers rarely need this directly; an unauthorized
+  /// response triggers it automatically.
+  Future<TokenPair> refresh() {
+    // Share one in-flight rotation: the refresh token is single-use, so two
+    // concurrent rotations would spend it twice and the server would treat the
+    // second as a leak and revoke the session.
+    return _refreshInFlight ??= _refreshOnce().whenComplete(() {
+      _refreshInFlight = null;
+    });
+  }
+
+  Future<TokenPair> _refreshOnce() async {
+    final current = session.tokens;
+    if (current == null) {
+      throw const UnauthorizedException('not signed in');
+    }
+    try {
+      final json = await _send(
+        'POST',
+        '/auth/refresh',
+        authenticated: false,
+        body: {'refresh_token': current.refreshToken},
+      );
+      final tokens = TokenPair.fromJson(json as Map<String, dynamic>);
+      session.set(tokens);
+      return tokens;
+    } on UnauthorizedException {
+      // The refresh token is spent, revoked, or the session is gone; the only
+      // move left is a fresh sign-in.
+      session.clear();
+      rethrow;
+    }
+  }
+
+  /// Mints a single-use ticket for opening a WebSocket.
+  Future<Ticket> webSocketTicket() async {
+    final json = await _send('POST', '/auth/ws-ticket');
+    return Ticket.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Ends this session. Any live WebSocket on it is closed by the server.
+  Future<void> logout() async {
+    await _send('POST', '/auth/logout', expectNoContent: true);
+    session.clear();
+  }
+
+  /// Deletes the signed-in account. Irreversible.
+  Future<void> deleteAccount() async {
+    await _send('DELETE', '/account', expectNoContent: true);
+    session.clear();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Channels
+  // ---------------------------------------------------------------------------
+
+  Future<List<Channel>> listChannels() async {
+    final json = await _send('GET', '/channels');
+    return (json as List<dynamic>)
+        .map((c) => Channel.fromJson(c as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  /// Creates a channel. Requires the manage-channels permission.
+  Future<Channel> createChannel(
+      {required String name, String kind = 'text'}) async {
+    final json = await _send(
+      'POST',
+      '/channels',
+      body: {'name': name, 'kind': kind},
+    );
+    return Channel.fromJson(json as Map<String, dynamic>);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Messages
+  // ---------------------------------------------------------------------------
+
+  /// History, newest first. Pass the smallest `seq` already held as [before] to
+  /// page backwards.
+  Future<List<Message>> listMessages(
+    String channelId, {
+    int? before,
+    int? limit,
+  }) async {
+    final query = <String, String>{
+      if (before != null) 'before': '$before',
+      if (limit != null) 'limit': '$limit',
+    };
+    final json = await _send(
+      'GET',
+      '/channels/$channelId/messages',
+      query: query.isEmpty ? null : query,
+    );
+    return (json as List<dynamic>)
+        .map((m) => Message.fromJson(m as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  /// Sends a message. [id] must be a client-generated UUIDv7 and makes the send
+  /// idempotent, so retrying an uncertain send is always safe.
+  Future<Message> sendMessage({
+    required String channelId,
+    required String id,
+    required String content,
+  }) async {
+    final json = await _send(
+      'POST',
+      '/channels/$channelId/messages',
+      body: {'id': id, 'content': content},
+    );
+    return Message.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<Message> editMessage({
+    required String channelId,
+    required String messageId,
+    required String content,
+  }) async {
+    final json = await _send(
+      'PATCH',
+      '/channels/$channelId/messages/$messageId',
+      body: {'content': content},
+    );
+    return Message.fromJson(json as Map<String, dynamic>);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Read state and sync
+  // ---------------------------------------------------------------------------
+
+  Future<ReadState> readState(String channelId) async {
+    final json = await _send('GET', '/channels/$channelId/read');
+    return ReadState.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Advances the read marker. Monotonic: a lower seq is ignored by the server.
+  Future<ReadState> markRead(
+      {required String channelId, required int seq}) async {
+    final json = await _send(
+      'PUT',
+      '/channels/$channelId/read',
+      body: {'seq': seq},
+    );
+    return ReadState.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Catches several scopes up in one request. Scopes the caller cannot view
+  /// are omitted from the response rather than refused.
+  Future<List<ScopeDelta>> sync(List<ScopeCursor> scopes) async {
+    final json = await _send(
+      'POST',
+      '/sync',
+      body: {'scopes': scopes.map((s) => s.toJson()).toList(growable: false)},
+    );
+    final map = json as Map<String, dynamic>;
+    return (map['scopes'] as List<dynamic>)
+        .map((s) => ScopeDelta.fromJson(s as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Transport
+  // ---------------------------------------------------------------------------
+
+  Future<Object?> _send(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? query,
+    bool authenticated = true,
+    bool expectNoContent = false,
+    bool isRetry = false,
+  }) async {
+    final uri = baseUrl.replace(path: path, queryParameters: query);
+    final request = http.Request(method, uri);
+    if (body != null) {
+      request.headers['content-type'] = 'application/json';
+      request.body = jsonEncode(body);
+    }
+    if (authenticated) {
+      final token = session.tokens?.accessToken;
+      if (token == null) {
+        throw const UnauthorizedException('not signed in');
+      }
+      request.headers['authorization'] = 'Bearer $token';
+    }
+
+    final http.Response response;
+    try {
+      response = await http.Response.fromStream(await _http.send(request));
+    } catch (e) {
+      throw TransportException('$method $path failed: $e');
+    }
+
+    // One automatic rotation, then replay. Only for authenticated calls, and
+    // never twice for the same request.
+    if (response.statusCode == 401 &&
+        authenticated &&
+        !isRetry &&
+        session.tokens != null) {
+      await refresh();
+      return _send(
+        method,
+        path,
+        body: body,
+        query: query,
+        authenticated: authenticated,
+        expectNoContent: expectNoContent,
+        isRetry: true,
+      );
+    }
+
+    if (response.statusCode == 204 ||
+        (expectNoContent && response.statusCode < 300)) {
+      return null;
+    }
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.body.isEmpty) return null;
+      try {
+        return jsonDecode(response.body) as Object;
+      } catch (e) {
+        throw TransportException(
+            'could not decode the reply to $method $path: $e');
+      }
+    }
+    throw _errorFor(response);
+  }
+
+  ApiException _errorFor(http.Response response) {
+    var reason = 'request failed';
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic> && decoded['error'] is String) {
+        reason = decoded['error'] as String;
+      }
+    } catch (_) {
+      // A non-JSON body is not itself an error worth surfacing; the status is.
+    }
+    return switch (response.statusCode) {
+      400 => BadRequestException(reason),
+      401 => UnauthorizedException(reason),
+      403 => ForbiddenException(reason),
+      404 => NotFoundException(reason),
+      409 => ConflictException(reason),
+      429 => RateLimitedException(reason),
+      503 => UnavailableException(reason),
+      _ => ServerException(reason, response.statusCode),
+    };
+  }
+}

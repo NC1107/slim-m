@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: Apache-2.0
+/// Typed failures, so callers branch on what happened rather than parsing
+/// status codes at every call site.
+library;
+
+/// Base for anything the API layer can fail with.
+sealed class ApiException implements Exception {
+  const ApiException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => '$runtimeType: $message';
+}
+
+/// The request never reached the server, or the reply was unreadable.
+/// Retryable, and the caller cannot know whether the write landed, which is why
+/// writes are keyed idempotently.
+class TransportException extends ApiException {
+  const TransportException(super.message);
+}
+
+/// Credentials are missing, expired, or revoked. The session should refresh
+/// once and, if that also fails, sign the user out.
+class UnauthorizedException extends ApiException {
+  const UnauthorizedException(super.message);
+}
+
+/// The caller is authenticated but not allowed. Also returned for a channel
+/// that does not exist, so absence is not distinguishable from denial.
+class ForbiddenException extends ApiException {
+  const ForbiddenException(super.message);
+}
+
+/// The target does not exist within a scope the caller can see.
+class NotFoundException extends ApiException {
+  const NotFoundException(super.message);
+}
+
+/// The request collided with existing state, for example reusing a message id
+/// that already belongs to a different channel or author.
+class ConflictException extends ApiException {
+  const ConflictException(super.message);
+}
+
+/// The request failed validation.
+class BadRequestException extends ApiException {
+  const BadRequestException(super.message);
+}
+
+/// Over the rate budget for this traffic class. Back off before retrying.
+class RateLimitedException extends ApiException {
+  const RateLimitedException(super.message);
+}
+
+/// The server shed the request under load. Retry shortly.
+class UnavailableException extends ApiException {
+  const UnavailableException(super.message);
+}
+
+/// An unexpected status, kept distinct so it is never silently treated as one
+/// of the handled cases.
+class ServerException extends ApiException {
+  const ServerException(super.message, this.statusCode);
+
+  final int statusCode;
+}
