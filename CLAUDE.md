@@ -26,12 +26,16 @@ Server releases 0.1.0 and 0.2.0 are cut, with signed multi-arch GHCR images and 
 Phase 1 merged so far:
 - Core SQLite schema (PR #3): users, auth tables, RBAC, channels, per-scope sequence counters, messages, reactions, attachments, invites, read state, canvas tables, FTS5.
 - Identity and message store (PR #8): UUIDv7 newtype ids and a distinct per-scope `Seq`; a `Store` with atomic per-(channel, stream) sequence allocation and idempotent-by-message-id send; edit (FTS re-indexed by trigger); keyset pagination; integration tests for the ordering and idempotency invariants.
+- Auth (PR #10): Argon2id (OWASP 19 MiB, semaphore-bounded with a fail-fast acquire timeout), opaque server-side tokens (256-bit secrets stored as SHA-256), short access tokens, device-bound refresh rotation with reuse detection and a grace window, single-use WS connect tickets, instant revocation. Migration 0003 (access_tokens, ws_tickets). Rotation and ticket redemption use an atomic claim-first UPDATE so concurrent races serialize cleanly.
+- Permission evaluator (PR #11): a 63-bit `Permissions` bitmask and a pure `evaluate()`: @everyone base, role union, ADMINISTRATOR bypass, then channel overwrites (@everyone, role tier deny-wins, member overwrite absolute). Store loading (create_role/assign_role/set_*_overwrite, permissions_in_channel/base_permissions/has_permission). Migration 0004 enforces a single @everyone role.
+- Message endpoints (PR #12): authenticated + authorized REST send/list/edit (`POST`/`GET /channels/{id}/messages`, `PATCH .../{message_id}`), wiring the evaluator (view to read, view+send to post, authorship-or-manage to edit). Shared http `error`/`extract` modules. Send idempotency scoped to (channel, author) so a reused id cannot leak a foreign message.
 
 Phase 1 next increments, each its own PR:
-1. Auth: Argon2id password hashing, opaque server-side session tokens with the rotating refresh-family and reuse detection, and WebSocket connect tickets.
-2. The deny-by-default permission evaluator: @everyone base, union of role bits, channel role overwrites (deny wins), member overwrite absolute, ADMINISTRATOR bypass.
-3. The JSON-over-WebSocket envelope plus the REST message endpoints and the bundled per-scope sync cursor.
-4. Account deletion end to end (purge content, keep tombstones, anonymize).
+1. The JSON-over-WebSocket envelope and fan-out: connect via a redeemed WS ticket, a single typed envelope (discriminated type, protocol version, per-scope seq), server-to-client fan-out plus ephemeral client-to-server signals, protocol/capability negotiation.
+2. Read state (monotonic last-read seq, unread as an indexed range count) plus the bundled per-scope catch-up sync cursor (capped per scope and in aggregate, continuation flag, snapshot-pointer fallback).
+3. Account deletion end to end (purge personal data, tombstone the user, transfer group ownership, revoke devices and tokens).
+
+Open follow-ups noted during review: auth still needs real per-IP/per-account rate limiting (its own roadmap item; only the hashing-permit timeout ships so far); malformed query/JSON bodies still return axum's default error rather than the uniform JSON error contract (low).
 
 ## Repository layout
 
