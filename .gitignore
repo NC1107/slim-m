@@ -32,3 +32,8 @@ build/
 # Flutter build output
 client/**/build/
 client/**/.dart_tool/
+
+# Flutter generates these per-machine; never commit them.
+client/**/linux/flutter/ephemeral/
+client/**/windows/flutter/ephemeral/
+client/**/macos/Flutter/ephemeral/

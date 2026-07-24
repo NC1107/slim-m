@@ -24,7 +24,12 @@ jobs:
           # Emoji are user content (reactions), never interface chrome.
           # Chrome uses Lucide icons. This gate fails on any emoji codepoint in
           # client source.
-          if grep -rlP '[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE0F}\x{200D}]' client/ 2>/dev/null; then
+          # Text sources only, and --binary-files=without-match, so a compiled
+          # artifact that happens to contain those bytes cannot trip the gate.
+          if grep -rlP --binary-files=without-match \
+               --include='*.dart' --include='*.yaml' --include='*.arb' \
+               '[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE0F}\x{200D}]' \
+               client/ 2>/dev/null; then
             echo "::error::emoji found in UI source; use Lucide icons for chrome"
             exit 1
           fi
