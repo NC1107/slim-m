@@ -9,6 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Lucide is the icon set of record; AppIcons is the only place widgets touch
+  # it, so swapping sets later is one file.
+  lucide_icons_flutter: ^3.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

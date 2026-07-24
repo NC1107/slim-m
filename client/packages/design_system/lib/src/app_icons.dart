@@ -1,28 +1,40 @@
 // SPDX-License-Identifier: Apache-2.0
-import 'package:flutter/widgets.dart';
-
-/// Central icon access for slim-m interface chrome.
+/// The icon vocabulary.
 ///
-/// The UI uses the Lucide icon set and never emoji as chrome; CI fails on emoji
-/// codepoints in client source. This wrapper is the single seam through which
-/// the Lucide package is bound, so swapping or extending the icon set touches
-/// one file. The concrete Lucide bindings are wired when the client is built on
-/// a Flutter toolchain; until then this exposes the icon vocabulary the app
-/// depends on.
+/// Widgets reference these names, never an icon package directly, so the set can
+/// be swapped in one file. Emoji are never interface chrome; they are user
+/// content only (reactions), which a CI grep enforces.
+library;
+
+import 'package:flutter/widgets.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 abstract final class AppIcons {
-  // Navigation and chrome.
-  static const IconData hash = _placeholder;
-  static const IconData voice = _placeholder;
-  static const IconData settings = _placeholder;
-  static const IconData members = _placeholder;
+  // Navigation and structure.
+  static const IconData hash = LucideIcons.hash;
+  static const IconData voice = LucideIcons.volume2;
+  static const IconData settings = LucideIcons.settings;
+  static const IconData members = LucideIcons.users;
+  static const IconData back = LucideIcons.arrowLeft;
+  static const IconData add = LucideIcons.plus;
+  static const IconData search = LucideIcons.search;
 
-  // Calls and canvas.
-  static const IconData mic = _placeholder;
-  static const IconData camera = _placeholder;
-  static const IconData screenShare = _placeholder;
-  static const IconData leaveCall = _placeholder;
-  static const IconData canvas = _placeholder;
+  // Messaging.
+  static const IconData send = LucideIcons.send;
+  static const IconData edit = LucideIcons.pencil;
+  static const IconData retry = LucideIcons.rotateCw;
+  static const IconData pending = LucideIcons.clock;
+  static const IconData failed = LucideIcons.circleAlert;
 
-  static const IconData _placeholder =
-      IconData(0x2610, fontFamily: 'MaterialIcons');
+  // Calls and canvas, wired up in later phases.
+  static const IconData mic = LucideIcons.mic;
+  static const IconData micOff = LucideIcons.micOff;
+  static const IconData camera = LucideIcons.video;
+  static const IconData screenShare = LucideIcons.monitorUp;
+  static const IconData leaveCall = LucideIcons.phoneOff;
+  static const IconData canvas = LucideIcons.pencilRuler;
+
+  // Account.
+  static const IconData signOut = LucideIcons.logOut;
+  static const IconData account = LucideIcons.circleUser;
 }
