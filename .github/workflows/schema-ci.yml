@@ -17,6 +17,8 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: schema-ci-${{ github.ref }}
@@ -70,3 +72,36 @@ jobs:
           base: "${{ github.event.pull_request.base.sha }}:schema/openapi.yaml"
           revision: "HEAD:schema/openapi.yaml"
           fail-on: ERR
+
+  # GitHub's file view shows OpenAPI as plain YAML, so the browsable API
+  # reference lives on Pages instead, rebuilt on every schema change to main.
+  publish-docs:
+    name: publish rendered api docs
+    if: github.event_name == 'push'
+    needs: [lint]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7 # pin to commit SHA before public
+
+      - uses: actions/setup-node@v6 # pin to commit SHA before public
+        with:
+          node-version: lts/*
+
+      - name: build redoc html
+        run: |
+          mkdir -p dist
+          npx @redocly/cli build-docs schema/openapi.yaml -o dist/index.html
+
+      - uses: actions/configure-pages@v5 # pin to commit SHA before public
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v4 # pin to commit SHA before public
+        with:
+          path: dist
+
+      - id: deploy
+        uses: actions/deploy-pages@v4 # pin to commit SHA before public

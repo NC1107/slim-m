@@ -33,6 +33,7 @@ curl localhost:8080/version     # -> {"name":"slim-m",...}
 
 ## Documents
 
+- [API reference](https://nc1107.github.io/slim-m/) (rendered from [schema/openapi.yaml](schema/openapi.yaml) on every change)
 - [Brief](docs/BRIEF.md), [strategy](docs/STRATEGY.md), [roadmap](docs/ROADMAP.md)
 - [Decisions of record](docs/decisions/), [backlog](docs/BACKLOG.md)
 - [Licensing](LICENSING.md) (AGPL-3.0 server, Apache-2.0 client and schema), [contributing](CONTRIBUTING.md)

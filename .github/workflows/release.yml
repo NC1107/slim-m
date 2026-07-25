@@ -440,6 +440,121 @@ jobs:
             dist/SHA256SUMS.asc
 
   # ---------------------------------------------------------------------------
+  # android-client: build the upload-signed apk and appbundle and attach them
+  # to the client release. Inert until the signing secrets exist; it verifies
+  # the signer is the upload key, since silently falling back to the debug
+  # keystore is the exact failure this job exists to close.
+  #
+  # Required secrets (all must be present for the job to do real work):
+  #   ANDROID_UPLOAD_KEYSTORE_B64  - base64 of the upload keystore (.jks)
+  #   ANDROID_KEY_PROPERTIES       - key.properties contents
+  #   ANDROID_GOOGLE_SERVICES_JSON - google-services.json contents (gitignored;
+  #                                  without it push is silently disabled)
+  # ---------------------------------------------------------------------------
+  android-client:
+    needs: [release-please]
+    if: >-
+      (needs.release-please.result == 'success' &&
+       needs.release-please.outputs.client_released == 'true') ||
+      startsWith(github.ref, 'refs/tags/client-v')
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      ANDROID_UPLOAD_KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+      ANDROID_KEY_PROPERTIES: ${{ secrets.ANDROID_KEY_PROPERTIES }}
+      ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+    steps:
+      - name: check secrets
+        id: gate
+        run: |
+          if [ -n "$ANDROID_UPLOAD_KEYSTORE_B64" ] && [ -n "$ANDROID_KEY_PROPERTIES" ] \
+             && [ -n "$ANDROID_GOOGLE_SERVICES_JSON" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Android signing secrets are not configured. Add ANDROID_UPLOAD_KEYSTORE_B64, ANDROID_KEY_PROPERTIES, and ANDROID_GOOGLE_SERVICES_JSON to enable the signed build. Skipping."
+          fi
+
+      - uses: actions/checkout@v7 # pin to commit SHA before public
+        if: steps.gate.outputs.ready == 'true'
+
+      - name: resolve version
+        if: steps.gate.outputs.ready == 'true'
+        id: ver
+        run: |
+          if [ -n "${{ needs.release-please.outputs.client_version }}" ]; then
+            echo "tag=${{ needs.release-please.outputs.client_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: write signing assets
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON" \
+            > client/packages/app/android/app/google-services.json
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE_B64" | base64 -d \
+            > client/packages/app/android/app/upload-keystore.jks
+          printf '%s' "$ANDROID_KEY_PROPERTIES" \
+            > client/packages/app/android/key.properties
+
+      - uses: actions/setup-java@v5 # pin to commit SHA before public
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          distribution: temurin
+          # The LTS the Android Gradle Plugin supports; local builds match.
+          java-version: "21"
+
+      - uses: subosito/flutter-action@v2 # pin to commit SHA before public
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          channel: stable
+
+      - name: build android release
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: client/packages/app
+        run: |
+          # --enforce-lockfile: resolve exactly what pubspec.lock pins.
+          flutter pub get --enforce-lockfile
+          flutter build appbundle --release
+          flutter build apk --release
+
+      - name: verify the signer is the upload key, not debug
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: client/packages/app
+        run: |
+          SIGNER="$("${ANDROID_HOME}/build-tools/$(ls "${ANDROID_HOME}/build-tools" | sort -V | tail -n1)/apksigner" \
+            verify --print-certs build/app/outputs/flutter-apk/app-release.apk \
+            | grep 'Signer #1 certificate DN')"
+          echo "$SIGNER"
+          if echo "$SIGNER" | grep -q 'Android Debug'; then
+            echo "::error::release apk is signed with the debug keystore; key.properties did not take effect"
+            exit 1
+          fi
+
+      - name: checksums
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: client/packages/app
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            "dist/slim-m-client-android.apk"
+          cp build/app/outputs/bundle/release/app-release.aab \
+            "dist/slim-m-client-android.aab"
+          (cd dist && sha256sum *.apk *.aab > SHA256SUMS.android)
+
+      - uses: softprops/action-gh-release@v3 # pin to commit SHA before public
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          files: |
+            client/packages/app/dist/slim-m-client-android.apk
+            client/packages/app/dist/slim-m-client-android.aab
+            client/packages/app/dist/SHA256SUMS.android
+
+  # ---------------------------------------------------------------------------
   # ios-testflight: build the signed ipa and upload to TestFlight. Reviewer-
   # gated environment; intentionally inert until the signing and App Store
   # Connect secrets exist. It warns and stops rather than faking an upload.
