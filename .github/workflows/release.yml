@@ -513,6 +513,13 @@ jobs:
             | plutil -extract UUID raw -o - -)"
           cp "$PROFILE_PATH" "${PROFILE_DIR}/${UUID}.mobileprovision"
 
+          # A signing failure downstream is otherwise reported only as "no valid
+          # code signing certificates were found", which says nothing about
+          # whether the import worked. This names the identity that is actually
+          # visible to codesign.
+          echo "signing identities available to codesign:"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
       - uses: subosito/flutter-action@v2 # pin to commit SHA before public
         if: steps.gate.outputs.ready == 'true'
         with:

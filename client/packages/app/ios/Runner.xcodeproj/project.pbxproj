@@ -583,6 +583,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				CODE_SIGN_STYLE = Manual;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
+				DEVELOPMENT_TEAM = 76S78SUWVM;
+				PROVISIONING_PROFILE_SPECIFIER = "slim-m App Store Distribution";
 				PRODUCT_BUNDLE_IDENTIFIER = top.npcserver.slimm;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
