@@ -5,7 +5,7 @@ publish_to: none
 # Feeds CFBundleShortVersionString and CFBundleVersion. Without it an archive
 # builds but cannot be submitted, and every TestFlight upload would collide on
 # the same missing build number.
-version: 0.1.0+3
+version: 0.1.0+4
 resolution: workspace
 environment:
   sdk: ^3.6.0
