@@ -17,6 +17,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_data/data.dart';
+import 'package:slimm_platform/platform.dart';
 
 /// Where the app points. Overridden at startup from saved settings, and by
 /// tests to aim at a throwaway server.
@@ -75,6 +76,10 @@ final storeProvider = FutureProvider<MessageStore>((ref) async {
 final preferencesProvider = FutureProvider<SharedPreferences>(
   (ref) => SharedPreferences.getInstance(),
 );
+
+/// Where device secrets live: today the push private key, later signing and
+/// agreement keys for E2EE. In memory until Phase 3 wires a platform keychain.
+final keyStoreProvider = Provider<KeyStore>((ref) => InMemoryKeyStore());
 
 /// Prepends a current value to a stream, so a listener attaching late still
 /// sees the present state rather than waiting for the next change.

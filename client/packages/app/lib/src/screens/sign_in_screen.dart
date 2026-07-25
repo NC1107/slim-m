@@ -2,12 +2,15 @@
 /// Connecting to a server and signing in.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart';
+import '../providers/push_controller.dart';
 import '../providers/sync_controller.dart';
 
 /// Sign in or create an account on a chosen server.
@@ -85,6 +88,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         ref.read(pendingInviteProvider.notifier).state = null;
       }
       await ref.read(syncControllerProvider.notifier).start();
+      // Fire-and-forget: a denied permission or unreachable server here must
+      // never hold up sign-in, which is already complete at this point.
+      unawaited(ref.read(pushControllerProvider).register());
     } on ApiException catch (e) {
       // Say what actually happened. "Something went wrong" tells the user
       // nothing about whether to fix their password or wait.
