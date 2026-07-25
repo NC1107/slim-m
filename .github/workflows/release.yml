@@ -522,7 +522,9 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         working-directory: client/packages/app
         run: |
-          flutter pub get
+          # --enforce-lockfile so a release build resolves exactly what the
+          # committed pubspec.lock pins, rather than whatever is newest today.
+          flutter pub get --enforce-lockfile
           flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
 
       - name: upload to TestFlight
