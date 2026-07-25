@@ -118,4 +118,72 @@ void main() {
       expect(token, 'abc123');
     });
   });
+
+  group('ApnsTokenChannel.fetch', () {
+    test('not iOS is ApnsUnsupported, without touching the channel', () async {
+      var touched = false;
+      _mock((call) async {
+        touched = true;
+        return null;
+      });
+      addTearDown(() => _mock(null));
+
+      final result = await ApnsTokenChannel(isIOS: false).fetch();
+
+      expect(result, isA<ApnsUnsupported>());
+      expect(touched, isFalse);
+    });
+
+    test('a cached token is ApnsTokenReady', () async {
+      _mock((call) async => switch (call.method) {
+            'getToken' => 'abcd1234',
+            _ => null,
+          });
+      addTearDown(() => _mock(null));
+
+      final result = await ApnsTokenChannel(isIOS: true).fetch();
+
+      expect(result, isA<ApnsTokenReady>());
+      expect((result as ApnsTokenReady).token, 'abcd1234');
+    });
+
+    test(
+        'a cached registration error is ApnsRegistrationFailed with the '
+        'reason preserved', () async {
+      _mock((call) async => switch (call.method) {
+            'getRegistrationError' => 'no push entitlement',
+            _ => null,
+          });
+      addTearDown(() => _mock(null));
+
+      final result = await ApnsTokenChannel(isIOS: true)
+          .fetch(timeout: const Duration(seconds: 30));
+
+      expect(result, isA<ApnsRegistrationFailed>());
+      expect(
+        (result as ApnsRegistrationFailed).reason,
+        'no push entitlement',
+      );
+    });
+
+    test('nothing arriving within the timeout is ApnsTokenPending', () async {
+      _mock((call) async => null);
+      addTearDown(() => _mock(null));
+
+      final result = await ApnsTokenChannel(isIOS: true)
+          .fetch(timeout: const Duration(milliseconds: 20));
+
+      expect(result, isA<ApnsTokenPending>());
+    });
+
+    test('no plugin registered at all is ApnsTokenPending, not a hang',
+        () async {
+      // Deliberately no handler: nothing answers the channel, the way a
+      // desktop build with the wrong isIOS override would behave.
+      _mock(null);
+      final result = await ApnsTokenChannel(isIOS: true).fetch();
+
+      expect(result, isA<ApnsTokenPending>());
+    });
+  });
 }

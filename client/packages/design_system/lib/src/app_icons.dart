@@ -18,6 +18,7 @@ abstract final class AppIcons {
   static const IconData back = LucideIcons.arrowLeft;
   static const IconData add = LucideIcons.plus;
   static const IconData search = LucideIcons.search;
+  static const IconData info = LucideIcons.info;
 
   // Messaging.
   static const IconData send = LucideIcons.send;
@@ -37,4 +38,8 @@ abstract final class AppIcons {
   // Account.
   static const IconData signOut = LucideIcons.logOut;
   static const IconData account = LucideIcons.circleUser;
+
+  // Notifications.
+  static const IconData notificationsOn = LucideIcons.bell;
+  static const IconData notificationsOff = LucideIcons.bellOff;
 }

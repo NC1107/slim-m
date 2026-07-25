@@ -24,10 +24,35 @@ enum SyncStatus { offline, connecting, live }
 /// The socket is only a delivery route for things already written durably, so
 /// losing it is never data loss, just staleness, and reconnecting re-runs the
 /// same catch-up.
+///
+/// Session-driven: starts the moment a session begins, whether that is a
+/// fresh sign-in or one restored from the last launch, and stops the moment
+/// one ends, whether that is a sign-out or a refresh token the server
+/// rejected. Only that 0-to-1 or 1-to-0 edge matters, not every token
+/// rotation in between, so a routine access-token refresh mid-session does
+/// not drop and reconnect the socket for no reason.
 class SyncController extends StateNotifier<SyncStatus> {
-  SyncController(this._ref) : super(SyncStatus.offline);
+  SyncController(this._ref) : super(SyncStatus.offline) {
+    final session = _ref.read(sessionProvider);
+    // Subscribe before reading the current value, so a change landing between
+    // the two is never missed.
+    _sessionSubscription = session.changes.listen((tokens) {
+      final signedIn = tokens != null;
+      if (signedIn == _lastSignedIn) return;
+      _lastSignedIn = signedIn;
+      if (signedIn) {
+        unawaited(start());
+      } else {
+        unawaited(stop());
+      }
+    });
+    _lastSignedIn = session.isSignedIn;
+    if (_lastSignedIn) unawaited(start());
+  }
 
   final Ref _ref;
+  late final StreamSubscription<TokenPair?> _sessionSubscription;
+  bool _lastSignedIn = false;
   EventConnection? _connection;
   StreamSubscription<ServerEvent>? _events;
   Timer? _retry;
@@ -152,6 +177,7 @@ class SyncController extends StateNotifier<SyncStatus> {
   @override
   void dispose() {
     _disposed = true;
+    unawaited(_sessionSubscription.cancel());
     _retry?.cancel();
     unawaited(_teardown());
     super.dispose();

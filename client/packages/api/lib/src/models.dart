@@ -49,6 +49,15 @@ class TokenPair {
         accessExpiresAt: json['access_expires_at'] as int,
       );
 
+  /// For persisting the session locally, in a platform key store rather than
+  /// a log or anywhere else these secrets could linger in plain text.
+  Map<String, dynamic> toJson() => {
+        'user_id': userId,
+        'access_token': accessToken,
+        'refresh_token': refreshToken,
+        'access_expires_at': accessExpiresAt,
+      };
+
   /// Deliberately hides the secrets, so an accidental interpolation into a log
   /// cannot leak a working credential.
   @override
