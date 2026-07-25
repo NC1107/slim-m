@@ -649,12 +649,27 @@ async fn revoke_family(
 }
 
 /// Tears down a session's live credentials: access tokens and connect tickets
-/// gone, refresh tokens marked revoked, and the session itself marked revoked.
+/// gone, refresh tokens marked revoked, the session itself marked revoked, and
+/// its device's push registration cleared.
+///
+/// The registration is cleared here, not left to the read-side liveness
+/// filter in [`Store::push_targets`] alone, so a signed-out device stops being
+/// a push target the instant it is revoked rather than on whatever cadence
+/// the next read happens to run.
 async fn revoke_session_rows(
     conn: &mut SqliteConnection,
     session_id: SessionId,
     now: i64,
 ) -> anyhow::Result<()> {
+    sqlx::query!(
+        "UPDATE devices
+         SET platform = NULL, push_token_ref = NULL, voip_push_token_ref = NULL,
+             push_public_key = NULL
+         WHERE id = (SELECT device_id FROM sessions WHERE id = ?)",
+        session_id
+    )
+    .execute(&mut *conn)
+    .await?;
     sqlx::query!("DELETE FROM access_tokens WHERE session_id = ?", session_id)
         .execute(&mut *conn)
         .await?;

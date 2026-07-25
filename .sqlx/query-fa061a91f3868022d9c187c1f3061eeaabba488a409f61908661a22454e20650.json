@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE devices\n         SET platform = NULL, push_token_ref = NULL, voip_push_token_ref = NULL,\n             push_public_key = NULL\n         WHERE id = (SELECT device_id FROM sessions WHERE id = ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "fa061a91f3868022d9c187c1f3061eeaabba488a409f61908661a22454e20650"
+}

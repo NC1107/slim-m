@@ -8,7 +8,7 @@ use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
 use crate::auth::HashError;
-use crate::store::{OpenError, SendError};
+use crate::store::{OpenError, PushError, SendError};
 
 pub(crate) enum ApiError {
     BadRequest(&'static str),
@@ -71,6 +71,20 @@ impl From<SendError> for ApiError {
             SendError::IdConflict => ApiError::Conflict("message id already used"),
             SendError::Internal(e) => {
                 tracing::error!(error = %e, "message send failed");
+                ApiError::Internal
+            }
+        }
+    }
+}
+
+impl From<PushError> for ApiError {
+    fn from(err: PushError) -> Self {
+        match err {
+            // The caller's own device vanished mid-request (signed out from
+            // elsewhere, or the account was deleted concurrently).
+            PushError::NotFound => ApiError::NotFound("device not found"),
+            PushError::Internal(e) => {
+                tracing::error!(error = %e, "push registration failed");
                 ApiError::Internal
             }
         }

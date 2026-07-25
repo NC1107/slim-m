@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE devices SET lifecycle_state = ?, lifecycle_reported_at = ?\n             WHERE id = ? AND user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "d4b6c616e10853b22df11e34f90d6449f7d5a4040fbb968f41f212b67e6c0e19"
+}

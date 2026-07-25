@@ -12,6 +12,8 @@ async fn store() -> Store {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
+        push_relay_url: None,
+        push_relay_key: None,
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)

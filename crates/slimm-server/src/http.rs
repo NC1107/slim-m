@@ -8,6 +8,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::auth::Auth;
 use crate::hub::Hub;
+use crate::push::PushSender;
 use crate::ratelimit::RateLimiter;
 use crate::store::Store;
 
@@ -17,6 +18,7 @@ mod error;
 mod extract;
 mod invites;
 mod messages;
+mod push;
 mod safety;
 mod sync;
 mod ws;
@@ -33,6 +35,7 @@ pub struct AppState {
     pub auth: Auth,
     pub hub: Hub,
     pub limiter: RateLimiter,
+    pub push: PushSender,
 }
 
 /// Builds the router over the shared application state.
@@ -44,6 +47,7 @@ pub fn router(state: AppState) -> Router {
         .merge(channels::routes())
         .merge(invites::routes())
         .merge(messages::routes())
+        .merge(push::routes())
         .merge(safety::routes())
         .merge(sync::routes())
         .merge(ws::routes())

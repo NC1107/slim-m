@@ -35,6 +35,19 @@ base64 = "0.22"
 # both the Argon2 salt and the opaque token secrets draw from. This is the same
 # rand_core that argon2's password-hash uses, so the feature simply unifies onto it.
 rand_core = { version = "0.6", features = ["getrandom"] }
+# Anonymous sealed boxes (libsodium crypto_box_seal, X25519 + XSalsa20Poly1305)
+# for the content-free push envelope. Pre-release because the `seal` API this
+# needs has not had a 0.10 stable cut yet; pinned to an exact version rather
+# than a range so a new pre-release cannot silently change behavior underfoot.
+crypto_box = { version = "=0.10.0-pre.0", features = ["seal"] }
+# The push relay HTTP client. `rustls-tls` (not the default native-tls) so the
+# static musl release binary and distroless image never need OpenSSL; its ring
+# crypto provider needs only a C compiler, not cmake, so it fits the existing
+# Alpine builder unchanged.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# Already pulled in transitively by reqwest; named explicitly so the push relay
+# URL's scheme and host can be validated at startup without hand-rolled parsing.
+url = "2"
 
 [profile.release]
 # Small, fast self-host binary: the brief treats binary size as a budget.

@@ -21,6 +21,19 @@ Thumbs.db
 .env
 .env.local
 
+# Push credentials. These are downloaded as files from Firebase and Apple, land
+# in whatever directory the browser chose, and are unrecoverable once leaked -
+# an APNs key signs pushes for every app under the team. They belong on the
+# server host as secrets, never in the tree.
+*.p8
+*.p12
+*.mobileprovision
+**/service-account*.json
+**/firebase-adminsdk*.json
+google-services.json
+GoogleService-Info.plist
+/secrets/
+
 # Flutter / Dart
 .dart_tool/
 .packages

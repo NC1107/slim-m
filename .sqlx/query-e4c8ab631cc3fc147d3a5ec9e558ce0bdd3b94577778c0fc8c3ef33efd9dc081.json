@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE devices\n             SET platform = NULL, push_token_ref = NULL, voip_push_token_ref = NULL,\n                 push_public_key = NULL\n             WHERE id != ? AND push_token_ref = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "e4c8ab631cc3fc147d3a5ec9e558ce0bdd3b94577778c0fc8c3ef33efd9dc081"
+}

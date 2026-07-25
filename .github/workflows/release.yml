@@ -479,13 +479,39 @@ jobs:
       - name: import signing assets
         if: steps.gate.outputs.ready == 'true'
         run: |
-          # TODO: import the .p12 into a temporary keychain and install the
-          # provisioning profile before building. The cert password and profile
-          # come from IOS_SIGNING_CERTIFICATE_PASSWORD / IOS_PROVISIONING_PROFILE.
           KEYDIR="${HOME}/.appstoreconnect/private_keys"
           mkdir -p "$KEYDIR"
           printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" \
             > "${KEYDIR}/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+
+          # The signing identity lives in a throwaway keychain rather than the
+          # login one: the runner is ephemeral, and a dedicated keychain keeps
+          # the private key out of any shared default that later steps touch.
+          CERT_PATH="${RUNNER_TEMP}/build_certificate.p12"
+          PROFILE_PATH="${RUNNER_TEMP}/build_pp.mobileprovision"
+          KEYCHAIN_PATH="${RUNNER_TEMP}/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          printf '%s' "$IOS_SIGNING_CERTIFICATE_P12" | base64 --decode > "$CERT_PATH"
+          printf '%s' "$IOS_PROVISIONING_PROFILE" | base64 --decode > "$PROFILE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$IOS_SIGNING_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          # Without this, codesign prompts for permission and hangs a headless run.
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          # xcodebuild finds a profile by its UUID under this directory, so the
+          # file has to be named for the UUID embedded in its own signed plist.
+          PROFILE_DIR="${HOME}/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+          UUID="$(security cms -D -i "$PROFILE_PATH" \
+            | plutil -extract UUID raw -o - -)"
+          cp "$PROFILE_PATH" "${PROFILE_DIR}/${UUID}.mobileprovision"
 
       - uses: subosito/flutter-action@v2 # pin to commit SHA before public
         if: steps.gate.outputs.ready == 'true'
@@ -496,9 +522,9 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         working-directory: client/packages/app
         run: |
-          dart pub get
-          # TODO: provide ios/ExportOptions.plist referencing the imported
-          # provisioning profile and distribution signing identity.
+          # --enforce-lockfile so a release build resolves exactly what the
+          # committed pubspec.lock pins, rather than whatever is newest today.
+          flutter pub get --enforce-lockfile
           flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
 
       - name: upload to TestFlight

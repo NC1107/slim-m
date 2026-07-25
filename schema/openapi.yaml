@@ -39,6 +39,8 @@ tags:
     description: Channel listing and creation.
   - name: messages
     description: Sending, reading, and editing messages.
+  - name: push
+    description: Device push registration and lifecycle reporting.
   - name: sync
     description: Read state and reconnect catch-up.
 
@@ -351,6 +353,75 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /push:
+    put:
+      operationId: registerPush
+      tags: [push]
+      summary: Register (or replace) the caller's own device's push registration.
+      description: >
+        Always scoped to the device the caller's access token belongs to; a
+        device can never register on behalf of another device. The public key
+        is what the server seals content-free push envelopes to, so a device
+        that never registers one cannot receive push.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterPushRequest"
+      responses:
+        "204":
+          description: The registration was stored.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: deregisterPush
+      tags: [push]
+      summary: Clear the caller's own device's push registration.
+      responses:
+        "204":
+          description: The registration was cleared.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /push/lifecycle:
+    put:
+      operationId: reportPushLifecycle
+      tags: [push]
+      summary: Report the caller's own device's app lifecycle state.
+      description: >
+        Push is triggered from this self-reported state, not from WebSocket
+        presence: a suspended-but-still-connected socket (iOS backgrounding)
+        is not proof the app can show a notification. A recent `foreground`
+        report suppresses push to that device until it goes stale or changes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportLifecycleRequest"
+      responses:
+        "204":
+          description: The lifecycle state was recorded.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/read:
     parameters:
@@ -687,6 +758,44 @@ components:
           type: string
           minLength: 1
           maxLength: 4000
+
+    RegisterPushRequest:
+      type: object
+      required: [platform, push_token, push_public_key]
+      properties:
+        platform:
+          type: string
+          enum: [ios, android]
+        push_token:
+          type: string
+          minLength: 1
+          maxLength: 1024
+          description: The opaque relay token for ordinary (non-VoIP) push.
+        voip_push_token:
+          type: string
+          minLength: 1
+          maxLength: 1024
+          description: The opaque relay token for VoIP wake (incoming calls).
+        push_public_key:
+          type: string
+          format: byte
+          description: >
+            The device's X25519 public key, base64-encoded (32 bytes decoded).
+            Push content is sealed to this key with an anonymous sealed box; a
+            device without one registered cannot receive push.
+
+    ReportLifecycleRequest:
+      type: object
+      required: [state]
+      properties:
+        state:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: >
+            A client lifecycle label, for example `foreground` or
+            `background`. Only `foreground` carries meaning to the server
+            today; anything else is treated as not foreground.
 
     ReadState:
       type: object
