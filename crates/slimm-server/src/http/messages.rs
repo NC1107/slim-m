@@ -56,6 +56,21 @@ pub(crate) struct MessageDto {
     content: String,
     created_at: i64,
     edited_at: Option<i64>,
+    /// Empty unless the caller asked for a list, which is the only path that
+    /// batch-loads them; a single echoed message carries none because it
+    /// cannot have any yet.
+    #[serde(default)]
+    reactions: Vec<ReactionDto>,
+}
+
+/// One emoji on a message, with the asking user's own state.
+#[derive(Serialize)]
+pub(crate) struct ReactionDto {
+    emoji: String,
+    count: i64,
+    /// Whether the caller reacted with this emoji, so the client can render the
+    /// toggled state without a second request.
+    reacted: bool,
 }
 
 impl From<Message> for MessageDto {
@@ -69,6 +84,7 @@ impl From<Message> for MessageDto {
             content: message.content,
             created_at: message.created_at,
             edited_at: message.edited_at,
+            reactions: Vec::new(),
         }
     }
 }
@@ -159,7 +175,35 @@ async fn list(
         .store
         .list_messages(channel_id, params.before, limit)
         .await?;
-    Ok(Json(messages.into_iter().map(MessageDto::from).collect()))
+
+    // One query for the whole page. Loading per message would be a query per
+    // row, which only bites once a channel has real traffic.
+    let ids: Vec<MessageId> = messages.iter().map(|m| m.id).collect();
+    let mut by_message = state
+        .store
+        .reactions_for_messages(&ids, ctx.user_id)
+        .await?;
+
+    let mut dtos: Vec<MessageDto> = Vec::with_capacity(messages.len());
+    for message in messages {
+        let mut dto = MessageDto::from(message);
+        if let Some(pos) = by_message
+            .iter()
+            .position(|(id, _)| id.to_string() == dto.id)
+        {
+            let (_, summaries) = by_message.swap_remove(pos);
+            dto.reactions = summaries
+                .into_iter()
+                .map(|s| ReactionDto {
+                    emoji: s.emoji,
+                    count: s.count,
+                    reacted: s.reacted,
+                })
+                .collect();
+        }
+        dtos.push(dto);
+    }
+    Ok(Json(dtos))
 }
 
 async fn edit(

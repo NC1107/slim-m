@@ -86,10 +86,24 @@ enum ServerFrame {
         seq: i64,
         message: MessageDto,
     },
+    #[serde(rename = "reactions.changed")]
+    ReactionsChanged {
+        channel_id: String,
+        message_id: String,
+        reactions: Vec<ReactionCountDto>,
+    },
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]
     Error { message: String },
+}
+
+/// One emoji and how many people used it. Public counts only: what the asking
+/// user reacted with is per viewer and never broadcast.
+#[derive(Serialize)]
+pub(crate) struct ReactionCountDto {
+    emoji: String,
+    count: i64,
 }
 
 #[derive(Deserialize)]
@@ -208,6 +222,7 @@ async fn authenticate(
 async fn authorize(store: &Store, ctx: &SessionContext, event: Event) -> Option<ServerFrame> {
     let channel_id = match &event {
         Event::MessageCreated(message) | Event::MessageEdited(message) => message.channel_id,
+        Event::ReactionsChanged { channel_id, .. } => *channel_id,
         // Control events are handled in the loop, never here.
         Event::SessionRevoked(_) => return None,
     };
@@ -229,6 +244,18 @@ async fn authorize(store: &Store, ctx: &SessionContext, event: Event) -> Option<
             channel_id: message.channel_id.to_string(),
             seq: message.seq.0,
             message: MessageDto::from(message),
+        },
+        Event::ReactionsChanged {
+            channel_id,
+            message_id,
+            reactions,
+        } => ServerFrame::ReactionsChanged {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
+            reactions: reactions
+                .into_iter()
+                .map(|(emoji, count)| ReactionCountDto { emoji, count })
+                .collect(),
         },
         Event::SessionRevoked(_) => return None,
     })

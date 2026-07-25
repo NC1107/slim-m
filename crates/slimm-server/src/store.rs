@@ -23,6 +23,7 @@ mod bootstrap;
 mod invites;
 mod permissions;
 mod push;
+mod reactions;
 mod read_state;
 mod safety;
 mod sessions;
@@ -30,6 +31,7 @@ mod sessions;
 pub use bootstrap::Bootstrap;
 pub use invites::{Invite, RedeemError};
 pub use push::{PushError, PushTarget};
+pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
 pub use safety::{Device, ReportError, ReportSubject};
 pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext,

@@ -19,6 +19,7 @@ mod extract;
 mod invites;
 mod messages;
 mod push;
+mod reactions;
 mod safety;
 mod sync;
 mod ws;
@@ -47,6 +48,7 @@ pub fn router(state: AppState) -> Router {
         .merge(channels::routes())
         .merge(invites::routes())
         .merge(messages::routes())
+        .merge(reactions::routes())
         .merge(push::routes())
         .merge(safety::routes())
         .merge(sync::routes())
