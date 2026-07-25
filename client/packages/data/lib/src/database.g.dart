@@ -373,6 +373,12 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
   late final GeneratedColumn<String> authorId = GeneratedColumn<String>(
       'author_id', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _authorDisplayNameMeta =
+      const VerificationMeta('authorDisplayName');
+  @override
+  late final GeneratedColumn<String> authorDisplayName =
+      GeneratedColumn<String>('author_display_name', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _seqMeta = const VerificationMeta('seq');
   @override
   late final GeneratedColumn<int> seq = GeneratedColumn<int>(
@@ -422,6 +428,7 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
         id,
         channelId,
         authorId,
+        authorDisplayName,
         seq,
         content,
         createdAt,
@@ -453,6 +460,12 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     if (data.containsKey('author_id')) {
       context.handle(_authorIdMeta,
           authorId.isAcceptableOrUnknown(data['author_id']!, _authorIdMeta));
+    }
+    if (data.containsKey('author_display_name')) {
+      context.handle(
+          _authorDisplayNameMeta,
+          authorDisplayName.isAcceptableOrUnknown(
+              data['author_display_name']!, _authorDisplayNameMeta));
     }
     if (data.containsKey('seq')) {
       context.handle(
@@ -497,6 +510,8 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
           .read(DriftSqlType.string, data['${effectivePrefix}channel_id'])!,
       authorId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}author_id']),
+      authorDisplayName: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}author_display_name']),
       seq: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}seq'])!,
       content: attachedDatabase.typeMapping
@@ -523,6 +538,10 @@ class Message extends DataClass implements Insertable<Message> {
   final String channelId;
   final String? authorId;
 
+  /// Sent with the message so rendering a channel needs no lookup per sender.
+  /// Null when the author was anonymized, exactly as [authorId] is.
+  final String? authorDisplayName;
+
   /// Server order key. Zero while a message is only local (an optimistic echo
   /// that has not been acknowledged yet), so pending messages sort last.
   final int seq;
@@ -540,6 +559,7 @@ class Message extends DataClass implements Insertable<Message> {
       {required this.id,
       required this.channelId,
       this.authorId,
+      this.authorDisplayName,
       required this.seq,
       required this.content,
       required this.createdAt,
@@ -553,6 +573,9 @@ class Message extends DataClass implements Insertable<Message> {
     map['channel_id'] = Variable<String>(channelId);
     if (!nullToAbsent || authorId != null) {
       map['author_id'] = Variable<String>(authorId);
+    }
+    if (!nullToAbsent || authorDisplayName != null) {
+      map['author_display_name'] = Variable<String>(authorDisplayName);
     }
     map['seq'] = Variable<int>(seq);
     map['content'] = Variable<String>(content);
@@ -572,6 +595,9 @@ class Message extends DataClass implements Insertable<Message> {
       authorId: authorId == null && nullToAbsent
           ? const Value.absent()
           : Value(authorId),
+      authorDisplayName: authorDisplayName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(authorDisplayName),
       seq: Value(seq),
       content: Value(content),
       createdAt: Value(createdAt),
@@ -590,6 +616,8 @@ class Message extends DataClass implements Insertable<Message> {
       id: serializer.fromJson<String>(json['id']),
       channelId: serializer.fromJson<String>(json['channelId']),
       authorId: serializer.fromJson<String?>(json['authorId']),
+      authorDisplayName:
+          serializer.fromJson<String?>(json['authorDisplayName']),
       seq: serializer.fromJson<int>(json['seq']),
       content: serializer.fromJson<String>(json['content']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
@@ -605,6 +633,7 @@ class Message extends DataClass implements Insertable<Message> {
       'id': serializer.toJson<String>(id),
       'channelId': serializer.toJson<String>(channelId),
       'authorId': serializer.toJson<String?>(authorId),
+      'authorDisplayName': serializer.toJson<String?>(authorDisplayName),
       'seq': serializer.toJson<int>(seq),
       'content': serializer.toJson<String>(content),
       'createdAt': serializer.toJson<int>(createdAt),
@@ -618,6 +647,7 @@ class Message extends DataClass implements Insertable<Message> {
           {String? id,
           String? channelId,
           Value<String?> authorId = const Value.absent(),
+          Value<String?> authorDisplayName = const Value.absent(),
           int? seq,
           String? content,
           int? createdAt,
@@ -628,6 +658,9 @@ class Message extends DataClass implements Insertable<Message> {
         id: id ?? this.id,
         channelId: channelId ?? this.channelId,
         authorId: authorId.present ? authorId.value : this.authorId,
+        authorDisplayName: authorDisplayName.present
+            ? authorDisplayName.value
+            : this.authorDisplayName,
         seq: seq ?? this.seq,
         content: content ?? this.content,
         createdAt: createdAt ?? this.createdAt,
@@ -640,6 +673,9 @@ class Message extends DataClass implements Insertable<Message> {
       id: data.id.present ? data.id.value : this.id,
       channelId: data.channelId.present ? data.channelId.value : this.channelId,
       authorId: data.authorId.present ? data.authorId.value : this.authorId,
+      authorDisplayName: data.authorDisplayName.present
+          ? data.authorDisplayName.value
+          : this.authorDisplayName,
       seq: data.seq.present ? data.seq.value : this.seq,
       content: data.content.present ? data.content.value : this.content,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -655,6 +691,7 @@ class Message extends DataClass implements Insertable<Message> {
           ..write('id: $id, ')
           ..write('channelId: $channelId, ')
           ..write('authorId: $authorId, ')
+          ..write('authorDisplayName: $authorDisplayName, ')
           ..write('seq: $seq, ')
           ..write('content: $content, ')
           ..write('createdAt: $createdAt, ')
@@ -666,8 +703,8 @@ class Message extends DataClass implements Insertable<Message> {
   }
 
   @override
-  int get hashCode => Object.hash(id, channelId, authorId, seq, content,
-      createdAt, editedAt, pending, failed);
+  int get hashCode => Object.hash(id, channelId, authorId, authorDisplayName,
+      seq, content, createdAt, editedAt, pending, failed);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -675,6 +712,7 @@ class Message extends DataClass implements Insertable<Message> {
           other.id == this.id &&
           other.channelId == this.channelId &&
           other.authorId == this.authorId &&
+          other.authorDisplayName == this.authorDisplayName &&
           other.seq == this.seq &&
           other.content == this.content &&
           other.createdAt == this.createdAt &&
@@ -687,6 +725,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   final Value<String> id;
   final Value<String> channelId;
   final Value<String?> authorId;
+  final Value<String?> authorDisplayName;
   final Value<int> seq;
   final Value<String> content;
   final Value<int> createdAt;
@@ -698,6 +737,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     this.id = const Value.absent(),
     this.channelId = const Value.absent(),
     this.authorId = const Value.absent(),
+    this.authorDisplayName = const Value.absent(),
     this.seq = const Value.absent(),
     this.content = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -710,6 +750,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     required String id,
     required String channelId,
     this.authorId = const Value.absent(),
+    this.authorDisplayName = const Value.absent(),
     this.seq = const Value.absent(),
     required String content,
     required int createdAt,
@@ -725,6 +766,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Expression<String>? id,
     Expression<String>? channelId,
     Expression<String>? authorId,
+    Expression<String>? authorDisplayName,
     Expression<int>? seq,
     Expression<String>? content,
     Expression<int>? createdAt,
@@ -737,6 +779,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       if (id != null) 'id': id,
       if (channelId != null) 'channel_id': channelId,
       if (authorId != null) 'author_id': authorId,
+      if (authorDisplayName != null) 'author_display_name': authorDisplayName,
       if (seq != null) 'seq': seq,
       if (content != null) 'content': content,
       if (createdAt != null) 'created_at': createdAt,
@@ -751,6 +794,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       {Value<String>? id,
       Value<String>? channelId,
       Value<String?>? authorId,
+      Value<String?>? authorDisplayName,
       Value<int>? seq,
       Value<String>? content,
       Value<int>? createdAt,
@@ -762,6 +806,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       id: id ?? this.id,
       channelId: channelId ?? this.channelId,
       authorId: authorId ?? this.authorId,
+      authorDisplayName: authorDisplayName ?? this.authorDisplayName,
       seq: seq ?? this.seq,
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
@@ -783,6 +828,9 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     }
     if (authorId.present) {
       map['author_id'] = Variable<String>(authorId.value);
+    }
+    if (authorDisplayName.present) {
+      map['author_display_name'] = Variable<String>(authorDisplayName.value);
     }
     if (seq.present) {
       map['seq'] = Variable<int>(seq.value);
@@ -814,6 +862,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
           ..write('id: $id, ')
           ..write('channelId: $channelId, ')
           ..write('authorId: $authorId, ')
+          ..write('authorDisplayName: $authorDisplayName, ')
           ..write('seq: $seq, ')
           ..write('content: $content, ')
           ..write('createdAt: $createdAt, ')
@@ -1022,6 +1071,7 @@ typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   required String id,
   required String channelId,
   Value<String?> authorId,
+  Value<String?> authorDisplayName,
   Value<int> seq,
   required String content,
   required int createdAt,
@@ -1034,6 +1084,7 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
   Value<String> id,
   Value<String> channelId,
   Value<String?> authorId,
+  Value<String?> authorDisplayName,
   Value<int> seq,
   Value<String> content,
   Value<int> createdAt,
@@ -1060,6 +1111,10 @@ class $$MessagesTableFilterComposer
 
   ColumnFilters<String> get authorId => $composableBuilder(
       column: $table.authorId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get authorDisplayName => $composableBuilder(
+      column: $table.authorDisplayName,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get seq => $composableBuilder(
       column: $table.seq, builder: (column) => ColumnFilters(column));
@@ -1098,6 +1153,10 @@ class $$MessagesTableOrderingComposer
   ColumnOrderings<String> get authorId => $composableBuilder(
       column: $table.authorId, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get authorDisplayName => $composableBuilder(
+      column: $table.authorDisplayName,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get seq => $composableBuilder(
       column: $table.seq, builder: (column) => ColumnOrderings(column));
 
@@ -1134,6 +1193,9 @@ class $$MessagesTableAnnotationComposer
 
   GeneratedColumn<String> get authorId =>
       $composableBuilder(column: $table.authorId, builder: (column) => column);
+
+  GeneratedColumn<String> get authorDisplayName => $composableBuilder(
+      column: $table.authorDisplayName, builder: (column) => column);
 
   GeneratedColumn<int> get seq =>
       $composableBuilder(column: $table.seq, builder: (column) => column);
@@ -1180,6 +1242,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             Value<String> id = const Value.absent(),
             Value<String> channelId = const Value.absent(),
             Value<String?> authorId = const Value.absent(),
+            Value<String?> authorDisplayName = const Value.absent(),
             Value<int> seq = const Value.absent(),
             Value<String> content = const Value.absent(),
             Value<int> createdAt = const Value.absent(),
@@ -1192,6 +1255,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             id: id,
             channelId: channelId,
             authorId: authorId,
+            authorDisplayName: authorDisplayName,
             seq: seq,
             content: content,
             createdAt: createdAt,
@@ -1204,6 +1268,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             required String id,
             required String channelId,
             Value<String?> authorId = const Value.absent(),
+            Value<String?> authorDisplayName = const Value.absent(),
             Value<int> seq = const Value.absent(),
             required String content,
             required int createdAt,
@@ -1216,6 +1281,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             id: id,
             channelId: channelId,
             authorId: authorId,
+            authorDisplayName: authorDisplayName,
             seq: seq,
             content: content,
             createdAt: createdAt,

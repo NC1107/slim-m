@@ -48,6 +48,10 @@ pub(crate) struct MessageDto {
     id: String,
     channel_id: String,
     author_id: Option<String>,
+    /// Null once the author's account is anonymized, which is also when
+    /// `author_id` goes null. Clients render their own fallback rather than
+    /// being handed a server-invented placeholder.
+    author_display_name: Option<String>,
     seq: i64,
     content: String,
     created_at: i64,
@@ -60,6 +64,7 @@ impl From<Message> for MessageDto {
             id: message.id.to_string(),
             channel_id: message.channel_id.to_string(),
             author_id: message.author_id.map(|id| id.to_string()),
+            author_display_name: message.author_display_name,
             seq: message.seq.0,
             content: message.content,
             created_at: message.created_at,

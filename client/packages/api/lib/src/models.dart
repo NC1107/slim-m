@@ -111,6 +111,7 @@ class Message {
     required this.id,
     required this.channelId,
     required this.authorId,
+    required this.authorDisplayName,
     required this.seq,
     required this.content,
     required this.createdAt,
@@ -122,6 +123,11 @@ class Message {
 
   /// Null once the author's account has been deleted.
   final String? authorId;
+
+  /// The author's display name, sent with the message so a channel does not
+  /// need a lookup per distinct sender. Null for the same reason [authorId]
+  /// is: the account was anonymized and there is no name left to show.
+  final String? authorDisplayName;
   final int seq;
   final String content;
   final int createdAt;
@@ -133,6 +139,7 @@ class Message {
         id: json['id'] as String,
         channelId: json['channel_id'] as String,
         authorId: json['author_id'] as String?,
+        authorDisplayName: json['author_display_name'] as String?,
         seq: json['seq'] as int,
         content: json['content'] as String,
         createdAt: json['created_at'] as int,

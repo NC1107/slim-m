@@ -124,6 +124,7 @@ class MessageStore {
               id: message.id,
               channelId: message.channelId,
               authorId: Value(message.authorId),
+              authorDisplayName: Value(message.authorDisplayName),
               seq: Value(message.seq),
               content: message.content,
               createdAt: message.createdAt,

@@ -426,3 +426,55 @@ async fn validation_and_missing_resources() {
         .unwrap();
     assert_eq!(anon.status(), StatusCode::UNAUTHORIZED);
 }
+
+/// A channel renders sender names, so the message payload has to carry one.
+/// Without it the client has only an opaque user id to show, which is exactly
+/// what it used to display.
+#[tokio::test]
+async fn a_message_carries_its_author_display_name() {
+    let store = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let app = app(store);
+    let (token, _user) = register(&app, "alice").await;
+
+    let uri = format!("/channels/{}/messages", channel.id);
+    let sent = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                &uri,
+                Some(&token),
+                Some(json!({ "id": Uuid::now_v7().to_string(), "content": "who said this" })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        sent["author_display_name"], "alice",
+        "the echoed message must name its author, not just its id"
+    );
+
+    // The read path has its own query, so it needs asserting separately: an
+    // echo that names the author while a reload shows a bare id would look
+    // like the bug had been fixed until the app restarted.
+    let listed = json_body(
+        app.clone()
+            .oneshot(request("GET", &uri, Some(&token), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        listed.as_array().unwrap()[0]["author_display_name"],
+        "alice"
+    );
+}

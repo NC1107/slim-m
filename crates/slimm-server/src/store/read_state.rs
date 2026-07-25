@@ -100,12 +100,15 @@ impl Store {
     ) -> anyhow::Result<Vec<Message>> {
         let rows = sqlx::query_as!(
             Message,
-            r#"SELECT id AS "id!: MessageId", channel_id AS "channel_id!: ChannelId",
-                      author_id AS "author_id: UserId", seq AS "seq!: Seq",
-                      content AS "content!", created_at AS "created_at!", edited_at
-               FROM messages
-               WHERE channel_id = ? AND deleted_at IS NULL AND seq > ?
-               ORDER BY seq ASC
+            r#"SELECT m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
+                      m.author_id AS "author_id: UserId",
+                      u.display_name AS "author_display_name?: String",
+                      m.seq AS "seq!: Seq",
+                      m.content AS "content!", m.created_at AS "created_at!", m.edited_at
+               FROM messages m
+               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
+               WHERE m.channel_id = ? AND m.deleted_at IS NULL AND m.seq > ?
+               ORDER BY m.seq ASC
                LIMIT ?"#,
             channel_id,
             after_seq,

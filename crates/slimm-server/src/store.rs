@@ -65,11 +65,17 @@ pub struct User {
 }
 
 /// A message. `author_id` is null once the author's account is anonymized.
+///
+/// The author's display name rides along with the message rather than being
+/// looked up per author by the client, which would be a request per distinct
+/// sender in a channel. It is null for the same reason `author_id` is: the
+/// account was anonymized, and there is no name left to show.
 #[derive(Debug, Clone)]
 pub struct Message {
     pub id: MessageId,
     pub channel_id: ChannelId,
     pub author_id: Option<UserId>,
+    pub author_display_name: Option<String>,
     pub seq: Seq,
     pub content: String,
     pub created_at: i64,
@@ -231,11 +237,22 @@ impl Store {
         .execute(&mut *tx)
         .await?;
 
+        // Read the name inside the same transaction the insert used, so the
+        // echoed message cannot disagree with what a later fetch would return.
+        let author_display_name = sqlx::query_scalar!(
+            r#"SELECT display_name AS "display_name!: String"
+               FROM users WHERE id = ? AND deleted_at IS NULL"#,
+            author_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+
         tx.commit().await?;
         Ok(Message {
             id,
             channel_id,
             author_id: Some(author_id),
+            author_display_name,
             seq: Seq(seq),
             content: content.to_owned(),
             created_at: now,
@@ -278,12 +295,15 @@ impl Store {
         let before = before_seq.unwrap_or(i64::MAX);
         let rows = sqlx::query_as!(
             Message,
-            r#"SELECT id AS "id!: MessageId", channel_id AS "channel_id!: ChannelId",
-                      author_id AS "author_id: UserId", seq AS "seq!: Seq",
-                      content AS "content!", created_at AS "created_at!", edited_at
-               FROM messages
-               WHERE channel_id = ? AND deleted_at IS NULL AND seq < ?
-               ORDER BY seq DESC
+            r#"SELECT m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
+                      m.author_id AS "author_id: UserId",
+                      u.display_name AS "author_display_name?: String",
+                      m.seq AS "seq!: Seq",
+                      m.content AS "content!", m.created_at AS "created_at!", m.edited_at
+               FROM messages m
+               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
+               WHERE m.channel_id = ? AND m.deleted_at IS NULL AND m.seq < ?
+               ORDER BY m.seq DESC
                LIMIT ?"#,
             channel_id,
             before,
@@ -336,10 +356,14 @@ where
 {
     let message = sqlx::query_as!(
         Message,
-        r#"SELECT id AS "id!: MessageId", channel_id AS "channel_id!: ChannelId",
-                  author_id AS "author_id: UserId", seq AS "seq!: Seq",
-                  content AS "content!", created_at AS "created_at!", edited_at
-           FROM messages WHERE id = ? AND deleted_at IS NULL"#,
+        r#"SELECT m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
+                  m.author_id AS "author_id: UserId",
+                  u.display_name AS "author_display_name?: String",
+                  m.seq AS "seq!: Seq",
+                  m.content AS "content!", m.created_at AS "created_at!", m.edited_at
+           FROM messages m
+           LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
+           WHERE m.id = ? AND m.deleted_at IS NULL"#,
         id
     )
     .fetch_optional(executor)
