@@ -8,9 +8,12 @@ info:
   title: slim-m API
   version: 0.5.0
   description: >
-    The Phase 1 server surface: liveness, auth with opaque rotating tokens,
-    channels, text messaging, read state, bundled catch-up sync, account
-    deletion, and the WebSocket event envelope.
+    The server surface: liveness, auth with opaque rotating tokens, channel
+    management, text messaging with reactions, deletion, and full-text
+    search, user profiles and the member list, devices, blocking, report
+    intake and triage, invite codes, read state, bundled catch-up sync,
+    account deletion, admin-issued password reset, role management and
+    channel permission overwrites, and the WebSocket event envelope.
 
     Identity and ordering are separate concerns. A message's identity is a
     client-generated UUIDv7, which also makes sending idempotent; its order is a
@@ -35,10 +38,24 @@ tags:
     description: Liveness, version, and the event socket.
   - name: auth
     description: Registration, sessions, tokens, and account deletion.
+  - name: users
+    description: Public profiles, the caller's own account, and the member list.
+  - name: safety
+    description: Devices, blocking, and report intake.
+  - name: moderation
+    description: Report triage. Requires MANAGE_MESSAGES.
+  - name: roles
+    description: >
+      Role management and channel permission overwrites. Requires
+      MANAGE_ROLES.
+  - name: admin
+    description: Administrator-only account recovery.
+  - name: invites
+    description: Creating, listing, checking, and redeeming invite codes.
   - name: channels
     description: Channel listing and creation.
   - name: messages
-    description: Sending, reading, and editing messages.
+    description: Sending, reading, editing, and reacting to messages.
   - name: push
     description: Device push registration and lifecycle reporting.
   - name: sync
@@ -206,6 +223,496 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /auth/reset:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      summary: Spend a reset code to set a new password.
+      description: >
+        Unauthenticated, since the point is recovering an account that cannot
+        currently sign in. Single-use, and revokes every live session on the
+        account, since the account may be compromised rather than just
+        locked out.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetRequest"
+      responses:
+        "204":
+          description: The password was changed and every session revoked.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /admin/users/{userId}/reset-code:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The account to issue a reset code for.
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: issueResetCode
+      tags: [admin]
+      summary: Issue a one-time password reset code. Requires ADMINISTRATOR.
+      description: >
+        The self-hosted account recovery path chosen in place of email. The
+        plaintext code is returned once; only its hash is stored, and it
+        expires on its own even if nobody redeems it.
+      responses:
+        "200":
+          description: The issued code and its expiry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResetCodeIssued"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: The caller's own profile plus their effective base permissions.
+      description: >
+        Base permissions are the deployment-level set (the @everyone role
+        plus every role the caller holds), ignoring any per-channel
+        overwrite. A client uses them to decide which actions to show, but
+        that is a UI nicety only: every write is re-authorized server-side
+        from scratch regardless of what a client chooses to display.
+      responses:
+        "200":
+          description: The caller's profile and base permissions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      operationId: updateMe
+      tags: [users]
+      summary: Update the caller's own display name.
+      description: >
+        Username is not editable here: it backs the live per-account
+        uniqueness index, so changing it needs a dedicated flow that can
+        handle the resulting collision.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMeRequest"
+      responses:
+        "200":
+          description: The updated profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: Batch-fetch public profiles by id.
+      description: >
+        An id with nothing live to report (never existed, or deleted) is
+        simply absent from the result, so the response may be shorter than
+        the request; match by id rather than by position.
+      parameters:
+        - name: ids
+          in: query
+          description: Comma-separated user UUIDs. Omit or leave empty for none.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Public profiles for the ids that are live.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The user's UUID.
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: A single public profile.
+      description: >
+        A deleted or anonymized account answers 404, exactly like an id that
+        was never used, so this cannot confirm someone deleted their account.
+      responses:
+        "200":
+          description: The user's public profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /members:
+    get:
+      operationId: listMembers
+      tags: [users]
+      summary: The deployment's members, for a member list.
+      description: >
+        Deployment-wide rather than scoped to a channel, so any authenticated
+        caller may read it. Keyset paginated on id (UUIDv7 sorts
+        chronologically, so id order is creation order); pass the last id
+        seen as `after` for the next page.
+      parameters:
+        - name: after
+          in: query
+          description: Return only members with an id greater than this one.
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          description: Page size; the server clamps it.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: A page of members, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /devices:
+    get:
+      operationId: listDevices
+      tags: [safety]
+      summary: List the caller's own signed-in devices.
+      responses:
+        "200":
+          description: The caller's devices, including which one is the current session.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Device"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /devices/{deviceId}:
+    parameters:
+      - name: deviceId
+        in: path
+        required: true
+        description: The device's UUID.
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: removeDevice
+      tags: [safety]
+      summary: Sign a device out.
+      description: >
+        Only ever the caller's own device: a device id on someone else's
+        account is reported as missing, so this cannot be used to probe for or
+        evict others. Closes any live WebSocket on the revoked sessions.
+      responses:
+        "204":
+          description: The device was signed out.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /blocks:
+    get:
+      operationId: listBlocks
+      tags: [safety]
+      summary: List the users the caller has blocked.
+      responses:
+        "200":
+          description: User ids the caller has blocked.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  format: uuid
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /blocks/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The blocked (or to-be-blocked) user's UUID.
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: blockUser
+      tags: [safety]
+      summary: Block a user.
+      description: >
+        Idempotent, and silent by design: the blocked user is never notified,
+        because telling them turns blocking into a provocation.
+      responses:
+        "204":
+          description: The user is blocked.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      operationId: unblockUser
+      tags: [safety]
+      summary: Unblock a user.
+      responses:
+        "204":
+          description: The user is no longer blocked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /reports:
+    get:
+      operationId: listOpenReports
+      tags: [moderation]
+      summary: The open moderation queue, oldest first. Requires MANAGE_MESSAGES.
+      description: >
+        Carries each report's content snapshot, so this must never answer to
+        anyone below the MANAGE_MESSAGES bar.
+      responses:
+        "200":
+          description: Open reports.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Report"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: fileReport
+      tags: [safety]
+      summary: File a report on a message or a user for human review.
+      description: >
+        Nothing here inspects content automatically; a person decides.
+        Reporting a message requires being able to see it, so this cannot be
+        used to confirm a message exists in a channel the caller cannot read.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+      responses:
+        "200":
+          description: The report was filed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportFiled"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /reports/{reportId}:
+    parameters:
+      - name: reportId
+        in: path
+        required: true
+        description: The report's UUID.
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: resolveReport
+      tags: [moderation]
+      summary: Resolve or dismiss a report. Requires MANAGE_MESSAGES.
+      description: >
+        The close is a conditional update, so two moderators racing the same
+        report cannot both win it; the loser sees it as already gone.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolveReportRequest"
+      responses:
+        "204":
+          description: The report was closed.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /invites:
+    get:
+      operationId: listInvites
+      tags: [invites]
+      summary: List every invite. Requires CREATE_INVITE.
+      responses:
+        "200":
+          description: All invites.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invite"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createInvite
+      tags: [invites]
+      summary: Create an invite. Requires CREATE_INVITE.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInviteRequest"
+      responses:
+        "200":
+          description: The created invite.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invite"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /invites/{code}:
+    parameters:
+      - name: code
+        in: path
+        required: true
+        description: The invite code.
+        schema:
+          type: string
+    delete:
+      operationId: revokeInvite
+      tags: [invites]
+      summary: Revoke an invite. Requires CREATE_INVITE.
+      responses:
+        "204":
+          description: The invite was revoked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /invites/{code}/check:
+    parameters:
+      - name: code
+        in: path
+        required: true
+        description: The invite code.
+        schema:
+          type: string
+    get:
+      operationId: checkInvite
+      tags: [invites]
+      summary: Check whether an invite code is usable, before signing up.
+      description: >
+        Unauthenticated, since the caller does not have an account yet.
+        Answers only usable or not, never why, so an expired code, a spent
+        code, and a code that was never issued are indistinguishable: this
+        cannot be used to mine valid codes.
+      security: []
+      responses:
+        "200":
+          description: Whether the code can be redeemed right now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckInviteResponse"
+
+  /invites/{code}/redeem:
+    parameters:
+      - name: code
+        in: path
+        required: true
+        description: The invite code.
+        schema:
+          type: string
+    post:
+      operationId: redeemInvite
+      tags: [invites]
+      summary: Redeem an invite for the calling account.
+      responses:
+        "204":
+          description: The invite was redeemed.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /channels:
     get:
       operationId: listChannels
@@ -246,6 +753,296 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+
+  /channels/{channelId}:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    patch:
+      operationId: updateChannel
+      tags: [channels]
+      summary: Rename a channel.
+      description: >
+        Requires MANAGE_CHANNELS at the deployment level, the same check
+        `createChannel` uses. Checked at the deployment level rather than
+        per-channel so it stays well defined for a channel that is being (or
+        has been) deleted; a caller without MANAGE_CHANNELS anywhere cannot
+        tell a real channel id from a fake one either way.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateChannelRequest"
+      responses:
+        "200":
+          description: The updated channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Channel"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteChannel
+      tags: [channels]
+      summary: Soft-delete a channel.
+      description: >
+        Requires MANAGE_CHANNELS at the deployment level. Refuses to delete
+        the deployment's last live channel, since a deployment with zero
+        channels has nowhere for anyone to land. Deleting an
+        already-deleted channel is not an error; a channel id that was
+        never real is a 404.
+      responses:
+        "204":
+          description: The channel was deleted (or was already gone).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /roles:
+    get:
+      operationId: listRoles
+      tags: [roles]
+      summary: List every role. Requires MANAGE_ROLES.
+      responses:
+        "200":
+          description: All roles.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Role"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createRole
+      tags: [roles]
+      summary: Create a role. Requires MANAGE_ROLES.
+      description: >
+        The requested permissions must already be a subset of the caller's
+        own effective permissions, or this is refused: MANAGE_ROLES alone is
+        never enough to hand out a permission the caller does not hold.
+        Never creates `@everyone`; that role is seeded once, by bootstrap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+      responses:
+        "200":
+          description: The created role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /roles/{roleId}:
+    parameters:
+      - name: roleId
+        in: path
+        required: true
+        description: The role's UUID.
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: updateRole
+      tags: [roles]
+      summary: Rename a role or change its permissions. Requires MANAGE_ROLES.
+      description: >
+        Both fields are optional; a field left out is unchanged. A
+        permissions change is checked the same way `createRole` checks one,
+        and is refused if it would leave the deployment with no
+        administrator.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoleRequest"
+      responses:
+        "200":
+          description: The updated role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: deleteRole
+      tags: [roles]
+      summary: Delete a role. Requires MANAGE_ROLES.
+      description: >
+        Refuses to delete `@everyone` (exactly one always exists) and refuses
+        if this role is the deployment's only remaining source of
+        ADMINISTRATOR.
+      responses:
+        "204":
+          description: The role was deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /members/{userId}/roles/{roleId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The member's UUID.
+        schema:
+          type: string
+          format: uuid
+      - name: roleId
+        in: path
+        required: true
+        description: The role's UUID.
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: assignRole
+      tags: [roles]
+      summary: Grant a role to a member. Requires MANAGE_ROLES.
+      description: >
+        Idempotent. Refused if the role carries a permission the caller does
+        not themselves hold, since granting a role is granting whatever it
+        carries.
+      responses:
+        "204":
+          description: The role is assigned.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: unassignRole
+      tags: [roles]
+      summary: Revoke a role from a member. Requires MANAGE_ROLES.
+      description: >
+        Idempotent. Refused if it would leave the deployment with no
+        administrator.
+      responses:
+        "204":
+          description: The role is no longer assigned (or never was).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /channels/{channelId}/overwrites/{kind}/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+      - name: kind
+        in: path
+        required: true
+        description: Which kind of target `id` names.
+        schema:
+          type: string
+          enum: [role, member]
+      - name: id
+        in: path
+        required: true
+        description: The role's or member's UUID, matching `kind`.
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: setChannelOverwrite
+      tags: [roles]
+      summary: Set (or replace) a channel permission overwrite.
+      description: >
+        Requires MANAGE_ROLES in this channel specifically, evaluated the
+        same way any other channel permission is: a channel overwrite can
+        itself grant or deny MANAGE_ROLES there. `allow` is checked against
+        the caller's own effective permissions in this channel and refused
+        if it would force on a bit the caller does not hold; `deny` is a
+        restriction, not a grant, and carries no such check.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetOverwriteRequest"
+      responses:
+        "204":
+          description: The overwrite was stored.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: deleteChannelOverwrite
+      tags: [roles]
+      summary: Clear a channel permission overwrite.
+      description: >
+        Requires MANAGE_ROLES in this channel. Idempotent: clearing one that
+        was never set still succeeds.
+      responses:
+        "204":
+          description: The overwrite is cleared (or never existed).
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/messages:
     parameters:
@@ -353,6 +1150,131 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteMessage
+      tags: [messages]
+      summary: Soft-delete a message.
+      description: >
+        Allowed for the author, or a member with MANAGE_MESSAGES. Deleting an
+        already-deleted message is not an error. Live connections are told
+        over the WebSocket (`message.deleted`) so they can drop it from view.
+      responses:
+        "204":
+          description: The message was deleted (or was already gone).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /channels/{channelId}/messages/search:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: searchMessages
+      tags: [messages]
+      summary: Full-text search a channel's live messages.
+      description: >
+        Backed by FTS5; `q` reaches it close to as-is, so its mini query
+        language (`AND`/`OR`/`NOT`, `"phrase"`, a trailing `*` prefix) is
+        available. Results are permission-filtered exactly like listing and
+        keyset paginated on `seq` the same way. A `q` that is not valid FTS5
+        syntax is a 400, never a 500.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - name: before
+          in: query
+          description: Return only messages with a `seq` strictly below this.
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          description: Page size; the server clamps it.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: Matching messages, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /messages/{messageId}/reactions/{emoji}:
+    parameters:
+      - name: messageId
+        in: path
+        required: true
+        description: The message's UUID.
+        schema:
+          type: string
+          format: uuid
+      - name: emoji
+        in: path
+        required: true
+        description: The reaction emoji, URL-encoded.
+        schema:
+          type: string
+    put:
+      operationId: addReaction
+      tags: [messages]
+      summary: React to a message with one emoji.
+      description: >
+        Idempotent: reacting twice with the same emoji leaves one reaction.
+        Requires being able to view the message's channel as well as
+        ADD_REACTIONS, so reacting cannot be used to probe for a message in a
+        channel the caller cannot see; a hidden message answers exactly as a
+        missing one.
+      responses:
+        "204":
+          description: The reaction was recorded.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: removeReaction
+      tags: [messages]
+      summary: Remove the caller's own reaction of one emoji from a message.
+      description: >
+        Idempotent: removing a reaction that is not there succeeds, since the
+        caller's intent already holds.
+      responses:
+        "204":
+          description: The reaction was removed (or was already absent).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /push:
     put:
@@ -634,6 +1556,29 @@ components:
           format: int64
           description: Unix milliseconds at which the ticket expires.
 
+    ResetCodeIssued:
+      type: object
+      required: [code, expires_at]
+      properties:
+        code:
+          type: string
+          description: The plaintext one-time code. Shown only this once.
+        expires_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds at which the code stops being usable.
+
+    ResetRequest:
+      type: object
+      required: [code, new_password]
+      properties:
+        code:
+          type: string
+        new_password:
+          type: string
+          minLength: 8
+          maxLength: 1024
+
     RegisterRequest:
       type: object
       required: [username, display_name, password, device_name]
@@ -677,6 +1622,189 @@ components:
         refresh_token:
           type: string
 
+    UserProfile:
+      type: object
+      required: [id, username, display_name, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        display_name:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds.
+
+    Me:
+      type: object
+      required: [id, username, display_name, created_at, permissions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        display_name:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds.
+        permissions:
+          type: integer
+          format: int64
+          description: >
+            The caller's base (deployment-level) permission bitmask, ignoring
+            any per-channel overwrite. A UI nicety for hiding actions the
+            caller cannot perform; every write is still re-authorized
+            server-side regardless of what this says.
+
+    UpdateMeRequest:
+      type: object
+      required: [display_name]
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: >
+            Must not contain control characters or text-direction overrides,
+            the same rule registration enforces.
+
+    Device:
+      type: object
+      required: [id, name, created_at, is_current]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+        last_seen_at:
+          type: [integer, "null"]
+          format: int64
+        is_current:
+          type: boolean
+          description: Whether this is the device making the request.
+
+    ReportRequest:
+      type: object
+      required: [subject_kind, subject_id, reason]
+      properties:
+        subject_kind:
+          type: string
+          enum: [message, user]
+        subject_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 2000
+
+    ReportFiled:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+
+    Report:
+      type: object
+      required: [id, subject_kind, subject_id, reason, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        reporter_id:
+          type: [string, "null"]
+          format: uuid
+          description: Null once the reporter's account has been anonymized.
+        subject_kind:
+          type: string
+          enum: [message, user]
+        subject_id:
+          type: string
+          format: uuid
+        channel_id:
+          type: [string, "null"]
+          format: uuid
+        reason:
+          type: string
+        snapshot:
+          type: [string, "null"]
+          description: >
+            The reported content as it stood at filing time; the author may
+            have since edited or deleted it. Absent for a user report.
+        created_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds.
+
+    ResolveReportRequest:
+      type: object
+      required: [resolution]
+      properties:
+        resolution:
+          type: string
+          enum: [resolved, dismissed]
+
+    Invite:
+      type: object
+      required: [code, uses, created_at, revoked, usable]
+      properties:
+        code:
+          type: string
+        max_uses:
+          type: [integer, "null"]
+          format: int64
+          description: Null means unlimited.
+        uses:
+          type: integer
+          format: int64
+        expires_at:
+          type: [integer, "null"]
+          format: int64
+          description: Unix milliseconds; null means it never expires.
+        created_at:
+          type: integer
+          format: int64
+        revoked:
+          type: boolean
+        usable:
+          type: boolean
+          description: Whether the invite can be redeemed right now.
+
+    CreateInviteRequest:
+      type: object
+      properties:
+        max_uses:
+          type: [integer, "null"]
+          format: int64
+          minimum: 1
+          description: Null means unlimited.
+        expires_at:
+          type: [integer, "null"]
+          format: int64
+          description: Unix milliseconds; null means it never expires.
+
+    CheckInviteResponse:
+      type: object
+      required: [usable]
+      properties:
+        usable:
+          type: boolean
+          description: >-
+            Whether this code can be redeemed right now. Deliberately the only
+            signal: saying why not would let someone probe for real codes.
+
     Channel:
       type: object
       required: [id, name, kind, created_at]
@@ -706,6 +1834,83 @@ components:
           type: string
           enum: [text, voice]
           default: text
+
+    UpdateChannelRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+
+    Role:
+      type: object
+      required: [id, name, permissions, is_everyone, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        permissions:
+          type: integer
+          format: int64
+          description: >
+            The raw permission bitmask; see the server's `Permissions` type
+            for what each bit means.
+        is_everyone:
+          type: boolean
+          description: >
+            Whether this is the deployment's single `@everyone` base role.
+            Exactly one role always carries this.
+        created_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds.
+
+    CreateRoleRequest:
+      type: object
+      required: [name, permissions]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        permissions:
+          type: integer
+          format: int64
+          description: >
+            Must be a subset of the caller's own effective permissions, or
+            the request is refused.
+
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        permissions:
+          type: integer
+          format: int64
+          description: Checked the same way `CreateRoleRequest.permissions` is.
+
+    SetOverwriteRequest:
+      type: object
+      properties:
+        allow:
+          type: integer
+          format: int64
+          default: 0
+          description: >
+            Bits to force on. Must be a subset of the caller's own effective
+            permissions in this channel.
+        deny:
+          type: integer
+          format: int64
+          default: 0
+          description: Bits to force off.
 
     Message:
       type: object
@@ -911,6 +2116,7 @@ components:
         - $ref: "#/components/schemas/ServerHello"
         - $ref: "#/components/schemas/MessageCreated"
         - $ref: "#/components/schemas/MessageEdited"
+        - $ref: "#/components/schemas/MessageDeleted"
         - $ref: "#/components/schemas/ServerPong"
         - $ref: "#/components/schemas/ServerError"
 
@@ -956,6 +2162,20 @@ components:
           format: int64
         message:
           $ref: "#/components/schemas/Message"
+
+    MessageDeleted:
+      type: object
+      required: [type, channel_id, message_id]
+      properties:
+        type:
+          type: string
+          enum: [message.deleted]
+        channel_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
 
     ServerPong:
       type: object

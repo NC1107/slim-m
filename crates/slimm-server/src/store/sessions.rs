@@ -94,6 +94,27 @@ impl From<sqlx::Error> for OpenError {
     }
 }
 
+/// Why deleting an account was refused.
+#[derive(Debug)]
+pub enum DeleteAccountError {
+    /// Doing it would leave other people in a deployment with no administrator
+    /// and no way to appoint one.
+    WouldStrandDeployment,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for DeleteAccountError {
+    fn from(err: sqlx::Error) -> Self {
+        DeleteAccountError::Internal(err.into())
+    }
+}
+
+impl From<anyhow::Error> for DeleteAccountError {
+    fn from(err: anyhow::Error) -> Self {
+        DeleteAccountError::Internal(err)
+    }
+}
+
 impl Store {
     /// Registers an account with an Argon2id password hash. A duplicate live
     /// username is reported as [`RegisterError::UsernameTaken`], not a 500.
@@ -490,7 +511,10 @@ impl Store {
     ///
     /// Group-ownership transfer is a no-op until an ownership model exists; the
     /// current schema has no owner column, so nothing can be orphaned.
-    pub async fn delete_account(&self, user_id: UserId) -> anyhow::Result<Vec<SessionId>> {
+    pub async fn delete_account(
+        &self,
+        user_id: UserId,
+    ) -> Result<Vec<SessionId>, DeleteAccountError> {
         let now = now_ms();
         let mut tx = self.pool.begin().await?;
 
@@ -581,6 +605,29 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+
+        // Deleting the last administrator leaves a deployment nobody can
+        // administer, with no recovery path: roles, invites, and moderation all
+        // need a bit no live account would hold any more. Every other path that
+        // can remove an administrator already checks this; account deletion was
+        // the one that did not.
+        //
+        // Only refused while somebody would actually be stranded. The last user
+        // of a deployment deleting themselves leaves nobody to administer, but
+        // also nobody to care, and refusing there would trap the one person who
+        // most clearly has the right to leave.
+        if super::roles::administrator_count(&mut tx).await? == 0 {
+            let others = sqlx::query_scalar!(
+                r#"SELECT COUNT(*) AS "n!: i64" FROM users
+                   WHERE deleted_at IS NULL AND id != ?"#,
+                user_id
+            )
+            .fetch_one(&mut *tx)
+            .await?;
+            if others > 0 {
+                return Err(DeleteAccountError::WouldStrandDeployment);
+            }
+        }
 
         tx.commit().await?;
         Ok(revoked)

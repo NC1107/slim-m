@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Message HTTP routes: send, list, and edit, each authorized server-side
-//! through the permission evaluator.
+//! Message HTTP routes: send, list, edit, and delete, each authorized
+//! server-side through the permission evaluator. Full-text search lives in
+//! [`super::search`], a separate module since it has its own validation and
+//! error handling.
 //!
 //! Sends are idempotent by the client-supplied message id, so an at-least-once
 //! client that retries never duplicates. Every handler checks permissions in the
 //! target channel before touching the store: view to read, view plus send to
-//! post, and authorship or manage-messages to edit.
+//! post, and authorship or manage-messages to edit or delete.
 
 use axum::extract::{DefaultBodyLimit, Path, Query, State};
+use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::{get, patch};
 use axum::{Json, Router};
@@ -18,7 +21,7 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::{Authed, enforce};
 use crate::hub::Event;
-use crate::ids::{ChannelId, MessageId};
+use crate::ids::{ChannelId, MessageId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::Message;
@@ -35,7 +38,10 @@ const MAX_LIMIT: i64 = 100;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/channels/{channel_id}/messages", get(list).post(send))
-        .route("/channels/{channel_id}/messages/{message_id}", patch(edit))
+        .route(
+            "/channels/{channel_id}/messages/{message_id}",
+            patch(edit).delete(delete),
+        )
         .layer(DefaultBodyLimit::max(MESSAGE_BODY_LIMIT))
 }
 
@@ -175,35 +181,59 @@ async fn list(
         .store
         .list_messages(channel_id, params.before, limit)
         .await?;
-
-    // One query for the whole page. Loading per message would be a query per
-    // row, which only bites once a channel has real traffic.
-    let ids: Vec<MessageId> = messages.iter().map(|m| m.id).collect();
-    let mut by_message = state
-        .store
-        .reactions_for_messages(&ids, ctx.user_id)
-        .await?;
-
-    let mut dtos: Vec<MessageDto> = Vec::with_capacity(messages.len());
-    for message in messages {
-        let mut dto = MessageDto::from(message);
-        if let Some(pos) = by_message
-            .iter()
-            .position(|(id, _)| id.to_string() == dto.id)
-        {
-            let (_, summaries) = by_message.swap_remove(pos);
-            dto.reactions = summaries
-                .into_iter()
-                .map(|s| ReactionDto {
-                    emoji: s.emoji,
-                    count: s.count,
-                    reacted: s.reacted,
-                })
-                .collect();
-        }
-        dtos.push(dto);
-    }
+    let dtos = with_reactions(&state, ctx.user_id, messages).await?;
     Ok(Json(dtos))
+}
+
+async fn delete(
+    Authed(ctx): Authed,
+    parts: Parts,
+    Path((channel_id, message_id)): Path<(String, String)>,
+    State(state): State<AppState>,
+) -> Result<StatusCode, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    let message_id = MessageId(parse_uuid(&message_id)?);
+
+    // Not being able to see the channel hides whether the message exists,
+    // exactly like edit.
+    if !state
+        .store
+        .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
+        .await?
+    {
+        return Err(ApiError::Forbidden);
+    }
+
+    // Fetched regardless of `deleted_at`: deleting an already-deleted message
+    // must succeed rather than 404, so this needs to see that row to tell
+    // "already gone" apart from "never existed in this channel".
+    let message = state
+        .store
+        .message_including_deleted(message_id)
+        .await?
+        .filter(|m| m.channel_id == channel_id)
+        .ok_or(ApiError::NotFound("message not found"))?;
+
+    // Deleting your own message is allowed; deleting another's needs manage
+    // rights, same split as edit.
+    let is_author = message.author_id == Some(ctx.user_id);
+    if !is_author
+        && !state
+            .store
+            .has_permission(ctx.user_id, channel_id, Permissions::MANAGE_MESSAGES)
+            .await?
+    {
+        return Err(ApiError::Forbidden);
+    }
+
+    if state.store.delete_message(message_id).await? {
+        state.hub.publish(Event::MessageDeleted {
+            channel_id,
+            message_id,
+        });
+    }
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn edit(
@@ -250,6 +280,42 @@ async fn edit(
         .ok_or(ApiError::NotFound("message not found"))?;
     state.hub.publish(Event::MessageEdited(updated.clone()));
     Ok(Json(updated.into()))
+}
+
+// ---------------------------------------------------------------------------
+// Shared enrichment
+// ---------------------------------------------------------------------------
+
+/// Batch-attaches each message's reaction summary to its DTO in one query,
+/// rather than one query per row, which only bites once a channel has real
+/// traffic. Shared by [`list`] and the full-text search route, which enrich a
+/// page of messages the same way.
+pub(crate) async fn with_reactions(
+    state: &AppState,
+    viewer: UserId,
+    messages: Vec<Message>,
+) -> anyhow::Result<Vec<MessageDto>> {
+    let ids: Vec<MessageId> = messages.iter().map(|m| m.id).collect();
+    let mut by_message = state.store.reactions_for_messages(&ids, viewer).await?;
+
+    let mut dtos: Vec<MessageDto> = Vec::with_capacity(messages.len());
+    for message in messages {
+        let id = message.id;
+        let mut dto = MessageDto::from(message);
+        if let Some(pos) = by_message.iter().position(|(mid, _)| *mid == id) {
+            let (_, summaries) = by_message.swap_remove(pos);
+            dto.reactions = summaries
+                .into_iter()
+                .map(|s| ReactionDto {
+                    emoji: s.emoji,
+                    count: s.count,
+                    reacted: s.reacted,
+                })
+                .collect();
+        }
+        dtos.push(dto);
+    }
+    Ok(dtos)
 }
 
 // ---------------------------------------------------------------------------

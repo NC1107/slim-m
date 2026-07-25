@@ -61,6 +61,26 @@ impl From<sqlx::Error> for ReportError {
     }
 }
 
+/// A filed report, for the moderation queue. Carries the content snapshot, so
+/// this type must never reach anyone below the MANAGE_MESSAGES bar.
+#[derive(Debug, Clone)]
+pub struct Report {
+    pub id: Uuid,
+    /// Null once the reporter's account has been anonymized.
+    pub reporter_id: Option<UserId>,
+    pub subject_kind: String,
+    pub subject_id: Uuid,
+    pub channel_id: Option<ChannelId>,
+    pub reason: String,
+    /// The reported content as it was at filing time; the author may have
+    /// since edited or deleted it.
+    pub snapshot: Option<String>,
+    pub created_at: i64,
+    pub resolved_at: Option<i64>,
+    pub resolved_by: Option<UserId>,
+    pub resolution: Option<String>,
+}
+
 impl Store {
     // -------------------------------------------------------------------------
     // Devices
@@ -260,5 +280,51 @@ impl Store {
         .fetch_one(&self.pool)
         .await?;
         Ok(count)
+    }
+
+    /// The moderation queue: open reports, oldest first.
+    pub async fn list_open_reports(&self) -> anyhow::Result<Vec<Report>> {
+        let rows = sqlx::query_as!(
+            Report,
+            r#"SELECT id AS "id!: Uuid", reporter_id AS "reporter_id: UserId",
+                      subject_kind AS "subject_kind!", subject_id AS "subject_id!: Uuid",
+                      channel_id AS "channel_id: ChannelId", reason AS "reason!",
+                      snapshot, created_at AS "created_at!",
+                      resolved_at, resolved_by AS "resolved_by: UserId", resolution
+               FROM reports WHERE resolved_at IS NULL ORDER BY created_at"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Resolves or dismisses an open report. `resolution` is a short caller-
+    /// supplied label ("resolved" or "dismissed"); the distinction is not
+    /// enforced here, since both are just a moderator's disposition on the
+    /// same claim-first close.
+    ///
+    /// The UPDATE is conditional on `resolved_at IS NULL`, so two moderators
+    /// racing the same report cannot both "win" it, and returns whether this
+    /// call was the one that closed it: `false` covers both an unknown report
+    /// and one already resolved, which the caller treats the same way.
+    pub async fn resolve_report(
+        &self,
+        report_id: Uuid,
+        resolved_by: UserId,
+        resolution: &str,
+    ) -> anyhow::Result<bool> {
+        let now = now_ms();
+        let affected = sqlx::query!(
+            "UPDATE reports SET resolved_at = ?, resolved_by = ?, resolution = ?
+             WHERE id = ? AND resolved_at IS NULL",
+            now,
+            resolved_by,
+            resolution,
+            report_id
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        Ok(affected > 0)
     }
 }

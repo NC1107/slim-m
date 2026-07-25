@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: UserId\", username AS \"username!\",\n                      display_name AS \"display_name!\", created_at AS \"created_at!\"\n               FROM users WHERE id = ? AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "username!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_name!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 3,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "af364690d7388846d9f21a6e6c43335bb651adfeb5b4d74284045c51f01a7898"
+}

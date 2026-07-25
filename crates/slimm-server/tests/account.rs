@@ -216,3 +216,88 @@ async fn http_delete_account_rejects_the_token_afterward() {
         .unwrap();
     assert_eq!(after.status(), StatusCode::UNAUTHORIZED);
 }
+
+/// The last administrator cannot delete themselves out of a deployment other
+/// people are still using: roles, invites and moderation all need a bit nobody
+/// would hold afterwards, and there is no recovery path from that state.
+#[tokio::test]
+async fn the_last_administrator_cannot_strand_a_populated_deployment() {
+    let store = new_store().await;
+    let app = http::router(AppState {
+        store,
+        auth: Auth::new(2).unwrap(),
+        hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+    });
+
+    let signup = |username: &'static str| {
+        let app = app.clone();
+        async move {
+            let response = app
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/auth/register")
+                        .header("content-type", "application/json")
+                        .body(Body::from(
+                            json!({
+                                "username": username,
+                                "display_name": username,
+                                "password": "hunter2hunter2",
+                                "device_name": "cli"
+                            })
+                            .to_string(),
+                        ))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            json["access_token"].as_str().unwrap().to_owned()
+        }
+    };
+
+    // The first account claims the deployment and becomes its administrator.
+    let admin = signup("admin").await;
+    // A second, ordinary member: somebody who would be stranded.
+    let _member = signup("member").await;
+
+    let refused = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/account")
+                .header("authorization", format!("Bearer {admin}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        refused.status(),
+        StatusCode::CONFLICT,
+        "deleting the only administrator while others remain must be refused, and as a \
+         conflict rather than a server error"
+    );
+
+    // The account is still usable, not left half-deleted.
+    let still_working = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/channels")
+                .header("authorization", format!("Bearer {admin}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(still_working.status(), StatusCode::OK);
+}

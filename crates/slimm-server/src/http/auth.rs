@@ -17,6 +17,7 @@ use super::error::ApiError;
 use super::extract::{Authed, PASSWORD, REFRESH, RateLimited, enforce};
 use crate::hub::Event;
 use crate::ratelimit::Class;
+use crate::store::DeleteAccountError;
 use crate::store::{Bootstrap, IssuedTokens, RefreshOutcome, RegisterError};
 
 /// Auth payloads are a handful of short fields; cap the body well below any
@@ -201,7 +202,17 @@ async fn delete_account(
     Authed(ctx): Authed,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
-    let revoked = state.store.delete_account(ctx.user_id).await?;
+    let revoked = match state.store.delete_account(ctx.user_id).await {
+        Ok(revoked) => revoked,
+        // A refusal is the caller's situation, not a server fault, so it must
+        // not surface as a 500.
+        Err(DeleteAccountError::WouldStrandDeployment) => {
+            return Err(ApiError::Conflict(
+                "you are the only administrator; appoint another before deleting your account",
+            ));
+        }
+        Err(DeleteAccountError::Internal(e)) => return Err(e.into()),
+    };
     for session_id in revoked {
         state.hub.publish(Event::SessionRevoked(session_id));
     }
@@ -228,7 +239,9 @@ fn validate_username(username: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-fn validate_password(password: &str) -> Result<(), ApiError> {
+/// Shared with the reset-password consumption endpoint, so a reset cannot be
+/// used to set a weaker password than registration would ever allow.
+pub(crate) fn validate_password(password: &str) -> Result<(), ApiError> {
     let len = password.chars().count();
     if !(8..=1024).contains(&len) {
         return Err(ApiError::BadRequest(
@@ -238,7 +251,10 @@ fn validate_password(password: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-fn validate_label(value: &str, message: &'static str) -> Result<(), ApiError> {
+/// Shared with the display-name-only update on `/me`, so a later rename
+/// cannot bypass the same anti-spoofing checks registration enforces up
+/// front.
+pub(crate) fn validate_label(value: &str, message: &'static str) -> Result<(), ApiError> {
     let len = value.chars().count();
     if !(1..=64).contains(&len) {
         return Err(ApiError::BadRequest(message));

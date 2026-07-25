@@ -116,6 +116,73 @@ impl Store {
         Ok(())
     }
 
+    /// The overwrite currently set for one target in one channel, if any.
+    ///
+    /// Callers need this to work out what a write would actually grant.
+    /// Judging an overwrite by its new `allow` bits alone misses that removing
+    /// a `deny` grants that permission just as surely as adding an `allow`.
+    pub async fn overwrite_for(
+        &self,
+        channel_id: ChannelId,
+        target_type: &str,
+        target_id: Uuid,
+    ) -> anyhow::Result<Option<(Permissions, Permissions)>> {
+        let row = sqlx::query!(
+            r#"SELECT allow AS "allow!: i64", deny AS "deny!: i64"
+               FROM channel_overwrites
+               WHERE channel_id = ? AND target_type = ? AND target_id = ?"#,
+            channel_id,
+            target_type,
+            target_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| {
+            (
+                Permissions::from_bits(r.allow),
+                Permissions::from_bits(r.deny),
+            )
+        }))
+    }
+
+    /// Clears a channel's role overwrite. Idempotent: clearing one that is
+    /// not set still succeeds, the same as removing a reaction that is not
+    /// there does.
+    pub async fn delete_role_overwrite(
+        &self,
+        channel_id: ChannelId,
+        role_id: RoleId,
+    ) -> anyhow::Result<()> {
+        self.delete_overwrite(channel_id, "role", role_id.0).await
+    }
+
+    /// Clears a channel's member overwrite. Idempotent, the same way.
+    pub async fn delete_member_overwrite(
+        &self,
+        channel_id: ChannelId,
+        user_id: UserId,
+    ) -> anyhow::Result<()> {
+        self.delete_overwrite(channel_id, "member", user_id.0).await
+    }
+
+    async fn delete_overwrite(
+        &self,
+        channel_id: ChannelId,
+        target_type: &str,
+        target_id: Uuid,
+    ) -> anyhow::Result<()> {
+        sqlx::query!(
+            "DELETE FROM channel_overwrites
+             WHERE channel_id = ? AND target_type = ? AND target_id = ?",
+            channel_id,
+            target_type,
+            target_id
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     /// The user's guild-level permissions, ignoring any channel. Applies the
     /// `@everyone` base, the role union, and the administrator bypass.
     pub async fn base_permissions(&self, user_id: UserId) -> anyhow::Result<Permissions> {
