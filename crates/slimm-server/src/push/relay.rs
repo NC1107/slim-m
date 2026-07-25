@@ -44,6 +44,44 @@ pub(super) struct RelayResult {
     pub(super) status: String,
 }
 
+/// The relay's own per-token status vocabulary (slim-m-relay's
+/// `internal/push.Status`), pinned here as the same five literal wire
+/// strings the cross-repo contract test pins on the Go side (see
+/// `push_relay_contract_test.go`'s `contractCases`). `RelayResult::status`
+/// above stays a bare `String` because the wire body carries no guarantee it
+/// only ever holds one of these; parsing it into this enum explicitly, once,
+/// rather than matching the raw string ad hoc at each call site, means a
+/// status either side renames, drops, or grows without telling the other is
+/// noticed here - as "not one of these" - instead of silently falling
+/// through to "do nothing" alongside every genuinely inactionable status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RelayStatus {
+    Delivered,
+    Unregistered,
+    Forbidden,
+    Error,
+    NotAttempted,
+}
+
+impl RelayResult {
+    /// Parses [`Self::status`] against the relay's documented vocabulary.
+    /// `None` for anything else, including a status this server used to
+    /// recognize but no longer does - the caller must treat that the same as
+    /// any other status it takes no special action on, not crash or
+    /// misroute, but it is worth a log line since it means the two repos
+    /// have drifted.
+    pub(super) fn parsed_status(&self) -> Option<RelayStatus> {
+        match self.status.as_str() {
+            "delivered" => Some(RelayStatus::Delivered),
+            "unregistered" => Some(RelayStatus::Unregistered),
+            "forbidden" => Some(RelayStatus::Forbidden),
+            "error" => Some(RelayStatus::Error),
+            "not_attempted" => Some(RelayStatus::NotAttempted),
+            _ => None,
+        }
+    }
+}
+
 /// Posts one batch to the relay's `/v1/send` and returns the per-token
 /// results. `messages` is expected non-empty; the caller filters out targets
 /// with nothing sealed to send before calling this.
@@ -73,4 +111,36 @@ pub(super) async fn send(
         .error_for_status()?;
     let parsed: SendResponse = response.json().await?;
     Ok(parsed.results)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Pins the relay's per-result status vocabulary as literal wire
+    /// strings on the server side, matching the literals
+    /// `push_relay_contract_test.go`'s `contractCases` pins on the relay
+    /// side. A status renamed, dropped, or added on one side without the
+    /// other must show up as a test failure on at least one side; this is
+    /// this side's half.
+    #[test]
+    fn parsed_status_accepts_exactly_the_documented_vocabulary_and_rejects_unknown() {
+        let cases = [
+            ("delivered", Some(RelayStatus::Delivered)),
+            ("unregistered", Some(RelayStatus::Unregistered)),
+            ("forbidden", Some(RelayStatus::Forbidden)),
+            ("error", Some(RelayStatus::Error)),
+            ("not_attempted", Some(RelayStatus::NotAttempted)),
+            ("bogus", None),
+            ("", None),
+            ("Delivered", None), // case must matter: not a loose match
+        ];
+        for (wire, want) in cases {
+            let result = RelayResult {
+                token: "t".to_owned(),
+                status: wire.to_owned(),
+            };
+            assert_eq!(result.parsed_status(), want, "status {wire:?}");
+        }
+    }
 }

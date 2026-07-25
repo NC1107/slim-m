@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The notification small icon is named only as a runtime string from Dart
+  ("@drawable/ic_stat_notify") and resolved natively through
+  Resources.getIdentifier, so no compiled Android code references it. The
+  resource shrinker sees an unused drawable and strips it from a release build,
+  and the notification then has no icon at all. This keeps it.
+-->
+<resources
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_notify" />

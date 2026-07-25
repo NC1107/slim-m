@@ -24,7 +24,7 @@ use std::sync::Arc;
 
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, broadcast};
 
-use crate::ids::SessionId;
+use crate::ids::{ChannelId, MessageId, SessionId};
 use crate::store::Message;
 
 /// How many events the channel buffers per subscriber before the slowest one
@@ -42,6 +42,14 @@ pub enum Event {
     MessageCreated(Message),
     /// A message was edited.
     MessageEdited(Message),
+    /// A message's reactions changed. Carries the whole public summary rather
+    /// than a delta, so a client that missed a frame cannot drift; the
+    /// per-viewer "did I react" flag is deliberately not broadcast.
+    ReactionsChanged {
+        channel_id: ChannelId,
+        message_id: MessageId,
+        reactions: Vec<(String, i64)>,
+    },
     /// A session was revoked; any live connection on it must close at once.
     SessionRevoked(SessionId),
 }

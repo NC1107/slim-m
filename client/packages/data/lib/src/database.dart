@@ -43,6 +43,10 @@ class Messages extends Table {
   TextColumn get channelId => text()();
   TextColumn get authorId => text().nullable()();
 
+  /// Sent with the message so rendering a channel needs no lookup per sender.
+  /// Null when the author was anonymized, exactly as [authorId] is.
+  TextColumn get authorDisplayName => text().nullable()();
+
   /// Server order key. Zero while a message is only local (an optimistic echo
   /// that has not been acknowledged yet), so pending messages sort last.
   IntColumn get seq => integer().withDefault(const Constant(0))();
@@ -66,10 +70,18 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          // v2 carries the author's display name alongside the message. Existing
+          // rows backfill to null and render the same fallback an anonymized
+          // author does, until the next sync replaces them.
+          if (from < 2) {
+            await m.addColumn(messages, messages.authorDisplayName);
+          }
+        },
         beforeOpen: (details) async {
           // Keyset reads and unread counts both scan a channel newest-first, so the
           // index has to match that order to be used.

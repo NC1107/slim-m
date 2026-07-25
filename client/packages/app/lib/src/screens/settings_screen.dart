@@ -159,6 +159,7 @@ class _NotificationsSection extends ConsumerWidget {
     final status = ref.watch(pushControllerProvider);
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final registered = status == PushStatus.registered;
+    final blocked = status == PushStatus.registeredNotificationsBlocked;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,7 +171,11 @@ class _NotificationsSection extends ConsumerWidget {
         ListTile(
           leading: Icon(
             registered ? AppIcons.notificationsOn : AppIcons.notificationsOff,
-            color: registered ? tokens.accent : tokens.textSecondary,
+            color: registered
+                ? tokens.accent
+                : blocked
+                    ? Theme.of(context).colorScheme.error
+                    : tokens.textSecondary,
           ),
           title: Text(status.label),
         ),

@@ -260,11 +260,11 @@ async fn deliver(
                 let Some(target) = messages.iter().find(|m| m.token == result.token) else {
                     continue;
                 };
-                match result.status.as_str() {
-                    "delivered" => {
+                match result.parsed_status() {
+                    Some(relay::RelayStatus::Delivered) => {
                         delivered.insert(target.user_id);
                     }
-                    "unregistered" => {
+                    Some(relay::RelayStatus::Unregistered) => {
                         if let Err(err) = store
                             .clear_push_registration(
                                 target.user_id,
@@ -276,7 +276,24 @@ async fn deliver(
                             tracing::warn!(error = %err, "push: failed to clear a dead registration");
                         }
                     }
-                    _ => {}
+                    Some(
+                        relay::RelayStatus::Forbidden
+                        | relay::RelayStatus::Error
+                        | relay::RelayStatus::NotAttempted,
+                    ) => {}
+                    None => {
+                        // The relay returned a status this server does not
+                        // recognize: the two repos have drifted apart on the
+                        // status vocabulary. Treated the same as any other
+                        // inactionable status rather than crashing or
+                        // misrouting, but worth a log line since it should
+                        // never happen against a relay built from the
+                        // documented contract.
+                        tracing::warn!(
+                            status = %result.status,
+                            "push: relay reported a status this server does not recognize"
+                        );
+                    }
                 }
             }
             for (&user_id, &fired_at) in &opened {

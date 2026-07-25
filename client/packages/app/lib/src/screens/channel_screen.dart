@@ -207,7 +207,14 @@ class _MessageRow extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.s4),
               child: Text(
-                message.authorId ?? 'Deleted user',
+                // Falls back to the id only when the name is genuinely absent
+                // but the account still exists, which is a message cached
+                // before the server sent names; a null author means the
+                // account is gone.
+                message.authorDisplayName ??
+                    (message.authorId == null
+                        ? 'Deleted user'
+                        : message.authorId!),
                 style: TextStyle(
                   color: tokens.textSecondary,
                   fontWeight: FontWeight.w600,
