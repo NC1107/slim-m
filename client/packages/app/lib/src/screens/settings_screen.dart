@@ -12,6 +12,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart';
+import '../providers/push_controller.dart';
 import '../providers/sync_controller.dart';
 
 /// The account's devices, refetched when invalidated.
@@ -207,6 +208,11 @@ class _AccountSection extends ConsumerWidget {
           title: const Text('Sign out'),
           onTap: () async {
             await ref.read(syncControllerProvider.notifier).stop();
+            // Drop the push registration first, while the session that owns it
+            // is still valid. Otherwise this handset keeps waking for an
+            // account nobody is signed into, which on a shared or handed-on
+            // device means notifying the wrong person.
+            await ref.read(pushControllerProvider).unregister();
             try {
               await ref.read(apiProvider).logout();
             } on api.ApiException {
