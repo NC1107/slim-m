@@ -5,7 +5,7 @@ publish_to: none
 # Feeds CFBundleShortVersionString and CFBundleVersion. Without it an archive
 # builds but cannot be submitted, and every TestFlight upload would collide on
 # the same missing build number.
-version: 0.1.0+2
+version: 0.1.0+3
 resolution: workspace
 environment:
   sdk: ^3.6.0
@@ -20,6 +20,7 @@ dependencies:
   slimm_design_system:
   slimm_platform:
   drift: ^2.20.0
+  package_info_plus: ^10.2.1
   path: ^1.9.0
   path_provider: ^2.1.0
   shared_preferences: ^2.3.0

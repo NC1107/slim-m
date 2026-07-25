@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
@@ -25,6 +26,12 @@ final blocksProvider = FutureProvider.autoDispose<List<String>>(
   (ref) => ref.watch(apiProvider).listBlocks(),
 );
 
+/// This build's version and build number, for a tester to read off the
+/// screen rather than guessing which build they are running.
+final appInfoProvider = FutureProvider.autoDispose<PackageInfo>(
+  (ref) => PackageInfo.fromPlatform(),
+);
+
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -36,9 +43,13 @@ class SettingsScreen extends ConsumerWidget {
         children: const [
           _DevicesSection(),
           Divider(height: 1),
+          _NotificationsSection(),
+          Divider(height: 1),
           _BlockedSection(),
           Divider(height: 1),
           _AccountSection(),
+          Divider(height: 1),
+          _AboutSection(),
         ],
       ),
     );
@@ -137,6 +148,37 @@ class _DevicesSection extends ConsumerWidget {
   }
 }
 
+/// Whether this device is registered for push, read plainly off the state
+/// [PushController] tracks: this is what makes a registration problem
+/// diagnosable from the device itself, instead of guessing from server logs.
+class _NotificationsSection extends ConsumerWidget {
+  const _NotificationsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(pushControllerProvider);
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final registered = status == PushStatus.registered;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeader(
+          'Notifications',
+          description: 'Whether this device is registered for push.',
+        ),
+        ListTile(
+          leading: Icon(
+            registered ? AppIcons.notificationsOn : AppIcons.notificationsOff,
+            color: registered ? tokens.accent : tokens.textSecondary,
+          ),
+          title: Text(status.label),
+        ),
+      ],
+    );
+  }
+}
+
 class _BlockedSection extends ConsumerWidget {
   const _BlockedSection();
 
@@ -212,7 +254,7 @@ class _AccountSection extends ConsumerWidget {
             // is still valid. Otherwise this handset keeps waking for an
             // account nobody is signed into, which on a shared or handed-on
             // device means notifying the wrong person.
-            await ref.read(pushControllerProvider).unregister();
+            await ref.read(pushControllerProvider.notifier).unregister();
             try {
               await ref.read(apiProvider).logout();
             } on api.ApiException {
@@ -271,6 +313,54 @@ class _AccountSection extends ConsumerWidget {
     if (confirmed != true) return;
 
     await ref.read(syncControllerProvider.notifier).stop();
-    await ref.read(apiProvider).deleteAccount();
+    // Same reasoning as sign-out: clear the device's push key while the
+    // session that registered it is still valid, so it is not sitting around
+    // to be inherited by whichever account signs into this device next.
+    await ref.read(pushControllerProvider.notifier).unregister();
+    try {
+      await ref.read(apiProvider).deleteAccount();
+    } on api.ApiException catch (e) {
+      // Sync is already stopped and the push key already dropped by this
+      // point. The session is deliberately left alone (unlike sign-out,
+      // deletion is not safe to assume happened just because the request
+      // failed) so the account is not orphaned with no session left to retry
+      // from, but the failure still has to reach the screen instead of
+      // leaving the user stranded with no idea why nothing updates any more.
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete the account. ${e.message}')),
+      );
+    }
+  }
+}
+
+/// Which build this is, for a tester to read off the device rather than
+/// asking whoever is looking at it what they have installed.
+class _AboutSection extends ConsumerWidget {
+  const _AboutSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final info = ref.watch(appInfoProvider);
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeader('About'),
+        ListTile(
+          leading: const Icon(AppIcons.info),
+          title: const Text('Version'),
+          subtitle: Text(
+            info.when(
+              data: (i) => '${i.version} (${i.buildNumber})',
+              loading: () => 'Loading…',
+              error: (e, _) => 'Unknown',
+            ),
+            style: TextStyle(color: tokens.textSecondary),
+          ),
+        ),
+      ],
+    );
   }
 }

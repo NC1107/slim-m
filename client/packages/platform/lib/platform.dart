@@ -6,4 +6,5 @@ library;
 export 'src/apns_token_channel.dart';
 export 'src/device_push_keys.dart';
 export 'src/key_store.dart';
+export 'src/persistent_key_store.dart';
 export 'src/shortcuts.dart';

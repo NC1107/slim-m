@@ -11,7 +11,6 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
-import '../providers/sync_controller.dart';
 
 /// Sign in or create an account on a chosen server.
 ///
@@ -87,10 +86,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         }
         ref.read(pendingInviteProvider.notifier).state = null;
       }
-      await ref.read(syncControllerProvider.notifier).start();
+      // Sync is not started here: SyncController is session-driven (see its
+      // class doc) and its own listener already reacts to the session.set()
+      // that api.register()/api.login() just performed. Starting it again
+      // explicitly raced that listener's own start() and opened a second
+      // socket that went on to kick the first, healthy one offline.
+      //
       // Fire-and-forget: a denied permission or unreachable server here must
       // never hold up sign-in, which is already complete at this point.
-      unawaited(ref.read(pushControllerProvider).register());
+      unawaited(ref.read(pushControllerProvider.notifier).register());
     } on ApiException catch (e) {
       // Say what actually happened. "Something went wrong" tells the user
       // nothing about whether to fix their password or wait.

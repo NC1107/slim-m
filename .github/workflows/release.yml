@@ -349,11 +349,20 @@ jobs:
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
+      # flutter_secure_storage is a normal pub dependency of the platform
+      # package (used on iOS/Android; see persistent_key_store.dart), and pub
+      # has no per-target scoping that would keep its Linux plugin
+      # (flutter_secure_storage_linux) out of a Linux build's dependency
+      # graph. That plugin's CMake config hard-requires libsecret-1-dev to
+      # even configure, regardless of whether the app ever calls into it on
+      # this platform. Installing the one system package here is simpler to
+      # maintain than splitting the platform package apart just to keep
+      # Linux out of that graph.
       - name: linux build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            clang cmake ninja-build pkg-config libgtk-3-dev
+            clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev
 
       - uses: subosito/flutter-action@v2 # pin to commit SHA before public
         with:
