@@ -14,7 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 /// The official instance. Someone with no invite and no server of their own
 /// still needs somewhere to land.
-const officialServer = 'https://slim-npc-server.top';
+const officialServer = 'https://slim.npc-server.top';
 
 /// Whether an address is on the loopback interface or a private network.
 ///
