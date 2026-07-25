@@ -18,10 +18,16 @@ mod error;
 mod extract;
 mod invites;
 mod messages;
+mod overwrites;
 mod push;
 mod reactions;
+mod recovery;
+mod reports;
+mod roles;
 mod safety;
+mod search;
 mod sync;
+mod users;
 mod ws;
 
 /// The wire-protocol envelope version a client negotiates on connect. Bumped
@@ -48,10 +54,16 @@ pub fn router(state: AppState) -> Router {
         .merge(channels::routes())
         .merge(invites::routes())
         .merge(messages::routes())
+        .merge(overwrites::routes())
         .merge(reactions::routes())
         .merge(push::routes())
+        .merge(recovery::routes())
+        .merge(reports::routes())
+        .merge(roles::routes())
         .merge(safety::routes())
+        .merge(search::routes())
         .merge(sync::routes())
+        .merge(users::routes())
         .merge(ws::routes())
         .layer(TraceLayer::new_for_http())
         .with_state(state)

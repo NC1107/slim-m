@@ -1,0 +1,477 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Role management and member role assignment: the MANAGE_ROLES gate, the
+//! escalation guard (nobody can grant a permission they do not themselves
+//! hold), and the invariant that the deployment never ends up with zero
+//! administrators.
+
+use axum::Router;
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use serde_json::{Value, json};
+use slimm_server::auth::Auth;
+use slimm_server::config::Config;
+use slimm_server::db;
+use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
+use slimm_server::permissions::Permissions;
+use slimm_server::push::PushSender;
+use slimm_server::ratelimit::RateLimiter;
+use slimm_server::store::Store;
+use tower::ServiceExt;
+
+async fn new_store() -> Store {
+    let path = format!("/tmp/slimm-roles-test-{}.db", uuid::Uuid::now_v7());
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        push_relay_url: None,
+        push_relay_key: None,
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    Store::new(pool)
+}
+
+fn app(store: Store) -> Router {
+    http::router(AppState {
+        store,
+        auth: Auth::new(2).unwrap(),
+        hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+    })
+}
+
+fn request(method: &str, uri: &str, token: Option<&str>, body: Option<Value>) -> Request<Body> {
+    let mut builder = Request::builder().method(method).uri(uri);
+    if let Some(token) = token {
+        builder = builder.header("authorization", format!("Bearer {token}"));
+    }
+    match body {
+        Some(value) => builder
+            .header("content-type", "application/json")
+            .body(Body::from(value.to_string()))
+            .unwrap(),
+        None => builder.body(Body::empty()).unwrap(),
+    }
+}
+
+async fn json_body(response: axum::response::Response) -> Value {
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    serde_json::from_slice(&bytes).unwrap()
+}
+
+/// Registers a user and returns (access_token, user_id). The first account on
+/// a fresh store claims the deployment and becomes its administrator; every
+/// later one is a plain member with only the `@everyone` base.
+async fn register(app: &Router, username: &str) -> (String, String) {
+    let response = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/auth/register",
+            None,
+            Some(json!({
+                "username": username,
+                "display_name": username,
+                "password": "hunter2hunter2",
+                "device_name": "cli"
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    (
+        body["access_token"].as_str().unwrap().to_owned(),
+        body["user_id"].as_str().unwrap().to_owned(),
+    )
+}
+
+async fn admin_role_id(store: &Store) -> String {
+    store
+        .list_roles()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|r| r.name == "admin")
+        .expect("bootstrap seeds an admin role")
+        .id
+        .to_string()
+}
+
+// ---------------------------------------------------------------------------
+// The MANAGE_ROLES gate
+// ---------------------------------------------------------------------------
+
+/// Every role-management verb refuses a caller without MANAGE_ROLES, whether
+/// or not the resource named in the path exists.
+#[tokio::test]
+async fn every_verb_requires_manage_roles() {
+    let store = new_store().await;
+    let app = app(store.clone());
+    let (_admin_token, _admin_id) = register(&app, "alice").await;
+    let (member_token, member_id) = register(&app, "bob").await;
+    let admin_role = admin_role_id(&store).await;
+
+    let cases: [(&str, String); 6] = [
+        ("GET", "/roles".to_owned()),
+        ("POST", "/roles".to_owned()),
+        ("PATCH", format!("/roles/{admin_role}")),
+        ("DELETE", format!("/roles/{admin_role}")),
+        ("PUT", format!("/members/{member_id}/roles/{admin_role}")),
+        ("DELETE", format!("/members/{member_id}/roles/{admin_role}")),
+    ];
+    for (method, uri) in cases {
+        let body =
+            matches!(method, "POST" | "PATCH").then(|| json!({ "name": "x", "permissions": 0 }));
+        let response = app
+            .clone()
+            .oneshot(request(method, &uri, Some(&member_token), body))
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::FORBIDDEN,
+            "{method} {uri} must require MANAGE_ROLES"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Escalation: nobody can grant what they do not hold
+// ---------------------------------------------------------------------------
+
+/// A MANAGE_ROLES holder who is not themselves an administrator cannot create
+/// a role carrying ADMINISTRATOR: MANAGE_ROLES is not a shortcut to it.
+#[tokio::test]
+async fn creating_a_role_cannot_grant_a_permission_the_caller_lacks() {
+    let store = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (member_token, member_id) = register(&app, "bob").await;
+
+    let manager_role = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/roles",
+                Some(&admin_token),
+                Some(json!({ "name": "manager", "permissions": Permissions::MANAGE_ROLES.bits() })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let manager_role_id = manager_role["id"].as_str().unwrap();
+    let assign = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            &format!("/members/{member_id}/roles/{manager_role_id}"),
+            Some(&admin_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(assign.status(), StatusCode::NO_CONTENT);
+
+    // Bob now holds MANAGE_ROLES but nothing else. He must not be able to
+    // mint an administrator role, not even for himself.
+    let response = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/roles",
+            Some(&member_token),
+            Some(json!({
+                "name": "self-promotion",
+                "permissions": Permissions::ADMINISTRATOR.bits()
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+/// Assigning an existing role is also a grant: a MANAGE_ROLES holder cannot
+/// hand out the `admin` role to themselves or anyone else unless they already
+/// hold ADMINISTRATOR.
+#[tokio::test]
+async fn assigning_a_role_cannot_grant_a_permission_the_caller_lacks() {
+    let store = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (member_token, member_id) = register(&app, "bob").await;
+    let admin_role = admin_role_id(&store).await;
+
+    let manager_role = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/roles",
+                Some(&admin_token),
+                Some(json!({ "name": "manager", "permissions": Permissions::MANAGE_ROLES.bits() })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let manager_role_id = manager_role["id"].as_str().unwrap().to_owned();
+    app.clone()
+        .oneshot(request(
+            "PUT",
+            &format!("/members/{member_id}/roles/{manager_role_id}"),
+            Some(&admin_token),
+            None,
+        ))
+        .await
+        .unwrap();
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            &format!("/members/{member_id}/roles/{admin_role}"),
+            Some(&member_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+/// Unknown permission bits are rejected outright, before the escalation
+/// check even runs, so a stray high bit cannot smuggle in a future meaning.
+#[tokio::test]
+async fn unknown_permission_bits_are_rejected() {
+    let store = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&app, "alice").await;
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/roles",
+            Some(&admin_token),
+            Some(json!({ "name": "weird", "permissions": 1_i64 << 60 })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+// ---------------------------------------------------------------------------
+// The last-administrator invariant
+// ---------------------------------------------------------------------------
+
+/// The sole administrator cannot remove their own admin role: that would
+/// leave the deployment with no administrator and no recovery path.
+#[tokio::test]
+async fn cannot_unassign_the_last_administrator() {
+    let store = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, admin_id) = register(&app, "alice").await;
+    let admin_role = admin_role_id(&store).await;
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/members/{admin_id}/roles/{admin_role}"),
+            Some(&admin_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+
+    // The refusal must be a real rollback: alice is still an administrator
+    // and can still do administrator-only things afterwards.
+    let still_admin = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/roles",
+            Some(&admin_token),
+            Some(json!({ "name": "proof", "permissions": 0 })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(still_admin.status(), StatusCode::OK);
+}
+
+/// Deleting the role that is the deployment's only source of ADMINISTRATOR is
+/// refused the same way removing the assignment is, even though the caller
+/// (holding only MANAGE_ROLES via a second role) is not trying to touch their
+/// own access at all.
+#[tokio::test]
+async fn cannot_delete_the_only_administrator_role() {
+    let store = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (member_token, member_id) = register(&app, "bob").await;
+    let admin_role = admin_role_id(&store).await;
+
+    let manager_role = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/roles",
+                Some(&admin_token),
+                Some(json!({ "name": "manager", "permissions": Permissions::MANAGE_ROLES.bits() })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let manager_role_id = manager_role["id"].as_str().unwrap().to_owned();
+    app.clone()
+        .oneshot(request(
+            "PUT",
+            &format!("/members/{member_id}/roles/{manager_role_id}"),
+            Some(&admin_token),
+            None,
+        ))
+        .await
+        .unwrap();
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/roles/{admin_role}"),
+            Some(&member_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+}
+
+/// Once a second administrator exists, removing the first one's assignment
+/// succeeds: the guard only refuses the transition to zero, not to one.
+#[tokio::test]
+async fn a_second_administrator_makes_removal_possible() {
+    let store = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, admin_id) = register(&app, "alice").await;
+    let (_member_token, member_id) = register(&app, "bob").await;
+    let admin_role = admin_role_id(&store).await;
+
+    let promote = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            &format!("/members/{member_id}/roles/{admin_role}"),
+            Some(&admin_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(promote.status(), StatusCode::NO_CONTENT);
+
+    let demote_self = app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/members/{admin_id}/roles/{admin_role}"),
+            Some(&admin_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(demote_self.status(), StatusCode::NO_CONTENT);
+}
+
+/// `@everyone` can never be deleted, administrator or not: it is the base of
+/// every permission evaluation and the schema allows only one.
+#[tokio::test]
+async fn cannot_delete_everyone_role() {
+    let store = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&app, "alice").await;
+
+    let everyone_id = store
+        .list_roles()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|r| r.is_everyone)
+        .expect("bootstrap seeds @everyone")
+        .id
+        .to_string();
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/roles/{everyone_id}"),
+            Some(&admin_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+}
+
+// ---------------------------------------------------------------------------
+// Happy path
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn admin_can_create_update_list_and_the_role_takes_effect() {
+    let store = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&app, "alice").await;
+
+    let created = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/roles",
+                Some(&admin_token),
+                Some(json!({ "name": "mods", "permissions": Permissions::MANAGE_MESSAGES.bits() })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let role_id = created["id"].as_str().unwrap().to_owned();
+    assert_eq!(created["name"], "mods");
+    assert_eq!(created["is_everyone"], false);
+
+    let updated = json_body(
+        app.clone()
+            .oneshot(request(
+                "PATCH",
+                &format!("/roles/{role_id}"),
+                Some(&admin_token),
+                Some(json!({ "name": "moderators" })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(updated["name"], "moderators");
+    // Untouched field survives a partial update.
+    assert_eq!(updated["permissions"], Permissions::MANAGE_MESSAGES.bits());
+
+    let listed = json_body(
+        app.clone()
+            .oneshot(request("GET", "/roles", Some(&admin_token), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        listed
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["id"] == role_id && r["name"] == "moderators")
+    );
+}

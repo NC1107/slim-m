@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM channel_overwrites WHERE target_type = 'role' AND target_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "b2febbf6b734f473e1a2c69b3bcc2dd291e3fc618ac9e87bc98080a8b175b9d7"
+}

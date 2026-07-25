@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE reports SET resolved_at = ?, resolved_by = ?, resolution = ?\n             WHERE id = ? AND resolved_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "f2f60114c74c92124d04f16a651c2bc576975b57a72d8889c7f4637cf752235a"
+}

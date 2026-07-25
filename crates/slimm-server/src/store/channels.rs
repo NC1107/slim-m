@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Channel persistence: create, fetch, rename, and soft-delete.
+//!
+//! Listing lives in [`super::bootstrap`] alongside the rest of the admin
+//! surface it was introduced with; this module is the CRUD paths for a
+//! single channel.
+
+use super::{Channel, Store, now_ms};
+use crate::ids::ChannelId;
+
+/// Why deleting a channel failed.
+#[derive(Debug)]
+pub enum DeleteChannelError {
+    /// This is the deployment's last live channel. Refused rather than
+    /// honoured: a deployment with zero channels has nowhere for anyone to
+    /// land, the same reason bootstrap seeds a `general` channel for a fresh
+    /// deployment in the first place.
+    LastChannel,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for DeleteChannelError {
+    fn from(err: sqlx::Error) -> Self {
+        DeleteChannelError::Internal(err.into())
+    }
+}
+
+impl Store {
+    /// Creates a channel and seeds its message and canvas sequence counters.
+    pub async fn create_channel(&self, name: &str, kind: &str) -> anyhow::Result<Channel> {
+        let id = ChannelId::generate();
+        let now = now_ms();
+        let mut tx = self.pool.begin().await?;
+        sqlx::query!(
+            "INSERT INTO channels (id, name, kind, created_at) VALUES (?, ?, ?, ?)",
+            id,
+            name,
+            kind,
+            now
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "INSERT INTO channel_seq_counters (channel_id, stream, next_seq)
+             VALUES (?, 'message', 1), (?, 'canvas', 1)",
+            id,
+            id
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(Channel {
+            id,
+            name: name.to_owned(),
+            kind: kind.to_owned(),
+            created_at: now,
+        })
+    }
+
+    /// Fetches a live channel by id, or `None` if it is missing or deleted.
+    pub async fn channel(&self, id: ChannelId) -> anyhow::Result<Option<Channel>> {
+        let row = sqlx::query!(
+            r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!",
+                      created_at AS "created_at!"
+               FROM channels WHERE id = ? AND deleted_at IS NULL"#,
+            id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| Channel {
+            id: r.id,
+            name: r.name,
+            kind: r.kind,
+            created_at: r.created_at,
+        }))
+    }
+
+    /// Fetches a channel by id whether or not it is deleted. The delete
+    /// handler needs this rather than [`Store::channel`] to tell "never
+    /// existed" (a 404) apart from "already deleted" (an idempotent no-op),
+    /// which a `deleted_at`-filtered read cannot distinguish, the same
+    /// reason [`Store::message_including_deleted`] exists.
+    pub async fn channel_including_deleted(
+        &self,
+        id: ChannelId,
+    ) -> anyhow::Result<Option<Channel>> {
+        let row = sqlx::query!(
+            r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!",
+                      created_at AS "created_at!"
+               FROM channels WHERE id = ?"#,
+            id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| Channel {
+            id: r.id,
+            name: r.name,
+            kind: r.kind,
+            created_at: r.created_at,
+        }))
+    }
+
+    /// Renames a live channel. Returns `None` if it does not exist (or was
+    /// deleted, racing this call).
+    pub async fn update_channel_name(
+        &self,
+        id: ChannelId,
+        name: &str,
+    ) -> anyhow::Result<Option<Channel>> {
+        let affected = sqlx::query!(
+            "UPDATE channels SET name = ? WHERE id = ? AND deleted_at IS NULL",
+            name,
+            id
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        if affected == 0 {
+            return Ok(None);
+        }
+        self.channel(id).await
+    }
+
+    /// Soft-deletes a channel, refusing to remove the deployment's last live
+    /// one. Returns whether this call performed the delete, so a retry
+    /// against an already-deleted channel is idempotent rather than an error.
+    ///
+    /// Write-first: the single `UPDATE` both claims the row and enforces the
+    /// last-channel guard in its `WHERE` clause, so two concurrent deletes of
+    /// the deployment's last two channels cannot both succeed and leave zero.
+    /// A separate "count, then decide, then delete" would race exactly there.
+    pub async fn delete_channel(&self, id: ChannelId) -> Result<bool, DeleteChannelError> {
+        let now = now_ms();
+        let mut tx = self.pool.begin().await?;
+
+        let affected = sqlx::query!(
+            "UPDATE channels SET deleted_at = ?
+             WHERE id = ? AND deleted_at IS NULL
+               AND (SELECT COUNT(*) FROM channels WHERE deleted_at IS NULL) > 1",
+            now,
+            id
+        )
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
+        if affected > 0 {
+            tx.commit().await?;
+            return Ok(true);
+        }
+
+        // The UPDATE matched nothing: tell "already gone" (idempotent no-op)
+        // apart from "still live and alone" (the last-channel guard fired).
+        let still_live = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM channels WHERE id = ? AND deleted_at IS NULL"#,
+            id
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .is_some();
+        tx.commit().await?;
+
+        if still_live {
+            Err(DeleteChannelError::LastChannel)
+        } else {
+            Ok(false)
+        }
+    }
+}

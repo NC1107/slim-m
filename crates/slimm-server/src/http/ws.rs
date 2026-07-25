@@ -86,6 +86,11 @@ enum ServerFrame {
         seq: i64,
         message: MessageDto,
     },
+    #[serde(rename = "message.deleted")]
+    MessageDeleted {
+        channel_id: String,
+        message_id: String,
+    },
     #[serde(rename = "reactions.changed")]
     ReactionsChanged {
         channel_id: String,
@@ -222,6 +227,7 @@ async fn authenticate(
 async fn authorize(store: &Store, ctx: &SessionContext, event: Event) -> Option<ServerFrame> {
     let channel_id = match &event {
         Event::MessageCreated(message) | Event::MessageEdited(message) => message.channel_id,
+        Event::MessageDeleted { channel_id, .. } => *channel_id,
         Event::ReactionsChanged { channel_id, .. } => *channel_id,
         // Control events are handled in the loop, never here.
         Event::SessionRevoked(_) => return None,
@@ -244,6 +250,13 @@ async fn authorize(store: &Store, ctx: &SessionContext, event: Event) -> Option<
             channel_id: message.channel_id.to_string(),
             seq: message.seq.0,
             message: MessageDto::from(message),
+        },
+        Event::MessageDeleted {
+            channel_id,
+            message_id,
+        } => ServerFrame::MessageDeleted {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
         },
         Event::ReactionsChanged {
             channel_id,

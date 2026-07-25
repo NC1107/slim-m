@@ -42,6 +42,12 @@ pub enum Event {
     MessageCreated(Message),
     /// A message was edited.
     MessageEdited(Message),
+    /// A message was soft-deleted; carries only the ids a live connection
+    /// needs to drop it from view, not the content it no longer shows.
+    MessageDeleted {
+        channel_id: ChannelId,
+        message_id: MessageId,
+    },
     /// A message's reactions changed. Carries the whole public summary rather
     /// than a delta, so a client that missed a frame cannot drift; the
     /// per-viewer "did I react" flag is deliberately not broadcast.
