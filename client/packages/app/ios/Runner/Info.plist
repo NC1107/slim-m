@@ -49,6 +49,14 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Declares that the app uses no encryption beyond what is exempt, which is
+	     what stops App Store Connect asking the export compliance question on
+	     every single build and holding it out of TestFlight until answered by
+	     hand. Matches the same declaration check-in ships with on this account.
+	     Revisit if the app ever adds encryption beyond transport security and
+	     the push envelope. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
