@@ -1,4 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The debug/profile manifests each carry their own copy of this,
+         commented there as being "required for development" (hot reload).
+         It is really just required, full stop: this app talks to its home
+         server over HTTP and WebSocket, and a release build with no copy of
+         this permission in the main manifest cannot reach the network at
+         all. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 13+ (API 33) shows nothing without this, declared here and
+         requested at runtime (see LocalNotifications in packages/platform);
+         a no-op on every older API level, where notification permission is
+         granted at install time. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="slim-m"
         android:name="${applicationName}"

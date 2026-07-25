@@ -2,6 +2,10 @@
 /// The slim-m client.
 library;
 
+import 'dart:io';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -9,10 +13,12 @@ import 'package:slimm_design_system/design_system.dart';
 import 'src/providers/providers.dart';
 import 'src/providers/push_controller.dart';
 import 'src/providers/sync_controller.dart';
+import 'src/push/android_push_messages.dart';
 import 'src/routing/router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _initAndroidPush();
 
   final container = ProviderContainer();
   // Local-only, so it cannot hang startup on a dead connection; see
@@ -30,6 +36,34 @@ Future<void> main() async {
   runApp(
     UncontrolledProviderScope(container: container, child: const SlimMApp()),
   );
+}
+
+/// Wires Firebase and the FCM background message handler Android needs to
+/// ever show a notification while backgrounded or killed - the relay sends
+/// data-only messages, so nothing appears unless this app builds it (see
+/// `src/push/android_push_messages.dart`). Deliberately does not also listen
+/// for foreground messages: see that file's doc for why a foreground push
+/// never needs to show anything of its own.
+///
+/// Must run before [runApp], and the background handler must be registered
+/// here specifically rather than from a provider or a widget: FCM invokes it
+/// in its own isolate with no widget tree and no [ProviderContainer], so it
+/// has to already be a reachable top-level function before that isolate can
+/// exist. A no-op on iOS and Linux, and best-effort even on Android: a
+/// contributor's build with no `google-services.json` (see
+/// `android/app/build.gradle.kts`) throws here, and push, like on iOS, must
+/// never be the reason the rest of the app fails to start.
+Future<void> _initAndroidPush() async {
+  if (!Platform.isAndroid) return;
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (_) {
+    // No Firebase credentials, or no Play Services on this device: push
+    // registration itself degrades the same way through FcmTokenChannel, and
+    // showing notifications simply cannot work without a token to register
+    // in the first place.
+  }
 }
 
 /// The root. Which surface is shown follows the session, enforced by the

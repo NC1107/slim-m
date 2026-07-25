@@ -48,6 +48,41 @@ Phase 1 merged so far:
 - Onboarding with the three entry points, invite redemption, unread badges (PR #28).
 - Key-storage seam, remappable shortcuts, permessage-deflate interop (PR #29).
 
+**Phase 3 (push relay and notifications) is largely done, and proven on real hardware.**
+A backgrounded iPhone running the TestFlight build received a content-free push on 2026-07-25, with the relay logging `delivered=1`.
+
+What landed:
+- Server push path (PR #30): device registration scoped to the caller's own session, a client-reported lifecycle signal, a sealed content-free envelope (X25519, carrying only version, kind, channel, message id and seq), and a relay client.
+  `PushSender` is a two-state thing rather than an error path, since a LAN-only self-host has nowhere for a relay to reach it.
+  Triggering reads the lifecycle report, never raw WebSocket presence, because iOS suspends a socket without closing it.
+- Relay hardening (relay PR #1): dead-token pruning, a VoIP topic for calls, a bounded worker pool under a real deadline, a registration ceiling, and `SECURITY.md`/`CODEOWNERS`/`MAINTAINERS.md`.
+- Visible alerts (relay PR #2): message and mention kinds send a fixed generic string rather than a silent `content-available` push, which displayed nothing at all without a Notification Service Extension.
+- iOS client registration (PR #31) and session persistence (PR #32).
+
+Still open in Phase 3:
+- The iOS Notification Service Extension, which is what would replace "New message" with the decrypted content. It needs a new Xcode target, which cannot be created or tested on this machine.
+- Android push, and the cross-repo envelope contract test (both in progress).
+- Reachability surfaced in onboarding as a hard push precondition.
+
+Known residuals, deliberately shipped:
+- The session write lands just after the in-memory token becomes authoritative, so a process death in that window replays a spent refresh token into reuse detection and forces a sign-out. Recoverable, but closing it means reordering `SlimmApi`'s refresh path.
+- The delete-account error path reports its failure but still strands the user.
+
+## Push credentials and identifiers
+
+Bundle id `top.npcserver.slimm` on both platforms, following the existing `top.npcserver.checkin` convention.
+A hyphenated form is legal on iOS but not in an Android `applicationId`, which is why the obvious `top.npc-server.slimm` was rejected.
+The bundle id is deliberately not tied to the product name: the App Store display name is a separate field and stays free to change.
+
+- Apple team `76S78SUWVM`, APNs key `AY9T3ZH9JX` (team scoped, sandbox and production; both settings are fixed at creation).
+- App Store Connect app id `6794496135`, distribution certificate expiring 2027-07-25, profile `slim-m App Store Distribution`.
+- Firebase project `slim-m` on the free Spark plan, FCM v1 enabled. Analytics and Gemini were declined at creation: neither is needed to send a push and both widen what Google sees of a messaging product.
+- Secrets live in `~/.secrets/slim-m/`, mode 600, outside the repo. GitHub secrets are set for the TestFlight pipeline.
+- `google-services.json` and `GoogleService-Info.plist` are gitignored on purpose. Google does not class them as secrets, but this repo is public and they carry an API key, so CI injects them like the signing assets. A contributor needs their own to build the mobile targets.
+
+The iOS TestFlight pipeline works: push a `client-v*` tag and a signed build reaches the Internal Testers group, which has automatic distribution on.
+The job was a skeleton with TODOs until PR #30; it also needs `set-key-partition-list`, without which `codesign` hangs a headless runner waiting for permission.
+
 Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 leans on them:
 - **The UI has never been driven by a human.** It builds, runs, and passes tests, but nobody has clicked through sign-up to sending a message in a real window. The owner intends to.
 - **Golden images are not committed.** The matrix asserts no overflow at any scale (machine-independent, runs everywhere); the pixel comparison is behind `SLIMM_GOLDENS` with no reference images, because images generated off-CI would never match the runner and would mean a permanently red build. Generate them once on the CI runner and enable the flag there.
@@ -57,6 +92,13 @@ Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 
 Open follow-ups noted during reviews: malformed query/JSON bodies still return axum's default error rather than the uniform JSON error contract (low); `revoke_device` does not itself publish `SessionRevoked` (the logout and deletion paths do).
 
 ## Running deployment (LAN test instance)
+
+The push relay also runs on this host, at `npc_projects/slim-m-relay/`, published through Traefik at `https://slim-m-relay.npc-server.top`.
+It holds both provider credentials, bind-mounted read-only at mode 640; the image runs as `nonroot` so `group_add: ["1000"]` is what lets it read them.
+`RELAY_TRUST_PROXY=true` because Traefik terminates TLS in front: without it every caller shares one rate-limit bucket and one abusive server throttles everyone.
+
+`slim-npc-server.top` has no NS records and is not registered, so the standing instruction to publish there cannot be honoured yet; `npc-server.top` has a wildcard and is what everything else on the box uses.
+
 
 A pinned instance runs on the owner's homelab box, deployed 2026-07-24.
 
