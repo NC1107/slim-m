@@ -188,6 +188,21 @@ impl Store {
         ))
     }
 
+    /// Live users who can view a channel: the recipient set for push fan-out.
+    /// A nonexistent channel yields nobody, the same as [`Self::permissions_in_channel`].
+    pub async fn channel_viewer_ids(&self, channel_id: ChannelId) -> anyhow::Result<Vec<UserId>> {
+        let mut viewers = Vec::new();
+        for user_id in self.live_user_ids().await? {
+            if self
+                .has_permission(user_id, channel_id, Permissions::VIEW_CHANNEL)
+                .await?
+            {
+                viewers.push(user_id);
+            }
+        }
+        Ok(viewers)
+    }
+
     /// Whether the user holds every bit in `needed` in this channel.
     pub async fn has_permission(
         &self,

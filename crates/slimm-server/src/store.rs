@@ -22,18 +22,23 @@ use crate::ids::{ChannelId, MessageId, Seq, UserId};
 mod bootstrap;
 mod invites;
 mod permissions;
+mod push;
 mod read_state;
 mod safety;
 mod sessions;
 
 pub use bootstrap::Bootstrap;
 pub use invites::{Invite, RedeemError};
+pub use push::{PushError, PushTarget};
 pub use safety::{Device, ReportError, ReportSubject};
 pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext,
 };
 
-fn now_ms() -> i64 {
+/// Unix milliseconds, `pub(crate)` so the push trigger path (outside this
+/// module) can compare a lifecycle report's age against the same clock
+/// everything here is stamped with.
+pub(crate) fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -310,6 +315,17 @@ impl Store {
     /// Fetches a live message by id, or `None` if it is missing or deleted.
     pub async fn message(&self, id: MessageId) -> anyhow::Result<Option<Message>> {
         fetch_message(&self.pool, id).await
+    }
+
+    /// Every live user's id. Used to compute who can view a channel for push
+    /// fan-out; small self-hosted deployments make an O(users) scan cheap
+    /// enough that a dedicated membership table is not worth carrying yet.
+    pub async fn live_user_ids(&self) -> anyhow::Result<Vec<UserId>> {
+        let rows =
+            sqlx::query!(r#"SELECT id AS "id!: UserId" FROM users WHERE deleted_at IS NULL"#)
+                .fetch_all(&self.pool)
+                .await?;
+        Ok(rows.into_iter().map(|r| r.id).collect())
     }
 }
 

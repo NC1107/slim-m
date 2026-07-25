@@ -11,6 +11,7 @@ pub mod http;
 pub mod hub;
 pub mod ids;
 pub mod permissions;
+pub mod push;
 pub mod ratelimit;
 pub mod store;
 
@@ -30,11 +31,13 @@ pub async fn run() -> anyhow::Result<()> {
     let auth = auth::Auth::new(config.hash_concurrency)?;
     let hub = hub::Hub::new();
     let limiter = ratelimit::RateLimiter::new();
+    let push = push::PushSender::new(&config)?;
     let app = http::router(http::AppState {
         store,
         auth,
         hub,
         limiter,
+        push,
     });
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;

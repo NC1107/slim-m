@@ -22,6 +22,17 @@ pub struct Config {
     /// the limit wait on the semaphore rather than piling that memory up.
     #[serde(default = "default_hash_concurrency")]
     pub hash_concurrency: usize,
+
+    /// Base URL of the push relay (for example `https://relay.example.com`);
+    /// `/v1/send` is appended when calling it.
+    pub push_relay_url: Option<String>,
+    /// Bearer key this deployment authenticates to the relay with.
+    ///
+    /// Both push settings are optional together: a LAN-only or
+    /// NAT-unreachable self-host has nowhere for a relay to reach it, and
+    /// running with push disabled is a supported first-class configuration,
+    /// not an error.
+    pub push_relay_key: Option<String>,
 }
 
 fn default_port() -> u16 {

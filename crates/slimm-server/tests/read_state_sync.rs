@@ -12,6 +12,7 @@ use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
 use slimm_server::ids::{MessageId, UserId};
 use slimm_server::permissions::Permissions;
+use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
@@ -22,6 +23,8 @@ async fn new_store() -> Store {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
+        push_relay_url: None,
+        push_relay_key: None,
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)
@@ -43,6 +46,7 @@ async fn setup(everyone: Permissions) -> Fixture {
         auth: Auth::new(2).unwrap(),
         hub: Hub::new(),
         limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
     });
     let user = store.create_user("alice", "Alice").await.unwrap();
     let tokens = store.open_session(user.id, "dev").await.unwrap();

@@ -118,6 +118,19 @@ async fn send(
         .send_message(channel_id, ctx.user_id, id, content)
         .await?;
     state.hub.publish(Event::MessageCreated(message.clone()));
+
+    // The message is already committed and its response is already on the
+    // way; this only ever makes a cheap in-memory decision here, handing any
+    // actual push work to a detached background task, so a relay outage can
+    // never turn this successful send into an error.
+    state.push.notify_message(
+        state.store.clone(),
+        channel_id,
+        ctx.user_id,
+        message.id,
+        message.seq,
+    );
+
     Ok(Json(message.into()))
 }
 
