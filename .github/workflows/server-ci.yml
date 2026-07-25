@@ -2,11 +2,15 @@
 name: server-ci
 
 # Path-gated: a client-only change never triggers a server build.
+# schema/openapi.yaml is included even though it is not Rust: tests/openapi_contract.rs
+# gates the schema against the router, and a schema-only edit (documenting a path
+# nothing serves, without touching crates/) must still run that test.
 on:
   push:
     branches: [main]
     paths:
       - "crates/**"
+      - "schema/openapi.yaml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -15,6 +19,7 @@ on:
   pull_request:
     paths:
       - "crates/**"
+      - "schema/openapi.yaml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"

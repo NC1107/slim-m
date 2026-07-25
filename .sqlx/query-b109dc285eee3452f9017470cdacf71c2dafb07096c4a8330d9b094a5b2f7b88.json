@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT allow AS \"allow!: i64\", deny AS \"deny!: i64\"\n               FROM channel_overwrites\n               WHERE channel_id = ? AND target_type = ? AND target_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "allow!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "deny!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "b109dc285eee3452f9017470cdacf71c2dafb07096c4a8330d9b094a5b2f7b88"
+}

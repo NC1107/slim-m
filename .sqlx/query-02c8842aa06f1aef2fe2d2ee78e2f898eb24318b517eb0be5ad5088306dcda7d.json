@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE password_reset_codes SET used_at = ?\n               WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?\n               RETURNING user_id AS \"user_id!: UserId\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "02c8842aa06f1aef2fe2d2ee78e2f898eb24318b517eb0be5ad5088306dcda7d"
+}

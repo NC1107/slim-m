@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: RoleId\", name AS \"name!\",\n                      permissions AS \"permissions!: Permissions\",\n                      is_everyone AS \"is_everyone!: bool\", created_at AS \"created_at!\"\n               FROM roles ORDER BY position DESC, created_at",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: RoleId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "name!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "permissions!: Permissions",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "is_everyone!: bool",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 4,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "97903b80ba9878b238e2d7a56428dcc555537dfc4886c144d8413c08dd60e37f"
+}
