@@ -57,6 +57,14 @@
 	     the push envelope. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Required for PushKit: without the voip background mode iOS never
+	     delivers a VoIP push at all, so the CallKit path below it is dead code.
+	     remote-notification is the ordinary content-free wake from phase 3. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>voip</string>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
