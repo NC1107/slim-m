@@ -80,14 +80,22 @@ struct Version {
     name: &'static str,
     version: &'static str,
     protocol: u32,
+    push_enabled: bool,
 }
 
-/// Build version and the wire-protocol envelope version a client negotiates.
-async fn version() -> Json<Version> {
+/// Build version, the wire-protocol envelope version a client negotiates, and
+/// whether this deployment can deliver push at all.
+///
+/// Push state is here rather than behind auth because onboarding needs it
+/// before an account exists: someone choosing a LAN-only server should learn
+/// their phone will not get notifications while they can still choose
+/// differently. It reveals only deployment configuration, not user data.
+async fn version(State(state): State<AppState>) -> Json<Version> {
     Json(Version {
         name: "slim-m",
         version: env!("CARGO_PKG_VERSION"),
         protocol: PROTOCOL_VERSION,
+        push_enabled: state.push.is_enabled(),
     })
 }
 

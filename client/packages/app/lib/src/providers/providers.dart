@@ -165,6 +165,14 @@ final apiProvider = Provider<SlimmApi>((ref) {
   return api;
 });
 
+/// Builds a throwaway unauthenticated client for a server that is not (yet)
+/// the current one: probing a candidate address during onboarding or
+/// sign-in. A provider rather than a bare constructor call so tests can
+/// substitute a fake transport; the caller owns close().
+final probeApiProvider = Provider<SlimmApi Function(Uri)>(
+  (ref) => (baseUrl) => SlimmApi(baseUrl: baseUrl),
+);
+
 /// Whether there is a signed-in session, as a stream so routing can react.
 final signedInProvider = StreamProvider<bool>((ref) {
   final session = ref.watch(sessionProvider);

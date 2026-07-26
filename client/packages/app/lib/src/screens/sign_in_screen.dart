@@ -25,7 +25,12 @@ class SignInScreen extends ConsumerStatefulWidget {
 }
 
 class _SignInScreenState extends ConsumerState<SignInScreen> {
-  final _server = TextEditingController(text: 'http://10.0.0.100:8095');
+  // Prefilled from the server chosen during onboarding, which every entry
+  // path has already written; a hardcoded default here silently overrode
+  // that choice on submit.
+  late final TextEditingController _server = TextEditingController(
+    text: ref.read(serverUrlProvider).toString(),
+  );
   final _username = TextEditingController();
   final _password = TextEditingController();
   final _displayName = TextEditingController();
@@ -34,13 +39,86 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   bool _busy = false;
   String? _error;
 
+  /// Whether the server in the field can deliver push, from its /version:
+  /// true, false, or null while unknown (probe pending, unreachable, or a
+  /// server too old to say). Only an explicit false renders the notice,
+  /// because warning someone off a server that has push is worse than
+  /// staying quiet.
+  bool? _pushEnabled;
+  Timer? _probeDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _probePush();
+  }
+
   @override
   void dispose() {
+    _probeDebounce?.cancel();
     _server.dispose();
     _username.dispose();
     _password.dispose();
     _displayName.dispose();
     super.dispose();
+  }
+
+  /// Reduces a typed address to the scheme, host, and port worth probing.
+  /// Anything else it carries (path, query, userinfo) must not ride along
+  /// on a request that fires as someone types: pasted userinfo would even
+  /// become a Basic auth header sent to whatever host is in the field.
+  Uri? _probeTarget(String text) {
+    final parsed = Uri.tryParse(text.trim());
+    if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
+      return null;
+    }
+    return Uri(
+      scheme: parsed.scheme,
+      host: parsed.host,
+      port: parsed.hasPort ? parsed.port : null,
+    );
+  }
+
+  /// Asks the server in the field whether it can deliver push at all, so
+  /// someone joining a LAN-only deployment learns their phone will stay
+  /// silent while they are still choosing, not after a week of wondering.
+  Future<void> _probePush() async {
+    final target = _probeTarget(_server.text);
+    if (target == null) {
+      setState(() => _pushEnabled = null);
+      return;
+    }
+    final client = ref.read(probeApiProvider)(target);
+    bool? answer;
+    try {
+      answer = (await client.version()).pushEnabled;
+    } on ApiException {
+      // Unreachable or refusing means unknown, and sign-in itself will say
+      // "could not reach that server" with more authority than a probe.
+      answer = null;
+    } catch (_) {
+      // A host that answers 200 with something that is not a slim-m
+      // /version body is just as unknown as one that refuses to connect. A
+      // foreign or hostile server must not crash sign-in with a shaped
+      // reply, so this deliberately catches everything the parse can throw.
+      answer = null;
+    } finally {
+      client.close();
+    }
+    if (!mounted) return;
+    // Guarded on every path, failures included: a slow answer about a
+    // previously typed address must not relabel the current one, whether
+    // it would set the notice or clear it.
+    if (_probeTarget(_server.text) == target) {
+      setState(() => _pushEnabled = answer);
+    }
+  }
+
+  void _onServerEdited(String _) {
+    // The old answer is about the old address the moment the field changes.
+    if (_pushEnabled != null) setState(() => _pushEnabled = null);
+    _probeDebounce?.cancel();
+    _probeDebounce = Timer(const Duration(milliseconds: 600), _probePush);
   }
 
   Future<void> _submit() async {
@@ -152,7 +230,36 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   ),
                   keyboardType: TextInputType.url,
                   autocorrect: false,
+                  onChanged: _onServerEdited,
                 ),
+                if (_pushEnabled == false) ...[
+                  const SizedBox(height: AppSpacing.s8),
+                  Semantics(
+                    liveRegion: true,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          AppIcons.notificationsOff,
+                          size: 16,
+                          color: tokens.textSecondary,
+                        ),
+                        const SizedBox(width: AppSpacing.s8),
+                        Expanded(
+                          child: Text(
+                            'This server cannot send push notifications. '
+                            'You can still use it, but phones will only see '
+                            'new messages while the app is open.',
+                            style: TextStyle(
+                              color: tokens.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.s16),
                 TextField(
                   controller: _username,
