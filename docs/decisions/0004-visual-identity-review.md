@@ -1,0 +1,219 @@
+# 0004 - Visual identity review
+
+Date: 2026-07-26.
+Status: accepted, with one decision still open (the accent hue).
+
+Owner decision 8 said a real designer review had to happen before the token
+palette was locked, because the accent is a from-scratch brand choice and the
+tokens are load-bearing across every screen.
+This is that review.
+It drew the v1 shell across eleven screens (text channel, canvas, light and true
+black, command palette, compact, voice strip, settings, onboarding, accent
+options, components, app mark) rather than assessing a swatch grid, which is why
+most of what follows is specific rather than directional.
+
+## Confirmed, no change
+
+- **Cool slate neutrals.** Hold up under a dense evening of real chat.
+- **Border-first elevation.** Called the strongest decision in the system, and
+  the reason the canvas can float six objects without the screen turning to
+  soup.
+- **IBM Plex Sans with Plex Mono, capped at 600.** The pairing carries more of
+  the personality than the accent does; mono on timestamps, code, channel names
+  and keycaps is worth leaning on harder.
+- **Flat grouped messages, the 4dp grid, no backdrop blur.** No notes.
+- **Comfortable density at 15sp / 1.45.** Reads well, but the message column
+  needs a cap near 760px or wide monitors hurt.
+
+## Changed, and why
+
+### The accent could not be one token
+
+A value legible **as text** and a value recognisable **as a fill** are different
+colours. Forcing one token through both jobs is why light `#1E7F77` and dark
+`#4FBDB4` passed contrast and still did not read as the same brand: the light
+one is a duller colour, not a darker version of the same one.
+
+Split into `accent` (contrast-bound, for text and icons), `accentFill`
+(brand-true, always paired with `accentOn`), and `accentSoft` (a ~12% tint that
+does most of the actual accent work). The contrast gate now checks honest pairs
+instead of one value against two different requirements.
+
+### True black needed a brighter hairline
+
+In dark mode a border is a hint, because fill difference already separates
+surfaces. On `#000000` the border **is** the entire elevation system, and
+`#23282D` against black is 1.41:1, which disappears at exactly the low OLED
+brightness true black exists for.
+
+Raised to `#2C3238`. That is 1.62:1, better but still far from the 3:1 that WCAG
+1.4.11 asks of a UI component boundary, and reaching 3:1 would need roughly
+`#5A5A5A`, which is a visible grey rule rather than a hairline. So the value
+moved and the underlying question did not: **is a separator hairline a UI
+component under 1.4.11, or an incidental boundary that is exempt?** Until that is
+answered the gate reports border ratios instead of asserting them, with the
+reasoning written next to the test rather than left as a silent omission.
+
+### Two scales had one step too many
+
+Radius 4 and 6 are indistinguishable under a 1px hairline. Collapsed to
+`6 / 10 / 16 / full`.
+
+Type subheading 17 never appears next to body 15 without also differing in
+weight and colour, so it earned nothing. Six steps (11 / 12 / 14 / 15 / 20 / 24)
+covered every screen drawn.
+
+Fewer tokens is fewer judgement calls per contributor, which is the point of
+having a system at all.
+
+### Three token families were missing
+
+They would have been invented under pressure, inconsistently, by whoever hit
+them first:
+
+- **Code syntax**, five roles (keyword, string, number, comment, punctuation)
+  and per theme, because the same string colour cannot clear 4.5:1 on both
+  `#FFFFFF` and `#000000`. Fifteen values, all now gated. A fenced block is
+  exactly the surface that quietly ends up the one inaccessible thing in an
+  otherwise AA product.
+- **Canvas objects**, deliberately warmer and more saturated than the chrome,
+  plus a closed set of six categorical cursor hues for remote participants that
+  must not reuse status or accent hues.
+- **A focus ring**, its own token rather than the accent border already used for
+  active and selected states. If focus and selection look the same, a keyboard
+  user cannot tell where they are.
+
+### One more surface
+
+`surface.sunken`, a step below base, for the rails. Six surfaces were not enough
+to draw the shell without the panes bleeding together.
+
+Adding it immediately paid for itself by exposing a real defect: the light accent
+cleared base at 4.53:1 but only reached 4.26:1 on sunken, and the rails carry
+accent (active channel marker, unread badge). Corrected to `#1D7A72`.
+
+## Still open: the accent hue
+
+The shipped teal collides with the online-status green. At 9 to 10px, `#4FBDB4`
+and a conventional online green sit two rows apart in the member list and read as
+one colour to a deuteranope. The redundant-cue rule means the dots survive, but
+the accent stops meaning "interactive" the moment presence uses a neighbouring
+hue.
+
+Three options were drawn against the same probe (accent beside a status dot, a
+role badge, a mention, a filled button, a poll bar):
+
+| Option | Dark / light | Hue | Verdict |
+|---|---|---|---|
+| A, muted teal | `#4FBDB4` / `#1D7A72` | 178 | Shipped. This is the collision. |
+| B, glacier cyan | `#58B4D8` / `#1B6F91` | 202 | **Recommended.** 24 degrees further from green, clears amber, red and grey, reads cooler and more technical. Teams' blue is an indigo at 265, so no collision there either. |
+| C, copper | `#C98F63` / `#8F5A2E` | 48 | Strongest identity, but moves the collision rather than solving it: copper then sits beside the away amber. Only viable if away loses amber or becomes shape-only. |
+
+The argument for B is that the accent is the cheap thing to move and the
+traffic-light status convention is the expensive thing. Everything drawn works
+unchanged with B, because it is one primitive value, which is what the two-layer
+token model promised.
+
+A fourth option was named and not recommended: no chromatic accent at all, with
+colour reserved entirely for status and canvas content. Maximum longevity and
+zero collisions, but it leaves the app icon with no brand colour and gives new
+users nothing to learn "this is clickable" from.
+
+**Not decided here.** Changing it is one primitive value in `app_tokens.dart`
+plus regenerating goldens.
+
+## The seven accent roles, closed
+
+Whatever hue wins, the accent's value is that it is rare. The failure mode is not
+a wrong hue, it is the sixteenth contributor adding an accent border to a card
+because it looked plain. The list:
+
+1. Active channel (2px marker plus soft tint)
+2. Unread badge
+3. Mentions of you
+4. The live-voice glyph
+5. The unread divider
+6. Your own poll vote
+7. The member-pane toggle when open
+
+All of them mean "this concerns you". Nothing decorative. Treat this as closed.
+
+## Layout: nothing needs reopening
+
+The standing worry was whether the Spaces / Focus / Deck concepts were parked too
+early. The framing was wrong rather than the decision:
+
+- **Focus is not an alternative shell.** It is the compact breakpoint plus a
+  command palette, and both are already shipping. The compact and palette screens
+  are Concept 02 in everything but name.
+- **Deck is not a layout either.** It is a landing pane, and can live where the
+  channel list points when nothing is selected. Additive later, no rewrite.
+- **Only Spaces was a genuine fork**, and betting the shell on spatial navigation
+  for heads-down text was the right call to decline.
+
+So what was parked was two additive features, not two roads not taken.
+
+## Canvas: "window" is a behaviour, not an object kind
+
+This settles the contradiction in `voice-canvas.md`, which listed `window` as a
+fourth content kind in the schema comment and then said two paragraphs later that
+it was not a kind at all.
+
+The second reading is right. Drag, resize and bring-to-front are a contract that
+images, GIFs, camera bubbles and screen-share tiles all satisfy; a distinct
+window object would be a frame with nothing in it.
+
+Consequence: **the tool dock has three tools, not four** - pen, note, shape.
+Paste is a gesture, not a tool. A tool must be selected before touch draws, so
+every slot added is another mode to be wrong about.
+
+## Smaller things worth keeping
+
+- **Presence is shape-first**: circle online, triangle away, barred square do not
+  disturb, ring offline, struck ring appearing offline. Still distinct
+  desaturated, which is worth a golden test.
+- **Density changes vertical rhythm only.** Type sizes, avatar sizes and the
+  gutter are identical across compact, comfortable and spacious, which is what
+  stops three densities becoming three designs.
+- **Non-human authors get a square avatar**, mono body, and an always-visible
+  tag that is never colour-coded, so the cue survives a screenshot.
+- **Operators become chips once parsed.** Typed text stays plain mono; a valid
+  operator commits to an accent-soft chip, which is free validation feedback.
+- **The command palette uses a flat scrim, not blur.** Cheap to composite and
+  keeps the dismissed state legible.
+- **The voice strip lives in the rail, not over the content**, so collapsing the
+  canvas costs no message space and survives navigating to another channel. You
+  are in a call, not in a screen.
+- **The speaking ring pulses**, and it is the one looping animation in the
+  chrome. Under reduce-motion it becomes a static ring plus a bar glyph, so
+  speaking is still conveyed twice.
+- **Disabled controls say why.** The share-audio row keeps its space and explains
+  itself on sessions that cannot capture, because silently hiding a
+  platform-limited control is how a self-hoster concludes a feature is broken
+  rather than unavailable.
+- **Fingerprint confirmation gets a colour strip** derived from the same hash,
+  taken from the canvas cursor palette so it never collides with status colours.
+  Four swatches are far easier to compare over a phone call than 32 hex
+  characters; keep the hex as the real check.
+- **Say the awkward thing early.** "No email on this account, ask an admin for a
+  reset code" belongs on the create-account screen, not in a settings page nobody
+  reads.
+- **Selection handles must stop scaling with the world below about 25% zoom**, or
+  they become untappable on a phone.
+
+## App mark and the name
+
+Three marks were drawn from the geometry the UI already uses, with no letterforms
+so the name stays free. The recommended one, **Offset**, is an empty frame with a
+solid object pushed out of it, using the 16 and 10 radii verbatim.
+
+The review also offered it as a *name*: short, spatial, meaningful in both drawing
+and typesetting, and apt for a product whose defining feature is arranging objects
+in space. `offset.chat` works and "an Offset server" reads naturally. Weaker
+alternatives named: Plane, Commons.
+
+Owner decision 9 still stands - the name is chosen before 1.0, in Phase 9. This
+is input to that, not a decision.
+
+Wordmark, when there is a name: Plex Mono 500, lowercase, letter-spaced +0.04em,
+mark to the left at cap height. Do not commission a drawn logotype first.

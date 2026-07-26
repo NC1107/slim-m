@@ -122,10 +122,14 @@ The bundle id is deliberately not tied to the product name: the App Store displa
 Both store pipelines work from a `client-v*` tag: a signed iOS build reaches the Internal Testers group on TestFlight (automatic distribution on), and a signed apk + aab land on the GitHub release.
 The aab still goes to Play by hand (no upload API wired); the first one was uploaded 2026-07-25.
 The iOS job needs `set-key-partition-list`, without which `codesign` hangs a headless runner waiting for permission.
-Uploading a new Play build: Test and release > Internal testing > Create new release; Play rejects a reused version code, so bump pubspec's `+N` first, same as iOS.
+Uploading a new Play build: Test and release > Internal testing > Create new release.
+The build number is **no longer taken from pubspec**: both store builds pass `--build-number=${{ github.run_number }}`, so it is monotonic and cannot be reused.
+That was not cosmetic. `pubspec` sat at `0.1.0+4` through four client tags, so every TestFlight upload after the first carried a build number App Store Connect had already seen.
+altool uploads a duplicate happily and the rejection arrives later by email, so all four release runs went green while the iPhone never saw a new build.
+The pubspec `+N` is now only a local-build default and does not need touching per release.
 
 Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 leans on them:
-- **The UI has been driven by a human only lightly.** The live instance holds real messages from the owner, so the primary flow has been exercised, but there is no record of a full sign-up-to-send pass on Fedora GNOME Wayland specifically (this box is KDE), which is what the Phase 2 exit criterion names.
+- **The UI has been driven by a human only lightly.** The live instance holds real messages from the owner, so the primary flow has been exercised, but there is no record of a full sign-up-to-send pass written down.
 - **Golden images are not committed.** The matrix asserts no overflow at any scale (machine-independent, runs everywhere); the pixel comparison is behind `SLIMM_GOLDENS` with no reference images, because images generated off-CI would never match the runner and would mean a permanently red build. Generate them once on the CI runner and enable the flag there.
 - Reactions UI, the shared context menu, the quick switcher, haptics, and history pagination are not built. The server side of reactions exists (PUT/DELETE on `/messages/{id}/reactions/{emoji}`, summaries on list, a ReactionsChanged event).
 - The shortcut table exists but is not yet bound into the widget tree.
@@ -204,7 +208,7 @@ JDK 21 rather than the packaged 25 because that is the LTS the Android Gradle Pl
 Two things still cannot be verified here:
 - **iOS** needs macOS and Xcode, so it stays CI and TestFlight only (and that job still needs the Apple secrets).
 - **Golden files** are sensitive to the engine build and font rendering, and CI generates and checks them on `ubuntu-latest` / `stable`. Run goldens locally to see failures, but regenerate them only in CI, or local and CI renders will disagree.
-The roadmap names GNOME Wayland as the Linux target while this box is KDE Wayland, so compositor-specific behaviour (notably the Phase 4 screen-share portal) still needs checking on GNOME.
+Fedora KDE Plasma Wayland is the Linux development and test target (owner decision, 2026-07-26), which is what this box runs. The roadmap used to name GNOME; that was corrected rather than the environment. The product still ships cross-platform, so other desktops are release targets, just not where the work is validated day to day.
 `sqlx-cli` 0.8 is installed at `~/.cargo/bin`.
 
 Everyday commands:
@@ -275,19 +279,21 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 - **Deploy the invite gate.** The live instance at `https://slim.npc-server.top` still accepts anonymous registration and will until it runs a build containing the gate. Watchtower tracks `latest`, so cutting a release is what closes it; nothing else needs doing on the host.
 - **Watch the next release PR.** `release-please-config.json` gained the `cargo-workspace` plugin so a version bump also updates `Cargo.lock`, which the new `--locked` builds require. That is the one change in the audit pass that could not be verified locally, and its failure mode is a red release PR, not a bad release.
 - **`bump-minor-pre-major` is why the server stays on 0.x.** PR #42 landed as `feat!` (registration genuinely changed behaviour for a claimed deployment), and release-please read the breaking marker on a 0.x project as "go to 1.0.0" and opened exactly that PR. It was closed unmerged. The flag makes a breaking change bump the minor while under 1.0, so that reads 0.9.0 instead. 1.0 is a Phase 9 deliverable and the product is not even named yet (owner decision 9), so nothing should reach it by accident.
-- Internal testers on the Play internal testing track: release 0.1.0 (4) is published there with zero testers, deliberately, until the owner picks who.
+- **Adding Play internal testers needs the owner.** There is no Play Developer API credential anywhere: `~/.secrets/slim-m/` holds only the Firebase/FCM service account, which is scoped to messaging and cannot touch Play. Tester lists live in Play Console > Test and release > Testing > Internal testing > Testers, and each tester must then accept the opt-in link before the build appears for them.
 - A real Android device test of the push path end-to-end (the last Phase 3 exit criterion with any work left).
 - Reviewer protection on the `release` and `testflight` GitHub Environments (they exist but are ungated).
 - Flatpak and rpm packaging manifests (`packaging/flatpak/*.yaml`, `packaging/rpm/*.spec`); the release jobs warn-and-skip until they exist.
 - Optional GPG signing secret for the Linux client checksums.
 - A decision on whether to keep release-please's auto-PR flow or switch to manual tag-based releases (to keep the repo at zero open PRs).
 - ~~Where rendered API docs should live.~~ Settled 2026-07-26: nowhere. GitLab renders an OpenAPI file in its repo browser the way GitHub renders a README, GitHub has no equivalent, and building redoc HTML into a run artifact nobody downloads is not worth a job. The render step is gone; `redocly lint` stays, since that is the schema-ci gate. `schema/openapi.yaml` is read as the source. If a browsable copy is ever wanted: `npx @redocly/cli build-docs schema/openapi.yaml -o /tmp/api.html`.
-- Linux desktop screen sharing on Wayland is an open `flutter_webrtc` bug; voice, video, and the canvas work, only screen capture is broken. Validate in the Phase 4 Fedora RTC spike (fallbacks: a newer flutter_webrtc, contributing the portal fix, or an X11 session).
+- Linux desktop screen sharing on Wayland was written up as a blocking `flutter_webrtc` bug (issue 1542, the PipeWire/xdg-desktop-portal path not waiting for the picker response). **The owner reports getting screen share working in their own testing**, so that research finding looks stale or GNOME-specific rather than a Wayland-wide block. Treat it as probably fine and confirm in the Phase 4 spike rather than planning around a fallback. If it does break, the fallbacks are a newer flutter_webrtc, contributing the portal fix, or an X11 session.
 
 ## Parked and reference
 
 - [docs/BACKLOG.md](docs/BACKLOG.md): accepted extra features, architectural hooks to preserve, and deliberate declines from the segment gap analysis.
-- [docs/design/layout-explorations.md](docs/design/layout-explorations.md): the parked Spaces/Focus/Deck layout concepts (the sidebar layout was kept for v1).
+- [docs/design/design-language.md](docs/design/design-language.md): the visual identity spec (colour, type, spacing, iconography, motion). It moved out of `docs/research/` on 2026-07-26, which is where it was hiding.
+- [docs/decisions/0004-visual-identity-review.md](docs/decisions/0004-visual-identity-review.md): the designer review that gated token lock. Read this before changing a token; it also closes the seven accent roles and settles the canvas `window` contradiction.
+- [docs/design/layout-explorations.md](docs/design/layout-explorations.md): the parked Spaces/Focus/Deck layout concepts (the sidebar layout was kept for v1, and the review confirms nothing needs reopening).
 - [docs/design/feature-exploration.md](docs/design/feature-exploration.md): the segment feature-gap analysis.
 - [docs/research/](docs/research/): the specialist domain reports and adversarial reviews that fed the strategy; note that `stack-decision.md` and the fresh domain files supersede any older content.
 - Interactive design mockups were published as Claude artifacts (a design proposal and a layout-explorations page).

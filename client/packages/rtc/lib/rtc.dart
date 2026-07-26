@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 /// LiveKit room and client wrapper behind an explicit public API.
 ///
-/// Phase 0 boundary stub; implemented in a later phase.
+/// Everything the app does with media goes through here, so nothing else in
+/// the client imports livekit_client or flutter_webrtc directly. That keeps
+/// the RTC dependency in one package, and means a widget test can drive a
+/// session without a real SFU behind it.
 library;
+
+export 'src/media_capabilities.dart';

@@ -1,0 +1,148 @@
+// SPDX-License-Identifier: Apache-2.0
+import CallKit
+import Foundation
+import PushKit
+
+/// The one rule this file exists to keep.
+///
+/// Since iOS 13, an app that receives a VoIP push and does not report an
+/// incoming call to CallKit before returning from the push handler is
+/// terminated, and doing it repeatedly costs the app its VoIP push privileges
+/// entirely. That makes it a correctness invariant rather than a nicety: every
+/// path out of `handle` has to report, including the ones where the payload is
+/// wrong, where the seal will not open, or where CallKit itself errors.
+///
+/// The tempting shape is to parse the payload, and bail early if it is
+/// rubbish. That is exactly the bug: a malformed push is still a push, and
+/// bailing is what gets the app killed. So a payload that cannot be understood
+/// is reported as a call from an unknown caller and then immediately ended,
+/// which is visible for an instant and survivable, instead of silently fatal.
+protocol CallReporting {
+  func reportNewIncomingCall(
+    with UUID: UUID,
+    update: CXCallUpdate,
+    completion: @escaping (Error?) -> Void
+  )
+  func reportCall(with UUID: UUID, endedAt: Date?, reason: CXCallEndedReason)
+}
+
+extension CXProvider: CallReporting {}
+
+/// Turns a VoIP push payload into a reported CallKit call.
+///
+/// Deliberately separate from the PushKit delegate wiring so the invariant can
+/// be tested: the delegate below is a few lines of glue, and everything worth
+/// asserting on happens here against an injected `CallReporting`.
+final class VoipCallHandler {
+  private let provider: CallReporting
+
+  init(provider: CallReporting) {
+    self.provider = provider
+  }
+
+  /// The caller name shown when the payload does not say who is calling.
+  ///
+  /// The push envelope is content-free by design, so this is what most calls
+  /// will show until the app is foregrounded and can resolve the channel. A
+  /// generic string is the honest thing to display rather than a guess.
+  static let unknownCaller = "Incoming call"
+
+  /// Handles one VoIP push. `completion` is PushKit's, and is called only
+  /// after CallKit has been told about the call.
+  func handle(payload: [AnyHashable: Any], completion: @escaping () -> Void) {
+    let callId = Self.callId(from: payload)
+    let update = CXCallUpdate()
+    update.localizedCallerName = payload["caller"] as? String ?? Self.unknownCaller
+    update.hasVideo = false
+    update.supportsGrouping = false
+    update.supportsUngrouping = false
+    update.supportsHolding = false
+
+    // Reported before anything else can throw, return, or dispatch elsewhere.
+    provider.reportNewIncomingCall(with: callId, update: update) { [provider] error in
+      if error != nil {
+        // CallKit refused it (a call already up, Do Not Disturb, and so on).
+        // Ending it keeps the app's own idea of active calls in step with
+        // CallKit's, which is what stops a ghost call being left on screen.
+        provider.reportCall(with: callId, endedAt: Date(), reason: .failed)
+      }
+      completion()
+    }
+  }
+
+  /// The call's identity, taken from the payload when it carries a usable one
+  /// so that a repeated push for the same call updates it rather than stacking
+  /// a second call on screen, and freshly generated when it does not.
+  static func callId(from payload: [AnyHashable: Any]) -> UUID {
+    if let raw = payload["call_id"] as? String, let parsed = UUID(uuidString: raw) {
+      return parsed
+    }
+    return UUID()
+  }
+}
+
+/// Registers for VoIP pushes and hands them to [VoipCallHandler].
+///
+/// Kept apart from `AppDelegate` because the delegate already carries the APNs
+/// path; these are two different push types with two different failure modes,
+/// and mixing them makes it hard to see that the rule above is being kept.
+final class VoipPushRegistrar: NSObject, PKPushRegistryDelegate, CXProviderDelegate {
+  private let registry: PKPushRegistry
+  private let provider: CXProvider
+  private let handler: VoipCallHandler
+
+  /// Called with the VoIP token so the Dart side can register it with the
+  /// server, alongside the ordinary APNs token.
+  var onToken: ((String) -> Void)?
+
+  override init() {
+    registry = PKPushRegistry(queue: .main)
+
+    // The localizedName initializer rather than the empty one: the empty
+    // CXProviderConfiguration() is iOS 14 and up, and this project deploys to
+    // 13.0. It is also the better call regardless, because this name is what
+    // the system call UI and the Recents list show, and neither should say
+    // nothing.
+    let configuration = CXProviderConfiguration(localizedName: "slim-m")
+    configuration.supportsVideo = false
+    configuration.maximumCallsPerCallGroup = 1
+    configuration.supportedHandleTypes = [.generic]
+    provider = CXProvider(configuration: configuration)
+
+    handler = VoipCallHandler(provider: provider)
+    super.init()
+
+    registry.delegate = self
+    registry.desiredPushTypes = [.voIP]
+    provider.setDelegate(self, queue: .main)
+  }
+
+  // MARK: PKPushRegistryDelegate
+
+  func pushRegistry(
+    _ registry: PKPushRegistry,
+    didUpdate pushCredentials: PKPushCredentials,
+    for type: PKPushType
+  ) {
+    guard type == .voIP else { return }
+    let hex = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
+    onToken?(hex)
+  }
+
+  func pushRegistry(
+    _ registry: PKPushRegistry,
+    didReceiveIncomingPushWith payload: PKPushPayload,
+    for type: PKPushType,
+    completion: @escaping () -> Void
+  ) {
+    guard type == .voIP else {
+      completion()
+      return
+    }
+    handler.handle(payload: payload.dictionaryPayload, completion: completion)
+  }
+
+  // MARK: CXProviderDelegate
+
+  func providerDidReset(_ provider: CXProvider) {}
+}

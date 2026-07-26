@@ -11,6 +11,7 @@ use crate::hub::Hub;
 use crate::push::PushSender;
 use crate::ratelimit::RateLimiter;
 use crate::store::Store;
+use crate::voice::VoiceService;
 
 mod auth;
 mod channels;
@@ -28,6 +29,7 @@ mod safety;
 mod search;
 mod sync;
 mod users;
+mod voice;
 mod ws;
 
 /// The wire-protocol envelope version a client negotiates on connect. Bumped
@@ -43,6 +45,7 @@ pub struct AppState {
     pub hub: Hub,
     pub limiter: RateLimiter,
     pub push: PushSender,
+    pub voice: VoiceService,
 }
 
 /// Builds the router over the shared application state.
@@ -63,6 +66,7 @@ pub fn router(state: AppState) -> Router {
         .merge(safety::routes())
         .merge(search::routes())
         .merge(sync::routes())
+        .merge(voice::routes())
         .merge(users::routes())
         .merge(ws::routes())
         .layer(TraceLayer::new_for_http())

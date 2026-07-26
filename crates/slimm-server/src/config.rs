@@ -33,6 +33,21 @@ pub struct Config {
     /// running with push disabled is a supported first-class configuration,
     /// not an error.
     pub push_relay_key: Option<String>,
+
+    /// The LiveKit SFU clients connect to, for example
+    /// `wss://livekit.example.com`. Handed to the client alongside a token,
+    /// so it is the address reachable from outside, not the compose-internal
+    /// one.
+    pub livekit_url: Option<String>,
+    /// API key the SFU knows this deployment by.
+    pub livekit_api_key: Option<String>,
+    /// The matching secret, which room tokens are signed with.
+    ///
+    /// All three LiveKit settings are optional together, and a deployment
+    /// without them simply has no voice: the same first-class two-state shape
+    /// as push above, because a text-only self-host is a supported way to run
+    /// this and should not need to stand up an SFU to start.
+    pub livekit_api_secret: Option<String>,
 }
 
 fn default_port() -> u16 {

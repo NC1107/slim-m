@@ -18,7 +18,8 @@ The push relay draws only on check-in-relay, a separate and allowed reference; n
 ## Executive Summary
 
 slim-m recreates the core Discord experience (group chats and direct messages with text, voice, and screen sharing) around three non-negotiable priorities from the brief: performance as a first-class feature, extreme self-hosting simplicity, and an infinite collaborative Voice Canvas during calls as the signature feature.
-The client is a Flutter application targeting iOS and Linux (Fedora, GNOME Wayland) first and Android next, with iOS and Linux as the primary early test targets.
+The client is a Flutter application targeting iOS and Linux (Fedora, KDE Plasma Wayland) first and Android next, with iOS and Linux as the primary early test targets.
+Cross-platform support is the goal for release; KDE Wayland is the development and test environment, not a narrowing of scope.
 The server is a single Rust process on Axum that serves both the HTTP surface and the WebSocket event stream, with SQLite in WAL mode embedded directly in that same process, so a self-hosted deployment is one binary and one data directory with no second database service to operate.
 A separate Go push relay, adapted from check-in-relay, exists only to wake mobile devices, never to route messages.
 Real-time voice, video, and screen share run through a self-hostable LiveKit SFU, kept strictly separate from the chat and canvas data planes.

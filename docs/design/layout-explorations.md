@@ -5,6 +5,18 @@ Date: 2026-07-23.
 Decision: keep the familiar sidebar layout (Discord/Slack-style, but calmer) for v1.
 These alternative organizing concepts are recorded for a possible later revisit, not scheduled.
 
+
+> **Revisited 2026-07-26** (see `../decisions/0004-visual-identity-review.md`).
+> The worry that these were parked too early was based on a wrong framing.
+> **Focus is not an alternative shell** - it is the compact breakpoint plus a
+> command palette, and both already ship. **Deck is not a layout** - it is a
+> landing pane that can live where the channel list points when nothing is
+> selected, addable later with no rewrite. Only **Spaces** was a genuine fork,
+> and declining it for heads-down text was the right call. What was parked is
+> two additive features, not two roads not taken, so nothing here needs
+> reopening.
+
+
 ## Why there is room to diverge
 
 Two decisions give slim-m freedom to organize the UI differently from Discord if it ever wants to.

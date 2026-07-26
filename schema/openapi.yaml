@@ -1403,6 +1403,55 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /channels/{channelId}/voice/token:
+    post:
+      operationId: mintVoiceToken
+      tags: [voice]
+      summary: Mint a short-lived token for this channel's voice room.
+      description: >
+        Requires `VIEW_CHANNEL` and `CONNECT`. `SPEAK` and `USE_CANVAS` are not
+        pass-or-fail here: they are carried into the token as SFU grants, so a
+        member with listen-only rights joins with a token that cannot publish
+        and the SFU enforces that, rather than the client being trusted to hide
+        a button.
+
+
+        The room name is derived from the channel id on the server and echoed
+        back; it is never accepted from the caller, so a token can only ever be
+        for the channel that was authorized. The token is deliberately
+        short-lived, because the server cannot revoke a bearer credential the
+        SFU has already accepted: somebody removed from a room is evicted
+        through the room service, and the expiry bounds how long a token they
+        still hold could let them back in.
+
+
+        A 501 means this deployment has no SFU configured, which is a supported
+        way to run a text-only server rather than a fault, so a client should
+        hide voice instead of retrying.
+      parameters:
+        - $ref: "#/components/parameters/ChannelId"
+      responses:
+        "200":
+          description: A join token for the channel's room.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceToken"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "501":
+          description: This deployment has no voice configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /sync:
     post:
       operationId: sync
@@ -1997,6 +2046,35 @@ components:
             omitted them.
           items:
             $ref: "#/components/schemas/ReactionSummary"
+
+    VoiceToken:
+      type: object
+      required: [url, room, token, expires_at, can_publish]
+      properties:
+        url:
+          type: string
+          description: >-
+            The SFU to connect to, as reachable from outside the deployment.
+        room:
+          type: string
+          description: >-
+            The room to join. Derived from the channel id on the server, echoed
+            here so a client does not have to know the derivation rule.
+        token:
+          type: string
+          description: A LiveKit access token (an HS256 JWT).
+        expires_at:
+          type: integer
+          format: int64
+          description: >-
+            Unix milliseconds. Deliberately soon; re-mint before it lapses
+            rather than waiting to be disconnected.
+        can_publish:
+          type: boolean
+          description: >-
+            Whether this token grants publishing audio, mirroring the SPEAK
+            grant inside it, so the UI can show a listen-only state up front
+            instead of after the SFU refuses a track.
 
     ReactionSummary:
       type: object

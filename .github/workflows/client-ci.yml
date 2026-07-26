@@ -67,3 +67,74 @@ jobs:
             fi
           done
           exit "$status"
+
+  # The CallKit synchronous-report invariant is a real termination risk, not a
+  # style rule: iOS kills an app that takes a VoIP push without reporting a
+  # call before the handler returns, and repeat offences cost it VoIP push
+  # entirely. That makes it worth a macOS runner of its own, because the
+  # ubuntu job above runs Dart tests and cannot compile a line of Swift.
+  #
+  # Simulator only, so it needs no signing identity and no secrets: this
+  # compiles the Swift and runs XCTest, it does not produce a shippable build.
+  # The signed device build stays in the release workflow.
+  ios-unit-tests:
+    name: ios unit tests (callkit invariant)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get
+
+      # xcodebuild needs the generated Flutter config and the plugin registrant
+      # to exist before the project will open, and only a Flutter build makes
+      # them. --no-codesign keeps it to compiling, with no identity involved.
+      - name: generate the ios project
+        working-directory: client/packages/app
+        run: flutter build ios --simulator --no-codesign
+
+      # The simulator is chosen from what the runner actually has rather than
+      # by name. A hardcoded 'iPhone 16' broke the first time this ran, and it
+      # would break again silently every time GitHub rolls the image forward.
+      - name: pick an available simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          udid=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          devices = json.load(sys.stdin)['devices']
+          for runtime, devs in sorted(devices.items()):
+              if 'iOS' not in runtime:
+                  continue
+              for dev in devs:
+                  if dev.get('isAvailable') and 'iPhone' in dev.get('name', ''):
+                      print(dev['udid'])
+                      raise SystemExit
+          ")
+          if [ -z "$udid" ]; then
+            echo "::error::no available iPhone simulator on this runner"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices available | grep "$udid" || true
+
+      - name: run xctest
+        working-directory: client/packages/app/ios
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -only-testing:RunnerTests \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || exit ${PIPESTATUS[0]}
+

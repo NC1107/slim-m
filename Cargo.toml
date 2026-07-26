@@ -30,6 +30,12 @@ anyhow = "1"
 # hashing, and URL-safe base64 for opaque token secrets.
 argon2 = "0.5"
 sha2 = "0.10"
+# HMAC-SHA256 for the LiveKit access tokens, which are HS256 JWTs. Only ever
+# signed here, never verified, so none of the JWT verification pitfalls
+# (alg=none, algorithm confusion) are in play and a full JWT library would
+# be carrying parsing code this never runs. Same RustCrypto family as the
+# sha2 above, and already in the tree transitively.
+hmac = "0.12"
 base64 = "0.22"
 # The `getrandom` feature turns on rand_core's OS entropy source (OsRng), which
 # both the Argon2 salt and the opaque token secrets draw from. This is the same

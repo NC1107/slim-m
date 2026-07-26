@@ -28,6 +28,9 @@ async fn new_store() -> Store {
         hash_concurrency: 2,
         push_relay_url: None,
         push_relay_key: None,
+        livekit_url: None,
+        livekit_api_key: None,
+        livekit_api_secret: None,
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)
@@ -161,6 +164,7 @@ async fn http_delete_account_rejects_the_token_afterward() {
         hub: Hub::new(),
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
+        voice: slimm_server::voice::VoiceService::disabled(),
     });
 
     // Register and grab the access token.
@@ -233,6 +237,7 @@ async fn the_last_administrator_cannot_strand_a_populated_deployment() {
         hub: Hub::new(),
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
+        voice: slimm_server::voice::VoiceService::disabled(),
     });
 
     let signup = |username: &'static str, invite: Option<String>| {
