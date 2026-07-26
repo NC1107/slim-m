@@ -23,10 +23,15 @@ Repositories (public, owner NC1107):
 
 Server 0.10.0 is released (2026-07-26) with signed multi-arch GHCR images and native musl binaries; the live instance tracks `latest` and auto-updates.
 
-**Phase 4 is in progress.** Landed: the Linux RTC spike's build answer (livekit_client 2.8.1 and flutter_webrtc 1.4.0 compile and link on Fedora KDE Wayland), LiveKit room capability tokens derived from the permission bitfield, the iOS CallKit and PushKit path with its synchronous-report invariant under test on a macOS CI runner, the `rtc` package's `VoiceSession` behind a room-injection seam with screen-share ceilings, and the self-host stack wired to its own SFU with a `compose-smoke` job that boots it.
+**Phase 4 is in progress.** Landed: the Linux RTC spike's build answer (livekit_client 2.8.1 and flutter_webrtc 1.4.0 compile and link on Fedora KDE Wayland), LiveKit room capability tokens derived from the permission bitfield, the iOS CallKit and PushKit path with its synchronous-report invariant under test on a macOS CI runner, the `rtc` package's `VoiceSession` behind a room-injection seam with screen-share ceilings, the self-host stack wired to its own SFU with a `compose-smoke` job that boots it, and (PR #50) the voice UI plus a working SFU on the live instance.
+
+PR #50 is worth reading before the next voice change, because both halves were found by using the thing rather than by any gate.
+A channel with kind `voice` rendered as a text channel, so there was no way to start or join a call at all; `ConversationPane` now reads the kind from the local store and routes to `VoiceScreen`.
+`Routes.settings` was registered, built and tested, and nothing in the app ever navigated to it, which left sign-out, the device list and account deletion unreachable through a whole release.
+`client/packages/app/test/route_reachability_test.dart` now fails if any registered route has nothing navigating to it, ignoring the route's own `path:` registration (the evidence that was present for settings the whole time) and comments (its own first draft passed on a comment that merely named the route).
 
 Still open in Phase 4:
-- Voice UX: join preview with mic and camera pre-toggles, the roster, collapse-to-strip. `VoiceSession` is ready for it; nothing renders it yet.
+- Voice UX polish: camera pre-toggle and a roster shown before joining rather than after. The join preview, mic pre-toggle, in-call controls and collapse-to-strip indicator are built.
 - Android ConnectionService with a CallStyle notification.
 - The runtime half of the RTC spike. `MediaCapabilities.probeAll()` exists but nothing calls it, and the Wayland portal shows a picker, so it needs a human at the screen.
 - A real call on an iPhone through TestFlight, and an Android device for the heads-up path.
@@ -165,6 +170,25 @@ A pinned instance runs on the owner's homelab box, deployed 2026-07-24.
 - Published at **`https://slim.npc-server.top`** through Traefik since 2026-07-25 (joined `traefik_proxy`, labels mirror the relay stack's), and still reachable on the LAN at `http://10.0.0.100:8095`.
 - Verified live against 0.5.0 (auto-updated from 0.4.0 by Watchtower with no manual step, proving the pipeline): `/healthz`, `/version`, a 13-check auth and WebSocket smoke run (including a real ws hello handshake and post-deletion refusal), and a 17-check messaging run (bootstrap seeding, send, idempotent retry, list, edit, read state, sync, and the member-versus-admin permission split), plus rate limiting confirmed live (5 answered, then 429).
 - Operate it with `docker compose` from that directory. It tracks `latest`; set `SLIMM_VERSION` in `.env` to a version to freeze it.
+
+### The SFU on that box (added 2026-07-26)
+
+`slim-m-livekit` runs in the same stack, published through Traefik at `https://livekit.npc-server.top`, and the server is pointed at it with `SLIMM_LIVEKIT_URL=wss://livekit.npc-server.top`.
+Both services read one `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` pair out of the stack's `.env`, so they cannot drift apart.
+Verified end to end: a token signed the way `voice.rs` signs one validates against the SFU both through Traefik and directly on the compose network, and a tampered signature comes back 401.
+
+Its ports are **not** the defaults, because three things on that host already held them.
+
+- TCP fallback on **7891**, not 7881: `echo-messenger-livekit-1` has 7881.
+- ICE media on **50300-50400/udp**, not 50000-50100: that same container has 50000-50200.
+- TURN is **disabled**. UniFi holds 3478, and a TURN relay on a non-standard port reaches nothing the published ICE range does not already reach, so it was only ever going to advertise candidates that time out. A network that blocks the ICE range blocks 3479 too; the answer for one of those is TURN/TLS on 443, which is a Traefik TCP passthrough rather than a UDP port.
+
+Two failures cost real time here and are worth knowing before touching this again.
+
+- **The server reporting `voice enabled` says nothing about the SFU being up.** It is the server's opinion of its own config. LiveKit crashlooped behind a perfectly healthy `voice enabled` line for half an hour. `compose-smoke` now checks the SFU separately, and that gap is why.
+- **LiveKit exits if it cannot resolve a STUN hostname**, which it needs to discover the address peers must reach it on. That box runs systemd-resolved, so the container inherited a `127.0.0.53` stub that does not exist inside it. The service carries an explicit `dns:` block for this, in prod and in the example compose.
+
+Note that `livekit.npc-server.top` is proxied by Cloudflare, which rejects some non-browser user agents with `error code: 1010` - `Python-urllib` gets a 403 there while curl and the Dart client do not. Worth remembering when a probe against that name fails in a way the SFU could not have caused.
 
 ## Repository layout
 
