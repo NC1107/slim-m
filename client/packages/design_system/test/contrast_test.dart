@@ -75,6 +75,73 @@ void main() {
       }
     });
 
+    test('$name danger and warning text meet WCAG AA', () {
+      // These carry the messages a user most needs to read and is least able
+      // to guess from context: a destructive confirmation, an invite about to
+      // lapse. A palette change that quietly dropped one below AA would be
+      // least noticeable exactly where it matters most.
+      for (final surface in [t.surfaceSunken, t.surfaceBase, t.surfaceRaised]) {
+        _expectAA(t.dangerText, surface, '$name danger text');
+        _expectAA(t.warnText, surface, '$name warning text');
+      }
+    });
+
+    test('$name status colours are not relied on to be legible as text', () {
+      // Deliberately NOT an AA assertion. A status colour is only ever a small
+      // filled shape, never text, and every presence indicator pairs its hue
+      // with a distinct shape so the state survives greyscale. Holding these to
+      // a text ratio would force four muddy colours that no longer read as
+      // traffic lights, and would buy nothing, because nobody reads them.
+      //
+      // What is asserted is only that each dot is visible against the surfaces
+      // it is drawn on, and that no two states share a value outright.
+      //
+      // Deliberately NOT asserted: a contrast ratio between two status hues.
+      // Contrast ratio measures luminance alone, and the away amber and the dnd
+      // red sit at almost exactly the same luminance (1.04:1 between them) while
+      // being obviously different colours to anyone with normal colour vision.
+      // A first draft of this test gated that pair and "failed" a palette that
+      // is fine. Telling the states apart is the shape's job, which is asserted
+      // in the AppStatusDot component tests, not here.
+      for (final surface in [t.surfaceSunken, t.surfaceRaised]) {
+        for (final status in t.status.all) {
+          expect(
+            _contrast(status, surface),
+            greaterThanOrEqualTo(1.6),
+            reason: '$name status dot must at least be visible on $surface',
+          );
+        }
+      }
+      expect(
+        t.status.all.toSet(),
+        hasLength(t.status.all.length),
+        reason: '$name has two presence states sharing one colour',
+      );
+    });
+
+    test('$name disabled text is quieter than secondary', () {
+      // The real invariant, and the only one worth gating: disabled must read
+      // as unavailable rather than as merely de-emphasised, so it has to sit
+      // below textSecondary. If the two converge, a user cannot tell a control
+      // they may not use from one that is simply quiet.
+      expect(
+        _contrast(t.textDisabled, t.surfaceBase),
+        lessThan(_contrast(t.textSecondary, t.surfaceBase)),
+        reason: '$name disabled must be quieter than secondary',
+      );
+
+      // Its absolute ratio is reported rather than gated, the same way the
+      // border is below. WCAG 1.4.3 explicitly exempts inactive controls, so
+      // any floor here would be a house rule invented in this file, and light
+      // mode currently lands at 2.96:1 - close enough to a round number that
+      // gating it would be picking a threshold to match the palette rather than
+      // the other way round.
+      final ratio = _contrast(t.textDisabled, t.surfaceBase);
+      // ignore: avoid_print
+      print('$name disabled text on base: '
+          '${ratio.toStringAsFixed(2)}:1 (not gated, WCAG exempts it)');
+    });
+
     // Not asserted, on purpose, and the reason is worth writing down rather
     // than leaving as a silent omission.
     //
