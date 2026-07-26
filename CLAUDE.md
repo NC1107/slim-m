@@ -274,6 +274,7 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 
 - **Deploy the invite gate.** The live instance at `https://slim.npc-server.top` still accepts anonymous registration and will until it runs a build containing the gate. Watchtower tracks `latest`, so cutting a release is what closes it; nothing else needs doing on the host.
 - **Watch the next release PR.** `release-please-config.json` gained the `cargo-workspace` plugin so a version bump also updates `Cargo.lock`, which the new `--locked` builds require. That is the one change in the audit pass that could not be verified locally, and its failure mode is a red release PR, not a bad release.
+- **`bump-minor-pre-major` is why the server stays on 0.x.** PR #42 landed as `feat!` (registration genuinely changed behaviour for a claimed deployment), and release-please read the breaking marker on a 0.x project as "go to 1.0.0" and opened exactly that PR. It was closed unmerged. The flag makes a breaking change bump the minor while under 1.0, so that reads 0.9.0 instead. 1.0 is a Phase 9 deliverable and the product is not even named yet (owner decision 9), so nothing should reach it by accident.
 - Internal testers on the Play internal testing track: release 0.1.0 (4) is published there with zero testers, deliberately, until the owner picks who.
 - A real Android device test of the push path end-to-end (the last Phase 3 exit criterion with any work left).
 - Reviewer protection on the `release` and `testflight` GitHub Environments (they exist but are ungated).
