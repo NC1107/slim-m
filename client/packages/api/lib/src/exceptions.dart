@@ -58,6 +58,16 @@ class UnavailableException extends ApiException {
   const UnavailableException(super.message);
 }
 
+/// The deployment does not offer this feature at all, as opposed to offering it
+/// and being briefly unable to serve it.
+///
+/// Distinct from [UnavailableException] because the right response is opposite:
+/// hide the feature rather than retry it. A text-only self-host with no SFU is
+/// a supported configuration, not a fault.
+class NotConfiguredException extends ApiException {
+  const NotConfiguredException(super.message);
+}
+
 /// An unexpected status, kept distinct so it is never silently treated as one
 /// of the handled cases.
 class ServerException extends ApiException {

@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
@@ -15,6 +16,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../providers/sync_controller.dart';
+import '../routing/routes.dart';
 
 /// The account's devices, refetched when invalidated.
 final devicesProvider = FutureProvider.autoDispose<List<api.Device>>(
@@ -38,7 +40,18 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        title: const Text('Settings'),
+        // Explicit rather than relying on the implicit back button: settings
+        // is reached with go(), which replaces the location instead of
+        // pushing, so there is no stack for Navigator to pop and the default
+        // arrow never appears.
+        leading: IconButton(
+          icon: const Icon(AppIcons.back),
+          tooltip: 'Back to channels',
+          onPressed: () => context.go(Routes.channels),
+        ),
+      ),
       body: ListView(
         children: const [
           _DevicesSection(),

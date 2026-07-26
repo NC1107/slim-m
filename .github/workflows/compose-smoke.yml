@@ -120,6 +120,78 @@ jobs:
           }
           echo "server reports voice enabled"
 
+      - name: the SFU actually starts
+        run: |
+          set -euo pipefail
+          # "voice enabled" above is the server's opinion of its own config; it
+          # says nothing about whether the SFU came up. The first real
+          # deployment of this stack hit exactly that gap: the server reported
+          # voice enabled while LiveKit crashlooped on DNS behind it, and
+          # nothing in CI would have noticed.
+          for i in $(seq 1 45); do
+            docker compose logs livekit 2>/dev/null | grep -q "starting LiveKit server" && break
+            sleep 2
+          done
+          docker compose logs livekit | grep -q "starting LiveKit server" || {
+            echo "::error::livekit never finished starting"
+            docker compose logs livekit
+            exit 1
+          }
+          # A crashloop looks like a start too, so check it is still up a moment
+          # later rather than trusting the one log line.
+          sleep 5
+          state=$(docker inspect --format '{{.State.Status}}' "$(docker compose ps -q livekit)")
+          [ "$state" = "running" ] || {
+            echo "::error::livekit is $state, not running"
+            docker compose logs livekit
+            exit 1
+          }
+          echo "livekit is up"
+
+      - name: the SFU accepts a token signed with the configured key
+        run: |
+          set -euo pipefail
+          # The end-to-end property that matters: a token signed the way the
+          # server signs one is a token this SFU honours. A key/secret that
+          # reached only one of the two services would pass every check above
+          # and fail on the first call.
+          set -a; . ./.env; set +a
+          token=$(python3 - <<'PY'
+          import base64, hashlib, hmac, json, os, time
+
+          key, secret = os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"]
+          seg = lambda o: base64.urlsafe_b64encode(
+              json.dumps(o, separators=(",", ":")).encode()
+          ).rstrip(b"=")
+          now = int(time.time())
+          body = seg({"alg": "HS256", "typ": "JWT"}) + b"." + seg({
+              "iss": key, "sub": "smoke", "nbf": now, "exp": now + 120,
+              "video": {"room": "smoke", "roomJoin": True, "canSubscribe": True},
+          })
+          sig = hmac.new(secret.encode(), body, hashlib.sha256).digest()
+          print((body + b"." + base64.urlsafe_b64encode(sig).rstrip(b"=")).decode())
+          PY
+          )
+          # Plain HTTP on purpose, and the only correct choice here: this is a
+          # container-to-container call on a private compose network, to the
+          # port LiveKit serves unencrypted by design. TLS is Caddy's job one
+          # hop further out, and Caddy is not running on the runner because it
+          # has neither a domain nor a certificate to serve.
+          net=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q livekit)")
+          curl_in() { docker run --rm --network "$net" curlimages/curl:8.11.1 "$@"; }
+          curl_in -fsS "http://livekit:7880/rtc/validate?access_token=$token" | grep -q success || {
+            echo "::error::the SFU rejected a token signed with the configured key"
+            exit 1
+          }
+          # And the converse, so the check above cannot be passing on an SFU
+          # that would accept anything.
+          code=$(curl_in -s -o /dev/null -w '%{http_code}' "http://livekit:7880/rtc/validate?access_token=${token}tampered")
+          [ "$code" = "401" ] || {
+            echo "::error::a tampered token got $code, expected 401"
+            exit 1
+          }
+          echo "the SFU honours our tokens and refuses forged ones"
+
       - name: tear down
         if: always()
         run: docker compose down -v

@@ -88,12 +88,31 @@ services:
     # No bundled healthcheck: the image has no verified shell/HTTP client to
     # probe with, so this relies on `restart: unless-stopped` plus normal
     # log/monitoring rather than a Docker HEALTHCHECK.
+    # LiveKit resolves a STUN hostname at startup to discover the address peers
+    # must reach it on, and exits if it cannot. On a host running
+    # systemd-resolved - the default on Ubuntu and Fedora - /etc/resolv.conf
+    # names the 127.0.0.53 stub, which does not exist inside a container, so
+    # LiveKit crashloops with "could not resolve external IP". Giving it real
+    # resolvers is the fix. Change them to whatever you prefer; the STUN lookup
+    # is the only thing they serve, and its target is a public Google host
+    # either way.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     expose:
       - "7880" # WebSocket signaling, reverse-proxied by Caddy - not published to the host
     ports:
-      - "7881:7881"       # TCP fallback for clients that cannot do UDP at all
-      - "3478:3478/udp"   # STUN/TURN (UDP), the default LiveKit/TURN port
-      - "${LIVEKIT_UDP_PORT_START:-50000}-${LIVEKIT_UDP_PORT_END:-51000}:${LIVEKIT_UDP_PORT_START:-50000}-${LIVEKIT_UDP_PORT_END:-51000}/udp"
+      # TCP fallback for clients that cannot do UDP at all. Configurable
+      # because 7881 is a popular port and this may not be the only SFU on the
+      # host.
+      - "${LIVEKIT_TCP_PORT:-7881}:${LIVEKIT_TCP_PORT:-7881}"
+      # STUN/TURN (UDP), the default LiveKit/TURN port.
+      - "${LIVEKIT_TURN_UDP_PORT:-3478}:${LIVEKIT_TURN_UDP_PORT:-3478}/udp"
+      # TURN's relay ports, a block distinct from the media range below. Easy
+      # to miss, and missing it is worse than having no TURN at all: LiveKit
+      # still advertises relay candidates, and every one of them times out.
+      - "${LIVEKIT_TURN_RELAY_PORT_START:-30000}-${LIVEKIT_TURN_RELAY_PORT_END:-30100}:${LIVEKIT_TURN_RELAY_PORT_START:-30000}-${LIVEKIT_TURN_RELAY_PORT_END:-30100}/udp"
+      - "${LIVEKIT_UDP_PORT_START:-50000}-${LIVEKIT_UDP_PORT_END:-50100}:${LIVEKIT_UDP_PORT_START:-50000}-${LIVEKIT_UDP_PORT_END:-50100}/udp"
       # TURN/TLS (TURNS) is deliberately NOT on 443 - Caddy already owns that
       # port for the API and LiveKit signaling domains, and TURN is not an
       # HTTP protocol Caddy can share it with. LiveKit's TURN/TLS listener
@@ -118,15 +137,21 @@ services:
         bind_addresses:
           - "0.0.0.0"
         rtc:
-          tcp_port: 7881
+          tcp_port: ${LIVEKIT_TCP_PORT:-7881}
           port_range_start: ${LIVEKIT_UDP_PORT_START:-50000}
-          port_range_end: ${LIVEKIT_UDP_PORT_END:-51000}
+          port_range_end: ${LIVEKIT_UDP_PORT_END:-50100}
           use_external_ip: true
         keys:
           ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set in .env, see deploy/README.md}: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set in .env to a random value of at least 32 characters}
         turn:
           enabled: true
-          udp_port: 3478
+          udp_port: ${LIVEKIT_TURN_UDP_PORT:-3478}
+          # TURN hands each session a relay port out of this range, separate
+          # from the media range above and published separately. LiveKit's own
+          # default is 30000-40000, which nobody publishes ten thousand ports
+          # for; the effect is TURN that looks enabled and connects nothing.
+          relay_range_start: ${LIVEKIT_TURN_RELAY_PORT_START:-30000}
+          relay_range_end: ${LIVEKIT_TURN_RELAY_PORT_END:-30100}
           # TURN/TLS, off by default. Its listener needs its own certificate -
           # it cannot borrow Caddy's, since Caddy's ACME storage layout is not
           # a stable path to rely on. To turn it on: point a third DNS name at

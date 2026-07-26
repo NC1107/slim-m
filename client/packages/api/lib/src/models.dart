@@ -163,6 +163,34 @@ class Message {
       );
 }
 
+/// A short-lived credential for a channel's voice room.
+///
+/// [canPublish] mirrors the SPEAK grant inside the token, so the UI can show a
+/// listen-only state up front rather than after the SFU refuses a track.
+class VoiceToken {
+  const VoiceToken({
+    required this.url,
+    required this.room,
+    required this.token,
+    required this.expiresAt,
+    required this.canPublish,
+  });
+
+  final String url;
+  final String room;
+  final String token;
+  final int expiresAt;
+  final bool canPublish;
+
+  factory VoiceToken.fromJson(Map<String, dynamic> json) => VoiceToken(
+        url: json['url'] as String,
+        room: json['room'] as String,
+        token: json['token'] as String,
+        expiresAt: json['expires_at'] as int,
+        canPublish: json['can_publish'] as bool,
+      );
+}
+
 /// How far a user has read in a channel, and how much is left.
 class ReadState {
   const ReadState({required this.lastReadSeq, required this.unread});

@@ -207,14 +207,13 @@ class _MessageRow extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.s4),
               child: Text(
-                // Falls back to the id only when the name is genuinely absent
-                // but the account still exists, which is a message cached
-                // before the server sent names; a null author means the
-                // account is gone.
+                // Never the raw id. A missing name means the row was cached
+                // before the server sent names and has not been re-synced, and
+                // showing a 36-character uuid where a person's name goes reads
+                // as corruption rather than as staleness. A null author is a
+                // deleted account, which is a different and knowable thing.
                 message.authorDisplayName ??
-                    (message.authorId == null
-                        ? 'Deleted user'
-                        : message.authorId!),
+                    (message.authorId == null ? 'Deleted user' : 'Unknown'),
                 style: TextStyle(
                   color: tokens.textSecondary,
                   fontWeight: FontWeight.w600,
