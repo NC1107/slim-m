@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_data/data.dart';
 
+import 'dms.dart';
 import 'providers.dart';
 
 /// How the connection is doing, for the UI to show honestly rather than
@@ -59,6 +60,25 @@ class SyncController extends StateNotifier<SyncStatus> {
   bool _disposed = false;
   int _attempt = 0;
 
+  /// Every event this session receives, broadcast to whoever else wants one
+  /// (presence, typing, reactions, pins, polls): a second, independent
+  /// listener on top of the store-application switch below, so those
+  /// features do not need their own socket connection or their own copy of
+  /// the reconnect/backoff logic. Outlives any one connection: created once
+  /// here, never recreated by [_teardown] or a reconnect.
+  final _liveEvents = StreamController<ServerEvent>.broadcast();
+
+  /// Every event this session receives, for anything that wants to react to
+  /// one live rather than re-deriving it from the local store.
+  Stream<ServerEvent> get liveEvents => _liveEvents.stream;
+
+  /// Tells the server this user is typing in a channel.
+  ///
+  /// A no-op while the socket is down: typing is ephemeral, so a refresh
+  /// missed during a reconnect is worth nothing and must never surface as an
+  /// error to the person typing.
+  void notifyTyping(String channelId) => _connection?.typing(channelId);
+
   /// Starts, or restarts, synchronisation. Safe to call repeatedly.
   Future<void> start() async {
     if (_disposed) return;
@@ -84,9 +104,16 @@ class SyncController extends StateNotifier<SyncStatus> {
     }
   }
 
+  /// Refreshes both channel listings the server keeps apart: the
+  /// deployment's own channels, and the caller's DM conversations (which
+  /// `GET /channels` deliberately excludes). Both land in the same local
+  /// channel table under the same shape, so everything downstream (the
+  /// rail, sync cursors, read state) treats a DM exactly like any other
+  /// channel once it is here.
   Future<void> _refreshChannels(SlimmApi api, MessageStore store) async {
     final channels = await api.listChannels();
-    await store.upsertChannels(channels);
+    final dms = await api.listDirectMessages();
+    await store.upsertChannels([...channels, ...dms.map(channelFromDm)]);
   }
 
   /// Catches every known scope up in one request, applying deltas in order.
@@ -132,6 +159,10 @@ class SyncController extends StateNotifier<SyncStatus> {
 
     _events = connection.events.listen(
       (event) async {
+        // Broadcast first and unconditionally: a listener that only cares
+        // about, say, ReactionsChanged must not depend on this switch ever
+        // learning about that event type.
+        _liveEvents.add(event);
         switch (event) {
           case MessageCreated(:final message):
           case MessageEdited(:final message):
@@ -215,6 +246,7 @@ class SyncController extends StateNotifier<SyncStatus> {
     unawaited(_sessionSubscription.cancel());
     _retry?.cancel();
     unawaited(_teardown());
+    unawaited(_liveEvents.close());
     super.dispose();
   }
 }

@@ -36,11 +36,13 @@ class _FakeSession implements VoiceSession {
     this.joinOutcome = VoiceSessionState.connected,
     this.microphoneGranted = true,
     this.screenShareGranted = true,
+    this.deafenGranted = true,
   });
 
   final VoiceSessionState joinOutcome;
   final bool microphoneGranted;
   final bool screenShareGranted;
+  final bool deafenGranted;
 
   final _states = StreamController<VoiceSessionState>.broadcast();
   final _participants = StreamController<List<VoiceParticipant>>.broadcast();
@@ -48,6 +50,9 @@ class _FakeSession implements VoiceSession {
   VoiceSessionState _state = VoiceSessionState.idle;
   bool? askedForMicrophoneOnJoin;
   int leaveCalls = 0;
+
+  @override
+  bool deafened = false;
 
   @override
   VoiceSessionState get state => _state;
@@ -90,6 +95,13 @@ class _FakeSession implements VoiceSession {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
   }) async =>
       enabled ? screenShareGranted : false;
+
+  @override
+  Future<bool> setDeafened(bool value) async {
+    if (!deafenGranted) return false;
+    deafened = value;
+    return true;
+  }
 
   @override
   Future<void> dispose() async {
@@ -268,6 +280,31 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(controller.state.screenSharing, isFalse);
+  });
+
+  test('deafening reflects what the session actually did', () async {
+    final session = _FakeSession();
+    final controller = controllerWith(session, _api());
+
+    await controller.join('channel-1');
+    expect(controller.state.deafened, isFalse);
+
+    await controller.toggleDeafen();
+    expect(controller.state.deafened, isTrue);
+
+    await controller.toggleDeafen();
+    expect(controller.state.deafened, isFalse);
+  });
+
+  test('a session that cannot deafen leaves the button where it was', () async {
+    final session = _FakeSession(deafenGranted: false);
+    final controller = controllerWith(session, _api());
+
+    await controller.join('channel-1');
+    await controller.toggleDeafen();
+
+    expect(controller.state.deafened, isFalse);
+    expect(controller.state.error, isNotNull);
   });
 
   test('leaving forgets the call entirely', () async {

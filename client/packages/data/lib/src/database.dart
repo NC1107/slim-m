@@ -27,6 +27,9 @@ class Channels extends Table {
   TextColumn get kind => text()();
   IntColumn get createdAt => integer()();
 
+  /// A one-line header shown beside the name. Null for no topic.
+  TextColumn get topic => text().nullable()();
+
   /// The highest `seq` this client holds for the channel: the sync cursor.
   IntColumn get cursor => integer().withDefault(const Constant(0))();
 
@@ -70,16 +73,36 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
-          // v2 carries the author's display name alongside the message. Existing
-          // rows backfill to null and render the same fallback an anonymized
-          // author does, until the next sync replaces them.
           if (from < 2) {
             await m.addColumn(messages, messages.authorDisplayName);
+          }
+          // v2 added the author's display name and left existing rows null,
+          // on the assumption that the next sync would replace them. It does
+          // not: sync is keyset on `seq` and only ever asks for messages newer
+          // than the cursor, so every message that predated the upgrade kept a
+          // null name permanently and rendered as an unknown author. On a real
+          // client that was 19 of 22 messages.
+          //
+          // Dropping the cache and rewinding the cursor is the whole fix. This
+          // table is a cache of server state with no local-only rows worth
+          // keeping, so the cost is one catch-up sync and the benefit is that
+          // the client cannot be left holding a version of a message the
+          // server has a better copy of.
+          // Unlike the message cache below, channels are fully refetched on
+          // every sync rather than paged by a cursor, so a null topic fills
+          // itself in on the next connect without dropping anything.
+          if (from < 4) {
+            await m.addColumn(channels, channels.topic);
+          }
+          if (from < 3) {
+            await m.deleteTable(messages.actualTableName);
+            await m.createTable(messages);
+            await m.database.customStatement('UPDATE channels SET cursor = 0');
           }
         },
         beforeOpen: (details) async {

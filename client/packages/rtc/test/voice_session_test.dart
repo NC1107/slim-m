@@ -36,6 +36,7 @@ void main() {
     expect(session.state, VoiceSessionState.idle);
     expect(session.participants, isEmpty);
     expect(session.lastError, isNull);
+    expect(session.deafened, isFalse);
   });
 
   test('a refused connection fails the session rather than hanging', () async {
@@ -75,9 +76,32 @@ void main() {
     expect(session.participants, isEmpty);
 
     // The mic control must not act on a room that was torn down, and must say
-    // so rather than throwing into whatever called it.
+    // so rather than throwing into whatever called it. Deafening follows the
+    // same convention.
     expect(await session.setMicrophoneEnabled(true), isFalse);
     expect(await session.setScreenShareEnabled(true), isFalse);
+    expect(await session.setDeafened(true), isFalse);
+    expect(session.deafened, isFalse);
+  });
+
+  group('deafen', () {
+    test('has no effect and reports failure with no room to act on', () async {
+      final session = VoiceSession(roomFactory: () => lk.Room());
+      addTearDown(session.dispose);
+
+      expect(await session.setDeafened(true), isFalse);
+      expect(session.deafened, isFalse);
+    });
+
+    test('leaving resets state back to idle without deafen surviving it',
+        () async {
+      final session = VoiceSession(roomFactory: () => lk.Room());
+      addTearDown(session.dispose);
+
+      await session.leave();
+      expect(session.state, VoiceSessionState.idle);
+      expect(session.deafened, isFalse);
+    });
   });
 
   test('leaving an idle session is safe and stays idle', () async {

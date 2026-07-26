@@ -90,11 +90,13 @@ class MessageStore {
             name: channel.name,
             kind: channel.kind,
             createdAt: channel.createdAt,
+            topic: Value(channel.topic),
           ),
           onConflict: DoUpdate(
             (_) => ChannelsCompanion.custom(
               name: Variable(channel.name),
               kind: Variable(channel.kind),
+              topic: Variable(channel.topic),
             ),
           ),
         );

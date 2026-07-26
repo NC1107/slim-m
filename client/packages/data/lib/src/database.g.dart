@@ -29,6 +29,11 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
   late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
       'created_at', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _topicMeta = const VerificationMeta('topic');
+  @override
+  late final GeneratedColumn<String> topic = GeneratedColumn<String>(
+      'topic', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _cursorMeta = const VerificationMeta('cursor');
   @override
   late final GeneratedColumn<int> cursor = GeneratedColumn<int>(
@@ -46,7 +51,7 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
       defaultValue: const Constant(0));
   @override
   List<GeneratedColumn> get $columns =>
-      [id, name, kind, createdAt, cursor, lastReadSeq];
+      [id, name, kind, createdAt, topic, cursor, lastReadSeq];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -80,6 +85,10 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('topic')) {
+      context.handle(
+          _topicMeta, topic.isAcceptableOrUnknown(data['topic']!, _topicMeta));
+    }
     if (data.containsKey('cursor')) {
       context.handle(_cursorMeta,
           cursor.isAcceptableOrUnknown(data['cursor']!, _cursorMeta));
@@ -107,6 +116,8 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           .read(DriftSqlType.string, data['${effectivePrefix}kind'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}created_at'])!,
+      topic: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}topic']),
       cursor: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}cursor'])!,
       lastReadSeq: attachedDatabase.typeMapping
@@ -126,6 +137,9 @@ class Channel extends DataClass implements Insertable<Channel> {
   final String kind;
   final int createdAt;
 
+  /// A one-line header shown beside the name. Null for no topic.
+  final String? topic;
+
   /// The highest `seq` this client holds for the channel: the sync cursor.
   final int cursor;
 
@@ -136,6 +150,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       required this.name,
       required this.kind,
       required this.createdAt,
+      this.topic,
       required this.cursor,
       required this.lastReadSeq});
   @override
@@ -145,6 +160,9 @@ class Channel extends DataClass implements Insertable<Channel> {
     map['name'] = Variable<String>(name);
     map['kind'] = Variable<String>(kind);
     map['created_at'] = Variable<int>(createdAt);
+    if (!nullToAbsent || topic != null) {
+      map['topic'] = Variable<String>(topic);
+    }
     map['cursor'] = Variable<int>(cursor);
     map['last_read_seq'] = Variable<int>(lastReadSeq);
     return map;
@@ -156,6 +174,8 @@ class Channel extends DataClass implements Insertable<Channel> {
       name: Value(name),
       kind: Value(kind),
       createdAt: Value(createdAt),
+      topic:
+          topic == null && nullToAbsent ? const Value.absent() : Value(topic),
       cursor: Value(cursor),
       lastReadSeq: Value(lastReadSeq),
     );
@@ -169,6 +189,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       name: serializer.fromJson<String>(json['name']),
       kind: serializer.fromJson<String>(json['kind']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
+      topic: serializer.fromJson<String?>(json['topic']),
       cursor: serializer.fromJson<int>(json['cursor']),
       lastReadSeq: serializer.fromJson<int>(json['lastReadSeq']),
     );
@@ -181,6 +202,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       'name': serializer.toJson<String>(name),
       'kind': serializer.toJson<String>(kind),
       'createdAt': serializer.toJson<int>(createdAt),
+      'topic': serializer.toJson<String?>(topic),
       'cursor': serializer.toJson<int>(cursor),
       'lastReadSeq': serializer.toJson<int>(lastReadSeq),
     };
@@ -191,6 +213,7 @@ class Channel extends DataClass implements Insertable<Channel> {
           String? name,
           String? kind,
           int? createdAt,
+          Value<String?> topic = const Value.absent(),
           int? cursor,
           int? lastReadSeq}) =>
       Channel(
@@ -198,6 +221,7 @@ class Channel extends DataClass implements Insertable<Channel> {
         name: name ?? this.name,
         kind: kind ?? this.kind,
         createdAt: createdAt ?? this.createdAt,
+        topic: topic.present ? topic.value : this.topic,
         cursor: cursor ?? this.cursor,
         lastReadSeq: lastReadSeq ?? this.lastReadSeq,
       );
@@ -207,6 +231,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       name: data.name.present ? data.name.value : this.name,
       kind: data.kind.present ? data.kind.value : this.kind,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      topic: data.topic.present ? data.topic.value : this.topic,
       cursor: data.cursor.present ? data.cursor.value : this.cursor,
       lastReadSeq:
           data.lastReadSeq.present ? data.lastReadSeq.value : this.lastReadSeq,
@@ -220,6 +245,7 @@ class Channel extends DataClass implements Insertable<Channel> {
           ..write('name: $name, ')
           ..write('kind: $kind, ')
           ..write('createdAt: $createdAt, ')
+          ..write('topic: $topic, ')
           ..write('cursor: $cursor, ')
           ..write('lastReadSeq: $lastReadSeq')
           ..write(')'))
@@ -228,7 +254,7 @@ class Channel extends DataClass implements Insertable<Channel> {
 
   @override
   int get hashCode =>
-      Object.hash(id, name, kind, createdAt, cursor, lastReadSeq);
+      Object.hash(id, name, kind, createdAt, topic, cursor, lastReadSeq);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -237,6 +263,7 @@ class Channel extends DataClass implements Insertable<Channel> {
           other.name == this.name &&
           other.kind == this.kind &&
           other.createdAt == this.createdAt &&
+          other.topic == this.topic &&
           other.cursor == this.cursor &&
           other.lastReadSeq == this.lastReadSeq);
 }
@@ -246,6 +273,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
   final Value<String> name;
   final Value<String> kind;
   final Value<int> createdAt;
+  final Value<String?> topic;
   final Value<int> cursor;
   final Value<int> lastReadSeq;
   final Value<int> rowid;
@@ -254,6 +282,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.name = const Value.absent(),
     this.kind = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.topic = const Value.absent(),
     this.cursor = const Value.absent(),
     this.lastReadSeq = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -263,6 +292,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     required String name,
     required String kind,
     required int createdAt,
+    this.topic = const Value.absent(),
     this.cursor = const Value.absent(),
     this.lastReadSeq = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -275,6 +305,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     Expression<String>? name,
     Expression<String>? kind,
     Expression<int>? createdAt,
+    Expression<String>? topic,
     Expression<int>? cursor,
     Expression<int>? lastReadSeq,
     Expression<int>? rowid,
@@ -284,6 +315,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       if (name != null) 'name': name,
       if (kind != null) 'kind': kind,
       if (createdAt != null) 'created_at': createdAt,
+      if (topic != null) 'topic': topic,
       if (cursor != null) 'cursor': cursor,
       if (lastReadSeq != null) 'last_read_seq': lastReadSeq,
       if (rowid != null) 'rowid': rowid,
@@ -295,6 +327,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       Value<String>? name,
       Value<String>? kind,
       Value<int>? createdAt,
+      Value<String?>? topic,
       Value<int>? cursor,
       Value<int>? lastReadSeq,
       Value<int>? rowid}) {
@@ -303,6 +336,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       name: name ?? this.name,
       kind: kind ?? this.kind,
       createdAt: createdAt ?? this.createdAt,
+      topic: topic ?? this.topic,
       cursor: cursor ?? this.cursor,
       lastReadSeq: lastReadSeq ?? this.lastReadSeq,
       rowid: rowid ?? this.rowid,
@@ -324,6 +358,9 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
+    if (topic.present) {
+      map['topic'] = Variable<String>(topic.value);
+    }
     if (cursor.present) {
       map['cursor'] = Variable<int>(cursor.value);
     }
@@ -343,6 +380,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
           ..write('name: $name, ')
           ..write('kind: $kind, ')
           ..write('createdAt: $createdAt, ')
+          ..write('topic: $topic, ')
           ..write('cursor: $cursor, ')
           ..write('lastReadSeq: $lastReadSeq, ')
           ..write('rowid: $rowid')
@@ -892,6 +930,7 @@ typedef $$ChannelsTableCreateCompanionBuilder = ChannelsCompanion Function({
   required String name,
   required String kind,
   required int createdAt,
+  Value<String?> topic,
   Value<int> cursor,
   Value<int> lastReadSeq,
   Value<int> rowid,
@@ -901,6 +940,7 @@ typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
   Value<String> name,
   Value<String> kind,
   Value<int> createdAt,
+  Value<String?> topic,
   Value<int> cursor,
   Value<int> lastReadSeq,
   Value<int> rowid,
@@ -926,6 +966,9 @@ class $$ChannelsTableFilterComposer
 
   ColumnFilters<int> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get topic => $composableBuilder(
+      column: $table.topic, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get cursor => $composableBuilder(
       column: $table.cursor, builder: (column) => ColumnFilters(column));
@@ -955,6 +998,9 @@ class $$ChannelsTableOrderingComposer
   ColumnOrderings<int> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get topic => $composableBuilder(
+      column: $table.topic, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get cursor => $composableBuilder(
       column: $table.cursor, builder: (column) => ColumnOrderings(column));
 
@@ -982,6 +1028,9 @@ class $$ChannelsTableAnnotationComposer
 
   GeneratedColumn<int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get topic =>
+      $composableBuilder(column: $table.topic, builder: (column) => column);
 
   GeneratedColumn<int> get cursor =>
       $composableBuilder(column: $table.cursor, builder: (column) => column);
@@ -1017,6 +1066,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<String> name = const Value.absent(),
             Value<String> kind = const Value.absent(),
             Value<int> createdAt = const Value.absent(),
+            Value<String?> topic = const Value.absent(),
             Value<int> cursor = const Value.absent(),
             Value<int> lastReadSeq = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -1026,6 +1076,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             name: name,
             kind: kind,
             createdAt: createdAt,
+            topic: topic,
             cursor: cursor,
             lastReadSeq: lastReadSeq,
             rowid: rowid,
@@ -1035,6 +1086,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             required String name,
             required String kind,
             required int createdAt,
+            Value<String?> topic = const Value.absent(),
             Value<int> cursor = const Value.absent(),
             Value<int> lastReadSeq = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -1044,6 +1096,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             name: name,
             kind: kind,
             createdAt: createdAt,
+            topic: topic,
             cursor: cursor,
             lastReadSeq: lastReadSeq,
             rowid: rowid,
