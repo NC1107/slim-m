@@ -35,6 +35,33 @@ const REFRESH_TTL_MS: i64 = 30 * 24 * 60 * 60 * 1000;
 /// Connect tickets exist only to bridge a REST auth into a WebSocket upgrade.
 const WS_TICKET_TTL_MS: i64 = 30 * 1000;
 
+/// How long past its own expiry a refresh token is kept before being swept.
+///
+/// Not zero, and not tunable down casually: reuse detection works by finding
+/// the spent row and noticing `used_at` is set (see [`Store::rotate_refresh`]).
+/// Delete the row and a replayed token stops being distinguishable from one
+/// that never existed, so the family is denied softly instead of being revoked
+/// as leaked. Keeping a full extra `REFRESH_TTL_MS` past expiry means anything
+/// still worth detecting is still there: by then the token has been unusable
+/// for a month and the attacker has had nothing to gain from it for as long.
+const REFRESH_SWEEP_GRACE_MS: i64 = REFRESH_TTL_MS;
+
+/// How long past expiry a spent or stale connect ticket is kept. Single use is
+/// enforced by `used_at` inside the 30-second window, so nothing after that
+/// window depends on the row existing; the hour is slack for clock skew.
+const TICKET_SWEEP_GRACE_MS: i64 = 60 * 60 * 1000;
+
+/// How long past expiry an access token row is kept. Authorization already
+/// checks `expires_at`, so an expired row grants nothing; the day is slack.
+const ACCESS_SWEEP_GRACE_MS: i64 = 24 * 60 * 60 * 1000;
+
+/// How many rows one sweep deletes per table.
+///
+/// Bounded so the sweep cannot take the write lock for an unbounded stretch on
+/// a deployment that has gone a long time without one. Whatever it does not
+/// reach this pass, it reaches on the next.
+const SWEEP_BATCH: i64 = 5_000;
+
 /// A freshly created account.
 #[derive(Debug, Clone)]
 pub struct Account {
@@ -128,7 +155,79 @@ impl From<anyhow::Error> for DeleteAccountError {
     }
 }
 
+/// What one sweep removed, so the caller can log something meaningful and a
+/// test can assert on it.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct SweptTokens {
+    pub access_tokens: u64,
+    pub refresh_tokens: u64,
+    pub ws_tickets: u64,
+}
+
+impl SweptTokens {
+    pub fn total(self) -> u64 {
+        self.access_tokens + self.refresh_tokens + self.ws_tickets
+    }
+}
+
 impl Store {
+    /// Deletes token rows that are far enough past their expiry to be useless.
+    ///
+    /// Every sign-in writes an access token and a refresh token, every rotation
+    /// writes another refresh token, and every socket connect writes a ticket.
+    /// Nothing deleted any of them except the targeted revocation paths, so all
+    /// three tables grew for the life of a deployment and never shrank, taking
+    /// the indexes over them along for the ride.
+    ///
+    /// Each grace window is chosen so nothing that still means something is
+    /// removed; see the constants for why, particularly
+    /// [`REFRESH_SWEEP_GRACE_MS`], which reuse detection depends on.
+    pub async fn sweep_expired_tokens(&self) -> anyhow::Result<SweptTokens> {
+        let now = now_ms();
+        let access_cutoff = now - ACCESS_SWEEP_GRACE_MS;
+        let refresh_cutoff = now - REFRESH_SWEEP_GRACE_MS;
+        let ticket_cutoff = now - TICKET_SWEEP_GRACE_MS;
+
+        // Separate statements rather than one transaction: these tables are
+        // independent, and holding the write lock across all three buys nothing
+        // while making the pause longer.
+        let access_tokens = sqlx::query!(
+            "DELETE FROM access_tokens WHERE rowid IN
+             (SELECT rowid FROM access_tokens WHERE expires_at < ? LIMIT ?)",
+            access_cutoff,
+            SWEEP_BATCH
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+
+        let refresh_tokens = sqlx::query!(
+            "DELETE FROM refresh_tokens WHERE rowid IN
+             (SELECT rowid FROM refresh_tokens WHERE expires_at < ? LIMIT ?)",
+            refresh_cutoff,
+            SWEEP_BATCH
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+
+        let ws_tickets = sqlx::query!(
+            "DELETE FROM ws_tickets WHERE rowid IN
+             (SELECT rowid FROM ws_tickets WHERE expires_at < ? LIMIT ?)",
+            ticket_cutoff,
+            SWEEP_BATCH
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+
+        Ok(SweptTokens {
+            access_tokens,
+            refresh_tokens,
+            ws_tickets,
+        })
+    }
+
     /// Registers an account through the front door: the deployment's join
     /// policy is applied here, atomically with the account insert.
     ///

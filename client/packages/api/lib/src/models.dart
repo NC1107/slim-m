@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Wire types, mirroring the schemas in `schema/openapi.yaml`.
 ///
-/// These are hand-written rather than generated, but the shapes and field names
-/// are the schema's; the contract test in `test/` asserts every model here has a
-/// matching schema entry, so drift shows up as a failing test rather than a
-/// runtime surprise.
+/// Hand-written rather than generated, and deliberately so: nothing here is
+/// checked against the schema by any test. The route surface is gated
+/// (`crates/slimm-server/tests/openapi_contract.rs`), but field names,
+/// nullability, and status codes are not, on any of the three sides. A field
+/// renamed on the server and not here fails at runtime, as a null where a value
+/// was expected, so treat the schema as the record and change both together.
 library;
 
 /// The server's identity and negotiated protocol version.
@@ -140,6 +142,12 @@ class Message {
   final String content;
   final int createdAt;
   final int? editedAt;
+
+  // The server also sends a `reactions` array on every message. It is not
+  // parsed here on purpose: there is no reactions UI and no column to persist
+  // them into yet, and an unread field is cheaper to add later than a stored
+  // one is to migrate. Unknown JSON keys are ignored, so this costs nothing
+  // until the UI lands.
 
   bool get isEdited => editedAt != null;
 

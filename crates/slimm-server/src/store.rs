@@ -39,7 +39,7 @@ pub use roles::{Role, RoleGuardError};
 pub use safety::{Device, Report, ReportError, ReportSubject};
 pub use sessions::{
     Account, DeleteAccountError, IssuedTokens, OpenError, RefreshOutcome, RegisterError,
-    SessionContext,
+    SessionContext, SweptTokens,
 };
 
 /// Unix milliseconds, `pub(crate)` so the push trigger path (outside this

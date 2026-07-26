@@ -1,8 +1,21 @@
 # SPDX-License-Identifier: Apache-2.0
 # Single source of record for the slim-m wire protocol.
-# Rust (server) and Dart (client) types are generated from this file; CI fails
-# on any drift between the schema and the generated code. Evolution is
-# additive-only, enforced by an oasdiff breaking-change gate.
+#
+# What CI actually enforces, so this file is not trusted for more than it is
+# worth:
+#
+# - The route surface. crates/slimm-server/tests/openapi_contract.rs parses the
+#   methods and paths axum really serves and fails if either side has one the
+#   other does not, so a route cannot be added, removed, or renamed without the
+#   matching edit here.
+# - Additive-only evolution, by the oasdiff breaking-change gate in schema-ci.
+# - Valid OpenAPI, by redocly lint.
+#
+# What it does NOT enforce: request and response BODIES. No types are generated
+# from this file. The Rust DTOs and the Dart models in client/packages/api are
+# both hand-written, and nothing compares their fields, nullability, or status
+# codes against what is written here. Field-level drift is caught by review
+# alone, so keep this file honest by hand when changing a body shape.
 openapi: 3.1.0
 info:
   title: slim-m API
@@ -253,6 +266,8 @@ paths:
           description: The password was changed and every session revoked.
         "400":
           $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/Unavailable"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -1973,6 +1988,32 @@ components:
         edited_at:
           type: [integer, "null"]
           format: int64
+        reactions:
+          type: array
+          description: >-
+            Reaction summaries for this message, one entry per distinct emoji,
+            with `reacted` set from the calling user's point of view. Always
+            present: an empty array means no reactions, never that the server
+            omitted them.
+          items:
+            $ref: "#/components/schemas/ReactionSummary"
+
+    ReactionSummary:
+      type: object
+      required: [emoji, count, reacted]
+      properties:
+        emoji:
+          type: string
+          description: The reaction emoji itself. User content, never chrome.
+        count:
+          type: integer
+          format: int64
+          description: How many people have reacted with this emoji.
+        reacted:
+          type: boolean
+          description: >-
+            Whether the calling user is one of them, so a client can render the
+            toggled state without a second request.
 
     SendMessageRequest:
       type: object
