@@ -8,3 +8,4 @@
 library;
 
 export 'src/media_capabilities.dart';
+export 'src/voice_session.dart';

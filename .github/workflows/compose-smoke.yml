@@ -1,0 +1,125 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: compose-smoke
+
+# The self-host stack is the product for most people, and nothing was checking
+# that it boots. Every other gate here tests the server, the client or the
+# schema in isolation; this one asks whether `docker compose up` on a fresh box
+# actually produces a working deployment, which is the thing a self-hoster does
+# first and the thing most likely to rot silently when a service is added.
+#
+# Runs on changes to the stack itself, and on a schedule, because the failure
+# mode this catches is usually an upstream image moving rather than a commit
+# here.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docker-compose.yml"
+      - "deploy/**"
+      - "docker/server.Dockerfile"
+      - ".github/workflows/compose-smoke.yml"
+  pull_request:
+    paths:
+      - "docker-compose.yml"
+      - "deploy/**"
+      - "docker/server.Dockerfile"
+      - ".github/workflows/compose-smoke.yml"
+  schedule:
+    # Weekly, so a broken upstream image is found before a self-hoster finds it.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compose-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boot:
+    name: the self-host stack boots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The published image is only correct for main. On a PR that changes the
+      # Dockerfile the whole point is to boot what this branch would produce, so
+      # it is built locally under the tag SLIMM_VERSION=smoke resolves to, so
+      # compose uses it instead of pulling.
+      - name: build the server image from this branch
+        run: docker build -f docker/server.Dockerfile -t ghcr.io/nc1107/slim-m-server:smoke .
+        env:
+          SQLX_OFFLINE: "true"
+
+      - name: refuse to start without livekit credentials
+        run: |
+          set -euo pipefail
+          cp deploy/.env.example .env
+          # .env.example ships these empty on purpose. Compose must refuse and
+          # name the missing one rather than starting an SFU anybody can mint
+          # tokens for, and that refusal is worth a test of its own because it
+          # is a security property, not a convenience.
+          if docker compose config >/dev/null 2>err.txt; then
+            echo "::error::compose started with no LiveKit credentials set"
+            exit 1
+          fi
+          grep -q "LIVEKIT_API_KEY" err.txt || {
+            echo "::error::compose refused but did not name the missing variable"
+            cat err.txt
+            exit 1
+          }
+          echo "refused correctly, naming the variable"
+
+      - name: bring the stack up
+        run: |
+          set -euo pipefail
+          # Real-looking values so the config renders; nothing here is reachable
+          # from outside the runner.
+          sed -i "s|^LIVEKIT_API_KEY=.*|LIVEKIT_API_KEY=APIsmoketestkey|" .env
+          sed -i "s|^LIVEKIT_API_SECRET=.*|LIVEKIT_API_SECRET=$(openssl rand -hex 24)|" .env
+          sed -i "s|^SLIMM_API_DOMAIN=.*|SLIMM_API_DOMAIN=localhost|" .env
+          sed -i "s|^LIVEKIT_DOMAIN=.*|LIVEKIT_DOMAIN=localhost|" .env
+          echo "SLIMM_VERSION=smoke" >> .env
+          # Caddy wants port 80/443 and a real domain to get a certificate, and
+          # neither is available here, so the smoke test covers the two services
+          # that carry the product: the server and the SFU.
+          docker compose up -d server livekit
+          docker compose ps
+
+      - name: the server becomes healthy and answers
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            state=$(docker inspect --format '{{.State.Health.Status}}' "$(docker compose ps -q server)" 2>/dev/null || echo starting)
+            [ "$state" = "healthy" ] && break
+            sleep 2
+          done
+          if [ "$state" != "healthy" ]; then
+            echo "::error::server never became healthy"
+            docker compose logs server
+            exit 1
+          fi
+          # The image ships no shell, so ask from the host through a throwaway
+          # container on the same network rather than exec-ing into it.
+          net=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q server)")
+          version=$(docker run --rm --network "$net" curlimages/curl:8.11.1 -fsS http://server:8080/version)
+          echo "$version"
+          echo "$version" | grep -q '"name":"slim-m"'
+
+      - name: voice is configured, not silently disabled
+        run: |
+          set -euo pipefail
+          # The regression this exists for: the compose file ran an SFU for
+          # months without ever telling the server about it, so every voice
+          # request would have answered 501 on a stack that looked complete.
+          docker compose logs server | grep -q "voice enabled" || {
+            echo "::error::server did not report voice enabled; check SLIMM_LIVEKIT_* reach it"
+            docker compose logs server
+            exit 1
+          }
+          echo "server reports voice enabled"
+
+      - name: tear down
+        if: always()
+        run: docker compose down -v
