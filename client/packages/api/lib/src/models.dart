@@ -9,6 +9,29 @@
 /// was expected, so treat the schema as the record and change both together.
 library;
 
+// Split into companion files purely to stay under this repo's line budget;
+// each is exported here so importing this one file still surfaces every
+// model, exactly as if they had all been written in one place.
+export 'models_admin.dart';
+export 'models_attachments.dart';
+export 'models_dms.dart';
+export 'models_identity.dart';
+export 'models_moderation.dart';
+export 'models_pins.dart';
+export 'models_polls.dart';
+export 'models_presence.dart';
+export 'models_reactions.dart';
+export 'models_roles.dart';
+export 'models_users.dart';
+
+// Version and Message below need the ServerIdentity, Attachment, Poll, and
+// ReactionSummary types, which import alone (not export) grants; the exports
+// above are what re-surface them to callers of this file.
+import 'models_attachments.dart';
+import 'models_identity.dart';
+import 'models_polls.dart';
+import 'models_reactions.dart';
+
 /// The server's identity and negotiated protocol version.
 class Version {
   const Version({
@@ -16,6 +39,7 @@ class Version {
     required this.version,
     required this.protocol,
     this.pushEnabled,
+    this.identity,
   });
 
   final String name;
@@ -28,11 +52,18 @@ class Version {
   /// staying quiet.
   final bool? pushEnabled;
 
+  /// The server's trust-on-first-use identity. Null on servers too old to
+  /// report it, the same "unknown" treatment [pushEnabled] gets.
+  final ServerIdentity? identity;
+
   factory Version.fromJson(Map<String, dynamic> json) => Version(
         name: json['name'] as String,
         version: json['version'] as String,
         protocol: json['protocol'] as int,
         pushEnabled: json['push_enabled'] as bool?,
+        identity: json['identity'] == null
+            ? null
+            : ServerIdentity.fromJson(json['identity'] as Map<String, dynamic>),
       );
 }
 
@@ -96,12 +127,17 @@ class Channel {
     required this.name,
     required this.kind,
     required this.createdAt,
+    this.topic,
   });
 
   final String id;
   final String name;
   final String kind;
   final int createdAt;
+
+  /// A one-line header shown beside the name. Null for no topic; the server
+  /// never stores an empty string, so blank and absent mean the same thing.
+  final String? topic;
 
   bool get isVoice => kind == 'voice';
 
@@ -110,6 +146,7 @@ class Channel {
         name: json['name'] as String,
         kind: json['kind'] as String,
         createdAt: json['created_at'] as int,
+        topic: json['topic'] as String?,
       );
 }
 
@@ -126,6 +163,12 @@ class Message {
     required this.content,
     required this.createdAt,
     required this.editedAt,
+    // Empty is the honest default and by far the common case: most messages
+    // carry neither. Requiring them at every construction site bought no
+    // safety and broke every existing caller and test.
+    this.reactions = const [],
+    this.attachments = const [],
+    this.poll,
   });
 
   final String id;
@@ -143,11 +186,23 @@ class Message {
   final int createdAt;
   final int? editedAt;
 
-  // The server also sends a `reactions` array on every message. It is not
-  // parsed here on purpose: there is no reactions UI and no column to persist
-  // them into yet, and an unread field is cheaper to add later than a stored
-  // one is to migrate. Unknown JSON keys are ignored, so this costs nothing
-  // until the UI lands.
+  /// Reaction summaries, one entry per distinct emoji, with `reacted` set
+  /// from the calling user's point of view. Always present: an empty list
+  /// means no reactions, never that the server omitted them.
+  final List<ReactionSummary> reactions;
+
+  /// The poll this message carries, if it is a poll message. Null both for an
+  /// ordinary message and for a key the server omitted, so an older server
+  /// that never heard of polls parses identically to one that just has none
+  /// here.
+  final Poll? poll;
+
+  /// Attachments riding on this message, in display order. Always present:
+  /// an empty list means none, never that the server omitted them. Unlike
+  /// [reactions] and [poll], a freshly sent message can carry these
+  /// immediately, since they are uploaded before the send and only
+  /// referenced by it.
+  final List<Attachment> attachments;
 
   bool get isEdited => editedAt != null;
 
@@ -160,6 +215,21 @@ class Message {
         content: json['content'] as String,
         createdAt: json['created_at'] as int,
         editedAt: json['edited_at'] as int?,
+        // Not in the schema's own `required` list, despite the description
+        // promising it is always sent; fall back to empty rather than crash
+        // a caller on a technically-conformant response with the key absent.
+        reactions: (json['reactions'] as List<dynamic>?)
+                ?.map(
+                    (r) => ReactionSummary.fromJson(r as Map<String, dynamic>))
+                .toList(growable: false) ??
+            const [],
+        poll: json['poll'] == null
+            ? null
+            : Poll.fromJson(json['poll'] as Map<String, dynamic>),
+        attachments: (json['attachments'] as List<dynamic>?)
+                ?.map((a) => Attachment.fromJson(a as Map<String, dynamic>))
+                .toList(growable: false) ??
+            const [],
       );
 }
 

@@ -10,6 +10,8 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'client.dart';
 import 'models.dart';
 
+part 'events_frames.dart';
+
 /// The envelope version this client speaks. The server refuses a mismatch, so a
 /// client that is too old fails at connect rather than misreading frames.
 const int protocolVersion = 1;
@@ -19,8 +21,9 @@ sealed class ServerEvent {
   const ServerEvent();
 
   /// Parses a frame, or returns null for anything unrecognized. Unknown frame
-  /// types are ignored rather than fatal, so the server can add events without
-  /// breaking older clients.
+  /// types (or a known type with a shape that does not parse) are ignored
+  /// rather than fatal, so the server can add events without breaking older
+  /// clients.
   static ServerEvent? parse(String raw) {
     final Object? decoded;
     try {
@@ -36,11 +39,90 @@ sealed class ServerEvent {
         MessageCreated(Message.fromJson(message)),
       'message.edited' when message is Map<String, dynamic> =>
         MessageEdited(Message.fromJson(message)),
+      'message.deleted'
+          when decoded['channel_id'] is String &&
+              decoded['message_id'] is String =>
+        MessageDeleted(
+          channelId: decoded['channel_id'] as String,
+          messageId: decoded['message_id'] as String,
+        ),
+      'reactions.changed'
+          when decoded['channel_id'] is String &&
+              decoded['message_id'] is String &&
+              decoded['reactions'] is List =>
+        ReactionsChanged(
+          channelId: decoded['channel_id'] as String,
+          messageId: decoded['message_id'] as String,
+          reactions: (decoded['reactions'] as List<dynamic>)
+              .map((r) => ReactionTally.fromJson(r as Map<String, dynamic>))
+              .toList(growable: false),
+        ),
+      'message.pinned'
+          when decoded['channel_id'] is String &&
+              decoded['message_id'] is String &&
+              decoded['pinned_at'] is int =>
+        MessagePinned(
+          channelId: decoded['channel_id'] as String,
+          messageId: decoded['message_id'] as String,
+          pinnedBy: decoded['pinned_by'] as String?,
+          pinnedAt: decoded['pinned_at'] as int,
+        ),
+      'message.unpinned'
+          when decoded['channel_id'] is String &&
+              decoded['message_id'] is String =>
+        MessageUnpinned(
+          channelId: decoded['channel_id'] as String,
+          messageId: decoded['message_id'] as String,
+        ),
+      'poll.voted'
+          when decoded['channel_id'] is String &&
+              decoded['message_id'] is String &&
+              decoded['options'] is List =>
+        PollVoted(
+          channelId: decoded['channel_id'] as String,
+          messageId: decoded['message_id'] as String,
+          options: (decoded['options'] as List<dynamic>)
+              .map((o) => PollOptionTally.fromJson(o as Map<String, dynamic>))
+              .toList(growable: false),
+        ),
+      'presence.changed'
+          when decoded['user_id'] is String &&
+              _presenceStateOf(decoded['status']) != null =>
+        PresenceChanged(
+          userId: decoded['user_id'] as String,
+          status: _presenceStateOf(decoded['status'])!,
+        ),
+      'typing.started'
+          when decoded['channel_id'] is String &&
+              decoded['user_id'] is String =>
+        TypingStarted(
+          channelId: decoded['channel_id'] as String,
+          userId: decoded['user_id'] as String,
+        ),
+      'typing.stopped'
+          when decoded['channel_id'] is String &&
+              decoded['user_id'] is String =>
+        TypingStopped(
+          channelId: decoded['channel_id'] as String,
+          userId: decoded['user_id'] as String,
+        ),
       'pong' => const PongEvent(),
       'error' => ErrorEvent(decoded['message'] as String? ?? 'unknown'),
       _ => null,
     };
   }
+}
+
+/// Resolves a frame's raw `status` string to a known [PresenceState], or null
+/// for anything else (including a non-string), so a future server addition
+/// is ignored the same way an unrecognized frame type is rather than
+/// throwing out of an enum lookup.
+PresenceState? _presenceStateOf(Object? raw) {
+  if (raw is! String) return null;
+  for (final state in PresenceState.values) {
+    if (state.name == raw) return state;
+  }
+  return null;
 }
 
 /// The server accepted the handshake.
@@ -152,6 +234,16 @@ class EventConnection {
 
   /// Sends a keepalive. The server answers with [PongEvent].
   void ping() => _channel.sink.add(jsonEncode({'type': 'ping'}));
+
+  /// Refreshes "this user is typing" in a channel.
+  ///
+  /// There is deliberately no stop frame: the server expires the state on a
+  /// TTL, so a client that closes mid-typing cannot leave the indicator stuck
+  /// on somebody else's screen. Call this repeatedly while the user types.
+  /// Over-sending is safe - the server rate-limits it and drops the excess
+  /// silently rather than erroring or closing the socket.
+  void typing(String channelId) => _channel.sink
+      .add(jsonEncode({'type': 'typing', 'channel_id': channelId}));
 
   Future<void> close() => _channel.sink.close();
 }
