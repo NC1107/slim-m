@@ -526,8 +526,15 @@ jobs:
           # fine every time. A run number is monotonic and cannot be forgotten,
           # so a reused build number stops being possible rather than being
           # something to remember.
-          flutter build appbundle --release --build-number=${{ github.run_number }}
-          flutter build apk --release --build-number=${{ github.run_number }}
+          # --build-name from the tag, not pubspec: pubspec's version is a
+          # local-build default and has sat at 0.1.0 across every release, so
+          # without this a tester cannot tell one build from another.
+          flutter build appbundle --release \
+            --build-name=${{ steps.ver.outputs.version }} \
+            --build-number=${{ github.run_number }}
+          flutter build apk --release \
+            --build-name=${{ steps.ver.outputs.version }} \
+            --build-number=${{ github.run_number }}
 
       - name: verify the signer is the upload key, not debug
         if: steps.gate.outputs.ready == 'true'
@@ -593,6 +600,15 @@ jobs:
       IOS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.IOS_SIGNING_CERTIFICATE_PASSWORD }}
       IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
     steps:
+      - name: resolve version
+        id: ver
+        run: |
+          if [ -n "${{ needs.release-please.outputs.client_version }}" ]; then
+            echo "version=${{ needs.release-please.outputs.client_version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#client-v}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: check secrets
         id: gate
         run: |
@@ -672,7 +688,11 @@ jobs:
           # fine every time. A run number is monotonic and cannot be forgotten,
           # so a reused build number stops being possible rather than being
           # something to remember.
+          # --build-name from the tag, for the same reason as the Android job:
+          # pubspec's version is a local default and never moves, so every
+          # TestFlight build otherwise reads 0.1.0 whatever was tagged.
           flutter build ipa --release --export-options-plist=ios/ExportOptions.plist \
+            --build-name=${{ steps.ver.outputs.version }} \
             --build-number=${{ github.run_number }}
 
       - name: upload to TestFlight
