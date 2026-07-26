@@ -27,6 +27,12 @@ Each baseline file has:
   - `value`, the measured point estimate
   - `unit`, the unit the value is expressed in (for example `ns`)
 
+Two entries are not criterion benchmarks: `idle_rss` and `peak_rss`, in kB.
+They exist because the Phase 1 exit criterion is stated in terms of resident
+memory rather than throughput, and a number nobody records is a number nobody
+can hold a release to.
+See "Measuring idle RSS" below for how to take them.
+
 Keeping the shape flat and per-metric means a new baseline can be diffed
 against the previous one metric by metric, without needing to parse
 criterion's own (much larger) internal JSON format.
@@ -65,6 +71,35 @@ Turning that uploaded criterion output into a new committed
 point estimates out of the artifact and add them to a new baseline file in
 the same pull request that finalizes the release.
 Automating that extraction is a later phase, not part of this scaffolding.
+
+## Measuring idle RSS
+
+STRATEGY.md budgets the server at under 30MB resident at true zero load, and
+the Phase 1 exit criterion is that the figure has actually been measured.
+Take it against a release build, not a debug one, with nothing connected:
+
+```sh
+cargo build --locked --release --bin slimm-server
+SLIMM_PORT=8099 SLIMM_DATABASE_PATH=/tmp/rss-probe.db \
+  ./target/release/slimm-server &
+SRV=$!
+sleep 5                              # let startup and migrations settle
+curl -s localhost:8099/healthz       # confirm it is actually serving
+grep -E '^VmRSS|^VmHWM' /proc/$SRV/status
+kill $SRV
+```
+
+`VmRSS` is the steady idle figure the budget refers to.
+`VmHWM` is the high-water mark, which peaks during migrations at startup and
+then never recurs, so it is worth recording separately rather than mistaking it
+for the idle cost.
+
+The 0.8.0 baseline was taken this way on Fedora with glibc, measuring 7,296 kB
+idle and 25,760 kB peak.
+Note that releases ship a musl binary built in CI, and musl's allocator
+fragments differently under Tokio, so a musl-built figure is the one that
+finally settles the budget; this local glibc number is indicative and both
+figures sit inside it with room to spare.
 
 ## Adding a new baseline
 

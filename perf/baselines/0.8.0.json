@@ -1,0 +1,25 @@
+{
+  "version": "0.8.0",
+  "metrics": [
+    {
+      "name": "uuid_now_v7",
+      "value": 119.57,
+      "unit": "ns"
+    },
+    {
+      "name": "version_json_serialize",
+      "value": 134.98,
+      "unit": "ns"
+    },
+    {
+      "name": "idle_rss",
+      "value": 7296,
+      "unit": "kB"
+    },
+    {
+      "name": "peak_rss",
+      "value": 25760,
+      "unit": "kB"
+    }
+  ]
+}

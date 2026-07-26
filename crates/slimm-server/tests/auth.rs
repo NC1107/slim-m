@@ -510,3 +510,40 @@ async fn http_register_rejects_spoofing_display_name() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
+
+/// A connect ticket is single use. The redemption is a claim-first conditional
+/// UPDATE for exactly this reason, but every other test here spends one
+/// sequentially, which cannot tell an atomic claim from a check-then-write that
+/// happens to work when nothing races it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_redemptions_of_one_ticket_admit_exactly_one() {
+    let (store, _auth, user_id) = with_alice().await;
+    let tokens = store.open_session(user_id, "laptop").await.unwrap();
+    let ctx = store
+        .authenticate(&tokens.access_token)
+        .await
+        .unwrap()
+        .expect("the fresh access token authenticates");
+    let (ticket, _expires_at) = store.mint_ws_ticket(&ctx).await.unwrap();
+
+    let racers = (0..8).map(|_| {
+        let store = store.clone();
+        let ticket = ticket.clone();
+        tokio::spawn(async move { store.redeem_ws_ticket(&ticket).await })
+    });
+    let outcomes = futures_util::future::join_all(racers).await;
+
+    let mut admitted = 0;
+    for outcome in outcomes {
+        let redeemed = outcome
+            .expect("redemption task panicked")
+            .expect("a racing redemption must not error");
+        if redeemed.is_some() {
+            admitted += 1;
+        }
+    }
+    assert_eq!(
+        admitted, 1,
+        "exactly one racer may spend a single-use ticket, however many present it at once"
+    );
+}

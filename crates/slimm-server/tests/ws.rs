@@ -258,3 +258,36 @@ async fn a_bad_ticket_is_rejected() {
     let frame = read_frame(&mut ws).await;
     assert_eq!(frame["type"], "error");
 }
+
+/// Deleting an account revokes its sessions and publishes the same event
+/// logout does, but only logout had a test proving a live socket actually
+/// closes. Deletion is the path where a socket left attached would keep
+/// delivering a channel's messages to an account that no longer exists.
+#[tokio::test]
+async fn deleting_the_account_closes_its_live_socket() {
+    let store = new_store().await;
+    let state = state_for(&store);
+    let (alice_access, alice_ticket, _alice) = user_ticket(&store, "alice").await;
+
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+
+    let response = http::router(state.clone())
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/account")
+                .header("authorization", format!("Bearer {alice_access}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    let closed = tokio::time::timeout(Duration::from_secs(2), wait_closed(&mut alice_ws)).await;
+    assert!(
+        closed.is_ok(),
+        "the socket must close when the account behind it is deleted"
+    );
+}
