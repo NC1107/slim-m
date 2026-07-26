@@ -380,6 +380,18 @@ class SlimmApi {
     return VoiceToken.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Evicts a participant from a channel's voice room.
+  ///
+  /// Idempotent: removing somebody who is not connected succeeds, so a retry
+  /// after a timeout is safe. This does not bar them from rejoining - taking
+  /// away CONNECT is what does that - it makes the removal take effect now
+  /// rather than when their current token lapses.
+  Future<void> kickVoiceParticipant(String channelId, String userId) => _send(
+        'POST',
+        '/channels/$channelId/voice/participants/$userId/kick',
+        expectNoContent: true,
+      );
+
   /// Files a report for a human to review.
   Future<String> report({
     required ReportSubject subject,
