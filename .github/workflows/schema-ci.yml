@@ -73,21 +73,17 @@ jobs:
           revision: "HEAD:schema/openapi.yaml"
           fail-on: ERR
 
-  # GitHub's file view shows OpenAPI as plain YAML, so the browsable API
-  # reference lives on Pages instead, rebuilt on every schema change to main.
-  publish-docs:
-    name: publish rendered api docs
+  # GitHub's file view shows OpenAPI as plain YAML, so a browsable rendering
+  # is built on every schema change to main and attached as a run artifact.
+  # It is NOT deployed anywhere: the owner already uses nc1107.github.io for
+  # something else and asked that nothing be published there. To read it,
+  # download the artifact, or run locally:
+  #   npx @redocly/cli build-docs schema/openapi.yaml -o /tmp/api.html
+  render-docs:
+    name: render api docs artifact
     if: github.event_name == 'push'
     needs: [lint]
     runs-on: ubuntu-latest
-    # Job-level rather than workflow-level so the lint and diff jobs, which
-    # run on untrusted PR content, never hold a write token.
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -98,18 +94,11 @@ jobs:
       - name: build redoc html
         run: |
           mkdir -p dist
-          # Exact version, no lifecycle scripts: this job holds a Pages write
-          # token, so nothing here may run arbitrary install hooks.
           npm install --no-save --ignore-scripts @redocly/cli@2.40.0
           ./node_modules/.bin/redocly build-docs schema/openapi.yaml -o dist/index.html
 
-      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          enablement: true
-
-      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
-        with:
-          path: dist
-
-      - id: deploy
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+          name: api-docs
+          path: dist/index.html
+          retention-days: 90
