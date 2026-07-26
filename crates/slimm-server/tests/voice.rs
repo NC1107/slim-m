@@ -327,3 +327,85 @@ async fn a_token_requires_authentication() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
+
+/// A minted token cannot be revoked, so eviction is what makes a kick take
+/// effect now rather than whenever the token lapses. That makes the permission
+/// gate in front of it the whole security property, and it went untested for
+/// as long as the route did not exist.
+#[tokio::test]
+async fn kicking_needs_kick_members_in_that_channel() {
+    let store = new_store().await;
+    // Enough to join a room, deliberately not enough to remove anyone from it.
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::CONNECT),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let app = app(store.clone(), enabled_voice());
+
+    let token = member(&store, "alice").await;
+    let target = store
+        .create_account("bob", "bob", "not-a-real-hash")
+        .await
+        .unwrap();
+
+    let refused = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!(
+                "/channels/{}/voice/participants/{}/kick",
+                channel.id, target.id
+            ),
+            Some(&token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        refused.status(),
+        StatusCode::FORBIDDEN,
+        "being allowed into a room is not being allowed to throw people out"
+    );
+}
+
+/// A text-only deployment answers plainly enough for a client to hide the
+/// control, rather than failing as though something went wrong.
+#[tokio::test]
+async fn kicking_without_an_sfu_says_so() {
+    let store = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL
+                .union(Permissions::CONNECT)
+                .union(Permissions::KICK_MEMBERS),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let app = app(store.clone(), VoiceService::disabled());
+
+    let token = member(&store, "alice").await;
+    let target = store
+        .create_account("bob", "bob", "not-a-real-hash")
+        .await
+        .unwrap();
+
+    let response = app
+        .oneshot(request(
+            "POST",
+            &format!(
+                "/channels/{}/voice/participants/{}/kick",
+                channel.id, target.id
+            ),
+            Some(&token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+}
