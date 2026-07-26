@@ -14,6 +14,7 @@ import '../providers/sync_controller.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import 'channel_screen.dart';
+import 'voice_screen.dart';
 
 /// The shell. One widget handles every width: at compact widths it shows one
 /// pane at a time, and above that both at once. The panes themselves are the
@@ -81,32 +82,52 @@ class NoChannelSelected extends StatelessWidget {
 }
 
 /// The routed conversation pane.
-class ConversationPane extends StatelessWidget {
+class ConversationPane extends ConsumerWidget {
   const ConversationPane({required this.channelId, super.key});
 
   final String channelId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     // On a narrow window the shell supplies its own header via the app bar.
     final layout = LayoutClass.of(context);
-    if (!layout.showsBothPanes) return ChannelScreen(channelId: channelId);
-    return _Conversation(channelId: channelId);
+    final body = _ChannelBody(channelId: channelId);
+    if (!layout.showsBothPanes) return body;
+    return Column(
+      children: [
+        _ConversationHeader(channelId: channelId),
+        Expanded(child: body),
+      ],
+    );
   }
 }
 
-class _Conversation extends StatelessWidget {
-  const _Conversation({required this.channelId});
+/// A text channel reads; a voice channel calls. The kind decides, read from
+/// the local store so it does not need a round trip to know which to show.
+class _ChannelBody extends ConsumerWidget {
+  const _ChannelBody({required this.channelId});
 
   final String channelId;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _ConversationHeader(channelId: channelId),
-        Expanded(child: ChannelScreen(channelId: channelId)),
-      ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final storeAsync = ref.watch(storeProvider);
+    return storeAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('$e')),
+      data: (store) => StreamBuilder<List<Channel>>(
+        stream: store.watchChannels(),
+        builder: (context, snapshot) {
+          final channel = snapshot.data
+              ?.where((c) => c.id == channelId)
+              .cast<Channel?>()
+              .firstOrNull;
+          if (channel?.kind == 'voice') {
+            return VoiceScreen(channelId: channelId);
+          }
+          return ChannelScreen(channelId: channelId);
+        },
+      ),
     );
   }
 }
@@ -234,6 +255,7 @@ class _ChannelList extends ConsumerWidget {
               ),
             ),
           ),
+          const VoiceStripIndicator(),
           const _ConnectionBar(),
         ],
       ),
@@ -253,11 +275,31 @@ class _ShellHeader extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
       ),
-      alignment: Alignment.centerLeft,
-      child: Text(
-        'slim-m',
-        style:
-            TextStyle(color: tokens.textPrimary, fontWeight: FontWeight.w600),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'slim-m',
+              style: TextStyle(
+                color: tokens.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          // The only way into settings, and therefore the only way to sign
+          // out, see your devices, or delete your account. Routes.settings
+          // existed and nothing navigated to it, which left all of those
+          // unreachable from a running app; account deletion in particular is
+          // a store requirement, not a convenience.
+          IconButton(
+            iconSize: 18,
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Settings',
+            icon: const Icon(AppIcons.settings),
+            color: tokens.textSecondary,
+            onPressed: () => context.go(Routes.settings),
+          ),
+        ],
       ),
     );
   }

@@ -347,6 +347,16 @@ class SlimmApi {
   Future<void> redeemInvite(String code) =>
       _send('POST', '/invites/$code/redeem', expectNoContent: true);
 
+  /// Mints a join token for a channel's voice room.
+  ///
+  /// Throws [NotImplementedException] when the deployment has no SFU, which is
+  /// a supported way to run text-only rather than a fault, so a caller should
+  /// hide voice rather than retry.
+  Future<VoiceToken> voiceToken(String channelId) async {
+    final json = await _send('POST', '/channels/$channelId/voice/token');
+    return VoiceToken.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Files a report for a human to review.
   Future<String> report({
     required ReportSubject subject,
@@ -489,6 +499,7 @@ class SlimmApi {
       404 => NotFoundException(reason),
       409 => ConflictException(reason),
       429 => RateLimitedException(reason),
+      501 => NotConfiguredException(reason),
       503 => UnavailableException(reason),
       _ => ServerException(reason, response.statusCode),
     };
