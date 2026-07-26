@@ -60,6 +60,15 @@
 	<!-- Required for PushKit: without the voip background mode iOS never
 	     delivers a VoIP push at all, so the CallKit path below it is dead code.
 	     remote-notification is the ordinary content-free wake from phase 3. -->
+	<!-- Required whether or not the feature is reached: App Store review
+	     rejects a binary whose linked SDKs reference these APIs without a
+	     purpose string, and livekit_client and file_picker both do. -->
+	<key>NSCameraUsageDescription</key>
+	<string>slim-m uses the camera when you turn on video in a call.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>slim-m uses the microphone when you join a voice call.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>slim-m opens your photo library when you attach an image to a message.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>voip</string>

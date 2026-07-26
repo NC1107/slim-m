@@ -19,6 +19,25 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # App Store review rejects a binary whose linked SDKs reference a
+      # sensitive API without a purpose string, and it does it asynchronously:
+      # altool uploads, the job goes green, and the rejection arrives by email
+      # some minutes later. This turns that into a red PR instead.
+      - name: ios purpose strings are present
+        run: |
+          plist=client/packages/app/ios/Runner/Info.plist
+          missing=()
+          for key in NSCameraUsageDescription NSMicrophoneUsageDescription \
+                     NSPhotoLibraryUsageDescription; do
+            grep -q "<key>$key</key>" "$plist" || missing+=("$key")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::$plist is missing purpose strings: ${missing[*]}."
+            echo "App Store review will reject the upload after CI goes green."
+            exit 1
+          fi
+          echo "ios purpose strings present"
+
       - name: no emoji in UI source
         run: |
           # Emoji are user content (reactions), never interface chrome.
