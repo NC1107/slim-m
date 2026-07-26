@@ -19,7 +19,10 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-message-search-{}.db", Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-message-search-{}.db", Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,
@@ -62,26 +65,25 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-async fn register(app: &Router, username: &str) -> String {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "cli"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register(store: &Store, username: &str) -> String {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    json_body(response).await["access_token"]
-        .as_str()
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    store
+        .open_session(account.id, "cli")
+        .await
         .unwrap()
-        .to_owned()
+        .access_token
 }
 
 async fn send(app: &Router, channel_id: &str, token: &str, content: &str) -> Value {
@@ -113,8 +115,8 @@ async fn search_returns_matching_messages_only() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
     let channel_id = channel.id.to_string();
 
     send(&app, &channel_id, &token, "the quick brown fox").await;
@@ -151,8 +153,8 @@ async fn search_excludes_deleted_messages() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
     let channel_id = channel.id.to_string();
 
     let sent = send(&app, &channel_id, &token, "unicorns are searchable").await;
@@ -193,8 +195,8 @@ async fn search_requires_view_permission() {
         .await
         .unwrap();
     let channel = store.create_channel("private", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -218,8 +220,8 @@ async fn a_malformed_query_is_a_bad_request_not_a_server_error() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     // A dangling boolean operator is not valid FTS5 syntax.
     let response = app
@@ -244,8 +246,8 @@ async fn an_empty_query_is_rejected() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -276,8 +278,8 @@ async fn search_stays_scoped_to_its_own_channel() {
         .unwrap();
     let channel_a = store.create_channel("a", "text").await.unwrap();
     let channel_b = store.create_channel("b", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     send(
         &app,

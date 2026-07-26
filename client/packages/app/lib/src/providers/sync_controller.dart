@@ -43,7 +43,7 @@ class SyncController extends StateNotifier<SyncStatus> {
       if (signedIn) {
         unawaited(start());
       } else {
-        unawaited(stop());
+        unawaited(_endSession());
       }
     });
     _lastSignedIn = session.isSignedIn;
@@ -95,6 +95,7 @@ class SyncController extends StateNotifier<SyncStatus> {
     if (cursors.isEmpty) return;
 
     final deltas = await api.sync(cursors);
+    var more = false;
     for (final delta in deltas) {
       if (delta.reset) {
         // The server says the gap is too large to stream: local state for this
@@ -105,12 +106,17 @@ class SyncController extends StateNotifier<SyncStatus> {
         continue;
       }
       await store.applyMessages(delta.messages);
-      if (delta.hasMore) {
-        // More remains than one response could carry; go again next tick rather
-        // than looping here and blocking the first paint.
-        unawaited(
-            Future<void>.delayed(Duration.zero, () => _catchUp(api, store)));
-      }
+      more = more || delta.hasMore;
+    }
+
+    // At most one continuation per round, however many scopes are behind.
+    // Scheduling inside the loop meant every backlogged channel started its own
+    // full-cursor resync, so ten of them fanned out into ten overlapping /sync
+    // calls that each re-requested all ten scopes. Next tick rather than
+    // straight through, so a long backlog does not block the first paint.
+    if (more) {
+      unawaited(
+          Future<void>.delayed(Duration.zero, () => _catchUp(api, store)));
     }
   }
 
@@ -168,10 +174,39 @@ class SyncController extends StateNotifier<SyncStatus> {
   }
 
   /// Stops synchronising, for sign-out.
+  ///
+  /// Deliberately does not touch the local database. The sign-out and delete
+  /// handlers await this before their request goes out, and a delete that
+  /// fails keeps the session on purpose; wiping here would throw the cache
+  /// away for an account the user is still signed into. The wipe belongs to
+  /// the session actually ending, which is [_endSession].
   Future<void> stop() async {
     _retry?.cancel();
     await _teardown();
     state = SyncStatus.offline;
+  }
+
+  /// The session ended, whichever way: a sign-out, an account deletion that
+  /// went through, or a refresh the server rejected.
+  ///
+  /// The local database is one file for the whole app, not one per account or
+  /// per server, so whatever survives here is read by whoever signs in next on
+  /// this device: the previous account's channel list and message text,
+  /// visible before any new sync could correct it. Phones get handed over and
+  /// desktops are shared, so the cache goes the moment it stops belonging to
+  /// the person holding the device.
+  ///
+  /// Best-effort. A database that will not open or clear must not leave
+  /// somebody stuck signed in, so the failure is swallowed; the session is
+  /// already gone by the time this runs.
+  Future<void> _endSession() async {
+    await stop();
+    try {
+      final store = await _ref.read(storeProvider.future);
+      await store.clear();
+    } catch (_) {
+      // Nothing useful to do here, and the sign-out itself already succeeded.
+    }
   }
 
   @override

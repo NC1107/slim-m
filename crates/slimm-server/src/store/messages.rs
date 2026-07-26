@@ -22,6 +22,18 @@ use sqlx::SqliteExecutor;
 use super::{Message, Store, now_ms};
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
+/// The outcome of a send, which is idempotent and so may be a retry.
+#[derive(Debug, Clone)]
+pub struct Sent {
+    pub message: Message,
+    /// False when this id was already stored, so the call was a retry of a send
+    /// that already succeeded. Everything that must happen exactly once per
+    /// message keys off this: fanning the message out again would duplicate it
+    /// for every connected client, and pushing again would wake every idle
+    /// recipient a second time for a message they were already told about.
+    pub fresh: bool,
+}
+
 /// Why a message send failed.
 #[derive(Debug)]
 pub enum SendError {
@@ -75,19 +87,32 @@ impl Store {
     /// the per-scope `seq` is allocated in the same transaction as the insert. A
     /// reused id that belongs to a different channel or author is rejected rather
     /// than returned, so the idempotency path cannot leak a foreign message.
+    ///
+    /// [`Sent::fresh`] is what separates a first send from a retry of one, so
+    /// the caller can run the once-per-message side effects (fan-out, a push
+    /// wake) only for a message that is genuinely new.
     pub async fn send_message(
         &self,
         channel_id: ChannelId,
         author_id: UserId,
         id: MessageId,
         content: &str,
-    ) -> Result<Message, SendError> {
-        let mut tx = self.pool.begin().await?;
+    ) -> Result<Sent, SendError> {
+        // BEGIN IMMEDIATE rather than a deferred transaction: this reads the
+        // id before it writes, and a deferred transaction that has already
+        // taken a read snapshot cannot promote itself to a writer once another
+        // connection holds the write lock. SQLite answers that with SQLITE_BUSY
+        // straight away, ignoring busy_timeout, because waiting could deadlock.
+        // Taking the write lock up front makes concurrent sends queue instead.
+        let mut tx = self.begin_write().await?;
 
         if let Some(existing) = fetch_message(&mut *tx, id).await? {
             tx.commit().await?;
             if existing.channel_id == channel_id && existing.author_id == Some(author_id) {
-                return Ok(existing);
+                return Ok(Sent {
+                    message: existing,
+                    fresh: false,
+                });
             }
             return Err(SendError::IdConflict);
         }
@@ -129,15 +154,18 @@ impl Store {
         .await?;
 
         tx.commit().await?;
-        Ok(Message {
-            id,
-            channel_id,
-            author_id: Some(author_id),
-            author_display_name,
-            seq: Seq(seq),
-            content: content.to_owned(),
-            created_at: now,
-            edited_at: None,
+        Ok(Sent {
+            message: Message {
+                id,
+                channel_id,
+                author_id: Some(author_id),
+                author_display_name,
+                seq: Seq(seq),
+                content: content.to_owned(),
+                created_at: now,
+                edited_at: None,
+            },
+            fresh: true,
         })
     }
 

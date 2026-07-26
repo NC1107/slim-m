@@ -162,6 +162,21 @@ class MessageStore {
     });
   }
 
+  /// Drops everything this device has cached: every channel, every message,
+  /// every cursor and read marker, including pending sends.
+  ///
+  /// Unlike [resetChannel] this keeps nothing at all, because it is called when
+  /// the cached data stops belonging to whoever is about to use the app: a sign
+  /// out, an account deletion, or a switch to a different server. A pending
+  /// send is the previous account's unsent message and must go with the rest,
+  /// which is exactly why this cannot be built out of [resetChannel].
+  Future<void> clear() async {
+    await db.transaction(() async {
+      await db.delete(db.messages).go();
+      await db.delete(db.channels).go();
+    });
+  }
+
   /// Records a message the user just sent, before the server has seen it, so it
   /// appears immediately. Replaced in place by [applyMessage] on acknowledgement
   /// because both are keyed by the same client-generated id.

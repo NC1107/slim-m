@@ -136,8 +136,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     ref.read(serverUrlProvider.notifier).state = address;
     final api = ref.read(apiProvider);
 
+    final invite = ref.read(pendingInviteProvider);
     try {
       if (_creatingAccount) {
+        // The code goes in with the signup rather than being redeemed after
+        // it: a claimed deployment refuses an uninvited registration outright,
+        // so there is no account to redeem against until this call succeeds.
         await api.register(
           username: _username.text.trim(),
           displayName: _displayName.text.trim().isEmpty
@@ -145,6 +149,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               : _displayName.text.trim(),
           password: _password.text,
           deviceName: 'desktop',
+          inviteCode: invite,
         );
       } else {
         await api.login(
@@ -152,16 +157,17 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           password: _password.text,
           deviceName: 'desktop',
         );
-      }
-      // Redeem the invite that brought them here, now that an account exists.
-      final invite = ref.read(pendingInviteProvider);
-      if (invite != null) {
-        try {
-          await api.redeemInvite(invite);
-        } on ApiException {
-          // The account is real either way; a spent code should not strand
-          // someone on the sign-in screen with no way forward.
+        // An existing account can still spend a code, for the role it grants.
+        if (invite != null) {
+          try {
+            await api.redeemInvite(invite);
+          } on ApiException {
+            // The session is real either way; a spent code should not strand
+            // someone on the sign-in screen with no way forward.
+          }
         }
+      }
+      if (invite != null) {
         ref.read(pendingInviteProvider.notifier).state = null;
       }
       // Sync is not started here: SyncController is session-driven (see its

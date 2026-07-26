@@ -21,7 +21,10 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-message-delete-{}.db", Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-message-delete-{}.db", Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,
@@ -64,28 +67,22 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-/// Registers a user and returns (access_token, user_id).
-async fn register(app: &Router, username: &str) -> (String, String) {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "cli"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register(store: &Store, username: &str) -> (String, String) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    let body = json_body(response).await;
-    (
-        body["access_token"].as_str().unwrap().to_owned(),
-        body["user_id"].as_str().unwrap().to_owned(),
-    )
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id.to_string())
 }
 
 async fn send(app: &Router, channel_id: &str, token: &str, content: &str) -> Value {
@@ -118,8 +115,8 @@ async fn author_can_delete_their_own_message_and_it_is_idempotent() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let (token, _user) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, _user) = register(&store, "alice").await;
 
     let sent = send(&app, &channel.id.to_string(), &token, "delete me").await;
     let message_id = sent["id"].as_str().unwrap().to_owned();
@@ -173,8 +170,8 @@ async fn deleting_anothers_message_needs_manage_messages() {
     let channel = store.create_channel("general", "text").await.unwrap();
     let app = app(store.clone());
 
-    let (alice_token, _alice) = register(&app, "alice").await;
-    let (bob_token, bob_id) = register(&app, "bob").await;
+    let (alice_token, _alice) = register(&store, "alice").await;
+    let (bob_token, bob_id) = register(&store, "bob").await;
 
     let sent = send(
         &app,
@@ -215,7 +212,7 @@ async fn deleting_in_a_hidden_channel_cannot_be_used_to_probe() {
         .unwrap();
     let channel = store.create_channel("private", "text").await.unwrap();
     let app = app(store.clone());
-    let (token, _user) = register(&app, "alice").await;
+    let (token, _user) = register(&store, "alice").await;
 
     let real = slimm_server::ids::MessageId::generate();
     let author = store.create_user("author", "Author").await.unwrap();
@@ -247,8 +244,8 @@ async fn deleting_an_unknown_message_in_a_visible_channel_is_not_found() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let (token, _user) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, _user) = register(&store, "alice").await;
 
     let missing = Uuid::now_v7();
     let response = app

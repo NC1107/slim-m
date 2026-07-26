@@ -11,6 +11,8 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
+use slimm_server::ids::{ChannelId, UserId};
+use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
@@ -18,7 +20,10 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-reports-test-{}.db", Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-reports-test-{}.db", Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,
@@ -61,30 +66,22 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-/// Registers a user and returns (access_token, user_id). The first account on
-/// a fresh store becomes its administrator.
-async fn register(app: &Router, username: &str) -> (String, String) {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "cli"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register(store: &Store, username: &str) -> (String, String) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = json_body(response).await;
-    (
-        body["access_token"].as_str().unwrap().to_owned(),
-        body["user_id"].as_str().unwrap().to_owned(),
-    )
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id.to_string())
 }
 
 async fn general_channel_id(store: &Store) -> String {
@@ -148,9 +145,9 @@ async fn file_a_report(
 async fn listing_and_resolving_require_manage_messages() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (bob_token, _bob_id) = register(&app, "bob").await;
-    let (carol_token, _carol_id) = register(&app, "carol").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, _bob_id) = register(&store, "bob").await;
+    let (carol_token, _carol_id) = register(&store, "carol").await;
     let channel_id = general_channel_id(&store).await;
     let report_id = file_a_report(
         &app,
@@ -197,9 +194,9 @@ async fn listing_and_resolving_require_manage_messages() {
 async fn the_queue_carries_the_snapshot_and_resolving_removes_it() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (bob_token, _bob_id) = register(&app, "bob").await;
-    let (carol_token, _carol_id) = register(&app, "carol").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, _bob_id) = register(&store, "bob").await;
+    let (carol_token, _carol_id) = register(&store, "carol").await;
     let channel_id = general_channel_id(&store).await;
     let report_id = file_a_report(
         &app,
@@ -266,9 +263,9 @@ async fn the_queue_carries_the_snapshot_and_resolving_removes_it() {
 async fn resolution_must_be_resolved_or_dismissed() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (bob_token, _bob_id) = register(&app, "bob").await;
-    let (carol_token, _carol_id) = register(&app, "carol").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, _bob_id) = register(&store, "bob").await;
+    let (carol_token, _carol_id) = register(&store, "carol").await;
     let channel_id = general_channel_id(&store).await;
     let report_id = file_a_report(&app, &channel_id, &bob_token, &carol_token, "x").await;
 
@@ -289,7 +286,7 @@ async fn resolution_must_be_resolved_or_dismissed() {
 async fn resolving_a_nonexistent_report_is_not_found() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -302,4 +299,79 @@ async fn resolving_a_nonexistent_report_is_not_found() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_report_you_cannot_read_is_one_you_cannot_resolve_either() {
+    // Listing already hides a report from a moderator denied MANAGE_MESSAGES in
+    // the channel it came from, because the queue carries the reported content
+    // verbatim. Resolving checked only the deployment-wide permission, so that
+    // same moderator could still dismiss reports from the one channel they were
+    // deliberately kept out of, quietly emptying its queue.
+    let store = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, _bob_id) = register(&store, "bob").await;
+    let (carol_token, carol_id) = register(&store, "carol").await;
+    let channel_id = general_channel_id(&store).await;
+
+    // Carol moderates the deployment, but is denied it in this channel.
+    let moderator = store
+        .create_role("moderator", Permissions::MANAGE_MESSAGES, false)
+        .await
+        .unwrap();
+    let carol = UserId(Uuid::parse_str(&carol_id).unwrap());
+    store.assign_role(carol, moderator).await.unwrap();
+    let channel = ChannelId(Uuid::parse_str(&channel_id).unwrap());
+    store
+        .set_member_overwrite(
+            channel,
+            carol,
+            Permissions::NONE,
+            Permissions::MANAGE_MESSAGES,
+        )
+        .await
+        .unwrap();
+
+    let report_id = file_a_report(&app, &channel_id, &bob_token, &admin_token, "reported").await;
+
+    // She cannot see it.
+    let listed = json_body(
+        app.clone()
+            .oneshot(request("GET", "/reports", Some(&carol_token), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        listed.as_array().unwrap().is_empty(),
+        "the queue already hides a report from a channel she cannot moderate"
+    );
+
+    // And cannot close it either. Answered as missing rather than forbidden, so
+    // the endpoint does not confirm the report exists.
+    let refused = app
+        .clone()
+        .oneshot(request(
+            "PATCH",
+            &format!("/reports/{report_id}"),
+            Some(&carol_token),
+            Some(json!({ "resolution": "dismissed" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(refused.status(), StatusCode::NOT_FOUND);
+
+    // The report is untouched, so a moderator who may act on it still can.
+    let closed = app
+        .clone()
+        .oneshot(request(
+            "PATCH",
+            &format!("/reports/{report_id}"),
+            Some(&admin_token),
+            Some(json!({ "resolution": "resolved" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(closed.status(), StatusCode::NO_CONTENT);
 }

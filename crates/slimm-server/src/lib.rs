@@ -28,6 +28,7 @@ pub async fn run() -> anyhow::Result<()> {
     let pool = db::connect(&config).await?;
 
     let store = store::Store::new(pool);
+    spawn_token_sweep(store.clone());
     let auth = auth::Auth::new(config.hash_concurrency)?;
     let hub = hub::Hub::new();
     let limiter = ratelimit::RateLimiter::new();
@@ -50,6 +51,40 @@ pub async fn run() -> anyhow::Result<()> {
     .with_graceful_shutdown(shutdown_signal())
     .await?;
     Ok(())
+}
+
+/// How often expired token rows are swept. Long, because nothing depends on
+/// the rows going promptly: they are already refused by their own `expires_at`
+/// checks, and this only reclaims the space and keeps the indexes over them
+/// from growing without bound for the life of a deployment.
+const TOKEN_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
+
+/// Runs the token sweep in the background for the life of the process.
+///
+/// Detached and best-effort: a failed sweep is logged and retried on the next
+/// tick, never propagated, because nothing a request does depends on it. The
+/// first tick waits out the interval rather than running at startup, so a
+/// container that crash-loops does not hammer the same delete on every boot.
+fn spawn_token_sweep(store: store::Store) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(TOKEN_SWEEP_INTERVAL);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            match store.sweep_expired_tokens().await {
+                Ok(swept) if swept.total() > 0 => {
+                    tracing::info!(
+                        access_tokens = swept.access_tokens,
+                        refresh_tokens = swept.refresh_tokens,
+                        ws_tickets = swept.ws_tickets,
+                        "swept expired token rows"
+                    );
+                }
+                Ok(_) => {}
+                Err(err) => tracing::warn!(error = %err, "token sweep failed"),
+            }
+        }
+    });
 }
 
 /// Connects to the local server and confirms `/healthz` returns 200. Used by the

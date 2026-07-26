@@ -19,7 +19,10 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-recovery-test-{}.db", Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-recovery-test-{}.db", Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,
@@ -62,30 +65,22 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-/// Registers a user and returns (access_token, user_id). The first account on
-/// a fresh store becomes its administrator.
-async fn register(app: &Router, username: &str) -> (String, String) {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "cli"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register(store: &Store, username: &str) -> (String, String) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = json_body(response).await;
-    (
-        body["access_token"].as_str().unwrap().to_owned(),
-        body["user_id"].as_str().unwrap().to_owned(),
-    )
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id.to_string())
 }
 
 async fn issue_code(app: &Router, admin_token: &str, user_id: &str) -> String {
@@ -114,8 +109,8 @@ async fn issue_code(app: &Router, admin_token: &str, user_id: &str) -> String {
 async fn only_an_administrator_can_issue_a_code() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (_admin_token, _admin_id) = register(&app, "alice").await;
-    let (member_token, member_id) = register(&app, "bob").await;
+    let (_admin_token, _admin_id) = register(&store, "alice").await;
+    let (member_token, member_id) = register(&store, "bob").await;
 
     let response = app
         .clone()
@@ -134,7 +129,7 @@ async fn only_an_administrator_can_issue_a_code() {
 async fn issuing_for_a_nonexistent_user_is_not_found() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -157,8 +152,8 @@ async fn issuing_for_a_nonexistent_user_is_not_found() {
 async fn a_wrong_code_is_refused() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (_bob_token, bob_id) = register(&app, "bob").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (_bob_token, bob_id) = register(&store, "bob").await;
     let _ = issue_code(&app, &admin_token, &bob_id).await;
 
     let response = app
@@ -178,8 +173,8 @@ async fn a_wrong_code_is_refused() {
 async fn a_weak_new_password_is_rejected() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (_bob_token, bob_id) = register(&app, "bob").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (_bob_token, bob_id) = register(&store, "bob").await;
     let code = issue_code(&app, &admin_token, &bob_id).await;
 
     let response = app
@@ -202,8 +197,8 @@ async fn a_weak_new_password_is_rejected() {
 async fn consuming_revokes_old_sessions_and_sets_the_new_password() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (bob_token, bob_id) = register(&app, "bob").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, bob_id) = register(&store, "bob").await;
 
     let still_valid = app
         .clone()
@@ -275,8 +270,8 @@ async fn consuming_revokes_old_sessions_and_sets_the_new_password() {
 async fn a_code_cannot_be_redeemed_twice() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (_bob_token, bob_id) = register(&app, "bob").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (_bob_token, bob_id) = register(&store, "bob").await;
     let code = issue_code(&app, &admin_token, &bob_id).await;
 
     let first = app

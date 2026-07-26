@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT channel_id AS \"channel_id: ChannelId\"\n               FROM reports WHERE id = ? AND resolved_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "channel_id: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "81aeb8dc5f2909a9f716cbc3bb3361fe099cde4bb6bb539b23601560985fff97"
+}

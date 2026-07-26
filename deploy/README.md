@@ -16,10 +16,15 @@ git clone https://github.com/NC1107/slim-m.git
 cd slim-m
 cp deploy/.env.example .env
 # edit .env: both domains, ACME_EMAIL, and a real LIVEKIT_API_KEY/SECRET
-# set the server image tag in docker-compose.yml to a published release
-# (no image is published to GHCR until the first release is cut)
 docker compose up -d
 ```
+
+The server image tracks the rolling `latest` tag.
+Set `SLIMM_VERSION` in `.env` to a published release (see the [releases page](https://github.com/NC1107/slim-m/releases)) to freeze it on a specific version instead.
+
+`LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` have no defaults, on purpose.
+They authorize minting a room token, so a placeholder default would be a publicly known credential on a publicly reachable SFU.
+Compose refuses to start until both are set and tells you which one is missing; generate a pair with `docker run --rm livekit/livekit-server:v1.10.1 generate-keys`.
 
 Check it:
 

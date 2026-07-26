@@ -20,7 +20,10 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-channels-test-{}.db", Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-channels-test-{}.db", Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,
@@ -63,26 +66,25 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-async fn register(app: &Router, username: &str) -> String {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "cli"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register(store: &Store, username: &str) -> String {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    json_body(response).await["access_token"]
-        .as_str()
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    store
+        .open_session(account.id, "cli")
+        .await
         .unwrap()
-        .to_owned()
+        .access_token
 }
 
 #[tokio::test]
@@ -99,8 +101,8 @@ async fn manager_can_rename_a_channel() {
     let channel = store.create_channel("general", "text").await.unwrap();
     // A second channel so the rename target is never the deployment's last.
     store.create_channel("spare", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -126,8 +128,8 @@ async fn renaming_without_manage_channels_is_forbidden() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -153,8 +155,8 @@ async fn a_non_manager_cannot_distinguish_a_real_channel_from_a_fake_one_by_rena
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     let real_status = app
         .clone()
@@ -198,8 +200,8 @@ async fn renaming_a_nonexistent_channel_by_a_manager_is_not_found() {
         .await
         .unwrap();
     store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -226,8 +228,8 @@ async fn rename_validates_the_new_name() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -257,8 +259,8 @@ async fn manager_can_delete_a_channel_idempotently() {
         .unwrap();
     let channel = store.create_channel("doomed", "text").await.unwrap();
     store.create_channel("spare", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     let uri = format!("/channels/{}", channel.id);
     for _ in 0..2 {
@@ -301,8 +303,8 @@ async fn the_last_channel_cannot_be_deleted() {
         .await
         .unwrap();
     let channel = store.create_channel("only", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -341,8 +343,8 @@ async fn deleting_a_channel_id_that_was_never_real_is_not_found() {
         .await
         .unwrap();
     store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -366,8 +368,8 @@ async fn deleting_without_manage_channels_is_forbidden() {
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
     store.create_channel("spare", "text").await.unwrap();
-    let app = app(store);
-    let token = register(&app, "alice").await;
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
 
     let response = app
         .clone()

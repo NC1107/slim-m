@@ -158,7 +158,10 @@ impl Store {
     /// Deletes a role. `Ok(None)` if it does not exist. Refuses to delete
     /// `@everyone`, and refuses if doing so would leave no administrator.
     pub async fn delete_role(&self, role_id: RoleId) -> Result<Option<()>, RoleGuardError> {
-        let mut tx = self.pool.begin().await?;
+        // Reads the role and the administrator count before deciding whether to
+        // delete, so it must hold the write lock from the start; see
+        // Store::begin_write.
+        let mut tx = self.begin_write().await?;
 
         let is_everyone = sqlx::query_scalar!(
             r#"SELECT is_everyone AS "is_everyone!: bool" FROM roles WHERE id = ?"#,

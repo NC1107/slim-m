@@ -172,6 +172,33 @@ impl Store {
         Ok(targets)
     }
 
+    /// Everyone who has at least one device that could actually receive a push
+    /// right now: a live session, a token, a key, and a platform.
+    ///
+    /// This is the candidate set the push trigger starts from, and it exists to
+    /// keep that path off an all-users scan. Working the other way round, from
+    /// every live user to the ones who can view the channel, costs a full
+    /// permission evaluation (several queries) per user on every single
+    /// message, whether or not anybody has push set up at all. Starting here
+    /// and then filtering by view permission gives the same recipients for the
+    /// price of one indexed query plus a check per candidate, and a deployment
+    /// where nobody registered for push does no permission work whatsoever.
+    pub async fn users_with_push_devices(&self) -> anyhow::Result<Vec<UserId>> {
+        let rows = sqlx::query!(
+            r#"SELECT DISTINCT user_id AS "user_id!: UserId"
+               FROM devices
+               WHERE push_token_ref IS NOT NULL
+                 AND push_public_key IS NOT NULL AND platform IS NOT NULL
+                 AND EXISTS (
+                       SELECT 1 FROM sessions
+                        WHERE sessions.device_id = devices.id AND sessions.revoked_at IS NULL
+                     )"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|r| r.user_id).collect())
+    }
+
     async fn push_targets_for_user(&self, user_id: UserId) -> anyhow::Result<Vec<PushTarget>> {
         let rows = sqlx::query!(
             r#"SELECT id AS "device_id!: DeviceId", user_id AS "user_id!: UserId",

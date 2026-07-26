@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use super::AppState;
 use super::error::ApiError;
 use super::extract::Authed;
-use super::messages::{MessageDto, parse_uuid};
+use super::messages::{MessageDto, parse_uuid, with_reactions};
 use crate::ids::ChannelId;
 use crate::permissions::Permissions;
 
@@ -200,9 +200,15 @@ async fn sync(
                 let has_more = rows.len() as i64 > limit;
                 rows.truncate(limit as usize);
                 budget -= rows.len() as i64;
+                // Through with_reactions, exactly as list and search go, rather
+                // than a bare MessageDto::from. The bare conversion leaves
+                // `reactions` empty, so a message that arrived by catch-up came
+                // back with no reactions at all while the same message fetched
+                // by list carried them, and a client that trusts its local
+                // store showed the difference.
                 ScopeDelta {
                     channel_id: cursor.channel_id,
-                    messages: rows.into_iter().map(MessageDto::from).collect(),
+                    messages: with_reactions(&state, ctx.user_id, rows).await?,
                     has_more,
                     reset: false,
                 }

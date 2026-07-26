@@ -298,6 +298,26 @@ impl Store {
         Ok(rows)
     }
 
+    /// The channel an open report is about, if it is about a message at all.
+    ///
+    /// `Ok(None)` means no open report by that id; `Ok(Some(None))` means one
+    /// exists and is deployment-wide (a report about a person, not a message).
+    /// Callers use it to apply the same per-channel gate the queue listing
+    /// applies before acting on a report.
+    pub async fn open_report_channel(
+        &self,
+        report_id: Uuid,
+    ) -> anyhow::Result<Option<Option<ChannelId>>> {
+        let row = sqlx::query!(
+            r#"SELECT channel_id AS "channel_id: ChannelId"
+               FROM reports WHERE id = ? AND resolved_at IS NULL"#,
+            report_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| r.channel_id))
+    }
+
     /// Resolves or dismisses an open report. `resolution` is a short caller-
     /// supplied label ("resolved" or "dismissed"); the distinction is not
     /// enforced here, since both are just a moderator's disposition on the

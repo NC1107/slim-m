@@ -3,8 +3,16 @@
 //!
 //! Registration is open on an unclaimed server so the first account can claim
 //! it, but a real deployment wants joining to be by invitation. An invite is a
-//! short code with an optional use limit and expiry, and redeeming one is what
-//! turns a registration into a member.
+//! short code with an optional use limit and expiry.
+//!
+//! A code is spent in one of two places, both through [`spend_invite`] so they
+//! cannot drift apart:
+//!
+//! - [`Store::register_account`], which is how somebody without an account
+//!   joins a claimed deployment. The spend happens in the same transaction as
+//!   the account insert, so neither half can land without the other.
+//! - [`Store::redeem_invite`], for an account that already exists and is
+//!   spending a code for the role it grants.
 
 use rand_core::{OsRng, RngCore};
 
@@ -152,24 +160,11 @@ impl Store {
         let now = now_ms();
         let mut tx = self.pool.begin().await?;
 
-        let claimed = sqlx::query!(
-            r#"UPDATE invites SET uses = uses + 1
-               WHERE code = ?
-                 AND revoked_at IS NULL
-                 AND (max_uses IS NULL OR uses < max_uses)
-                 AND (expires_at IS NULL OR expires_at > ?)
-               RETURNING role_grant AS "role_grant: RoleId""#,
-            code,
-            now
-        )
-        .fetch_optional(&mut *tx)
-        .await?;
-
-        let Some(claimed) = claimed else {
+        let Some(role_grant) = spend_invite(&mut tx, code, now).await? else {
             return Err(RedeemError::Unusable);
         };
 
-        if let Some(role_id) = claimed.role_grant {
+        if let Some(role_id) = role_grant {
             sqlx::query!(
                 "INSERT OR IGNORE INTO member_roles (user_id, role_id) VALUES (?, ?)",
                 user_id,
@@ -182,4 +177,36 @@ impl Store {
         tx.commit().await?;
         Ok(())
     }
+}
+
+/// Spends one use of `code` inside an open transaction.
+///
+/// `Ok(None)` means the code was unusable: expired, spent, revoked, or never
+/// there. `Ok(Some(grant))` means this caller won the use, and `grant` is the
+/// role the invite carries, if any.
+///
+/// A single conditional UPDATE is what makes the use limit hold under
+/// concurrency: two callers racing the last slot cannot both match. It lives
+/// here as a free function so registration ([`Store::register_account`]) and
+/// redemption by an existing account ([`Store::redeem_invite`]) spend a code
+/// through exactly the same statement, and cannot drift into two different
+/// notions of what "usable" means.
+pub(super) async fn spend_invite(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    code: &str,
+    now: i64,
+) -> Result<Option<Option<RoleId>>, sqlx::Error> {
+    let claimed = sqlx::query!(
+        r#"UPDATE invites SET uses = uses + 1
+           WHERE code = ?
+             AND revoked_at IS NULL
+             AND (max_uses IS NULL OR uses < max_uses)
+             AND (expires_at IS NULL OR expires_at > ?)
+           RETURNING role_grant AS "role_grant: RoleId""#,
+        code,
+        now
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    Ok(claimed.map(|row| row.role_grant))
 }

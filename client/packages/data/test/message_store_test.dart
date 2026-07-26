@@ -192,6 +192,33 @@ void main() {
         reason: 'refetch from the start');
   });
 
+  test('clear leaves nothing at all for whoever signs in next', () async {
+    // The database is one file for the whole app, not one per account or
+    // server, so anything surviving a sign-out is read by the next person to
+    // use the device. Unlike resetChannel, that has to include pending sends:
+    // an unsent message belongs to the account that was signing out.
+    await store.applyMessages([
+      _message(id: 'm1', seq: 1),
+      _message(id: 'm2', channelId: 'chan-2', seq: 1),
+    ]);
+    await store.addPending(
+      id: 'local-1',
+      channelId: 'chan-1',
+      authorId: 'user-1',
+      content: 'never sent',
+    );
+    await store.setReadMarker('chan-1', 1);
+
+    await store.clear();
+
+    expect(await store.watchChannel('chan-1').first, isEmpty);
+    expect(await store.watchChannel('chan-2').first, isEmpty,
+        reason: 'every channel goes, not just the one on screen');
+    expect(await store.watchChannels().first, isEmpty,
+        reason: 'the channel list itself leaks which server this was');
+    expect(await store.cursorFor('chan-1'), 0);
+  });
+
   test('out-of-order arrival still reads back in seq order', () async {
     await store.applyMessage(_message(id: 'm3', seq: 3, content: 'third'));
     await store.applyMessage(_message(id: 'm1', seq: 1, content: 'first'));

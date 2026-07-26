@@ -92,11 +92,17 @@ class SlimmApi {
 
   /// Creates an account and signs in. On an unclaimed deployment the first
   /// account also becomes its administrator.
+  ///
+  /// Once a deployment has been claimed, joining it takes an [inviteCode]: the
+  /// server spends the code in the same transaction that creates the account,
+  /// so there is no separate redeem step to get wrong, and a rejected signup
+  /// leaves both the username and the code untouched.
   Future<TokenPair> register({
     required String username,
     required String displayName,
     required String password,
     required String deviceName,
+    String? inviteCode,
   }) async {
     final json = await _send(
       'POST',
@@ -107,6 +113,7 @@ class SlimmApi {
         'display_name': displayName,
         'password': password,
         'device_name': deviceName,
+        if (inviteCode != null) 'invite_code': inviteCode,
       },
     );
     final tokens = TokenPair.fromJson(json as Map<String, dynamic>);

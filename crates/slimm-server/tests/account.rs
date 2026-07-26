@@ -18,7 +18,10 @@ use slimm_server::store::{OpenError, RefreshOutcome, Store};
 use tower::ServiceExt;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-account-test-{}.db", uuid::Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-account-test-{}.db", uuid::Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,
@@ -44,7 +47,8 @@ async fn delete_account_anonymizes_content_and_revokes_access() {
     let message = store
         .send_message(channel.id, account.id, MessageId::generate(), "hello")
         .await
-        .unwrap();
+        .unwrap()
+        .message;
 
     // Before: the token works, the message is authored by alice, login exists.
     assert!(
@@ -231,24 +235,25 @@ async fn the_last_administrator_cannot_strand_a_populated_deployment() {
         push: PushSender::disabled(),
     });
 
-    let signup = |username: &'static str| {
+    let signup = |username: &'static str, invite: Option<String>| {
         let app = app.clone();
         async move {
+            let mut body = json!({
+                "username": username,
+                "display_name": username,
+                "password": "hunter2hunter2",
+                "device_name": "cli"
+            });
+            if let Some(code) = invite {
+                body["invite_code"] = json!(code);
+            }
             let response = app
                 .oneshot(
                     Request::builder()
                         .method("POST")
                         .uri("/auth/register")
                         .header("content-type", "application/json")
-                        .body(Body::from(
-                            json!({
-                                "username": username,
-                                "display_name": username,
-                                "password": "hunter2hunter2",
-                                "device_name": "cli"
-                            })
-                            .to_string(),
-                        ))
+                        .body(Body::from(body.to_string()))
                         .unwrap(),
                 )
                 .await
@@ -263,9 +268,31 @@ async fn the_last_administrator_cannot_strand_a_populated_deployment() {
     };
 
     // The first account claims the deployment and becomes its administrator.
-    let admin = signup("admin").await;
-    // A second, ordinary member: somebody who would be stranded.
-    let _member = signup("member").await;
+    let admin = signup("admin", None).await;
+
+    // A second, ordinary member: somebody who would be stranded. Joining a
+    // claimed deployment takes an invite, so the admin issues one.
+    let created = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/invites")
+                .header("authorization", format!("Bearer {admin}"))
+                .header("content-type", "application/json")
+                .body(Body::from(json!({}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(created.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let invite: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let code = invite["code"].as_str().unwrap().to_owned();
+
+    let _member = signup("member", Some(code)).await;
 
     let refused = app
         .clone()

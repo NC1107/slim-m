@@ -22,6 +22,7 @@
 
 use sqlx::{Sqlite, SqliteConnection, Transaction};
 
+use super::invites::spend_invite;
 use super::{Store, now_ms};
 use crate::auth::{generate_secret, hash_secret};
 use crate::ids::{DeviceId, FamilyId, SessionId, UserId};
@@ -33,6 +34,33 @@ const ACCESS_TTL_MS: i64 = 15 * 60 * 1000;
 const REFRESH_TTL_MS: i64 = 30 * 24 * 60 * 60 * 1000;
 /// Connect tickets exist only to bridge a REST auth into a WebSocket upgrade.
 const WS_TICKET_TTL_MS: i64 = 30 * 1000;
+
+/// How long past its own expiry a refresh token is kept before being swept.
+///
+/// Not zero, and not tunable down casually: reuse detection works by finding
+/// the spent row and noticing `used_at` is set (see [`Store::rotate_refresh`]).
+/// Delete the row and a replayed token stops being distinguishable from one
+/// that never existed, so the family is denied softly instead of being revoked
+/// as leaked. Keeping a full extra `REFRESH_TTL_MS` past expiry means anything
+/// still worth detecting is still there: by then the token has been unusable
+/// for a month and the attacker has had nothing to gain from it for as long.
+const REFRESH_SWEEP_GRACE_MS: i64 = REFRESH_TTL_MS;
+
+/// How long past expiry a spent or stale connect ticket is kept. Single use is
+/// enforced by `used_at` inside the 30-second window, so nothing after that
+/// window depends on the row existing; the hour is slack for clock skew.
+const TICKET_SWEEP_GRACE_MS: i64 = 60 * 60 * 1000;
+
+/// How long past expiry an access token row is kept. Authorization already
+/// checks `expires_at`, so an expired row grants nothing; the day is slack.
+const ACCESS_SWEEP_GRACE_MS: i64 = 24 * 60 * 60 * 1000;
+
+/// How many rows one sweep deletes per table.
+///
+/// Bounded so the sweep cannot take the write lock for an unbounded stretch on
+/// a deployment that has gone a long time without one. Whatever it does not
+/// reach this pass, it reaches on the next.
+const SWEEP_BATCH: i64 = 5_000;
 
 /// A freshly created account.
 #[derive(Debug, Clone)]
@@ -76,7 +104,19 @@ pub enum RefreshOutcome {
 #[derive(Debug)]
 pub enum RegisterError {
     UsernameTaken,
+    /// The deployment has been claimed, so joining is by invitation and no code
+    /// was presented.
+    InviteRequired,
+    /// A code was presented but is expired, spent, revoked, or never existed.
+    /// One variant for all four, so registration cannot be used to mine codes.
+    InviteUnusable,
     Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for RegisterError {
+    fn from(err: sqlx::Error) -> Self {
+        RegisterError::Internal(err.into())
+    }
 }
 
 /// Why opening a session failed.
@@ -115,9 +155,164 @@ impl From<anyhow::Error> for DeleteAccountError {
     }
 }
 
+/// What one sweep removed, so the caller can log something meaningful and a
+/// test can assert on it.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct SweptTokens {
+    pub access_tokens: u64,
+    pub refresh_tokens: u64,
+    pub ws_tickets: u64,
+}
+
+impl SweptTokens {
+    pub fn total(self) -> u64 {
+        self.access_tokens + self.refresh_tokens + self.ws_tickets
+    }
+}
+
 impl Store {
-    /// Registers an account with an Argon2id password hash. A duplicate live
-    /// username is reported as [`RegisterError::UsernameTaken`], not a 500.
+    /// Deletes token rows that are far enough past their expiry to be useless.
+    ///
+    /// Every sign-in writes an access token and a refresh token, every rotation
+    /// writes another refresh token, and every socket connect writes a ticket.
+    /// Nothing deleted any of them except the targeted revocation paths, so all
+    /// three tables grew for the life of a deployment and never shrank, taking
+    /// the indexes over them along for the ride.
+    ///
+    /// Each grace window is chosen so nothing that still means something is
+    /// removed; see the constants for why, particularly
+    /// [`REFRESH_SWEEP_GRACE_MS`], which reuse detection depends on.
+    pub async fn sweep_expired_tokens(&self) -> anyhow::Result<SweptTokens> {
+        let now = now_ms();
+        let access_cutoff = now - ACCESS_SWEEP_GRACE_MS;
+        let refresh_cutoff = now - REFRESH_SWEEP_GRACE_MS;
+        let ticket_cutoff = now - TICKET_SWEEP_GRACE_MS;
+
+        // Separate statements rather than one transaction: these tables are
+        // independent, and holding the write lock across all three buys nothing
+        // while making the pause longer.
+        let access_tokens = sqlx::query!(
+            "DELETE FROM access_tokens WHERE rowid IN
+             (SELECT rowid FROM access_tokens WHERE expires_at < ? LIMIT ?)",
+            access_cutoff,
+            SWEEP_BATCH
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+
+        let refresh_tokens = sqlx::query!(
+            "DELETE FROM refresh_tokens WHERE rowid IN
+             (SELECT rowid FROM refresh_tokens WHERE expires_at < ? LIMIT ?)",
+            refresh_cutoff,
+            SWEEP_BATCH
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+
+        let ws_tickets = sqlx::query!(
+            "DELETE FROM ws_tickets WHERE rowid IN
+             (SELECT rowid FROM ws_tickets WHERE expires_at < ? LIMIT ?)",
+            ticket_cutoff,
+            SWEEP_BATCH
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+
+        Ok(SweptTokens {
+            access_tokens,
+            refresh_tokens,
+            ws_tickets,
+        })
+    }
+
+    /// Registers an account through the front door: the deployment's join
+    /// policy is applied here, atomically with the account insert.
+    ///
+    /// An unclaimed deployment accepts anyone, because the first account is
+    /// what claims it and there is nobody to issue an invite yet. Once claimed,
+    /// joining is by invitation (see [`crate::store::invites`]), and the invite
+    /// is spent in the same transaction that creates the account: a code that
+    /// loses the race for its last remaining use leaves no orphan account
+    /// behind, and an account that fails to insert never spends a code.
+    ///
+    /// The account insert is deliberately the transaction's first statement, so
+    /// it takes the write lock up front rather than reading a snapshot it would
+    /// later have to promote; the same reason [`Self::rotate_refresh`] claims
+    /// write-first.
+    pub async fn register_account(
+        &self,
+        username: &str,
+        display_name: &str,
+        password_hash: &str,
+        invite_code: Option<&str>,
+    ) -> Result<Account, RegisterError> {
+        let id = UserId::generate();
+        let now = now_ms();
+        let mut tx = self.pool.begin().await?;
+
+        let inserted = sqlx::query!(
+            "INSERT INTO users (id, username, display_name, password_hash, created_at)
+             VALUES (?, ?, ?, ?, ?)",
+            id,
+            username,
+            display_name,
+            password_hash,
+            now
+        )
+        .execute(&mut *tx)
+        .await;
+        match inserted {
+            Ok(_) => {}
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(RegisterError::UsernameTaken);
+            }
+            Err(e) => return Err(RegisterError::Internal(e.into())),
+        }
+
+        // Read inside the transaction: a deployment claimed by a concurrent
+        // first registration must not let this one in ungated.
+        let claimed =
+            sqlx::query_scalar!(r#"SELECT 1 AS "one!: i64" FROM roles WHERE is_everyone = 1"#)
+                .fetch_optional(&mut *tx)
+                .await?
+                .is_some();
+
+        if claimed {
+            // Dropping `tx` without committing rolls the account insert back, so
+            // every early return below leaves the username free.
+            let Some(code) = invite_code else {
+                return Err(RegisterError::InviteRequired);
+            };
+            let Some(spent) = spend_invite(&mut tx, code, now).await? else {
+                return Err(RegisterError::InviteUnusable);
+            };
+            if let Some(role_id) = spent {
+                sqlx::query!(
+                    "INSERT OR IGNORE INTO member_roles (user_id, role_id) VALUES (?, ?)",
+                    id,
+                    role_id
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+        }
+
+        tx.commit().await?;
+        Ok(Account {
+            id,
+            username: username.to_owned(),
+        })
+    }
+
+    /// Inserts an account with no join policy applied at all.
+    ///
+    /// This is the bare primitive, for building a fixture or a scenario. It is
+    /// NOT the registration path: a route that calls this reopens the hole
+    /// where anyone could join a claimed deployment without an invite. Route
+    /// handlers use [`Self::register_account`].
     pub async fn create_account(
         &self,
         username: &str,

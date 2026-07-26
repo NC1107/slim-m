@@ -24,6 +24,10 @@ use crate::store::{Bootstrap, IssuedTokens, RefreshOutcome, RegisterError};
 /// realistic request so an oversized body is rejected before it is buffered.
 const AUTH_BODY_LIMIT: usize = 4 * 1024;
 
+/// Said the same way whether the code was missing up front or the deployment
+/// was claimed mid-request, so the client has one string to react to.
+const INVITE_REQUIRED: &str = "an invite code is required to join this server";
+
 /// The auth routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -46,6 +50,11 @@ struct RegisterRequest {
     display_name: String,
     password: String,
     device_name: String,
+    /// Required once the deployment has been claimed; ignored before that,
+    /// since the first account is the one that claims it and there is nobody
+    /// to have issued a code yet.
+    #[serde(default)]
+    invite_code: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -87,8 +96,13 @@ fn token_response(tokens: &IssuedTokens) -> TokenResponse {
 // Handlers
 // ---------------------------------------------------------------------------
 
-// TODO(phase 2): gate registration behind invite redemption or an admin
-// bootstrap once the invite flow exists; it is open now for server-core work.
+/// Creates an account.
+///
+/// Open only until the deployment is claimed; after that, joining is by
+/// invitation, which [`crate::store::Store::register_account`] applies in the
+/// same transaction as the account insert. The "no code at all" case is
+/// answered before hashing, so the cheapest way to hammer this endpoint does
+/// not also buy an Argon2id run per attempt.
 async fn register(
     _limited: RateLimited<PASSWORD>,
     State(state): State<AppState>,
@@ -99,15 +113,30 @@ async fn register(
     validate_label(&req.display_name, "display_name must be 1 to 64 characters")?;
     validate_label(&req.device_name, "device_name must be 1 to 64 characters")?;
 
+    let invite_code = req
+        .invite_code
+        .as_deref()
+        .map(str::trim)
+        .filter(|c| !c.is_empty());
+    if invite_code.is_none() && state.store.is_bootstrapped().await? {
+        return Err(ApiError::BadRequest(INVITE_REQUIRED));
+    }
+
     let hash = state.auth.hash_password(req.password).await?;
     let account = match state
         .store
-        .create_account(&req.username, &req.display_name, &hash)
+        .register_account(&req.username, &req.display_name, &hash, invite_code)
         .await
     {
         Ok(account) => account,
         Err(RegisterError::UsernameTaken) => {
             return Err(ApiError::Conflict("username is already taken"));
+        }
+        // The deployment was claimed between the pre-check above and the
+        // insert, so this registration needs a code after all.
+        Err(RegisterError::InviteRequired) => return Err(ApiError::BadRequest(INVITE_REQUIRED)),
+        Err(RegisterError::InviteUnusable) => {
+            return Err(ApiError::BadRequest("that invite cannot be used"));
         }
         Err(RegisterError::Internal(err)) => return Err(err.into()),
     };
