@@ -97,7 +97,8 @@ The push relay also runs on this host, at `npc_projects/slim-m-relay/`, publishe
 It holds both provider credentials, bind-mounted read-only at mode 640; the image runs as `nonroot` so `group_add: ["1000"]` is what lets it read them.
 `RELAY_TRUST_PROXY=true` because Traefik terminates TLS in front: without it every caller shares one rate-limit bucket and one abusive server throttles everyone.
 
-`slim-npc-server.top` has no NS records and is not registered, so the standing instruction to publish there cannot be honoured yet; `npc-server.top` has a wildcard and is what everything else on the box uses.
+The public name is `slim.npc-server.top`, a subdomain under the `npc-server.top` wildcard like everything else on the box.
+(An earlier note here misread it as a separate `slim-npc-server.top` registration, which does not exist.)
 
 
 A pinned instance runs on the owner's homelab box, deployed 2026-07-24.
@@ -105,7 +106,7 @@ A pinned instance runs on the owner's homelab box, deployed 2026-07-24.
 - Host `npc@10.0.0.100` (Ubuntu, Docker). Stack at `/home/npc/docker-server/npc_projects/slim-m/` (`docker-compose.yml` + `.env`), following that host's one-directory-per-stack convention.
 - Image `ghcr.io/nc1107/slim-m-server:latest` (the release now publishes a rolling `latest` alongside the version and sha tags), SQLite on the named volume `slim-m_slimm_data`, reachable at `http://10.0.0.100:8095`.
 - Auto-updates are on: the container carries `com.centurylinklabs.watchtower.enable=true`. That host runs **exactly one** Watchtower, `scw-watchtower` in `npc_projects/scw_server/`, in label mode across every stack. Do NOT add a second Watchtower to this stack: a new instance stops the existing one on startup, which is how `scw-watchtower` briefly got killed on 2026-07-24 before being restored.
-- LAN only for now: deliberately NOT on `traefik_proxy`. The owner's standing instruction is to publish it at **`slim-npc-server.top`** once a UI exists; the Traefik labels are commented at the bottom of that compose file.
+- Published at **`https://slim.npc-server.top`** through Traefik since 2026-07-25 (joined `traefik_proxy`, labels mirror the relay stack's), and still reachable on the LAN at `http://10.0.0.100:8095`.
 - Verified live against 0.5.0 (auto-updated from 0.4.0 by Watchtower with no manual step, proving the pipeline): `/healthz`, `/version`, a 13-check auth and WebSocket smoke run (including a real ws hello handshake and post-deletion refusal), and a 17-check messaging run (bootstrap seeding, send, idempotent retry, list, edit, read state, sync, and the member-versus-admin permission split), plus rate limiting confirmed live (5 answered, then 429).
 - Operate it with `docker compose` from that directory. It tracks `latest`; set `SLIMM_VERSION` in `.env` to a version to freeze it.
 

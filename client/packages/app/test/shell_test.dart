@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/routing/breakpoints.dart';
 import 'package:slimm_app/src/screens/channel_screen.dart';
+import 'package:slimm_app/src/screens/onboarding_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 void main() {
@@ -70,6 +71,8 @@ void main() {
     });
   });
 
+  _localAddressTests();
+
   group('theme', () {
     test('tokens reach widgets through the theme extension', () {
       for (final (brightness, tokens) in [
@@ -98,6 +101,37 @@ void main() {
         ),
       );
       expect(resolved.accent, AppTokens.dark.accent);
+    });
+  });
+}
+
+/// Local addresses may use plain http; anything public must not.
+void _localAddressTests() {
+  group('local addresses', () {
+    test('loopback and private ranges are treated as local', () {
+      for (final host in [
+        'http://localhost:8080',
+        'http://127.0.0.1:8095',
+        'http://10.0.0.100:8095',
+        'http://192.168.1.20:8080',
+        'http://172.16.4.2:8080',
+        'http://nas.local:8080',
+      ]) {
+        expect(isLocalAddress(Uri.parse(host)), isTrue, reason: host);
+      }
+    });
+
+    test('public addresses are not', () {
+      // 172.32 is outside the private 172.16/12 block, which is the boundary
+      // most often got wrong.
+      for (final host in [
+        'https://chat.example.com',
+        'http://8.8.8.8',
+        'http://172.32.0.1',
+        'http://11.0.0.1',
+      ]) {
+        expect(isLocalAddress(Uri.parse(host)), isFalse, reason: host);
+      }
     });
   });
 }
