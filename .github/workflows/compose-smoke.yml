@@ -172,6 +172,11 @@ jobs:
           print((body + b"." + base64.urlsafe_b64encode(sig).rstrip(b"=")).decode())
           PY
           )
+          # Plain HTTP on purpose, and the only correct choice here: this is a
+          # container-to-container call on a private compose network, to the
+          # port LiveKit serves unencrypted by design. TLS is Caddy's job one
+          # hop further out, and Caddy is not running on the runner because it
+          # has neither a domain nor a certificate to serve.
           net=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q livekit)")
           curl_in() { docker run --rm --network "$net" curlimages/curl:8.11.1 "$@"; }
           curl_in -fsS "http://livekit:7880/rtc/validate?access_token=$token" | grep -q success || {
