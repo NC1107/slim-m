@@ -280,7 +280,7 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 - Flatpak and rpm packaging manifests (`packaging/flatpak/*.yaml`, `packaging/rpm/*.spec`); the release jobs warn-and-skip until they exist.
 - Optional GPG signing secret for the Linux client checksums.
 - A decision on whether to keep release-please's auto-PR flow or switch to manual tag-based releases (to keep the repo at zero open PRs).
-- Where rendered API docs should live: the owner ruled out nc1107.github.io (their user site), so schema-ci attaches the redoc HTML as a run artifact instead of deploying anywhere. A project Pages site would live under nc1107.github.io/slim-m/ without touching the user site, if that distinction changes the answer; hosting it under npc-server.top is the other candidate.
+- ~~Where rendered API docs should live.~~ Settled 2026-07-26: nowhere. GitLab renders an OpenAPI file in its repo browser the way GitHub renders a README, GitHub has no equivalent, and building redoc HTML into a run artifact nobody downloads is not worth a job. The render step is gone; `redocly lint` stays, since that is the schema-ci gate. `schema/openapi.yaml` is read as the source. If a browsable copy is ever wanted: `npx @redocly/cli build-docs schema/openapi.yaml -o /tmp/api.html`.
 - Linux desktop screen sharing on Wayland is an open `flutter_webrtc` bug; voice, video, and the canvas work, only screen capture is broken. Validate in the Phase 4 Fedora RTC spike (fallbacks: a newer flutter_webrtc, contributing the portal fix, or an X11 session).
 
 ## Parked and reference
