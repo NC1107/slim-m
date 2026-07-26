@@ -62,26 +62,25 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-async fn register(app: &Router, username: &str) -> String {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "test"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register(store: &Store, username: &str) -> String {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    json_body(response).await["access_token"]
-        .as_str()
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    store
+        .open_session(account.id, "cli")
+        .await
         .unwrap()
-        .to_owned()
+        .access_token
 }
 
 /// Reacting twice with the same emoji must leave one reaction, because a double
@@ -101,7 +100,7 @@ async fn reacting_twice_is_idempotent() {
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
     let app = app(store.clone());
-    let token = register(&app, "alice").await;
+    let token = register(&store, "alice").await;
 
     let message_id = Uuid::now_v7().to_string();
     app.clone()
@@ -166,7 +165,7 @@ async fn reacting_cannot_probe_for_messages_you_cannot_see() {
     let channel = store.create_channel("private", "text").await.unwrap();
     let app = app(store.clone());
 
-    let stranger = register(&app, "stranger").await;
+    let stranger = register(&store, "stranger").await;
 
     // A message id that certainly does not exist.
     let missing = Uuid::now_v7().to_string();

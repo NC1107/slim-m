@@ -66,29 +66,22 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-/// Registers a user and returns (access_token, user_id).
-async fn register(app: &Router, username: &str) -> (String, String) {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "cli"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register(store: &Store, username: &str) -> (String, String) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = json_body(response).await;
-    (
-        body["access_token"].as_str().unwrap().to_owned(),
-        body["user_id"].as_str().unwrap().to_owned(),
-    )
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id.to_string())
 }
 
 #[tokio::test]
@@ -103,8 +96,8 @@ async fn send_list_and_edit_happy_path() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let (token, _user) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, _user) = register(&store, "alice").await;
 
     let uri = format!("/channels/{}/messages", channel.id);
     let message_id = Uuid::now_v7().to_string();
@@ -166,8 +159,8 @@ async fn send_is_idempotent_over_http() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let (token, _user) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, _user) = register(&store, "alice").await;
 
     let uri = format!("/channels/{}/messages", channel.id);
     let message_id = Uuid::now_v7().to_string();
@@ -209,9 +202,9 @@ async fn send_id_is_scoped_to_channel_and_author() {
         .unwrap();
     let channel_a = store.create_channel("a", "text").await.unwrap();
     let channel_b = store.create_channel("b", "text").await.unwrap();
-    let app = app(store);
-    let (alice, _alice_id) = register(&app, "alice").await;
-    let (bob, _bob_id) = register(&app, "bob").await;
+    let app = app(store.clone());
+    let (alice, _alice_id) = register(&store, "alice").await;
+    let (bob, _bob_id) = register(&store, "bob").await;
 
     let shared_id = Uuid::now_v7().to_string();
 
@@ -265,8 +258,8 @@ async fn permissions_are_enforced() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let (token, _user) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, _user) = register(&store, "alice").await;
 
     let uri = format!("/channels/{}/messages", channel.id);
 
@@ -300,8 +293,8 @@ async fn no_view_permission_hides_the_channel() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let (token, _user) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, _user) = register(&store, "alice").await;
 
     let listed = app
         .clone()
@@ -334,8 +327,8 @@ async fn editing_another_users_message_needs_manage() {
     let channel = store.create_channel("general", "text").await.unwrap();
     let app = app(store.clone());
 
-    let (alice_token, _alice) = register(&app, "alice").await;
-    let (bob_token, bob_id) = register(&app, "bob").await;
+    let (alice_token, _alice) = register(&store, "alice").await;
+    let (bob_token, bob_id) = register(&store, "bob").await;
 
     // Alice sends a message.
     let uri = format!("/channels/{}/messages", channel.id);
@@ -385,8 +378,8 @@ async fn validation_and_missing_resources() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let (token, _user) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, _user) = register(&store, "alice").await;
 
     let uri = format!("/channels/{}/messages", channel.id);
 
@@ -442,8 +435,8 @@ async fn a_message_carries_its_author_display_name() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let app = app(store);
-    let (token, _user) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, _user) = register(&store, "alice").await;
 
     let uri = format!("/channels/{}/messages", channel.id);
     let sent = json_body(

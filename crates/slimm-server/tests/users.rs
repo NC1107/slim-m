@@ -6,7 +6,7 @@
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use serde_json::{Value, json};
+use serde_json::Value;
 use slimm_server::auth::Auth;
 use slimm_server::config::Config;
 use slimm_server::db;
@@ -62,35 +62,29 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-/// Registers a user and returns (access_token, user_id).
-async fn register(app: &Router, username: &str) -> (String, String) {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "cli"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register(store: &Store, username: &str) -> (String, String) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    let body = json_body(response).await;
-    (
-        body["access_token"].as_str().unwrap().to_owned(),
-        body["user_id"].as_str().unwrap().to_owned(),
-    )
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id.to_string())
 }
 
 #[tokio::test]
 async fn a_profile_carries_only_the_public_shape() {
     let store = new_store().await;
-    let app = app(store);
-    let (token, alice_id) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, alice_id) = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -121,8 +115,8 @@ async fn a_profile_carries_only_the_public_shape() {
 async fn a_deleted_account_looks_like_one_that_never_existed() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (token, _my_id) = register(&app, "alice").await;
-    let (_bob_token, bob_id) = register(&app, "bob").await;
+    let (token, _my_id) = register(&store, "alice").await;
+    let (_bob_token, bob_id) = register(&store, "bob").await;
 
     let never_existed = Uuid::now_v7().to_string();
 
@@ -160,9 +154,9 @@ async fn a_deleted_account_looks_like_one_that_never_existed() {
 #[tokio::test]
 async fn batch_lookup_skips_ids_with_nothing_to_report() {
     let store = new_store().await;
-    let app = app(store);
-    let (token, alice_id) = register(&app, "alice").await;
-    let (_, bob_id) = register(&app, "bob").await;
+    let app = app(store.clone());
+    let (token, alice_id) = register(&store, "alice").await;
+    let (_, bob_id) = register(&store, "bob").await;
     let never_existed = Uuid::now_v7().to_string();
 
     let response = app
@@ -191,8 +185,8 @@ async fn batch_lookup_skips_ids_with_nothing_to_report() {
 #[tokio::test]
 async fn an_empty_batch_returns_an_empty_list() {
     let store = new_store().await;
-    let app = app(store);
-    let (token, _id) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, _id) = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -207,8 +201,8 @@ async fn an_empty_batch_returns_an_empty_list() {
 #[tokio::test]
 async fn a_batch_over_the_cap_is_rejected() {
     let store = new_store().await;
-    let app = app(store);
-    let (token, _id) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, _id) = register(&store, "alice").await;
 
     let ids: Vec<String> = (0..101).map(|_| Uuid::now_v7().to_string()).collect();
     let response = app
@@ -227,8 +221,8 @@ async fn a_batch_over_the_cap_is_rejected() {
 #[tokio::test]
 async fn an_unparseable_id_in_the_batch_is_a_bad_request() {
     let store = new_store().await;
-    let app = app(store);
-    let (token, _id) = register(&app, "alice").await;
+    let app = app(store.clone());
+    let (token, _id) = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -241,10 +235,10 @@ async fn an_unparseable_id_in_the_batch_is_a_bad_request() {
 #[tokio::test]
 async fn the_member_list_is_paginated_and_bounded() {
     let store = new_store().await;
-    let app = app(store);
-    let (token, first_id) = register(&app, "alice").await;
-    let (_, second_id) = register(&app, "bob").await;
-    let (_, third_id) = register(&app, "carol").await;
+    let app = app(store.clone());
+    let (token, first_id) = register(&store, "alice").await;
+    let (_, second_id) = register(&store, "bob").await;
+    let (_, third_id) = register(&store, "carol").await;
 
     let first_page = json_body(
         app.clone()
@@ -279,7 +273,7 @@ async fn the_member_list_is_paginated_and_bounded() {
 #[tokio::test]
 async fn the_member_list_requires_authentication() {
     let store = new_store().await;
-    let app = app(store);
+    let app = app(store.clone());
 
     let response = app
         .clone()

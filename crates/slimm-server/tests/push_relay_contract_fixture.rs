@@ -122,32 +122,25 @@ fn request(
     }
 }
 
-async fn json_body(response: axum::response::Response) -> Value {
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register_user(store: &Store, username: &str) -> String {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    serde_json::from_slice(&bytes).unwrap()
-}
-
-async fn register_user(app: &Router, username: &str) -> String {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "phone"
-            })),
-        ))
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    store
+        .open_session(account.id, "cli")
         .await
-        .unwrap();
-    assert_eq!(response.status(), axum::http::StatusCode::OK);
-    let body = json_body(response).await;
-    body["access_token"].as_str().unwrap().to_owned()
+        .unwrap()
+        .access_token
 }
 
 /// Registers a real device keypair for push over HTTP, exactly the request
@@ -326,9 +319,9 @@ async fn push_relay_contract_fixture() {
     .expect("push sender");
 
     let app = app(store.clone(), push);
-    let alice_token = register_user(&app, "alice").await;
-    let bob_token = register_user(&app, "bob").await;
-    let carol_token = register_user(&app, "carol").await;
+    let alice_token = register_user(&store, "alice").await;
+    let bob_token = register_user(&store, "bob").await;
+    let carol_token = register_user(&store, "carol").await;
     let bob_secret = register_push(&app, &bob_token, "ios", REAL_CASE_TOKEN_IOS).await;
     let carol_secret = register_push(&app, &carol_token, "android", REAL_CASE_TOKEN_ANDROID).await;
 

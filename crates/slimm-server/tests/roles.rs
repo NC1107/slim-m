@@ -63,31 +63,22 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-/// Registers a user and returns (access_token, user_id). The first account on
-/// a fresh store claims the deployment and becomes its administrator; every
-/// later one is a plain member with only the `@everyone` base.
-async fn register(app: &Router, username: &str) -> (String, String) {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "cli"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register(store: &Store, username: &str) -> (String, String) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = json_body(response).await;
-    (
-        body["access_token"].as_str().unwrap().to_owned(),
-        body["user_id"].as_str().unwrap().to_owned(),
-    )
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id.to_string())
 }
 
 async fn admin_role_id(store: &Store) -> String {
@@ -112,8 +103,8 @@ async fn admin_role_id(store: &Store) -> String {
 async fn every_verb_requires_manage_roles() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (_admin_token, _admin_id) = register(&app, "alice").await;
-    let (member_token, member_id) = register(&app, "bob").await;
+    let (_admin_token, _admin_id) = register(&store, "alice").await;
+    let (member_token, member_id) = register(&store, "bob").await;
     let admin_role = admin_role_id(&store).await;
 
     let cases: [(&str, String); 6] = [
@@ -150,8 +141,8 @@ async fn every_verb_requires_manage_roles() {
 async fn creating_a_role_cannot_grant_a_permission_the_caller_lacks() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (member_token, member_id) = register(&app, "bob").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (member_token, member_id) = register(&store, "bob").await;
 
     let manager_role = json_body(
         app.clone()
@@ -203,8 +194,8 @@ async fn creating_a_role_cannot_grant_a_permission_the_caller_lacks() {
 async fn assigning_a_role_cannot_grant_a_permission_the_caller_lacks() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (member_token, member_id) = register(&app, "bob").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (member_token, member_id) = register(&store, "bob").await;
     let admin_role = admin_role_id(&store).await;
 
     let manager_role = json_body(
@@ -249,7 +240,7 @@ async fn assigning_a_role_cannot_grant_a_permission_the_caller_lacks() {
 async fn unknown_permission_bits_are_rejected() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
 
     let response = app
         .clone()
@@ -274,7 +265,7 @@ async fn unknown_permission_bits_are_rejected() {
 async fn cannot_unassign_the_last_administrator() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, admin_id) = register(&app, "alice").await;
+    let (admin_token, admin_id) = register(&store, "alice").await;
     let admin_role = admin_role_id(&store).await;
 
     let response = app
@@ -312,8 +303,8 @@ async fn cannot_unassign_the_last_administrator() {
 async fn cannot_delete_the_only_administrator_role() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (member_token, member_id) = register(&app, "bob").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (member_token, member_id) = register(&store, "bob").await;
     let admin_role = admin_role_id(&store).await;
 
     let manager_role = json_body(
@@ -358,8 +349,8 @@ async fn cannot_delete_the_only_administrator_role() {
 async fn a_second_administrator_makes_removal_possible() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, admin_id) = register(&app, "alice").await;
-    let (_member_token, member_id) = register(&app, "bob").await;
+    let (admin_token, admin_id) = register(&store, "alice").await;
+    let (_member_token, member_id) = register(&store, "bob").await;
     let admin_role = admin_role_id(&store).await;
 
     let promote = app
@@ -393,7 +384,7 @@ async fn a_second_administrator_makes_removal_possible() {
 async fn cannot_delete_everyone_role() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
 
     let everyone_id = store
         .list_roles()
@@ -426,7 +417,7 @@ async fn cannot_delete_everyone_role() {
 async fn admin_can_create_update_list_and_the_role_takes_effect() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
 
     let created = json_body(
         app.clone()

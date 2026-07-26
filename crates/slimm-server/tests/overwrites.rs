@@ -65,30 +65,22 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-/// Registers a user and returns (access_token, user_id). The first account on
-/// a fresh store becomes its administrator.
-async fn register(app: &Router, username: &str) -> (String, String) {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "cli"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register(store: &Store, username: &str) -> (String, String) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = json_body(response).await;
-    (
-        body["access_token"].as_str().unwrap().to_owned(),
-        body["user_id"].as_str().unwrap().to_owned(),
-    )
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id.to_string())
 }
 
 async fn general_channel_id(store: &Store) -> String {
@@ -140,7 +132,7 @@ async fn send_message(app: &Router, channel_id: &str, token: &str) -> StatusCode
 async fn nonexistent_channel_refuses_identically_for_everyone() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
     let everyone = everyone_role_id(&store).await;
 
     let missing_channel = Uuid::now_v7().to_string();
@@ -171,8 +163,8 @@ async fn nonexistent_channel_refuses_identically_for_everyone() {
 async fn allow_cannot_grant_a_permission_the_caller_lacks() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (member_token, member_id) = register(&app, "bob").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (member_token, member_id) = register(&store, "bob").await;
     let channel_id = general_channel_id(&store).await;
 
     // Bob holds MANAGE_ROLES (via a role) but never BAN_MEMBERS.
@@ -222,7 +214,7 @@ async fn allow_cannot_grant_a_permission_the_caller_lacks() {
 async fn kind_must_be_role_or_member() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
     let channel_id = general_channel_id(&store).await;
 
     let response = app
@@ -242,7 +234,7 @@ async fn kind_must_be_role_or_member() {
 async fn setting_an_overwrite_for_a_nonexistent_target_is_not_found() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
     let channel_id = general_channel_id(&store).await;
 
     let no_such_role = app
@@ -284,8 +276,8 @@ async fn setting_an_overwrite_for_a_nonexistent_target_is_not_found() {
 async fn set_and_clear_actually_change_what_the_evaluator_returns() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (carol_token, carol_id) = register(&app, "carol").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (carol_token, carol_id) = register(&store, "carol").await;
     let channel_id = general_channel_id(&store).await;
     let everyone = everyone_role_id(&store).await;
 
@@ -341,7 +333,7 @@ async fn set_and_clear_actually_change_what_the_evaluator_returns() {
         .unwrap();
     assert_eq!(clear.status(), StatusCode::NO_CONTENT);
 
-    let (dave_token, _dave_id) = register(&app, "dave").await;
+    let (dave_token, _dave_id) = register(&store, "dave").await;
     assert_eq!(
         send_message(&app, &channel_id, &dave_token).await,
         StatusCode::OK,
@@ -354,7 +346,7 @@ async fn set_and_clear_actually_change_what_the_evaluator_returns() {
 async fn clearing_an_unset_overwrite_is_idempotent() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
     let channel_id = general_channel_id(&store).await;
     let everyone = everyone_role_id(&store).await;
 
@@ -380,8 +372,8 @@ async fn clearing_a_deny_you_do_not_hold_is_refused() {
     let app = app(store.clone());
 
     // First account claims the deployment and is its administrator.
-    let (admin, _admin_id) = register(&app, "admin").await;
-    let (moderator, moderator_id) = register(&app, "moderator").await;
+    let (admin, _admin_id) = register(&store, "admin").await;
+    let (moderator, moderator_id) = register(&store, "moderator").await;
     let channel = general_channel_id(&store).await;
 
     // The moderator may manage roles, but never gets MANAGE_SERVER.

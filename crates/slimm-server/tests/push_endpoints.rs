@@ -86,29 +86,22 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-/// Registers a user and returns (access_token, user_id).
-async fn register_user(app: &Router, username: &str) -> (String, String) {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "phone"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register_user(store: &Store, username: &str) -> (String, String) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    assert_eq!(response.status(), axum::http::StatusCode::OK);
-    let body = json_body(response).await;
-    (
-        body["access_token"].as_str().unwrap().to_owned(),
-        body["user_id"].as_str().unwrap().to_owned(),
-    )
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id.to_string())
 }
 
 /// Generates a device keypair and registers it for push over HTTP. Returns
@@ -335,9 +328,9 @@ async fn a_disabled_sender_never_reaches_a_relay() {
     let (mock, _addr) = spawn_mock_relay().await;
 
     let app = app(store.clone(), PushSender::disabled());
-    let (alice_token, _alice_id) = register_user(&app, "alice").await;
+    let (alice_token, _alice_id) = register_user(&store, "alice").await;
     let _bob_secret = {
-        let (bob_token, _bob_id) = register_user(&app, "bob").await;
+        let (bob_token, _bob_id) = register_user(&store, "bob").await;
         register_push(&app, &bob_token, "bobs-token").await
     };
 
@@ -370,8 +363,8 @@ async fn a_recipient_gets_a_push_and_the_envelope_carries_no_message_content() {
         .expect("push sender");
 
     let app = app(store.clone(), push);
-    let (alice_token, _alice_id) = register_user(&app, "alice").await;
-    let (bob_token, _bob_id) = register_user(&app, "bob").await;
+    let (alice_token, _alice_id) = register_user(&store, "alice").await;
+    let (bob_token, _bob_id) = register_user(&store, "bob").await;
     let bob_secret = register_push(&app, &bob_token, "bobs-token").await;
 
     let secret_content = "the launch codes are 8675309, tell nobody";
@@ -445,8 +438,8 @@ async fn an_unregistered_result_clears_the_registration() {
         .expect("push sender");
 
     let app = app(store.clone(), push);
-    let (alice_token, _alice_id) = register_user(&app, "alice").await;
-    let (bob_token, bob_id) = register_user(&app, "bob").await;
+    let (alice_token, _alice_id) = register_user(&store, "alice").await;
+    let (bob_token, bob_id) = register_user(&store, "bob").await;
     register_push(&app, &bob_token, "bobs-dead-token").await;
     mock.set_status("bobs-dead-token", "unregistered");
 
@@ -481,9 +474,9 @@ async fn a_foreground_device_is_not_pushed() {
         .expect("push sender");
 
     let app = app(store.clone(), push);
-    let (alice_token, _alice_id) = register_user(&app, "alice").await;
+    let (alice_token, _alice_id) = register_user(&store, "alice").await;
 
-    let (bob_token, _bob_id) = register_user(&app, "bob").await;
+    let (bob_token, _bob_id) = register_user(&store, "bob").await;
     register_push(&app, &bob_token, "bobs-token").await;
     let reported = app
         .clone()
@@ -497,7 +490,7 @@ async fn a_foreground_device_is_not_pushed() {
         .unwrap();
     assert_eq!(reported.status(), axum::http::StatusCode::NO_CONTENT);
 
-    let (carol_token, _carol_id) = register_user(&app, "carol").await;
+    let (carol_token, _carol_id) = register_user(&store, "carol").await;
     register_push(&app, &carol_token, "carols-token").await;
     // Carol never reports a lifecycle state at all, so she is pushed.
 
@@ -535,8 +528,8 @@ async fn a_burst_of_messages_in_one_channel_debounces_to_one_push() {
         .expect("push sender");
 
     let app = app(store.clone(), push);
-    let (alice_token, _alice_id) = register_user(&app, "alice").await;
-    let (bob_token, _bob_id) = register_user(&app, "bob").await;
+    let (alice_token, _alice_id) = register_user(&store, "alice").await;
+    let (bob_token, _bob_id) = register_user(&store, "bob").await;
     register_push(&app, &bob_token, "bobs-token").await;
 
     let send = |content: &str| {
@@ -583,8 +576,8 @@ async fn a_relay_failure_does_not_swallow_the_next_messages_wake() {
         .expect("push sender");
 
     let app = app(store.clone(), push);
-    let (alice_token, _alice_id) = register_user(&app, "alice").await;
-    let (bob_token, _bob_id) = register_user(&app, "bob").await;
+    let (alice_token, _alice_id) = register_user(&store, "alice").await;
+    let (bob_token, _bob_id) = register_user(&store, "bob").await;
     register_push(&app, &bob_token, "bobs-token").await;
 
     let send = |content: &str| {
@@ -645,10 +638,10 @@ async fn one_recipients_open_debounce_window_does_not_suppress_another_recipient
         .expect("push sender");
 
     let app = app(store.clone(), push);
-    let (alice_token, _alice_id) = register_user(&app, "alice").await;
-    let (bob_token, _bob_id) = register_user(&app, "bob").await;
+    let (alice_token, _alice_id) = register_user(&store, "alice").await;
+    let (bob_token, _bob_id) = register_user(&store, "bob").await;
     register_push(&app, &bob_token, "bobs-token").await;
-    let (carol_token, _carol_id) = register_user(&app, "carol").await;
+    let (carol_token, _carol_id) = register_user(&store, "carol").await;
     register_push(&app, &carol_token, "carols-token").await;
 
     let report_bob = |state: &str| {

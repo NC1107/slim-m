@@ -109,6 +109,14 @@ paths:
         The first account to register on an unclaimed deployment also claims it,
         seeding the @everyone role, an admin role granted to that account, and a
         general channel.
+
+
+        After that claim, joining is by invitation: `invite_code` is required,
+        and is spent in the same transaction that creates the account, so a
+        rejected signup neither takes the username nor burns the code. A 400
+        with `an invite code is required to join this server` means none was
+        sent; `that invite cannot be used` covers expired, spent, revoked, and
+        never-existed alike, so registration cannot be used to mine codes.
       security: []
       requestBody:
         required: true
@@ -1613,6 +1621,15 @@ components:
           type: string
           minLength: 1
           maxLength: 64
+        invite_code:
+          type: string
+          nullable: true
+          description: >
+            Required once the deployment has been claimed, since joining is by
+            invitation from that point on. Ignored on an unclaimed deployment,
+            where the first account is the one that claims it and there is
+            nobody to have issued a code yet. A blank or whitespace-only value
+            counts as absent.
 
     LoginRequest:
       type: object

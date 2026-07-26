@@ -61,30 +61,22 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-/// Registers a user and returns (access_token, user_id). The first account on
-/// a fresh store becomes its administrator.
-async fn register(app: &Router, username: &str) -> (String, String) {
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "cli"
-            })),
-        ))
+/// A member with a session, built straight through the store.
+///
+/// Deliberately not the `/auth/register` route: joining a claimed deployment
+/// is an invite-gated policy decision, and it is pinned by its own tests in
+/// `registration_gate.rs`. These tests only need somebody signed in, so going
+/// through the store keeps them independent of that policy.
+async fn register(store: &Store, username: &str) -> (String, String) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = json_body(response).await;
-    (
-        body["access_token"].as_str().unwrap().to_owned(),
-        body["user_id"].as_str().unwrap().to_owned(),
-    )
+    // The first account through here claims the deployment, exactly as the
+    // first real registration does; later ones find it already set up.
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id.to_string())
 }
 
 async fn general_channel_id(store: &Store) -> String {
@@ -148,9 +140,9 @@ async fn file_a_report(
 async fn listing_and_resolving_require_manage_messages() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (bob_token, _bob_id) = register(&app, "bob").await;
-    let (carol_token, _carol_id) = register(&app, "carol").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, _bob_id) = register(&store, "bob").await;
+    let (carol_token, _carol_id) = register(&store, "carol").await;
     let channel_id = general_channel_id(&store).await;
     let report_id = file_a_report(
         &app,
@@ -197,9 +189,9 @@ async fn listing_and_resolving_require_manage_messages() {
 async fn the_queue_carries_the_snapshot_and_resolving_removes_it() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (bob_token, _bob_id) = register(&app, "bob").await;
-    let (carol_token, _carol_id) = register(&app, "carol").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, _bob_id) = register(&store, "bob").await;
+    let (carol_token, _carol_id) = register(&store, "carol").await;
     let channel_id = general_channel_id(&store).await;
     let report_id = file_a_report(
         &app,
@@ -266,9 +258,9 @@ async fn the_queue_carries_the_snapshot_and_resolving_removes_it() {
 async fn resolution_must_be_resolved_or_dismissed() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
-    let (bob_token, _bob_id) = register(&app, "bob").await;
-    let (carol_token, _carol_id) = register(&app, "carol").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, _bob_id) = register(&store, "bob").await;
+    let (carol_token, _carol_id) = register(&store, "carol").await;
     let channel_id = general_channel_id(&store).await;
     let report_id = file_a_report(&app, &channel_id, &bob_token, &carol_token, "x").await;
 
@@ -289,7 +281,7 @@ async fn resolution_must_be_resolved_or_dismissed() {
 async fn resolving_a_nonexistent_report_is_not_found() {
     let store = new_store().await;
     let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&app, "alice").await;
+    let (admin_token, _admin_id) = register(&store, "alice").await;
 
     let response = app
         .clone()

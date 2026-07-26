@@ -61,20 +61,41 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
+/// Registers the account that claims the deployment. Only valid first: a
+/// claimed deployment takes an invite (see [`join`]).
 async fn register(app: &Router, username: &str) -> String {
+    signup(app, username, None).await
+}
+
+/// Joins an already-claimed deployment, minting an invite with `host`'s token
+/// the way a real member gets in.
+async fn join(app: &Router, host: &str, username: &str) -> String {
+    let created = app
+        .clone()
+        .oneshot(request("POST", "/invites", Some(host), Some(json!({}))))
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::OK);
+    let code = json_body(created).await["code"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    signup(app, username, Some(&code)).await
+}
+
+async fn signup(app: &Router, username: &str, invite_code: Option<&str>) -> String {
+    let mut body = json!({
+        "username": username,
+        "display_name": username,
+        "password": "hunter2hunter2",
+        "device_name": "cli"
+    });
+    if let Some(code) = invite_code {
+        body["invite_code"] = json!(code);
+    }
     let response = app
         .clone()
-        .oneshot(request(
-            "POST",
-            "/auth/register",
-            None,
-            Some(json!({
-                "username": username,
-                "display_name": username,
-                "password": "hunter2hunter2",
-                "device_name": "cli"
-            })),
-        ))
+        .oneshot(request("POST", "/auth/register", None, Some(body)))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
@@ -122,8 +143,9 @@ async fn first_account_claims_the_deployment_and_can_message() {
     assert_eq!(sent.status(), StatusCode::OK);
     assert_eq!(json_body(sent).await["seq"], 1);
 
-    // A second account joins, inherits @everyone, and can also read and send.
-    let member = register(&app, "bob").await;
+    // A second account joins on an invite, inherits @everyone, and can also
+    // read and send.
+    let member = join(&app, &admin, "bob").await;
     let listed = json_body(
         app.clone()
             .oneshot(request(
@@ -163,7 +185,7 @@ async fn only_a_manager_can_create_channels() {
     let store = new_store().await;
     let app = app(store);
     let admin = register(&app, "alice").await;
-    let member = register(&app, "bob").await;
+    let member = join(&app, &admin, "bob").await;
 
     // The bootstrap admin can create one.
     let created = app

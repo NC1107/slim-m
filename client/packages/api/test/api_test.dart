@@ -108,6 +108,54 @@ void main() {
     });
   });
 
+  group('register', () {
+    Future<Map<String, dynamic>> bodySentBy(
+      Future<void> Function(SlimmApi api) call,
+    ) async {
+      late Map<String, dynamic> sent;
+      final api = SlimmApi(
+        baseUrl: _base,
+        httpClient: MockClient((request) async {
+          sent = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(
+            jsonEncode({
+              'user_id': 'user-1',
+              'access_token': 'a',
+              'refresh_token': 'r',
+              'access_expires_at': 0,
+            }),
+            200,
+          );
+        }),
+      );
+      await call(api);
+      return sent;
+    }
+
+    test('an invite code travels with the signup, not a later redeem',
+        () async {
+      final sent = await bodySentBy((api) => api.register(
+            username: 'bob',
+            displayName: 'Bob',
+            password: 'hunter2hunter2',
+            deviceName: 'cli',
+            inviteCode: 'abc123',
+          ));
+      expect(sent['invite_code'], 'abc123');
+    });
+
+    test('no code means no field at all, so an unclaimed server is unaffected',
+        () async {
+      final sent = await bodySentBy((api) => api.register(
+            username: 'alice',
+            displayName: 'Alice',
+            password: 'hunter2hunter2',
+            deviceName: 'cli',
+          ));
+      expect(sent.containsKey('invite_code'), isFalse);
+    });
+  });
+
   group('refresh', () {
     test('an expired call refreshes once and replays', () async {
       final calls = <String>[];

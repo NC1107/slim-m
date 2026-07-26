@@ -22,6 +22,7 @@
 
 use sqlx::{Sqlite, SqliteConnection, Transaction};
 
+use super::invites::spend_invite;
 use super::{Store, now_ms};
 use crate::auth::{generate_secret, hash_secret};
 use crate::ids::{DeviceId, FamilyId, SessionId, UserId};
@@ -76,7 +77,19 @@ pub enum RefreshOutcome {
 #[derive(Debug)]
 pub enum RegisterError {
     UsernameTaken,
+    /// The deployment has been claimed, so joining is by invitation and no code
+    /// was presented.
+    InviteRequired,
+    /// A code was presented but is expired, spent, revoked, or never existed.
+    /// One variant for all four, so registration cannot be used to mine codes.
+    InviteUnusable,
     Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for RegisterError {
+    fn from(err: sqlx::Error) -> Self {
+        RegisterError::Internal(err.into())
+    }
 }
 
 /// Why opening a session failed.
@@ -116,8 +129,91 @@ impl From<anyhow::Error> for DeleteAccountError {
 }
 
 impl Store {
-    /// Registers an account with an Argon2id password hash. A duplicate live
-    /// username is reported as [`RegisterError::UsernameTaken`], not a 500.
+    /// Registers an account through the front door: the deployment's join
+    /// policy is applied here, atomically with the account insert.
+    ///
+    /// An unclaimed deployment accepts anyone, because the first account is
+    /// what claims it and there is nobody to issue an invite yet. Once claimed,
+    /// joining is by invitation (see [`crate::store::invites`]), and the invite
+    /// is spent in the same transaction that creates the account: a code that
+    /// loses the race for its last remaining use leaves no orphan account
+    /// behind, and an account that fails to insert never spends a code.
+    ///
+    /// The account insert is deliberately the transaction's first statement, so
+    /// it takes the write lock up front rather than reading a snapshot it would
+    /// later have to promote; the same reason [`Self::rotate_refresh`] claims
+    /// write-first.
+    pub async fn register_account(
+        &self,
+        username: &str,
+        display_name: &str,
+        password_hash: &str,
+        invite_code: Option<&str>,
+    ) -> Result<Account, RegisterError> {
+        let id = UserId::generate();
+        let now = now_ms();
+        let mut tx = self.pool.begin().await?;
+
+        let inserted = sqlx::query!(
+            "INSERT INTO users (id, username, display_name, password_hash, created_at)
+             VALUES (?, ?, ?, ?, ?)",
+            id,
+            username,
+            display_name,
+            password_hash,
+            now
+        )
+        .execute(&mut *tx)
+        .await;
+        match inserted {
+            Ok(_) => {}
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(RegisterError::UsernameTaken);
+            }
+            Err(e) => return Err(RegisterError::Internal(e.into())),
+        }
+
+        // Read inside the transaction: a deployment claimed by a concurrent
+        // first registration must not let this one in ungated.
+        let claimed =
+            sqlx::query_scalar!(r#"SELECT 1 AS "one!: i64" FROM roles WHERE is_everyone = 1"#)
+                .fetch_optional(&mut *tx)
+                .await?
+                .is_some();
+
+        if claimed {
+            // Dropping `tx` without committing rolls the account insert back, so
+            // every early return below leaves the username free.
+            let Some(code) = invite_code else {
+                return Err(RegisterError::InviteRequired);
+            };
+            let Some(spent) = spend_invite(&mut tx, code, now).await? else {
+                return Err(RegisterError::InviteUnusable);
+            };
+            if let Some(role_id) = spent {
+                sqlx::query!(
+                    "INSERT OR IGNORE INTO member_roles (user_id, role_id) VALUES (?, ?)",
+                    id,
+                    role_id
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+        }
+
+        tx.commit().await?;
+        Ok(Account {
+            id,
+            username: username.to_owned(),
+        })
+    }
+
+    /// Inserts an account with no join policy applied at all.
+    ///
+    /// This is the bare primitive, for building a fixture or a scenario. It is
+    /// NOT the registration path: a route that calls this reopens the hole
+    /// where anyone could join a claimed deployment without an invite. Route
+    /// handlers use [`Self::register_account`].
     pub async fn create_account(
         &self,
         username: &str,
