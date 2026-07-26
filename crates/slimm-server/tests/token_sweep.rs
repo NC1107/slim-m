@@ -27,6 +27,9 @@ async fn pool() -> SqlitePool {
         hash_concurrency: 2,
         push_relay_url: None,
         push_relay_key: None,
+        livekit_url: None,
+        livekit_api_key: None,
+        livekit_api_secret: None,
     };
     db::connect(&config).await.expect("connect + migrate")
 }

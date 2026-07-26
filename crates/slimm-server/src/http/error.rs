@@ -17,6 +17,11 @@ pub(crate) enum ApiError {
     NotFound(&'static str),
     Conflict(&'static str),
     TooManyRequests,
+    /// The deployment does not offer this feature at all, as opposed to
+    /// offering it and being briefly unable to serve it. Distinct from
+    /// [`ApiError::Unavailable`] so a client can hide the feature rather than
+    /// showing it and retrying forever.
+    NotConfigured(&'static str),
     Unavailable,
     Internal,
 }
@@ -35,6 +40,7 @@ impl IntoResponse for ApiError {
             ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message),
             ApiError::Conflict(message) => (StatusCode::CONFLICT, message),
             ApiError::TooManyRequests => (StatusCode::TOO_MANY_REQUESTS, "slow down and retry"),
+            ApiError::NotConfigured(message) => (StatusCode::NOT_IMPLEMENTED, message),
             ApiError::Unavailable => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "server busy, retry shortly",

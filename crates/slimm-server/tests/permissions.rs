@@ -18,6 +18,9 @@ async fn store() -> Store {
         hash_concurrency: 2,
         push_relay_url: None,
         push_relay_key: None,
+        livekit_url: None,
+        livekit_api_key: None,
+        livekit_api_secret: None,
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)

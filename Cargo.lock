@@ -2141,6 +2141,7 @@ dependencies = [
  "crypto_box",
  "envy",
  "futures-util",
+ "hmac",
  "jiff",
  "rand_core 0.6.4",
  "reqwest",

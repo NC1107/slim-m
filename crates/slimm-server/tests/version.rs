@@ -27,6 +27,9 @@ async fn new_store() -> Store {
         hash_concurrency: 2,
         push_relay_url: None,
         push_relay_key: None,
+        livekit_url: None,
+        livekit_api_key: None,
+        livekit_api_secret: None,
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)
@@ -39,6 +42,7 @@ fn app(store: Store, push: PushSender) -> Router {
         hub: Hub::new(),
         limiter: RateLimiter::new(),
         push,
+        voice: slimm_server::voice::VoiceService::disabled(),
     })
 }
 
@@ -78,6 +82,9 @@ async fn version_reports_push_enabled_with_a_relay() {
         hash_concurrency: 2,
         push_relay_url: Some("https://relay.example".into()),
         push_relay_key: Some("smr_test".into()),
+        livekit_url: None,
+        livekit_api_key: None,
+        livekit_api_secret: None,
     };
     let push = PushSender::new(&config).expect("relay config is valid");
 

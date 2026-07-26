@@ -14,6 +14,7 @@ pub mod permissions;
 pub mod push;
 pub mod ratelimit;
 pub mod store;
+pub mod voice;
 
 use std::net::SocketAddr;
 
@@ -33,12 +34,14 @@ pub async fn run() -> anyhow::Result<()> {
     let hub = hub::Hub::new();
     let limiter = ratelimit::RateLimiter::new();
     let push = push::PushSender::new(&config)?;
+    let voice = voice::VoiceService::new(&config)?;
     let app = http::router(http::AppState {
         store,
         auth,
         hub,
         limiter,
         push,
+        voice,
     });
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;
