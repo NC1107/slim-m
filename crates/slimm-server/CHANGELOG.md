@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/NC1107/slim-m/compare/server-v0.8.0...server-v1.0.0) (2026-07-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* gate registration behind an invite, plus the phase 3 audit fixes ([#42](https://github.com/NC1107/slim-m/issues/42))
+
+### Features
+
+* gate registration behind an invite, plus the phase 3 audit fixes ([#42](https://github.com/NC1107/slim-m/issues/42)) ([06a9397](https://github.com/NC1107/slim-m/commit/06a93975f126f39aec335760ba0712901103b279))
+
 ## [0.8.0](https://github.com/NC1107/slim-m/compare/server-v0.7.0...server-v0.8.0) (2026-07-26)
 
 
