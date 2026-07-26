@@ -3,6 +3,17 @@
 Source material: the echo-messenger reference notes (`decentralized-chat-app/reference-echo-messenger.md`) and its own `docs/voice-lounge/*` decision-of-record folder.
 This report designs a fresh implementation for slim-m, reusing what worked in echo-messenger and deliberately not repeating its two biggest mistakes: the flat-JSON-array data model and the ordering-free sync layer.
 
+
+> **Settled 2026-07-26** (see `../decisions/0004-visual-identity-review.md`).
+> This doc listed `window` as a fourth content kind here and then said two
+> paragraphs later that it was not a kind at all. The second reading is right:
+> drag, resize and bring-to-front are a *contract* that image, gif,
+> camera_bubble and screen_share_tile all satisfy, and a distinct window object
+> would be a frame with nothing in it. Content kinds are `stroke | image | gif`.
+> The consequence is that the tool dock has three tools (pen, note, shape), not
+> four; paste is a gesture, not a tool.
+
+
 ## A note on "infinite"
 
 The brief asks for a literally infinite canvas.

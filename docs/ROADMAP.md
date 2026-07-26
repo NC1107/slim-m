@@ -204,12 +204,13 @@ Deliverables:
 - The numpy additive-synthesis pipeline with a shared synth.py, seven sounds sharing one bell-like timbre distinguished by contour, count, and duration, pyloudnorm normalization with a whole-clip K-weighted RMS fallback for sub-400ms clips, and a CI job that regenerates WAVs from CI only and diffs.
 - Per-platform playback: iOS .ambient foreground player plus NSE on-device sound selection with call-session precedence rules; Android versioned Notification Channels; Linux foreground PipeWire playback; a separate CallKit ringtone bundled file scoped by platform and call direction; a CI bundle-check so a missing file never silently falls back.
 - Motion, haptic, hover, and transition polish per the design language (platform-idiomatic transitions, reduce-motion respected, debounced zoom-limit haptic), and a pixel-perfection pass across the primary flows.
+- The interaction details decision 0004 specified rather than left to taste: the pulsing speaking ring as the one looping chrome animation, with a static ring plus bar glyph under reduce-motion so speaking is conveyed twice; disabled controls that keep their space and state why they are unavailable rather than hiding; the density selector changing vertical rhythm only, never type or touch-target size; and the message column capped near 760px.
 
 Risks: cross-platform loudness perception can be misread as a bug and is documented as relative-not-absolute normalization; three iOS audio paths add surface, mitigated by the CI bundle-check.
 
 Dependencies: Phase 0, Phase 2 (client shell), Phase 3 (NSE), Phase 4 (CallKit and call audio session).
 
-Exit criteria: seven distinguishable, consistently normalized sounds play correctly on Fedora, iOS, and Android; in-app chimes never glitch a live call; reduce-motion collapses non-essential motion; the polish pass has no known visible defects in the primary flows.
+Exit criteria: seven distinguishable, consistently normalized sounds play correctly on Fedora, iOS, and Android; in-app chimes never glitch a live call; reduce-motion collapses non-essential motion; the polish pass has no known visible defects in the primary flows; and a golden proves every presence state stays distinguishable desaturated, since the shape-first cue only matters if it survives the greyscale screenshot a bug report arrives as.
 
 ## Phase 9 - Release Readiness and Store Submission
 
@@ -245,3 +246,7 @@ Exit criteria: the store-readiness checklist passes; a one-command self-host wor
 
 Every dependency points backward; no phase requires work scheduled later.
 The design track (validating the palette against the CI contrast gate and the designer review) runs in parallel from Phase 0, since the token pipeline and gate exist from the start and the visual identity is decoupled from widget code by design.
+**The designer review happened on 2026-07-26** ([decision 0004](decisions/0004-visual-identity-review.md)).
+It confirmed the neutrals, type, spacing and border-first elevation, corrected several token values, and added three token families that were missing.
+One thing remains open: the accent hue, because the shipped teal collides with the online-status green.
+That is a single primitive value plus regenerated goldens whenever it is decided, and it does not block any phase.

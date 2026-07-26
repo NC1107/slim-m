@@ -373,7 +373,7 @@ class _UnreadBadge extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: tokens.accent,
-          borderRadius: BorderRadius.circular(AppRadii.chip),
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
         child: Text(
           count > 99 ? '99+' : '$count',

@@ -1,6 +1,30 @@
 # Visual Identity and Design Language
 
 Scope: color, typography, spacing, iconography, motion, and how they compile into Flutter design tokens.
+
+> **Status, 2026-07-26.** This is the original proposal. Where it disagrees with
+> `client/packages/design_system/lib/src/app_tokens.dart`, **the code is
+> correct** - values were tuned to pass the WCAG contrast gate, and the
+> 2026-07-26 identity review changed several more.
+>
+> Superseded by [`../decisions/0004-visual-identity-review.md`](../decisions/0004-visual-identity-review.md)
+> on these points specifically:
+>
+> - The accent is three tokens now (`accent`, `accentFill` with `accentOn`,
+>   `accentSoft`), not one. One value cannot be both legible as text and
+>   brand-true as a fill.
+> - `surface.sunken` exists, below base, for the rails.
+> - True black's hairline is `#2C3238`, not `#23282D`.
+> - Radius is `6 / 10 / 16 / full`. The 4dp step is gone: it is
+>   indistinguishable from 6 under a hairline.
+> - The type scale drops subheading 17, leaving 11 / 12 / 14 / 15 / 20 / 24.
+> - Code syntax, canvas object and focus-ring token families were missing and
+>   now exist.
+> - The accent **hue** is still open; a glacier cyan is recommended because the
+>   shipped teal collides with the online-status green.
+>
+> The direction, the reasoning and the rejected alternatives below all still
+> stand. Read this for why, and the decision record for what.
 This builds on the token pipeline already decided in `flutter-client.md` (a compiled token file wired through a `ThemeExtension`, with light, dark, and true-black variants) and defines the values that fill it.
 
 ## Direction
