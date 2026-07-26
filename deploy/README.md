@@ -38,6 +38,11 @@ docker compose ps                         # server and caddy should show healthy
 Litestream is off by default because it needs a real S3-compatible bucket.
 To turn it on: fill in the `LITESTREAM_*` values in `.env`, uncomment `COMPOSE_PROFILES=litestream`, then re-run `docker compose up -d`.
 
+**Litestream replicates only the SQLite database file. Attachment and avatar bytes are not covered.**
+They live on disk beside the database, at `SLIMM_ATTACHMENTS_DIR` (default `/data/media` inside the container, so the same `slimm_data` volume as the database), specifically because multi-megabyte blobs in the SQLite file would bloat what Litestream streams for no benefit.
+That means restoring from a Litestream replica brings back every message and its attachment references, but not the attachment files themselves; a client would render broken images and failed downloads for anything uploaded since the last time `/data/media` was backed up some other way.
+If attachments matter to your deployment, back up the whole `slimm_data` volume yourself (a periodic `docker run --rm -v slimm_data:/data -v $(pwd):/backup alpine tar czf /backup/slimm-data-$(date +%F).tgz -C / data`, restic, or your platform's volume-snapshot feature), not just the database.
+
 ## Voice and screen share
 
 LiveKit's signaling channel is fronted by Caddy on the `LIVEKIT_DOMAIN` you set, so no extra port beyond 443 is needed for a client to negotiate a call.

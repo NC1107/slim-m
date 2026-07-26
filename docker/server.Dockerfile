@@ -28,7 +28,8 @@ COPY --from=builder /out/slimm-server /usr/local/bin/slimm-server
 COPY --from=builder --chown=nonroot:nonroot /out/data /data
 
 ENV SLIMM_PORT=8080 \
-    SLIMM_DATABASE_PATH=/data/slimm.db
+    SLIMM_DATABASE_PATH=/data/slimm.db \
+    SLIMM_ATTACHMENTS_DIR=/data/media
 EXPOSE 8080
 VOLUME ["/data"]
 USER nonroot
