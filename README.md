@@ -33,6 +33,7 @@ curl localhost:8080/version     # -> {"name":"slim-m",...}
 
 ## Documents
 
+- API reference: [schema/openapi.yaml](schema/openapi.yaml) is the source of record; a rendered HTML copy is attached to each schema-ci run as the `api-docs` artifact, or build one locally with `npx @redocly/cli build-docs schema/openapi.yaml -o /tmp/api.html`
 - [Brief](docs/BRIEF.md), [strategy](docs/STRATEGY.md), [roadmap](docs/ROADMAP.md)
 - [Decisions of record](docs/decisions/), [backlog](docs/BACKLOG.md)
 - [Licensing](LICENSING.md) (AGPL-3.0 server, Apache-2.0 client and schema), [contributing](CONTRIBUTING.md)
