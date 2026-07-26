@@ -100,6 +100,32 @@ jobs:
         working-directory: client/packages/app
         run: flutter build ios --simulator --no-codesign
 
+      # The simulator is chosen from what the runner actually has rather than
+      # by name. A hardcoded 'iPhone 16' broke the first time this ran, and it
+      # would break again silently every time GitHub rolls the image forward.
+      - name: pick an available simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          udid=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          devices = json.load(sys.stdin)['devices']
+          for runtime, devs in sorted(devices.items()):
+              if 'iOS' not in runtime:
+                  continue
+              for dev in devs:
+                  if dev.get('isAvailable') and 'iPhone' in dev.get('name', ''):
+                      print(dev['udid'])
+                      raise SystemExit
+          ")
+          if [ -z "$udid" ]; then
+            echo "::error::no available iPhone simulator on this runner"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices available | grep "$udid" || true
+
       - name: run xctest
         working-directory: client/packages/app/ios
         run: |
@@ -107,7 +133,7 @@ jobs:
           xcodebuild test \
             -workspace Runner.xcworkspace \
             -scheme Runner \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
             -only-testing:RunnerTests \
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty || exit ${PIPESTATUS[0]}
