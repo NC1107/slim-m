@@ -126,6 +126,11 @@ async fn a_spent_refresh_token_survives_long_enough_to_still_catch_reuse() {
         "a token only just past expiry is still the evidence reuse detection reads"
     );
 
+    // The grace window is zero here, but `now - used_at` is measured in whole
+    // milliseconds and this test is fast enough to land inside the same one,
+    // which would read as the honest client racing itself rather than a replay.
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+
     assert!(
         matches!(
             store.rotate_refresh(&original.refresh_token).await.unwrap(),

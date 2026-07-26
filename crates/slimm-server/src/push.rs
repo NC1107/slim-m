@@ -43,6 +43,7 @@ use url::{Host, Url};
 
 use crate::config::Config;
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
+use crate::permissions::Permissions;
 use crate::store::{Store, now_ms};
 
 /// How long a burst of messages in one channel collapses into a single wake.
@@ -176,14 +177,40 @@ async fn deliver(
     message_id: MessageId,
     seq: Seq,
 ) {
-    let viewers = match store.channel_viewer_ids(channel_id).await {
-        Ok(viewers) => viewers,
+    // Start from who could receive a push at all, then filter that set by view
+    // permission, rather than evaluating permissions for every live user and
+    // then asking which of them have a device. Both orders give the same
+    // recipients, but this one costs a single indexed query on a deployment
+    // where nobody has registered for push, instead of a full permission
+    // evaluation per user on every message sent.
+    let candidates = match store.users_with_push_devices().await {
+        Ok(candidates) => candidates,
         Err(err) => {
-            tracing::warn!(error = %err, %channel_id, "push: failed to resolve channel viewers");
+            tracing::warn!(error = %err, %channel_id, "push: failed to resolve push candidates");
             return;
         }
     };
-    let recipients: Vec<UserId> = viewers.into_iter().filter(|&id| id != author_id).collect();
+
+    let mut recipients: Vec<UserId> = Vec::with_capacity(candidates.len());
+    for user_id in candidates {
+        if user_id == author_id {
+            continue;
+        }
+        // A recipient who cannot see the channel must never be told a message
+        // landed in it; that is the whole reason this check is here and not
+        // skipped as an optimization.
+        match store
+            .has_permission(user_id, channel_id, Permissions::VIEW_CHANNEL)
+            .await
+        {
+            Ok(true) => recipients.push(user_id),
+            Ok(false) => {}
+            Err(err) => {
+                tracing::warn!(error = %err, %channel_id, "push: failed to check a recipient's view permission");
+                return;
+            }
+        }
+    }
     if recipients.is_empty() {
         return;
     }
