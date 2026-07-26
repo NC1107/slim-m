@@ -1525,6 +1525,16 @@ components:
           type: integer
           format: int32
           description: Wire-protocol envelope version a client negotiates against.
+        push_enabled:
+          type: boolean
+          description: >
+            Whether this deployment can deliver push notifications at all
+            (a relay is configured). Absent on servers older than 0.8.0,
+            which a client must treat as unknown rather than false.
+            Deliberately unauthenticated: onboarding surfaces it before an
+            account exists, so someone choosing a LAN-only server learns
+            their phone will stay silent while they can still choose
+            differently.
 
     TokenPair:
       type: object

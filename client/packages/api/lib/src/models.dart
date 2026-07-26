@@ -13,16 +13,24 @@ class Version {
     required this.name,
     required this.version,
     required this.protocol,
+    this.pushEnabled,
   });
 
   final String name;
   final String version;
   final int protocol;
 
+  /// Whether the server can deliver push notifications at all. Null on
+  /// servers too old to report it, which is "unknown", not "no": warning
+  /// someone off a server that actually has push would be worse than
+  /// staying quiet.
+  final bool? pushEnabled;
+
   factory Version.fromJson(Map<String, dynamic> json) => Version(
         name: json['name'] as String,
         version: json['version'] as String,
         protocol: json['protocol'] as int,
+        pushEnabled: json['push_enabled'] as bool?,
       );
 }
 

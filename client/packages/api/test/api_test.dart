@@ -49,6 +49,23 @@ void main() {
       expect(message.isEdited, isTrue);
     });
 
+    test('a server too old to report push reads as unknown, not false', () {
+      final old = Version.fromJson({
+        'name': 'slim-m',
+        'version': '0.6.0',
+        'protocol': 1,
+      });
+      expect(old.pushEnabled, isNull);
+
+      final current = Version.fromJson({
+        'name': 'slim-m',
+        'version': '0.8.0',
+        'protocol': 1,
+        'push_enabled': false,
+      });
+      expect(current.pushEnabled, isFalse);
+    });
+
     test('token and ticket toString never leak the secret', () {
       expect(_tokens(access: 'super-secret').toString(),
           isNot(contains('super-secret')));

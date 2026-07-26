@@ -5,6 +5,7 @@
 /// competing sockets open and one kicks the other offline.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/native.dart';
@@ -105,5 +106,169 @@ void main() {
             'session-driven start is the only thing allowed to run');
 
     container.dispose();
+  });
+
+  group('push reachability', () {
+    /// Pumps the screen with /version answering [versionBody] and returns
+    /// the finder for the no-push notice.
+    Future<Finder> pumpWithVersion(
+      WidgetTester tester,
+      Map<String, Object?> versionBody,
+    ) async {
+      final httpClient = MockClient((request) async {
+        if (request.method == 'GET' && request.url.path == '/version') {
+          return http.Response(
+            jsonEncode(versionBody),
+            200,
+            headers: const {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('{}', 200);
+      });
+
+      final container = ProviderContainer(overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        probeApiProvider.overrideWithValue(
+          (baseUrl) => SlimmApi(baseUrl: baseUrl, httpClient: httpClient),
+        ),
+      ]);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const SignInScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      return find.textContaining('cannot send push notifications');
+    }
+
+    testWidgets('a server that reports no push says so before sign-in',
+        (tester) async {
+      final notice = await pumpWithVersion(tester, {
+        'name': 'slim-m',
+        'version': '0.8.0',
+        'protocol': 1,
+        'push_enabled': false,
+      });
+      expect(notice, findsOneWidget);
+    });
+
+    testWidgets('a server with push shows no notice', (tester) async {
+      final notice = await pumpWithVersion(tester, {
+        'name': 'slim-m',
+        'version': '0.8.0',
+        'protocol': 1,
+        'push_enabled': true,
+      });
+      expect(notice, findsNothing);
+    });
+
+    testWidgets('a server too old to say is not accused of having no push',
+        (tester) async {
+      final notice = await pumpWithVersion(tester, {
+        'name': 'slim-m',
+        'version': '0.6.0',
+        'protocol': 1,
+      });
+      expect(notice, findsNothing);
+    });
+
+    testWidgets(
+        'editing the field re-probes, and a slow failure from the old '
+        'address cannot wipe the notice the new one earned', (tester) async {
+      // The prefilled server hangs until told to fail; the typed one
+      // answers no-push immediately. The stale failure arriving after the
+      // fresh answer is exactly the interleaving the guard exists for.
+      final oldServerGate = Completer<void>();
+      final httpClient = MockClient((request) async {
+        if (request.url.host == 'old.example') {
+          await oldServerGate.future;
+          throw http.ClientException('connection timed out');
+        }
+        return http.Response(
+          jsonEncode({
+            'name': 'slim-m',
+            'version': '0.8.0',
+            'protocol': 1,
+            'push_enabled': false,
+          }),
+          200,
+          headers: const {'content-type': 'application/json'},
+        );
+      });
+
+      final container = ProviderContainer(overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        serverUrlProvider
+            .overrideWith((ref) => Uri.parse('http://old.example')),
+        probeApiProvider.overrideWithValue(
+          (baseUrl) => SlimmApi(baseUrl: baseUrl, httpClient: httpClient),
+        ),
+      ]);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const SignInScreen(),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final notice = find.textContaining('cannot send push notifications');
+      expect(notice, findsNothing);
+
+      await tester.enterText(
+          find.byType(TextField).first, 'http://new.example');
+      // Past the debounce, then let the probe's response apply.
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pump();
+      expect(notice, findsOneWidget,
+          reason: 'editing the field must probe the new address');
+
+      // Now the old address's probe finally fails. The notice belongs to
+      // the current address and must survive the stale failure.
+      oldServerGate.complete();
+      await tester.pump();
+      await tester.pump();
+      expect(notice, findsOneWidget,
+          reason: 'a stale failure for a previous address must not '
+              'relabel the current one as unknown');
+    });
+  });
+
+  testWidgets(
+      'the server field starts from the onboarding choice, not a hardcoded '
+      'address', (tester) async {
+    final container = ProviderContainer(overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      serverUrlProvider.overrideWith(
+        (ref) => Uri.parse('https://chat.example'),
+      ),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const SignInScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<TextField>(find.byType(TextField).first);
+    expect(field.controller!.text, 'https://chat.example');
   });
 }
