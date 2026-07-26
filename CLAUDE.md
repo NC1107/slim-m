@@ -12,16 +12,16 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
-## Current state (2026-07-24)
+## Current state (2026-07-25)
 
-Phase 0 (foundations) is complete: both repos live, full CI, a validated release pipeline, quality and performance gates, and design mockups.
-Phase 1 (server and protocol core) is in progress.
+Phases 0 (foundations), 1 (server and protocol core), and 2 (client shell and text messaging) are complete.
+Phase 3 (push relay and notifications) is nearly complete; what remains is listed under "Still open in Phase 3" below.
 
 Repositories (public, owner NC1107):
 - Core monorepo: https://github.com/NC1107/slim-m (Rust server + Flutter client + shared schema).
 - Push relay: https://github.com/NC1107/slim-m-relay (Go, adapted from check-in-relay). Local checkout at `../slim-m-relay`.
 
-Server releases 0.1.0 and 0.2.0 are cut, with signed multi-arch GHCR images and native musl binaries.
+Server 0.7.0 is released (2026-07-25) with signed multi-arch GHCR images and native musl binaries; the live instance tracks `latest` and auto-updates.
 
 Phase 1 merged so far:
 - Core SQLite schema (PR #3): users, auth tables, RBAC, channels, per-scope sequence counters, messages, reactions, attachments, invites, read state, canvas tables, FTS5.
@@ -58,11 +58,14 @@ What landed:
 - Relay hardening (relay PR #1): dead-token pruning, a VoIP topic for calls, a bounded worker pool under a real deadline, a registration ceiling, and `SECURITY.md`/`CODEOWNERS`/`MAINTAINERS.md`.
 - Visible alerts (relay PR #2): message and mention kinds send a fixed generic string rather than a silent `content-available` push, which displayed nothing at all without a Notification Service Extension.
 - iOS client registration (PR #31) and session persistence (PR #32).
+- Android push, sender names, and the cross-repo envelope contract test (PR #33, relay PR #3). The contract job checks out both repos and drives a server-generated fixture through the relay's real HTTP handler.
+- The endpoints the frontend still needs (PR #36): 21 routes (message delete, FTS search, profiles and member list, self profile, channel rename/delete, roles, overwrites, admin password recovery, report triage), the openapi contract gate (`tests/openapi_contract.rs`), and three privilege fixes found by adversarial review.
+- Android delivery (PR #38): upload keystore signing (verified signer in CI, never debug), a release job attaching apk + aab, and the Play Console app (see identifiers below). First AAB 0.1.0 (4) is on the internal testing track; no testers added yet by owner choice.
+- Push reachability in onboarding (PR #39): `/version` reports `push_enabled`, and the sign-in screen (where all onboarding paths land) probes it and shows a non-blocking notice when a server explicitly cannot push. Also fixed the sign-in field hardcoding a LAN address over the onboarding choice.
 
 Still open in Phase 3:
 - The iOS Notification Service Extension, which is what would replace "New message" with the decrypted content. It needs a new Xcode target, which cannot be created or tested on this machine.
-- Android push, and the cross-repo envelope contract test (both in progress).
-- Reachability surfaced in onboarding as a hard push precondition.
+- The Android half of the exit criterion: a real backgrounded Android device receiving a content-free wake. No Android hardware has been available; the pipeline, registration path, and contract test are done.
 
 Known residuals, deliberately shipped:
 - The session write lands just after the in-memory token becomes authoritative, so a process death in that window replays a spent refresh token into reuse detection and forces a sign-out. Recoverable, but closing it means reordering `SlimmApi`'s refresh path.
@@ -77,16 +80,20 @@ The bundle id is deliberately not tied to the product name: the App Store displa
 - Apple team `76S78SUWVM`, APNs key `AY9T3ZH9JX` (team scoped, sandbox and production; both settings are fixed at creation).
 - App Store Connect app id `6794496135`, distribution certificate expiring 2027-07-25, profile `slim-m App Store Distribution`.
 - Firebase project `slim-m` on the free Spark plan, FCM v1 enabled. Analytics and Gemini were declined at creation: neither is needed to send a push and both widen what Google sees of a messaging product.
-- Secrets live in `~/.secrets/slim-m/`, mode 600, outside the repo. GitHub secrets are set for the TestFlight pipeline.
+- Play Console: app "slim-m", package `top.npcserver.slimm`, app id `4975488981113040762`, under the "Echo Messenger" developer account (`8924129173175438446`). Play App Signing is on; our keystore is the upload key only.
+- Android upload keystore: `~/.secrets/slim-m/android-upload-keystore.jks` (alias `upload`, password alongside in `android-upload-keystore-password.txt`). GitHub secrets `ANDROID_UPLOAD_KEYSTORE_B64`, `ANDROID_KEY_PROPERTIES`, `ANDROID_GOOGLE_SERVICES_JSON` feed the release job.
+- Secrets live in `~/.secrets/slim-m/`, mode 600, outside the repo. GitHub secrets are set for the TestFlight and Android pipelines.
 - `google-services.json` and `GoogleService-Info.plist` are gitignored on purpose. Google does not class them as secrets, but this repo is public and they carry an API key, so CI injects them like the signing assets. A contributor needs their own to build the mobile targets.
 
-The iOS TestFlight pipeline works: push a `client-v*` tag and a signed build reaches the Internal Testers group, which has automatic distribution on.
-The job was a skeleton with TODOs until PR #30; it also needs `set-key-partition-list`, without which `codesign` hangs a headless runner waiting for permission.
+Both store pipelines work from a `client-v*` tag: a signed iOS build reaches the Internal Testers group on TestFlight (automatic distribution on), and a signed apk + aab land on the GitHub release.
+The aab still goes to Play by hand (no upload API wired); the first one was uploaded 2026-07-25.
+The iOS job needs `set-key-partition-list`, without which `codesign` hangs a headless runner waiting for permission.
+Uploading a new Play build: Test and release > Internal testing > Create new release; Play rejects a reused version code, so bump pubspec's `+N` first, same as iOS.
 
 Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 leans on them:
 - **The UI has never been driven by a human.** It builds, runs, and passes tests, but nobody has clicked through sign-up to sending a message in a real window. The owner intends to.
 - **Golden images are not committed.** The matrix asserts no overflow at any scale (machine-independent, runs everywhere); the pixel comparison is behind `SLIMM_GOLDENS` with no reference images, because images generated off-CI would never match the runner and would mean a permanently red build. Generate them once on the CI runner and enable the flag there.
-- Reactions, the shared context menu, the quick switcher, haptics, and history pagination are not built. Reactions also need a server verb.
+- Reactions UI, the shared context menu, the quick switcher, haptics, and history pagination are not built. The server side of reactions exists (PUT/DELETE on `/messages/{id}/reactions/{emoji}`, summaries on list, a ReactionsChanged event).
 - The shortcut table exists but is not yet bound into the widget tree.
 
 Open follow-ups noted during reviews: malformed query/JSON bodies still return axum's default error rather than the uniform JSON error contract (low); `revoke_device` does not itself publish `SessionRevoked` (the logout and deletion paths do).
@@ -231,10 +238,13 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 
 ## Open items that need the owner
 
+- Internal testers on the Play internal testing track: release 0.1.0 (4) is published there with zero testers, deliberately, until the owner picks who.
+- A real Android device test of the push path end-to-end (the last Phase 3 exit criterion with any work left).
 - Reviewer protection on the `release` and `testflight` GitHub Environments (they exist but are ungated).
 - Flatpak and rpm packaging manifests (`packaging/flatpak/*.yaml`, `packaging/rpm/*.spec`); the release jobs warn-and-skip until they exist.
-- Secrets: Apple App Store Connect for TestFlight, optional GPG signing, and for the relay a Firebase service account plus an APNs `.p8`.
+- Optional GPG signing secret for the Linux client checksums.
 - A decision on whether to keep release-please's auto-PR flow or switch to manual tag-based releases (to keep the repo at zero open PRs).
+- Where rendered API docs should live: the owner ruled out nc1107.github.io (their user site), so schema-ci attaches the redoc HTML as a run artifact instead of deploying anywhere. A project Pages site would live under nc1107.github.io/slim-m/ without touching the user site, if that distinction changes the answer; hosting it under npc-server.top is the other candidate.
 - Linux desktop screen sharing on Wayland is an open `flutter_webrtc` bug; voice, video, and the canvas work, only screen capture is broken. Validate in the Phase 4 Fedora RTC spike (fallbacks: a newer flutter_webrtc, contributing the portal fix, or an X11 session).
 
 ## Parked and reference
