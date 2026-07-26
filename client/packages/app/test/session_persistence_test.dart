@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -16,6 +17,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/push_controller.dart';
+import 'package:slimm_app/src/providers/sync_controller.dart';
+// Channel and Message exist in both packages; the wire types are the ones
+// this file builds, so only the store types come across from data.
+import 'package:slimm_data/data.dart' show MessageStore, SlimmDatabase;
 import 'package:slimm_platform/platform.dart';
 
 const _tokens = TokenPair(
@@ -439,6 +444,63 @@ void main() {
       expect(await keyStore.read(devicePushKeyHandle), isNull);
       expect(await keyStore.read(sessionTokenHandle), isNull);
       expect(container.read(sessionProvider).isSignedIn, isFalse);
+    });
+
+    test('drops the cached channels and messages the session was reading',
+        () async {
+      // The local database is one file for the whole app, not one per account
+      // or per server. Without this, the next person to sign in on the device
+      // opens straight onto the previous account's channel list and message
+      // text, before any sync could correct it.
+      final db = SlimmDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final store = MessageStore(db);
+
+      final container = ProviderContainer(overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        storeProvider.overrideWith((ref) async => store),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: ref.watch(serverUrlProvider),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((_) async => http.Response('', 204)),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+      ]);
+      addTearDown(container.dispose);
+
+      await store.upsertChannels([
+        const Channel(
+            id: 'chan-1', name: 'general', kind: 'text', createdAt: 1),
+      ]);
+      await store.applyMessage(const Message(
+        id: 'm1',
+        channelId: 'chan-1',
+        authorId: 'user-1',
+        authorDisplayName: 'User One',
+        seq: 1,
+        content: 'private to the account signing out',
+        createdAt: 1000,
+        editedAt: null,
+      ));
+
+      // Bring the sync controller up so it is listening to the session, the
+      // way the app shell does.
+      container.read(syncControllerProvider.notifier);
+      container.read(sessionProvider).set(_tokens);
+      await pumpEventQueue();
+      expect(await store.watchChannel('chan-1').first, hasLength(1));
+
+      await container.read(apiProvider).logout();
+      await pumpEventQueue();
+
+      expect(container.read(sessionProvider).isSignedIn, isFalse);
+      expect(await store.watchChannel('chan-1').first, isEmpty,
+          reason: 'the previous account\'s messages must not survive');
+      expect(await store.watchChannels().first, isEmpty,
+          reason: 'nor the channel list, which names the server they were on');
     });
   });
 }
