@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/NC1107/slim-m/compare/server-v0.10.0...server-v0.11.0) (2026-07-26)
+
+
+### Features
+
+* align the ui to the design, and build the backends it assumed ([#52](https://github.com/NC1107/slim-m/issues/52)) ([fdc56a8](https://github.com/NC1107/slim-m/commit/fdc56a8067f580e3d8c6a9ba22193cd5e2ecb64e))
+
 ## [0.10.0](https://github.com/NC1107/slim-m/compare/server-v0.9.0...server-v0.10.0) (2026-07-26)
 
 
