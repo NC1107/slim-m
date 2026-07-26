@@ -33,6 +33,14 @@ services:
     restart: unless-stopped
     environment:
       SLIMM_LOG: ${SLIMM_LOG:-info}
+      # Without these the server has no SFU and answers 501 for voice, which is
+      # a supported way to run text-only but is not what somebody who brought up
+      # the livekit service below is asking for. The URL is the one clients
+      # reach from outside, not the compose-internal name, because it is handed
+      # to the client alongside a join token.
+      SLIMM_LIVEKIT_URL: wss://${LIVEKIT_DOMAIN:?set LIVEKIT_DOMAIN in .env}
+      SLIMM_LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set in .env, see deploy/README.md}
+      SLIMM_LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set in .env to a random value of at least 32 characters}
     volumes:
       # SLIMM_DATABASE_PATH defaults to /data/slimm.db inside the image; the
       # whole /data directory is the volume so Litestream (below) can see the
