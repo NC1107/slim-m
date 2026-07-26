@@ -21,8 +21,16 @@ dependencies:
   slimm_data:
   slimm_design_system:
   slimm_platform:
+  slimm_rtc:
   drift: ^2.20.0
-  package_info_plus: ^10.2.1
+  # Held on 9.x deliberately. 10.x moved to win32 6, and every other
+  # Windows-only package in the tree (device_info_plus, which
+  # livekit_client pulls, plus flutter_secure_storage_windows and
+  # win32_registry) is still on win32 5. Those libraries type-check on a
+  # Linux build even though they never run there, so the mismatch is a
+  # hard build failure rather than a Windows-only concern. Staying on 9.x
+  # is what lets the client use current livekit_client and flutter_webrtc.
+  package_info_plus: ^9.0.1
   path: ^1.9.0
   path_provider: ^2.1.0
   shared_preferences: ^2.3.0

@@ -125,7 +125,7 @@ The iOS job needs `set-key-partition-list`, without which `codesign` hangs a hea
 Uploading a new Play build: Test and release > Internal testing > Create new release; Play rejects a reused version code, so bump pubspec's `+N` first, same as iOS.
 
 Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 leans on them:
-- **The UI has been driven by a human only lightly.** The live instance holds real messages from the owner, so the primary flow has been exercised, but there is no record of a full sign-up-to-send pass on Fedora GNOME Wayland specifically (this box is KDE), which is what the Phase 2 exit criterion names.
+- **The UI has been driven by a human only lightly.** The live instance holds real messages from the owner, so the primary flow has been exercised, but there is no record of a full sign-up-to-send pass written down.
 - **Golden images are not committed.** The matrix asserts no overflow at any scale (machine-independent, runs everywhere); the pixel comparison is behind `SLIMM_GOLDENS` with no reference images, because images generated off-CI would never match the runner and would mean a permanently red build. Generate them once on the CI runner and enable the flag there.
 - Reactions UI, the shared context menu, the quick switcher, haptics, and history pagination are not built. The server side of reactions exists (PUT/DELETE on `/messages/{id}/reactions/{emoji}`, summaries on list, a ReactionsChanged event).
 - The shortcut table exists but is not yet bound into the widget tree.
@@ -204,7 +204,7 @@ JDK 21 rather than the packaged 25 because that is the LTS the Android Gradle Pl
 Two things still cannot be verified here:
 - **iOS** needs macOS and Xcode, so it stays CI and TestFlight only (and that job still needs the Apple secrets).
 - **Golden files** are sensitive to the engine build and font rendering, and CI generates and checks them on `ubuntu-latest` / `stable`. Run goldens locally to see failures, but regenerate them only in CI, or local and CI renders will disagree.
-The roadmap names GNOME Wayland as the Linux target while this box is KDE Wayland, so compositor-specific behaviour (notably the Phase 4 screen-share portal) still needs checking on GNOME.
+Fedora KDE Plasma Wayland is the Linux development and test target (owner decision, 2026-07-26), which is what this box runs. The roadmap used to name GNOME; that was corrected rather than the environment. The product still ships cross-platform, so other desktops are release targets, just not where the work is validated day to day.
 `sqlx-cli` 0.8 is installed at `~/.cargo/bin`.
 
 Everyday commands:
@@ -282,7 +282,7 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 - Optional GPG signing secret for the Linux client checksums.
 - A decision on whether to keep release-please's auto-PR flow or switch to manual tag-based releases (to keep the repo at zero open PRs).
 - ~~Where rendered API docs should live.~~ Settled 2026-07-26: nowhere. GitLab renders an OpenAPI file in its repo browser the way GitHub renders a README, GitHub has no equivalent, and building redoc HTML into a run artifact nobody downloads is not worth a job. The render step is gone; `redocly lint` stays, since that is the schema-ci gate. `schema/openapi.yaml` is read as the source. If a browsable copy is ever wanted: `npx @redocly/cli build-docs schema/openapi.yaml -o /tmp/api.html`.
-- Linux desktop screen sharing on Wayland is an open `flutter_webrtc` bug; voice, video, and the canvas work, only screen capture is broken. Validate in the Phase 4 Fedora RTC spike (fallbacks: a newer flutter_webrtc, contributing the portal fix, or an X11 session).
+- Linux desktop screen sharing on Wayland was written up as a blocking `flutter_webrtc` bug (issue 1542, the PipeWire/xdg-desktop-portal path not waiting for the picker response). **The owner reports getting screen share working in their own testing**, so that research finding looks stale or GNOME-specific rather than a Wayland-wide block. Treat it as probably fine and confirm in the Phase 4 spike rather than planning around a fallback. If it does break, the fallbacks are a newer flutter_webrtc, contributing the portal fix, or an X11 session.
 
 ## Parked and reference
 

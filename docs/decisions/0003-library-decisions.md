@@ -49,5 +49,7 @@ Argon2id and rustls or Caddy as the security baseline.
 The validation pass overstated this, and independent checking corrected it.
 LiveKit officially lists Linux among its supported Flutter platforms, and voice (audio) and camera video work on Linux desktop, so the Voice Canvas (which needs voice and camera bubbles, not screen capture) is available on Linux desktop at 1.0.
 The one real gap is screen sharing on Wayland: flutter_webrtc has an open bug (flutter-webrtc issue 1542, open since 2024) where its PipeWire and xdg-desktop-portal capture path does not wait for the portal's screen-picker response and crashes, and WebRTC's older X11 capturer does not work under Wayland; Fedora GNOME defaults to Wayland, so this affects the primary desktop target's screen-share path only.
+
+Update (2026-07-26): the owner reports screen share working in their own testing on Fedora KDE Plasma Wayland, so this finding is either stale or specific to GNOME's portal implementation. The Phase 4 spike confirms it rather than designing around a fallback.
 Decision: no LiveKit C++ FFI rewrite and no deferral of Linux voice; Linux desktop ships voice, video, and the Voice Canvas at 1.0.
 The narrow Wayland screen-capture gap is validated and closed in the Phase 4 Fedora RTC spike the roadmap already schedules, with fallbacks in priority order: confirm whether a current flutter_webrtc release already handles the portal path, contribute the portal wait-handling fix upstream (small and well-scoped), or fall back to an X11 session for screen capture until the Wayland path lands.

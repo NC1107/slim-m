@@ -3,7 +3,8 @@
 This is the phased delivery plan for slim-m.
 It implements the decisions recorded in [STRATEGY.md](STRATEGY.md) and is readable standalone by a contributor who has never seen the research.
 Phases are ordered so that no phase depends on work scheduled in a later phase.
-Early phases prioritize Linux (Fedora, GNOME Wayland) and iOS as the primary test targets, per the brief.
+Early phases prioritize Linux (Fedora, KDE Plasma Wayland) and iOS as the primary test targets.
+The product is cross-platform and every supported OS is a first-class target for release; KDE is simply where the owner develops and tests, so it is what the exit criteria are written against.
 The Voice Canvas, the signature feature, gets a dedicated de-risking spike phase before its full build.
 
 Sizing is relative effort only (S, M, L, XL), never a calendar estimate.
@@ -83,7 +84,7 @@ Risks: the fixed multi-pane layout must reflow cleanly at 200 percent font scale
 
 Dependencies: Phase 0, Phase 1.
 
-Exit criteria: full text chat works end-to-end on Fedora GNOME Wayland and iOS against a self-hosted server; account deletion, report, and block work from the client; the golden matrix is green; client cold-start and idle-memory budgets are met on both targets.
+Exit criteria: full text chat works end-to-end on Fedora KDE Wayland and iOS against a self-hosted server; account deletion, report, and block work from the client; the golden matrix is green; client cold-start and idle-memory budgets are met on both targets.
 
 ## Phase 3 - Push Relay and Notifications
 
