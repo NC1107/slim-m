@@ -72,33 +72,3 @@ jobs:
           base: "${{ github.event.pull_request.base.sha }}:schema/openapi.yaml"
           revision: "HEAD:schema/openapi.yaml"
           fail-on: ERR
-
-  # GitHub's file view shows OpenAPI as plain YAML, so a browsable rendering
-  # is built on every schema change to main and attached as a run artifact.
-  # It is NOT deployed anywhere: the owner already uses nc1107.github.io for
-  # something else and asked that nothing be published there. To read it,
-  # download the artifact, or run locally:
-  #   npx @redocly/cli build-docs schema/openapi.yaml -o /tmp/api.html
-  render-docs:
-    name: render api docs artifact
-    if: github.event_name == 'push'
-    needs: [lint]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: lts/*
-
-      - name: build redoc html
-        run: |
-          mkdir -p dist
-          npm install --no-save --ignore-scripts @redocly/cli@2.40.0
-          ./node_modules/.bin/redocly build-docs schema/openapi.yaml -o dist/index.html
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: api-docs
-          path: dist/index.html
-          retention-days: 90
