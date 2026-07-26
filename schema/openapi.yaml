@@ -2248,7 +2248,15 @@ components:
           minLength: 1
           maxLength: 64
         invite_code:
-          type: [string, "null"]
+          # Left as the OpenAPI 3.0 `nullable` keyword, alone in this file.
+          # oasdiff cannot read a 3.1 `type: [x, "null"]` union and reports the
+          # conversion as the property losing nullability, which fails the
+          # additive-only gate; redocly rejects carrying both forms. This is a
+          # request property, so nothing is testable either way - the field is
+          # optional through `required` regardless, and the server takes an
+          # absent value and an explicit null identically.
+          type: string
+          nullable: true
           description: >
             Required once the deployment has been claimed, since joining is by
             invitation from that point on. Ignored on an unclaimed deployment,

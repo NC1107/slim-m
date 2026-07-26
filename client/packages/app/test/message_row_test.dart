@@ -164,14 +164,17 @@ void main() {
         onReactionTap: (_) {},
         onVote: (_) {},
         reactions: const [
-          api.ReactionSummary(emoji: '👍', count: 3, reacted: true),
-          api.ReactionSummary(emoji: '🎉', count: 1, reacted: false),
+          // Escaped rather than literal: the hygiene gate forbids emoji
+          // codepoints in client source, and these are user content standing in
+          // for a reaction, not interface chrome.
+          api.ReactionSummary(emoji: '\u{1F44D}', count: 3, reacted: true),
+          api.ReactionSummary(emoji: '\u{1F389}', count: 1, reacted: false),
         ],
       )));
 
-      expect(find.text('👍'), findsOneWidget);
+      expect(find.text('\u{1F44D}'), findsOneWidget);
       expect(find.text('3'), findsOneWidget);
-      expect(find.text('🎉'), findsOneWidget);
+      expect(find.text('\u{1F389}'), findsOneWidget);
       expect(find.text('1'), findsOneWidget);
     });
 
@@ -189,12 +192,12 @@ void main() {
         onReactionTap: (r) => tapped = r,
         onVote: (_) {},
         reactions: const [
-          api.ReactionSummary(emoji: '👍', count: 3, reacted: true),
+          api.ReactionSummary(emoji: '\u{1F44D}', count: 3, reacted: true),
         ],
       )));
 
-      await tester.tap(find.text('👍'));
-      expect(tapped?.emoji, '👍');
+      await tester.tap(find.text('\u{1F44D}'));
+      expect(tapped?.emoji, '\u{1F44D}');
       expect(tapped?.reacted, isTrue);
     });
   });

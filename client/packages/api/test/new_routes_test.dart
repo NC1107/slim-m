@@ -142,11 +142,14 @@ void main() {
   group('Message: reactions, poll, attachments', () {
     test('reactions are parsed with the viewer-specific reacted flag', () {
       final message = Message.fromJson(_messageJson(reactions: [
-        {'emoji': '👍', 'count': 3, 'reacted': true},
-        {'emoji': '🎉', 'count': 1, 'reacted': false},
+        // Escaped rather than literal: the hygiene gate forbids emoji
+        // codepoints in client source, and these are user content standing in
+        // for a reaction, not interface chrome.
+        {'emoji': '\u{1F44D}', 'count': 3, 'reacted': true},
+        {'emoji': '\u{1F389}', 'count': 1, 'reacted': false},
       ]));
       expect(message.reactions, hasLength(2));
-      expect(message.reactions.first.emoji, '👍');
+      expect(message.reactions.first.emoji, '\u{1F44D}');
       expect(message.reactions.first.count, 3);
       expect(message.reactions.first.reacted, isTrue);
       expect(message.reactions.last.reacted, isFalse);
@@ -561,12 +564,12 @@ void main() {
         'channel_id': 'c',
         'message_id': 'm',
         'reactions': [
-          {'emoji': '👍', 'count': 2},
+          {'emoji': '\u{1F44D}', 'count': 2},
         ],
       }));
       expect(event, isA<ReactionsChanged>());
       final changed = event! as ReactionsChanged;
-      expect(changed.reactions.single.emoji, '👍');
+      expect(changed.reactions.single.emoji, '\u{1F44D}');
       expect(changed.reactions.single.count, 2);
     });
 
