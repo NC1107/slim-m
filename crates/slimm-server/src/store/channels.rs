@@ -53,6 +53,7 @@ impl Store {
             id,
             name: name.to_owned(),
             kind: kind.to_owned(),
+            topic: None,
             created_at: now,
         })
     }
@@ -60,7 +61,7 @@ impl Store {
     /// Fetches a live channel by id, or `None` if it is missing or deleted.
     pub async fn channel(&self, id: ChannelId) -> anyhow::Result<Option<Channel>> {
         let row = sqlx::query!(
-            r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!",
+            r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
                       created_at AS "created_at!"
                FROM channels WHERE id = ? AND deleted_at IS NULL"#,
             id
@@ -71,6 +72,7 @@ impl Store {
             id: r.id,
             name: r.name,
             kind: r.kind,
+            topic: r.topic,
             created_at: r.created_at,
         }))
     }
@@ -85,7 +87,7 @@ impl Store {
         id: ChannelId,
     ) -> anyhow::Result<Option<Channel>> {
         let row = sqlx::query!(
-            r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!",
+            r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
                       created_at AS "created_at!"
                FROM channels WHERE id = ?"#,
             id
@@ -96,25 +98,71 @@ impl Store {
             id: r.id,
             name: r.name,
             kind: r.kind,
+            topic: r.topic,
             created_at: r.created_at,
         }))
     }
 
-    /// Renames a live channel. Returns `None` if it does not exist (or was
-    /// deleted, racing this call).
-    pub async fn update_channel_name(
+    /// Renames a channel and/or replaces its topic. `None` for either leaves
+    /// that field untouched; `Some(None)` for `topic` clears it. Returns
+    /// `None` if the channel does not exist (or was deleted, racing this
+    /// call). Callers are expected to reject the case where both are `None`
+    /// before reaching here (there is nothing to update), the same
+    /// convention [`super::roles::update_role`] follows for its own two
+    /// optional fields; this still resolves it safely as a plain existence
+    /// check rather than assuming it can't happen.
+    /// A DM is a channel of kind `dm` in this same table, and it is deliberately
+    /// unreachable here: its only access rule is membership of the pair
+    /// ([`super::dms`]), while these management routes gate on deployment-wide
+    /// `MANAGE_CHANNELS`. Excluding it in SQL rather than at the call site is the
+    /// same choice `list_channels` made, and for the same reason - the guard
+    /// holds however many handlers end up calling this.
+    pub async fn update_channel(
         &self,
         id: ChannelId,
-        name: &str,
+        name: Option<&str>,
+        topic: Option<Option<&str>>,
     ) -> anyhow::Result<Option<Channel>> {
-        let affected = sqlx::query!(
-            "UPDATE channels SET name = ? WHERE id = ? AND deleted_at IS NULL",
-            name,
-            id
-        )
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
+        let affected = match (name, topic) {
+            (Some(name), Some(topic)) => sqlx::query!(
+                "UPDATE channels SET name = ?, topic = ? \
+                 WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'",
+                name,
+                topic,
+                id
+            )
+            .execute(&self.pool)
+            .await?
+            .rows_affected(),
+            (Some(name), None) => sqlx::query!(
+                "UPDATE channels SET name = ? \
+                 WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'",
+                name,
+                id
+            )
+            .execute(&self.pool)
+            .await?
+            .rows_affected(),
+            (None, Some(topic)) => sqlx::query!(
+                "UPDATE channels SET topic = ? \
+                 WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'",
+                topic,
+                id
+            )
+            .execute(&self.pool)
+            .await?
+            .rows_affected(),
+            (None, None) => {
+                let exists = sqlx::query_scalar!(
+                    r#"SELECT 1 AS "one!: i64" FROM channels
+                       WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'"#,
+                    id
+                )
+                .fetch_optional(&self.pool)
+                .await?;
+                u64::from(exists.is_some())
+            }
+        };
         if affected == 0 {
             return Ok(None);
         }
@@ -129,14 +177,19 @@ impl Store {
     /// last-channel guard in its `WHERE` clause, so two concurrent deletes of
     /// the deployment's last two channels cannot both succeed and leave zero.
     /// A separate "count, then decide, then delete" would race exactly there.
+    /// Excludes `dm` channels for the reason given on [`Self::update_channel`].
+    /// Note the last-channel guard counts only non-DM channels: otherwise a
+    /// deployment could delete its final real channel as long as one DM existed,
+    /// leaving members with nowhere to talk.
     pub async fn delete_channel(&self, id: ChannelId) -> Result<bool, DeleteChannelError> {
         let now = now_ms();
         let mut tx = self.pool.begin().await?;
 
         let affected = sqlx::query!(
             "UPDATE channels SET deleted_at = ?
-             WHERE id = ? AND deleted_at IS NULL
-               AND (SELECT COUNT(*) FROM channels WHERE deleted_at IS NULL) > 1",
+             WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'
+               AND (SELECT COUNT(*) FROM channels
+                    WHERE deleted_at IS NULL AND kind != 'dm') > 1",
             now,
             id
         )

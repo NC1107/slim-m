@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO poll_votes (message_id, user_id, position, voted_at)\n               VALUES (?, ?, ?, ?)\n               ON CONFLICT(message_id, user_id)\n               DO UPDATE SET position = excluded.position, voted_at = excluded.voted_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "4da7f6351b230469e414dc914f09c7785aff6e1e55b7c4038ebc24529f245df6"
+}

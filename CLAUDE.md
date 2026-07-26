@@ -12,6 +12,54 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The design-alignment push (2026-07-26)
+
+The UI was aligned to the Claude Design visual identity review, and the features the design assumed were built to back it.
+Read this before touching the client or adding a server feature the UI needs.
+
+The design system is a real component library now: `client/packages/design_system/lib/src/components/` holds core (avatar, badge, button, icon button, kbd, status dot), forms (input, chip, toggle, segmented control, slider) and surfaces (card, callout, code block, list row, menu).
+Tokens split into `app_tokens.dart` (colour), `app_typography.dart` (the six-step scale, three weights, stopping at 600) and `app_metrics.dart` (spacing, radii, control sizes, the two shadows, density).
+
+**Eight server features were built because the design needed them and nothing backed them**: presence (with appear-offline), typing indicators, pinned messages, polls, direct messages, attachments and avatars, a server identity fingerprint, and channel topics plus member roles on the member list.
+Migrations 0008 through 0014.
+
+Things worth knowing before changing any of it:
+
+- **Appear-offline is enforced structurally, not by filtering.** The `PresenceChanged` event carries only a user id, never a status, and the real status is derived per receiving connection at send time through one pure function. A hidden user's true state is never present in the payload that fans out. Do not "optimise" this by precomputing the status into the event.
+- **`checkInvite` answers expired, spent, revoked and never-issued identically**, so codes cannot be mined. The client models this as a sealed `InviteCheck` where `InviteUnusable` carries no fields at all, so metadata is unreachable except by matching the usable case. A test asserts the four responses are byte-identical.
+- **The server identity fingerprint is Ed25519, not derived from the TLS certificate.** A plain-HTTP LAN self-host has no certificate, and a reverse proxy's certificate churns on every renewal. TOFU protects every connection after the first, not the first one; the docs say so in those words rather than overselling it.
+- **A DM is a channel with kind `dm`.** Teaching `permissions_in_channel` about that kind was enough to make push fan-out, WebSocket delivery, sync and search all DM-aware with no change to any of those files. Membership of the pair is the only thing granting access: the ADMINISTRATOR bypass is deliberately skipped, and there is a test for exactly that.
+- **Attachment content types are sniffed from the bytes**, never taken from the upload's header or filename, and avatars re-sniff at serve time so a stored type cannot drift from the file. Fetches are permission-checked; an unguessable URL is not access control.
+- **Litestream does not back up attachments.** It replicates the SQLite file only, so a restore returns messages and their attachment references but not the bytes. `deploy/README.md` says so.
+- **`Config` has a `Default` impl now.** It did not, and 38 files built it as a struct literal, so every new setting was a 38-file edit. That cost is why the attachments work first read its settings straight from the environment, creating a second configuration mechanism. A test asserts `Config::default()` matches deserializing an empty config, because that drift is the one failure this refactor could introduce silently.
+
+**Check `0002_core_schema.sql` before adding a table.** Two of these features turned out to have dormant schema waiting for them: the `attachments` and `message_attachments` tables, and `channels.topic`. Both were written speculatively in the very first schema pass and never referenced by a single line of code since. Attachments reused its tables (they were already content-addressed by sha256, which gives deduplication for free); `0014_channel_topic.sql` is a documented no-op marker recording the discovery rather than a redundant `ALTER TABLE`.
+
+After this push every table in 0002 is wired except the canvas pair. `canvas_objects` and `canvas_ops` are referenced in exactly one place, `store/sessions.rs`, which anonymises their `author_id` on account deletion. That is correct and deliberate: account deletion has to cover a table the moment it exists, not the moment it is used. The canvas itself is Phase 5 and 6 work.
+
+Known gaps, deliberately left:
+
+- **Live WebSocket frames for a freshly created message omit poll, reaction and attachment data.** Those frames are built from a bare DTO rather than the enrichment path that list, search, sync and the pin list all share. It is pre-existing (reactions always had it) and affects three features identically. Fixing it means a database read inside the hot fan-out path or reshaping a widely shared struct. The client recovers on the next sync.
+- **Webhook and bot authorship is not built.** The design shows a CI message; an integrations system is well past beta scope, and the UI marker stays rather than being faked.
+- **Emoji picking is a single placeholder reaction.** The reaction chip, its count and the "did you react" state are all real.
+
+### Seeing the UI, and the font trap it exposed
+
+The shell was compared against the design by rendering it in a throwaway widget test at the design's own 1400x880 and writing a PNG, because there is no nested display server on this box and a native Wayland window cannot be raised or captured by `xdotool`. That harness is not committed: it produces the image correctly every run but does not shut down cleanly, and a test that fails when run is worse than none. Recreating it is cheap, and worth it before any further visual change.
+
+Three things it takes to make such a render truthful, each of which silently produces a wrong picture rather than an error:
+
+- **Load the real fonts with `FontLoader`.** The test binding ships a placeholder face, so every glyph is a filled box.
+- **Load the Lucide font too**, from `packages/lucide_icons_flutter/assets/lucide.ttf`. An unloaded icon font renders every icon as an empty square, which reads as a layout bug.
+- **Seed a session.** Signed out, the client refuses each read before sending it, so the member pane and rail render error states rather than their real layout. Then dispose the container *before* unmounting, or `SyncController`'s reconnect timer keeps the test alive forever.
+
+What it found is the reason to bother: **the fonts were never bundled at all.** `AppFonts` named IBM Plex Sans and Mono, `app_typography.dart` claimed in a doc comment that they shipped with the app, and no font file existed in the repo. On this machine both resolved to Noto Sans, so the *monospace* family was rendering proportional - every code block, timestamp, keycap and the server fingerprint. The faces are now bundled under `client/packages/design_system/fonts/` (OFL, licence alongside), and note the family name must be package-qualified as `packages/slimm_design_system/IBM Plex Sans` or it resolves to nothing from the app package and falls back silently. `buildTheme` also names the family now; it never did, so everything outside `AppText.code` was using Flutter's default regardless.
+
+Two accessibility rules the components enforce and test, worth not breaking:
+
+- **Presence is never colour alone.** Five states, five silhouettes: filled disc, triangle, notched square, hollow ring, and a slashed ring for appearing offline. Contrast ratio is deliberately *not* asserted between two status hues, because it measures luminance only and the away amber sits within 1.04:1 of the dnd red while being obviously a different colour. Shape carries it.
+- **`focusRing` and `accentFill` are the same value in every theme**, which the design intends. Focus is told from selection by shape: selection is a fill plus a marker, focus is an outline ring. An earlier doc comment claimed the two were different colours; they never were, and a test written against that claim found it.
+
 ## Current state (2026-07-25)
 
 Phases 0 (foundations), 1 (server and protocol core), and 2 (client shell and text messaging) are complete.
@@ -290,6 +338,7 @@ Test databases are temp SQLite files (`Config { port, database_path }` then `db:
 - Never use the em dash character; use a plain dash. In long Markdown files, put each full sentence on its own physical line.
 - No emoji as interface chrome (a CI gate enforces this); use Lucide icons. SPDX headers on every source file (a CI gate checks the Rust ones).
 - Keep files small (a soft 300-line review budget, generated code excluded).
+- **No comment may exceed two lines.** Code explains how; a comment explains why, and two lines is enough for a why. If the reason genuinely needs more room it belongs in a doc comment on the item, in `docs/`, or in the decision record - not in a block above a statement. A long comment above a confusing function is a sign the function should be refactored, which is the rule this one exists to enforce.
 - Anything published under the owner's name (PR titles and bodies, issues, review comments, releases) is written in Nick's voice: read `~/.claude/Voice.md`. It is plain, hedged, anti-hype, lowercase product names, no emoji or exclamation points, and it walks through how a thing works. Commit messages, code, and working conversation stay in the normal clear register.
 - Subagent model selection (from the owner's global instructions): haiku for trivial ops, sonnet for default coding and analysis, opus only for orchestration or hard reasoning; never use fable for engineering. Prefer sonnet-4-6 over sonnet-5. Workflow/Agent tooling only accepts tier aliases (haiku/sonnet/opus/fable), so full model ids cannot be passed there.
 - schema/openapi.yaml is gated against the router: `crates/slimm-server/tests/openapi_contract.rs` parses the routes axum actually serves out of `src/http.rs`/`src/http/*.rs` and the paths documented under `paths:` in the schema, and fails `cargo test` (locally and in CI, via server-ci, no separate workflow to remember) if either side has something the other does not. This is why adding, removing, or renaming a route belongs in the same change as the matching edit to `schema/openapi.yaml`: the build will not pass otherwise, and the failure names the exact method, path, and file that drifted.

@@ -29,11 +29,7 @@ async fn new_store() -> Store {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
-        push_relay_url: None,
-        push_relay_key: None,
-        livekit_url: None,
-        livekit_api_key: None,
-        livekit_api_secret: None,
+        ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)
@@ -47,6 +43,7 @@ fn app(store: Store) -> Router {
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
     })
 }
 
@@ -221,7 +218,7 @@ async fn deleting_in_a_hidden_channel_cannot_be_used_to_probe() {
     let real = slimm_server::ids::MessageId::generate();
     let author = store.create_user("author", "Author").await.unwrap();
     store
-        .send_message(channel.id, author.id, real, "secret")
+        .send_message(channel.id, author.id, real, "secret", &[])
         .await
         .unwrap();
 

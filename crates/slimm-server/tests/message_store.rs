@@ -15,11 +15,7 @@ async fn store() -> Store {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
-        push_relay_url: None,
-        push_relay_key: None,
-        livekit_url: None,
-        livekit_api_key: None,
-        livekit_api_secret: None,
+        ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)
@@ -33,17 +29,17 @@ async fn seq_is_monotonic_and_independent_per_channel() {
     let b = s.create_channel("gaming", "text").await.unwrap();
 
     let a1 = s
-        .send_message(a.id, author.id, MessageId::generate(), "one")
+        .send_message(a.id, author.id, MessageId::generate(), "one", &[])
         .await
         .unwrap()
         .message;
     let a2 = s
-        .send_message(a.id, author.id, MessageId::generate(), "two")
+        .send_message(a.id, author.id, MessageId::generate(), "two", &[])
         .await
         .unwrap()
         .message;
     let b1 = s
-        .send_message(b.id, author.id, MessageId::generate(), "other")
+        .send_message(b.id, author.id, MessageId::generate(), "other", &[])
         .await
         .unwrap()
         .message;
@@ -62,13 +58,13 @@ async fn send_is_idempotent_by_id() {
 
     let id = MessageId::generate();
     let first = s
-        .send_message(c.id, author.id, id, "hi")
+        .send_message(c.id, author.id, id, "hi", &[])
         .await
         .unwrap()
         .message;
     // A retry with the same id returns the stored message and wastes no sequence.
     let retry = s
-        .send_message(c.id, author.id, id, "hi again")
+        .send_message(c.id, author.id, id, "hi again", &[])
         .await
         .unwrap()
         .message;
@@ -82,7 +78,7 @@ async fn send_is_idempotent_by_id() {
 
     // The next real send is seq 2, proving the retry did not consume seq 2.
     let second = s
-        .send_message(c.id, author.id, MessageId::generate(), "second")
+        .send_message(c.id, author.id, MessageId::generate(), "second", &[])
         .await
         .unwrap()
         .message;
@@ -98,9 +94,15 @@ async fn edit_and_keyset_pagination() {
     let author = s.create_user("priya", "Priya").await.unwrap();
     let c = s.create_channel("general", "text").await.unwrap();
     for i in 0..5 {
-        s.send_message(c.id, author.id, MessageId::generate(), &format!("m{i}"))
-            .await
-            .unwrap();
+        s.send_message(
+            c.id,
+            author.id,
+            MessageId::generate(),
+            &format!("m{i}"),
+            &[],
+        )
+        .await
+        .unwrap();
     }
 
     // Newest-first page of 3.
@@ -136,10 +138,16 @@ async fn a_retry_reports_itself_as_a_retry() {
     let c = s.create_channel("general", "text").await.unwrap();
     let id = MessageId::generate();
 
-    let first = s.send_message(c.id, author.id, id, "hi").await.unwrap();
+    let first = s
+        .send_message(c.id, author.id, id, "hi", &[])
+        .await
+        .unwrap();
     assert!(first.fresh, "a first send is fresh");
 
-    let retry = s.send_message(c.id, author.id, id, "hi").await.unwrap();
+    let retry = s
+        .send_message(c.id, author.id, id, "hi", &[])
+        .await
+        .unwrap();
     assert!(
         !retry.fresh,
         "a replayed id must be flagged, or the caller fans it out and pushes it a second time"
@@ -165,8 +173,14 @@ async fn concurrent_sends_each_take_a_distinct_sequence_number() {
         let channel = c.id;
         let author = author.id;
         tokio::spawn(async move {
-            s.send_message(channel, author, MessageId::generate(), &format!("m{i}"))
-                .await
+            s.send_message(
+                channel,
+                author,
+                MessageId::generate(),
+                &format!("m{i}"),
+                &[],
+            )
+            .await
         })
     });
     let results = futures_util::future::join_all(sends).await;

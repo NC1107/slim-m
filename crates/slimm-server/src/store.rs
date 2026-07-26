@@ -14,11 +14,16 @@ use sqlx::SqlitePool;
 
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
+mod attachments;
 mod bootstrap;
 mod channels;
+mod dms;
 mod invites;
 mod messages;
 mod permissions;
+mod pins;
+mod polls;
+mod presence;
 mod push;
 mod reactions;
 mod read_state;
@@ -28,10 +33,18 @@ mod safety;
 mod sessions;
 mod users;
 
+pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
 pub use bootstrap::Bootstrap;
 pub use channels::DeleteChannelError;
-pub use invites::{Invite, RedeemError};
-pub use messages::{SearchError, SendError, Sent};
+pub(crate) use dms::DM_CHANNEL_KIND;
+pub use dms::{DmConversation, OpenDmError};
+pub use invites::{Invite, InviteCheck, InviteMetadata, RedeemError};
+pub use messages::{MessageDeletion, SearchError, SendError, Sent};
+pub use pins::{PinError, PinnedMessage};
+pub use polls::{
+    CreatePollError, MAX_OPTION_CHARS, MAX_OPTIONS, MAX_QUESTION_CHARS, MIN_OPTIONS, Poll,
+    PollOption, PollTally, VoteError,
+};
 pub use push::{PushError, PushTarget};
 pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
 pub use recovery::{ConsumeResetError, IssueResetError};
@@ -59,6 +72,11 @@ pub struct Channel {
     pub id: ChannelId,
     pub name: String,
     pub kind: String,
+    /// A one-line description shown beside the name in the client's channel
+    /// header. `None` for no topic, distinct from an empty string: clearing
+    /// it back to `None` is what an edit to a blank value normalizes to, the
+    /// same way an empty topic and no topic render identically to a viewer.
+    pub topic: Option<String>,
     pub created_at: i64,
 }
 
@@ -72,6 +90,12 @@ pub struct User {
     pub username: String,
     pub display_name: String,
     pub created_at: i64,
+    /// When the caller's current avatar was set, or `None` for no avatar.
+    /// Not a foreign key to anything: the bytes live on disk keyed by user
+    /// id, not content-addressed like a message attachment (see migration
+    /// 0013). A client uses the value only as a cache-busting version
+    /// appended to the fetch URL.
+    pub avatar_updated_at: Option<i64>,
 }
 
 /// A message. `author_id` is null once the author's account is anonymized.
@@ -165,6 +189,7 @@ impl Store {
             username: username.to_owned(),
             display_name: display_name.to_owned(),
             created_at: now,
+            avatar_updated_at: None,
         })
     }
 
@@ -177,5 +202,29 @@ impl Store {
                 .fetch_all(&self.pool)
                 .await?;
         Ok(rows.into_iter().map(|r| r.id).collect())
+    }
+
+    /// The server's long-lived identity keypair, generating and persisting
+    /// one on the first call a fresh deployment ever makes. See
+    /// [`crate::identity`] for what a client may and may not conclude from it.
+    pub async fn server_identity(&self) -> anyhow::Result<crate::identity::ServerIdentity> {
+        crate::identity::load_or_create(&self.pool).await
+    }
+
+    /// This deployment's display name, shown to a prospective joiner (invite
+    /// metadata) before they have an account.
+    ///
+    /// Backed by `server_meta` rather than a dedicated column: it is exactly
+    /// the kind of singleton deployment-wide setting that table already
+    /// exists for, seeded with a default by migration 0010. The fallback
+    /// here is defensive only (every deployment gets the seeded row), not a
+    /// substitute for it.
+    pub async fn deployment_name(&self) -> anyhow::Result<String> {
+        let value = sqlx::query_scalar!(
+            r#"SELECT value AS "value!" FROM server_meta WHERE key = 'deployment_name'"#
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(value.unwrap_or_else(|| "slim-m".to_owned()))
     }
 }

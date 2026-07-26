@@ -9,11 +9,15 @@ pub mod config;
 pub mod db;
 pub mod http;
 pub mod hub;
+pub mod identity;
 pub mod ids;
+pub mod media;
 pub mod permissions;
+pub mod presence;
 pub mod push;
 pub mod ratelimit;
 pub mod store;
+pub mod typing;
 pub mod voice;
 
 use std::net::SocketAddr;
@@ -30,6 +34,8 @@ pub async fn run() -> anyhow::Result<()> {
 
     let store = store::Store::new(pool);
     spawn_token_sweep(store.clone());
+    let media = media::Media::new(config.attachments_dir.clone(), config.attachment_max_bytes)?;
+    spawn_attachment_sweep(store.clone(), media.clone());
     let auth = auth::Auth::new(config.hash_concurrency)?;
     let hub = hub::Hub::new();
     let limiter = ratelimit::RateLimiter::new();
@@ -42,6 +48,7 @@ pub async fn run() -> anyhow::Result<()> {
         limiter,
         push,
         voice,
+        media,
     });
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;
@@ -85,6 +92,39 @@ fn spawn_token_sweep(store: store::Store) {
                 }
                 Ok(_) => {}
                 Err(err) => tracing::warn!(error = %err, "token sweep failed"),
+            }
+        }
+    });
+}
+
+/// How often an uploaded-but-never-attached attachment is swept. Uploading is
+/// two-phase (bytes first, a message reference second), so an interrupted
+/// compose leaves a real, if bounded, class of orphan this reclaims; see
+/// `store::attachments` for the grace window and per-pass batch size.
+const ATTACHMENT_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
+/// Runs the orphaned-attachment sweep in the background for the life of the
+/// process, on the same detached, best-effort, wait-first model as
+/// [`spawn_token_sweep`]. The database rows are removed first (inside the
+/// store call); this only cleans up the backing files that removal freed,
+/// which is why it needs `media` and not just `store`.
+fn spawn_attachment_sweep(store: store::Store, media: media::Media) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(ATTACHMENT_SWEEP_INTERVAL);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            match store.sweep_orphaned_attachments().await {
+                Ok(freed) if !freed.is_empty() => {
+                    tracing::info!(count = freed.len(), "swept orphaned attachment rows");
+                    for hex in freed {
+                        if let Err(err) = media.delete_attachment(&hex).await {
+                            tracing::warn!(error = %err, attachment = %hex, "failed to delete a swept attachment file");
+                        }
+                    }
+                }
+                Ok(_) => {}
+                Err(err) => tracing::warn!(error = %err, "attachment sweep failed"),
             }
         }
     });

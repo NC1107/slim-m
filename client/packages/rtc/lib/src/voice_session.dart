@@ -141,12 +141,19 @@ class VoiceSession {
   Object? _lastError;
   bool _disposed = false;
 
+  /// Whether every remote participant's audio is locally silenced. Purely
+  /// local playback state: it never touches this session's own microphone
+  /// or publishes anything, so nobody else in the call can tell.
+  bool _deafened = false;
+
   VoiceSessionState get state => _state;
   Stream<VoiceSessionState> get states => _stateController.stream;
 
   List<VoiceParticipant> get participants => _participants;
   Stream<List<VoiceParticipant>> get participantChanges =>
       _participantsController.stream;
+
+  bool get deafened => _deafened;
 
   /// Why the last attempt failed, when [state] is [VoiceSessionState.failed].
   Object? get lastError => _lastError;
@@ -187,9 +194,15 @@ class VoiceSession {
   }
 
   /// Leaves the call. Safe to call when not in one.
+  ///
+  /// Resets [deafened] along with everything else: there is no room left to
+  /// apply it to once this returns, and leaving it set internally would
+  /// silently deafen the next call before anyone asked for that, with
+  /// nothing in [VoiceState] (which does reset) around to say so.
   Future<void> leave() async {
     await _teardown();
     _participants = const [];
+    _deafened = false;
     if (!_participantsController.isClosed) {
       _participantsController.add(_participants);
     }
@@ -253,6 +266,45 @@ class VoiceSession {
     }
   }
 
+  /// Silences (or restores) every remote participant's audio locally, by
+  /// disabling the underlying WebRTC track rather than unsubscribing from
+  /// it: a track publication's own `disable()` drops the SFU subscription
+  /// and would need renegotiation before sound comes back, while flipping
+  /// the underlying media track's `enabled` flag is a local, instant, and
+  /// instantly reversible mute. Returns whether it took effect, matching
+  /// [setMicrophoneEnabled] and [setScreenShareEnabled]'s own convention: no
+  /// room, no effect.
+  Future<bool> setDeafened(bool deafened) async {
+    final room = _room;
+    if (room == null) return false;
+    _deafened = deafened;
+    await _applyDeafenState(room);
+    return true;
+  }
+
+  /// Applies [_deafened] to every remote audio track currently subscribed.
+  /// Called again on every room event (see [_listen]), not just when the
+  /// toggle changes, which is what keeps a participant who joins (or whose
+  /// track resubscribes) after deafening starts silenced too, without this
+  /// session having to track subscriptions itself.
+  Future<void> _applyDeafenState(lk.Room room) async {
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.audioTrackPublications) {
+        final track = publication.track;
+        if (track == null) continue;
+        try {
+          if (_deafened) {
+            await track.disable();
+          } else {
+            await track.enable();
+          }
+        } catch (e) {
+          _lastError = e;
+        }
+      }
+    }
+  }
+
   void _listen(lk.Room room) {
     // One coarse listener rather than a subscription per event type. Every
     // event this cares about ends in the same place, which is "recompute who is
@@ -265,6 +317,11 @@ class VoiceSession {
   void _refreshParticipants() {
     final room = _room;
     if (room == null || _disposed) return;
+
+    // Reapplied on every refresh, not only when the toggle changes, so a
+    // participant (or track) that appears after deafening starts is
+    // silenced too; see [_applyDeafenState].
+    unawaited(_applyDeafenState(room));
 
     final next = <VoiceParticipant>[];
     final local = room.localParticipant;

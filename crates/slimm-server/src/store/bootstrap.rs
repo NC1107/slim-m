@@ -116,11 +116,19 @@ impl Store {
     }
 
     /// Lists the deployment's live channels, oldest first.
+    ///
+    /// Excludes `dm`-kind channels: a DM is not a deployment channel anyone
+    /// browses into, it is a conversation between exactly two people, listed
+    /// instead by `Store::list_dm_conversations`. Filtering it out here,
+    /// rather than trusting every caller of this method to do it themselves,
+    /// is what keeps a DM out of the ordinary channel list even though it
+    /// lives in the same table.
     pub async fn list_channels(&self) -> anyhow::Result<Vec<super::Channel>> {
         let rows = sqlx::query!(
-            r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!",
+            r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
                       created_at AS "created_at!"
-               FROM channels WHERE deleted_at IS NULL ORDER BY position, created_at"#
+               FROM channels WHERE deleted_at IS NULL AND kind != 'dm'
+               ORDER BY position, created_at"#
         )
         .fetch_all(&self.pool)
         .await?;
@@ -130,6 +138,7 @@ impl Store {
                 id: r.id,
                 name: r.name,
                 kind: r.kind,
+                topic: r.topic,
                 created_at: r.created_at,
             })
             .collect())

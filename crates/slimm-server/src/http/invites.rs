@@ -2,9 +2,15 @@
 //! Invite routes: creating, listing, checking, and redeeming.
 //!
 //! Checking a code is unauthenticated, because it happens before someone has an
-//! account. It answers only usable or not, never why, so the endpoint cannot be
-//! used to mine valid codes: an expired code, a spent code, and a code that was
-//! never issued are indistinguishable.
+//! account, and rate limited (`Class::InviteCheck`) because it is. An unusable
+//! code (expired, spent, revoked, or never issued) answers with exactly
+//! `{"usable": false}`, byte for byte, so it cannot be used to mine valid
+//! codes by telling them apart. A usable code additionally discloses what it
+//! unlocks (the community's name and size, who invited the caller, and how
+//! much of the code is left): reaching that branch already proves the caller
+//! holds a working code, so it discloses nothing they had not already
+//! demonstrated. See [`crate::store::InviteCheck`] for where that boundary is
+//! enforced.
 
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
@@ -14,9 +20,9 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::Authed;
+use super::extract::{Authed, INVITE_CHECK, RateLimited};
 use crate::permissions::Permissions;
-use crate::store::{Invite, RedeemError};
+use crate::store::{Invite, InviteCheck, RedeemError};
 
 const BODY_LIMIT: usize = 4 * 1024;
 
@@ -63,8 +69,29 @@ struct CreateRequest {
 #[derive(Serialize)]
 struct CheckResponse {
     /// Whether this code can be redeemed right now. Deliberately the only
-    /// signal: saying *why* not would let someone probe for real codes.
+    /// signal for an unusable code: saying *why* not would let someone probe
+    /// for real codes.
     usable: bool,
+    /// Present only when `usable` is true; see the module doc comment for
+    /// why that boundary is the one that matters, not `skip_serializing_if`
+    /// on the fields below it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    community: Option<InviteCommunity>,
+}
+
+#[derive(Serialize)]
+struct InviteCommunity {
+    /// This deployment's display name.
+    name: String,
+    /// How many live accounts the deployment has.
+    member_count: i64,
+    /// The inviter's current display name; null if their account has since
+    /// been deleted.
+    invited_by: Option<String>,
+    /// Null means unlimited.
+    uses_remaining: Option<i64>,
+    /// Unix milliseconds; null means it never expires.
+    expires_at: Option<i64>,
 }
 
 fn now_ms() -> i64 {
@@ -135,13 +162,34 @@ async fn revoke(
 }
 
 /// Checks a code before signup. Unauthenticated by necessity: the person
-/// holding it does not have an account yet.
+/// holding it does not have an account yet. Rate limited because of that:
+/// see the module doc comment for why a usable code is worth more to guess
+/// for than before.
 async fn check(
+    _limited: RateLimited<INVITE_CHECK>,
     Path(code): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<CheckResponse>, ApiError> {
-    let usable = state.store.invite_is_usable(&code).await?;
-    Ok(Json(CheckResponse { usable }))
+    match state.store.check_invite(&code).await? {
+        InviteCheck::Unusable => Ok(Json(CheckResponse {
+            usable: false,
+            community: None,
+        })),
+        InviteCheck::Usable(meta) => {
+            let name = state.store.deployment_name().await?;
+            let member_count = state.store.member_count().await?;
+            Ok(Json(CheckResponse {
+                usable: true,
+                community: Some(InviteCommunity {
+                    name,
+                    member_count,
+                    invited_by: meta.invited_by,
+                    uses_remaining: meta.uses_remaining,
+                    expires_at: meta.expires_at,
+                }),
+            }))
+        }
+    }
 }
 
 /// Spends an invite for the signed-in account.

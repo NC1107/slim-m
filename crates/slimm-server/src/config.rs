@@ -48,6 +48,18 @@ pub struct Config {
     /// as push above, because a text-only self-host is a supported way to run
     /// this and should not need to stand up an SFU to start.
     pub livekit_api_secret: Option<String>,
+
+    /// Directory attachment and avatar bytes are stored under, beside the
+    /// database rather than in it. A sibling of the database's own default
+    /// (`data/slimm.db`), so a local `cargo run` gets both without any
+    /// configuration, and the container image overrides both to absolute
+    /// paths under the same mounted volume (see `docker/server.Dockerfile`).
+    #[serde(default = "default_attachments_dir")]
+    pub attachments_dir: String,
+
+    /// Largest attachment a single upload may store, in bytes.
+    #[serde(default = "default_attachment_max_bytes")]
+    pub attachment_max_bytes: u64,
 }
 
 fn default_port() -> u16 {
@@ -62,11 +74,71 @@ fn default_hash_concurrency() -> usize {
     4
 }
 
+fn default_attachments_dir() -> String {
+    "data/media".to_owned()
+}
+
+fn default_attachment_max_bytes() -> u64 {
+    10 * 1024 * 1024
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            port: default_port(),
+            database_path: default_database_path(),
+            hash_concurrency: default_hash_concurrency(),
+            push_relay_url: None,
+            push_relay_key: None,
+            livekit_url: None,
+            livekit_api_key: None,
+            livekit_api_secret: None,
+            attachments_dir: default_attachments_dir(),
+            attachment_max_bytes: default_attachment_max_bytes(),
+        }
+    }
+}
+
 impl Config {
     /// Reads configuration from `SLIMM_`-prefixed environment variables,
     /// for example `SLIMM_PORT` and `SLIMM_DATABASE_PATH`.
     pub fn from_env() -> anyhow::Result<Self> {
         let config = envy::prefixed("SLIMM_").from_env::<Config>()?;
         Ok(config)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `Default` reuses the same `default_*` functions serde calls when a
+    /// field is missing from the environment, but nothing stops the two from
+    /// drifting apart if a future edit changes one and not the other. This
+    /// deserializes an empty environment map through the same `Deserialize`
+    /// impl `from_env` uses and checks it lands on exactly what `Default`
+    /// produces, so that drift fails a test instead of shipping silently.
+    #[test]
+    fn default_matches_deserializing_an_empty_config() {
+        let empty: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let from_empty_env: Config = envy::from_iter(empty).expect("all fields have defaults");
+        let defaulted = Config::default();
+
+        assert_eq!(from_empty_env.port, defaulted.port);
+        assert_eq!(from_empty_env.database_path, defaulted.database_path);
+        assert_eq!(from_empty_env.hash_concurrency, defaulted.hash_concurrency);
+        assert_eq!(from_empty_env.push_relay_url, defaulted.push_relay_url);
+        assert_eq!(from_empty_env.push_relay_key, defaulted.push_relay_key);
+        assert_eq!(from_empty_env.livekit_url, defaulted.livekit_url);
+        assert_eq!(from_empty_env.livekit_api_key, defaulted.livekit_api_key);
+        assert_eq!(
+            from_empty_env.livekit_api_secret,
+            defaulted.livekit_api_secret
+        );
+        assert_eq!(from_empty_env.attachments_dir, defaulted.attachments_dir);
+        assert_eq!(
+            from_empty_env.attachment_max_bytes,
+            defaulted.attachment_max_bytes
+        );
     }
 }

@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! The half of the pass about people rather than content: the caller's own
+//! profile and avatar, other users, presence, devices, blocks, and the
+//! report queue.
+
+use serde_json::json;
+
+use super::{PNG, text};
+use crate::world::{Contract, Payload};
+
+pub(super) async fn profile_calls(c: &mut Contract, root: &str, admin_id: &str, bob_id: &str) {
+    c.get("getMe", "/me", root).await;
+    c.json(
+        "updateMe",
+        "PATCH",
+        "/me",
+        root,
+        json!({ "display_name": "Admin" }),
+    )
+    .await;
+    c.get(
+        "listUsers",
+        &format!("/users?ids={admin_id},{bob_id}"),
+        root,
+    )
+    .await;
+    c.get("getUser", &format!("/users/{bob_id}"), root).await;
+    c.get("listMembers", "/members?limit=50", root).await;
+    c.get(
+        "listPresence",
+        &format!("/presence?ids={admin_id},{bob_id}"),
+        root,
+    )
+    .await;
+    c.json(
+        "setPresenceVisibility",
+        "PATCH",
+        "/presence",
+        root,
+        json!({ "visibility": "hidden" }),
+    )
+    .await;
+
+    c.call(
+        "uploadAvatar",
+        "POST",
+        "/me/avatar",
+        Some(root),
+        Payload::Bytes(PNG.to_vec()),
+    )
+    .await;
+    c.get("getAvatar", &format!("/users/{admin_id}/avatar"), root)
+        .await;
+    c.bare("deleteAvatar", "DELETE", "/me/avatar", root).await;
+}
+
+pub(super) async fn safety_calls(c: &mut Contract, root: &str, bob_token: &str, bob_id: &str) {
+    let devices = c.get("listDevices", "/devices", bob_token).await;
+    let other = devices
+        .as_array()
+        .and_then(|list| list.iter().find(|d| d["is_current"] == json!(false)))
+        .map(|d| text(d, "id"))
+        .expect("bob signed in twice, so one device is not the current one");
+    c.bare(
+        "removeDevice",
+        "DELETE",
+        &format!("/devices/{other}"),
+        bob_token,
+    )
+    .await;
+
+    c.bare("blockUser", "POST", &format!("/blocks/{bob_id}"), root)
+        .await;
+    c.get("listBlocks", "/blocks", root).await;
+    c.bare("unblockUser", "DELETE", &format!("/blocks/{bob_id}"), root)
+        .await;
+}
+
+pub(super) async fn moderation_calls(c: &mut Contract, root: &str, bob_token: &str, message: &str) {
+    let filed = c
+        .json(
+            "fileReport",
+            "POST",
+            "/reports",
+            bob_token,
+            json!({ "subject_kind": "message", "subject_id": message, "reason": "spam" }),
+        )
+        .await;
+    c.get("listOpenReports", "/reports", root).await;
+    c.json(
+        "resolveReport",
+        "PATCH",
+        &format!("/reports/{}", text(&filed, "id")),
+        root,
+        json!({ "resolution": "dismissed" }),
+    )
+    .await;
+}

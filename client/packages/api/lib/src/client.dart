@@ -10,6 +10,20 @@ import 'package:http/http.dart' as http;
 import 'exceptions.dart';
 import 'models.dart';
 
+// Split into companion files purely to stay under this repo's line budget.
+// Each is a `part of` this library rather than its own, since every one of
+// them needs the private `_send` helper below and privacy in Dart is scoped
+// to the library, not the file.
+part 'client_admin.dart';
+part 'client_attachments.dart';
+part 'client_channel_admin.dart';
+part 'client_dms.dart';
+part 'client_messages.dart';
+part 'client_moderation.dart';
+part 'client_presence.dart';
+part 'client_roles.dart';
+part 'client_users.dart';
+
 /// Holds the current session and hands out the access token.
 ///
 /// Kept separate from the client so storage (secure storage on device, memory
@@ -241,16 +255,24 @@ class SlimmApi {
   }
 
   /// Sends a message. [id] must be a client-generated UUIDv7 and makes the send
-  /// idempotent, so retrying an uncertain send is always safe.
+  /// idempotent, so retrying an uncertain send is always safe. [attachmentIds]
+  /// are hex sha256 ids already uploaded through [SlimmApi.uploadAttachment],
+  /// in display order; a non-empty list needs ATTACH_FILES in addition to
+  /// SEND_MESSAGES.
   Future<Message> sendMessage({
     required String channelId,
     required String id,
     required String content,
+    List<String> attachmentIds = const [],
   }) async {
     final json = await _send(
       'POST',
       '/channels/$channelId/messages',
-      body: {'id': id, 'content': content},
+      body: {
+        'id': id,
+        'content': content,
+        if (attachmentIds.isNotEmpty) 'attachment_ids': attachmentIds,
+      },
     );
     return Message.fromJson(json as Map<String, dynamic>);
   }
@@ -332,15 +354,16 @@ class SlimmApi {
   Future<void> unblockUser(String userId) =>
       _send('DELETE', '/blocks/$userId', expectNoContent: true);
 
-  /// Whether an invite code can be used. Unauthenticated, because the person
-  /// holding a code does not have an account yet. Answers only usable or not.
-  Future<bool> checkInvite(String code) async {
+  /// Whether an invite code can be used, and if so, a preview of what it
+  /// joins. Unauthenticated, because the person holding a code does not have
+  /// an account yet.
+  Future<InviteCheck> checkInvite(String code) async {
     final json = await _send(
       'GET',
       '/invites/$code/check',
       authenticated: false,
     );
-    return (json as Map<String, dynamic>)['usable'] as bool;
+    return InviteCheck.fromJson(json as Map<String, dynamic>);
   }
 
   /// Spends an invite for the signed-in account.
@@ -422,6 +445,7 @@ class SlimmApi {
     String method,
     String path, {
     Map<String, dynamic>? body,
+    List<int>? bytes,
     Map<String, String>? query,
     bool authenticated = true,
     bool expectNoContent = false,
@@ -429,7 +453,12 @@ class SlimmApi {
   }) async {
     final uri = baseUrl.replace(path: path, queryParameters: query);
     final request = http.Request(method, uri);
-    if (body != null) {
+    if (bytes != null) {
+      // An upload (an attachment or an avatar): the request body is the raw
+      // bytes, never JSON, though the response below still is.
+      request.headers['content-type'] = 'application/octet-stream';
+      request.bodyBytes = bytes;
+    } else if (body != null) {
       request.headers['content-type'] = 'application/json';
       request.body = jsonEncode(body);
     }
@@ -459,6 +488,7 @@ class SlimmApi {
         method,
         path,
         body: body,
+        bytes: bytes,
         query: query,
         authenticated: authenticated,
         expectNoContent: expectNoContent,
@@ -478,6 +508,41 @@ class SlimmApi {
         throw TransportException(
             'could not decode the reply to $method $path: $e');
       }
+    }
+    throw _errorFor(response);
+  }
+
+  /// Like [_send], for an authenticated GET whose response is raw bytes
+  /// rather than JSON (an attachment or an avatar fetch): the same one-shot
+  /// refresh-and-retry and error mapping, without a JSON decode that would
+  /// only fail on a body that was never JSON to begin with.
+  Future<FetchedBytes> _fetchBytes(String path, {bool isRetry = false}) async {
+    final uri = baseUrl.replace(path: path);
+    final request = http.Request('GET', uri);
+    final token = session.tokens?.accessToken;
+    if (token == null) {
+      throw const UnauthorizedException('not signed in');
+    }
+    request.headers['authorization'] = 'Bearer $token';
+
+    final http.Response response;
+    try {
+      response = await http.Response.fromStream(await _http.send(request));
+    } catch (e) {
+      throw TransportException('GET $path failed: $e');
+    }
+
+    if (response.statusCode == 401 && !isRetry && session.tokens != null) {
+      await refresh();
+      return _fetchBytes(path, isRetry: true);
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return FetchedBytes(
+        bytes: response.bodyBytes,
+        contentType:
+            response.headers['content-type'] ?? 'application/octet-stream',
+      );
     }
     throw _errorFor(response);
   }

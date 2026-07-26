@@ -219,8 +219,12 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
 
     final client = api.SlimmApi(baseUrl: address);
     try {
-      final usable = await client.checkInvite(_code.text.trim());
-      if (!usable) {
+      final check = await client.checkInvite(_code.text.trim());
+      if (check is api.InviteUnusable) {
+        // Deliberately vague, and it has to stay that way: the server answers
+        // expired, spent, revoked and never-issued identically so codes cannot
+        // be mined, and naming a reason here would undo that from the client
+        // side by telling an attacker which of the four they hit.
         setState(() => _error = 'That code is not usable. It may have expired '
             'or already been used.');
         return;

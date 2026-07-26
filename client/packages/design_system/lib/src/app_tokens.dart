@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import 'package:flutter/material.dart';
 
+import 'app_typography.dart';
+
 /// Semantic design tokens for slim-m, exposed as a [ThemeExtension] so a widget
 /// does one lookup (`Theme.of(context).extension<AppTokens>()`).
 ///
@@ -32,13 +34,22 @@ class AppTokens extends ThemeExtension<AppTokens> {
     required this.surfaceBase,
     required this.surfaceRaised,
     required this.borderSubtle,
+    required this.borderStrong,
     required this.textPrimary,
     required this.textSecondary,
+    required this.textDisabled,
     required this.accent,
     required this.accentFill,
     required this.accentOn,
     required this.accentSoft,
+    required this.accentRing,
     required this.focusRing,
+    required this.status,
+    required this.dangerText,
+    required this.dangerBorder,
+    required this.warnText,
+    required this.warnSoft,
+    required this.stripe,
     required this.code,
   });
 
@@ -52,8 +63,18 @@ class AppTokens extends ThemeExtension<AppTokens> {
   /// shadows do elsewhere.
   final Color borderSubtle;
 
+  /// The separator for something that must read as an edge rather than a hint:
+  /// a focused input, a menu against the surface it floats over.
+  final Color borderStrong;
+
   final Color textPrimary;
   final Color textSecondary;
+
+  /// Text that is present but not actionable. Deliberately not
+  /// [textSecondary] at lower opacity: a disabled control and a de-emphasised
+  /// one are different claims, and reusing one colour for both means a user
+  /// cannot tell which they are looking at.
+  final Color textDisabled;
 
   /// The accent as *text or icon*: contrast-bound, so it is darker in light
   /// mode and does not match [accentFill]'s hue exactly. Use for accented
@@ -72,10 +93,48 @@ class AppTokens extends ThemeExtension<AppTokens> {
   /// selected rows, active channel background, operator chips.
   final Color accentSoft;
 
-  /// The keyboard focus indicator. Deliberately its own token rather than the
-  /// accent border used for active and selected states: if focus and selection
-  /// look the same, a keyboard user cannot tell where they are.
+  /// A wider, fainter accent tint for the ring around a pressed or dragged
+  /// control. Distinct from [accentSoft] because the two are seen together and
+  /// an identical value collapses the ring into the fill.
+  final Color accentRing;
+
+  /// The keyboard focus indicator.
+  ///
+  /// **This is currently the same value as [accentFill] in every theme**, which
+  /// the design system intends: its own `--focus-ring` is defined as
+  /// `var(--accent-fill)`. It stays a separate token so that a future decision
+  /// to give focus its own hue is one edit here rather than a search for every
+  /// accent border that happened to mean focus.
+  ///
+  /// Because the colour is shared, **shape is what separates focus from
+  /// selection**, and that separation is not optional: a keyboard user who
+  /// cannot tell the two apart has lost their place. The house rule, which the
+  /// components follow and test, is that selection is a *fill* plus a marker
+  /// while focus is an *outline ring* drawn around the whole control. A widget
+  /// that signals focus with a fill is a bug even though it uses this token.
+  ///
+  /// An earlier version of this comment claimed the two were deliberately
+  /// different colours. They never have been, and a test written against that
+  /// claim failed honestly and found it.
   final Color focusRing;
+
+  /// Presence colours. Always paired with a distinct shape, never used alone:
+  /// the traffic-light convention is invisible to the most common form of
+  /// colour blindness, and a status dot is the smallest thing on screen.
+  final AppStatusColors status;
+
+  /// Destructive text, and the border of a destructive control.
+  final Color dangerText;
+  final Color dangerBorder;
+
+  /// A caution that is not a failure: an expiring invite, a stale device.
+  final Color warnText;
+  final Color warnSoft;
+
+  /// Diagonal hatching for imagery that has not loaded or has not been
+  /// supplied. Its own token so a placeholder never gets drawn as a flat grey
+  /// block that reads like a real, empty surface.
+  final Color stripe;
 
   /// Syntax colours for fenced code blocks.
   final AppCodeColors code;
@@ -86,8 +145,10 @@ class AppTokens extends ThemeExtension<AppTokens> {
     surfaceBase: Color(0xFFF7F8F9),
     surfaceRaised: Color(0xFFFFFFFF),
     borderSubtle: Color(0xFFDCE0E5),
+    borderStrong: Color(0xFFC4CAD1),
     textPrimary: Color(0xFF1B1E22),
     textSecondary: Color(0xFF5B6169),
+    textDisabled: Color(0xFF8A929B),
     // Darkened from #1E7F77 by the identity review's own consequence: adding
     // surface.sunken gave the accent a third surface to be legible on, and the
     // old value cleared base at 4.53:1 but only reached 4.26:1 on sunken. The
@@ -97,7 +158,14 @@ class AppTokens extends ThemeExtension<AppTokens> {
     accentFill: Color(0xFF1D7A72),
     accentOn: Color(0xFFFFFFFF),
     accentSoft: Color(0xFFDDEEEC),
+    accentRing: Color(0x381D7A72),
     focusRing: Color(0xFF1D7A72),
+    status: AppStatusColors.light,
+    dangerText: Color(0xFFA83B32),
+    dangerBorder: Color(0xFFC0524A),
+    warnText: Color(0xFF7A5A22),
+    warnSoft: Color(0x1FC08A2E),
+    stripe: Color(0x175B6169),
     code: AppCodeColors.light,
   );
 
@@ -107,13 +175,22 @@ class AppTokens extends ThemeExtension<AppTokens> {
     surfaceBase: Color(0xFF17191C),
     surfaceRaised: Color(0xFF1F2226),
     borderSubtle: Color(0xFF2E333A),
+    borderStrong: Color(0xFF6C757E),
     textPrimary: Color(0xFFECEDEF),
     textSecondary: Color(0xFFA7AEB6),
+    textDisabled: Color(0xFF6C757E),
     accent: Color(0xFF4FBDB4),
     accentFill: Color(0xFF4FBDB4),
     accentOn: Color(0xFF07100F),
     accentSoft: Color(0xFF1B2E2E),
+    accentRing: Color(0x404FBDB4),
     focusRing: Color(0xFF4FBDB4),
+    status: AppStatusColors.dark,
+    dangerText: Color(0xFFD4756B),
+    dangerBorder: Color(0xFFC0524A),
+    warnText: Color(0xFFC08A2E),
+    warnSoft: Color(0x1AC08A2E),
+    stripe: Color(0x12A7AEB6),
     code: AppCodeColors.dark,
   );
 
@@ -130,13 +207,22 @@ class AppTokens extends ThemeExtension<AppTokens> {
     surfaceBase: Color(0xFF000000),
     surfaceRaised: Color(0xFF0B0D0F),
     borderSubtle: Color(0xFF2C3238),
+    borderStrong: Color(0xFF6C757E),
     textPrimary: Color(0xFFF2F5F7),
     textSecondary: Color(0xFFA8B2BC),
+    textDisabled: Color(0xFF6C757E),
     accent: Color(0xFF3FBFAE),
     accentFill: Color(0xFF3FBFAE),
     accentOn: Color(0xFF04100E),
     accentSoft: Color(0xFF132926),
+    accentRing: Color(0x3D3FBFAE),
     focusRing: Color(0xFF3FBFAE),
+    status: AppStatusColors.dark,
+    dangerText: Color(0xFFD4756B),
+    dangerBorder: Color(0xFFC0524A),
+    warnText: Color(0xFFC08A2E),
+    warnSoft: Color(0x1AC08A2E),
+    stripe: Color(0x12A8B2BC),
     code: AppCodeColors.trueBlack,
   );
 
@@ -146,13 +232,22 @@ class AppTokens extends ThemeExtension<AppTokens> {
     Color? surfaceBase,
     Color? surfaceRaised,
     Color? borderSubtle,
+    Color? borderStrong,
     Color? textPrimary,
     Color? textSecondary,
+    Color? textDisabled,
     Color? accent,
     Color? accentFill,
     Color? accentOn,
     Color? accentSoft,
+    Color? accentRing,
     Color? focusRing,
+    AppStatusColors? status,
+    Color? dangerText,
+    Color? dangerBorder,
+    Color? warnText,
+    Color? warnSoft,
+    Color? stripe,
     AppCodeColors? code,
   }) {
     return AppTokens(
@@ -166,7 +261,16 @@ class AppTokens extends ThemeExtension<AppTokens> {
       accentFill: accentFill ?? this.accentFill,
       accentOn: accentOn ?? this.accentOn,
       accentSoft: accentSoft ?? this.accentSoft,
+      borderStrong: borderStrong ?? this.borderStrong,
+      textDisabled: textDisabled ?? this.textDisabled,
+      accentRing: accentRing ?? this.accentRing,
       focusRing: focusRing ?? this.focusRing,
+      status: status ?? this.status,
+      dangerText: dangerText ?? this.dangerText,
+      dangerBorder: dangerBorder ?? this.dangerBorder,
+      warnText: warnText ?? this.warnText,
+      warnSoft: warnSoft ?? this.warnSoft,
+      stripe: stripe ?? this.stripe,
       code: code ?? this.code,
     );
   }
@@ -185,10 +289,58 @@ class AppTokens extends ThemeExtension<AppTokens> {
       accentFill: Color.lerp(accentFill, other.accentFill, t)!,
       accentOn: Color.lerp(accentOn, other.accentOn, t)!,
       accentSoft: Color.lerp(accentSoft, other.accentSoft, t)!,
+      borderStrong: Color.lerp(borderStrong, other.borderStrong, t)!,
+      textDisabled: Color.lerp(textDisabled, other.textDisabled, t)!,
+      accentRing: Color.lerp(accentRing, other.accentRing, t)!,
       focusRing: Color.lerp(focusRing, other.focusRing, t)!,
+      status: t < 0.5 ? status : other.status,
+      dangerText: Color.lerp(dangerText, other.dangerText, t)!,
+      dangerBorder: Color.lerp(dangerBorder, other.dangerBorder, t)!,
+      warnText: Color.lerp(warnText, other.warnText, t)!,
+      warnSoft: Color.lerp(warnSoft, other.warnSoft, t)!,
+      stripe: Color.lerp(stripe, other.stripe, t)!,
       code: t < 0.5 ? code : other.code,
     );
   }
+}
+
+/// Presence colours, one per state.
+///
+/// The traffic-light convention is used because it is the one users already
+/// have, but it is never load-bearing on its own: every presence indicator
+/// pairs a hue with a distinct shape (filled disc, hollow ring, dash, crescent)
+/// so the state survives greyscale. That matters more than usual here, because
+/// a bug report arrives as a screenshot and a status dot is the smallest thing
+/// in it.
+@immutable
+class AppStatusColors {
+  const AppStatusColors({
+    required this.online,
+    required this.away,
+    required this.dnd,
+    required this.offline,
+  });
+
+  final Color online;
+  final Color away;
+  final Color dnd;
+  final Color offline;
+
+  static const AppStatusColors light = AppStatusColors(
+    online: Color(0xFF2E7D45),
+    away: Color(0xFF8A6218),
+    dnd: Color(0xFFA83B32),
+    offline: Color(0xFF6C757E),
+  );
+
+  static const AppStatusColors dark = AppStatusColors(
+    online: Color(0xFF3FA45B),
+    away: Color(0xFFC08A2E),
+    dnd: Color(0xFFC0524A),
+    offline: Color(0xFF6C757E),
+  );
+
+  List<Color> get all => [online, away, dnd, offline];
 }
 
 /// Syntax colours for fenced code blocks, five roles per theme.
@@ -212,28 +364,34 @@ class AppCodeColors {
   final Color comment;
   final Color punctuation;
 
+  /// Comment and punctuation are darker here than the design system's CSS,
+  /// which leaves both at slate-400. That is an oversight in the source rather
+  /// than a choice: the light block overrides keyword, string and number and
+  /// simply does not override these two, so they inherit a value that lands at
+  /// about 2.2:1 on white. The rule stated one line above this class is the one
+  /// followed.
   static const AppCodeColors light = AppCodeColors(
-    keyword: Color(0xFF8A3FA0),
-    string: Color(0xFF0F7A5A),
-    number: Color(0xFF9A5B00),
-    comment: Color(0xFF6B7280),
-    punctuation: Color(0xFF4A5158),
+    keyword: Color(0xFF166B64),
+    string: Color(0xFF7A5A22),
+    number: Color(0xFF7A5A22),
+    comment: Color(0xFF5B6169),
+    punctuation: Color(0xFF5B6169),
   );
 
   static const AppCodeColors dark = AppCodeColors(
-    keyword: Color(0xFFD9A2E8),
-    string: Color(0xFF7FD2A8),
-    number: Color(0xFFE0B274),
-    comment: Color(0xFF8B939C),
-    punctuation: Color(0xFFB9C1C9),
+    keyword: Color(0xFF8FC7C1),
+    string: Color(0xFFC6A882),
+    number: Color(0xFFC6A882),
+    comment: Color(0xFFA7AEB6),
+    punctuation: Color(0xFFA7AEB6),
   );
 
   static const AppCodeColors trueBlack = AppCodeColors(
-    keyword: Color(0xFFDFAAEE),
-    string: Color(0xFF8ADCB2),
-    number: Color(0xFFE8BC80),
-    comment: Color(0xFF949CA6),
-    punctuation: Color(0xFFC4CCD4),
+    keyword: Color(0xFF79C8BE),
+    string: Color(0xFFC9AA84),
+    number: Color(0xFFC9AA84),
+    comment: Color(0xFFA8B2BC),
+    punctuation: Color(0xFFA8B2BC),
   );
 
   /// Every role, for a contrast gate that must not miss one.
@@ -264,35 +422,6 @@ abstract final class AppCanvasColors {
   ];
 }
 
-/// The 4dp spacing grid, named by value.
-abstract final class AppSpacing {
-  static const double s4 = 4;
-  static const double s8 = 8;
-  static const double s12 = 12;
-  static const double s16 = 16;
-  static const double s24 = 24;
-  static const double s32 = 32;
-  static const double s48 = 48;
-}
-
-/// Corner radii; elevation is border-first, so shadows are rare.
-///
-/// Three steps plus full. A 4dp and a 6dp corner are indistinguishable under a
-/// 1px hairline, so the extra step bought nothing except one more judgement
-/// call per contributor.
-abstract final class AppRadii {
-  static const double control = 6;
-  static const double card = 10;
-  static const double window = 16;
-  static const double full = 999;
-}
-
-/// How wide a message column is allowed to get.
-///
-/// Line length, not layout: 15sp at 1.45 stops being comfortable to read well
-/// before a wide monitor runs out of room.
-const double kMessageColumnMax = 760;
-
 /// Builds a theme from the token set, so widgets read colours from tokens and
 /// never from raw literals. Shared by the app and the golden tests, which is
 /// what keeps goldens representative of what ships.
@@ -307,6 +436,7 @@ ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
     brightness: brightness,
     colorScheme: scheme,
     scaffoldBackgroundColor: tokens.surfaceBase,
+    fontFamily: AppFonts.sans,
     extensions: [tokens],
     dividerTheme: DividerThemeData(color: tokens.borderSubtle, space: 1),
   );

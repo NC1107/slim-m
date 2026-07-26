@@ -23,6 +23,7 @@ class VoiceState {
     this.microphoneEnabled = true,
     this.screenSharing = false,
     this.canPublish = true,
+    this.deafened = false,
     this.error,
   });
 
@@ -40,6 +41,11 @@ class VoiceState {
   /// Whether the token allows publishing at all, mirroring the SPEAK grant.
   final bool canPublish;
 
+  /// Whether every other participant's audio is locally silenced. Purely
+  /// local: it never touches this session's own microphone, so it carries
+  /// no [canPublish]-style server permission to check.
+  final bool deafened;
+
   final String? error;
 
   VoiceState copyWith({
@@ -49,6 +55,7 @@ class VoiceState {
     bool? microphoneEnabled,
     bool? screenSharing,
     bool? canPublish,
+    bool? deafened,
     String? error,
     bool clearError = false,
   }) =>
@@ -59,6 +66,7 @@ class VoiceState {
         microphoneEnabled: microphoneEnabled ?? this.microphoneEnabled,
         screenSharing: screenSharing ?? this.screenSharing,
         canPublish: canPublish ?? this.canPublish,
+        deafened: deafened ?? this.deafened,
         error: clearError ? null : (error ?? this.error),
       );
 }
@@ -141,6 +149,19 @@ class VoiceController extends StateNotifier<VoiceState> {
       microphoneEnabled: got ? want : state.microphoneEnabled,
       error:
           got ? null : 'Could not ${want ? 'unmute' : 'mute'} the microphone.',
+      clearError: got,
+    );
+  }
+
+  /// Toggles local playback of everyone else's audio. Never touches this
+  /// session's own microphone: deafening and muting are independent, exactly
+  /// as they are for every other voice product this design is drawn from.
+  Future<void> toggleDeafen() async {
+    final want = !state.deafened;
+    final got = await _session.setDeafened(want);
+    state = state.copyWith(
+      deafened: got ? want : state.deafened,
+      error: got ? null : 'Could not ${want ? 'deafen' : 'undeafen'}.',
       clearError: got,
     );
   }

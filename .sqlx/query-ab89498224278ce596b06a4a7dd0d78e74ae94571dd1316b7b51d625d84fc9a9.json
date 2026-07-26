@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT pinned_by AS \"pinned_by: UserId\", pinned_at AS \"pinned_at!\"\n               FROM pinned_messages WHERE channel_id = ? AND message_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "pinned_by: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "pinned_at!",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "ab89498224278ce596b06a4a7dd0d78e74ae94571dd1316b7b51d625d84fc9a9"
+}

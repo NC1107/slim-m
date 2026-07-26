@@ -11,7 +11,23 @@
 ///   fan-out of things that already happened durably, never the write path.
 library;
 
-export 'src/client.dart' show SlimmApi, SessionStore;
+// The extensions must be named in this `show` list too, not just SlimmApi
+// itself: `show` filters by declaration name, and an extension's methods are
+// only in scope for a caller if the extension's own name is exported, even
+// though the caller never spells that name out at the call site.
+export 'src/client.dart'
+    show
+        SlimmApi,
+        SessionStore,
+        SlimmApiAdmin,
+        SlimmApiAttachments,
+        SlimmApiChannelAdmin,
+        SlimmApiDms,
+        SlimmApiMessages,
+        SlimmApiModeration,
+        SlimmApiPresence,
+        SlimmApiRoles,
+        SlimmApiUsers;
 export 'src/events.dart'
     show
         EventConnection,
@@ -19,9 +35,19 @@ export 'src/events.dart'
         ErrorEvent,
         HelloEvent,
         MessageCreated,
+        MessageDeleted,
         MessageEdited,
+        MessagePinned,
+        MessageUnpinned,
+        PollVoted,
+        PollOptionTally,
         PongEvent,
+        PresenceChanged,
+        ReactionsChanged,
+        ReactionTally,
         ServerEvent,
+        TypingStarted,
+        TypingStopped,
         protocolVersion;
 export 'src/exceptions.dart';
 export 'src/models.dart';

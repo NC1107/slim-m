@@ -13,6 +13,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../providers/sync_controller.dart';
@@ -57,6 +58,8 @@ class SettingsScreen extends ConsumerWidget {
           _DevicesSection(),
           Divider(height: 1),
           _NotificationsSection(),
+          Divider(height: 1),
+          _PresenceSection(),
           Divider(height: 1),
           _BlockedSection(),
           Divider(height: 1),
@@ -191,6 +194,62 @@ class _NotificationsSection extends ConsumerWidget {
                     : tokens.textSecondary,
           ),
           title: Text(status.label),
+        ),
+      ],
+    );
+  }
+}
+
+/// Sets the caller's own visibility preference via `PATCH /presence`. See
+/// [presenceVisibilityDisplayProvider] for why the selected segment is a
+/// local echo of the last choice rather than a value read back from the
+/// server: there is no endpoint that returns it.
+class _PresenceSection extends ConsumerWidget {
+  const _PresenceSection();
+
+  static const _options = [
+    (api.PresenceVisibility.online, 'Online'),
+    (api.PresenceVisibility.away, 'Away'),
+    (api.PresenceVisibility.dnd, 'Do not disturb'),
+    (api.PresenceVisibility.hidden, 'Appear offline'),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(presenceVisibilityDisplayProvider);
+    final index = _options.indexWhere((option) => option.$1 == selected);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeader(
+          'Presence',
+          description: 'What other members see next to your name.',
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+          child: AppSegmentedControl.inline(
+            semanticLabel: 'Presence visibility',
+            options: [
+              for (final option in _options)
+                AppSegmentedOption(label: option.$2),
+            ],
+            selectedIndex: index < 0 ? 0 : index,
+            onSegmentSelected: (i) async {
+              final visibility = _options[i].$1;
+              ref.read(presenceVisibilityDisplayProvider.notifier).state =
+                  visibility;
+              try {
+                await ref.read(apiProvider).setPresenceVisibility(visibility);
+              } on api.ApiException catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content: Text('Could not update presence. ${e.message}')),
+                );
+              }
+            },
+          ),
         ),
       ],
     );

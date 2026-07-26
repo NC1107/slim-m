@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The conversation: history, live arrivals, and the composer.
+/// The conversation: history, live arrivals, search, and the composer.
 library;
 
-import 'dart:math';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,28 +10,22 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../ids.dart';
+import '../providers/message_actions.dart';
+import '../providers/message_extras.dart';
 import '../providers/providers.dart';
+import '../routing/breakpoints.dart';
+import '../widgets/channel_header.dart';
+import '../widgets/channel_search.dart';
+import '../widgets/composer.dart';
+import '../widgets/member_pane.dart';
+import '../widgets/message_row.dart';
 
-/// Generates the UUIDv7 that identifies a message and makes its send
-/// idempotent. Time-ordered, which is what the server's storage assumes.
-String newMessageId() {
-  final now = DateTime.now().millisecondsSinceEpoch;
-  final random = Random.secure();
-  final bytes = <int>[
-    (now >> 40) & 0xff,
-    (now >> 32) & 0xff,
-    (now >> 24) & 0xff,
-    (now >> 16) & 0xff,
-    (now >> 8) & 0xff,
-    now & 0xff,
-    ...List<int>.generate(10, (_) => random.nextInt(256)),
-  ];
-  bytes[6] = (bytes[6] & 0x0f) | 0x70;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}'
-      '-${hex.substring(16, 20)}-${hex.substring(20)}';
-}
+export '../ids.dart' show newMessageId;
+
+/// The fixed emoji the message row's quick-react glyph adds, standing in
+/// for a full picker.
+const String _quickReactionEmoji = '\u{1F44D}';
 
 /// One channel's messages.
 class ChannelScreen extends ConsumerStatefulWidget {
@@ -46,18 +40,50 @@ class ChannelScreen extends ConsumerStatefulWidget {
 class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   final _composer = TextEditingController();
   final _scroll = ScrollController();
+  final _searchController = TextEditingController();
+  bool _searchOpen = false;
+
+  /// Search hits straight from the server, not the local store: `api.Message`
+  /// here, never the local `Message` row the rest of this screen otherwise
+  /// uses, since a search result was never necessarily written locally.
+  List<api.Message>? _searchResults;
+
+  @override
+  void initState() {
+    super.initState();
+    // Hydrates the reaction/attachment/poll cache for the visible window,
+    // which is what makes it correct after a restart: the local database
+    // has no columns for any of the three (see message_extras.dart), and
+    // sync only ever fetches messages newer than the cursor, so an old
+    // message's enrichment would otherwise never come back. Best-effort and
+    // silent: a failure here just leaves the cache as it was, and the row
+    // itself still renders from the local store either way.
+    unawaited(_hydrateExtras());
+  }
+
+  Future<void> _hydrateExtras() async {
+    try {
+      final recent =
+          await ref.read(apiProvider).listMessages(widget.channelId, limit: 50);
+      if (!mounted) return;
+      ref.read(messageExtrasProvider.notifier).applyMessages(recent);
+    } on api.ApiException {
+      // Nothing useful to do; a live event or the next channel open corrects it.
+    }
+  }
 
   @override
   void dispose() {
     _composer.dispose();
     _scroll.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   /// Sends, showing the message immediately and reconciling with the server's
   /// copy when it lands. The id is generated here and reused on retry, so a
   /// retry after an uncertain failure can never post twice.
-  Future<void> _send() async {
+  Future<void> _send(List<String> attachmentIds) async {
     final text = _composer.text.trim();
     if (text.isEmpty) return;
 
@@ -79,12 +105,17 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
             channelId: widget.channelId,
             id: id,
             content: text,
+            attachmentIds: attachmentIds,
           );
       // Lands on the same row, because it carries the same id.
       await store.applyMessage(sent);
+      ref.read(messageExtrasProvider.notifier).applyMessage(sent);
     } on api.ApiException {
       // Keep the text as a failed row rather than dropping it; the user can
       // retry or discard, and either way they do not lose what they wrote.
+      // A retry only resends the text: the local store has nowhere to keep
+      // the attachment ids for a message that has not landed yet, so a
+      // retried send after a failure goes out without them.
       await store.markFailed(id);
     }
     _scrollToLatest();
@@ -105,8 +136,49 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
             content: message.content,
           );
       await store.applyMessage(sent);
+      ref.read(messageExtrasProvider.notifier).applyMessage(sent);
     } on api.ApiException {
       await store.markFailed(message.id);
+    }
+  }
+
+  Future<void> _quickReact(Message message) => setReaction(
+        ref,
+        message.id,
+        _quickReactionEmoji,
+        wasActive: hasReacted(ref, message.id, _quickReactionEmoji),
+      );
+
+  Future<void> _toggleReaction(Message message, api.ReactionSummary reaction) =>
+      setReaction(ref, message.id, reaction.emoji, wasActive: reaction.reacted);
+
+  Future<void> _vote(Message message, int option) =>
+      castVote(ref, message.id, option);
+
+  void _toggleSearch() {
+    setState(() {
+      _searchOpen = !_searchOpen;
+      if (!_searchOpen) {
+        _searchResults = null;
+        _searchController.clear();
+      }
+    });
+  }
+
+  Future<void> _runSearch(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() => _searchResults = null);
+      return;
+    }
+    try {
+      final results = await ref
+          .read(apiProvider)
+          .searchMessages(widget.channelId, q: query);
+      if (!mounted) return;
+      setState(() => _searchResults = results);
+    } on api.ApiException {
+      if (!mounted) return;
+      setState(() => _searchResults = const []);
     }
   }
 
@@ -114,7 +186,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
       _scroll.animateTo(
-        _scroll.position.maxScrollExtent,
+        // The list is reversed, so the latest message sits at offset zero.
+        _scroll.position.minScrollExtent,
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
       );
@@ -125,203 +198,124 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   Widget build(BuildContext context) {
     final storeAsync = ref.watch(storeProvider);
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final layout = LayoutClass.of(context);
+    final knownUsernames = ref.watch(membersProvider).maybeWhen(
+          data: (members) =>
+              members.map((m) => m.username.toLowerCase()).toSet(),
+          orElse: () => const <String>{},
+        );
+    final extrasById = ref.watch(messageExtrasProvider);
 
     return storeAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) =>
           Center(child: Text('Could not open the local store: $e')),
-      data: (store) => Column(
-        children: [
-          Expanded(
-            child: StreamBuilder<List<Message>>(
-              stream: store.watchChannel(widget.channelId),
-              builder: (context, snapshot) {
-                final messages = snapshot.data ?? const <Message>[];
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No messages yet.',
-                      style: TextStyle(color: tokens.textSecondary),
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s8),
-                  itemCount: messages.length,
-                  itemBuilder: (context, i) => _MessageRow(
-                    message: messages[i],
-                    previous: i == 0 ? null : messages[i - 1],
-                    onRetry: () => _retry(messages[i]),
-                    onDiscard: () async =>
-                        (await ref.read(storeProvider.future))
-                            .discard(messages[i].id),
-                  ),
-                );
-              },
-            ),
-          ),
-          _Composer(controller: _composer, onSend: _send),
-        ],
-      ),
-    );
-  }
-}
+      data: (store) => StreamBuilder<List<Channel>>(
+        stream: store.watchChannels(),
+        builder: (context, channelsSnapshot) {
+          final channel = channelsSnapshot.data
+              ?.where((c) => c.id == widget.channelId)
+              .cast<Channel?>()
+              .firstOrNull;
+          final channelName = channel?.name ?? '';
 
-/// One message. Consecutive messages from the same author are grouped, so a
-/// back-and-forth reads as a conversation rather than a wall of repeated names.
-class _MessageRow extends StatelessWidget {
-  const _MessageRow({
-    required this.message,
-    required this.previous,
-    required this.onRetry,
-    required this.onDiscard,
-  });
-
-  final Message message;
-  final Message? previous;
-  final VoidCallback onRetry;
-  final VoidCallback onDiscard;
-
-  bool get _grouped =>
-      previous != null &&
-      previous!.authorId == message.authorId &&
-      (message.createdAt - previous!.createdAt).abs() < 5 * 60 * 1000;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final unsent = message.pending || message.failed;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.s16,
-        _grouped ? AppSpacing.s4 : AppSpacing.s12,
-        AppSpacing.s16,
-        AppSpacing.s4,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!_grouped)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.s4),
-              child: Text(
-                // Never the raw id. A missing name means the row was cached
-                // before the server sent names and has not been re-synced, and
-                // showing a 36-character uuid where a person's name goes reads
-                // as corruption rather than as staleness. A null author is a
-                // deleted account, which is a different and knowable thing.
-                message.authorDisplayName ??
-                    (message.authorId == null ? 'Deleted user' : 'Unknown'),
-                style: TextStyle(
-                  color: tokens.textSecondary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          return Column(
             children: [
+              if (layout.showsBothPanes)
+                ChannelHeader(
+                  channelId: widget.channelId,
+                  name: channelName,
+                  topic: channel?.topic,
+                  isVoice: false,
+                  searchOpen: _searchOpen,
+                  onToggleSearch: _toggleSearch,
+                ),
+              if (_searchOpen)
+                ChannelSearchBar(
+                    controller: _searchController, onChanged: _runSearch),
               Expanded(
-                child: Text(
-                  message.content,
-                  style: TextStyle(
-                    color: unsent ? tokens.textSecondary : tokens.textPrimary,
-                  ),
-                ),
+                child: _searchResults != null
+                    ? ChannelSearchResults(
+                        results: _searchResults!,
+                        knownUsernames: knownUsernames)
+                    : StreamBuilder<List<Message>>(
+                        stream: store.watchChannel(widget.channelId),
+                        builder: (context, snapshot) {
+                          final messages = snapshot.data ?? const <Message>[];
+                          if (messages.isEmpty) {
+                            return Center(
+                              child: Text('No messages yet.',
+                                  style:
+                                      TextStyle(color: tokens.textSecondary)),
+                            );
+                          }
+                          final lastReadSeq = channel?.lastReadSeq ?? 0;
+                          // The design fills the column from the bottom, so a
+                          // short conversation sits against the composer
+                          // rather than stranding it below empty space.
+                          return ListView.builder(
+                            controller: _scroll,
+                            reverse: true,
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpacing.s8),
+                            itemCount: messages.length,
+                            itemBuilder: (context, i) {
+                              // Index 0 is the newest, at the bottom.
+                              // `previous` stays the row visually above, which
+                              // is the older message, so grouping and the
+                              // unread divider read the same as before.
+                              final index = messages.length - 1 - i;
+                              final message = messages[index];
+                              final previous =
+                                  index == 0 ? null : messages[index - 1];
+                              final extras =
+                                  extrasById[message.id] ?? MessageExtras.empty;
+                              return MessageRow(
+                                message: message,
+                                grouped: _isGrouped(message, previous),
+                                showNewDivider: _startsUnread(
+                                    message, previous, lastReadSeq),
+                                knownUsernames: knownUsernames,
+                                onRetry: () => _retry(message),
+                                onDiscard: () async =>
+                                    (await ref.read(storeProvider.future))
+                                        .discard(message.id),
+                                onQuickReact: () => _quickReact(message),
+                                onReactionTap: (reaction) =>
+                                    _toggleReaction(message, reaction),
+                                onVote: (option) => _vote(message, option),
+                                reactions: extras.reactions,
+                                attachments: extras.attachments,
+                                poll: extras.poll,
+                              );
+                            },
+                          );
+                        },
+                      ),
               ),
-              if (message.editedAt != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: AppSpacing.s8),
-                  child: Text(
-                    'edited',
-                    style: TextStyle(color: tokens.textSecondary, fontSize: 11),
-                  ),
-                ),
-              if (message.pending)
-                Padding(
-                  padding: const EdgeInsets.only(left: AppSpacing.s8),
-                  child: Icon(AppIcons.pending,
-                      size: 14, color: tokens.textSecondary),
-                ),
+              Composer(
+                  controller: _composer,
+                  channelId: widget.channelId,
+                  channelName: channelName,
+                  onSend: _send),
             ],
-          ),
-          if (message.failed)
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.s4),
-              child: Row(
-                children: [
-                  Icon(
-                    AppIcons.failed,
-                    size: 14,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                  const SizedBox(width: AppSpacing.s8),
-                  Text(
-                    'Not sent.',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                      fontSize: 12,
-                    ),
-                  ),
-                  TextButton(onPressed: onRetry, child: const Text('Retry')),
-                  TextButton(
-                      onPressed: onDiscard, child: const Text('Discard')),
-                ],
-              ),
-            ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
-class _Composer extends StatelessWidget {
-  const _Composer({required this.controller, required this.onSend});
+/// A continuation of the same author's previous message inside the density's
+/// grouping window drops its avatar and header.
+bool _isGrouped(Message message, Message? previous) =>
+    previous != null &&
+    previous.authorId == message.authorId &&
+    (message.createdAt - previous.createdAt).abs() <
+        AppDensity.normal.groupWindow.inMilliseconds;
 
-  final TextEditingController controller;
-  final Future<void> Function() onSend;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: tokens.borderSubtle)),
-      ),
-      padding: const EdgeInsets.all(AppSpacing.s12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              minLines: 1,
-              maxLines: 6,
-              textInputAction: TextInputAction.send,
-              decoration: const InputDecoration(
-                hintText: 'Message',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              onSubmitted: (_) => onSend(),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.s8),
-          // 48x48 keeps the target within reach of the accessibility baseline.
-          SizedBox(
-            height: 48,
-            width: 48,
-            child: IconButton(
-              onPressed: onSend,
-              icon: const Icon(AppIcons.send),
-              tooltip: 'Send',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+/// True for the first message past the read marker, so the "New" divider
+/// lands exactly once, directly above it.
+bool _startsUnread(Message message, Message? previous, int lastReadSeq) =>
+    message.seq > lastReadSeq &&
+    (previous == null || previous.seq <= lastReadSeq);

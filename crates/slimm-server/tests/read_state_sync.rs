@@ -26,11 +26,7 @@ async fn new_store() -> Store {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
-        push_relay_url: None,
-        push_relay_key: None,
-        livekit_url: None,
-        livekit_api_key: None,
-        livekit_api_secret: None,
+        ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)
@@ -54,6 +50,7 @@ async fn setup(everyone: Permissions) -> Fixture {
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
     });
     let user = store.create_user("alice", "Alice").await.unwrap();
     let tokens = store.open_session(user.id, "dev").await.unwrap();
@@ -97,6 +94,7 @@ async fn read_state_tracks_unread_and_is_monotonic() {
                 f.user_id,
                 MessageId::generate(),
                 &format!("m{i}"),
+                &[],
             )
             .await
             .unwrap();
@@ -196,6 +194,7 @@ async fn sync_returns_messages_after_the_cursor() {
                 f.user_id,
                 MessageId::generate(),
                 &format!("m{i}"),
+                &[],
             )
             .await
             .unwrap();
@@ -251,11 +250,11 @@ async fn sync_skips_channels_without_view() {
     let visible = f.store.create_channel("visible", "text").await.unwrap();
     let hidden = f.store.create_channel("hidden", "text").await.unwrap();
     f.store
-        .send_message(visible.id, f.user_id, MessageId::generate(), "hi")
+        .send_message(visible.id, f.user_id, MessageId::generate(), "hi", &[])
         .await
         .unwrap();
     f.store
-        .send_message(hidden.id, f.user_id, MessageId::generate(), "secret")
+        .send_message(hidden.id, f.user_id, MessageId::generate(), "secret", &[])
         .await
         .unwrap();
     // Deny alice the view of the hidden channel.
@@ -339,6 +338,7 @@ async fn sync_collapses_duplicate_scopes() {
                 f.user_id,
                 MessageId::generate(),
                 &format!("m{i}"),
+                &[],
             )
             .await
             .unwrap();
@@ -372,7 +372,7 @@ async fn sync_far_behind_cursor_asks_for_reset() {
     let f = setup(Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES)).await;
     let channel = f.store.create_channel("general", "text").await.unwrap();
     f.store
-        .send_message(channel.id, f.user_id, MessageId::generate(), "hi")
+        .send_message(channel.id, f.user_id, MessageId::generate(), "hi", &[])
         .await
         .unwrap();
 

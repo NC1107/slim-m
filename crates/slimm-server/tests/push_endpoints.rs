@@ -49,11 +49,7 @@ async fn new_store() -> Store {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
-        push_relay_url: None,
-        push_relay_key: None,
-        livekit_url: None,
-        livekit_api_key: None,
-        livekit_api_secret: None,
+        ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)
@@ -67,6 +63,7 @@ fn app(store: Store, push: PushSender) -> Router {
         limiter: RateLimiter::new(),
         push,
         voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
     })
 }
 
@@ -303,9 +300,7 @@ fn push_config(relay_url: &str) -> Config {
         hash_concurrency: 2,
         push_relay_url: Some(relay_url.to_owned()),
         push_relay_key: Some("test-relay-key".to_owned()),
-        livekit_url: None,
-        livekit_api_key: None,
-        livekit_api_secret: None,
+        ..Config::default()
     }
 }
 

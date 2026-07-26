@@ -155,6 +155,13 @@ Future<void> restoreSession(ProviderContainer container) async {
   }
 }
 
+/// The caller's own profile. Real endpoint; kept here rather than beside one
+/// particular widget because more than one of them (the rail footer, the
+/// member pane's "message a member" affordance) need to know their own id.
+final meProvider = FutureProvider.autoDispose<Me>(
+  (ref) => ref.watch(apiProvider).me(),
+);
+
 /// The API client for the current server.
 final apiProvider = Provider<SlimmApi>((ref) {
   final api = SlimmApi(

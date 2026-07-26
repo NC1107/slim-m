@@ -1,0 +1,210 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Pinned messages: a per-channel highlight set, keyed by (channel, message)
+//! exactly like reactions key on (message, user, emoji), so pinning an
+//! already-pinned message is naturally idempotent rather than something the
+//! caller has to check for.
+//!
+//! A pinned message's cleanup on delete is not this module's job: it is a
+//! database trigger (migrations/0009_pins.sql) that fires directly off the
+//! soft-delete `UPDATE`, so it runs no matter which code path deletes a
+//! message and can never be missed by a future one that forgets pins exist.
+
+use anyhow::Context;
+
+use super::{Message, Store, now_ms};
+use crate::ids::{ChannelId, MessageId, Seq, UserId};
+
+/// A pinned message, with the pin's own metadata alongside the message it
+/// points at.
+#[derive(Debug, Clone)]
+pub struct PinnedMessage {
+    pub message: Message,
+    /// Who pinned it. Null once that account is anonymized, the same reason
+    /// `Message::author_id` goes null.
+    pub pinned_by: Option<UserId>,
+    pub pinned_at: i64,
+}
+
+/// Why pinning a message failed.
+#[derive(Debug)]
+pub enum PinError {
+    /// The message does not exist in this channel, or is deleted.
+    UnknownMessage,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for PinError {
+    fn from(err: sqlx::Error) -> Self {
+        PinError::Internal(err.into())
+    }
+}
+
+impl From<anyhow::Error> for PinError {
+    fn from(err: anyhow::Error) -> Self {
+        PinError::Internal(err)
+    }
+}
+
+impl Store {
+    /// Pins a message in a channel. Idempotent: pinning an already-pinned
+    /// message leaves the original pin's timestamp and pinner in place rather
+    /// than moving them to whoever asked most recently.
+    ///
+    /// The existence check and the insert share a transaction that takes the
+    /// write lock up front (see [`Store::begin_write`]), so a message deleted
+    /// concurrently cannot slip a pin in behind the check.
+    pub async fn pin_message(
+        &self,
+        channel_id: ChannelId,
+        message_id: MessageId,
+        pinned_by: UserId,
+    ) -> Result<PinnedMessage, PinError> {
+        let now = now_ms();
+        let mut tx = self.begin_write().await?;
+
+        let message = fetch_channel_message(&mut *tx, channel_id, message_id).await?;
+        let Some(message) = message else {
+            return Err(PinError::UnknownMessage);
+        };
+
+        sqlx::query!(
+            "INSERT OR IGNORE INTO pinned_messages (channel_id, message_id, pinned_by, pinned_at)
+             VALUES (?, ?, ?, ?)",
+            channel_id,
+            message_id,
+            pinned_by,
+            now
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        // Read back rather than trust `now`/`pinned_by`: a concurrent first
+        // pin may have won the INSERT OR IGNORE race, and the event this
+        // backs must report who actually pinned it, not whoever's request
+        // arrived second.
+        let row = sqlx::query!(
+            r#"SELECT pinned_by AS "pinned_by: UserId", pinned_at AS "pinned_at!"
+               FROM pinned_messages WHERE channel_id = ? AND message_id = ?"#,
+            channel_id,
+            message_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(PinnedMessage {
+            message,
+            pinned_by: row.pinned_by,
+            pinned_at: row.pinned_at,
+        })
+    }
+
+    /// Unpins a message. Idempotent: unpinning one that is not pinned (or
+    /// never existed) succeeds, since the caller's intent - "this pin is
+    /// gone" - already holds either way.
+    pub async fn unpin_message(
+        &self,
+        channel_id: ChannelId,
+        message_id: MessageId,
+    ) -> anyhow::Result<()> {
+        sqlx::query!(
+            "DELETE FROM pinned_messages WHERE channel_id = ? AND message_id = ?",
+            channel_id,
+            message_id
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// A channel's pinned messages, newest pin first, joined against the
+    /// message and author in one query rather than one round trip per pin.
+    pub async fn list_pinned_messages(
+        &self,
+        channel_id: ChannelId,
+    ) -> anyhow::Result<Vec<PinnedMessage>> {
+        let rows = sqlx::query!(
+            r#"SELECT p.pinned_by AS "pinned_by: UserId", p.pinned_at AS "pinned_at!",
+                      m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
+                      m.author_id AS "author_id: UserId",
+                      u.display_name AS "author_display_name?: String",
+                      m.seq AS "seq!: Seq", m.content AS "content!",
+                      m.created_at AS "created_at!", m.edited_at
+               FROM pinned_messages p
+               JOIN messages m ON m.id = p.message_id
+               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
+               WHERE p.channel_id = ? AND m.deleted_at IS NULL
+               ORDER BY p.pinned_at DESC"#,
+            channel_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| PinnedMessage {
+                message: Message {
+                    id: r.id,
+                    channel_id: r.channel_id,
+                    author_id: r.author_id,
+                    author_display_name: r.author_display_name,
+                    seq: r.seq,
+                    content: r.content,
+                    created_at: r.created_at,
+                    edited_at: r.edited_at,
+                },
+                pinned_by: r.pinned_by,
+                pinned_at: r.pinned_at,
+            })
+            .collect())
+    }
+
+    /// How many messages are pinned in a channel. Backs the channel header's
+    /// pin count: a single indexed `COUNT(*)`, so the client never has to
+    /// fetch every pinned message just to show "3".
+    pub async fn pin_count(&self, channel_id: ChannelId) -> anyhow::Result<i64> {
+        let count = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) AS "n!: i64" FROM pinned_messages WHERE channel_id = ?"#,
+            channel_id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(count)
+    }
+}
+
+/// Fetches a live message, but only if it belongs to `channel_id`. A message
+/// id from a different channel is treated as not found, so a pin can never
+/// be created under a channel it does not actually belong to.
+async fn fetch_channel_message(
+    executor: impl sqlx::SqliteExecutor<'_>,
+    channel_id: ChannelId,
+    message_id: MessageId,
+) -> anyhow::Result<Option<Message>> {
+    let row = sqlx::query!(
+        r#"SELECT m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
+                  m.author_id AS "author_id: UserId",
+                  u.display_name AS "author_display_name?: String",
+                  m.seq AS "seq!: Seq", m.content AS "content!",
+                  m.created_at AS "created_at!", m.edited_at
+           FROM messages m
+           LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
+           WHERE m.id = ? AND m.channel_id = ? AND m.deleted_at IS NULL"#,
+        message_id,
+        channel_id
+    )
+    .fetch_optional(executor)
+    .await
+    .context("loading a message to pin it")?;
+
+    Ok(row.map(|r| Message {
+        id: r.id,
+        channel_id: r.channel_id,
+        author_id: r.author_id,
+        author_display_name: r.author_display_name,
+        seq: r.seq,
+        content: r.content,
+        created_at: r.created_at,
+        edited_at: r.edited_at,
+    }))
+}

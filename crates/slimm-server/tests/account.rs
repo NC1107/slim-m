@@ -26,11 +26,7 @@ async fn new_store() -> Store {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
-        push_relay_url: None,
-        push_relay_key: None,
-        livekit_url: None,
-        livekit_api_key: None,
-        livekit_api_secret: None,
+        ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)
@@ -48,7 +44,7 @@ async fn delete_account_anonymizes_content_and_revokes_access() {
     let channel = store.create_channel("general", "text").await.unwrap();
     let tokens = store.open_session(account.id, "laptop").await.unwrap();
     let message = store
-        .send_message(channel.id, account.id, MessageId::generate(), "hello")
+        .send_message(channel.id, account.id, MessageId::generate(), "hello", &[])
         .await
         .unwrap()
         .message;
@@ -165,6 +161,7 @@ async fn http_delete_account_rejects_the_token_afterward() {
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
     });
 
     // Register and grab the access token.
@@ -238,6 +235,7 @@ async fn the_last_administrator_cannot_strand_a_populated_deployment() {
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
     });
 
     let signup = |username: &'static str, invite: Option<String>| {

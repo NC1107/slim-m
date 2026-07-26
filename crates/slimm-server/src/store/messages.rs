@@ -19,6 +19,7 @@
 use anyhow::Context;
 use sqlx::SqliteExecutor;
 
+use super::attachments::{LinkError, link_attachments, release_message_attachments};
 use super::{Message, Store, now_ms};
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
@@ -40,6 +41,9 @@ pub enum SendError {
     /// A message with this id already exists for a different channel or author.
     /// Idempotency is scoped so a colliding id never returns a foreign message.
     IdConflict,
+    /// One of the referenced attachment ids was never uploaded, or was
+    /// already swept as an orphan before this send reached it.
+    AttachmentNotFound,
     Internal(anyhow::Error),
 }
 
@@ -53,6 +57,29 @@ impl From<anyhow::Error> for SendError {
     fn from(err: anyhow::Error) -> Self {
         SendError::Internal(err)
     }
+}
+
+impl From<LinkError> for SendError {
+    fn from(err: LinkError) -> Self {
+        match err {
+            LinkError::NotFound => SendError::AttachmentNotFound,
+            LinkError::Internal(e) => SendError::Internal(e),
+        }
+    }
+}
+
+/// What one message delete actually did, so the HTTP handler can tell a
+/// caller and the fan-out hub apart from the filesystem cleanup that follows.
+#[derive(Debug, Default, Clone)]
+pub struct MessageDeletion {
+    /// `false` means the message was already gone (a retry after a dropped
+    /// response), the same idempotency contract the old boolean return had.
+    pub deleted: bool,
+    /// Hex ids of attachments this delete left with no message referencing
+    /// them. Their database rows are already gone; the caller still needs to
+    /// delete the backing files, which is filesystem I/O kept outside the
+    /// transaction that removed the rows.
+    pub freed_attachments: Vec<String>,
 }
 
 /// Why a full-text search failed.
@@ -91,12 +118,18 @@ impl Store {
     /// [`Sent::fresh`] is what separates a first send from a retry of one, so
     /// the caller can run the once-per-message side effects (fan-out, a push
     /// wake) only for a message that is genuinely new.
+    ///
+    /// `attachment_ids` (sha256 hashes of already-uploaded attachments) are
+    /// linked inside this same transaction, so a message is never visible
+    /// with only some of its attachments recorded: either every id resolves
+    /// and the whole send commits, or none of it does.
     pub async fn send_message(
         &self,
         channel_id: ChannelId,
         author_id: UserId,
         id: MessageId,
         content: &str,
+        attachment_ids: &[Vec<u8>],
     ) -> Result<Sent, SendError> {
         // BEGIN IMMEDIATE rather than a deferred transaction: this reads the
         // id before it writes, and a deferred transaction that has already
@@ -142,6 +175,10 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+
+        if !attachment_ids.is_empty() {
+            link_attachments(&mut tx, id, attachment_ids).await?;
+        }
 
         // Read the name inside the same transaction the insert used, so the
         // echoed message cannot disagree with what a later fetch would return.
@@ -192,24 +229,39 @@ impl Store {
         fetch_message(&self.pool, id).await
     }
 
-    /// Soft-deletes a message. Returns whether this call performed the delete
-    /// (`false` means it was already gone), so a retry after a dropped
-    /// response stays idempotent and the caller can skip a redundant fan-out.
+    /// Soft-deletes a message and releases its attachments. Returns whether
+    /// this call performed the delete (`false` means it was already gone),
+    /// so a retry after a dropped response stays idempotent and the caller
+    /// can skip a redundant fan-out.
     ///
-    /// Write-first: the `UPDATE` is the one statement, and its `WHERE` clause
-    /// is both the claim and the idempotency check, so two racing deletes of
-    /// the same message cannot both believe they were the one that deleted it.
-    pub async fn delete_message(&self, id: MessageId) -> anyhow::Result<bool> {
+    /// The `UPDATE` is the transaction's first statement, and its `WHERE`
+    /// clause is both the claim and the idempotency check, so two racing
+    /// deletes of the same message cannot both believe they were the one
+    /// that deleted it. Releasing the attachment links happens in the same
+    /// transaction, so a message can never end up soft-deleted while still
+    /// holding live attachment references.
+    pub async fn delete_message(&self, id: MessageId) -> anyhow::Result<MessageDeletion> {
+        let mut tx = self.begin_write().await?;
         let now = now_ms();
         let affected = sqlx::query!(
             "UPDATE messages SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
             now,
             id
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?
         .rows_affected();
-        Ok(affected > 0)
+        if affected == 0 {
+            tx.commit().await?;
+            return Ok(MessageDeletion::default());
+        }
+
+        let freed_attachments = release_message_attachments(&mut tx, id).await?;
+        tx.commit().await?;
+        Ok(MessageDeletion {
+            deleted: true,
+            freed_attachments,
+        })
     }
 
     /// Lists a channel's live messages newest-first, using keyset pagination on
