@@ -21,7 +21,18 @@ Repositories (public, owner NC1107):
 - Core monorepo: https://github.com/NC1107/slim-m (Rust server + Flutter client + shared schema).
 - Push relay: https://github.com/NC1107/slim-m-relay (Go, adapted from check-in-relay). Local checkout at `../slim-m-relay`.
 
-Server 0.8.0 is released (2026-07-26) with signed multi-arch GHCR images and native musl binaries; the live instance tracks `latest` and auto-updates.
+Server 0.10.0 is released (2026-07-26) with signed multi-arch GHCR images and native musl binaries; the live instance tracks `latest` and auto-updates.
+
+**Phase 4 is in progress.** Landed: the Linux RTC spike's build answer (livekit_client 2.8.1 and flutter_webrtc 1.4.0 compile and link on Fedora KDE Wayland), LiveKit room capability tokens derived from the permission bitfield, the iOS CallKit and PushKit path with its synchronous-report invariant under test on a macOS CI runner, the `rtc` package's `VoiceSession` behind a room-injection seam with screen-share ceilings, and the self-host stack wired to its own SFU with a `compose-smoke` job that boots it.
+
+Still open in Phase 4:
+- Voice UX: join preview with mic and camera pre-toggles, the roster, collapse-to-strip. `VoiceSession` is ready for it; nothing renders it yet.
+- Android ConnectionService with a CallStyle notification.
+- The runtime half of the RTC spike. `MediaCapabilities.probeAll()` exists but nothing calls it, and the Wayland portal shows a picker, so it needs a human at the screen.
+- A real call on an iPhone through TestFlight, and an Android device for the heads-up path.
+- The aggregate egress budget, which needs several real clients at once.
+
+**iOS work does not need a local Mac.** `release.yml` builds the ipa on `macos-latest`, `client-ci` runs XCTest there, `project.pbxproj` is a text file that can be edited directly, and a device build reaches a real iPhone through TestFlight. An earlier note here claimed otherwise; that was wrong, and it is why the phase 3 NSE sat parked longer than it needed to.
 
 ### The phase 3 audit (2026-07-25), and what it changed
 
