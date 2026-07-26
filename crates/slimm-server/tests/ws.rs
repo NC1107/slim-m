@@ -28,7 +28,10 @@ type Client =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-ws-test-{}.db", uuid::Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-ws-test-{}.db", uuid::Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,

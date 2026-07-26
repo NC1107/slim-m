@@ -67,7 +67,9 @@ impl Store {
         }
 
         let now = super::now_ms();
-        let mut tx = self.pool.begin().await?;
+        // Reads the message before it decides what to write, so it must hold
+        // the write lock from the start; see Store::begin_write.
+        let mut tx = self.begin_write().await?;
 
         // Existence is checked inside the transaction rather than before it,
         // so a message deleted concurrently cannot slip a reaction in behind

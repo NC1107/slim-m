@@ -18,7 +18,10 @@ use slimm_server::store::{OpenError, RefreshOutcome, Store};
 use tower::ServiceExt;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-account-test-{}.db", uuid::Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-account-test-{}.db", uuid::Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,
@@ -44,7 +47,8 @@ async fn delete_account_anonymizes_content_and_revokes_access() {
     let message = store
         .send_message(channel.id, account.id, MessageId::generate(), "hello")
         .await
-        .unwrap();
+        .unwrap()
+        .message;
 
     // Before: the token works, the message is authored by alice, login exists.
     assert!(

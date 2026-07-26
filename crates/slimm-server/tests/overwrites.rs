@@ -22,7 +22,10 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-overwrites-test-{}.db", Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-overwrites-test-{}.db", Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,

@@ -17,7 +17,10 @@ use slimm_server::store::{RefreshOutcome, RegisterError, Store};
 use tower::ServiceExt;
 
 async fn store() -> Store {
-    let path = format!("/tmp/slimm-auth-test-{}.db", uuid::Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-auth-test-{}.db", uuid::Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,
@@ -167,7 +170,10 @@ async fn concurrent_double_refresh_within_grace_denies_softly() {
 #[tokio::test]
 async fn stale_refresh_reuse_revokes_the_family() {
     // A zero grace window makes any replay of a spent token count as reuse.
-    let path = format!("/tmp/slimm-auth-test-{}.db", uuid::Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-auth-test-{}.db", uuid::Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,

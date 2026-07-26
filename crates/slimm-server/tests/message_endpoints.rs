@@ -20,7 +20,10 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-msg-test-{}.db", uuid::Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-msg-test-{}.db", uuid::Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,
@@ -469,5 +472,63 @@ async fn a_message_carries_its_author_display_name() {
     assert_eq!(
         listed.as_array().unwrap()[0]["author_display_name"],
         "alice"
+    );
+}
+
+#[tokio::test]
+async fn editing_is_rate_limited_like_the_other_writes() {
+    // Send and delete both charged the Write bucket; edit did not, so one
+    // account could re-run the FTS5 re-index trigger as fast as it could send
+    // requests. The Write budget is a burst of 30, so a run well past that must
+    // start being refused.
+    let store = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let app = app(store.clone());
+    let (token, _user) = register(&store, "alice").await;
+
+    let message_id = Uuid::now_v7().to_string();
+    let sent = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{}/messages", channel.id),
+            Some(&token),
+            Some(json!({ "id": message_id, "content": "original" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(sent.status(), StatusCode::OK);
+
+    let uri = format!("/channels/{}/messages/{message_id}", channel.id);
+    let mut statuses = Vec::new();
+    for i in 0..60 {
+        let response = app
+            .clone()
+            .oneshot(request(
+                "PATCH",
+                &uri,
+                Some(&token),
+                Some(json!({ "content": format!("edit {i}") })),
+            ))
+            .await
+            .unwrap();
+        statuses.push(response.status());
+    }
+
+    assert!(
+        statuses.contains(&StatusCode::OK),
+        "the first edits inside the burst are answered: {statuses:?}"
+    );
+    assert!(
+        statuses.contains(&StatusCode::TOO_MANY_REQUESTS),
+        "a sustained edit flood must be refused: {statuses:?}"
     );
 }

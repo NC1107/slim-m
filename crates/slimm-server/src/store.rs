@@ -31,7 +31,7 @@ mod users;
 pub use bootstrap::Bootstrap;
 pub use channels::DeleteChannelError;
 pub use invites::{Invite, RedeemError};
-pub use messages::{SearchError, SendError};
+pub use messages::{SearchError, SendError, Sent};
 pub use push::{PushError, PushTarget};
 pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
 pub use recovery::{ConsumeResetError, IssueResetError};
@@ -124,6 +124,26 @@ impl Store {
     pub async fn ping(&self) -> anyhow::Result<()> {
         sqlx::query("SELECT 1").execute(&self.pool).await?;
         Ok(())
+    }
+
+    /// Opens a transaction that takes SQLite's write lock immediately.
+    ///
+    /// The pool hands out eight connections and any of them may write, so two
+    /// requests really can be inside a transaction at once. A plain `BEGIN` is
+    /// deferred: it takes a read snapshot on its first statement and only tries
+    /// for the write lock later. If another connection took that lock in
+    /// between, the upgrade cannot wait, because two readers both waiting to
+    /// become writers would deadlock, so SQLite returns SQLITE_BUSY at once and
+    /// `busy_timeout` never comes into it.
+    ///
+    /// Any transaction whose first statement is a write already avoids this by
+    /// construction, which is what most of the store does deliberately (see
+    /// [`Store::rotate_refresh`]). Use this for the ones that genuinely have to
+    /// read before they decide what to write.
+    pub(crate) async fn begin_write(
+        &self,
+    ) -> Result<sqlx::Transaction<'_, sqlx::Sqlite>, sqlx::Error> {
+        self.pool.begin_with("BEGIN IMMEDIATE").await
     }
 
     /// Creates a passwordless user. Used by tests and internal fixtures; the

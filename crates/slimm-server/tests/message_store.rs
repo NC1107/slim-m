@@ -7,7 +7,10 @@ use slimm_server::ids::{MessageId, Seq};
 use slimm_server::store::Store;
 
 async fn store() -> Store {
-    let path = format!("/tmp/slimm-test-{}.db", uuid::Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-test-{}.db", uuid::Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,
@@ -29,15 +32,18 @@ async fn seq_is_monotonic_and_independent_per_channel() {
     let a1 = s
         .send_message(a.id, author.id, MessageId::generate(), "one")
         .await
-        .unwrap();
+        .unwrap()
+        .message;
     let a2 = s
         .send_message(a.id, author.id, MessageId::generate(), "two")
         .await
-        .unwrap();
+        .unwrap()
+        .message;
     let b1 = s
         .send_message(b.id, author.id, MessageId::generate(), "other")
         .await
-        .unwrap();
+        .unwrap()
+        .message;
 
     assert_eq!(a1.seq, Seq(1));
     assert_eq!(a2.seq, Seq(2));
@@ -52,12 +58,17 @@ async fn send_is_idempotent_by_id() {
     let c = s.create_channel("general", "text").await.unwrap();
 
     let id = MessageId::generate();
-    let first = s.send_message(c.id, author.id, id, "hi").await.unwrap();
+    let first = s
+        .send_message(c.id, author.id, id, "hi")
+        .await
+        .unwrap()
+        .message;
     // A retry with the same id returns the stored message and wastes no sequence.
     let retry = s
         .send_message(c.id, author.id, id, "hi again")
         .await
-        .unwrap();
+        .unwrap()
+        .message;
 
     assert_eq!(first.seq, retry.seq);
     assert_eq!(first.id, retry.id);
@@ -70,7 +81,8 @@ async fn send_is_idempotent_by_id() {
     let second = s
         .send_message(c.id, author.id, MessageId::generate(), "second")
         .await
-        .unwrap();
+        .unwrap()
+        .message;
     assert_eq!(second.seq, Seq(2));
 
     let all = s.list_messages(c.id, None, 100).await.unwrap();
@@ -111,5 +123,63 @@ async fn edit_and_keyset_pagination() {
             .await
             .unwrap()
             .is_none()
+    );
+}
+
+#[tokio::test]
+async fn a_retry_reports_itself_as_a_retry() {
+    let s = store().await;
+    let author = s.create_user("rae", "Rae").await.unwrap();
+    let c = s.create_channel("general", "text").await.unwrap();
+    let id = MessageId::generate();
+
+    let first = s.send_message(c.id, author.id, id, "hi").await.unwrap();
+    assert!(first.fresh, "a first send is fresh");
+
+    let retry = s.send_message(c.id, author.id, id, "hi").await.unwrap();
+    assert!(
+        !retry.fresh,
+        "a replayed id must be flagged, or the caller fans it out and pushes it a second time"
+    );
+    assert_eq!(retry.message.seq, first.message.seq);
+}
+
+#[tokio::test]
+async fn concurrent_sends_each_take_a_distinct_sequence_number() {
+    // The per-channel counter is allocated inside the send transaction, and
+    // that transaction reads the message id before it writes. Every other test
+    // here drives it one call at a time, which cannot catch either a duplicate
+    // seq or the SQLITE_BUSY a deferred transaction hits when it tries to
+    // promote a read snapshot to a write.
+    const SENDERS: usize = 24;
+
+    let s = store().await;
+    let author = s.create_user("nils", "Nils").await.unwrap();
+    let c = s.create_channel("general", "text").await.unwrap();
+
+    let sends = (0..SENDERS).map(|i| {
+        let s = s.clone();
+        let channel = c.id;
+        let author = author.id;
+        tokio::spawn(async move {
+            s.send_message(channel, author, MessageId::generate(), &format!("m{i}"))
+                .await
+        })
+    });
+    let results = futures_util::future::join_all(sends).await;
+
+    let mut seqs: Vec<i64> = Vec::with_capacity(SENDERS);
+    for result in results {
+        let sent = result
+            .expect("send task panicked")
+            .expect("a concurrent send must not fail");
+        assert!(sent.fresh);
+        seqs.push(sent.message.seq.0);
+    }
+    seqs.sort_unstable();
+    let expected: Vec<i64> = (1..=SENDERS as i64).collect();
+    assert_eq!(
+        seqs, expected,
+        "every concurrent send must take its own sequence number, with no gap and no duplicate"
     );
 }

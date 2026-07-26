@@ -24,7 +24,10 @@ use slimm_server::store::Store;
 use tower::ServiceExt;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-register-gate-{}.db", uuid::Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-register-gate-{}.db", uuid::Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,

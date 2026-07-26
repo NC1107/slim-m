@@ -140,25 +140,36 @@ async fn send(
 
     let content = validate_content(&req.content)?;
     let id = MessageId(parse_uuid(&req.id)?);
-    let message = state
+    let sent = state
         .store
         .send_message(channel_id, ctx.user_id, id, content)
         .await?;
-    state.hub.publish(Event::MessageCreated(message.clone()));
 
-    // The message is already committed and its response is already on the
-    // way; this only ever makes a cheap in-memory decision here, handing any
-    // actual push work to a detached background task, so a relay outage can
-    // never turn this successful send into an error.
-    state.push.notify_message(
-        state.store.clone(),
-        channel_id,
-        ctx.user_id,
-        message.id,
-        message.seq,
-    );
+    // A retry of a send that already succeeded returns the stored message so
+    // the client gets its acknowledgement, but must not repeat what already
+    // happened once. Fanning it out again would show it twice to anyone whose
+    // client does not de-duplicate, and pushing again would wake every idle
+    // recipient a second time, outside the debounce window that exists to stop
+    // exactly that.
+    if sent.fresh {
+        state
+            .hub
+            .publish(Event::MessageCreated(sent.message.clone()));
 
-    Ok(Json(message.into()))
+        // The message is already committed and its response is already on the
+        // way; this only ever makes a cheap in-memory decision here, handing
+        // any actual push work to a detached background task, so a relay
+        // outage can never turn this successful send into an error.
+        state.push.notify_message(
+            state.store.clone(),
+            channel_id,
+            ctx.user_id,
+            sent.message.id,
+            sent.message.seq,
+        );
+    }
+
+    Ok(Json(sent.message.into()))
 }
 
 async fn list(
@@ -236,12 +247,17 @@ async fn delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Edits a message. Rate-limited like the other writes in this module: an edit
+/// re-runs the FTS5 re-index trigger, so leaving it uncapped let one account
+/// churn the search index as fast as it could send requests.
 async fn edit(
     Authed(ctx): Authed,
+    parts: Parts,
     Path((channel_id, message_id)): Path<(String, String)>,
     State(state): State<AppState>,
     Json(req): Json<EditRequest>,
 ) -> Result<Json<MessageDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
     let message_id = MessageId(parse_uuid(&message_id)?);
 

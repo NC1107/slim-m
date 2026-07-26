@@ -105,6 +105,12 @@ async fn list(
 /// Closes a report as resolved or dismissed. The claim is a conditional
 /// `UPDATE` in the store, so two moderators racing the same report cannot
 /// both win it; whichever loses sees the report as already gone.
+///
+/// Gated per channel exactly as [`list`] is. Without that, a moderator denied
+/// MANAGE_MESSAGES in one channel could not read its reports but could still
+/// dismiss them, quietly emptying the queue for the very channel they were
+/// deliberately excluded from. A report they may not act on is reported as
+/// missing rather than forbidden, so the endpoint does not confirm one exists.
 async fn resolve(
     Authed(ctx): Authed,
     parts: Parts,
@@ -124,6 +130,18 @@ async fn resolve(
             ));
         }
     };
+
+    let Some(channel_id) = state.store.open_report_channel(report_id).await? else {
+        return Err(ApiError::NotFound("report not found"));
+    };
+    if let Some(channel_id) = channel_id
+        && !state
+            .store
+            .has_permission(ctx.user_id, channel_id, Permissions::MANAGE_MESSAGES)
+            .await?
+    {
+        return Err(ApiError::NotFound("report not found"));
+    }
 
     let closed = state
         .store

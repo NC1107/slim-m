@@ -18,7 +18,10 @@ use slimm_server::store::Store;
 use tower::ServiceExt;
 
 async fn new_store() -> Store {
-    let path = format!("/tmp/slimm-safety-test-{}.db", uuid::Uuid::now_v7());
+    let path = std::env::temp_dir()
+        .join(format!("slimm-safety-test-{}.db", uuid::Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
         port: 0,
         database_path: path,
@@ -240,7 +243,8 @@ async fn reporting_a_message_keeps_a_snapshot_and_resists_flooding() {
     let message = store
         .send_message(channel.id, bob.id, MessageId::generate(), "something awful")
         .await
-        .unwrap();
+        .unwrap()
+        .message;
     let app = app(store.clone());
 
     let filed = app
@@ -330,7 +334,8 @@ async fn a_message_you_cannot_see_cannot_be_reported() {
     let message = store
         .send_message(hidden.id, bob.id, MessageId::generate(), "private")
         .await
-        .unwrap();
+        .unwrap()
+        .message;
 
     // Alice is denied view of that channel.
     store
