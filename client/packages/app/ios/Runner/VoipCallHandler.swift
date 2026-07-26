@@ -98,7 +98,12 @@ final class VoipPushRegistrar: NSObject, PKPushRegistryDelegate, CXProviderDeleg
   override init() {
     registry = PKPushRegistry(queue: .main)
 
-    let configuration = CXProviderConfiguration()
+    // The localizedName initializer rather than the empty one: the empty
+    // CXProviderConfiguration() is iOS 14 and up, and this project deploys to
+    // 13.0. It is also the better call regardless, because this name is what
+    // the system call UI and the Recents list show, and neither should say
+    // nothing.
+    let configuration = CXProviderConfiguration(localizedName: "slim-m")
     configuration.supportsVideo = false
     configuration.maximumCallsPerCallGroup = 1
     configuration.supportedHandleTypes = [.generic]
