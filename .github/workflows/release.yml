@@ -518,8 +518,16 @@ jobs:
         run: |
           # --enforce-lockfile: resolve exactly what pubspec.lock pins.
           flutter pub get --enforce-lockfile
-          flutter build appbundle --release
-          flutter build apk --release
+          # --build-number from the run number, not from pubspec. Both stores
+          # reject a build number that has already been used, and App Store
+          # Connect does it asynchronously: altool uploads happily, the job goes
+          # green, and the build is rejected minutes later by email. That is how
+          # the iPhone build sat on 4 through four client tags while CI looked
+          # fine every time. A run number is monotonic and cannot be forgotten,
+          # so a reused build number stops being possible rather than being
+          # something to remember.
+          flutter build appbundle --release --build-number=${{ github.run_number }}
+          flutter build apk --release --build-number=${{ github.run_number }}
 
       - name: verify the signer is the upload key, not debug
         if: steps.gate.outputs.ready == 'true'
@@ -656,7 +664,16 @@ jobs:
           # --enforce-lockfile so a release build resolves exactly what the
           # committed pubspec.lock pins, rather than whatever is newest today.
           flutter pub get --enforce-lockfile
-          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+          # --build-number from the run number, not from pubspec. Both stores
+          # reject a build number that has already been used, and App Store
+          # Connect does it asynchronously: altool uploads happily, the job goes
+          # green, and the build is rejected minutes later by email. That is how
+          # the iPhone build sat on 4 through four client tags while CI looked
+          # fine every time. A run number is monotonic and cannot be forgotten,
+          # so a reused build number stops being possible rather than being
+          # something to remember.
+          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist \
+            --build-number=${{ github.run_number }}
 
       - name: upload to TestFlight
         if: steps.gate.outputs.ready == 'true'
