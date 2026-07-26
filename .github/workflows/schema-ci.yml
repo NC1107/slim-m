@@ -17,8 +17,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: schema-ci-${{ github.ref }}
@@ -29,14 +27,16 @@ jobs:
     name: lint openapi schema
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7 # pin to commit SHA before public
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v6 # pin to commit SHA before public
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: lts/*
 
       - name: redocly lint
-        run: npx @redocly/cli lint schema/openapi.yaml
+        run: |
+          npm install --no-save --ignore-scripts @redocly/cli@2.40.0
+          ./node_modules/.bin/redocly lint schema/openapi.yaml
 
   breaking-change-gate:
     name: breaking-change gate (additive-only)
@@ -50,7 +50,7 @@ jobs:
       # checkout) so `HEAD:schema/openapi.yaml` below is exactly the schema the PR
       # proposes, with no synthetic merge commit in between.
       - name: checkout PR head
-        uses: actions/checkout@v7 # pin to commit SHA before public
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
@@ -67,7 +67,7 @@ jobs:
       # additive changes, such as a new optional field or a new endpoint, are not
       # breaking and pass, which is what makes this gate "additive-only" by construction.
       - name: oasdiff breaking-change check
-        uses: oasdiff/oasdiff-action/breaking@v0 # pin to commit SHA before public
+        uses: oasdiff/oasdiff-action/breaking@45c956ed8138f7f18f0425d34e3d66730b805cb2 # v0
         with:
           base: "${{ github.event.pull_request.base.sha }}:schema/openapi.yaml"
           revision: "HEAD:schema/openapi.yaml"
@@ -80,28 +80,36 @@ jobs:
     if: github.event_name == 'push'
     needs: [lint]
     runs-on: ubuntu-latest
+    # Job-level rather than workflow-level so the lint and diff jobs, which
+    # run on untrusted PR content, never hold a write token.
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v7 # pin to commit SHA before public
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v6 # pin to commit SHA before public
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: lts/*
 
       - name: build redoc html
         run: |
           mkdir -p dist
-          npx @redocly/cli build-docs schema/openapi.yaml -o dist/index.html
+          # Exact version, no lifecycle scripts: this job holds a Pages write
+          # token, so nothing here may run arbitrary install hooks.
+          npm install --no-save --ignore-scripts @redocly/cli@2.40.0
+          ./node_modules/.bin/redocly build-docs schema/openapi.yaml -o dist/index.html
 
-      - uses: actions/configure-pages@v5 # pin to commit SHA before public
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
         with:
           enablement: true
 
-      - uses: actions/upload-pages-artifact@v4 # pin to commit SHA before public
+      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
           path: dist
 
       - id: deploy
-        uses: actions/deploy-pages@v4 # pin to commit SHA before public
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
