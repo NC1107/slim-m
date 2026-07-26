@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/NC1107/slim-m/compare/server-v0.9.0...server-v0.10.0) (2026-07-26)
+
+
+### Features
+
+* phase 4 rtc spike, livekit tokens, callkit, and the design review ([#47](https://github.com/NC1107/slim-m/issues/47)) ([719331b](https://github.com/NC1107/slim-m/commit/719331b9d069aa1dcdebce7d123838c6624419ff))
+
 ## [0.9.0](https://github.com/NC1107/slim-m/compare/server-v0.8.0...server-v0.9.0) (2026-07-26)
 
 
