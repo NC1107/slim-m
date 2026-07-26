@@ -15,13 +15,44 @@ Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/
 ## Current state (2026-07-25)
 
 Phases 0 (foundations), 1 (server and protocol core), and 2 (client shell and text messaging) are complete.
-Phase 3 (push relay and notifications) is nearly complete; what remains is listed under "Still open in Phase 3" below.
+Phase 3 (push relay and notifications) is complete on every exit criterion except the two that need hardware or a Mac; see "Still open in Phase 3" below.
 
 Repositories (public, owner NC1107):
 - Core monorepo: https://github.com/NC1107/slim-m (Rust server + Flutter client + shared schema).
 - Push relay: https://github.com/NC1107/slim-m-relay (Go, adapted from check-in-relay). Local checkout at `../slim-m-relay`.
 
-Server 0.7.0 is released (2026-07-25) with signed multi-arch GHCR images and native musl binaries; the live instance tracks `latest` and auto-updates.
+Server 0.8.0 is released (2026-07-26) with signed multi-arch GHCR images and native musl binaries; the live instance tracks `latest` and auto-updates.
+
+### The phase 3 audit (2026-07-25), and what it changed
+
+A nine-dimension review of the whole backbone, with every finding put through an adversarial refutation pass.
+It confirmed Phase 3 itself: the sealed-box envelope is content-free and domain-separated, per-device push keys are a dedicated keypair, the relay logs only counts and a key id (never a token or payload), the LAN-only disable path works, and the cross-repo contract test drives a server-generated fixture through the relay's real router.
+
+What it found was mostly Phase 2 debris, and one live hole.
+**Registration was never gated on an invite.**
+The `TODO(phase 2)` asking for the gate was written before the invite flow existed, the invite flow shipped in phase 2, and the gate did not, so from the moment a deployment was claimed anyone who knew its address could create an account and inherit `@everyone`'s view and send rights.
+This was reproduced against the live instance, not inferred: an anonymous caller registered, listed both channels, and read real messages (probe account deleted afterwards).
+`register_account` now applies the join policy in the same transaction as the account insert, and the client sends the code with the signup rather than redeeming after it.
+
+Everything else fixed in the same pass, all with tests that fail without the fix:
+
+- Report resolution checked only deployment-wide MANAGE_MESSAGES while listing re-checks it per channel, so a moderator denied it in one channel could not read its reports but could still dismiss them.
+- `PATCH .../messages/{id}` charged no rate limit while send and delete both did.
+- An idempotent send retry re-fanned-out and re-pushed, outside the debounce window that exists to stop exactly that.
+- Three transactions read before writing under a deferred `BEGIN`. SQLite refuses to promote a read snapshot to a writer and returns SQLITE_BUSY immediately, ignoring `busy_timeout`; 24 concurrent sends to one channel failed with "database is locked". They use `Store::begin_write` (`BEGIN IMMEDIATE`) now.
+- The client's local database is one file for the whole app and nothing ever cleared it, so the channel list and message text of the account signing out were read straight back by whoever signed in next on that device.
+- `docker-compose.yml` fell back to `changeme_api_key` and a matching secret for LiveKit, character for character the placeholders in `.env.example`, and still pinned the very first server release. Both variables now use the `:?` form so compose refuses to start and names the missing one.
+- Four workflows ran actions on mutable tags behind a "pin to commit SHA before public" comment in a repo that has always been public.
+- Nothing built with `--locked`, so the committed lockfile was advisory and had been recording 0.6.0 while Cargo.toml said 0.8.0.
+- No index on `sessions.device_id`, which push fan-out and every device revocation path filter by; and nothing ever deleted expired access tokens, refresh tokens, or connect tickets.
+- The FTS5 delete and update triggers issued their `'delete'` unconditionally while the insert trigger is guarded on `is_encrypted`, which corrupts an external-content index. Dormant until E2EE lands, fixed while the table still holds no encrypted rows.
+- `/sync` returned messages with an empty `reactions` array while list and search filled it in.
+- `schema/openapi.yaml` claimed types were generated from it and CI failed on drift; `models.dart` claimed a contract test asserting every model matches a schema entry. Neither existed. Both headers now state what CI actually gates (method and path, additive-only, valid OpenAPI) and what it does not (bodies, on any of the three sides).
+- Push fan-out evaluated permissions for every live user on every message before the debounce was consulted; it starts from who has a usable push registration now.
+
+Measured for the first time, closing the Phase 1 exit criterion that had never been taken: idle RSS of the release binary is 7,296 kB steady and 25,760 kB peak, inside the under-30MB budget.
+`perf/baselines/0.8.0.json` is the first committed baseline after eight releases without one.
+Note it was taken on glibc while releases ship musl, whose allocator fragments differently under Tokio.
 
 Phase 1 merged so far:
 - Core SQLite schema (PR #3): users, auth tables, RBAC, channels, per-scope sequence counters, messages, reactions, attachments, invites, read state, canvas tables, FTS5.
@@ -70,6 +101,9 @@ Still open in Phase 3:
 Known residuals, deliberately shipped:
 - The session write lands just after the in-memory token becomes authoritative, so a process death in that window replays a spent refresh token into reuse detection and forces a sign-out. Recoverable, but closing it means reordering `SlimmApi`'s refresh path.
 - The delete-account error path reports its failure but still strands the user.
+- Malformed query strings and JSON bodies still return axum's default error rather than the uniform JSON error contract.
+- `revoke_device` does not itself publish `SessionRevoked`; the logout and deletion paths do, and both are now covered by socket-closes tests.
+- `packaging/flatpak/*.yaml` and `packaging/rpm/*.spec` still do not exist, so a tagged release warns and skips both Linux artifacts. Phase 0's exit criterion names them and Phase 9 owns them properly. Deliberately not guessed at here: an untested manifest that merely looks right is worse than an honest skip, because it produces a broken artifact instead of a visible gap.
 
 ## Push credentials and identifiers
 
@@ -91,7 +125,7 @@ The iOS job needs `set-key-partition-list`, without which `codesign` hangs a hea
 Uploading a new Play build: Test and release > Internal testing > Create new release; Play rejects a reused version code, so bump pubspec's `+N` first, same as iOS.
 
 Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 leans on them:
-- **The UI has never been driven by a human.** It builds, runs, and passes tests, but nobody has clicked through sign-up to sending a message in a real window. The owner intends to.
+- **The UI has been driven by a human only lightly.** The live instance holds real messages from the owner, so the primary flow has been exercised, but there is no record of a full sign-up-to-send pass on Fedora GNOME Wayland specifically (this box is KDE), which is what the Phase 2 exit criterion names.
 - **Golden images are not committed.** The matrix asserts no overflow at any scale (machine-independent, runs everywhere); the pixel comparison is behind `SLIMM_GOLDENS` with no reference images, because images generated off-CI would never match the runner and would mean a permanently red build. Generate them once on the CI runner and enable the flag there.
 - Reactions UI, the shared context menu, the quick switcher, haptics, and history pagination are not built. The server side of reactions exists (PUT/DELETE on `/messages/{id}/reactions/{emoji}`, summaries on list, a ReactionsChanged event).
 - The shortcut table exists but is not yet bound into the widget tree.
@@ -238,6 +272,8 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 
 ## Open items that need the owner
 
+- **Deploy the invite gate.** The live instance at `https://slim.npc-server.top` still accepts anonymous registration and will until it runs a build containing the gate. Watchtower tracks `latest`, so cutting a release is what closes it; nothing else needs doing on the host.
+- **Watch the next release PR.** `release-please-config.json` gained the `cargo-workspace` plugin so a version bump also updates `Cargo.lock`, which the new `--locked` builds require. That is the one change in the audit pass that could not be verified locally, and its failure mode is a red release PR, not a bad release.
 - Internal testers on the Play internal testing track: release 0.1.0 (4) is published there with zero testers, deliberately, until the owner picks who.
 - A real Android device test of the push path end-to-end (the last Phase 3 exit criterion with any work left).
 - Reviewer protection on the `release` and `testflight` GitHub Environments (they exist but are ungated).
