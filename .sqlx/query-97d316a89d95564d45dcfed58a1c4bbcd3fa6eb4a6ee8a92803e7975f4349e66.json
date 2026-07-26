@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT p.pinned_by AS \"pinned_by: UserId\", p.pinned_at AS \"pinned_at!\",\n                      m.id AS \"id!: MessageId\", m.channel_id AS \"channel_id!: ChannelId\",\n                      m.author_id AS \"author_id: UserId\",\n                      u.display_name AS \"author_display_name?: String\",\n                      m.seq AS \"seq!: Seq\", m.content AS \"content!\",\n                      m.created_at AS \"created_at!\", m.edited_at\n               FROM pinned_messages p\n               JOIN messages m ON m.id = p.message_id\n               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL\n               WHERE p.channel_id = ? AND m.deleted_at IS NULL\n               ORDER BY p.pinned_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "pinned_by: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "pinned_at!",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "id!: MessageId",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "channel_id!: ChannelId",
+        "ordinal": 3,
+        "type_info": "Blob"
+      },
+      {
+        "name": "author_id: UserId",
+        "ordinal": 4,
+        "type_info": "Blob"
+      },
+      {
+        "name": "author_display_name?: String",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "seq!: Seq",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "content!",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "edited_at",
+        "ordinal": 9,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "97d316a89d95564d45dcfed58a1c4bbcd3fa6eb4a6ee8a92803e7975f4349e66"
+}

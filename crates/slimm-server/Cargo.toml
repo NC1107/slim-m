@@ -38,6 +38,7 @@ futures-util.workspace = true
 crypto_box.workspace = true
 reqwest.workspace = true
 url.workspace = true
+ed25519-dalek.workspace = true
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -46,6 +47,16 @@ criterion = { version = "0.5", features = ["html_reports"] }
 # two-client fan-out test.
 tower = { version = "0.5", features = ["util"] }
 tokio-tungstenite = "0.24"
+# tests/response_contract.rs validates real responses against schema/openapi.yaml.
+# An OpenAPI 3.1 schema object *is* a JSON Schema 2020-12 schema, so a general
+# JSON Schema validator checks it directly rather than a hand-written copy of
+# each shape drifting alongside the real one. `default-features = false` drops
+# the file and http `$ref` resolvers (and the reqwest/aws-lc-rs they drag in):
+# every `$ref` here is a local pointer into the one document.
+jsonschema = { version = "0.49", default-features = false }
+# The maintained fork of the archived serde_yaml, only to turn the schema into
+# a serde_json::Value the validator can compile.
+serde_yaml_ng = "0.10"
 
 [[bench]]
 name = "hot_paths"

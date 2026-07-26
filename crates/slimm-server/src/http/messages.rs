@@ -20,11 +20,13 @@ use uuid::Uuid;
 use super::AppState;
 use super::error::ApiError;
 use super::extract::{Authed, enforce};
+use super::polls::PollDto;
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId, UserId};
+use crate::media;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::Message;
+use crate::store::{AttachmentSummary, MAX_ATTACHMENTS_PER_MESSAGE, Message};
 
 /// Message bodies carry one text field; cap it generously but bounded.
 const MESSAGE_BODY_LIMIT: usize = 64 * 1024;
@@ -67,6 +69,40 @@ pub(crate) struct MessageDto {
     /// cannot have any yet.
     #[serde(default)]
     reactions: Vec<ReactionDto>,
+    /// The poll this message carries, if any. Always present as a key (never
+    /// omitted): `null` means this message is not a poll, the same "always
+    /// there, empty or null means genuinely none" convention `reactions`
+    /// already follows. Set by [`super::polls::attach_polls`], not by this
+    /// conversion, since a bare `Message` has nowhere to read poll data from.
+    pub(crate) poll: Option<PollDto>,
+    /// Always present, empty when there are none - same convention as
+    /// `reactions`. Unlike reactions and polls, a fresh send can carry these
+    /// immediately (they are uploaded before the send, then referenced in
+    /// it), so [`send`] enriches its own single-message response rather than
+    /// leaving this empty the way it leaves `reactions` empty for a message
+    /// that cannot have any yet.
+    #[serde(default)]
+    attachments: Vec<AttachmentDto>,
+}
+
+/// One attachment as it appears on a message.
+#[derive(Serialize, Clone)]
+pub(crate) struct AttachmentDto {
+    id: String,
+    filename: String,
+    content_type: String,
+    size: i64,
+}
+
+impl From<AttachmentSummary> for AttachmentDto {
+    fn from(a: AttachmentSummary) -> Self {
+        Self {
+            id: a.id,
+            filename: a.filename,
+            content_type: a.content_type,
+            size: a.size,
+        }
+    }
 }
 
 /// One emoji on a message, with the asking user's own state.
@@ -91,6 +127,8 @@ impl From<Message> for MessageDto {
             created_at: message.created_at,
             edited_at: message.edited_at,
             reactions: Vec::new(),
+            poll: None,
+            attachments: Vec::new(),
         }
     }
 }
@@ -100,6 +138,13 @@ struct SendRequest {
     /// Client-generated UUID (v7 preferred) that makes the send idempotent.
     id: String,
     content: String,
+    /// Hex sha256 ids of attachments already uploaded through
+    /// `POST /attachments`, in display order. Capped at
+    /// [`MAX_ATTACHMENTS_PER_MESSAGE`]; referencing an id that was never
+    /// uploaded (or was already swept as an orphan) is a 400, not a silent
+    /// drop.
+    #[serde(default)]
+    attachment_ids: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -126,10 +171,16 @@ async fn send(
 ) -> Result<Json<MessageDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    let attachment_ids = parse_attachment_ids(&req.attachment_ids)?;
 
     // A nonexistent channel grants no permissions, so this refuses both "you
     // cannot post here" and "no such channel" identically, revealing neither.
-    let needed = Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES);
+    // ATTACH_FILES is only demanded when the send actually carries something,
+    // so an ordinary text message never needs it.
+    let mut needed = Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES);
+    if !attachment_ids.is_empty() {
+        needed = needed.union(Permissions::ATTACH_FILES);
+    }
     if !state
         .store
         .has_permission(ctx.user_id, channel_id, needed)
@@ -142,7 +193,7 @@ async fn send(
     let id = MessageId(parse_uuid(&req.id)?);
     let sent = state
         .store
-        .send_message(channel_id, ctx.user_id, id, content)
+        .send_message(channel_id, ctx.user_id, id, content, &attachment_ids)
         .await?;
 
     // A retry of a send that already succeeded returns the stored message so
@@ -169,7 +220,21 @@ async fn send(
         );
     }
 
-    Ok(Json(sent.message.into()))
+    let mut dto: MessageDto = sent.message.into();
+    // Unlike reactions and polls, attachments can exist the instant a message
+    // is created (they were uploaded before this call and just linked inside
+    // it), so the echoed response needs its own lookup rather than staying
+    // empty the way a fresh message's reactions correctly do.
+    if let Some((_, summaries)) = state
+        .store
+        .attachments_for_messages(&[id])
+        .await?
+        .into_iter()
+        .next()
+    {
+        dto.attachments = summaries.into_iter().map(AttachmentDto::from).collect();
+    }
+    Ok(Json(dto))
 }
 
 async fn list(
@@ -238,11 +303,21 @@ async fn delete(
         return Err(ApiError::Forbidden);
     }
 
-    if state.store.delete_message(message_id).await? {
+    let outcome = state.store.delete_message(message_id).await?;
+    if outcome.deleted {
         state.hub.publish(Event::MessageDeleted {
             channel_id,
             message_id,
         });
+        // The database rows are already gone (same transaction as the soft
+        // delete); this only reclaims the file. Best-effort and logged, not
+        // propagated: the delete already succeeded from the caller's point of
+        // view, and a leftover file is wasted disk, not a correctness bug.
+        for hex in outcome.freed_attachments {
+            if let Err(err) = state.media.delete_attachment(&hex).await {
+                tracing::warn!(error = %err, attachment = %hex, "failed to delete a freed attachment file");
+            }
+        }
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -302,10 +377,11 @@ async fn edit(
 // Shared enrichment
 // ---------------------------------------------------------------------------
 
-/// Batch-attaches each message's reaction summary to its DTO in one query,
-/// rather than one query per row, which only bites once a channel has real
-/// traffic. Shared by [`list`] and the full-text search route, which enrich a
-/// page of messages the same way.
+/// Batch-attaches each message's reaction summary and, if it carries one,
+/// its poll, to its DTO - in a fixed small number of queries rather than one
+/// per row, which only bites once a channel has real traffic. Shared by
+/// [`list`], the full-text search route, sync, and the pinned-message list,
+/// which all enrich a page of messages the same way.
 pub(crate) async fn with_reactions(
     state: &AppState,
     viewer: UserId,
@@ -313,6 +389,7 @@ pub(crate) async fn with_reactions(
 ) -> anyhow::Result<Vec<MessageDto>> {
     let ids: Vec<MessageId> = messages.iter().map(|m| m.id).collect();
     let mut by_message = state.store.reactions_for_messages(&ids, viewer).await?;
+    let mut attachments_by_message = state.store.attachments_for_messages(&ids).await?;
 
     let mut dtos: Vec<MessageDto> = Vec::with_capacity(messages.len());
     for message in messages {
@@ -329,8 +406,19 @@ pub(crate) async fn with_reactions(
                 })
                 .collect();
         }
+        if let Some(pos) = attachments_by_message
+            .iter()
+            .position(|(mid, _)| *mid == id)
+        {
+            let (_, summaries) = attachments_by_message.swap_remove(pos);
+            dto.attachments = summaries.into_iter().map(AttachmentDto::from).collect();
+        }
         dtos.push(dto);
     }
+    // `ids` and `dtos` stay in the same order and length: `dtos` is built by
+    // pushing exactly one entry per `messages` element above, the same list
+    // `ids` was drawn from.
+    super::polls::attach_polls(state, viewer, &ids, &mut dtos).await?;
     Ok(dtos)
 }
 
@@ -346,6 +434,23 @@ fn validate_content(content: &str) -> Result<&str, ApiError> {
         return Err(ApiError::BadRequest("message content is too long"));
     }
     Ok(content)
+}
+
+/// Parses and bounds a send's attachment id list. Each id must be a
+/// well-formed 32-byte sha256 in hex; whether it actually names something
+/// uploaded is checked later, inside the same transaction as the insert
+/// ([`crate::store::Store::send_message`]).
+fn parse_attachment_ids(raw: &[String]) -> Result<Vec<Vec<u8>>, ApiError> {
+    if raw.len() > MAX_ATTACHMENTS_PER_MESSAGE {
+        return Err(ApiError::BadRequest("too many attachments"));
+    }
+    raw.iter()
+        .map(|s| {
+            media::from_hex(s)
+                .filter(|bytes| bytes.len() == 32)
+                .ok_or(ApiError::BadRequest("invalid attachment id"))
+        })
+        .collect()
 }
 
 pub(crate) fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {

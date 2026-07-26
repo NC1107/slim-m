@@ -1,0 +1,222 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! HTTP integration tests for avatars: upload, fetch, and delete. Kept
+//! separate from `attachments.rs` because avatars are deliberately not
+//! attachments (see migration 0013) - one mutable image per user, gated by
+//! authentication only, never by a channel permission.
+
+use axum::Router;
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use slimm_server::auth::Auth;
+use slimm_server::config::Config;
+use slimm_server::db;
+use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
+use slimm_server::media::Media;
+use slimm_server::permissions::Permissions;
+use slimm_server::push::PushSender;
+use slimm_server::ratelimit::RateLimiter;
+use slimm_server::store::Store;
+use tower::ServiceExt;
+use uuid::Uuid;
+
+async fn new_store() -> Store {
+    let path = std::env::temp_dir()
+        .join(format!("slimm-avatars-test-{}.db", Uuid::now_v7()))
+        .to_string_lossy()
+        .into_owned();
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    Store::new(pool)
+}
+
+fn app(store: Store) -> Router {
+    http::router(AppState {
+        store,
+        auth: Auth::new(2).unwrap(),
+        hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice: slimm_server::voice::VoiceService::disabled(),
+        media: Media::for_tests(),
+    })
+}
+
+fn request_bytes(method: &str, uri: &str, token: &str, body: Vec<u8>) -> Request<Body> {
+    Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from(body))
+        .unwrap()
+}
+
+fn request_plain(method: &str, uri: &str, token: &str) -> Request<Body> {
+    Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap()
+}
+
+async fn json_body(response: axum::response::Response) -> serde_json::Value {
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    serde_json::from_slice(&bytes).unwrap()
+}
+
+async fn register(store: &Store, username: &str) -> String {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(account.id).await.unwrap();
+    store
+        .open_session(account.id, "cli")
+        .await
+        .unwrap()
+        .access_token
+}
+
+fn png(padding: usize) -> Vec<u8> {
+    let mut bytes = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    bytes.extend(std::iter::repeat_n(0u8, padding));
+    bytes
+}
+
+#[tokio::test]
+async fn uploading_an_avatar_is_reflected_on_the_profile_and_is_fetchable() {
+    let store = new_store().await;
+    store
+        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let before = json_body(
+        app.clone()
+            .oneshot(request_plain("GET", "/me", &token))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(before["avatar_updated_at"].is_null());
+
+    let uploaded = app
+        .clone()
+        .oneshot(request_bytes("POST", "/me/avatar", &token, png(8)))
+        .await
+        .unwrap();
+    assert_eq!(uploaded.status(), StatusCode::OK);
+    let uploaded = json_body(uploaded).await;
+    assert!(uploaded["avatar_updated_at"].is_i64());
+    let user_id = uploaded["id"].as_str().unwrap();
+
+    let fetched = app
+        .clone()
+        .oneshot(request_plain(
+            "GET",
+            &format!("/users/{user_id}/avatar"),
+            &token,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(fetched.status(), StatusCode::OK);
+    assert_eq!(fetched.headers().get("content-type").unwrap(), "image/png");
+    assert_eq!(
+        fetched.headers().get("x-content-type-options").unwrap(),
+        "nosniff"
+    );
+}
+
+#[tokio::test]
+async fn a_user_with_no_avatar_answers_not_found() {
+    let store = new_store().await;
+    store
+        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let me = json_body(
+        app.clone()
+            .oneshot(request_plain("GET", "/me", &token))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let user_id = me["id"].as_str().unwrap();
+
+    let response = app
+        .clone()
+        .oneshot(request_plain(
+            "GET",
+            &format!("/users/{user_id}/avatar"),
+            &token,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn deleting_an_avatar_clears_it() {
+    let store = new_store().await;
+    store
+        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    app.clone()
+        .oneshot(request_bytes("POST", "/me/avatar", &token, png(8)))
+        .await
+        .unwrap();
+
+    let deleted = app
+        .clone()
+        .oneshot(request_plain("DELETE", "/me/avatar", &token))
+        .await
+        .unwrap();
+    assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+
+    let me = json_body(
+        app.clone()
+            .oneshot(request_plain("GET", "/me", &token))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(me["avatar_updated_at"].is_null());
+}
+
+#[tokio::test]
+async fn a_non_image_avatar_is_refused() {
+    let store = new_store().await;
+    store
+        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    // A PDF passes the general attachment allowlist but must not pass as an
+    // avatar: an avatar is always a picture.
+    let pdf = b"%PDF-1.7 not really a pdf".to_vec();
+    let response = app
+        .clone()
+        .oneshot(request_bytes("POST", "/me/avatar", &token, pdf))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}

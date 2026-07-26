@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE users SET avatar_updated_at = NULL WHERE id = ? AND deleted_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "f535ba5c8d21a2f7a234c626c4b25843e17a9c6367dad6a2b4ec498e9adaf056"
+}

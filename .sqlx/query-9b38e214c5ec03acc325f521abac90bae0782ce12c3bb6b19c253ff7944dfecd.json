@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT max_uses, uses AS \"uses!\", expires_at, revoked_at\n               FROM invites WHERE code = ?",
+  "query": "SELECT max_uses, uses AS \"uses!\", expires_at, revoked_at,\n                      u.display_name AS \"invited_by?: String\"\n               FROM invites i\n               LEFT JOIN users u ON u.id = i.created_by AND u.deleted_at IS NULL\n               WHERE i.code = ?",
   "describe": {
     "columns": [
       {
@@ -22,6 +22,11 @@
         "name": "revoked_at",
         "ordinal": 3,
         "type_info": "Integer"
+      },
+      {
+        "name": "invited_by?: String",
+        "ordinal": 4,
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -31,8 +36,9 @@
       true,
       false,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "d4f742992088da241f2fedd960c078fbbb17521e5d2065b0641a40278f324cb4"
+  "hash": "9b38e214c5ec03acc325f521abac90bae0782ce12c3bb6b19c253ff7944dfecd"
 }

@@ -26,11 +26,7 @@ async fn new_store() -> Store {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
-        push_relay_url: None,
-        push_relay_key: None,
-        livekit_url: None,
-        livekit_api_key: None,
-        livekit_api_secret: None,
+        ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)
@@ -44,6 +40,7 @@ fn app(store: Store) -> Router {
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
     })
 }
 
@@ -245,7 +242,13 @@ async fn reporting_a_message_keeps_a_snapshot_and_resists_flooding() {
     let reporter = store.open_session(alice.id, "d").await.unwrap();
 
     let message = store
-        .send_message(channel.id, bob.id, MessageId::generate(), "something awful")
+        .send_message(
+            channel.id,
+            bob.id,
+            MessageId::generate(),
+            "something awful",
+            &[],
+        )
         .await
         .unwrap()
         .message;
@@ -336,7 +339,7 @@ async fn a_message_you_cannot_see_cannot_be_reported() {
     let bob = store.create_account("bob", "Bob", &hash).await.unwrap();
     let hidden = store.create_channel("hidden", "text").await.unwrap();
     let message = store
-        .send_message(hidden.id, bob.id, MessageId::generate(), "private")
+        .send_message(hidden.id, bob.id, MessageId::generate(), "private", &[])
         .await
         .unwrap()
         .message;

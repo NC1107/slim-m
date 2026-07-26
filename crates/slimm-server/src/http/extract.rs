@@ -80,10 +80,12 @@ pub(crate) struct RateLimited<const C: u8>;
 /// Class codes for [`RateLimited`], since const generics cannot take an enum.
 pub(crate) const PASSWORD: u8 = 0;
 pub(crate) const REFRESH: u8 = 1;
+pub(crate) const INVITE_CHECK: u8 = 2;
 
 fn class_of(code: u8) -> Class {
     match code {
         PASSWORD => Class::Password,
+        INVITE_CHECK => Class::InviteCheck,
         _ => Class::Refresh,
     }
 }

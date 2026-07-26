@@ -1,0 +1,19 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+-- Presence visibility: a durable per-user choice of how they want to be
+-- shown, independent of whether they are connected right now.
+--
+-- Presence itself -- whether a live WebSocket is open, and the resulting
+-- online/away/dnd/offline status a viewer is told -- is deliberately never
+-- written here. It lives in the in-process PresenceTracker (src/presence.rs)
+-- instead: a row per connect/disconnect would be pure write amplification on
+-- an embedded database for a value that is stale the instant it is read back
+-- after a crash, and it would let a client that crashed without closing its
+-- socket stay "online" forever.
+--
+-- 'online' | 'away' | 'dnd' | 'hidden', validated in the application layer
+-- (see src/presence.rs::Visibility), the same way channels.kind and
+-- devices.platform are elsewhere in this schema. 'hidden' is the owner's
+-- "appear-offline" decision (docs/decisions/0001-owner-decisions.md): a
+-- hidden user reads as offline to everyone else, but their own client still
+-- sees their true connection-derived state.
+ALTER TABLE users ADD COLUMN presence_visibility TEXT NOT NULL DEFAULT 'online';

@@ -15,11 +15,7 @@ async fn store() -> Store {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
-        push_relay_url: None,
-        push_relay_key: None,
-        livekit_url: None,
-        livekit_api_key: None,
-        livekit_api_secret: None,
+        ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO pinned_messages (channel_id, message_id, pinned_by, pinned_at)\n             VALUES (?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "6f3a299d02ff4461c979a9c05be9827a75b158217d65034b643b4b715697380b"
+}

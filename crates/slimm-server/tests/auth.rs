@@ -25,11 +25,7 @@ async fn store() -> Store {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
-        push_relay_url: None,
-        push_relay_key: None,
-        livekit_url: None,
-        livekit_api_key: None,
-        livekit_api_secret: None,
+        ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)
@@ -181,11 +177,7 @@ async fn stale_refresh_reuse_revokes_the_family() {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
-        push_relay_url: None,
-        push_relay_key: None,
-        livekit_url: None,
-        livekit_api_key: None,
-        livekit_api_secret: None,
+        ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     let store = Store::with_reuse_grace_ms(pool, 0);
@@ -315,6 +307,7 @@ async fn http_register_ticket_and_logout() {
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
     });
 
     // Register.
@@ -400,6 +393,7 @@ async fn http_login_rejects_bad_credentials() {
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
     });
 
     let wrong_password = app
@@ -496,6 +490,7 @@ async fn http_register_rejects_spoofing_display_name() {
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
     });
 
     let response = app

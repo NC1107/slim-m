@@ -28,9 +28,13 @@ use super::messages::parse_uuid;
 use crate::ids::ChannelId;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{Channel, DeleteChannelError};
+use crate::store::{Channel, DM_CHANNEL_KIND, DeleteChannelError};
 
 const CHANNEL_BODY_LIMIT: usize = 4 * 1024;
+/// A one-line header, not a description field: long enough for a real
+/// sentence, short enough that a client never needs to wrap or truncate it
+/// in the channel header it's designed for.
+const CHANNEL_TOPIC_MAX_CHARS: usize = 256;
 
 /// The channel routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
@@ -45,6 +49,11 @@ struct ChannelDto {
     id: String,
     name: String,
     kind: String,
+    /// `null` for no topic. A client shows this as a one-line description
+    /// beside the channel name; absence and an empty topic are treated as
+    /// the same thing, so this is never `Some("")` - see
+    /// [`validate_channel_topic`].
+    topic: Option<String>,
     created_at: i64,
 }
 
@@ -54,6 +63,7 @@ impl From<Channel> for ChannelDto {
             id: channel.id.to_string(),
             name: channel.name,
             kind: channel.kind,
+            topic: channel.topic,
             created_at: channel.created_at,
         }
     }
@@ -68,7 +78,16 @@ struct CreateRequest {
 
 #[derive(Deserialize)]
 struct UpdateChannelRequest {
-    name: String,
+    /// Absent leaves the name unchanged - both fields on this request are
+    /// optional, the same "at least one, absent means untouched" convention
+    /// `roles::UpdateRoleRequest` uses for its own two optional fields.
+    #[serde(default)]
+    name: Option<String>,
+    /// Absent leaves the topic unchanged; present (even as an empty or
+    /// whitespace-only string) replaces it, clearing it back to `None` if the
+    /// trimmed value is blank - see [`validate_channel_topic`].
+    #[serde(default)]
+    topic: Option<String>,
 }
 
 /// Lists the channels the caller can view.
@@ -114,7 +133,9 @@ async fn create(
     Ok(Json(channel.into()))
 }
 
-/// Renames a channel. Requires MANAGE_CHANNELS at the deployment level.
+/// Renames a channel and/or replaces its topic. Requires MANAGE_CHANNELS at
+/// the deployment level - the same gate `create` and `delete` use, not a new
+/// one for the topic half of this route.
 async fn update(
     Authed(ctx): Authed,
     parts: Parts,
@@ -134,10 +155,19 @@ async fn update(
         return Err(ApiError::Forbidden);
     }
 
-    let name = validate_channel_name(&req.name)?;
+    let name = req.name.as_deref().map(validate_channel_name).transpose()?;
+    let topic = req
+        .topic
+        .as_deref()
+        .map(validate_channel_topic)
+        .transpose()?;
+    if name.is_none() && topic.is_none() {
+        return Err(ApiError::BadRequest("nothing to update"));
+    }
+
     let channel = state
         .store
-        .update_channel_name(channel_id, name)
+        .update_channel(channel_id, name, topic.as_ref().map(|t| t.as_deref()))
         .await?
         .ok_or(ApiError::NotFound("channel not found"))?;
     Ok(Json(channel.into()))
@@ -172,11 +202,21 @@ async fn delete(
     // Fetched regardless of `deleted_at`: a retry against an already-deleted
     // channel must succeed rather than 404, so this needs to see that row to
     // tell "already gone" apart from "never existed".
-    state
+    let channel = state
         .store
         .channel_including_deleted(channel_id)
         .await?
         .ok_or(ApiError::NotFound("channel not found"))?;
+
+    // A DM is a channel of kind `dm` in the same table, and it is not a
+    // manageable channel: its only access rule is membership of the pair, which
+    // this deployment-wide check knows nothing about. The store refuses it too,
+    // but it can only answer "no rows matched", which this handler would report
+    // as the last-channel conflict. Answering 404 here keeps the status honest
+    // and matches how a DM is invisible to `GET /channels`.
+    if channel.kind == DM_CHANNEL_KIND {
+        return Err(ApiError::NotFound("channel not found"));
+    }
 
     match state.store.delete_channel(channel_id).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
@@ -190,6 +230,28 @@ async fn delete(
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
+
+/// Normalizes a topic edit. A blank (or whitespace-only) value clears the
+/// topic back to `None` rather than being stored as an empty string: a topic
+/// with nothing visible in it is not meaningfully different from having
+/// none, and folding the two together means a single `Option<String>` field
+/// can carry "clear it" without a separate tri-state signal.
+fn validate_channel_topic(topic: &str) -> Result<Option<String>, ApiError> {
+    let trimmed = topic.trim();
+    if trimmed.chars().count() > CHANNEL_TOPIC_MAX_CHARS {
+        return Err(ApiError::BadRequest("topic must be at most 256 characters"));
+    }
+    if trimmed.chars().any(|c| c.is_control()) {
+        return Err(ApiError::BadRequest(
+            "topic must not contain control characters",
+        ));
+    }
+    Ok(if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_owned())
+    })
+}
 
 fn validate_channel_name(name: &str) -> Result<&str, ApiError> {
     let trimmed = name.trim();

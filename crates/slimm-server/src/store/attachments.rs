@@ -1,0 +1,301 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Attachment metadata persistence: the content-addressed `attachments` rows,
+//! the join table linking them to messages, and the sweep that reclaims an
+//! upload nobody ever sent a message with.
+//!
+//! Two-phase by necessity (upload, then reference at send time) rather than
+//! one atomic operation: the client uploads bytes before it knows whether the
+//! send it is about to make will succeed, so nothing can make "upload" and
+//! "attach to a message" one transaction - there is no message row yet. What
+//! *is* transactional is the second half: linking an already-uploaded
+//! attachment to a message happens inside the same transaction as the
+//! message insert ([`link_attachments`], composed into
+//! `Store::send_message`), so a message is never visible with only some of
+//! its attachments recorded. The gap that leaves open - an upload nobody
+//! ever attached to anything - is what
+//! [`Store::sweep_orphaned_attachments`] reclaims, on the same periodic-sweep
+//! model as `Store::sweep_expired_tokens`.
+
+use sqlx::QueryBuilder;
+
+use super::{Store, now_ms};
+use crate::ids::{ChannelId, MessageId};
+
+/// Most attachments one message may carry. Without a cap the join table (and
+/// the per-send linking work, and the permission check on fetch) is an
+/// unbounded write target.
+pub const MAX_ATTACHMENTS_PER_MESSAGE: usize = 10;
+
+/// How long an uploaded-but-never-attached attachment survives before the
+/// sweep reclaims it. Generous: nothing about a normal compose flow (upload,
+/// then send the message that references it) should take anywhere near this
+/// long.
+const ORPHAN_GRACE_MS: i64 = 24 * 60 * 60 * 1000;
+
+/// How many orphaned rows one sweep pass deletes, bounding how long it can
+/// hold the write lock. Smaller than `Store::sweep_expired_tokens`'s batch:
+/// each row here has a file to delete behind it too.
+const ORPHAN_SWEEP_BATCH: i64 = 500;
+
+/// One uploaded attachment's metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttachmentSummary {
+    /// The sha256 of the stored bytes, hex-encoded: also the id a client
+    /// references it by and the path segment it is fetched at.
+    pub id: String,
+    pub filename: String,
+    pub content_type: String,
+    pub size: i64,
+}
+
+/// Why linking an already-uploaded attachment to a message failed.
+#[derive(Debug)]
+pub enum LinkError {
+    /// This id was never uploaded, or was already swept as an orphan.
+    NotFound,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for LinkError {
+    fn from(err: sqlx::Error) -> Self {
+        LinkError::Internal(err.into())
+    }
+}
+
+impl Store {
+    /// Records a freshly uploaded attachment's metadata. Idempotent by
+    /// content hash: uploading bytes that already exist leaves the original
+    /// row (and its filename) in place rather than overwriting it, the same
+    /// trade-off content addressing already makes for the storage itself.
+    ///
+    /// `key_version` and `is_encrypted` are written as 0 explicitly rather
+    /// than relying on the column defaults 0002 chose (`is_encrypted DEFAULT
+    /// 1`): v1 is transport-only encryption, the same reality
+    /// `messages.is_encrypted` already reflects. Changing a STRICT table's
+    /// column default in place is not a plain `ALTER TABLE`, so that default
+    /// is left as 0002 wrote it rather than migrated away, and simply never
+    /// relied upon.
+    pub async fn store_attachment(
+        &self,
+        sha256: &[u8],
+        size: i64,
+        content_type: &str,
+        filename: &str,
+    ) -> anyhow::Result<()> {
+        let now = now_ms();
+        sqlx::query!(
+            "INSERT INTO attachments (sha256, size, content_type, key_version, is_encrypted, filename, created_at)
+             VALUES (?, ?, ?, 0, 0, ?, ?)
+             ON CONFLICT (sha256) DO NOTHING",
+            sha256,
+            size,
+            content_type,
+            filename,
+            now
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// One attachment's metadata by content hash, regardless of whether it
+    /// has been attached to any message yet.
+    pub async fn attachment_summary(
+        &self,
+        sha256: &[u8],
+    ) -> anyhow::Result<Option<AttachmentSummary>> {
+        let row = sqlx::query!(
+            r#"SELECT sha256 AS "sha256!: Vec<u8>", filename AS "filename!",
+                      content_type AS "content_type!", size AS "size!"
+               FROM attachments WHERE sha256 = ?"#,
+            sha256
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| AttachmentSummary {
+            id: crate::media::to_hex(&r.sha256),
+            filename: r.filename,
+            content_type: r.content_type,
+            size: r.size,
+        }))
+    }
+
+    /// Every channel with a live message referencing this attachment. Used
+    /// only to decide the fetch permission: a caller may read the bytes if
+    /// they hold VIEW_CHANNEL in *any* channel that has attached them, since
+    /// content already visible to them in one channel does not become more
+    /// sensitive for also being attached somewhere else.
+    pub async fn channels_referencing_attachment(
+        &self,
+        sha256: &[u8],
+    ) -> anyhow::Result<Vec<ChannelId>> {
+        let rows = sqlx::query!(
+            r#"SELECT DISTINCT m.channel_id AS "channel_id!: ChannelId"
+               FROM message_attachments ma
+               JOIN messages m ON m.id = ma.message_id
+               WHERE ma.sha256 = ? AND m.deleted_at IS NULL"#,
+            sha256
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|r| r.channel_id).collect())
+    }
+
+    /// Attachment summaries for a page of messages, in one query, ordered by
+    /// the position they were sent with. Mirrors
+    /// `Store::reactions_for_messages`: a message with no attachments is
+    /// simply absent from the result rather than given an empty entry.
+    pub async fn attachments_for_messages(
+        &self,
+        message_ids: &[MessageId],
+    ) -> anyhow::Result<Vec<(MessageId, Vec<AttachmentSummary>)>> {
+        if message_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Built rather than a fixed `query!` because the id list is variable
+        // length and SQLite has no array binding.
+        let mut builder = QueryBuilder::new(
+            "SELECT ma.message_id, a.sha256, a.filename, a.content_type, a.size \
+             FROM message_attachments ma \
+             JOIN attachments a ON a.sha256 = ma.sha256 \
+             WHERE ma.message_id IN (",
+        );
+        let mut separated = builder.separated(", ");
+        for id in message_ids {
+            separated.push_bind(*id);
+        }
+        builder.push(") ORDER BY ma.message_id, ma.position ASC");
+
+        let rows = builder.build().fetch_all(&self.pool).await?;
+
+        use sqlx::Row;
+        let mut grouped: Vec<(MessageId, Vec<AttachmentSummary>)> = Vec::new();
+        for row in rows {
+            let message_id: MessageId = row.try_get("message_id")?;
+            let sha256: Vec<u8> = row.try_get("sha256")?;
+            let summary = AttachmentSummary {
+                id: crate::media::to_hex(&sha256),
+                filename: row.try_get("filename")?,
+                content_type: row.try_get("content_type")?,
+                size: row.try_get("size")?,
+            };
+            match grouped.iter_mut().find(|(id, _)| *id == message_id) {
+                Some((_, list)) => list.push(summary),
+                None => grouped.push((message_id, vec![summary])),
+            }
+        }
+        Ok(grouped)
+    }
+
+    /// Deletes up to a bounded batch of attachment rows uploaded more than a
+    /// day ago that no message ever attached, returning their hex ids so the
+    /// caller can delete the backing files (a filesystem operation, kept
+    /// outside this transaction).
+    ///
+    /// One statement: the `NOT EXISTS` is evaluated as the delete itself
+    /// runs, so nothing that gets linked between being selected as a
+    /// candidate and being deleted is at risk, and `RETURNING` reports
+    /// exactly the rows this call actually removed rather than the wider
+    /// candidate set the inner `SELECT` considered.
+    pub async fn sweep_orphaned_attachments(&self) -> anyhow::Result<Vec<String>> {
+        let cutoff = now_ms() - ORPHAN_GRACE_MS;
+        let rows = sqlx::query!(
+            r#"DELETE FROM attachments
+               WHERE sha256 IN (
+                   SELECT sha256 FROM attachments a
+                   WHERE a.created_at < ?
+                     AND NOT EXISTS (SELECT 1 FROM message_attachments ma WHERE ma.sha256 = a.sha256)
+                   LIMIT ?
+               )
+               RETURNING sha256 AS "sha256!: Vec<u8>""#,
+            cutoff,
+            ORPHAN_SWEEP_BATCH
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| crate::media::to_hex(&r.sha256))
+            .collect())
+    }
+}
+
+/// Links already-uploaded attachments to a message inside the caller's
+/// transaction, in the order given (recorded as `position`). `pub(super)`
+/// like `invites::spend_invite`: composed into `Store::send_message`'s own
+/// transaction rather than exposed as its own `Store` method, since it only
+/// ever makes sense as part of that larger write.
+///
+/// The existence check and the insert are one statement
+/// (`INSERT ... SELECT ... WHERE EXISTS`), so there is no separate
+/// check-then-insert race window: either the attachment row exists at the
+/// instant this runs and the link is created, or it does not and nothing is.
+pub(super) async fn link_attachments(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    message_id: MessageId,
+    sha256_list: &[Vec<u8>],
+) -> Result<(), LinkError> {
+    for (position, sha256) in sha256_list.iter().enumerate() {
+        let position = position as i64;
+        let affected = sqlx::query!(
+            "INSERT INTO message_attachments (message_id, sha256, position)
+             SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM attachments WHERE sha256 = ?)",
+            message_id,
+            sha256,
+            position,
+            sha256
+        )
+        .execute(&mut **tx)
+        .await?
+        .rows_affected();
+        if affected == 0 {
+            return Err(LinkError::NotFound);
+        }
+    }
+    Ok(())
+}
+
+/// Removes a message's attachment links, returning the hex ids of any
+/// attachment that is now referenced by nothing else so the caller can
+/// delete the backing file after this transaction commits. The `attachments`
+/// row itself is removed here, in the same transaction, so a concurrent
+/// fetch can never observe a metadata row with no message ever pointing to
+/// it again.
+pub(super) async fn release_message_attachments(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    message_id: MessageId,
+) -> Result<Vec<String>, sqlx::Error> {
+    let linked = sqlx::query!(
+        r#"SELECT sha256 AS "sha256!: Vec<u8>" FROM message_attachments WHERE message_id = ?"#,
+        message_id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
+    sqlx::query!(
+        "DELETE FROM message_attachments WHERE message_id = ?",
+        message_id
+    )
+    .execute(&mut **tx)
+    .await?;
+
+    let mut freed = Vec::new();
+    for row in linked {
+        let still_referenced = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM message_attachments WHERE sha256 = ? LIMIT 1"#,
+            row.sha256
+        )
+        .fetch_optional(&mut **tx)
+        .await?
+        .is_some();
+        if still_referenced {
+            continue;
+        }
+        sqlx::query!("DELETE FROM attachments WHERE sha256 = ?", row.sha256)
+            .execute(&mut **tx)
+            .await?;
+        freed.push(crate::media::to_hex(&row.sha256));
+    }
+    Ok(freed)
+}

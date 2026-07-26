@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT value AS \"value!\" FROM server_meta WHERE key = 'deployment_name'",
+  "describe": {
+    "columns": [
+      {
+        "name": "value!",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "53d587319f9d65ec1af58c2a122698cea31940e1ad4041c7d39f4a814fa097f0"
+}

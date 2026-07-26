@@ -8,25 +8,32 @@
 #   methods and paths axum really serves and fails if either side has one the
 #   other does not, so a route cannot be added, removed, or renamed without the
 #   matching edit here.
+# - Response bodies, against the server that sends them.
+#   crates/slimm-server/tests/response_contract/ drives every operationId below
+#   for real and validates the answer against the response schema written here:
+#   status code, content type, fields, types, enums and nullability. Both
+#   directions fail - a field promised here that the server omits, and a field
+#   the server sends that nothing here documents - and an operation the test
+#   never drives fails too, so coverage cannot quietly lapse.
 # - Additive-only evolution, by the oasdiff breaking-change gate in schema-ci.
 # - Valid OpenAPI, by redocly lint.
 #
-# What it does NOT enforce: request and response BODIES. No types are generated
-# from this file. The Rust DTOs and the Dart models in client/packages/api are
-# both hand-written, and nothing compares their fields, nullability, or status
-# codes against what is written here. Field-level drift is caught by review
-# alone, so keep this file honest by hand when changing a body shape.
+# What it does NOT enforce: REQUEST bodies, and the Dart models in
+# client/packages/api. No types are generated from this file; the Rust DTOs and
+# the Dart models are both hand-written, and only the Rust side is compared
+# against what is written here.
 openapi: 3.1.0
 info:
   title: slim-m API
   version: 0.5.0
   description: >
     The server surface: liveness, auth with opaque rotating tokens, channel
-    management, text messaging with reactions, deletion, and full-text
+    management, text messaging with reactions, polls, deletion, and full-text
     search, user profiles and the member list, devices, blocking, report
     intake and triage, invite codes, read state, bundled catch-up sync,
     account deletion, admin-issued password reset, role management and
-    channel permission overwrites, and the WebSocket event envelope.
+    channel permission overwrites, presence and typing indicators, and the
+    WebSocket event envelope.
 
     Identity and ordering are separate concerns. A message's identity is a
     client-generated UUIDv7, which also makes sending idempotent; its order is a
@@ -67,12 +74,25 @@ tags:
     description: Creating, listing, checking, and redeeming invite codes.
   - name: channels
     description: Channel listing and creation.
+  - name: dms
+    description: >
+      Direct-message conversations between two users on the same deployment.
+      A DM is a channel under the hood, so once opened it is read, sent to,
+      searched, and synced through the ordinary channel and message routes.
   - name: messages
     description: Sending, reading, editing, and reacting to messages.
+  - name: attachments
+    description: >
+      Uploading and fetching file attachments. Upload first, then reference
+      the returned id when sending a message.
   - name: push
     description: Device push registration and lifecycle reporting.
   - name: sync
     description: Read state and reconnect catch-up.
+  - name: presence
+    description: >
+      Who is online, away, do-not-disturb, or has chosen to appear offline,
+      and typing indicators over the WebSocket.
 
 security:
   - bearerAuth: []
@@ -448,6 +468,154 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /presence:
+    get:
+      operationId: listPresence
+      tags: [presence]
+      summary: Batch presence lookup.
+      description: >
+        Deployment-wide, like the member list: any authenticated caller may
+        ask about any user id. A user who set `hidden` reads as `offline`
+        here to everyone except themselves; asking about your own id always
+        returns your true state. An id with nothing live to report (never
+        existed, or deleted) is simply absent from the result, the same
+        contract `GET /users` has.
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: Comma-separated user UUIDs, at most 100.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Presence for the ids that resolved.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PresenceStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      operationId: setPresenceVisibility
+      tags: [presence]
+      summary: Set the caller's visibility preference.
+      description: >
+        The one persistent piece of presence; everything else (whether a
+        socket is actually open) is derived at runtime and never stored.
+        Taking effect updates every live viewer over the WebSocket at once,
+        not on their next reconnect.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetVisibilityRequest"
+      responses:
+        "200":
+          description: The visibility now in effect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetVisibilityRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /me/avatar:
+    post:
+      operationId: uploadAvatar
+      tags: [users]
+      summary: Upload (or replace) the caller's avatar.
+      description: >
+        Deliberately not an attachment: one mutable image per user, replaced
+        wholesale, not content addressed and not something a channel
+        permission gates. Content type is sniffed from the bytes the same
+        way an attachment's is, restricted to the allowlist's image entries
+        (a document is a valid attachment but not a valid avatar).
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: The caller's updated profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: deleteAvatar
+      tags: [users]
+      summary: Remove the caller's avatar.
+      responses:
+        "204":
+          description: The avatar was removed (or there was none).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /users/{userId}/avatar:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The user's UUID.
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getAvatar
+      tags: [users]
+      summary: Fetch a user's avatar bytes.
+      description: >
+        Gated on authentication only, the same as the rest of a
+        `UserProfile`: an avatar is a public profile picture, not a message
+        attachment, so no channel permission applies. 404 for a user with no
+        avatar set, and for a deleted or anonymized account exactly like
+        `getUser`.
+      responses:
+        "200":
+          description: >-
+            The avatar's raw bytes, served as the type sniffed from the stored
+            bytes rather than anything the uploader claimed.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /devices:
     get:
       operationId: listDevices
@@ -703,10 +871,16 @@ paths:
       tags: [invites]
       summary: Check whether an invite code is usable, before signing up.
       description: >
-        Unauthenticated, since the caller does not have an account yet.
-        Answers only usable or not, never why, so an expired code, a spent
-        code, and a code that was never issued are indistinguishable: this
-        cannot be used to mine valid codes.
+        Unauthenticated, since the caller does not have an account yet, and
+        rate limited because of that. An unusable code answers with exactly
+        `{"usable": false}`, byte for byte identical whether the code is
+        expired, already spent, revoked, or was never issued at all: this
+        cannot be used to mine valid codes. A usable code additionally
+        discloses community metadata (name, member count, who invited the
+        caller, uses remaining, and expiry). That is a deliberate, narrower
+        guarantee than the endpoint used to make: reaching the usable branch
+        already proves the caller holds a working code, so it discloses
+        nothing they had not already demonstrated.
       security: []
       responses:
         "200":
@@ -783,13 +957,15 @@ paths:
     patch:
       operationId: updateChannel
       tags: [channels]
-      summary: Rename a channel.
+      summary: Rename a channel and/or replace its topic.
       description: >
         Requires MANAGE_CHANNELS at the deployment level, the same check
-        `createChannel` uses. Checked at the deployment level rather than
-        per-channel so it stays well defined for a channel that is being (or
-        has been) deleted; a caller without MANAGE_CHANNELS anywhere cannot
-        tell a real channel id from a fake one either way.
+        `createChannel` uses - the topic half of this route is gated
+        identically, not a separate permission. Checked at the deployment
+        level rather than per-channel so it stays well defined for a channel
+        that is being (or has been) deleted; a caller without
+        MANAGE_CHANNELS anywhere cannot tell a real channel id from a fake
+        one either way.
       requestBody:
         required: true
         content:
@@ -832,6 +1008,64 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+
+  /dms:
+    get:
+      operationId: listDirectMessages
+      tags: [dms]
+      summary: List the caller's direct-message conversations.
+      description: >
+        Each entry is a DM channel: its id (used with the ordinary
+        `/channels/{channelId}/messages`, search, and `/sync` routes exactly
+        like any other channel), the other participant's public profile, and
+        the caller's unread count in it. Most recently active first.
+      responses:
+        "200":
+          description: The caller's DM conversations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DmConversation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /dms/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The other participant's UUID.
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: openDirectMessage
+      tags: [dms]
+      summary: Open (or return) the DM channel with another user.
+      description: >
+        Idempotent and race-safe: opening the same pair twice, even
+        concurrently, converges on one channel. Membership of the pair is the
+        only thing that grants access to it; the deployment's role and
+        channel-overwrite system, ADMINISTRATOR included, does not apply.
+        Refused if either party has blocked the other (both directions
+        checked), or if the target does not exist.
+      responses:
+        "200":
+          description: The DM conversation, existing or newly opened.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DmConversation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /roles:
     get:
@@ -1191,6 +1425,242 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /attachments:
+    post:
+      operationId: uploadAttachment
+      tags: [attachments]
+      summary: Upload an attachment's bytes.
+      description: >
+        The first of two steps: upload here, then reference the returned id
+        in `attachment_ids` on `sendMessage`. Content type is decided by
+        sniffing the uploaded bytes against a fixed server-side allowlist,
+        never from a client-declared Content-Type header or a filename
+        extension - an unrecognized type is refused outright. Idempotent by
+        content: uploading bytes that already exist returns the existing
+        id rather than storing a second copy. An id that is never referenced
+        by a message is reclaimed automatically after a day.
+      parameters:
+        - name: filename
+          in: query
+          description: >
+            Original filename, for display and the Content-Disposition of a
+            later fetch. Sanitized server-side; a control character, quote,
+            or path separator cannot reach either the response header or the
+            storage path (which never uses this value at all - storage is
+            keyed by content hash).
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: The stored attachment's metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attachment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /attachments/{attachmentId}:
+    parameters:
+      - name: attachmentId
+        in: path
+        required: true
+        description: Hex sha256 of the stored bytes, as returned by uploadAttachment.
+        schema:
+          type: string
+    get:
+      operationId: getAttachment
+      tags: [attachments]
+      summary: Fetch an attachment's bytes.
+      description: >
+        Gated on VIEW_CHANNEL in a channel that has a live message attaching
+        it - the same permission reading that message already requires, not
+        a bare "the id is hard to guess". An id nothing has ever attached
+        (still mid-compose, or already reclaimed) answers 404 for anyone,
+        including whoever uploaded it. The response always carries
+        `X-Content-Type-Options: nosniff` and a Content-Disposition that
+        forces a download for every content type except the handful of
+        image types the allowlist marks safe to render inline.
+      responses:
+        "200":
+          description: >-
+            The attachment's raw bytes, served as the type sniffed from the
+            stored bytes rather than anything the uploader claimed.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /channels/{channelId}/messages/polls:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    post:
+      operationId: sendPollMessage
+      tags: [messages]
+      summary: Send a message that carries a poll.
+      description: >
+        A poll is not its own resource: it is a message, so this is
+        idempotent by the client-supplied `id` exactly like `sendMessage`,
+        and gated on the same VIEW_CHANNEL plus SEND_MESSAGES permissions,
+        evaluated in this channel. Options are ordered and fixed at
+        creation; a poll needs between 2 and 4 of them. `close_at`, if given,
+        is a unix-millisecond deadline after which the server refuses votes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePollMessageRequest"
+      responses:
+        "200":
+          description: The stored message, with its poll attached.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /channels/{channelId}/messages/{messageId}/pin:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+      - name: messageId
+        in: path
+        required: true
+        description: The message's UUID.
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: pinMessage
+      tags: [messages]
+      summary: Pin a message in its channel.
+      description: >
+        Idempotent: pinning an already-pinned message leaves the original
+        pin's timestamp and pinner in place. Requires MANAGE_MESSAGES,
+        evaluated in this channel specifically; holding it in another channel
+        is not enough. Live connections are told over the WebSocket
+        (`message.pinned`).
+      responses:
+        "204":
+          description: The message was pinned (or already was).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: unpinMessage
+      tags: [messages]
+      summary: Unpin a message.
+      description: >
+        Idempotent: unpinning a message that is not pinned succeeds, since the
+        caller's intent already holds either way. Requires MANAGE_MESSAGES in
+        this channel. Live connections are told over the WebSocket
+        (`message.unpinned`).
+      responses:
+        "204":
+          description: The message was unpinned (or was already not pinned).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /channels/{channelId}/pins:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: listPinnedMessages
+      tags: [messages]
+      summary: List a channel's pinned messages, newest pin first.
+      description: >
+        Requires only VIEW_CHANNEL. Each entry is the full message, flattened,
+        plus when and by whom it was pinned.
+      responses:
+        "200":
+          description: The channel's pinned messages, newest pin first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PinnedMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /channels/{channelId}/pins/count:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: getPinnedMessageCount
+      tags: [messages]
+      summary: How many messages are pinned in a channel.
+      description: >
+        Backs the channel header's pin count without the client fetching
+        every pinned message just to count them. Requires only VIEW_CHANNEL.
+      responses:
+        "200":
+          description: The pin count.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PinCount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /channels/{channelId}/messages/search:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -1296,6 +1766,49 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /messages/{messageId}/polls/vote:
+    parameters:
+      - name: messageId
+        in: path
+        required: true
+        description: The message's UUID.
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: votePoll
+      tags: [messages]
+      summary: Cast or change the caller's vote on a message's poll.
+      description: >
+        One vote per user per poll: a second call replaces the first rather
+        than adding to it. Requires being able to view the message's channel
+        as well as SEND_MESSAGES there - the same permission sending a
+        message needs, evaluated in this channel specifically. Refused once
+        the poll's `close_at` has passed, checked against the server's own
+        clock. Live connections are told over the WebSocket (`poll.voted`)
+        with the whole refreshed tally, never who cast which vote.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VotePollRequest"
+      responses:
+        "204":
+          description: The vote was recorded.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -1607,6 +2120,55 @@ components:
             account exists, so someone choosing a LAN-only server learns
             their phone will stay silent while they can still choose
             differently.
+        identity:
+          type: object
+          required:
+            [public_key, fingerprint, fingerprint_groups, color_strip]
+          description: >
+            The server's long-lived, trust-on-first-use identity. Pinned by
+            a client on first connect and compared on every one after, so a
+            later machine-in-the-middle changes the fingerprint visibly
+            instead of silently. This protects nothing about the very first
+            connection: a client with nothing pinned yet cannot tell a
+            faithful server from an attacker's own keypair, which is why the
+            onboarding design has the admin read the fingerprint aloud for
+            comparison rather than trusting it silently on that first
+            connect. Deliberately not derived from the TLS certificate, so it
+            exists and stays stable for plain-HTTP LAN deployments and behind
+            a reverse proxy's own, separately renewing certificate.
+          properties:
+            public_key:
+              type: string
+              description: >-
+                Standard base64 of the 32-byte Ed25519 public key. This, not
+                `fingerprint`, is what a client should pin and compare
+                byte-for-byte.
+            fingerprint:
+              type: string
+              description: >-
+                32 lowercase hex characters (a truncated SHA-256 of the
+                public key), with no separators.
+            fingerprint_groups:
+              type: array
+              items:
+                type: string
+              minItems: 8
+              maxItems: 8
+              description: >-
+                The same fingerprint as eight 4-character hex groups, for the
+                onboarding design's two-rows-of-four display.
+            color_strip:
+              type: array
+              items:
+                type: integer
+                format: int32
+                minimum: 0
+                maximum: 5
+              minItems: 4
+              maxItems: 4
+              description: >-
+                Four indices into the client's six-entry cursor colour
+                palette, deterministically derived from the fingerprint.
 
     TokenPair:
       type: object
@@ -1686,8 +2248,7 @@ components:
           minLength: 1
           maxLength: 64
         invite_code:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: >
             Required once the deployment has been claimed, since joining is by
             invitation from that point on. Ignored on an unclaimed deployment,
@@ -1728,6 +2289,29 @@ components:
           type: integer
           format: int64
           description: Unix milliseconds.
+        avatar_updated_at:
+          type: [integer, "null"]
+          format: int64
+          description: >
+            When this user's avatar was last set, or null for no avatar. Not
+            itself fetchable: a client appends it as a cache-busting query
+            parameter on `getAvatar`, which ignores the query string and
+            serves whatever is currently stored. Absent on servers older
+            than the avatar feature, which a client must treat as unknown
+            (no cache key), not as "no avatar".
+        roles:
+          type: array
+          items:
+            type: string
+          description: >
+            Role names this member holds, for a client to render a badge
+            (e.g. "Op") beside them. Excludes `@everyone`: every member holds
+            that one, so including it would put a meaningless badge on every
+            row. Empty rather than absent for a member with nothing beyond
+            it. Deliberately no colour field: badges use the design system's
+            accent, not a per-role one. Absent on servers older than this
+            field, which a client must treat as unknown rather than "no
+            roles".
 
     Me:
       type: object
@@ -1744,6 +2328,10 @@ components:
           type: integer
           format: int64
           description: Unix milliseconds.
+        avatar_updated_at:
+          type: [integer, "null"]
+          format: int64
+          description: Same meaning as `UserProfile.avatar_updated_at`.
         permissions:
           type: integer
           format: int64
@@ -1764,6 +2352,32 @@ components:
           description: >
             Must not contain control characters or text-direction overrides,
             the same rule registration enforces.
+
+    PresenceStatus:
+      type: object
+      required: [user_id, status]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [online, away, dnd, offline]
+          description: >
+            What this specific caller may be told. Never `hidden`: a user who
+            chose it is `offline` here to anyone but themselves, and their
+            true state when they ask about their own id.
+
+    SetVisibilityRequest:
+      type: object
+      required: [visibility]
+      properties:
+        visibility:
+          type: string
+          enum: [online, away, dnd, hidden]
+          description: >
+            `hidden` is the appear-offline choice: the caller's own client
+            still sees their true state; everyone else sees `offline`.
 
     Device:
       type: object
@@ -1894,7 +2508,36 @@ components:
           type: boolean
           description: >-
             Whether this code can be redeemed right now. Deliberately the only
-            signal: saying why not would let someone probe for real codes.
+            signal when false: saying why not would let someone probe for
+            real codes.
+        community:
+          description: >-
+            Present only when `usable` is true; absent (not null) otherwise,
+            so the unusable response body stays exactly `{"usable": false}`.
+          type: object
+          required:
+            [name, member_count, invited_by, uses_remaining, expires_at]
+          properties:
+            name:
+              type: string
+              description: This deployment's display name.
+            member_count:
+              type: integer
+              format: int64
+              description: How many live accounts the deployment has.
+            invited_by:
+              type: [string, "null"]
+              description: >-
+                The inviter's current display name, or null if their account
+                has since been deleted.
+            uses_remaining:
+              type: [integer, "null"]
+              format: int64
+              description: Null means unlimited.
+            expires_at:
+              type: [integer, "null"]
+              format: int64
+              description: Unix milliseconds; null means it never expires.
 
     Channel:
       type: object
@@ -1908,6 +2551,14 @@ components:
         kind:
           type: string
           enum: [text, voice]
+        topic:
+          type: [string, "null"]
+          maxLength: 256
+          description: >
+            A one-line description shown beside the name in the client's
+            channel header, or null for no topic. Absent on servers older
+            than this field, which a client must treat as unknown rather
+            than "no topic".
         created_at:
           type: integer
           format: int64
@@ -1928,12 +2579,38 @@ components:
 
     UpdateChannelRequest:
       type: object
-      required: [name]
+      description: >
+        At least one of `name` and `topic` must be present; a request with
+        neither is a 400. Each is independent: sending only `topic` leaves
+        the name untouched, and vice versa.
       properties:
         name:
           type: string
           minLength: 1
           maxLength: 64
+        topic:
+          type: string
+          maxLength: 256
+          description: >
+            A blank or whitespace-only value clears the topic back to null
+            rather than storing an empty string.
+
+    DmConversation:
+      type: object
+      required: [channel_id, user, unread, created_at]
+      properties:
+        channel_id:
+          type: string
+          format: uuid
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        unread:
+          type: integer
+          format: int64
+        created_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds the DM channel was first opened.
 
     Role:
       type: object
@@ -2019,8 +2696,7 @@ components:
           format: uuid
           description: Null once the author's account has been deleted.
         author_display_name:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: >-
             The author's display name, sent with the message so a client does
             not need a lookup per distinct sender. Null once the account is
@@ -2046,6 +2722,80 @@ components:
             omitted them.
           items:
             $ref: "#/components/schemas/ReactionSummary"
+        poll:
+          oneOf:
+            - $ref: "#/components/schemas/Poll"
+            - type: "null"
+          description: >-
+            The poll this message carries, if any. Always present as a key:
+            null means this message is not a poll, the same convention
+            `reactions` follows for "genuinely none" versus omitted.
+        attachments:
+          type: array
+          description: >-
+            Always present, empty when there are none - same convention as
+            `reactions`. Unlike reactions, a freshly sent message can carry
+            these immediately, since they are uploaded before the send and
+            only referenced by it.
+          items:
+            $ref: "#/components/schemas/Attachment"
+
+    Attachment:
+      type: object
+      required: [id, filename, content_type, size]
+      properties:
+        id:
+          type: string
+          description: >
+            Hex sha256 of the stored bytes. Also the path segment
+            `getAttachment` fetches it at.
+        filename:
+          type: string
+          description: >
+            Sanitized display name. Content-addressed storage means this is a
+            property of the bytes, not of any one message attaching them: the
+            first upload of a given hash sets it.
+        content_type:
+          type: string
+          description: >
+            One of a fixed server-side allowlist, decided by sniffing the
+            uploaded bytes - never the client's declared Content-Type or a
+            filename extension.
+        size:
+          type: integer
+          format: int64
+
+    PinnedMessage:
+      description: >-
+        A pinned message: every Message field, flattened, plus when and by
+        whom it was pinned.
+      allOf:
+        - $ref: "#/components/schemas/Message"
+        - type: object
+          required: [pinned_at]
+          properties:
+            pinned_at:
+              type: integer
+              format: int64
+              description: When the message was pinned, unix milliseconds.
+            pinned_by:
+              type: [string, "null"]
+              format: uuid
+              description: >-
+                Who pinned it. Null once that account has been anonymized,
+                exactly as author_id is.
+
+    PinCount:
+      type: object
+      required: [count]
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: >-
+            How many messages are currently pinned in the channel. Cheap to
+            read: a single indexed count, never a fetch of every pinned
+            message.
 
     VoiceToken:
       type: object
@@ -2093,6 +2843,102 @@ components:
             Whether the calling user is one of them, so a client can render the
             toggled state without a second request.
 
+    Poll:
+      type: object
+      required: [question, options, total_votes, closed]
+      properties:
+        question:
+          type: string
+        options:
+          type: array
+          minItems: 2
+          maxItems: 4
+          description: Ordered and fixed at creation; never reordered or edited.
+          items:
+            $ref: "#/components/schemas/PollOption"
+        total_votes:
+          type: integer
+          format: int64
+          description: The sum of every option's count.
+        voted_option:
+          type: [integer, "null"]
+          format: int64
+          description: >-
+            The 0-based position the calling user picked, or null if they
+            have not voted. Per-viewer, exactly like ReactionSummary.reacted:
+            never present for anyone but the voter themselves.
+        close_at:
+          type: [integer, "null"]
+          format: int64
+          description: Unix milliseconds. Null means the poll never closes.
+        closed:
+          type: boolean
+          description: >-
+            Whether the server's own clock already considers this poll past
+            close_at. Voting is refused server-side regardless of what a
+            client believes this to be.
+
+    PollOption:
+      type: object
+      required: [position, label, votes]
+      properties:
+        position:
+          type: integer
+          format: int64
+          description: 0-based, fixed at creation; also the option's identity.
+        label:
+          type: string
+        votes:
+          type: integer
+          format: int64
+          description: >-
+            How many people picked this option. Who they are is never
+            revealed by this or any other read: only the calling user's own
+            voted_option is.
+
+    CreatePollMessageRequest:
+      type: object
+      required: [id, question, options]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: >
+            Client-generated UUIDv7. Retrying with the same id returns the
+            stored message instead of sending twice.
+        content:
+          type: string
+          maxLength: 4000
+          description: >-
+            An optional caption riding alongside the poll. May be empty or
+            omitted: the poll itself is what the message is for.
+        question:
+          type: string
+          minLength: 1
+          maxLength: 300
+        options:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+        close_at:
+          type: integer
+          format: int64
+          description: >-
+            Unix milliseconds. Omitted or null means the poll never closes.
+
+    VotePollRequest:
+      type: object
+      required: [option]
+      properties:
+        option:
+          type: integer
+          format: int64
+          description: The 0-based position of the option being voted for.
+
     SendMessageRequest:
       type: object
       required: [id, content]
@@ -2107,6 +2953,16 @@ components:
           type: string
           minLength: 1
           maxLength: 4000
+        attachment_ids:
+          type: array
+          description: >
+            Hex sha256 ids of attachments already uploaded through
+            `uploadAttachment`, in display order. Requires ATTACH_FILES in
+            addition to SEND_MESSAGES when non-empty. An id that was never
+            uploaded (or was already reclaimed) is a 400, not a silent drop.
+          items:
+            type: string
+          maxItems: 10
 
     EditMessageRequest:
       type: object
@@ -2233,6 +3089,7 @@ components:
       oneOf:
         - $ref: "#/components/schemas/ClientHello"
         - $ref: "#/components/schemas/ClientPing"
+        - $ref: "#/components/schemas/ClientTyping"
 
     ClientHello:
       type: object
@@ -2256,6 +3113,22 @@ components:
           type: string
           enum: [ping]
 
+    ClientTyping:
+      type: object
+      required: [type, channel_id]
+      description: >
+        A typing refresh. Rate-limited and authorized like a channel event
+        (the caller must be able to view and send in the channel); there is
+        no explicit "stop typing" frame, since the state lapses on its own
+        server-side after a few seconds without another refresh.
+      properties:
+        type:
+          type: string
+          enum: [typing]
+        channel_id:
+          type: string
+          format: uuid
+
     ServerFrame:
       description: A frame sent by the server over the WebSocket.
       oneOf:
@@ -2263,6 +3136,9 @@ components:
         - $ref: "#/components/schemas/MessageCreated"
         - $ref: "#/components/schemas/MessageEdited"
         - $ref: "#/components/schemas/MessageDeleted"
+        - $ref: "#/components/schemas/PresenceChanged"
+        - $ref: "#/components/schemas/TypingStarted"
+        - $ref: "#/components/schemas/TypingStopped"
         - $ref: "#/components/schemas/ServerPong"
         - $ref: "#/components/schemas/ServerError"
 
@@ -2320,6 +3196,55 @@ components:
           type: string
           format: uuid
         message_id:
+          type: string
+          format: uuid
+
+    PresenceChanged:
+      type: object
+      required: [type, user_id, status]
+      description: >
+        Resolved for this specific connection's viewer; see PresenceStatus.
+        A user who chose `hidden` is `offline` here to anyone but themselves.
+      properties:
+        type:
+          type: string
+          enum: [presence.changed]
+        user_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [online, away, dnd, offline]
+
+    TypingStarted:
+      type: object
+      required: [type, channel_id, user_id]
+      properties:
+        type:
+          type: string
+          enum: [typing.started]
+        channel_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+
+    TypingStopped:
+      type: object
+      required: [type, channel_id, user_id]
+      description: >
+        Published either on an explicit end or on lapsing a few seconds
+        without a refresh; the two are indistinguishable on the wire, since a
+        client only needs to stop showing the indicator either way.
+      properties:
+        type:
+          type: string
+          enum: [typing.stopped]
+        channel_id:
+          type: string
+          format: uuid
+        user_id:
           type: string
           format: uuid
 

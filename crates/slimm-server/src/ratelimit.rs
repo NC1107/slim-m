@@ -32,6 +32,25 @@ pub enum Class {
     Ticket,
     /// Ordinary authenticated writes (send, edit, mark read).
     Write,
+    /// Typing refresh frames over the WebSocket. A refresh every few seconds
+    /// is normal client behavior, so the budget only needs to absorb a short
+    /// burst (switching between channels while typing) while still refusing
+    /// a tight loop; the tracker's own dedup already stops a well-behaved
+    /// refresh from re-fanning-out, so this exists to bound the cost of a
+    /// misbehaving one.
+    Typing,
+    /// Checking an invite code before signup. Unauthenticated, and a valid
+    /// code now discloses real deployment metadata rather than a bare
+    /// boolean, which raises what a successful guess is worth; tight for the
+    /// same reason `Password` is.
+    InviteCheck,
+    /// Uploading an attachment or avatar. Far tighter than `Write`: each
+    /// request can cost real megabytes of disk, so the budget that is fine
+    /// for a burst of short text messages would let one account fill the
+    /// volume as fast as it could open connections. Sized for a normal
+    /// compose flow (a handful of files with one message, occasionally) while
+    /// still bounding a sustained flood to a trickle.
+    Upload,
 }
 
 impl Class {
@@ -42,6 +61,9 @@ impl Class {
             Class::Refresh => (10.0, 1.0 / 2.0),
             Class::Ticket => (10.0, 1.0),
             Class::Write => (30.0, 5.0),
+            Class::Typing => (10.0, 2.0),
+            Class::InviteCheck => (10.0, 1.0 / 10.0),
+            Class::Upload => (10.0, 1.0 / 20.0),
         }
     }
 }

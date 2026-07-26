@@ -13,7 +13,7 @@
 //! same transaction as the write, and rolls back rather than commit a state
 //! with zero administrators.
 
-use sqlx::SqliteConnection;
+use sqlx::{QueryBuilder, SqliteConnection};
 
 use super::Store;
 use crate::ids::{RoleId, UserId};
@@ -196,6 +196,55 @@ impl Store {
         }
         tx.commit().await?;
         Ok(Some(()))
+    }
+
+    /// Non-`@everyone` role names for a batch of users, in one query no
+    /// matter how many are asked about - the same batching shape
+    /// [`Store::reactions_for_messages`] uses to keep a page of messages from
+    /// paying one query per row. `GET /members` is the caller that actually
+    /// needs this: it pages up to 200 members at once, and a naive
+    /// per-member roles lookup would be exactly the N+1 that shape exists to
+    /// avoid.
+    ///
+    /// `@everyone` is deliberately excluded: every member holds it, so
+    /// including it would put a meaningless badge on every row. A user with
+    /// nothing beyond that base role is simply absent from the result, the
+    /// same "missing means none" contract [`Store::user_profiles`] already
+    /// has for a batch of ids.
+    pub async fn roles_for_users(
+        &self,
+        user_ids: &[UserId],
+    ) -> anyhow::Result<Vec<(UserId, Vec<String>)>> {
+        if user_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Built rather than a fixed `query!` because the id list is variable
+        // length and SQLite has no array binding.
+        let mut builder = QueryBuilder::new(
+            "SELECT mr.user_id AS user_id, r.name AS name \
+             FROM member_roles mr JOIN roles r ON r.id = mr.role_id \
+             WHERE r.is_everyone = 0 AND mr.user_id IN (",
+        );
+        let mut separated = builder.separated(", ");
+        for id in user_ids {
+            separated.push_bind(*id);
+        }
+        builder.push(") ORDER BY mr.user_id, r.position DESC, r.created_at");
+
+        let rows = builder.build().fetch_all(&self.pool).await?;
+
+        use sqlx::Row;
+        let mut grouped: Vec<(UserId, Vec<String>)> = Vec::new();
+        for row in rows {
+            let user_id: UserId = row.try_get("user_id")?;
+            let name: String = row.try_get("name")?;
+            match grouped.iter_mut().find(|(id, _)| *id == user_id) {
+                Some((_, names)) => names.push(name),
+                None => grouped.push((user_id, vec![name])),
+            }
+        }
+        Ok(grouped)
     }
 
     /// Revokes a role from a member. Idempotent: unassigning a role the

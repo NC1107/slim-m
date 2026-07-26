@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM attachments WHERE sha256 = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "5b0fb054076b8bca66813ad959b8f7d8edbb3a5aac02171814b4331c69ae1a7e"
+}

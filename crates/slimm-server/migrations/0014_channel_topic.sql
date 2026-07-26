@@ -1,0 +1,13 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+-- No column to add: `channels.topic` has existed since migration 0002's core
+-- schema, added speculatively ahead of any code that used it, the same
+-- situation 0013 found the attachment tables in. Nothing before this point
+-- ever read or wrote it - no route, no store method, no DTO field. This
+-- migration is a marker only, so the history records when it was finally
+-- wired up through the store and HTTP layers rather than silently changing
+-- behaviour with no migration to point to. The length ceiling lives in Rust
+-- (`http::channels::validate_channel_topic`), the same place `name` and every
+-- other user-supplied text field on this table is bounded, not a CHECK
+-- constraint: SQLite cannot add one to an existing column without rebuilding
+-- the table, and nothing else in this schema does that for a length limit.
+SELECT 1 WHERE 0;

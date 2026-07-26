@@ -39,6 +39,30 @@ impl Invite {
     }
 }
 
+/// What a valid invite discloses about itself, returned only for a code
+/// [`Store::check_invite`] found usable. See that method's doc comment for
+/// why the usable/unusable boundary is where this can be disclosed at all.
+#[derive(Debug, Clone)]
+pub struct InviteMetadata {
+    /// The inviter's current display name, or `None` if their account has
+    /// since been deleted: there is no name left to show, the same rule a
+    /// message's author display name follows once its author is anonymized.
+    pub invited_by: Option<String>,
+    /// How many uses are left. `None` means unlimited.
+    pub uses_remaining: Option<i64>,
+    /// Unix milliseconds. `None` means the invite never expires.
+    pub expires_at: Option<i64>,
+}
+
+/// The result of checking a code before signup.
+#[derive(Debug, Clone)]
+pub enum InviteCheck {
+    /// Expired, spent, revoked, or never issued. Deliberately one variant
+    /// for all four: see the module doc comment.
+    Unusable,
+    Usable(InviteMetadata),
+}
+
 /// Why redeeming failed. Deliberately one variant from the caller's point of
 /// view: an expired code, a used-up code, and a code that never existed are all
 /// reported the same way, so the endpoint cannot be used to mine valid codes.
@@ -133,21 +157,55 @@ impl Store {
         Ok(())
     }
 
-    /// Whether a code could be redeemed, without spending it. Used to check a
-    /// code before asking someone to fill in a whole signup form.
+    /// Whether a code could be redeemed, without spending it. A thin
+    /// boolean view over [`Store::check_invite`] for callers (and existing
+    /// tests) that only need the yes/no answer.
     pub async fn invite_is_usable(&self, code: &str) -> anyhow::Result<bool> {
+        Ok(matches!(
+            self.check_invite(code).await?,
+            InviteCheck::Usable(_)
+        ))
+    }
+
+    /// Checks a code before asking someone to fill in a whole signup form,
+    /// without spending it.
+    ///
+    /// The unusable branch answers identically for a code that is expired,
+    /// already spent, revoked, or was never issued at all: [`InviteCheck`]
+    /// has exactly one variant for all four, so there is no field this
+    /// method (or its caller) could even accidentally leak that would let a
+    /// caller distinguish one from another. The usable branch is different:
+    /// a caller reaching it has already demonstrated they hold a working
+    /// code, so [`InviteMetadata`] discloses what that code unlocks. That is
+    /// new information about the deployment, not about the code itself, and
+    /// it is safe only because proving the code works came first.
+    pub async fn check_invite(&self, code: &str) -> anyhow::Result<InviteCheck> {
         let now = now_ms();
         let row = sqlx::query!(
-            r#"SELECT max_uses, uses AS "uses!", expires_at, revoked_at
-               FROM invites WHERE code = ?"#,
+            r#"SELECT max_uses, uses AS "uses!", expires_at, revoked_at,
+                      u.display_name AS "invited_by?: String"
+               FROM invites i
+               LEFT JOIN users u ON u.id = i.created_by AND u.deleted_at IS NULL
+               WHERE i.code = ?"#,
             code
         )
         .fetch_optional(&self.pool)
         .await?;
-        Ok(row.is_some_and(|r| {
-            r.revoked_at.is_none()
-                && r.max_uses.is_none_or(|max| r.uses < max)
-                && r.expires_at.is_none_or(|expiry| expiry > now)
+
+        let Some(row) = row else {
+            return Ok(InviteCheck::Unusable);
+        };
+        let usable = row.revoked_at.is_none()
+            && row.max_uses.is_none_or(|max| row.uses < max)
+            && row.expires_at.is_none_or(|expiry| expiry > now);
+        if !usable {
+            return Ok(InviteCheck::Unusable);
+        }
+
+        Ok(InviteCheck::Usable(InviteMetadata {
+            invited_by: row.invited_by,
+            uses_remaining: row.max_uses.map(|max| max - row.uses),
+            expires_at: row.expires_at,
         }))
     }
 

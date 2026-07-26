@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM pinned_messages WHERE channel_id = ? AND message_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "ccb45d754f2ab1eeaad38d4a4eb153b76f6a36e7c7c56d1ad927d74e138d1331"
+}

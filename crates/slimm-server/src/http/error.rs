@@ -75,6 +75,9 @@ impl From<SendError> for ApiError {
     fn from(err: SendError) -> Self {
         match err {
             SendError::IdConflict => ApiError::Conflict("message id already used"),
+            SendError::AttachmentNotFound => {
+                ApiError::BadRequest("attachment not found; upload it first")
+            }
             SendError::Internal(e) => {
                 tracing::error!(error = %e, "message send failed");
                 ApiError::Internal

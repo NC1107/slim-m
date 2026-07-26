@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT channel_id AS \"channel_id!: ChannelId\"\n               FROM dm_channels WHERE user_a = ? AND user_b = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "channel_id!: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "69515f50ecd754ec2d95b2bbb884fe50dd51fe09d09a3043376de08d412c239f"
+}

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Integration tests for invites: the permission gate, the use limit under
-//! concurrency, expiry, and the deliberately uninformative check endpoint.
+//! concurrency, expiry, the check endpoint's anti-mining guarantee and the
+//! community metadata it discloses for a usable code, and its rate limit.
 
 use axum::Router;
 use axum::body::Body;
@@ -25,11 +26,7 @@ async fn new_store() -> Store {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
-        push_relay_url: None,
-        push_relay_key: None,
-        livekit_url: None,
-        livekit_api_key: None,
-        livekit_api_secret: None,
+        ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     Store::new(pool)
@@ -43,6 +40,7 @@ fn app(store: Store) -> Router {
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
     })
 }
 
@@ -303,5 +301,171 @@ async fn checking_an_unknown_code_looks_the_same_as_a_spent_one() {
         unknown.as_object().unwrap().len(),
         1,
         "the response says nothing beyond usable"
+    );
+}
+
+async fn check_bytes(app: &Router, code: &str) -> Vec<u8> {
+    let response = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            &format!("/invites/{code}/check"),
+            None,
+            None,
+        ))
+        .await
+        .unwrap();
+    axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap()
+        .to_vec()
+}
+
+#[tokio::test]
+async fn expired_spent_and_never_issued_invites_are_byte_for_byte_identical() {
+    let (store, app, admin, member) = fixture().await;
+    let auth = Auth::new(2).unwrap();
+    let hash = auth
+        .hash_password("hunter2hunter2".to_owned())
+        .await
+        .unwrap();
+    let creator = store.create_account("creator2", "C", &hash).await.unwrap();
+
+    let expired = store
+        .create_invite(creator.id, None, None, Some(1))
+        .await
+        .unwrap();
+
+    let spent = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/invites",
+                Some(&admin),
+                Some(json!({ "max_uses": 1 })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let spent_code = spent["code"].as_str().unwrap().to_owned();
+    let redeemed = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/invites/{spent_code}/redeem"),
+            Some(&member),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(redeemed.status(), StatusCode::NO_CONTENT);
+
+    let revoked = json_body(
+        app.clone()
+            .oneshot(request("POST", "/invites", Some(&admin), Some(json!({}))))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let revoked_code = revoked["code"].as_str().unwrap().to_owned();
+    let revoke_response = app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/invites/{revoked_code}"),
+            Some(&admin),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(revoke_response.status(), StatusCode::NO_CONTENT);
+
+    let never_issued = check_bytes(&app, "neverissued").await;
+    let expired_bytes = check_bytes(&app, &expired.code).await;
+    let spent_bytes = check_bytes(&app, &spent_code).await;
+    let revoked_bytes = check_bytes(&app, &revoked_code).await;
+
+    // Not just logically equal (a parsed-JSON comparison would not notice a
+    // stray field or a formatting quirk): the actual bytes on the wire, so a
+    // future edit that adds so much as one extra byte to only one of these
+    // branches fails this test rather than only a future security review.
+    assert_eq!(
+        expired_bytes, never_issued,
+        "expired must answer exactly like never-issued"
+    );
+    assert_eq!(
+        spent_bytes, never_issued,
+        "spent must answer exactly like never-issued"
+    );
+    assert_eq!(
+        revoked_bytes, never_issued,
+        "revoked must answer exactly like never-issued"
+    );
+    assert_eq!(never_issued, br#"{"usable":false}"#.to_vec());
+}
+
+#[tokio::test]
+async fn a_valid_code_discloses_community_metadata() {
+    let (_store, app, admin, _member) = fixture().await;
+
+    let invite = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/invites",
+                Some(&admin),
+                Some(json!({ "max_uses": 5 })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let code = invite["code"].as_str().unwrap().to_owned();
+
+    let check = json_body(
+        app.clone()
+            .oneshot(request(
+                "GET",
+                &format!("/invites/{code}/check"),
+                None,
+                None,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+
+    assert_eq!(check["usable"], true);
+    let community = &check["community"];
+    // The fixture's two accounts (admin, member) are the whole deployment.
+    assert_eq!(community["name"], "slim-m");
+    assert_eq!(community["member_count"], 2);
+    assert_eq!(community["invited_by"], "Admin");
+    assert_eq!(community["uses_remaining"], 5);
+    assert!(community["expires_at"].is_null());
+}
+
+#[tokio::test]
+async fn the_check_endpoint_is_rate_limited() {
+    let (_store, app, _admin, _member) = fixture().await;
+
+    let mut statuses = Vec::new();
+    for _ in 0..15 {
+        let response = app
+            .clone()
+            .oneshot(request("GET", "/invites/neverissued/check", None, None))
+            .await
+            .unwrap();
+        statuses.push(response.status());
+    }
+
+    assert!(
+        statuses.contains(&StatusCode::OK),
+        "the first checks inside the burst are answered: {statuses:?}"
+    );
+    assert!(
+        statuses.contains(&StatusCode::TOO_MANY_REQUESTS),
+        "a sustained flood of guesses must be refused: {statuses:?}"
     );
 }

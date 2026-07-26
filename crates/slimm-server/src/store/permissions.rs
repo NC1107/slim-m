@@ -207,8 +207,17 @@ impl Store {
         // a fabricated channel id would inherit the base @everyone permissions
         // (it has no overwrites) and be distinguishable from a real channel the
         // caller may not view, which would leak channel existence.
-        if self.channel(channel_id).await?.is_none() {
+        let Some(channel) = self.channel(channel_id).await? else {
             return Ok(Permissions::NONE);
+        };
+
+        // A direct-message channel does not run through the role/overwrite
+        // model below at all: see `dm_permissions` for why, and specifically
+        // why that has to hold even against ADMINISTRATOR, which the
+        // evaluator a few lines down bypasses for every other channel on
+        // purpose.
+        if channel.kind == super::dms::DM_CHANNEL_KIND {
+            return self.dm_permissions(user_id, channel_id).await;
         }
 
         let roles = self.load_roles(user_id).await?;

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT user_a AS \"user_a!: UserId\", user_b AS \"user_b!: UserId\"\n               FROM dm_channels WHERE channel_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_a!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "user_b!: UserId",
+        "ordinal": 1,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "8a4cdefbc23ef777bb12ad488182d261bcb5470ceccb62debf1a491bb0c0786d"
+}

@@ -1,25 +1,25 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: ChannelId\", name AS \"name!\", kind AS \"kind!\",\n                      created_at AS \"created_at!\"\n               FROM channels WHERE id = ? AND deleted_at IS NULL",
+  "query": "SELECT sha256 AS \"sha256!: Vec<u8>\", filename AS \"filename!\",\n                      content_type AS \"content_type!\", size AS \"size!\"\n               FROM attachments WHERE sha256 = ?",
   "describe": {
     "columns": [
       {
-        "name": "id!: ChannelId",
+        "name": "sha256!: Vec<u8>",
         "ordinal": 0,
         "type_info": "Blob"
       },
       {
-        "name": "name!",
+        "name": "filename!",
         "ordinal": 1,
         "type_info": "Text"
       },
       {
-        "name": "kind!",
+        "name": "content_type!",
         "ordinal": 2,
         "type_info": "Text"
       },
       {
-        "name": "created_at!",
+        "name": "size!",
         "ordinal": 3,
         "type_info": "Integer"
       }
@@ -34,5 +34,5 @@
       false
     ]
   },
-  "hash": "16bc5efbbfdcb63d971ac89a641b9cf5d5d64f3bb47671ba90b338b4096bf063"
+  "hash": "77435045eca27d0ecab5f33bd509c7a88925bfc524d92126402984fa0449428d"
 }

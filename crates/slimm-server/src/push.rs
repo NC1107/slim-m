@@ -606,9 +606,7 @@ mod tests {
             hash_concurrency: 1,
             push_relay_url: Some("http://relay.example.com".to_owned()),
             push_relay_key: Some("key".to_owned()),
-            livekit_url: None,
-            livekit_api_key: None,
-            livekit_api_secret: None,
+            ..Config::default()
         };
         assert!(
             PushSender::with_debounce_window_ms(&config, 1_000).is_err(),

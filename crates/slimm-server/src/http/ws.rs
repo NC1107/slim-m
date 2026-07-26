@@ -29,9 +29,11 @@ use tokio::sync::broadcast::error::RecvError;
 use super::AppState;
 use super::PROTOCOL_VERSION;
 use super::messages::MessageDto;
-use crate::hub::Event;
+use crate::hub::{Event, Hub};
 use crate::permissions::Permissions;
 use crate::store::{SessionContext, Store};
+
+mod signals;
 
 /// How long a freshly connected socket has to send its `hello` before it is
 /// dropped, so unauthenticated sockets cannot linger.
@@ -97,6 +99,30 @@ enum ServerFrame {
         message_id: String,
         reactions: Vec<ReactionCountDto>,
     },
+    #[serde(rename = "message.pinned")]
+    MessagePinned {
+        channel_id: String,
+        message_id: String,
+        pinned_by: Option<String>,
+        pinned_at: i64,
+    },
+    #[serde(rename = "message.unpinned")]
+    MessageUnpinned {
+        channel_id: String,
+        message_id: String,
+    },
+    #[serde(rename = "poll.voted")]
+    PollVoted {
+        channel_id: String,
+        message_id: String,
+        options: Vec<PollOptionCountDto>,
+    },
+    #[serde(rename = "presence.changed")]
+    PresenceChanged { user_id: String, status: String },
+    #[serde(rename = "typing.started")]
+    TypingStarted { channel_id: String, user_id: String },
+    #[serde(rename = "typing.stopped")]
+    TypingStopped { channel_id: String, user_id: String },
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]
@@ -111,6 +137,14 @@ pub(crate) struct ReactionCountDto {
     count: i64,
 }
 
+/// One poll option and its current public vote count. Never carries who cast
+/// a vote, only the option and its tally.
+#[derive(Serialize)]
+pub(crate) struct PollOptionCountDto {
+    position: i64,
+    votes: i64,
+}
+
 #[derive(Deserialize)]
 #[serde(tag = "type")]
 enum ClientFrame {
@@ -118,6 +152,11 @@ enum ClientFrame {
     Hello { ticket: String, protocol: u32 },
     #[serde(rename = "ping")]
     Ping,
+    /// A typing refresh. Rate-limited and authorized like any other channel
+    /// event (view plus send); see [`signals::handle_typing`]. There is no
+    /// explicit "stop" frame: the state lapses on its own without a refresh.
+    #[serde(rename = "typing")]
+    Typing { channel_id: String },
 }
 
 // ---------------------------------------------------------------------------
@@ -135,6 +174,12 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
     // Subscribe before acking the hello, so an event published during the
     // handshake is buffered rather than missed.
     let mut events = state.hub.subscribe();
+
+    // Records this connection with the presence tracker and guarantees the
+    // matching disconnect is recorded and published no matter which branch of
+    // the loop below causes this function to return; see `signals::PresenceGuard`.
+    let _presence_guard = signals::PresenceGuard::connect(state.hub.clone(), ctx.user_id);
+
     if send_frame(
         &mut sink,
         &ServerFrame::Hello {
@@ -152,10 +197,25 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
             incoming = stream.next() => {
                 match incoming {
                     Some(Ok(Message::Text(text))) => {
-                        if let Ok(ClientFrame::Ping) = serde_json::from_str::<ClientFrame>(text.as_str())
-                            && send_frame(&mut sink, &ServerFrame::Pong).await.is_err()
-                        {
-                            break;
+                        match serde_json::from_str::<ClientFrame>(text.as_str()) {
+                            Ok(ClientFrame::Ping) => {
+                                if send_frame(&mut sink, &ServerFrame::Pong).await.is_err() {
+                                    break;
+                                }
+                            }
+                            Ok(ClientFrame::Typing { channel_id }) => {
+                                signals::handle_typing(
+                                    &state.store,
+                                    &state.hub,
+                                    &state.limiter,
+                                    &ctx,
+                                    &channel_id,
+                                )
+                                .await;
+                            }
+                            // A second hello or anything unparseable is not
+                            // worth tearing the connection down over.
+                            Ok(ClientFrame::Hello { .. }) | Err(_) => {}
                         }
                     }
                     Some(Ok(Message::Close(_))) | None => break,
@@ -174,7 +234,7 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                         }
                     }
                     Ok(event) => {
-                        if let Some(frame) = authorize(&state.store, &ctx, event).await
+                        if let Some(frame) = authorize(&state.store, &state.hub, &ctx, event).await
                             && send_frame(&mut sink, &frame).await.is_err()
                         {
                             break;
@@ -224,13 +284,37 @@ async fn authenticate(
 
 /// Filters an event down to a wire frame, or `None` if this user may not see it.
 /// A permission-check error fails closed (no delivery).
-async fn authorize(store: &Store, ctx: &SessionContext, event: Event) -> Option<ServerFrame> {
+async fn authorize(
+    store: &Store,
+    hub: &Hub,
+    ctx: &SessionContext,
+    event: Event,
+) -> Option<ServerFrame> {
+    // Presence has no channel to check view permission against (it is
+    // deployment-wide, like the member list) and needs the receiving
+    // connection's own user id to resolve the right answer for it, so it is
+    // handled up front rather than folded into the channel-scoped match below.
+    if let Event::PresenceChanged(target_id) = event {
+        let status = signals::presence_status(store, hub, ctx.user_id, target_id).await?;
+        return Some(ServerFrame::PresenceChanged {
+            user_id: target_id.to_string(),
+            status: status.as_str().to_owned(),
+        });
+    }
+
     let channel_id = match &event {
         Event::MessageCreated(message) | Event::MessageEdited(message) => message.channel_id,
         Event::MessageDeleted { channel_id, .. } => *channel_id,
         Event::ReactionsChanged { channel_id, .. } => *channel_id,
-        // Control events are handled in the loop, never here.
-        Event::SessionRevoked(_) => return None,
+        Event::MessagePinned { channel_id, .. } => *channel_id,
+        Event::MessageUnpinned { channel_id, .. } => *channel_id,
+        Event::PollVoted { channel_id, .. } => *channel_id,
+        Event::TypingStarted { channel_id, .. } | Event::TypingStopped { channel_id, .. } => {
+            *channel_id
+        }
+        // Control events are handled in the loop, never here. PresenceChanged
+        // already returned above.
+        Event::SessionRevoked(_) | Event::PresenceChanged(_) => return None,
     };
     let visible = store
         .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
@@ -270,7 +354,52 @@ async fn authorize(store: &Store, ctx: &SessionContext, event: Event) -> Option<
                 .map(|(emoji, count)| ReactionCountDto { emoji, count })
                 .collect(),
         },
-        Event::SessionRevoked(_) => return None,
+        Event::MessagePinned {
+            channel_id,
+            message_id,
+            pinned_by,
+            pinned_at,
+        } => ServerFrame::MessagePinned {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
+            pinned_by: pinned_by.map(|id| id.to_string()),
+            pinned_at,
+        },
+        Event::MessageUnpinned {
+            channel_id,
+            message_id,
+        } => ServerFrame::MessageUnpinned {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
+        },
+        Event::PollVoted {
+            channel_id,
+            message_id,
+            options,
+        } => ServerFrame::PollVoted {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
+            options: options
+                .into_iter()
+                .map(|(position, votes)| PollOptionCountDto { position, votes })
+                .collect(),
+        },
+        Event::TypingStarted {
+            channel_id,
+            user_id,
+        } => ServerFrame::TypingStarted {
+            channel_id: channel_id.to_string(),
+            user_id: user_id.to_string(),
+        },
+        Event::TypingStopped {
+            channel_id,
+            user_id,
+        } => ServerFrame::TypingStopped {
+            channel_id: channel_id.to_string(),
+            user_id: user_id.to_string(),
+        },
+        // PresenceChanged already returned above; unreachable here.
+        Event::SessionRevoked(_) | Event::PresenceChanged(_) => return None,
     })
 }
 

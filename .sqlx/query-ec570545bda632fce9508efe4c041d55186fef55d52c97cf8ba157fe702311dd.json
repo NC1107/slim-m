@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT d.channel_id AS \"channel_id!: ChannelId\",\n                      CASE WHEN d.user_a = ? THEN d.user_b ELSE d.user_a END AS \"other_id!: UserId\",\n                      c.created_at AS \"created_at!\",\n                      COALESCE(\n                          (SELECT MAX(m.created_at) FROM messages m\n                           WHERE m.channel_id = d.channel_id AND m.deleted_at IS NULL),\n                          c.created_at\n                      ) AS \"activity_at!: i64\"\n               FROM dm_channels d\n               JOIN channels c ON c.id = d.channel_id AND c.deleted_at IS NULL\n               WHERE d.user_a = ? OR d.user_b = ?\n               ORDER BY \"activity_at!: i64\" DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "channel_id!: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "other_id!: UserId",
+        "ordinal": 1,
+        "type_info": "Null"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "activity_at!: i64",
+        "ordinal": 3,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      null,
+      false,
+      null
+    ]
+  },
+  "hash": "ec570545bda632fce9508efe4c041d55186fef55d52c97cf8ba157fe702311dd"
+}

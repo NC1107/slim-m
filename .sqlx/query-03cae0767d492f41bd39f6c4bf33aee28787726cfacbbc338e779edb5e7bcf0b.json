@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO attachments (sha256, size, content_type, key_version, is_encrypted, filename, created_at)\n             VALUES (?, ?, ?, 0, 0, ?, ?)\n             ON CONFLICT (sha256) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "03cae0767d492f41bd39f6c4bf33aee28787726cfacbbc338e779edb5e7bcf0b"
+}

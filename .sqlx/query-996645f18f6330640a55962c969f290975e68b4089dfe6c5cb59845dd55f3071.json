@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT presence_visibility AS \"presence_visibility!\" FROM users\n               WHERE id = ? AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "presence_visibility!",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "996645f18f6330640a55962c969f290975e68b4089dfe6c5cb59845dd55f3071"
+}
