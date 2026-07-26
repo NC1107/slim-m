@@ -19,7 +19,7 @@ RUN apk add --no-cache musl-dev
 ENV SQLX_OFFLINE=true
 WORKDIR /build
 COPY . .
-RUN cargo build --release --bin slimm-server \
+RUN cargo build --locked --release --bin slimm-server \
     && mkdir -p /out/data \
     && cp target/release/slimm-server /out/slimm-server
 

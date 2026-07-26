@@ -22,12 +22,14 @@
 
 services:
   server:
-    # Pin to a released server tag; bump this on every upgrade.
-    # https://github.com/NC1107/slim-m/releases
-    # Pin to a PUBLISHED release tag. No image exists in GHCR until the first
-    # release is cut (release-please turns the 0.0.0 manifest into 0.1.0 on the
-    # first feat merge); set this to that tag before `docker compose up`.
-    image: ghcr.io/nc1107/slim-m-server:0.1.0
+    # Pin to a released server tag and bump it on every upgrade; the published
+    # tags are at https://github.com/NC1107/slim-m/releases, and a rolling
+    # `latest` is published alongside each one.
+    #
+    # SLIMM_VERSION in .env overrides this without editing the file. Do not
+    # leave an old tag here: a stale server is one that predates every security
+    # fix since, and this file used to ship pinned to the very first release.
+    image: ghcr.io/nc1107/slim-m-server:${SLIMM_VERSION:-latest}
     restart: unless-stopped
     environment:
       SLIMM_LOG: ${SLIMM_LOG:-info}
@@ -95,6 +97,14 @@ services:
     environment:
       # LIVEKIT_CONFIG is LiveKit's own env binding for a full config.yaml
       # body - no separate config file needed for this example.
+      #
+      # The two key variables below deliberately have no ":-default" fallback,
+      # unlike every other variable in this file. They authorize minting a room
+      # token, so a placeholder default would be a publicly known credential on
+      # a publicly reachable SFU, and anyone could forge a join token for any
+      # room. The ":?" form makes compose refuse to start and name the missing
+      # variable, which is the only safe way for this to fail. Generate a pair
+      # with: docker run --rm livekit/livekit-server:v1.10.1 generate-keys
       LIVEKIT_CONFIG: |
         port: 7880
         bind_addresses:
@@ -105,7 +115,7 @@ services:
           port_range_end: ${LIVEKIT_UDP_PORT_END:-51000}
           use_external_ip: true
         keys:
-          ${LIVEKIT_API_KEY:-changeme_api_key}: ${LIVEKIT_API_SECRET:-changeme_api_secret_at_least_32_characters}
+          ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set in .env, see deploy/README.md}: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set in .env to a random value of at least 32 characters}
         turn:
           enabled: true
           udp_port: 3478
