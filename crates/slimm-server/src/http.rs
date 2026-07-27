@@ -19,6 +19,7 @@ use error::ApiError;
 
 mod attachments;
 mod auth;
+mod canvas;
 mod channels;
 mod dms;
 mod error;
@@ -64,6 +65,7 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(healthz))
         .route("/version", get(version))
         .merge(auth::routes())
+        .merge(canvas::routes())
         .merge(channels::routes())
         .merge(invites::routes())
         .merge(messages::routes())

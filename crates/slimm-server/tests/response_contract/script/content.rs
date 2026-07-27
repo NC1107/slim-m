@@ -90,6 +90,15 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
     c.bare("deleteRole", "DELETE", &format!("/roles/{role}"), root)
         .await;
 
+    // Empty on purpose: nothing writes a canvas object over HTTP yet, so what
+    // this checks is the envelope the client decodes before anyone has drawn.
+    c.get(
+        "listCanvasViewport",
+        &format!("/channels/{channel}/canvas/objects?min_x=0&min_y=0&max_x=1920&max_y=1080"),
+        root,
+    )
+    .await;
+
     let overwrite = format!("/channels/{channel}/overwrites/member/{bob_id}");
     c.json(
         "setChannelOverwrite",

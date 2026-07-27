@@ -17,6 +17,7 @@ export 'models_attachments.dart';
 export 'models_dms.dart';
 export 'models_identity.dart';
 export 'models_moderation.dart';
+export 'models_canvas.dart';
 export 'models_pins.dart';
 export 'models_polls.dart';
 export 'models_presence.dart';

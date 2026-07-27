@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE canvas_objects SET x = ?, y = ?, w = ?, h = ?\n             WHERE id = ? AND deleted_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "2e114affe818ce6f3fca1cf0cfcb0be6875cd4f0750ed73d49c8d5fee71b25ba"
+}
