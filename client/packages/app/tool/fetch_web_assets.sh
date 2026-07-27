@@ -26,24 +26,29 @@ pinned() {
 
 # A digest pinned here against a different lockfile version is worse than no
 # check at all, so refuse rather than fetch the wrong thing.
-for pair in "sqlite3 $SQLITE3_VERSION" "drift $DRIFT_VERSION"; do
-  set -- $pair
-  actual=$(pinned "$1")
-  if [ "$actual" != "$2" ]; then
-    echo "error: pubspec.lock pins $1 $actual but this script expects $2." >&2
+check_pinned() {
+  local pkg=$1 want=$2 actual
+  actual=$(pinned "$pkg")
+  if [[ "$actual" != "$want" ]]; then
+    echo "error: pubspec.lock pins $pkg $actual but this script expects $want." >&2
     echo "Update the version and sha256 in $0 in the same change." >&2
     exit 1
   fi
-done
+}
+
+check_pinned sqlite3 "$SQLITE3_VERSION"
+check_pinned drift "$DRIFT_VERSION"
 
 fetch() {
   local url=$1 out=$2 want=$3
-  [ -f "$out" ] && [ "$(sha256sum "$out" | cut -d' ' -f1)" = "$want" ] && {
-    echo "ok $out (cached)"; return; }
+  if [[ -f "$out" && "$(sha256sum "$out" | cut -d' ' -f1)" == "$want" ]]; then
+    echo "ok $out (cached)"
+    return
+  fi
   curl -sSfL --max-time 120 "$url" -o "$out"
   local got
   got=$(sha256sum "$out" | cut -d' ' -f1)
-  if [ "$got" != "$want" ]; then
+  if [[ "$got" != "$want" ]]; then
     rm -f "$out"
     echo "error: $out digest mismatch. expected $want, got $got" >&2
     exit 1
