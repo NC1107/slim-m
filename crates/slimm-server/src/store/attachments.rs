@@ -193,11 +193,19 @@ impl Store {
     /// caller can delete the backing files (a filesystem operation, kept
     /// outside this transaction).
     ///
-    /// One statement: the `NOT EXISTS` is evaluated as the delete itself
-    /// runs, so nothing that gets linked between being selected as a
+    /// One statement: the `NOT EXISTS` clauses are evaluated as the delete
+    /// itself runs, so nothing that gets linked between being selected as a
     /// candidate and being deleted is at risk, and `RETURNING` reports
     /// exactly the rows this call actually removed rather than the wider
     /// candidate set the inner `SELECT` considered.
+    ///
+    /// A message is not the only thing that can point at an attachment: a
+    /// custom emoji's image is an `attachments` row nothing ever attached to
+    /// a message, which is the exact shape this hunts.
+    /// `0016_custom_emoji.sql` guards those bytes with `ON DELETE RESTRICT`,
+    /// and RESTRICT does not filter, it aborts the whole statement. Excluding
+    /// them here is what keeps one emoji from stopping the sweep for the
+    /// entire deployment; the RESTRICT stays as the backstop it always was.
     pub async fn sweep_orphaned_attachments(&self) -> anyhow::Result<Vec<String>> {
         let cutoff = now_ms() - ORPHAN_GRACE_MS;
         let rows = sqlx::query!(
@@ -206,6 +214,7 @@ impl Store {
                    SELECT sha256 FROM attachments a
                    WHERE a.created_at < ?
                      AND NOT EXISTS (SELECT 1 FROM message_attachments ma WHERE ma.sha256 = a.sha256)
+                     AND NOT EXISTS (SELECT 1 FROM custom_emoji e WHERE e.sha256 = a.sha256)
                    LIMIT ?
                )
                RETURNING sha256 AS "sha256!: Vec<u8>""#,

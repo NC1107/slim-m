@@ -62,17 +62,47 @@ impl Store {
             .collect())
     }
 
+    /// Why creating an emoji named `name` would be refused right now, or
+    /// `None` if it would be accepted.
+    ///
+    /// Asked before any bytes are written, so a refusal costs nothing and
+    /// leaves nothing behind. Advisory by construction: two callers can both
+    /// read a count below the cap and both go on to write, which is why
+    /// [`Store::create_custom_emoji`] asks again inside its own write
+    /// transaction and stays the only authority on the answer.
+    pub async fn custom_emoji_refusal(
+        &self,
+        name: &str,
+    ) -> anyhow::Result<Option<CreateEmojiError>> {
+        let count = sqlx::query_scalar!("SELECT COUNT(*) FROM custom_emoji")
+            .fetch_one(&self.pool)
+            .await?;
+        if count as i64 >= MAX_CUSTOM_EMOJI {
+            return Ok(Some(CreateEmojiError::Full));
+        }
+
+        let taken = sqlx::query_scalar!("SELECT COUNT(*) FROM custom_emoji WHERE name = ?", name)
+            .fetch_one(&self.pool)
+            .await?;
+        Ok((taken > 0).then_some(CreateEmojiError::NameTaken))
+    }
+
     /// Records an emoji against already-written bytes.
     ///
     /// Write-locked and counted inside the same transaction as the insert:
     /// the cap is only a cap if two concurrent uploads cannot both read a
     /// count below it and then both write.
+    ///
+    /// `uploader` is `None` for the bulk import, which runs from an operator's
+    /// shell rather than an authenticated session, so there is no account to
+    /// name. The column is already nullable for the account-deletion case, and
+    /// a client renders both the same way: nobody to attribute it to.
     pub async fn create_custom_emoji(
         &self,
         id: EmojiId,
         name: &str,
         sha256: &[u8],
-        uploader: UserId,
+        uploader: Option<UserId>,
     ) -> anyhow::Result<Result<CustomEmoji, CreateEmojiError>> {
         let mut tx = self.begin_write().await?;
         let now = now_ms();
@@ -107,9 +137,22 @@ impl Store {
             id: id.to_string(),
             name: name.to_owned(),
             sha256: hex_of(sha256),
-            uploader_id: Some(uploader.to_string()),
+            uploader_id: uploader.map(|id| id.to_string()),
             created_at: now,
         }))
+    }
+
+    /// The bytes the emoji of this name points at, or None if no emoji
+    /// answers to it. The bulk import asks this to tell "already imported"
+    /// from "this name belongs to a different image".
+    pub async fn custom_emoji_sha256_by_name(&self, name: &str) -> anyhow::Result<Option<Vec<u8>>> {
+        let row = sqlx::query!(
+            r#"SELECT sha256 AS "sha256!" FROM custom_emoji WHERE name = ?"#,
+            name
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|row| row.sha256))
     }
 
     /// The bytes an emoji points at, or None if no such emoji exists.

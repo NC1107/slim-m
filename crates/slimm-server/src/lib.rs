@@ -8,6 +8,7 @@ pub mod auth;
 pub mod config;
 pub mod cors;
 pub mod db;
+pub mod emoji;
 pub mod http;
 pub mod hub;
 pub mod identity;
@@ -134,6 +135,36 @@ fn spawn_attachment_sweep(store: store::Store, media: media::Media) {
     });
 }
 
+/// Imports a directory of images as custom emoji, printing a line per file.
+///
+/// Reads the same `SLIMM_`-prefixed configuration [`run`] does and opens the
+/// same database and blob directory, so an operator points it at a deployment
+/// by running it where the server runs, with no second place to configure. It
+/// is safe to run against a live server: SQLite in WAL mode takes concurrent
+/// writers from separate processes, and every emoji is its own transaction.
+///
+/// Errors if any file did not end up as an emoji, so a script sees a non-zero
+/// exit rather than having to parse the report.
+pub async fn import_emoji(dir: &std::path::Path) -> anyhow::Result<()> {
+    init_tracing_to_stderr();
+    let config = config::Config::from_env()?;
+    let pool = db::connect(&config).await?;
+    let store = store::Store::new(pool);
+    let media = media::Media::new(config.attachments_dir.clone(), config.attachment_max_bytes)?;
+
+    let report = emoji::import::import_directory(&store, &media, dir).await?;
+    print!("{report}");
+
+    if !report.is_clean() {
+        anyhow::bail!(
+            "{} of {} files are not emoji",
+            report.unimported(),
+            report.files.len()
+        );
+    }
+    Ok(())
+}
+
 /// Connects to the local server and confirms `/healthz` returns 200. Used by the
 /// container image's healthcheck, since distroless has no shell.
 pub async fn healthcheck() -> anyhow::Result<()> {
@@ -159,9 +190,28 @@ pub async fn healthcheck() -> anyhow::Result<()> {
 }
 
 fn init_tracing() {
+    init_tracing_to(false);
+}
+
+/// Sends logs to stderr instead of stdout.
+///
+/// The import subcommand prints a machine-readable report on stdout, and at a
+/// non-default `SLIMM_LOG` the query logs interleave with it, so anything
+/// parsing that report reads corrupted input. Serving keeps stdout, which is
+/// what a container's log collector expects.
+fn init_tracing_to_stderr() {
+    init_tracing_to(true);
+}
+
+fn init_tracing_to(stderr: bool) {
     use tracing_subscriber::EnvFilter;
     let filter = EnvFilter::try_from_env("SLIMM_LOG").unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::fmt().with_env_filter(filter).init();
+    let builder = tracing_subscriber::fmt().with_env_filter(filter);
+    if stderr {
+        builder.with_writer(std::io::stderr).init();
+    } else {
+        builder.init();
+    }
 }
 
 /// Resolves on Ctrl-C or SIGTERM so the container stops cleanly.
