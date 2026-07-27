@@ -50,3 +50,7 @@ client/**/.dart_tool/
 client/**/linux/flutter/ephemeral/
 client/**/windows/flutter/ephemeral/
 client/**/macos/Flutter/ephemeral/
+
+# A working list for the owner, not project documentation. Durable decisions
+# belong in CLAUDE.md or a decision record.
+human-todos.md
