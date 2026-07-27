@@ -155,13 +155,13 @@ async fn a_retry_reports_itself_as_a_retry() {
     assert_eq!(retry.message.seq, first.message.seq);
 }
 
+/// The per-channel counter is allocated inside the send transaction, and that
+/// transaction reads the message id before it writes. Every other test here
+/// drives it one call at a time, which cannot catch either a duplicate seq or
+/// the SQLITE_BUSY a deferred transaction hits when it tries to promote a read
+/// snapshot to a write.
 #[tokio::test]
 async fn concurrent_sends_each_take_a_distinct_sequence_number() {
-    // The per-channel counter is allocated inside the send transaction, and
-    // that transaction reads the message id before it writes. Every other test
-    // here drives it one call at a time, which cannot catch either a duplicate
-    // seq or the SQLITE_BUSY a deferred transaction hits when it tries to
-    // promote a read snapshot to a write.
     const SENDERS: usize = 24;
 
     let s = store().await;

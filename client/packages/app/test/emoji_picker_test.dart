@@ -13,9 +13,9 @@ import 'package:slimm_app/src/providers/recent_emoji.dart';
 import 'package:slimm_app/src/widgets/emoji_picker.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-// The catalog's own first entries, escaped rather than literal: the hygiene
-// gate forbids an emoji codepoint in client source, and these are user
-// content standing in for a reaction, not interface chrome.
+/// The catalog's own first entries, escaped rather than literal: the hygiene
+/// gate forbids an emoji codepoint in client source, and these are user
+/// content standing in for a reaction, not interface chrome.
 const _grinningFace = '\u{1F600}'; // First catalog entry (smileys, default).
 const _grinningFaceBigEyes = '\u{1F603}'; // Second catalog entry.
 const _rofl = '\u{1F923}'; // Unique shortName "rofl"; a safe search probe.

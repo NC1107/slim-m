@@ -34,9 +34,7 @@ pub fn routes() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 #[derive(Serialize)]
 struct DeviceDto {
@@ -72,9 +70,7 @@ struct ReportFiled {
     id: String,
 }
 
-// ---------------------------------------------------------------------------
-// Devices
-// ---------------------------------------------------------------------------
+// --- Devices ---
 
 async fn list_devices(
     Authed(ctx): Authed,
@@ -105,9 +101,7 @@ async fn remove_device(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ---------------------------------------------------------------------------
-// Blocking
-// ---------------------------------------------------------------------------
+// --- Blocking ---
 
 async fn list_blocks(
     Authed(ctx): Authed,
@@ -142,9 +136,7 @@ async fn unblock(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ---------------------------------------------------------------------------
-// Reports
-// ---------------------------------------------------------------------------
+// --- Reports ---
 
 /// Files a report for a human to review. Nothing here inspects content
 /// automatically; the whole point is that a person decides.

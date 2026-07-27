@@ -72,6 +72,13 @@ struct ResolveReportRequest {
 }
 
 /// Lists the open moderation queue, oldest first.
+///
+/// A report carries the reported content verbatim, so the queue is filtered
+/// per channel rather than shown wholesale. `base_permissions` ignores channel
+/// overwrites by construction, so a moderator explicitly denied
+/// MANAGE_MESSAGES in one channel would otherwise still read every message
+/// reported there. Reports with no channel are deployment-wide (a report about
+/// a user rather than a message) and stay on the base check alone.
 async fn list(
     Authed(ctx): Authed,
     State(state): State<AppState>,
@@ -79,12 +86,8 @@ async fn list(
     require_manage_messages(&state, ctx.user_id).await?;
     let reports = state.store.list_open_reports().await?;
 
-    // A report carries the reported content verbatim, so the queue is filtered
-    // per channel rather than shown wholesale. base_permissions ignores channel
-    // overwrites by construction, so a moderator explicitly denied
-    // MANAGE_MESSAGES in one channel would otherwise still read every message
-    // reported there. Reports with no channel are deployment-wide (a report
-    // about a user rather than a message) and stay on the base check above.
+    // Re-checked per channel, not just deployment-wide; see the note on this
+    // function.
     let mut visible = Vec::with_capacity(reports.len());
     for report in reports {
         let allowed = match report.channel_id {

@@ -400,9 +400,8 @@ async fn validation_and_missing_resources() {
         .unwrap();
     assert_eq!(empty.status(), StatusCode::BAD_REQUEST);
 
-    // Posting to a channel that does not exist is refused the same way as one
-    // the caller cannot see (a nonexistent channel grants no permissions), so it
-    // reveals nothing about whether the channel is real.
+    // A nonexistent channel grants no permissions, so posting to one is refused
+    // exactly like one the caller cannot see: existence stays unobservable.
     let missing = app
         .clone()
         .oneshot(request(
@@ -427,6 +426,10 @@ async fn validation_and_missing_resources() {
 /// A channel renders sender names, so the message payload has to carry one.
 /// Without it the client has only an opaque user id to show, which is exactly
 /// what it used to display.
+///
+/// The read path has its own query, so it is asserted separately: an echo that
+/// names the author while a reload shows a bare id would look like the bug had
+/// been fixed until the app restarted.
 #[tokio::test]
 async fn a_message_carries_its_author_display_name() {
     let store = new_store().await;
@@ -460,9 +463,6 @@ async fn a_message_carries_its_author_display_name() {
         "the echoed message must name its author, not just its id"
     );
 
-    // The read path has its own query, so it needs asserting separately: an
-    // echo that names the author while a reload shows a bare id would look
-    // like the bug had been fixed until the app restarted.
     let listed = json_body(
         app.clone()
             .oneshot(request("GET", &uri, Some(&token), None))
@@ -476,12 +476,12 @@ async fn a_message_carries_its_author_display_name() {
     );
 }
 
+/// Send and delete both charged the Write bucket; edit did not, so one account
+/// could re-run the FTS5 re-index trigger as fast as it could send requests.
+/// The Write budget is a burst of 30, so a run well past that must start being
+/// refused.
 #[tokio::test]
 async fn editing_is_rate_limited_like_the_other_writes() {
-    // Send and delete both charged the Write bucket; edit did not, so one
-    // account could re-run the FTS5 re-index trigger as fast as it could send
-    // requests. The Write budget is a burst of 30, so a run well past that must
-    // start being refused.
     let store = new_store().await;
     store
         .create_role(

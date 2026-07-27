@@ -20,11 +20,20 @@ import 'package:slimm_app/src/screens/settings_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+/// Renders the settings screen with `/me` reporting [permissions], scrolled
+/// down to the section under test.
+///
+/// A token pair is seeded because every call this screen makes, including
+/// `/me`, goes through the signed session guard first: without one the client
+/// refuses fast with UnauthorizedException before the mock handler ever sees
+/// the request, which would make every case below read as "no permissions".
+///
+/// The section under test sits below several others (avatar, devices,
+/// notifications, voice, presence, blocked), so the default test viewport
+/// does not reach it without scrolling first. The drag is deliberately larger
+/// than the list's content, matching the account-deletion test's own
+/// reasoning: Flutter clamps to `maxScrollExtent` rather than erroring.
 Future<ProviderContainer> _pump(WidgetTester tester, int permissions) async {
-  // Every call this screen makes, including `/me`, goes through the signed
-  // session guard first: without a token pair here the client refuses fast
-  // with UnauthorizedException before the mock handler ever sees the
-  // request, which would make every case below read as "no permissions".
   const tokens = TokenPair(
     userId: 'self',
     accessToken: 'access',
@@ -77,11 +86,7 @@ Future<ProviderContainer> _pump(WidgetTester tester, int permissions) async {
   );
   await tester.pumpAndSettle();
 
-  // The section under test sits below several others (avatar, devices,
-  // notifications, voice, presence, blocked); the default test viewport
-  // does not reach it without scrolling first. The drag is deliberately
-  // larger than the list's content, matching the account-deletion test's
-  // own reasoning: Flutter clamps to `maxScrollExtent` rather than erroring.
+  // Deliberately larger than the list's content; see this function's doc.
   await tester.drag(find.byType(ListView), const Offset(0, -4000));
   await tester.pumpAndSettle();
 
@@ -144,13 +149,13 @@ void main() {
     expect(find.text('Invites'), findsNothing);
   });
 
+  /// The server resolves ADMINISTRATOR into every bit before `/me` ever
+  /// answers (see `evaluate()`'s bypass in permissions.rs), so the wire value
+  /// a real administrator's client receives already has every bit set; this
+  /// mock mirrors that resolved value rather than sending the lone
+  /// ADMINISTRATOR bit and asking the client to re-derive the bypass itself,
+  /// which it deliberately does not do.
   testWidgets('an administrator sees every row', (tester) async {
-    // The server resolves ADMINISTRATOR into every bit before `/me` ever
-    // answers (see `evaluate()`'s bypass in permissions.rs), so the wire
-    // value a real administrator's client receives already has every bit
-    // set; this mock mirrors that resolved value rather than sending the
-    // lone ADMINISTRATOR bit and asking the client to re-derive the bypass
-    // itself, which it deliberately does not do.
     final allBits = Perm.editable.fold(0, (acc, p) => acc | p.$1);
     await _pump(tester, allBits);
 

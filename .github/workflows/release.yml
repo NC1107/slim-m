@@ -1,22 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 name: release
 
-# Full release and publish pipeline for slim-m.
-#
-# Canonical path: release-please maintains release PRs on push to main. When a
-# release PR is merged, that same push run cuts the GitHub Release plus tag and
-# sets the per-package `release_created` outputs, which gate every downstream
-# publish job. A direct tag push (server-v* / client-v*) is also honored so a
-# release can be re-published without another release-please run.
-#
-# Independent versions: server (AGPL-3.0-only) and client (Apache-2.0) are
-# released separately, each with its own tag and its own set of jobs.
-#
-# Every job that pushes to GHCR, signs, attaches release assets, or touches
-# TestFlight runs under a reviewer-gated GitHub Environment and requests only
-# the permissions it needs. Secrets are referenced by name only and never
-# invented; jobs stay inert (a visible warning, no fake artifact) until the
-# corresponding secrets and packaging inputs exist.
+# Full release and publish pipeline. How a release is cut, why server and client
+# version independently, and what each job needs: docs/ci.md.
 
 on:
   push:
@@ -36,12 +22,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # release-please: open and maintain release PRs, and cut releases on merge.
-  # Manifest mode using the existing release-please-config.json and
-  # .release-please-manifest.json. Runs only on main-branch pushes; on a tag
-  # push it is a no-op so downstream jobs can still resolve via `needs`.
-  # ---------------------------------------------------------------------------
+  # Opens and maintains release PRs, and cuts releases on merge. A no-op on a tag
+  # push, so downstream jobs can still resolve it via `needs`. See docs/ci.md.
   release-please:
     runs-on: ubuntu-latest
     permissions:
@@ -62,15 +44,8 @@ jobs:
           manifest-file: .release-please-manifest.json
           config-file: release-please-config.json
 
-  # ---------------------------------------------------------------------------
-  # server-image: build one single-arch image per architecture on a NATIVE
-  # runner (amd64 on ubuntu-latest, arm64 on ubuntu-24.04-arm), each pushed to
-  # GHCR by digest with an SBOM and max provenance. No QEMU cross-compilation.
-  # server-image-merge then assembles the multi-arch manifest and signs it.
-  #
-  # Secrets: none beyond the automatic GITHUB_TOKEN (packages:write to push to
-  # GHCR). No cosign key material is stored.
-  # ---------------------------------------------------------------------------
+  # One single-arch image per architecture, built on a NATIVE runner and pushed
+  # to GHCR by digest. No QEMU, and no stored key material. See docs/ci.md.
   server-image:
     needs: [release-please]
     if: >-
@@ -123,10 +98,8 @@ jobs:
           path: /tmp/digests/${{ matrix.arch }}
           if-no-files-found: error
 
-  # ---------------------------------------------------------------------------
-  # server-image-merge: assemble the per-arch digests into one multi-arch
-  # manifest tag and cosign-sign it (keyless / OIDC). Reviewer-gated.
-  # ---------------------------------------------------------------------------
+  # Assembles the per-arch digests into one multi-arch manifest tag and
+  # cosign-signs it keylessly over OIDC. Reviewer-gated.
   server-image-merge:
     needs: [release-please, server-image]
     if: >-
@@ -173,9 +146,8 @@ jobs:
           for f in /tmp/digests/*; do
             refs="${refs} ${IMAGE}@$(cat "$f")"
           done
-          # `latest` is the rolling tag deployments track for auto-updates
-          # (Watchtower polls a mutable tag); the version and sha tags stay for
-          # pinning and for tracing an image back to its commit.
+          # `latest` is the rolling tag deployments track for auto-updates; the
+          # version and sha tags stay for pinning and for tracing to a commit.
           docker buildx imagetools create \
             -t "${IMAGE}:${version}" \
             -t "${IMAGE}:sha-${GITHUB_SHA}" \
@@ -191,10 +163,8 @@ jobs:
       - name: cosign sign (keyless)
         run: cosign sign --yes "${IMAGE}@${{ steps.manifest.outputs.digest }}"
 
-  # ---------------------------------------------------------------------------
-  # server-binaries: static musl binaries for direct download. Built per arch
-  # into artifacts; aggregated and attached by server-release-assets.
-  # ---------------------------------------------------------------------------
+  # Static musl binaries for direct download, built per arch into artifacts and
+  # aggregated by server-release-assets.
   server-binaries:
     needs: [release-please]
     if: >-
@@ -227,8 +197,8 @@ jobs:
           fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
-      # Each arch builds its own musl target natively on a native runner (no
-      # cross, no QEMU), the same approach the container image uses.
+      # Each arch builds its own musl target natively (no cross, no QEMU), the
+      # same approach the container image uses.
       - name: musl toolchain
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
 
@@ -252,13 +222,8 @@ jobs:
           path: dist/${{ steps.stage.outputs.name }}
           if-no-files-found: error
 
-  # ---------------------------------------------------------------------------
-  # server-release-assets: GPG-signable SHA256SUMS plus the raw binaries,
-  # attached to the server GitHub Release. Reviewer-gated environment.
-  #
-  # Optional secrets (attach still works without them; the .asc is just
-  # skipped): GPG_PRIVATE_KEY (ASCII-armored private key), GPG_PASSPHRASE.
-  # ---------------------------------------------------------------------------
+  # GPG-signable SHA256SUMS plus the raw binaries on the server GitHub Release.
+  # The GPG secrets are optional; only the .asc is skipped. See docs/ci.md.
   server-release-assets:
     needs: [release-please, server-binaries]
     if: >-
@@ -308,20 +273,8 @@ jobs:
             dist/SHA256SUMS
             dist/SHA256SUMS.asc
 
-  # ---------------------------------------------------------------------------
-  # linux-client: Flatpak and rpm for the Flutter Linux client, attached to the
-  # client GitHub Release with a GPG-signable SHA256SUMS. Reviewer-gated.
-  #
-  # SKELETON: the Flutter Linux build is real and wired. Packaging is gated on
-  # two repo files that do not exist yet:
-  #   TODO: packaging/flatpak/org.slimm.Client.yaml  (flatpak-builder manifest)
-  #   TODO: packaging/rpm/slim-m-client.spec         (rpmbuild spec)
-  # Until both exist the job emits a warning and uploads nothing; it never fakes
-  # a package. Once added, the gated steps produce and attach the real bundles.
-  #
-  # Optional secrets (for signing the checksums only): GPG_PRIVATE_KEY,
-  # GPG_PASSPHRASE.
-  # ---------------------------------------------------------------------------
+  # Flatpak and rpm for the Linux client. A skeleton: packaging is inert until
+  # packaging/flatpak/*.yaml and packaging/rpm/*.spec exist. See docs/ci.md.
   linux-client:
     needs: [release-please]
     if: >-
@@ -349,15 +302,8 @@ jobs:
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
-      # flutter_secure_storage is a normal pub dependency of the platform
-      # package (used on iOS/Android; see persistent_key_store.dart), and pub
-      # has no per-target scoping that would keep its Linux plugin
-      # (flutter_secure_storage_linux) out of a Linux build's dependency
-      # graph. That plugin's CMake config hard-requires libsecret-1-dev to
-      # even configure, regardless of whether the app ever calls into it on
-      # this platform. Installing the one system package here is simpler to
-      # maintain than splitting the platform package apart just to keep
-      # Linux out of that graph.
+      # libsecret-1-dev is here because flutter_secure_storage's Linux plugin
+      # will not even configure without it. Why that is unavoidable: docs/ci.md.
       - name: linux build deps
         run: |
           sudo apt-get update
@@ -439,18 +385,8 @@ jobs:
             dist/SHA256SUMS
             dist/SHA256SUMS.asc
 
-  # ---------------------------------------------------------------------------
-  # android-client: build the upload-signed apk and appbundle and attach them
-  # to the client release. Inert until the signing secrets exist; it verifies
-  # the signer is the upload key, since silently falling back to the debug
-  # keystore is the exact failure this job exists to close.
-  #
-  # Required secrets (all must be present for the job to do real work):
-  #   ANDROID_UPLOAD_KEYSTORE_B64  - base64 of the upload keystore (.jks)
-  #   ANDROID_KEY_PROPERTIES       - key.properties contents
-  #   ANDROID_GOOGLE_SERVICES_JSON - google-services.json contents (gitignored;
-  #                                  without it push is silently disabled)
-  # ---------------------------------------------------------------------------
+  # Upload-signed apk and appbundle. Inert without its three secrets, and it
+  # verifies the signer is the upload key, never debug. See docs/ci.md.
   android-client:
     needs: [release-please]
     if: >-
@@ -522,17 +458,8 @@ jobs:
         run: |
           # --enforce-lockfile: resolve exactly what pubspec.lock pins.
           flutter pub get --enforce-lockfile
-          # --build-number from the run number, not from pubspec. Both stores
-          # reject a build number that has already been used, and App Store
-          # Connect does it asynchronously: altool uploads happily, the job goes
-          # green, and the build is rejected minutes later by email. That is how
-          # the iPhone build sat on 4 through four client tags while CI looked
-          # fine every time. A run number is monotonic and cannot be forgotten,
-          # so a reused build number stops being possible rather than being
-          # something to remember.
-          # --build-name from the tag, not pubspec: pubspec's version is a
-          # local-build default and has sat at 0.1.0 across every release, so
-          # without this a tester cannot tell one build from another.
+          # Build number from the run number and build name from the tag, never
+          # from pubspec. Both stores reject a reuse; see docs/ci.md.
           flutter build appbundle --release \
             --build-name=${{ steps.ver.outputs.version }} \
             --build-number=${{ github.run_number }}
@@ -598,19 +525,8 @@ jobs:
             client/packages/app/dist/slim-m-client-android.aab
             client/packages/app/dist/SHA256SUMS.android
 
-  # ---------------------------------------------------------------------------
-  # ios-testflight: build the signed ipa and upload to TestFlight. Reviewer-
-  # gated environment; intentionally inert until the signing and App Store
-  # Connect secrets exist. It warns and stops rather than faking an upload.
-  #
-  # Required secrets (all must be present for the job to do real work):
-  #   APP_STORE_CONNECT_KEY_ID       - App Store Connect API key id
-  #   APP_STORE_CONNECT_ISSUER_ID    - App Store Connect issuer id
-  #   APP_STORE_CONNECT_PRIVATE_KEY  - contents of the .p8 API private key
-  #   IOS_SIGNING_CERTIFICATE_P12    - base64 of the distribution cert (.p12)
-  #   IOS_SIGNING_CERTIFICATE_PASSWORD - password for the .p12
-  #   IOS_PROVISIONING_PROFILE       - base64 of the .mobileprovision profile
-  # ---------------------------------------------------------------------------
+  # Signed ipa to TestFlight, reviewer-gated. Inert without its six secrets: it
+  # warns and stops rather than faking an upload. See docs/ci.md.
   ios-testflight:
     needs: [release-please]
     if: >-
@@ -661,9 +577,8 @@ jobs:
           printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" \
             > "${KEYDIR}/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
 
-          # The signing identity lives in a throwaway keychain rather than the
-          # login one: the runner is ephemeral, and a dedicated keychain keeps
-          # the private key out of any shared default that later steps touch.
+          # A throwaway keychain, not the login one: it keeps the private key
+          # out of any shared default that later steps touch.
           CERT_PATH="${RUNNER_TEMP}/build_certificate.p12"
           PROFILE_PATH="${RUNNER_TEMP}/build_pp.mobileprovision"
           KEYCHAIN_PATH="${RUNNER_TEMP}/app-signing.keychain-db"
@@ -690,10 +605,8 @@ jobs:
             | plutil -extract UUID raw -o - -)"
           cp "$PROFILE_PATH" "${PROFILE_DIR}/${UUID}.mobileprovision"
 
-          # A signing failure downstream is otherwise reported only as "no valid
-          # code signing certificates were found", which says nothing about
-          # whether the import worked. This names the identity that is actually
-          # visible to codesign.
+          # Name the identity codesign can actually see: a downstream failure
+          # otherwise says only "no valid code signing certificates were found".
           echo "signing identities available to codesign:"
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
 
@@ -706,20 +619,10 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         working-directory: client/packages/app
         run: |
-          # --enforce-lockfile so a release build resolves exactly what the
-          # committed pubspec.lock pins, rather than whatever is newest today.
+          # --enforce-lockfile: resolve exactly what pubspec.lock pins.
           flutter pub get --enforce-lockfile
-          # --build-number from the run number, not from pubspec. Both stores
-          # reject a build number that has already been used, and App Store
-          # Connect does it asynchronously: altool uploads happily, the job goes
-          # green, and the build is rejected minutes later by email. That is how
-          # the iPhone build sat on 4 through four client tags while CI looked
-          # fine every time. A run number is monotonic and cannot be forgotten,
-          # so a reused build number stops being possible rather than being
-          # something to remember.
-          # --build-name from the tag, for the same reason as the Android job:
-          # pubspec's version is a local default and never moves, so every
-          # TestFlight build otherwise reads 0.1.0 whatever was tagged.
+          # Build number from the run number and build name from the tag, never
+          # from pubspec. Both stores reject a reuse; see docs/ci.md.
           flutter build ipa --release --export-options-plist=ios/ExportOptions.plist \
             --build-name=${{ steps.ver.outputs.version }} \
             --build-number=${{ github.run_number }}

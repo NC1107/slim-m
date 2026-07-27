@@ -101,6 +101,10 @@ impl Store {
     /// instead makes a second concurrent open queue behind the first (up to
     /// the pool's `busy_timeout`) and then find the row the first one just
     /// committed, rather than racing it to insert a second one.
+    ///
+    /// Blocking is checked before the pair table is even touched, so a blocked
+    /// relationship never learns whether a channel already exists between
+    /// them, and a re-open is refused exactly as the first open would be.
     pub async fn open_dm(&self, caller: UserId, target: UserId) -> Result<Channel, OpenDmError> {
         if caller == target {
             return Err(OpenDmError::SameUser);
@@ -108,10 +112,7 @@ impl Store {
         if self.user_profile(target).await?.is_none() {
             return Err(OpenDmError::UserNotFound);
         }
-        // Checked before the pair table is even touched, so a blocked
-        // relationship never learns whether a channel already exists
-        // between them, and so this refuses a re-open exactly as it refuses
-        // the first open.
+        // Ahead of the pair table lookup; see the note on this function.
         if self.has_blocked(caller, target).await? || self.has_blocked(target, caller).await? {
             return Err(OpenDmError::Blocked);
         }

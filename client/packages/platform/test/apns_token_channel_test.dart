@@ -19,9 +19,8 @@ void main() {
 
   group('hexEncodeToken', () {
     test('lowercase, zero-padded, and unseparated', () {
-      // 0x0f and 0x00 catch the classic off-by-one padding bug; a naive
-      // toRadixString without padLeft would emit "f" and "" instead of "0f"
-      // and "00".
+      // 0x0f and 0x00 catch the padding bug: a naive toRadixString without
+      // padLeft would emit "f" and "" instead of "0f" and "00".
       expect(hexEncodeToken([0x00, 0x0f, 0xff, 0xa1]), '000fffa1');
     });
 
@@ -83,11 +82,8 @@ void main() {
     });
 
     test('a token arriving mid-probe is not dropped', () async {
-      // The native side can deliver the token in the gap between the getToken
-      // and getRegistrationError round trips. With no completer installed yet
-      // that delivery lands nowhere, and the subsequent wait times out having
-      // already been handed the answer - the device then registers for push
-      // and never tells the server, which fails as silence rather than error.
+      // The native side can deliver in the gap between the getToken and
+      // getRegistrationError round trips. See ApnsTokenChannel.fetch.
       late Future<void> deliver;
       _mock((call) async {
         switch (call.method) {

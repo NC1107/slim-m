@@ -198,24 +198,27 @@ impl Store {
 
     /// The user's effective permissions in a specific channel, applying the base
     /// then the channel overwrites in precedence order.
+    ///
+    /// A channel that does not exist grants nothing. Without that, a probe for
+    /// a fabricated channel id would inherit the base `@everyone` permissions
+    /// (it has no overwrites) and be distinguishable from a real channel the
+    /// caller may not view, which would leak channel existence.
+    ///
+    /// A direct-message channel does not run through the role and overwrite
+    /// model at all: see [`Store::dm_permissions`] for why, and specifically
+    /// why that has to hold even against ADMINISTRATOR, which the evaluator
+    /// bypasses for every other channel on purpose.
     pub async fn permissions_in_channel(
         &self,
         user_id: UserId,
         channel_id: ChannelId,
     ) -> anyhow::Result<Permissions> {
-        // A channel that does not exist grants nothing. Without this, a probe for
-        // a fabricated channel id would inherit the base @everyone permissions
-        // (it has no overwrites) and be distinguishable from a real channel the
-        // caller may not view, which would leak channel existence.
+        // A nonexistent channel grants nothing; see the note on this function.
         let Some(channel) = self.channel(channel_id).await? else {
             return Ok(Permissions::NONE);
         };
 
-        // A direct-message channel does not run through the role/overwrite
-        // model below at all: see `dm_permissions` for why, and specifically
-        // why that has to hold even against ADMINISTRATOR, which the
-        // evaluator a few lines down bypasses for every other channel on
-        // purpose.
+        // DMs skip the role and overwrite model; see the note on this function.
         if channel.kind == super::dms::DM_CHANNEL_KIND {
             return self.dm_permissions(user_id, channel_id).await;
         }

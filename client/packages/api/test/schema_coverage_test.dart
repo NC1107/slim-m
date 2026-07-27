@@ -109,9 +109,7 @@ void main() {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Locating the repo
-// ---------------------------------------------------------------------------
+// --- Locating the repo ---
 
 /// Walks upward from [start] looking for schema/openapi.yaml, so the test
 /// does not depend on whether it was invoked from the repo root, from
@@ -131,9 +129,7 @@ Directory _findRepoRoot(Directory start) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Schema-side extraction
-// ---------------------------------------------------------------------------
+// --- Schema-side extraction ---
 
 class _SchemaRoute {
   const _SchemaRoute(this.method, this.path, this.line);
@@ -195,9 +191,7 @@ List<_SchemaRoute> _extractSchemaRoutes(File schemaFile) {
   return routes;
 }
 
-// ---------------------------------------------------------------------------
-// Client-side extraction
-// ---------------------------------------------------------------------------
+// --- Client-side extraction ---
 
 /// Matches a call site whose first argument is a string literal, e.g.
 /// `_send('GET', ...`. Deliberately narrower than matching `_send(` alone: it
@@ -263,9 +257,7 @@ String _placeholderInterpolations(String path) => path
     .map((segment) => segment.contains('\$') ? '{}' : segment)
     .join('/');
 
-// ---------------------------------------------------------------------------
-// Shared normalization
-// ---------------------------------------------------------------------------
+// --- Shared normalization ---
 
 /// Turns a schema `{channelId}`-style segment into the same `{}` placeholder
 /// [_placeholderInterpolations] produces for the client side. Every other

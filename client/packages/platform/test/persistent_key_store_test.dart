@@ -89,9 +89,8 @@ void main() {
         'concurrent writes do not lose one another: every put lands, not '
         'just whichever read-modify-write cycle finished last', () async {
       final store = FileKeyStore(directory: dir);
-      // Fired together, not awaited individually: exactly the shape of a
-      // session write and a push-key write landing on the same store back
-      // to back.
+      // Fired together, not awaited individually: the shape of a session write
+      // and a push-key write landing on the same store back to back.
       await Future.wait([
         store.put('a', 'first'),
         store.put('b', 'second'),
@@ -109,9 +108,8 @@ void main() {
 
       final file = File('${dir.path}/slimm_secrets.json');
       expect(file.existsSync(), isTrue);
-      // rwx for the owner only; nothing for group or other. A file created
-      // with only the process's default umask is typically at least
-      // group-readable, which is the exact exposure this closes.
+      // Owner only, nothing for group or other. A file created with just the
+      // process umask is typically group-readable, the exposure this closes.
       expect(file.statSync().modeString(), 'rw-------');
     }, testOn: 'linux');
   });

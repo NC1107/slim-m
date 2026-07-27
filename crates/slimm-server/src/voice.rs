@@ -195,9 +195,8 @@ impl VoiceService {
             can_subscribe: true,
             can_publish,
             can_publish_data,
-            // Nothing about a participant's own metadata is trusted, and the
-            // display name is set from the token below, so there is no reason
-            // for a client to be able to rewrite it mid-call.
+            // The display name comes from the token below, so a client has no
+            // reason to be able to rewrite its own metadata mid-call.
             can_update_own_metadata: false,
             room_admin: false,
         };
@@ -287,10 +286,11 @@ impl VoiceService {
     }
 
     /// Signs a claim set as an HS256 JWT, which is the format LiveKit takes.
+    ///
+    /// The header is a fixed string rather than something built from a struct:
+    /// there is exactly one algorithm this ever uses, and writing it out means
+    /// nothing can influence it.
     fn sign(&self, enabled: &Enabled, claims: Claims<'_>) -> Result<String, VoiceError> {
-        // Header is fixed rather than built from a struct: there is exactly
-        // one algorithm this ever uses, and writing it out means it cannot be
-        // influenced by anything.
         const HEADER: &str = r#"{"alg":"HS256","typ":"JWT"}"#;
         let payload = serde_json::to_vec(&claims)
             .map_err(|e| VoiceError::Internal(anyhow::Error::from(e)))?;

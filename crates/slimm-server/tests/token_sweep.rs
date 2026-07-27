@@ -103,11 +103,11 @@ async fn long_dead_rows_are_removed_from_all_three_tables() {
     assert_eq!(count(&pool, "ws_tickets").await, 0);
 }
 
+/// The whole point of the grace window. A refresh token that expired recently
+/// is exactly the one an attacker would replay, and detecting that replay needs
+/// the row to still be there.
 #[tokio::test]
 async fn a_spent_refresh_token_survives_long_enough_to_still_catch_reuse() {
-    // The whole point of the grace window. A refresh token that expired
-    // recently is exactly the one an attacker would replay, and detecting that
-    // replay needs the row to still be there.
     let pool = pool().await;
     let store = Store::with_reuse_grace_ms(pool.clone(), 0);
     let user = store.create_user("alice", "Alice").await.unwrap();
@@ -125,9 +125,8 @@ async fn a_spent_refresh_token_survives_long_enough_to_still_catch_reuse() {
         "a token only just past expiry is still the evidence reuse detection reads"
     );
 
-    // The grace window is zero here, but `now - used_at` is measured in whole
-    // milliseconds and this test is fast enough to land inside the same one,
-    // which would read as the honest client racing itself rather than a replay.
+    // The grace window is zero, but `now - used_at` is whole milliseconds and
+    // landing inside the same one reads as an honest client, not a replay.
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
 
     assert!(

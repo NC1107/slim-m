@@ -237,6 +237,10 @@ async fn an_oversized_upload_is_refused() {
     );
 }
 
+/// The filename and an explicit Content-Type header both claim an image, but
+/// the bytes are HTML. Neither signal is trusted - only the bytes are sniffed
+/// - so this must be refused exactly like an honestly labeled HTML upload
+/// would be.
 #[tokio::test]
 async fn a_disallowed_content_type_is_refused_even_when_the_filename_lies() {
     let store = new_store().await;
@@ -247,10 +251,6 @@ async fn a_disallowed_content_type_is_refused_even_when_the_filename_lies() {
     let app = app(store.clone());
     let (token, _id) = register(&store, "alice").await;
 
-    // The filename and an explicit Content-Type header both claim an image,
-    // but the bytes are HTML. Neither signal is trusted - only the bytes
-    // are sniffed - so this must be refused exactly like an honestly
-    // labeled HTML upload would be.
     let evil = b"<html><body><script>alert(1)</script></body></html>".to_vec();
     let request = Request::builder()
         .method("POST")
@@ -378,6 +378,10 @@ async fn a_non_image_attachment_is_served_as_a_forced_download() {
     );
 }
 
+/// Storage never uses the filename as a path component at all (files are keyed
+/// by content hash), so the traversal has nowhere to escape to even before
+/// sanitizing; this asserts the whole round trip still behaves, not just the
+/// sanitizer in isolation.
 #[tokio::test]
 async fn a_hostile_filename_cannot_escape_into_the_header_or_the_storage_path() {
     let store = new_store().await;
@@ -395,12 +399,8 @@ async fn a_hostile_filename_cannot_escape_into_the_header_or_the_storage_path() 
     let app = app(store.clone());
     let (token, _id) = register(&store, "alice").await;
 
-    // A newline (header injection), a quote (breaks out of the quoted
-    // Content-Disposition value), and a path traversal sequence, all in one
-    // filename. Storage never uses the filename as a path component at all
-    // (files are keyed by content hash), so the traversal has nowhere to
-    // escape to even before sanitizing; this asserts the whole round trip
-    // still behaves, not just the sanitizer in isolation.
+    // A newline (header injection), a quote (breaking out of the quoted
+    // Content-Disposition value) and a path traversal sequence, in one name.
     let hostile = "evil\r\nX-Injected: yes\"../../../etc/passwd.png";
     let encoded = urlencoding_minimal(hostile);
     let bytes = png(4);
@@ -440,9 +440,8 @@ async fn a_hostile_filename_cannot_escape_into_the_header_or_the_storage_path() 
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    // The raw header value itself, not just the JSON field: `HeaderValue`
-    // cannot even represent a literal CR or LF, so this also proves the
-    // response was never built from the unsanitized name.
+    // The raw header value, not just the JSON field: a `HeaderValue` cannot
+    // even hold a literal CR or LF, so it can never have held the raw name.
     let disposition = response
         .headers()
         .get("content-disposition")
@@ -455,9 +454,8 @@ async fn a_hostile_filename_cannot_escape_into_the_header_or_the_storage_path() 
     // the hostile input itself.
     assert_eq!(disposition.matches('"').count(), 2);
 
-    // Storage was never told to use the filename as a path, so the bytes
-    // read back are exactly what was uploaded regardless of what the name
-    // claimed.
+    // Storage never used the filename as a path, so the bytes read back are
+    // exactly what was uploaded regardless of what the name claimed.
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();

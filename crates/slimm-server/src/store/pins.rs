@@ -78,10 +78,8 @@ impl Store {
         .execute(&mut *tx)
         .await?;
 
-        // Read back rather than trust `now`/`pinned_by`: a concurrent first
-        // pin may have won the INSERT OR IGNORE race, and the event this
-        // backs must report who actually pinned it, not whoever's request
-        // arrived second.
+        // Read back, never trusting `now`/`pinned_by`: a concurrent first pin
+        // may have won the INSERT OR IGNORE race, and the event must name it.
         let row = sqlx::query!(
             r#"SELECT pinned_by AS "pinned_by: UserId", pinned_at AS "pinned_at!"
                FROM pinned_messages WHERE channel_id = ? AND message_id = ?"#,

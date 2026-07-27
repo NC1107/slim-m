@@ -2383,13 +2383,8 @@ components:
           minLength: 1
           maxLength: 64
         invite_code:
-          # Left as the OpenAPI 3.0 `nullable` keyword, alone in this file.
-          # oasdiff cannot read a 3.1 `type: [x, "null"]` union and reports the
-          # conversion as the property losing nullability, which fails the
-          # additive-only gate; redocly rejects carrying both forms. This is a
-          # request property, so nothing is testable either way - the field is
-          # optional through `required` regardless, and the server takes an
-          # absent value and an explicit null identically.
+          # The OpenAPI 3.0 `nullable` keyword, alone in this 3.1 file: a 3.1
+          # null union fails the oasdiff gate. Why that is safe: docs/ci.md.
           type: string
           nullable: true
           description: >

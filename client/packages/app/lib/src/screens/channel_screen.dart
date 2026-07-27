@@ -79,16 +79,17 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   @override
   void initState() {
     super.initState();
-    // Hydrates the reaction/attachment/poll cache for the visible window,
-    // which is what makes it correct after a restart: the local database
-    // has no columns for any of the three (see message_extras.dart), and
-    // sync only ever fetches messages newer than the cursor, so an old
-    // message's enrichment would otherwise never come back. Best-effort and
-    // silent: a failure here just leaves the cache as it was, and the row
-    // itself still renders from the local store either way.
     unawaited(_hydrateExtras());
   }
 
+  /// Fills the reaction/attachment/poll cache for the visible window, which is
+  /// what makes it correct after a restart: the local database has no columns
+  /// for any of the three (see `message_extras.dart`), and sync only ever
+  /// fetches messages newer than the cursor, so an old message's enrichment
+  /// would otherwise never come back.
+  ///
+  /// Best-effort and silent. A failure leaves the cache as it was, and the row
+  /// still renders from the local store either way.
   Future<void> _hydrateExtras() async {
     try {
       final recent =
@@ -111,6 +112,12 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// Sends, showing the message immediately and reconciling with the server's
   /// copy when it lands. The id is generated here and reused on retry, so a
   /// retry after an uncertain failure can never post twice.
+  ///
+  /// A failed send keeps the text as a failed row rather than dropping it, so
+  /// the user can retry or discard and either way does not lose what they
+  /// wrote. Note a retry only resends the text: the local store has nowhere to
+  /// keep the attachment ids of a message that has not landed yet, so a retried
+  /// send goes out without them.
   Future<void> _send(List<String> attachmentIds) async {
     final text = _composer.text.trim();
     if (text.isEmpty) return;
@@ -139,11 +146,6 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       await store.applyMessage(sent);
       ref.read(messageExtrasProvider.notifier).applyMessage(sent);
     } on api.ApiException {
-      // Keep the text as a failed row rather than dropping it; the user can
-      // retry or discard, and either way they do not lose what they wrote.
-      // A retry only resends the text: the local store has nowhere to keep
-      // the attachment ids for a message that has not landed yet, so a
-      // retried send after a failure goes out without them.
       await store.markFailed(id);
     }
     _scrollToLatest();
@@ -362,9 +364,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     try {
       await ref.read(apiProvider).markRead(channelId: channelId, seq: seq);
     } on api.ApiException {
-      // Best-effort: the local marker already advanced, so the UI is
-      // already correct, and the next message or reconnect gives the
-      // server another chance to hear it.
+      // Best-effort: the local marker already advanced, so the UI is correct,
+      // and the next message or reconnect gives the server another chance.
     }
   }
 
@@ -446,9 +447,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                           }
                           final lastReadSeq = channel?.lastReadSeq ?? 0;
                           _markReadUpToLatest(messages, lastReadSeq);
-                          // The design fills the column from the bottom, so a
-                          // short conversation sits against the composer
-                          // rather than stranding it below empty space.
+                          // Reversed so the design's bottom-filled column puts
+                          // a short conversation against the composer.
                           return ListView.builder(
                             controller: _scroll,
                             reverse: true,
@@ -456,10 +456,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                 const EdgeInsets.only(bottom: AppSpacing.s8),
                             itemCount: messages.length,
                             itemBuilder: (context, i) {
-                              // Index 0 is the newest, at the bottom.
-                              // `previous` stays the row visually above, which
-                              // is the older message, so grouping and the
-                              // unread divider read the same as before.
+                              // Index 0 is the newest; `previous` stays the row
+                              // visually above, so grouping still reads right.
                               final index = messages.length - 1 - i;
                               final message = messages[index];
                               final previous =

@@ -494,15 +494,15 @@ async fn sync_and_search_follow_dm_participation() {
 /// non-participant to learn a DM's id - but deleting one is unrecoverable
 /// through the API: `open_dm` then finds a live `dm_channels` row whose channel
 /// is soft-deleted and fails for that pair permanently.
+///
+/// The first account through claims the deployment, so it holds MANAGE_CHANNELS
+/// deployment-wide, and it is a participant in the DM. It therefore knows the
+/// channel id legitimately, which is what makes this reachable at all.
 #[tokio::test]
 async fn channel_management_routes_cannot_touch_a_dm() {
     let store = new_store().await;
     let app = app(store.clone());
 
-    // The first account through claims the deployment, so it holds
-    // MANAGE_CHANNELS deployment-wide, and it is a participant in the DM. It
-    // therefore knows the channel id legitimately, which is what makes this
-    // reachable at all.
     let (admin_token, _admin_id) = register(&store, "admin").await;
     let (_bob_token, bob_id) = register(&store, "bob").await;
 

@@ -18,9 +18,7 @@ class MessageStore {
 
   final SlimmDatabase db;
 
-  // ---------------------------------------------------------------------------
-  // Reads
-  // ---------------------------------------------------------------------------
+  // --- Reads ---
 
   /// Watches a channel's messages, oldest first, as the UI renders them.
   /// Pending sends sort last because they have no server order yet.
@@ -83,9 +81,7 @@ class MessageStore {
     return await query.map((r) => r.read(count) ?? 0).getSingle();
   }
 
-  // ---------------------------------------------------------------------------
-  // Writes
-  // ---------------------------------------------------------------------------
+  // --- Writes ---
 
   /// Replaces the known channel list, keeping each channel's local cursor and
   /// read marker, which the server's channel list does not carry.

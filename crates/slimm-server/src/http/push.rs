@@ -36,9 +36,7 @@ pub fn routes() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 #[derive(Deserialize)]
 struct RegisterRequest {
@@ -58,9 +56,7 @@ struct LifecycleRequest {
     state: String,
 }
 
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
+// --- Handlers ---
 
 async fn register(
     Authed(ctx): Authed,
@@ -133,9 +129,7 @@ async fn report_lifecycle(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ---------------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------------
+// --- Validation ---
 
 fn validate_token<'a>(token: &'a str, field: &'static str) -> Result<&'a str, ApiError> {
     if token.is_empty() || token.chars().count() > MAX_TOKEN_CHARS {

@@ -179,9 +179,8 @@ class RailUserFooter extends ConsumerWidget {
     final voiceController = ref.read(voiceControllerProvider.notifier);
     final inCall = voice.state == VoiceSessionState.connected;
 
-    // Reflects this device's own known connection state, never another
-    // user's presence: the one presence-shaped claim this client can make
-    // honestly, since it is not broadcasting anyone else's status.
+    // This device's own connection state, never another user's presence: the
+    // one presence-shaped claim this client can make honestly.
     final (statusLabel, presence) = switch (syncStatus) {
       SyncStatus.live => ('online', AppPresence.online),
       SyncStatus.connecting => ('connecting', AppPresence.away),
@@ -230,11 +229,8 @@ class RailUserFooter extends ConsumerWidget {
             tooltip: inCall ? null : 'Not in a call',
             onPressed: inCall ? voiceController.toggleMicrophone : null,
           ),
-          // Same icon either way, the toggle communicated through `active`
-          // (see the header's search/members buttons for the same
-          // convention): there is no dedicated "deafened" glyph in
-          // AppIcons, and this system already uses active-state styling
-          // rather than an icon swap for a persistent toggle.
+          // Same icon either way, toggled through `active`: AppIcons has no
+          // "deafened" glyph, and this system styles toggles, not swaps them.
           AppIconButton(
             icon: AppIcons.headphones,
             semanticLabel: voice.deafened ? 'Undeafen' : 'Deafen',

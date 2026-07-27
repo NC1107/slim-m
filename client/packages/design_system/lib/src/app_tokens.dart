@@ -79,6 +79,12 @@ class AppTokens extends ThemeExtension<AppTokens> {
   /// The accent as *text or icon*: contrast-bound, so it is darker in light
   /// mode and does not match [accentFill]'s hue exactly. Use for accented
   /// labels and glyphs on an ordinary surface.
+  ///
+  /// [light]'s value was darkened from #1E7F77 by the identity review's own
+  /// consequence: adding [surfaceSunken] gave the accent a third surface to be
+  /// legible on, and the old value cleared base at 4.53:1 but only reached
+  /// 4.26:1 on sunken. The rails are sunken and do carry accent (active channel
+  /// marker, unread badge), so that combination is real rather than theoretical.
   final Color accent;
 
   /// The accent as a *fill*: brand-true and the same hue in every theme, always
@@ -149,11 +155,8 @@ class AppTokens extends ThemeExtension<AppTokens> {
     textPrimary: Color(0xFF1B1E22),
     textSecondary: Color(0xFF5B6169),
     textDisabled: Color(0xFF8A929B),
-    // Darkened from #1E7F77 by the identity review's own consequence: adding
-    // surface.sunken gave the accent a third surface to be legible on, and the
-    // old value cleared base at 4.53:1 but only reached 4.26:1 on sunken. The
-    // rails are sunken and do carry accent (active channel marker, unread
-    // badge), so that combination is real rather than theoretical.
+    // Darkened from #1E7F77 so the accent clears AA on sunken too, not just on
+    // base. See the [accent] doc comment above.
     accent: Color(0xFF1D7A72),
     accentFill: Color(0xFF1D7A72),
     accentOn: Color(0xFFFFFFFF),

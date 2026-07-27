@@ -54,6 +54,12 @@ const hasLaunchedBeforeKey = 'slimm.has_launched_before';
 /// changes (a restore immediately followed by a refresh) must land on disk in
 /// the order they happened, or a slow write can finish after a faster later
 /// one and leave a stale value as the persisted state.
+///
+/// A write that fails drops the stored session outright. The server rotates
+/// refresh tokens with reuse detection, so a failed write may have left a
+/// stale, already-spent token on disk, and replaying that on the next launch
+/// reads as reuse and revokes the whole family. Degrading to a fresh sign-in
+/// is better than that false replay.
 final sessionProvider = Provider<SessionStore>((ref) {
   final store = SessionStore();
   final keyStore = ref.read(keyStoreProvider);
@@ -63,11 +69,7 @@ final sessionProvider = Provider<SessionStore>((ref) {
     pending = pending
         .then((_) => _persistSession(keyStore, tokens, serverUrl))
         .catchError((Object _, StackTrace __) {
-      // The server rotates refresh tokens with reuse detection: a write that
-      // failed here may have left a stale, already-spent token on disk, and
-      // replaying that on the next launch reads as reuse and revokes the
-      // whole family. Dropping the stored session outright degrades to a
-      // fresh sign-in instead of that false replay.
+      // A half-written token replays as reuse next launch; see the doc above.
       if (tokens != null) {
         return keyStore.delete(sessionTokenHandle).catchError((_) {});
       }
@@ -110,14 +112,22 @@ Future<void> _persistSession(
 /// region: main() awaits this before runApp, so any failure of the storage
 /// layer itself must degrade to "no stored session" and let the app reach the
 /// sign-in screen, never crash launch outright.
+///
+/// The first-launch flag exists because the iOS/Android keychain outlives app
+/// deletion while the flag does not, so its absence means this is the first
+/// launch since an install (fresh, or a reinstall over one that was supposedly
+/// wiped). Whatever is in the keychain at that point belongs to the account
+/// signed in before, not to this install, and must not come back as if nothing
+/// had happened.
+///
+/// A restored session with no usable server address is treated as corrupt
+/// rather than falling back to the localhost default, because it restores to a
+/// connection that can never work, which is the exact failure this exists to
+/// prevent.
 Future<void> restoreSession(ProviderContainer container) async {
   final keyStore = container.read(keyStoreProvider);
   try {
-    // The iOS/Android keychain outlives app deletion; this flag does not, so
-    // its absence means this is the first launch since an install (fresh, or
-    // a reinstall over one that was supposedly wiped). Whatever is already in
-    // the keychain at that point belongs to the account signed in before,
-    // not to this install, and must not come back as if nothing happened.
+    // A missing flag means a fresh install over someone else's keychain.
     final prefs = await container.read(preferencesProvider.future);
     if (prefs.getBool(hasLaunchedBeforeKey) != true) {
       await keyStore.clear();
@@ -135,10 +145,6 @@ Future<void> restoreSession(ProviderContainer container) async {
     final serverUrl =
         storedServerUrl == null ? null : Uri.tryParse(storedServerUrl);
     if (serverUrl == null || !serverUrl.hasScheme || serverUrl.host.isEmpty) {
-      // A session with no usable server address restores to a connection
-      // that can never work; that is the exact failure this exists to
-      // prevent, so treat it the same as a corrupt session rather than
-      // silently falling back to the localhost default.
       throw const FormatException('missing or invalid persisted server url');
     }
     container.read(serverUrlProvider.notifier).state = serverUrl;

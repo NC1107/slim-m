@@ -35,9 +35,7 @@ pub fn routes() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 #[derive(Serialize)]
 struct DmConversationDto {
@@ -81,9 +79,7 @@ impl From<DmConversation> for DmConversationDto {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
+// --- Handlers ---
 
 /// Lists the caller's DM conversations, most recently active first.
 async fn list(

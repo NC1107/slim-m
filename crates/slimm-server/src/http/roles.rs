@@ -43,9 +43,7 @@ pub fn routes() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 #[derive(Serialize)]
 struct RoleDto {
@@ -82,9 +80,7 @@ struct UpdateRoleRequest {
     permissions: Option<i64>,
 }
 
-// ---------------------------------------------------------------------------
-// Handlers: role CRUD
-// ---------------------------------------------------------------------------
+// --- Handlers: role CRUD ---
 
 async fn list(
     Authed(ctx): Authed,
@@ -107,9 +103,8 @@ async fn create(
     let name = validate_role_name(&req.name)?;
     let permissions = grantable(caller_permissions, req.permissions)?;
 
-    // Never `@everyone`: exactly one of those exists, seeded only by
-    // `Store::bootstrap_deployment`, and this endpoint has no field to ask
-    // for it.
+    // Never `@everyone`: exactly one exists, seeded only by
+    // `Store::bootstrap_deployment`, and this endpoint cannot ask for it.
     let id = state.store.create_role(name, permissions, false).await?;
     let role = state.store.role(id).await?.ok_or(ApiError::Internal)?;
     Ok(Json(role.into()))
@@ -163,9 +158,7 @@ async fn delete(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Handlers: member role assignment
-// ---------------------------------------------------------------------------
+// --- Handlers: member role assignment ---
 
 /// Grants a role to a member. Idempotent. Refused if the role carries a
 /// permission the caller does not themselves hold, since granting a role is
@@ -213,9 +206,7 @@ async fn unassign(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Shared checks
-// ---------------------------------------------------------------------------
+// --- Shared checks ---
 
 /// Requires MANAGE_ROLES at the deployment level and returns the caller's
 /// full base permission set, so the handler can reuse it for the escalation

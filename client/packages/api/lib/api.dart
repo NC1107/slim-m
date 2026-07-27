@@ -11,10 +11,8 @@
 ///   fan-out of things that already happened durably, never the write path.
 library;
 
-// The extensions must be named in this `show` list too, not just SlimmApi
-// itself: `show` filters by declaration name, and an extension's methods are
-// only in scope for a caller if the extension's own name is exported, even
-// though the caller never spells that name out at the call site.
+// The extensions are named here too because `show` filters by declaration
+// name: an extension's methods need its own name exported to be in scope.
 export 'src/client.dart'
     show
         SlimmApi,

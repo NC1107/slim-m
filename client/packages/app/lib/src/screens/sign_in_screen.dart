@@ -25,9 +25,9 @@ class SignInScreen extends ConsumerStatefulWidget {
 }
 
 class _SignInScreenState extends ConsumerState<SignInScreen> {
-  // Prefilled from the server chosen during onboarding, which every entry
-  // path has already written; a hardcoded default here silently overrode
-  // that choice on submit.
+  /// Prefilled from the server chosen during onboarding, which every entry path
+  /// has already written; a hardcoded default here silently overrode that
+  /// choice on submit.
   late final TextEditingController _server = TextEditingController(
     text: ref.read(serverUrlProvider).toString(),
   );
@@ -82,6 +82,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   /// Asks the server in the field whether it can deliver push at all, so
   /// someone joining a LAN-only deployment learns their phone will stay
   /// silent while they are still choosing, not after a week of wondering.
+  ///
+  /// Every failure resolves to "unknown". A host that answers 200 with
+  /// something that is not a slim-m `/version` body is as unknown as one that
+  /// refuses to connect, so the bare `catch` is deliberate: a foreign or
+  /// hostile server must not crash sign-in with a shaped reply.
+  ///
+  /// The result is applied only if the field still holds the address that was
+  /// probed, on every path including failures, so a slow answer about a
+  /// previously typed address cannot relabel the current one either way.
   Future<void> _probePush() async {
     final target = _probeTarget(_server.text);
     if (target == null) {
@@ -97,18 +106,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       // "could not reach that server" with more authority than a probe.
       answer = null;
     } catch (_) {
-      // A host that answers 200 with something that is not a slim-m
-      // /version body is just as unknown as one that refuses to connect. A
-      // foreign or hostile server must not crash sign-in with a shaped
-      // reply, so this deliberately catches everything the parse can throw.
+      // A shaped reply from a foreign host is as unknown as a refusal.
       answer = null;
     } finally {
       client.close();
     }
     if (!mounted) return;
-    // Guarded on every path, failures included: a slow answer about a
-    // previously typed address must not relabel the current one, whether
-    // it would set the notice or clear it.
     if (_probeTarget(_server.text) == target) {
       setState(() => _pushEnabled = answer);
     }
@@ -121,6 +124,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     _probeDebounce = Timer(const Duration(milliseconds: 600), _probePush);
   }
 
+  /// Signs in or registers, then starts push.
+  ///
+  /// On registration the invite code goes in with the signup rather than being
+  /// redeemed after it: a claimed deployment refuses an uninvited registration
+  /// outright, so there is no account to redeem against until that call
+  /// succeeds.
+  ///
+  /// Sync is deliberately not started here. `SyncController` is session-driven
+  /// (see its class doc) and its own listener already reacts to the
+  /// `session.set()` that register or login just performed. Starting it again
+  /// explicitly raced that listener and opened a second socket, which went on
+  /// to kick the first, healthy one offline.
+  ///
+  /// Push registration is fire-and-forget: a denied permission or unreachable
+  /// server must never hold up a sign-in that is already complete.
   Future<void> _submit() async {
     final address = Uri.tryParse(_server.text.trim());
     if (address == null || !address.hasScheme || address.host.isEmpty) {
@@ -139,9 +157,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final invite = ref.read(pendingInviteProvider);
     try {
       if (_creatingAccount) {
-        // The code goes in with the signup rather than being redeemed after
-        // it: a claimed deployment refuses an uninvited registration outright,
-        // so there is no account to redeem against until this call succeeds.
         await api.register(
           username: _username.text.trim(),
           displayName: _displayName.text.trim().isEmpty
@@ -170,14 +185,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       if (invite != null) {
         ref.read(pendingInviteProvider.notifier).state = null;
       }
-      // Sync is not started here: SyncController is session-driven (see its
-      // class doc) and its own listener already reacts to the session.set()
-      // that api.register()/api.login() just performed. Starting it again
-      // explicitly raced that listener's own start() and opened a second
-      // socket that went on to kick the first, healthy one offline.
-      //
-      // Fire-and-forget: a denied permission or unreachable server here must
-      // never hold up sign-in, which is already complete at this point.
       unawaited(ref.read(pushControllerProvider.notifier).register());
     } on ApiException catch (e) {
       // Say what actually happened. "Something went wrong" tells the user

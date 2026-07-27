@@ -17,9 +17,8 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^5.0.0
 flutter:
-  # Bundled, not resolved from the system. IBM Plex is not installed on a
-  # typical Linux or Windows box, and the fallback for the mono family is a
-  # proportional font, which visibly breaks code blocks and tabular numerals.
+  # Bundled, not system-resolved: IBM Plex is not installed on a typical Linux or
+  # Windows box, and the mono fallback is proportional, breaking code and numerals.
   fonts:
     - family: IBM Plex Sans
       fonts:

@@ -28,9 +28,8 @@ void main() {
       path: '/ws',
     );
 
-    // Offer permessage-deflate and see what comes back. Either answer is fine;
-    // what matters is that the connection then actually works, rather than the
-    // two ends disagreeing about whether frames are compressed.
+    // Either answer to the offer is fine; what matters is that the connection
+    // works, rather than the ends disagreeing about whether frames deflate.
     final socket = await WebSocket.connect(
       wsUrl.toString(),
       compression: CompressionOptions.compressionDefault,

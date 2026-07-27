@@ -1,10 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 name: perf
 
-# Path-gated: only server and perf-scaffolding changes touch this workflow.
-# GitHub Actions does not support path filters on the `release` event, so the
-# release-triggered job below is not path-gated; it only ever runs once per
-# published release regardless.
+# Path-gated to server and perf-scaffolding changes. Actions cannot path-filter
+# the `release` event, so the release job below is not; see docs/ci.md.
 on:
   pull_request:
     paths:
@@ -39,15 +37,8 @@ jobs:
       - name: compile benches (no run)
         run: cargo bench --locked -p slimm-server --no-run
 
-  # Runs the real benchmarks once a release is published and uploads the
-  # criterion report as a workflow artifact for hand-curation into a new
-  # perf/baselines/<version>.json (see perf/README.md).
-  #
-  # No environment gate: this uploads only an intra-run workflow artifact, not a
-  # published release asset, so it is treated as exempt for the same reason the
-  # release workflow's server-binaries build stage is. Reviewer-gated
-  # Environments are applied at the true publish boundary (GHCR push, release
-  # assets, TestFlight), not to build-time artifacts. No secrets are used.
+  # Real benchmarks on a published release, uploaded for hand-curation into
+  # perf/baselines/. Deliberately not environment-gated; see docs/ci.md.
   benchmark:
     if: github.event_name == 'release'
     runs-on: ubuntu-latest

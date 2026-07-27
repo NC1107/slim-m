@@ -56,10 +56,10 @@ class AppChip extends StatelessWidget {
 
   final VoidCallback? onTap;
 
-  // Neither the operator's 7px horizontal padding nor the reaction's 6px
-  // emoji-to-count gap match a step in AppSpacing (nearest are s8 and s4/s8
-  // respectively). The design gives exact pixel values for both, used as
-  // literals here and reported as a token gap.
+  /// Neither the operator's 7px horizontal padding nor the reaction's 6px
+  /// emoji-to-count gap match a step in AppSpacing (nearest are s8 and s4/s8
+  /// respectively). The design gives exact pixel values for both, used as
+  /// literals here and reported as a token gap.
   static const double _operatorPaddingH = 7;
   static const double _reactionGap = 6;
 

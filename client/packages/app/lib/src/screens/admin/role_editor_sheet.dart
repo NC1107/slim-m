@@ -52,6 +52,11 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
     super.dispose();
   }
 
+  /// On edit, the permission bitmask is omitted rather than resent when nothing
+  /// changed: a role can carry a bit this caller does not hold (granted by
+  /// someone with a wider set), and resending it verbatim would still be
+  /// refused as "not a subset of the caller's own permissions" even though
+  /// nothing moved.
   Future<void> _submit() async {
     setState(() {
       _submitting = true;
@@ -63,10 +68,6 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
             .read(apiProvider)
             .createRole(name: _name.text.trim(), permissions: _permissions);
       } else {
-        // Omitted, not resent, when nothing changed: a role can carry a bit
-        // this caller does not hold (granted by someone with a wider set),
-        // and resending it verbatim would still be refused as "not a subset
-        // of the caller's own permissions" even though nothing moved.
         final changed = _permissions != widget.role!.permissions;
         await ref.read(apiProvider).updateRole(
               roleId: widget.role!.id,

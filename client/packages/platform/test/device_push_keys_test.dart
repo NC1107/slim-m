@@ -21,9 +21,7 @@ void main() {
       final first = await DevicePushKeys(store).publicKeyBase64();
 
       // A fresh DevicePushKeys over the same store stands in for a later
-      // launch: nothing survives in memory except what KeyStore held, so a
-      // changed answer here would mean the private key was not actually
-      // persisted and re-read.
+      // launch: a changed answer means the private key was never persisted.
       final second = await DevicePushKeys(store).publicKeyBase64();
 
       expect(second, first);

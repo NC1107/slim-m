@@ -51,10 +51,8 @@ class ChannelHeader extends ConsumerWidget {
             child: Text(
               name,
               overflow: TextOverflow.ellipsis,
-              // The design's 17px header size was deliberately dropped from
-              // the six-step type scale (see app_typography.dart): it never
-              // differed from body except in weight, so weight alone carries
-              // the same hierarchy here.
+              // The design's 17px header left the scale (app_typography.dart):
+              // it differed from body only in weight, so weight alone carries.
               style: AppText.body.copyWith(
                 color: tokens.textPrimary,
                 fontWeight: AppWeights.medium,

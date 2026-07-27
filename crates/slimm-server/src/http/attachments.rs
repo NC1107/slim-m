@@ -47,9 +47,7 @@ pub fn routes(max_attachment_bytes: u64) -> Router<AppState> {
         .layer(DefaultBodyLimit::max(max_attachment_bytes as usize))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 #[derive(Serialize)]
 struct AttachmentUploadDto {
@@ -64,10 +62,14 @@ struct UploadParams {
     filename: Option<String>,
 }
 
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
+// --- Handlers ---
 
+/// Stores uploaded bytes under their own sha256 and returns the hex id a
+/// message can then reference.
+///
+/// The file is written before the metadata row on purpose: a crash between
+/// the two leaves an orphaned file (harmless, eventually swept) rather than a
+/// row that promises bytes which were never actually written.
 async fn upload(
     Authed(ctx): Authed,
     parts: Parts,
@@ -93,9 +95,8 @@ async fn upload(
     let hex_id = media::to_hex(&sha256);
     let size = body.len() as i64;
 
-    // File written before the metadata row: a crash between the two leaves
-    // an orphaned file (harmless, eventually swept) rather than a row that
-    // promises bytes which were never actually written.
+    // Bytes before the metadata row, never the other way round; see the
+    // ordering note on this function.
     state
         .media
         .write_attachment(&hex_id, body.to_vec())
@@ -120,6 +121,16 @@ async fn upload(
     ))
 }
 
+/// Serves stored bytes back, gated on the same VIEW_CHANNEL a caller needs to
+/// read the message the attachment belongs to.
+///
+/// The check runs across every channel that has attached these bytes, because
+/// content addressing means more than one message, in more than one channel,
+/// can share them. An id nothing has ever attached - still mid-compose, or
+/// already swept as an orphan - reports the same 404 as one that never
+/// existed, for anyone including whoever uploaded it: existence follows
+/// permission here exactly as it does for a channel or a message elsewhere in
+/// this API.
 async fn fetch(
     Authed(ctx): Authed,
     Path(attachment_id): Path<String>,
@@ -129,14 +140,8 @@ async fn fetch(
         .filter(|bytes| bytes.len() == 32)
         .ok_or(ApiError::BadRequest("invalid attachment id"))?;
 
-    // Access control: the same VIEW_CHANNEL a caller needs to read the
-    // message this attachment belongs to, checked across every channel that
-    // has attached it (content addressing means more than one message, in
-    // more than one channel, can share the same bytes). An id nothing has
-    // ever attached - still mid-compose, or already swept as an orphan -
-    // reports the same 404 as one that never existed, for anyone including
-    // whoever uploaded it: existence follows permission here exactly as it
-    // does for a channel or a message elsewhere in this API.
+    // Unreferenced bytes 404 rather than 403, for everyone; see the access
+    // control note on this function.
     let channels = state.store.channels_referencing_attachment(&sha256).await?;
     if channels.is_empty() {
         return Err(ApiError::NotFound("attachment not found"));
@@ -179,15 +184,18 @@ async fn fetch(
 /// `content_type` is never trusted from the caller: both call sites pass a
 /// value this module itself already sniffed from stored bytes, so this only
 /// ever serves one of the allowlisted types.
+///
+/// The filename is sanitized again here even though the stored value was
+/// already sanitized at upload time. It is cheap, since the function is
+/// idempotent, and it means this response never depends on every future write
+/// path having remembered to.
 pub(crate) fn serve(bytes: Vec<u8>, content_type: &str, filename: &str) -> Response {
     let disposition_kind = if media::is_inline(content_type) {
         "inline"
     } else {
         "attachment"
     };
-    // Sanitized again even though the stored value is already sanitized at
-    // upload time: cheap, since the function is idempotent, and it means this
-    // response never depends on every future write path having remembered to.
+    // Re-sanitized rather than trusted from storage; see the note above.
     let safe_name = media::sanitize_filename(filename);
     let disposition = format!("{disposition_kind}; filename=\"{safe_name}\"");
 
@@ -198,9 +206,8 @@ pub(crate) fn serve(bytes: Vec<u8>, content_type: &str, filename: &str) -> Respo
         HeaderValue::from_str(content_type)
             .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
     );
-    // `sanitize_filename` guarantees printable ASCII, so this cannot fail;
-    // falling back to a fixed name rather than unwrapping keeps a future
-    // change to that guarantee a served response instead of a panic.
+    // `sanitize_filename` guarantees printable ASCII so this cannot fail; the
+    // fallback keeps a future change to that guarantee a response, not a panic.
     let disposition_value = HeaderValue::from_str(&disposition)
         .unwrap_or_else(|_| HeaderValue::from_static("attachment"));
     headers.insert(header::CONTENT_DISPOSITION, disposition_value);

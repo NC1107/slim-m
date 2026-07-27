@@ -9,6 +9,10 @@
 /// caller cannot recolour it per role even though real role data usually
 /// carries one. Ported as specified rather than "improved" with a colour
 /// parameter the design does not have.
+///
+/// The source design sets role/tag/warn at a literal 10px, a step the six-size
+/// type scale (11/12/14/15/20/24) does not have; [AppText.micro] (11px) is the
+/// nearest and is used for all four rather than a one-off.
 library;
 
 import 'package:flutter/material.dart';
@@ -49,9 +53,8 @@ class AppBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
-    // The source design sets role/tag/warn at a literal 10px, a step the
-    // six-size type scale (11/12/14/15/20/24) does not have; [AppText.micro]
-    // (11px) is the nearest and is used for all four rather than a one-off.
+    // One size for all four variants, not the source's literal 10px, which the
+    // type scale has no step for. See the library doc at the top of the file.
     final fontSize = AppText.micro.fontSize!;
 
     final Color? background;
