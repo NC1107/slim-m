@@ -20,8 +20,9 @@ Scope: color, typography, spacing, iconography, motion, and how they compile int
 > - The type scale drops subheading 17, leaving 11 / 12 / 14 / 15 / 20 / 24.
 > - Code syntax, canvas object and focus-ring token families were missing and
 >   now exist.
-> - The accent **hue** is still open; a glacier cyan is recommended because the
->   shipped teal collides with the online-status green.
+> - The accent **hue** is a glacier cyan, not the teal below, decided 2026-07-27.
+>   The reason is not the collision the review named, which was measured and did
+>   not hold; it is that teal desaturates to near-grey under deuteranopia.
 >
 > The direction, the reasoning and the rejected alternatives below all still
 > stand. Read this for why, and the decision record for what.

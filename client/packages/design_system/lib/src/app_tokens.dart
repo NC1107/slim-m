@@ -23,10 +23,14 @@ import 'app_typography.dart';
 ///   is the next contributor adding an accent border to something that looked
 ///   plain.
 ///
-/// The accent hue itself is still open: the review recommends moving to a
-/// glacier cyan because the shipped teal sits ~25 degrees from the online-status
-/// green and competes with it in the member list. That is one primitive change
-/// when it is decided. Do not hardcode any of these values in widgets.
+/// The accent hue is settled: glacier cyan, decided 2026-07-27 (option B in the
+/// decision record). It is not the review's stated reason, which a deuteranopia
+/// simulation of the real render measured and found wrong; the reason it holds
+/// is that teal loses 74% of its chroma under deuteranopia and stops reading as
+/// a colour, while cyan keeps effectively all of it. Every value below is
+/// derived from two anchors, `#1B6F91` light and `#58B4D8` dark, by preserving
+/// the teal family's own OKLCh offsets from its anchor, so this was a hue move
+/// rather than a retune. Do not hardcode any of these values in widgets.
 @immutable
 class AppTokens extends ThemeExtension<AppTokens> {
   const AppTokens({
@@ -155,14 +159,14 @@ class AppTokens extends ThemeExtension<AppTokens> {
     textPrimary: Color(0xFF1B1E22),
     textSecondary: Color(0xFF5B6169),
     textDisabled: Color(0xFF8A929B),
-    // Darkened from #1E7F77 so the accent clears AA on sunken too, not just on
-    // base. See the [accent] doc comment above.
-    accent: Color(0xFF1D7A72),
-    accentFill: Color(0xFF1D7A72),
+    // The decision record's light anchor, verbatim. Darker than the teal it
+    // replaces, so it clears sunken (the rails) by more: 4.97:1 against 4.55:1.
+    accent: Color(0xFF1B6F91),
+    accentFill: Color(0xFF1B6F91),
     accentOn: Color(0xFFFFFFFF),
-    accentSoft: Color(0xFFDDEEEC),
-    accentRing: Color(0x381D7A72),
-    focusRing: Color(0xFF1D7A72),
+    accentSoft: Color(0xFFD8E7F0),
+    accentRing: Color(0x381B6F91),
+    focusRing: Color(0xFF1B6F91),
     status: AppStatusColors.light,
     dangerText: Color(0xFFA83B32),
     dangerBorder: Color(0xFFC0524A),
@@ -182,12 +186,12 @@ class AppTokens extends ThemeExtension<AppTokens> {
     textPrimary: Color(0xFFECEDEF),
     textSecondary: Color(0xFFA7AEB6),
     textDisabled: Color(0xFF6C757E),
-    accent: Color(0xFF4FBDB4),
-    accentFill: Color(0xFF4FBDB4),
-    accentOn: Color(0xFF07100F),
-    accentSoft: Color(0xFF1B2E2E),
-    accentRing: Color(0x404FBDB4),
-    focusRing: Color(0xFF4FBDB4),
+    accent: Color(0xFF58B4D8),
+    accentFill: Color(0xFF58B4D8),
+    accentOn: Color(0xFF070E12),
+    accentSoft: Color(0xFF1D2B33),
+    accentRing: Color(0x4058B4D8),
+    focusRing: Color(0xFF58B4D8),
     status: AppStatusColors.dark,
     dangerText: Color(0xFFD4756B),
     dangerBorder: Color(0xFFC0524A),
@@ -214,12 +218,14 @@ class AppTokens extends ThemeExtension<AppTokens> {
     textPrimary: Color(0xFFF2F5F7),
     textSecondary: Color(0xFFA8B2BC),
     textDisabled: Color(0xFF6C757E),
-    accent: Color(0xFF3FBFAE),
-    accentFill: Color(0xFF3FBFAE),
-    accentOn: Color(0xFF04100E),
-    accentSoft: Color(0xFF132926),
-    accentRing: Color(0x3D3FBFAE),
-    focusRing: Color(0xFF3FBFAE),
+    // Carries more chroma than dark's accent at essentially the same lightness,
+    // which is the shift the teal family made here rather than a fresh choice.
+    accent: Color(0xFF40B6D9),
+    accentFill: Color(0xFF40B6D9),
+    accentOn: Color(0xFF030E12),
+    accentSoft: Color(0xFF12262D),
+    accentRing: Color(0x3D40B6D9),
+    focusRing: Color(0xFF40B6D9),
     status: AppStatusColors.dark,
     dangerText: Color(0xFFD4756B),
     dangerBorder: Color(0xFFC0524A),
