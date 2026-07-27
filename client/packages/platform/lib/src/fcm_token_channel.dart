@@ -11,10 +11,11 @@
 library;
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+
+import 'host_platform.dart';
 
 /// The minimal FCM surface [FcmTokenChannel] needs, factored out so a test
 /// can supply one that never touches Firebase or a real Android device.
@@ -97,7 +98,11 @@ class FcmRegistrationFailed extends FcmTokenResult {
 /// A clean no-op on every platform but Android: nothing on iOS should ever
 /// touch Firebase (the relay talks to APNs directly with a device's raw APNs
 /// token, and an FCM token would be meaningless there), and Linux desktop has
-/// no push channel at all. Deliberately a separate class from
+/// no push channel at all. The web build is excluded for a different reason
+/// than desktop: FCM does have a browser transport, but it is Web Push, which
+/// needs a VAPID key pair and a service worker this app does not ship, so a
+/// browser is honestly unsupported rather than merely unimplemented natively.
+/// Deliberately a separate class from
 /// [ApnsTokenChannel] rather than one shared abstraction over both: the two
 /// platforms' push transports are genuinely different things, and collapsing
 /// them behind one interface would make it easy for an iOS call site to
@@ -105,7 +110,7 @@ class FcmRegistrationFailed extends FcmTokenResult {
 class FcmTokenChannel {
   FcmTokenChannel({FcmTokenSource? source, bool? isAndroid})
       : _source = source ?? FirebaseFcmTokenSource(),
-        _isAndroid = isAndroid ?? Platform.isAndroid;
+        _isAndroid = isAndroid ?? isAndroidHost;
 
   final FcmTokenSource _source;
   final bool _isAndroid;

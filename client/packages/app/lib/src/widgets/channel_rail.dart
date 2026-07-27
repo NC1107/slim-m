@@ -9,11 +9,13 @@ import 'package:go_router/go_router.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../permissions.dart';
 import '../providers/dms.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
 import 'channel_rail_frame.dart';
 import 'channel_rail_sections.dart';
+import 'command_palette.dart';
 
 /// The route the router puts a channel id into; read here to highlight the
 /// selected row, and by [HomeShell] to decide which pane to show.
@@ -40,20 +42,14 @@ class ChannelRail extends ConsumerStatefulWidget {
 }
 
 class _ChannelRailState extends ConsumerState<ChannelRail> {
-  final _searchController = TextEditingController();
-  String _filter = '';
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final storeAsync = ref.watch(storeProvider);
     final selected = selectedChannelId(context);
+    final me = ref.watch(meProvider).valueOrNull;
+    final canManageChannels =
+        me != null && me.permissions.hasPermission(Perm.manageChannels);
 
     return Container(
       color: tokens.surfaceSunken,
@@ -62,33 +58,36 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
           const RailHeader(),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-            // Stands in for the design's command palette, which this client
-            // does not have yet (no quick switcher exists): typing here
-            // live-filters the sections below by name instead of opening a
-            // modal search.
-            child: AppInput(
-              controller: _searchController,
-              size: AppInputSize.sm,
-              placeholder: 'Search',
-              icon: Icon(AppIcons.search,
-                  size: AppSizes.icon16, color: tokens.textSecondary),
-              // AppKbd draws one keycap; a chained shortcut is composed by
-              // the caller, per that widget's own doc comment.
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const AppKbd('Ctrl'),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: Text('+',
-                        style:
-                            AppText.micro.copyWith(color: tokens.textDisabled)),
+            // A real field would gain focus and a keyboard on tap; this one
+            // exists only to open the palette, so pointer events stop at the
+            // AbsorbPointer and the tap reaches the trigger below it instead.
+            child: GestureDetector(
+              key: const Key('rail-search-trigger'),
+              onTap: () => openCommandPalette(context),
+              child: AbsorbPointer(
+                child: AppInput(
+                  size: AppInputSize.sm,
+                  placeholder: 'Search',
+                  icon: Icon(AppIcons.search,
+                      size: AppSizes.icon16, color: tokens.textSecondary),
+                  // AppKbd draws one keycap; a chained shortcut is composed
+                  // by the caller, per that widget's own doc comment.
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const AppKbd('Ctrl'),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: Text('+',
+                            style: AppText.micro
+                                .copyWith(color: tokens.textDisabled)),
+                      ),
+                      const AppKbd('K'),
+                    ],
                   ),
-                  const AppKbd('K'),
-                ],
+                  semanticLabel: 'Search channels, members and messages',
+                ),
               ),
-              onChanged: (value) =>
-                  setState(() => _filter = value.trim().toLowerCase()),
             ),
           ),
           Expanded(
@@ -105,26 +104,20 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                       DirectMessagesSection(
                         channels: channels
                             .where((c) => c.kind == dmChannelKind)
-                            .where(
-                                (c) => c.name.toLowerCase().contains(_filter))
                             .toList(),
                         selectedId: selected,
                       ),
                       TextChannelsSection(
-                        channels: channels
-                            .where((c) => c.kind == 'text')
-                            .where(
-                                (c) => c.name.toLowerCase().contains(_filter))
-                            .toList(),
+                        channels:
+                            channels.where((c) => c.kind == 'text').toList(),
                         selectedId: selected,
+                        canManage: canManageChannels,
                       ),
                       VoiceChannelsSection(
-                        channels: channels
-                            .where((c) => c.kind == 'voice')
-                            .where(
-                                (c) => c.name.toLowerCase().contains(_filter))
-                            .toList(),
+                        channels:
+                            channels.where((c) => c.kind == 'voice').toList(),
                         selectedId: selected,
+                        canManage: canManageChannels,
                       ),
                     ],
                   );

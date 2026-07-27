@@ -7,5 +7,6 @@
 /// the two routes can interleave, repeat, or overlap safely.
 library;
 
+export 'src/connection/connection.dart' show openSlimmDatabase;
 export 'src/database.dart' show SlimmDatabase, Channel, Message;
 export 'src/message_store.dart' show MessageStore;

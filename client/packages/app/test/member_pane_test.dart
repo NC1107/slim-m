@@ -4,6 +4,7 @@
 /// now, not the empty map production used to hand it).
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
+import 'package:slimm_app/src/providers/live_events.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/member_pane.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -183,5 +185,221 @@ void main() {
     expect(find.textContaining('OFFLINE · 1'), findsOneWidget);
     expect(find.text('Priya'), findsOneWidget);
     expect(find.text('Kess'), findsOneWidget);
+  });
+
+  testWidgets('a failed member fetch says so and offers a working retry',
+      (tester) async {
+    var fail = true;
+    final container = ProviderContainer(overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+      apiProvider.overrideWith((ref) {
+        final api = _fakeApi(ref.watch(sessionProvider));
+        ref.onDispose(api.close);
+        return api;
+      }),
+      membersProvider.overrideWith((ref) async {
+        if (fail) throw const TransportException('offline');
+        return [_profile('1', 'Priya')];
+      }),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(body: AppMemberPane()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load members.'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+
+    fail = false;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Priya'), findsOneWidget);
+  });
+
+  testWidgets('a 403 explains the denial and offers no retry', (tester) async {
+    final container = ProviderContainer(overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+      apiProvider.overrideWith((ref) {
+        final api = _fakeApi(ref.watch(sessionProvider));
+        ref.onDispose(api.close);
+        return api;
+      }),
+      membersProvider
+          .overrideWith((ref) async => throw const ForbiddenException('nope')),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(body: AppMemberPane()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load members.'), findsOneWidget);
+    expect(find.text('Retry'), findsNothing,
+        reason: 'a 403 will not succeed on retry, so none is offered');
+  });
+
+  group('roster keep-alive', () {
+    /// Builds a container whose [membersProvider] reads back a mutable
+    /// [members] list on every (re)fetch and counts how many fetches
+    /// happen, so a test can mutate the list mid-flight the way a real
+    /// join would and assert whether a refetch followed.
+    ({ProviderContainer container, StreamController<ServerEvent> events})
+        buildKeepAliveContainer(
+            List<UserProfile> Function() members, void Function() onFetch) {
+      final events = StreamController<ServerEvent>.broadcast();
+      final container = ProviderContainer(overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = _fakeApi(ref.watch(sessionProvider));
+          ref.onDispose(api.close);
+          return api;
+        }),
+        liveEventsProvider.overrideWithValue(events.stream),
+        membersProvider.overrideWith((ref) async {
+          onFetch();
+          return members();
+        }),
+      ]);
+      return (container: container, events: events);
+    }
+
+    testWidgets(
+        'a live presence event for an unknown id refetches the roster '
+        'after the debounce, so a new member appears without a reload',
+        (tester) async {
+      var members = [_profile('1', 'Priya')];
+      var fetchCount = 0;
+      final built = buildKeepAliveContainer(() => members, () => fetchCount++);
+      addTearDown(built.events.close);
+      addTearDown(built.container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: built.container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const Scaffold(body: AppMemberPane()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(fetchCount, 1);
+      expect(find.textContaining('MEMBERS · 1'), findsOneWidget);
+
+      // Bob registers and connects: there is no MemberJoined event, so his
+      // presence frame is the first trace of him Alice's client sees.
+      members = [_profile('1', 'Priya'), _profile('2', 'Bob')];
+      built.events.add(
+          const PresenceChanged(userId: '2', status: PresenceState.online));
+
+      // Before the debounce elapses the stale roster is still showing.
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(fetchCount, 1);
+      expect(find.textContaining('MEMBERS · 1'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+
+      expect(fetchCount, 2);
+      expect(find.textContaining('MEMBERS · 2'), findsOneWidget);
+      expect(find.text('Bob'), findsOneWidget);
+    });
+
+    testWidgets(
+        'a burst of unknown ids within the debounce window yields one '
+        'refetch, not one per event', (tester) async {
+      var members = [_profile('1', 'Priya')];
+      var fetchCount = 0;
+      final built = buildKeepAliveContainer(() => members, () => fetchCount++);
+      addTearDown(built.events.close);
+      addTearDown(built.container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: built.container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const Scaffold(body: AppMemberPane()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(fetchCount, 1);
+
+      members = [
+        _profile('1', 'Priya'),
+        _profile('2', 'Bob'),
+        _profile('3', 'Cass')
+      ];
+      built.events.add(
+          const PresenceChanged(userId: '2', status: PresenceState.online));
+      await tester.pump(const Duration(milliseconds: 200));
+      built.events.add(
+          const PresenceChanged(userId: '3', status: PresenceState.online));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+
+      expect(fetchCount, 2,
+          reason: 'two unknown ids close together must still coalesce '
+              'into a single refetch');
+    });
+
+    testWidgets(
+        'a message from an already-known author does not refetch the '
+        'roster', (tester) async {
+      var fetchCount = 0;
+      final members = [_profile('1', 'Priya')];
+      final built = buildKeepAliveContainer(() => members, () => fetchCount++);
+      addTearDown(built.events.close);
+      addTearDown(built.container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: built.container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const Scaffold(body: AppMemberPane()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(fetchCount, 1);
+
+      built.events.add(MessageCreated(Message(
+        id: 'm1',
+        channelId: 'c1',
+        authorId: '1',
+        authorDisplayName: 'Priya',
+        seq: 1,
+        content: 'hello',
+        createdAt: 0,
+        editedAt: null,
+      )));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+
+      expect(fetchCount, 1,
+          reason: 'the author is already on the roster, so nothing is '
+              'stale');
+    });
   });
 }

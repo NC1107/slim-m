@@ -4,16 +4,22 @@ part of 'client.dart';
 /// Channel renaming and deletion: the rest of the `channels` tag that
 /// [SlimmApi.listChannels] and [SlimmApi.createChannel] do not cover.
 extension SlimmApiChannelAdmin on SlimmApi {
-  /// Renames a channel. Requires MANAGE_CHANNELS at the deployment level, the
-  /// same check creating a channel uses.
+  /// Renames a channel and/or replaces its topic. Requires MANAGE_CHANNELS at
+  /// the deployment level, the same check creating a channel uses. At least
+  /// one of [name] and [topic] must be given; a blank or whitespace-only
+  /// [topic] clears it back to none rather than storing an empty string.
   Future<Channel> updateChannel({
     required String channelId,
-    required String name,
+    String? name,
+    String? topic,
   }) async {
     final json = await _send(
       'PATCH',
       '/channels/$channelId',
-      body: {'name': name},
+      body: {
+        if (name != null) 'name': name,
+        if (topic != null) 'topic': topic,
+      },
     );
     return Channel.fromJson(json as Map<String, dynamic>);
   }

@@ -87,7 +87,8 @@ void main() {
       addTearDown(sub.close);
 
       await container.read(pinsControllerProvider('c1').notifier).refresh();
-      expect(sub.read(), isEmpty);
+      expect(sub.read().pinned, isEmpty);
+      expect(sub.read().failed, isFalse);
 
       // The server now has one pin; a live event is what should notice.
       pinned = [_pinJson('m1')];
@@ -99,9 +100,78 @@ void main() {
       ));
       await _settle();
 
-      final state = sub.read();
+      final state = sub.read().pinned;
       expect(state, isNotNull);
       expect(state!.single.message.id, 'm1');
+    });
+
+    test('a failed refresh keeps the last known list and flags the failure',
+        () async {
+      final events = StreamController<ServerEvent>.broadcast();
+      addTearDown(events.close);
+      var fail = false;
+
+      final container = ProviderContainer(overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((request) async {
+              if (fail) return http.Response('server error', 500);
+              return http.Response(jsonEncode([_pinJson('m1')]), 200,
+                  headers: {'content-type': 'application/json'});
+            }),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+        liveEventsProvider.overrideWithValue(events.stream),
+      ]);
+      addTearDown(container.dispose);
+
+      final sub = container.listen(pinsControllerProvider('c1'), (_, __) {});
+      addTearDown(sub.close);
+      await _settle();
+      expect(sub.read().pinned, hasLength(1));
+      expect(sub.read().failed, isFalse);
+
+      fail = true;
+      await container.read(pinsControllerProvider('c1').notifier).refresh();
+
+      expect(sub.read().failed, isTrue,
+          reason: 'a failed refresh must be visible to the sheet');
+      expect(sub.read().pinned, hasLength(1),
+          reason: 'the last known list must survive a failed refresh');
+    });
+
+    test('a fresh 403 never gets a retry that could not succeed', () async {
+      final container = ProviderContainer(overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((request) async {
+              return http.Response('forbidden', 403);
+            }),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+        liveEventsProvider.overrideWithValue(const Stream.empty()),
+      ]);
+      addTearDown(container.dispose);
+
+      final sub = container.listen(pinsControllerProvider('c1'), (_, __) {});
+      addTearDown(sub.close);
+      await _settle();
+
+      expect(sub.read().failed, isTrue);
+      expect(sub.read().forbidden, isTrue);
+      expect(sub.read().pinned, isNull);
     });
 
     test('an event for a different channel is ignored', () async {

@@ -10,9 +10,10 @@
 library;
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/services.dart';
+
+import 'host_platform.dart';
 
 const _channelName = 'top.npcserver.slimm/push';
 
@@ -69,15 +70,15 @@ class ApnsRegistrationFailed extends ApnsTokenResult {
 /// Fetches the APNs device token registered by native code, as the lowercase
 /// hex string APNs and the push relay expect.
 ///
-/// A clean no-op everywhere but iOS: nothing on Linux desktop or Android
-/// answers this channel (Android registers through [FcmTokenChannel]
-/// instead), so [fetch] reports [ApnsUnsupported] there rather than touching
-/// it. Push is a nice-to-have; it must never be the reason the app fails to
-/// start or sign in.
+/// A clean no-op everywhere but iOS: nothing on Linux desktop, Android or the
+/// web answers this channel (Android registers through [FcmTokenChannel]
+/// instead, and a browser has no APNs at all), so [fetch] reports
+/// [ApnsUnsupported] there rather than touching it. Push is a nice-to-have; it
+/// must never be the reason the app fails to start or sign in.
 class ApnsTokenChannel {
   ApnsTokenChannel({MethodChannel? channel, bool? isIOS})
       : _channel = channel ?? const MethodChannel(_channelName),
-        _isIOS = isIOS ?? Platform.isIOS {
+        _isIOS = isIOS ?? isIOSHost {
     _channel.setMethodCallHandler(_onCall);
   }
 

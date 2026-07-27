@@ -60,6 +60,15 @@ pub struct Config {
     /// Largest attachment a single upload may store, in bytes.
     #[serde(default = "default_attachment_max_bytes")]
     pub attachment_max_bytes: u64,
+
+    /// Browser origins allowed to call this deployment cross-origin, comma
+    /// separated, for example `https://app.example.com,http://localhost:8099`.
+    ///
+    /// Unset or empty means no CORS layer at all, and a browser on any other
+    /// origin is refused. Native clients send no `Origin` and are unaffected,
+    /// so only a web build of the client needs this; see [`crate::cors`] for
+    /// why that default is the safe one.
+    pub cors_allowed_origins: Option<String>,
 }
 
 fn default_port() -> u16 {
@@ -95,6 +104,7 @@ impl Default for Config {
             livekit_api_secret: None,
             attachments_dir: default_attachments_dir(),
             attachment_max_bytes: default_attachment_max_bytes(),
+            cors_allowed_origins: None,
         }
     }
 }
@@ -140,5 +150,20 @@ mod tests {
             from_empty_env.attachment_max_bytes,
             defaulted.attachment_max_bytes
         );
+        assert_eq!(
+            from_empty_env.cors_allowed_origins,
+            defaulted.cors_allowed_origins
+        );
+    }
+
+    /// An unset origin list and an explicitly empty one must be the same
+    /// thing, because `SLIMM_CORS_ALLOWED_ORIGINS=` in a compose file is how
+    /// an operator turns the browser surface back off.
+    #[test]
+    fn an_empty_origin_list_is_read_as_an_empty_string_not_dropped() {
+        let env =
+            std::collections::HashMap::from([("CORS_ALLOWED_ORIGINS".to_owned(), String::new())]);
+        let config: Config = envy::from_iter(env).expect("all other fields have defaults");
+        assert_eq!(config.cors_allowed_origins.as_deref(), Some(""));
     }
 }

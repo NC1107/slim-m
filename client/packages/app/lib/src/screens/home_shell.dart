@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
 
 import 'package:go_router/go_router.dart';
 
@@ -14,6 +15,7 @@ import '../providers/providers.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import '../widgets/channel_rail.dart';
+import '../widgets/command_palette.dart';
 import '../widgets/member_pane.dart';
 import 'channel_screen.dart';
 import 'voice_screen.dart';
@@ -37,8 +39,9 @@ class HomeShell extends ConsumerWidget {
     final showMembers =
         layout == LayoutClass.expanded && ref.watch(memberPaneVisibleProvider);
 
+    final Widget scaffold;
     if (layout.showsBothPanes) {
-      return Scaffold(
+      scaffold = Scaffold(
         body: Row(
           children: [
             SizedBox(
@@ -53,11 +56,9 @@ class HomeShell extends ConsumerWidget {
           ],
         ),
       );
-    }
-
-    // Compact: the conversation replaces the list, with a way back.
-    if (selected != null) {
-      return Scaffold(
+    } else if (selected != null) {
+      // Compact: the conversation replaces the list, with a way back.
+      scaffold = Scaffold(
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(AppIcons.back),
@@ -68,8 +69,22 @@ class HomeShell extends ConsumerWidget {
         ),
         body: child,
       );
+    } else {
+      scaffold = const Scaffold(body: ChannelRail());
     }
-    return const Scaffold(body: ChannelRail());
+
+    // Binds the shared shortcut table's own key rather than a second,
+    // hardcoded `Ctrl K`, so a remap of quickSwitch is honoured here too.
+    final quickSwitch = activatorFor(AppAction.quickSwitch);
+    return CallbackShortcuts(
+      bindings: {
+        if (quickSwitch != null) quickSwitch: () => openCommandPalette(context),
+      },
+      // CallbackShortcuts only fires for a descendant that has focus; this
+      // gives the shell a default one, so the shortcut works the instant the
+      // app opens rather than only once something else has been clicked.
+      child: Focus(autofocus: true, child: scaffold),
+    );
   }
 }
 

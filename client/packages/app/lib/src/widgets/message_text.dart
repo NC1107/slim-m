@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Rendering a message body: plain text, inline code, and mentions.
+/// Rendering a message body: fenced code, plain text, inline code, and
+/// mentions.
 ///
 /// There is no mention protocol on the wire (no server-side highlighting or
 /// notification hook); this is a client-side decoration only, so it is only
@@ -10,6 +11,9 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
+
+import 'message_code_lexer.dart';
+import 'message_fences.dart';
 
 /// Matches a backtick-fenced inline code run or an `@username` token. Neither
 /// crosses a newline, since both are meant to be short inline runs.
@@ -46,8 +50,9 @@ List<_Token> _tokenize(String content, Set<String> knownUsernames) {
   return tokens;
 }
 
-/// A message body, with inline code and mentions picked out of the plain
-/// text. [knownUsernames] should be lower-cased; pass an empty set while the
+/// A message body: fenced code blocks rendered through [AppCodeBlock], and
+/// everything else through the inline code/mention tokenizer.
+/// [knownUsernames] should be lower-cased; pass an empty set while the
 /// member list has not loaded rather than guessing.
 class MessageBody extends StatelessWidget {
   const MessageBody({
@@ -68,12 +73,50 @@ class MessageBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final baseColor = dim ? tokens.textSecondary : tokens.textPrimary;
+    final blocks = splitMessageBlocks(content);
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < blocks.length; i++) ...[
+          if (i > 0) const SizedBox(height: AppSpacing.s4),
+          switch (blocks[i]) {
+            TextBlock(:final text) => _MessageTextRun(
+                text: text,
+                knownUsernames: knownUsernames,
+                color: baseColor,
+              ),
+            CodeBlock(:final language, :final code) => AppCodeBlock(
+                language: language,
+                lines: lexCodeBlock(code, language),
+              ),
+          },
+        ],
+      ],
+    );
+  }
+}
+
+/// One [TextBlock]'s worth of running text, with inline code and mentions
+/// picked out.
+class _MessageTextRun extends StatelessWidget {
+  const _MessageTextRun({
+    required this.text,
+    required this.knownUsernames,
+    required this.color,
+  });
+
+  final String text;
+  final Set<String> knownUsernames;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
     return Text.rich(
       TextSpan(
-        style: AppText.body.copyWith(color: baseColor),
+        style: AppText.body.copyWith(color: color),
         children: [
-          for (final token in _tokenize(content, knownUsernames))
+          for (final token in _tokenize(text, knownUsernames))
             switch (token.kind) {
               _SpanKind.text => TextSpan(text: token.text),
               _SpanKind.code => WidgetSpan(

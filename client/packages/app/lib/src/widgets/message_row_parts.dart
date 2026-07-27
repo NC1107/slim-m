@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import 'emoji_picker.dart';
+
 class EditedMarker extends StatelessWidget {
   const EditedMarker({super.key});
 
@@ -31,7 +33,7 @@ class EditedMarker extends StatelessWidget {
 
 /// One chip per distinct emoji already on the message (real counts, and
 /// [api.ReactionSummary.reacted] driving the active state), plus the
-/// existing quick-react glyph, which still stands in for a full picker.
+/// add-reaction glyph, which opens [EmojiPickerButton]'s floating picker.
 /// Tapping an existing chip calls [onReactionTap] with that summary; the
 /// caller decides whether that means adding or removing based on whether it
 /// was already active.
@@ -40,13 +42,15 @@ class ReactionsRow extends StatelessWidget {
     super.key,
     required this.reactions,
     required this.onReactionTap,
-    required this.onQuickReact,
+    required this.onPickReaction,
     this.showAddButton = false,
   });
 
   final List<api.ReactionSummary> reactions;
   final ValueChanged<api.ReactionSummary> onReactionTap;
-  final VoidCallback onQuickReact;
+
+  /// Called with the emoji character the picker chose.
+  final ValueChanged<String> onPickReaction;
 
   /// Whether to offer the add-a-reaction control. The row keeps rendering
   /// existing reactions without it.
@@ -74,13 +78,7 @@ class ReactionsRow extends StatelessWidget {
               active: reaction.reacted,
               onTap: () => onReactionTap(reaction),
             ),
-          if (showAddButton)
-            AppIconButton(
-              icon: AppIcons.smile,
-              semanticLabel: 'Add a reaction',
-              iconSize: AppSizes.icon16,
-              onPressed: onQuickReact,
-            ),
+          if (showAddButton) EmojiPickerButton(onSelect: onPickReaction),
         ],
       ),
     );

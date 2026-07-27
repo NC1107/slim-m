@@ -15,6 +15,7 @@ import '../providers/sync_controller.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'member_pane.dart';
+import 'user_avatar.dart';
 
 /// The server's own identity, for the header's name line. Real endpoint;
 /// there is no separate per-deployment "workspace name" concept, so this is
@@ -91,26 +92,32 @@ class _ServerMenuButtonState extends State<_ServerMenuButton> {
       link: _link,
       child: OverlayPortal(
         controller: _controller,
-        overlayChildBuilder: (context) => CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          targetAnchor: Alignment.bottomRight,
-          followerAnchor: Alignment.topRight,
-          offset: const Offset(0, 4),
-          child: TapRegion(
-            onTapOutside: (_) => _controller.hide(),
-            child: AppMenu(
-              width: 200,
-              children: [
-                AppMenuItem(
-                  label: 'Settings',
-                  leading: AppIcons.settings,
-                  onTap: () {
-                    _controller.hide();
-                    context.go(Routes.settings);
-                  },
-                ),
-              ],
+        // Positioned so the follower sizes to its content: an overlay child is
+        // otherwise laid out against the whole screen, which a Column fills.
+        overlayChildBuilder: (context) => Positioned(
+          left: 0,
+          top: 0,
+          child: CompositedTransformFollower(
+            link: _link,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.bottomRight,
+            followerAnchor: Alignment.topRight,
+            offset: const Offset(0, 4),
+            child: TapRegion(
+              onTapOutside: (_) => _controller.hide(),
+              child: AppMenu(
+                width: 200,
+                children: [
+                  AppMenuItem(
+                    label: 'Settings',
+                    leading: AppIcons.settings,
+                    onTap: () {
+                      _controller.hide();
+                      context.go(Routes.settings);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -190,7 +197,9 @@ class RailUserFooter extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          AppAvatar(
+          UserAvatar(
+            userId: me.valueOrNull?.id,
+            avatarUpdatedAt: me.valueOrNull?.avatarUpdatedAt,
             name: me.valueOrNull?.displayName ?? '',
             size: 28,
             status: presence,

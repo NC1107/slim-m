@@ -43,6 +43,32 @@ They live on disk beside the database, at `SLIMM_ATTACHMENTS_DIR` (default `/dat
 That means restoring from a Litestream replica brings back every message and its attachment references, but not the attachment files themselves; a client would render broken images and failed downloads for anything uploaded since the last time `/data/media` was backed up some other way.
 If attachments matter to your deployment, back up the whole `slimm_data` volume yourself (a periodic `docker run --rm -v slimm_data:/data -v $(pwd):/backup alpine tar czf /backup/slimm-data-$(date +%F).tgz -C / data`, restic, or your platform's volume-snapshot feature), not just the database.
 
+## Browser clients (`SLIMM_CORS_ALLOWED_ORIGINS`)
+
+Empty by default, and that default is the safe one: with nothing set there is no CORS layer at all, and a browser on any other origin is refused.
+The desktop and mobile clients send no `Origin` header, so this setting has no effect on them whatsoever.
+You only need it if you serve a web build of the client from a different origin than the API.
+
+```
+SLIMM_CORS_ALLOWED_ORIGINS=https://app.example.com,http://localhost:8099
+```
+
+Deny-by-default matters more here than it looks, and not only for a server on the public internet.
+A self-host usually sits on a network your own browser can route to and the rest of the internet cannot.
+An open policy would hand every page you happen to visit the ability to drive that deployment from inside the perimeter its network position was protecting it with, using your browser as the way in.
+That is why `*` is refused outright rather than accepted as a shortcut, and why the list is exact origins you write down.
+
+Malformed entries stop the server at startup with the offending value named, rather than turning into a `blocked by CORS policy` line in a browser console days later.
+An origin is `scheme://host[:port]` and nothing more, so a path, a query, a fragment, or embedded credentials are all rejected.
+A default port, an uppercase host, a unicode host, and a bare trailing slash are all normalized to the form a browser actually sends, so those still match.
+
+Credentials are never allowed, whatever you set.
+slim-m authenticates with an `Authorization: Bearer` header the client attaches itself; browsers never send that automatically the way they send cookies.
+Credentialed mode would therefore buy nothing here while adding the ambient authority that turns one mistaken origin into a full account takeover, so the server does not send `Access-Control-Allow-Credentials` at all.
+
+Only `authorization` and `content-type` are accepted as request headers, and only the methods the API actually serves (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`) are allowed.
+Preflights are answered by the server itself and cached for ten minutes.
+
 ## Voice and screen share
 
 LiveKit's signaling channel is fronted by Caddy on the `LIVEKIT_DOMAIN` you set, so no extra port beyond 443 is needed for a client to negotiate a call.

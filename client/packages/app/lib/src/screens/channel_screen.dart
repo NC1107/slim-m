@@ -11,21 +11,23 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../ids.dart';
+import '../providers/admin_providers.dart';
 import '../providers/message_actions.dart';
 import '../providers/message_extras.dart';
+import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
+import '../providers/sync_controller.dart';
 import '../routing/breakpoints.dart';
 import '../widgets/channel_header.dart';
 import '../widgets/channel_search.dart';
 import '../widgets/composer.dart';
+import '../widgets/confirm_dialog.dart';
 import '../widgets/member_pane.dart';
+import '../widgets/message_context_menu.dart';
 import '../widgets/message_row.dart';
+import '../widgets/report_dialog.dart';
 
 export '../ids.dart' show newMessageId;
-
-/// The fixed emoji the message row's quick-react glyph adds, standing in
-/// for a full picker.
-const String _quickReactionEmoji = '\u{1F44D}';
 
 /// One channel's messages.
 class ChannelScreen extends ConsumerStatefulWidget {
@@ -47,6 +49,32 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// here, never the local `Message` row the rest of this screen otherwise
   /// uses, since a search result was never necessarily written locally.
   List<api.Message>? _searchResults;
+
+  /// The last query actually submitted, null once cleared. Distinct from
+  /// [_searchResults] being null: that also happens mid-request and on a
+  /// failure, neither of which is "no search running".
+  String? _searchQuery;
+  bool _searchLoading = false;
+
+  /// Set on a failed search, cleared on the next attempt. Kept apart from
+  /// [_searchResults] so "the request failed" never renders identically to
+  /// "the request came back with nothing", which is the loading/empty
+  /// confusion this screen exists to avoid.
+  bool _searchFailed = false;
+  bool _searchForbidden = false;
+
+  /// The message currently swapped into its inline edit field, if any. At
+  /// most one at a time: starting a new edit implicitly cancels another.
+  String? _editingId;
+
+  /// The highest seq this state has already asked the store and server to
+  /// mark read, per channel. Keyed by channel because this state outlives a
+  /// channel switch: [ConversationPane] builds this widget with no key, so
+  /// navigating between channels reuses the same [State] rather than a fresh
+  /// one. Without the guard, every rebuild of an already-read channel (a
+  /// reaction landing, a typing indicator, anything) would re-fire both
+  /// calls for a seq that is already recorded as read.
+  final Map<String, int> _markedReadSeq = {};
 
   @override
   void initState() {
@@ -142,11 +170,11 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     }
   }
 
-  Future<void> _quickReact(Message message) => setReaction(
+  Future<void> _pickReaction(Message message, String emoji) => setReaction(
         ref,
         message.id,
-        _quickReactionEmoji,
-        wasActive: hasReacted(ref, message.id, _quickReactionEmoji),
+        emoji,
+        wasActive: hasReacted(ref, message.id, emoji),
       );
 
   Future<void> _toggleReaction(Message message, api.ReactionSummary reaction) =>
@@ -155,30 +183,188 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   Future<void> _vote(Message message, int option) =>
       castVote(ref, message.id, option);
 
+  void _startEdit(Message message) => setState(() => _editingId = message.id);
+
+  void _cancelEdit() => setState(() => _editingId = null);
+
+  Future<void> _submitEdit(Message message, String content) async {
+    setState(() => _editingId = null);
+    if (content == message.content) return;
+    try {
+      await editMessageAction(ref, message, content);
+    } on api.ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not save the edit. ${e.message}')));
+    }
+  }
+
+  Future<void> _deleteMessage(Message message) async {
+    final confirmed = await confirmDangerousAction(
+      context,
+      title: 'Delete message?',
+      message: 'This removes it for everyone in the channel. '
+          'This cannot be undone.',
+      confirmLabel: 'Delete',
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await deleteMessageAction(ref, message);
+    } on api.ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Could not delete the message. ${e.message}')));
+    }
+  }
+
+  Future<void> _togglePin(Message message, bool pinned) async {
+    final controller =
+        ref.read(pinsControllerProvider(widget.channelId).notifier);
+    try {
+      if (pinned) {
+        await controller.unpin(message.id);
+      } else {
+        await controller.pin(message.id);
+      }
+    } on api.ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update the pin. ${e.message}')));
+    }
+  }
+
+  Future<void> _reportMessage(Message message) async {
+    final reason =
+        await promptReportReason(context, subjectLabel: 'this message');
+    if (reason == null || !mounted) return;
+    try {
+      await ref.read(apiProvider).report(
+            subject: api.ReportSubject.message,
+            subjectId: message.id,
+            reason: reason,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Report filed. A moderator will review it.')));
+    } on api.ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not file the report. ${e.message}')));
+    }
+  }
+
+  Future<void> _blockAuthor(Message message) async {
+    final authorId = message.authorId;
+    if (authorId == null) return;
+    try {
+      await ref.read(apiProvider).blockUser(authorId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Blocked. Their messages are hidden for you.')));
+    } on api.ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not block that user. ${e.message}')));
+    }
+  }
+
   void _toggleSearch() {
     setState(() {
       _searchOpen = !_searchOpen;
       if (!_searchOpen) {
+        _searchQuery = null;
         _searchResults = null;
+        _searchLoading = false;
+        _searchFailed = false;
+        _searchForbidden = false;
         _searchController.clear();
       }
     });
   }
 
   Future<void> _runSearch(String query) async {
-    if (query.trim().isEmpty) {
-      setState(() => _searchResults = null);
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _searchQuery = null;
+        _searchResults = null;
+        _searchLoading = false;
+        _searchFailed = false;
+        _searchForbidden = false;
+      });
       return;
     }
+    setState(() {
+      _searchQuery = trimmed;
+      _searchLoading = true;
+      _searchFailed = false;
+      _searchForbidden = false;
+    });
     try {
       final results = await ref
           .read(apiProvider)
-          .searchMessages(widget.channelId, q: query);
+          .searchMessages(widget.channelId, q: trimmed);
       if (!mounted) return;
-      setState(() => _searchResults = results);
+      setState(() {
+        _searchResults = results;
+        _searchLoading = false;
+      });
+    } on api.ForbiddenException {
+      if (!mounted) return;
+      // Not transient: the same query will fail again until the caller's
+      // permissions change, so a retry button here would only waste a tap.
+      setState(() {
+        _searchResults = null;
+        _searchLoading = false;
+        _searchFailed = true;
+        _searchForbidden = true;
+      });
     } on api.ApiException {
       if (!mounted) return;
-      setState(() => _searchResults = const []);
+      setState(() {
+        _searchResults = null;
+        _searchLoading = false;
+        _searchFailed = true;
+      });
+    }
+  }
+
+  /// Advances the read marker to the newest message actually rendered.
+  ///
+  /// Pending sends are skipped: they carry seq 0 until the server
+  /// acknowledges them, so treating one as "read" would either no-op or,
+  /// once the real send lands with its assigned seq, immediately look
+  /// unread again for a message the user already sees on screen.
+  ///
+  /// The local write and the network call are both monotonic and idempotent
+  /// (`MessageStore.setReadMarker`, the server's `PUT .../read`), so a
+  /// redundant call is harmless; [_markedReadSeq] exists only to keep a busy
+  /// channel from re-sending the same seq on every unrelated rebuild.
+  void _markReadUpToLatest(List<Message> messages, int lastReadSeq) {
+    Message? newest;
+    for (final message in messages.reversed) {
+      if (!message.pending) {
+        newest = message;
+        break;
+      }
+    }
+    if (newest == null) return;
+    final seq = newest.seq;
+    if (seq <= lastReadSeq) return;
+    if ((_markedReadSeq[widget.channelId] ?? 0) >= seq) return;
+    _markedReadSeq[widget.channelId] = seq;
+    unawaited(_markRead(widget.channelId, seq));
+  }
+
+  Future<void> _markRead(String channelId, int seq) async {
+    final store = await ref.read(storeProvider.future);
+    await store.setReadMarker(channelId, seq);
+    try {
+      await ref.read(apiProvider).markRead(channelId: channelId, seq: seq);
+    } on api.ApiException {
+      // Best-effort: the local marker already advanced, so the UI is
+      // already correct, and the next message or reconnect gives the
+      // server another chance to hear it.
     }
   }
 
@@ -197,7 +383,6 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   @override
   Widget build(BuildContext context) {
     final storeAsync = ref.watch(storeProvider);
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final layout = LayoutClass.of(context);
     final knownUsernames = ref.watch(membersProvider).maybeWhen(
           data: (members) =>
@@ -205,6 +390,14 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
           orElse: () => const <String>{},
         );
     final extrasById = ref.watch(messageExtrasProvider);
+    final myId = ref.watch(meProvider).valueOrNull?.id;
+    final myPermissions = ref.watch(myPermissionsProvider);
+    final pinnedIds = {
+      for (final p
+          in ref.watch(pinsControllerProvider(widget.channelId)).pinned ??
+              const [])
+        p.message.id,
+    };
 
     return storeAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -234,22 +427,25 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                 ChannelSearchBar(
                     controller: _searchController, onChanged: _runSearch),
               Expanded(
-                child: _searchResults != null
+                child: _searchQuery != null
                     ? ChannelSearchResults(
-                        results: _searchResults!,
-                        knownUsernames: knownUsernames)
+                        results: _searchResults,
+                        knownUsernames: knownUsernames,
+                        loading: _searchLoading,
+                        failed: _searchFailed,
+                        forbidden: _searchForbidden,
+                        onRetry: () => _runSearch(_searchQuery!),
+                      )
                     : StreamBuilder<List<Message>>(
                         stream: store.watchChannel(widget.channelId),
                         builder: (context, snapshot) {
                           final messages = snapshot.data ?? const <Message>[];
                           if (messages.isEmpty) {
-                            return Center(
-                              child: Text('No messages yet.',
-                                  style:
-                                      TextStyle(color: tokens.textSecondary)),
-                            );
+                            return _EmptyMessages(
+                                syncStatus: ref.watch(syncControllerProvider));
                           }
                           final lastReadSeq = channel?.lastReadSeq ?? 0;
+                          _markReadUpToLatest(messages, lastReadSeq);
                           // The design fills the column from the bottom, so a
                           // short conversation sits against the composer
                           // rather than stranding it below empty space.
@@ -270,6 +466,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   index == 0 ? null : messages[index - 1];
                               final extras =
                                   extrasById[message.id] ?? MessageExtras.empty;
+                              final pinned = pinnedIds.contains(message.id);
                               return MessageRow(
                                 message: message,
                                 grouped: _isGrouped(message, previous),
@@ -280,13 +477,38 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                 onDiscard: () async =>
                                     (await ref.read(storeProvider.future))
                                         .discard(message.id),
-                                onQuickReact: () => _quickReact(message),
+                                onPickReaction: (emoji) =>
+                                    _pickReaction(message, emoji),
                                 onReactionTap: (reaction) =>
                                     _toggleReaction(message, reaction),
                                 onVote: (option) => _vote(message, option),
                                 reactions: extras.reactions,
                                 attachments: extras.attachments,
                                 poll: extras.poll,
+                                editing: message.id == _editingId,
+                                onSubmitEdit: (content) =>
+                                    unawaited(_submitEdit(message, content)),
+                                onCancelEdit: _cancelEdit,
+                                actions: MessageActions(
+                                  canEdit: canEditMessage(message, myId),
+                                  onEdit: () => _startEdit(message),
+                                  canDelete: canDeleteMessage(
+                                      message, myId, myPermissions),
+                                  onDelete: () =>
+                                      unawaited(_deleteMessage(message)),
+                                  canManagePins: canManageMessagePin(
+                                      message, myPermissions),
+                                  pinned: pinned,
+                                  onTogglePin: () =>
+                                      unawaited(_togglePin(message, pinned)),
+                                  canReport: canReportMessage(message, myId),
+                                  onReport: () =>
+                                      unawaited(_reportMessage(message)),
+                                  canBlockAuthor:
+                                      canBlockMessageAuthor(message, myId),
+                                  onBlockAuthor: () =>
+                                      unawaited(_blockAuthor(message)),
+                                ),
                               );
                             },
                           );
@@ -303,6 +525,46 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         },
       ),
     );
+  }
+}
+
+/// What an empty message list means depends on whether catch-up has actually
+/// run: a channel can look empty because it is, or because sync has not
+/// reached it yet, and those read as opposite things to the person waiting.
+class _EmptyMessages extends StatelessWidget {
+  const _EmptyMessages({required this.syncStatus});
+
+  final SyncStatus syncStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return switch (syncStatus) {
+      SyncStatus.connecting => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(height: AppSpacing.s12),
+              Text('Catching up on messages...',
+                  style: TextStyle(color: tokens.textSecondary)),
+            ],
+          ),
+        ),
+      SyncStatus.offline => Center(
+          child: Text('Offline. Messages will appear once reconnected.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: tokens.textSecondary)),
+        ),
+      SyncStatus.live => Center(
+          child: Text('No messages yet.',
+              style: TextStyle(color: tokens.textSecondary)),
+        ),
+    };
   }
 }
 

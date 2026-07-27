@@ -54,3 +54,8 @@ client/**/macos/Flutter/ephemeral/
 # A working list for the owner, not project documentation. Durable decisions
 # belong in CLAUDE.md or a decision record.
 human-todos.md
+
+# Fetched by tool/fetch_web_assets.sh, pinned to pubspec.lock and digest-checked.
+# The web build is a test surface, so these are not vendored into git.
+client/packages/app/web/drift_worker.js
+client/packages/app/web/sqlite3.wasm

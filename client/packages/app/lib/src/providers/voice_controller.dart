@@ -25,6 +25,7 @@ class VoiceState {
     this.canPublish = true,
     this.deafened = false,
     this.error,
+    this.retryable = true,
   });
 
   /// The channel this call belongs to, so a screen can tell "in a call here"
@@ -48,6 +49,11 @@ class VoiceState {
 
   final String? error;
 
+  /// False for a failure this channel cannot retry its way out of: no voice
+  /// configured, or no permission. True (the default) is everything
+  /// transient, where trying again might really work.
+  final bool retryable;
+
   VoiceState copyWith({
     String? channelId,
     VoiceSessionState? state,
@@ -58,6 +64,7 @@ class VoiceState {
     bool? deafened,
     String? error,
     bool clearError = false,
+    bool? retryable,
   }) =>
       VoiceState(
         channelId: channelId ?? this.channelId,
@@ -68,6 +75,7 @@ class VoiceState {
         canPublish: canPublish ?? this.canPublish,
         deafened: deafened ?? this.deafened,
         error: clearError ? null : (error ?? this.error),
+        retryable: clearError ? true : (retryable ?? this.retryable),
       );
 }
 
@@ -121,16 +129,19 @@ class VoiceController extends StateNotifier<VoiceState> {
       state = state.copyWith(
         state: VoiceSessionState.failed,
         error: 'This server has no voice configured.',
+        retryable: false,
       );
     } on api.ForbiddenException {
       state = state.copyWith(
         state: VoiceSessionState.failed,
         error: 'You do not have permission to join this channel.',
+        retryable: false,
       );
     } on api.ApiException catch (e) {
       state = state.copyWith(
         state: VoiceSessionState.failed,
         error: e.message,
+        retryable: true,
       );
     }
   }

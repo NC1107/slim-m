@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Reaction and poll-vote actions shared by any screen that renders a
-/// message: apply the optimistic local update first, then make the real
-/// request, reverting on failure where a clean revert exists.
+/// Message-row actions shared by any screen that renders a message: reaction
+/// and poll-vote toggles apply an optimistic local update before the real
+/// request, reverting on failure where a clean revert exists; edit and
+/// delete let the request fail up to the caller, which has a user-visible
+/// error to show. The `can*` gates decide what a caller may even offer,
+/// mirroring the server's own author-or-permission checks.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_data/data.dart';
 
+import '../permissions.dart';
 import 'message_extras.dart';
 import 'providers.dart';
 
@@ -58,4 +63,69 @@ Future<void> castVote(WidgetRef ref, String messageId, int option) async {
     // reaction, since the previous choice is already folded into the
     // locally merged tally.
   }
+}
+
+bool _isAuthor(Message message, String? myUserId) =>
+    message.authorId != null && message.authorId == myUserId;
+
+/// Own message only, matching the server's author check: a member holding
+/// MANAGE_MESSAGES can edit someone else's message server-side too, but
+/// that is deliberately not offered here (see `channel_screen.dart`).
+bool canEditMessage(Message message, String? myUserId) =>
+    !message.pending && !message.failed && _isAuthor(message, myUserId);
+
+/// Own message, or MANAGE_MESSAGES. A pending or failed send was never
+/// stored server-side, so it has nothing here to delete; its own
+/// retry/discard row covers that case instead.
+bool canDeleteMessage(Message message, String? myUserId, int myPermissions) =>
+    !message.pending &&
+    !message.failed &&
+    (_isAuthor(message, myUserId) ||
+        myPermissions.hasPermission(Perm.manageMessages));
+
+/// MANAGE_MESSAGES only; there is no author exception for pinning.
+bool canManageMessagePin(Message message, int myPermissions) =>
+    !message.pending &&
+    !message.failed &&
+    myPermissions.hasPermission(Perm.manageMessages);
+
+/// Any live message not your own. The server enforces no authorship rule
+/// on `/reports`; this is purely a client-side UX gate.
+bool canReportMessage(Message message, String? myUserId) =>
+    !message.pending && !message.failed && !_isAuthor(message, myUserId);
+
+/// Blocking is keyed by author id, so a message with no live author (its
+/// account was deleted and the content anonymized) has nobody left to block.
+bool canBlockMessageAuthor(Message message, String? myUserId) =>
+    !message.pending &&
+    !message.failed &&
+    message.authorId != null &&
+    !_isAuthor(message, myUserId);
+
+/// Edits a message, then applies the server's returned copy (with its
+/// fresh `edited_at`) to the local store and the extras cache the same way
+/// a live `message.edited` event would, so the row's own edited marker
+/// updates without waiting for that broadcast to loop back.
+Future<void> editMessageAction(
+    WidgetRef ref, Message message, String content) async {
+  final updated = await ref.read(apiProvider).editMessage(
+        channelId: message.channelId,
+        messageId: message.id,
+        content: content,
+      );
+  final store = await ref.read(storeProvider.future);
+  await store.applyMessage(updated);
+  ref.read(messageExtrasProvider.notifier).applyMessage(updated);
+}
+
+/// Deletes a message server-side, then drops its local row so it vanishes
+/// from this device immediately rather than waiting for the `message.deleted`
+/// broadcast [SyncController] applies the same way.
+Future<void> deleteMessageAction(WidgetRef ref, Message message) async {
+  await ref.read(apiProvider).deleteMessage(
+        channelId: message.channelId,
+        messageId: message.id,
+      );
+  final store = await ref.read(storeProvider.future);
+  await store.discard(message.id);
 }

@@ -12,6 +12,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../widgets/server_identity_confirmation.dart';
+
 /// The official instance. Someone with no invite and no server of their own
 /// still needs somewhere to land.
 const officialServer = 'https://slim.npc-server.top';
@@ -85,7 +87,7 @@ class OnboardingScreen extends ConsumerWidget {
                   icon: AppIcons.settings,
                   title: 'Connect to a server',
                   description: 'You run your own, or you have its address.',
-                  onTap: () => _manualFlow(context),
+                  onTap: () => _manualFlow(context, ref),
                 ),
                 const SizedBox(height: AppSpacing.s12),
                 _Entry(
@@ -110,12 +112,16 @@ class OnboardingScreen extends ConsumerWidget {
     if (result != null) onServerChosen(result.$1, result.$2);
   }
 
-  Future<void> _manualFlow(BuildContext context) async {
+  Future<void> _manualFlow(BuildContext context, WidgetRef ref) async {
     final server = await showDialog<Uri>(
       context: context,
       builder: (context) => const _ManualServerDialog(),
     );
-    if (server != null) onServerChosen(server, null);
+    if (server == null || !context.mounted) return;
+
+    if (await confirmServerIdentity(context, ref, server)) {
+      onServerChosen(server, null);
+    }
   }
 }
 

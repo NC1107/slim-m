@@ -105,13 +105,27 @@ void main() {
           session: ref.watch(sessionProvider),
           httpClient: MockClient((request) async {
             requests.add(request.url);
-            // The rest of the screen (devices, blocks) renders alongside the
-            // presence section this test is about; each gets an honest
-            // empty answer rather than a shape only `/presence` expects.
+            // The rest of the screen (devices, blocks, the caller's own
+            // profile for the avatar section) renders alongside the presence
+            // section this test is about; each gets an honest answer rather
+            // than a shape only `/presence` expects.
             if (request.url.path == '/devices' ||
                 request.url.path == '/blocks') {
               return http.Response('[]', 200,
                   headers: {'content-type': 'application/json'});
+            }
+            if (request.url.path == '/me') {
+              return http.Response(
+                jsonEncode({
+                  'id': 'self',
+                  'username': 'self',
+                  'display_name': 'Self',
+                  'created_at': 0,
+                  'permissions': 0,
+                }),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
             }
             return http.Response(
               jsonEncode({'visibility': 'away'}),
@@ -143,6 +157,11 @@ void main() {
     expect(container.read(presenceVisibilityDisplayProvider),
         PresenceVisibility.online);
 
+    // The avatar section above it pushes Presence far enough down that it
+    // is not always within the default test viewport; ensure it is in view
+    // rather than assume the fold falls wherever it used to.
+    await tester.ensureVisible(find.text('Away'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Away'));
     await tester.pumpAndSettle();
 

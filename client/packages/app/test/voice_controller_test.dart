@@ -198,6 +198,8 @@ void main() {
 
     expect(controller.state.state, VoiceSessionState.failed);
     expect(controller.state.error, contains('no voice configured'));
+    expect(controller.state.retryable, isFalse,
+        reason: 'the server config will not change from clicking Join again');
   });
 
   test('being refused the channel reads as permission, not as a fault',
@@ -209,15 +211,65 @@ void main() {
 
     expect(controller.state.state, VoiceSessionState.failed);
     expect(controller.state.error, contains('permission'));
+    expect(controller.state.retryable, isFalse,
+        reason: 'a permission denial will not change from clicking Join again');
   });
 
-  test('a failed connection surfaces why, not just that', () async {
+  test('a failed connection surfaces why, not just that, and stays retryable',
+      () async {
     final session = _FakeSession(joinOutcome: VoiceSessionState.failed);
     final controller = controllerWith(session, _api());
 
     await controller.join('channel-1');
 
     expect(controller.state.error, contains('the SFU refused'));
+    expect(controller.state.retryable, isTrue,
+        reason: 'a dropped connection might really succeed next time');
+  });
+
+  test('a retry after a non-retryable failure resets once it starts', () async {
+    // The same controller throughout. An earlier version of this test built a
+    // second one, whose retryable defaults to true, so it passed even with the
+    // reset deleted.
+    var status = 501;
+    final client = MockClient((request) async {
+      if (!request.url.path.endsWith('/voice/token')) {
+        return http.Response('{}', 404);
+      }
+      if (status != 200) {
+        return http.Response(
+          jsonEncode({
+            'error': {'code': 'nope', 'message': 'refused'}
+          }),
+          status,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      return http.Response(
+        jsonEncode({
+          'url': 'wss://sfu.example.com',
+          'room': 'channel-1',
+          'token': 'jwt',
+          'expires_at': 0,
+          'can_publish': true,
+        }),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    final controller = controllerWith(_FakeSession(), client);
+    await controller.join('channel-1');
+    expect(controller.state.retryable, isFalse,
+        reason: 'a server with no voice is not worth retrying');
+
+    // The admin configures an SFU and the user tries again.
+    status = 200;
+    await controller.join('channel-1');
+
+    expect(controller.state.retryable, isTrue,
+        reason: 'the previous failure must not lock this controller out');
+    expect(controller.state.error, isNull);
   });
 
   test('a refused microphone leaves the button where it was', () async {
