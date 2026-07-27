@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/NC1107/slim-m/compare/server-v0.11.0...server-v0.11.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* iOS purpose strings, the Android Kotlin build, and the voice kick ([#55](https://github.com/NC1107/slim-m/issues/55)) ([c7980f2](https://github.com/NC1107/slim-m/commit/c7980f2591e7be93cd9d2da2bdbd71bc9e84014a))
+
 ## [0.11.0](https://github.com/NC1107/slim-m/compare/server-v0.10.0...server-v0.11.0) (2026-07-26)
 
 
