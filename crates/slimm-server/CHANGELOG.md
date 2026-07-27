@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.0](https://github.com/NC1107/slim-m/compare/server-v0.13.0...server-v0.14.0) (2026-07-27)
+
+
+### Features
+
+* **server:** bulk emoji import, and fix the orphan sweep it exposed ([#75](https://github.com/NC1107/slim-m/issues/75)) ([4e3e9b1](https://github.com/NC1107/slim-m/commit/4e3e9b11931e591caee1129622771cdbbd861b81))
+* **server:** custom emoji ([#72](https://github.com/NC1107/slim-m/issues/72)) ([4823ef7](https://github.com/NC1107/slim-m/commit/4823ef7f4415efb5ad92ea81ad3d0138fef245b9))
+
 ## [0.13.0](https://github.com/NC1107/slim-m/compare/server-v0.12.0...server-v0.13.0) (2026-07-27)
 
 
