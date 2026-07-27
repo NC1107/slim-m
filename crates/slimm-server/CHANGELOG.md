@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/NC1107/slim-m/compare/server-v0.11.1...server-v0.12.0) (2026-07-27)
+
+
+### Features
+
+* the Phase 5 canvas de-risking spike ([#59](https://github.com/NC1107/slim-m/issues/59)) ([614aba0](https://github.com/NC1107/slim-m/commit/614aba096348a38662c5bb4c85b9088733c3bde8))
+
 ## [0.11.1](https://github.com/NC1107/slim-m/compare/server-v0.11.0...server-v0.11.1) (2026-07-27)
 
 
