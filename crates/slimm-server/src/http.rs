@@ -22,6 +22,7 @@ mod auth;
 mod canvas;
 mod channels;
 mod dms;
+mod emoji;
 mod error;
 mod extract;
 mod invites;
@@ -67,6 +68,7 @@ pub fn router(state: AppState) -> Router {
         .merge(auth::routes())
         .merge(canvas::routes())
         .merge(channels::routes())
+        .merge(emoji::routes())
         .merge(invites::routes())
         .merge(messages::routes())
         .merge(overwrites::routes())

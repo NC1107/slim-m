@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: EmojiId\", name AS \"name!\",\n                      sha256 AS \"sha256!\", uploader_id AS \"uploader_id?: UserId\",\n                      created_at AS \"created_at!\"\n               FROM custom_emoji\n               ORDER BY created_at ASC, rowid ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: EmojiId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "name!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "sha256!",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "uploader_id?: UserId",
+        "ordinal": 3,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 4,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "1d9e82d81be1fa8ecd95001c79c82932c405dfb368d6cb5909ccbf775f8bf816"
+}

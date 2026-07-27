@@ -259,3 +259,39 @@ pub(super) async fn message_calls(c: &mut Contract, root: &str, channel: &str) -
 
     message
 }
+
+/// The deployment's own emoji: add one, list it, fetch its bytes, remove it.
+///
+/// Uses the same PNG as the attachment above on purpose - the bytes are
+/// content-addressed and shared, so this also exercises the case where an
+/// emoji points at a hash a message already references.
+pub(super) async fn emoji_calls(c: &mut Contract, root: &str) {
+    let created = c
+        .call(
+            "uploadCustomEmoji",
+            "POST",
+            "/emoji?name=party_parrot",
+            Some(root),
+            Payload::Bytes(PNG.to_vec()),
+        )
+        .await;
+    let id = text(&created, "id");
+
+    c.get("listCustomEmoji", "/emoji", root).await;
+    c.call(
+        "fetchCustomEmojiImage",
+        "GET",
+        &format!("/emoji/{id}/image"),
+        Some(root),
+        Payload::None,
+    )
+    .await;
+    c.call(
+        "deleteCustomEmoji",
+        "DELETE",
+        &format!("/emoji/{id}"),
+        Some(root),
+        Payload::None,
+    )
+    .await;
+}

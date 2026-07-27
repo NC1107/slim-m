@@ -2148,6 +2148,114 @@ paths:
         "503":
           description: The connection ceiling was reached.
 
+  /emoji:
+    get:
+      operationId: listCustomEmoji
+      tags: [emoji]
+      summary: Every custom emoji in this deployment.
+      description: >
+        Unpaginated on purpose: a client needs the whole set to render any
+        message containing a `:shortcode:`, and the set is capped server-side.
+        Readable by every authenticated member, unlike an attachment, which is
+        gated on viewing a channel that references it - an emoji renders inside
+        messages a member may already read, and gating it per channel would
+        leak which channels use which emoji.
+      responses:
+        "200":
+          description: The deployment's emoji, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomEmoji"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: uploadCustomEmoji
+      tags: [emoji]
+      summary: Add a custom emoji.
+      description: >
+        Requires MANAGE_SERVER. The name is normalised to lowercase a-z, 0-9
+        and underscore, so two spellings of one name collide rather than
+        creating two emoji a `:shortcode:` could not choose between. Content
+        type is sniffed from the bytes against the inline image allowlist,
+        never taken from a header. The bytes reuse the content-addressed
+        attachment store, so an image already present costs no second copy.
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: The emoji was added.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomEmoji"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /emoji/{emoji_id}:
+    delete:
+      operationId: deleteCustomEmoji
+      tags: [emoji]
+      summary: Remove a custom emoji.
+      description: >
+        Requires MANAGE_SERVER. Idempotent: removing one already gone answers
+        204, so a retry never has to tell "gone" from "never existed". The
+        stored bytes are left for the orphan sweep, since another emoji or a
+        message may still reference the same hash.
+      parameters:
+        - name: emoji_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Removed, or already absent.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /emoji/{emoji_id}/image:
+    get:
+      operationId: fetchCustomEmojiImage
+      tags: [emoji]
+      summary: An emoji's image bytes.
+      description: >
+        Readable by any authenticated member. Served with the same security
+        headers as an attachment and an immutable cache policy, since the
+        bytes are content-addressed and cannot change under an id.
+      parameters:
+        - name: emoji_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >-
+            The emoji's raw bytes, served as the type sniffed from the stored
+            bytes rather than anything the uploader claimed.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2224,6 +2332,25 @@ components:
             $ref: "#/components/schemas/Error"
 
   schemas:
+    CustomEmoji:
+      type: object
+      description: >-
+        One of the deployment's own emoji. The name is what a member types
+        between colons; the image is fetched at /emoji/{id}/image.
+      required: [id, name, created_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          description: Lowercase a-z, 0-9 and underscore, normalised on upload.
+        uploader_id:
+          type: string
+          nullable: true
+          description: Null once the uploader's account has been deleted.
+        created_at:
+          type: integer
+          format: int64
     Error:
       type: object
       required: [error]
