@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Moderation and administration: the reports queue, invite management,
-/// roles, channel permission overwrites, and the deployment's custom emoji.
+/// Everything in settings that changes the Space rather than the person: the
+/// reports queue, invites, roles, channel permission overwrites, and the
+/// Space's custom emoji.
 ///
-/// Moved out of `settings_screen.dart` unchanged, to get that file back under
-/// the project's 500-line hard limit before another section was added to it.
+/// It owns the "Space" group header itself, so a caller with none of the
+/// gating bits removes the whole group by returning nothing.
 library;
 
 import 'package:flutter/material.dart';
@@ -20,11 +21,11 @@ import 'settings_section_header.dart';
 /// base permissions, rather than shown and left to answer 403: a member
 /// without MANAGE_ROLES should not see role editing exists at all.
 ///
-/// Hidden entirely, divider included, for a caller with none of the gating
-/// bits, so an ordinary member's settings screen looks exactly as it did
-/// before this section existed.
-class ModerationSettingsSection extends ConsumerWidget {
-  const ModerationSettingsSection({super.key});
+/// Hidden entirely, group header and divider included, for a caller with none
+/// of the gating bits, so an ordinary member's settings screen holds nothing
+/// but their own settings.
+class SpaceSettingsSection extends ConsumerWidget {
+  const SpaceSettingsSection({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -42,10 +43,8 @@ class ModerationSettingsSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Divider(height: 1),
-        const SettingsSectionHeader(
-          'Community management',
-          description: 'Only shown for what your roles let you do here.',
-        ),
+        const SettingsGroupHeader('Space'),
+        const SizedBox(height: AppSpacing.s8),
         if (canModerate)
           ListTile(
             leading: const Icon(AppIcons.report),

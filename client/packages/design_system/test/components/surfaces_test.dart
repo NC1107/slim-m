@@ -397,5 +397,28 @@ void main() {
       await _pump(tester, const AppMenuLabel('channel'));
       expect(find.text('CHANNEL'), findsOneWidget);
     });
+
+    testWidgets('the outer edge is borderStrong, not borderSubtle',
+        (tester) async {
+      // borderStrong's own doc names this exact case, and drawing it in
+      // borderSubtle left the token referenced by no widget at all.
+      const tokens = AppTokens.dark;
+      await _pump(
+        tester,
+        AppMenu(children: [AppMenuItem(label: 'Rename', onTap: () {})]),
+        tokens: tokens,
+      );
+
+      final edge = tester
+          .widgetList<Container>(find.descendant(
+            of: find.byType(AppMenu),
+            matching: find.byType(Container),
+          ))
+          .map((c) => (c.decoration as BoxDecoration?)?.border?.top.color)
+          .whereType<Color>();
+
+      expect(edge, contains(tokens.borderStrong));
+      expect(edge, isNot(contains(tokens.borderSubtle)));
+    });
   });
 }

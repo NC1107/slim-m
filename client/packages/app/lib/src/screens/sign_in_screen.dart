@@ -267,7 +267,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           const SizedBox(width: AppSpacing.s8),
                           Expanded(
                             child: Text(
-                              'This server cannot send push notifications. '
+                              'This Space cannot send push notifications. '
                               'You can still use it, but phones will only see '
                               'new messages while the app is open.',
                               style: TextStyle(
@@ -343,13 +343,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           : 'Create an account instead',
                     ),
                   ),
-                  // Once a server is remembered, sign-in is where a signed-out
+                  // Once a Space is remembered, sign-in is where a signed-out
                   // user lands, so this is the only way back to invite redemption.
                   TextButton(
                     onPressed: _busy
                         ? null
                         : () => context.go(Routes.onboarding),
-                    child: const Text('Use a different server'),
+                    child: const Text('Join a different Space'),
                   ),
                 ],
               ),

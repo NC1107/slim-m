@@ -174,18 +174,21 @@ class MessageRow extends StatelessWidget {
                         children: [
                           if (!grouped)
                             _Header(message: message, isWebhook: isWebhook),
-                          editing
-                              ? MessageEditField(
-                                  initialContent: message.content,
-                                  onSubmit: onSubmitEdit,
-                                  onCancel: onCancelEdit,
-                                )
-                              : MessageBody(
-                                  content: message.content,
-                                  knownUsernames: knownUsernames,
-                                  customEmoji: customEmoji,
-                                  dim: _unsent,
-                                ),
+                          if (editing)
+                            MessageEditField(
+                              initialContent: message.content,
+                              onSubmit: onSubmitEdit,
+                              onCancel: onCancelEdit,
+                            )
+                          // An attachment-only message has no body, and an
+                          // empty one still costs a blank line above the image.
+                          else if (message.content.isNotEmpty)
+                            MessageBody(
+                              content: message.content,
+                              knownUsernames: knownUsernames,
+                              customEmoji: customEmoji,
+                              dim: _unsent,
+                            ),
                           if (message.editedAt != null && !editing)
                             const EditedMarker(),
                           if (poll != null)

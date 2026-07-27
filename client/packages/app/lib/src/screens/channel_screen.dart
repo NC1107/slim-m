@@ -106,7 +106,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// empty and returns.
   Future<void> _send(List<String> attachmentIds) async {
     final text = _composer.text.trim();
-    if (text.isEmpty) return;
+    // A staged file is a message on its own, so only a send carrying neither
+    // text nor attachment is the one to drop.
+    if (text.isEmpty && attachmentIds.isEmpty) return;
     _composer.clear();
 
     await sendOptimistically(

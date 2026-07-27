@@ -3285,8 +3285,11 @@ components:
             stored message instead of sending twice.
         content:
           type: string
-          minLength: 1
           maxLength: 4000
+          description: >
+            Must not be blank unless `attachment_ids` is non-empty: a message
+            carrying a file needs no text, and a blank one carrying neither is
+            a 400.
         attachment_ids:
           type: array
           description: >

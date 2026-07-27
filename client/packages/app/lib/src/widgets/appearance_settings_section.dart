@@ -29,9 +29,7 @@ class AppearanceSettingsSection extends ConsumerWidget {
       children: [
         const SettingsSectionHeader(
           'Appearance',
-          description:
-              'Following the system picks light or dark, never true '
-              'black: that one is a choice for an OLED screen.',
+          description: 'System never picks true black.',
         ),
         SettingsSelectRow<AppThemeChoice>(
           label: 'Theme',

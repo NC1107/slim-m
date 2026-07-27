@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Account settings: devices, blocked users, sign out, and deletion.
+/// Settings, in three groups: "Personal" is what the account holder controls
+/// about themselves, "Space" is what they control about the deployment, and
+/// "App" is the build itself, which belongs to neither.
+///
+/// The split is the whole point of the layout. Presence and appearance follow
+/// the person to every Space they sign into; roles and invites belong to this
+/// one, and most members cannot touch them at all.
+///
+/// "App" is last and always present, because the Space group is hidden from a
+/// caller holding none of its permission bits: anything after it would
+/// otherwise read as part of whichever group did render.
 ///
 /// Account deletion is reachable in two taps from the main surface, which the
 /// app stores require and which is also just correct: an account you cannot
@@ -20,9 +30,9 @@ import '../providers/sync_controller.dart';
 import '../routing/routes.dart';
 import '../widgets/appearance_settings_section.dart';
 import '../widgets/avatar_settings_section.dart';
-import '../widgets/moderation_settings_section.dart';
 import '../widgets/settings_section_header.dart';
 import '../widgets/settings_select_row.dart';
+import '../widgets/space_settings_section.dart';
 
 /// The account's devices, refetched when invalidated.
 final devicesProvider = FutureProvider.autoDispose<List<api.Device>>(
@@ -58,24 +68,24 @@ class SettingsScreen extends ConsumerWidget {
       ),
       body: ListView(
         children: const [
+          SettingsGroupHeader('Personal'),
           AvatarSettingsSection(),
           Divider(height: 1),
           AppearanceSettingsSection(),
           Divider(height: 1),
-          _DevicesSection(),
+          _PresenceSection(),
           Divider(height: 1),
           _NotificationsSection(),
           Divider(height: 1),
           _VoiceSection(),
           Divider(height: 1),
-          _PresenceSection(),
+          _DevicesSection(),
           Divider(height: 1),
           _BlockedSection(),
-          ModerationSettingsSection(),
           Divider(height: 1),
           _AccountSection(),
-          Divider(height: 1),
-          _AboutSection(),
+          SpaceSettingsSection(),
+          _AppSection(),
         ],
       ),
     );
@@ -93,10 +103,7 @@ class _DevicesSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SettingsSectionHeader(
-          'Devices',
-          description: 'Everywhere this account is signed in.',
-        ),
+        const SettingsSectionHeader('Devices'),
         devices.when(
           loading: () => const Padding(
             padding: EdgeInsets.all(AppSpacing.s16),
@@ -152,10 +159,7 @@ class _NotificationsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SettingsSectionHeader(
-          'Notifications',
-          description: 'Whether this device is registered for push.',
-        ),
+        const SettingsSectionHeader('Notifications'),
         ListTile(
           leading: Icon(
             registered ? AppIcons.notificationsOn : AppIcons.notificationsOff,
@@ -182,13 +186,10 @@ class _VoiceSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SettingsSectionHeader(
-          'Voice',
-          description: 'Microphone, screen share, and call sounds.',
-        ),
+        const SettingsSectionHeader('Voice'),
         ListTile(
           leading: const Icon(AppIcons.mic),
-          title: const Text('Voice settings'),
+          title: const Text('Microphone, screen share, sounds'),
           trailing: const Icon(AppIcons.chevronRight),
           onTap: () => context.push(Routes.voiceSettings),
         ),
@@ -218,10 +219,7 @@ class _PresenceSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SettingsSectionHeader(
-          'Presence',
-          description: 'What other members see next to your name.',
-        ),
+        const SettingsSectionHeader('Presence'),
         SettingsSelectRow<api.PresenceVisibility>(
           label: 'Status',
           sheetTitle: 'Presence',
@@ -263,8 +261,7 @@ class _BlockedSection extends ConsumerWidget {
       children: [
         const SettingsSectionHeader(
           'Blocked',
-          description:
-              'They are not told, and unblocking restores their messages.',
+          description: 'They are not told. Unblocking restores their messages.',
         ),
         blocks.when(
           loading: () => const Padding(
@@ -407,8 +404,17 @@ class _AccountSection extends ConsumerWidget {
 
 /// Which build this is, for a tester to read off the device rather than
 /// asking whoever is looking at it what they have installed.
-class _AboutSection extends ConsumerWidget {
-  const _AboutSection();
+///
+/// Its own group, not the tail of Personal or of Space. The build number is
+/// about the app: it is the same for a member and for an administrator, and
+/// it followed whichever group happened to render last while it sat under
+/// neither header of its own.
+///
+/// It owns its leading divider and group header the way
+/// [SpaceSettingsSection] does, so the group above it cannot change what this
+/// one is called by being absent.
+class _AppSection extends ConsumerWidget {
+  const _AppSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -418,7 +424,9 @@ class _AboutSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SettingsSectionHeader('About'),
+        const Divider(height: 1),
+        const SettingsGroupHeader('App'),
+        const SizedBox(height: AppSpacing.s8),
         ListTile(
           leading: const Icon(AppIcons.info),
           title: const Text('Version'),

@@ -273,8 +273,8 @@ jobs:
             dist/SHA256SUMS
             dist/SHA256SUMS.asc
 
-  # Flatpak and rpm for the Linux client. A skeleton: packaging is inert until
-  # packaging/flatpak/*.yaml and packaging/rpm/*.spec exist. See docs/ci.md.
+  # The portable Linux tarball, always, plus whichever packaging formats have
+  # their inputs in the repo. Each format gates on its own file. See docs/ci.md.
   linux-client:
     needs: [release-please]
     if: >-
@@ -321,20 +321,43 @@ jobs:
           flutter build linux --release
         working-directory: client/packages/app
 
-      # Gate packaging on the manifest and spec. Honest skeleton: no inputs, no
-      # artifact, and a clearly visible warning rather than a green lie.
+      # Published on every client release and gated on nothing. It is both the
+      # download for a user with no packaging, and the spec's Source0.
+      - name: stage portable tarball
+        run: |
+          version="${{ steps.ver.outputs.version }}"
+          name="slim-m-client-${version}"
+          bundle="client/packages/app/build/linux/x64/release/bundle"
+          if [ ! -x "${bundle}/slimm_app" ]; then
+            echo "::error::no linux bundle at ${bundle}"
+            exit 1
+          fi
+          mkdir -p "stage/${name}" dist
+          cp -a "${bundle}/." "stage/${name}/"
+          cp LICENSES/Apache-2.0.txt "stage/${name}/LICENSE"
+          cp packaging/linux/README.md "stage/${name}/README.md"
+          tar -C stage -czf "dist/${name}-linux-amd64.tar.gz" "${name}"
+
+      # One gate per format, so a working rpm is not held back by the absence of
+      # a flatpak manifest. The tarball above ships either way.
       - name: check packaging inputs
         id: pkg
         run: |
-          if [ -f packaging/flatpak/org.slimm.Client.yaml ] && [ -f packaging/rpm/slim-m-client.spec ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+          if [ -f packaging/flatpak/org.slimm.Client.yaml ]; then
+            echo "flatpak=true" >> "$GITHUB_OUTPUT"
           else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Linux client packaging not wired yet. Add packaging/flatpak/org.slimm.Client.yaml and packaging/rpm/slim-m-client.spec to enable Flatpak and rpm builds. Skipping."
+            echo "flatpak=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No packaging/flatpak/org.slimm.Client.yaml, so no Flatpak bundle is built. The portable tarball is published regardless."
+          fi
+          if [ -f packaging/rpm/slim-m-client.spec ]; then
+            echo "rpm=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rpm=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No packaging/rpm/slim-m-client.spec, so no rpm is built. The portable tarball is published regardless."
           fi
 
       - name: build flatpak
-        if: steps.pkg.outputs.ready == 'true'
+        if: steps.pkg.outputs.flatpak == 'true'
         run: |
           sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
           flatpak remote-add --user --if-not-exists flathub \
@@ -348,27 +371,35 @@ jobs:
             "dist/slim-m-client-${{ steps.ver.outputs.version }}.flatpak" \
             org.slimm.Client
 
+      # In a Fedora container, not on the runner: the spec is written against
+      # Fedora's macros and dependency generators, and Ubuntu's rpm has neither.
       - name: build rpm
-        if: steps.pkg.outputs.ready == 'true'
+        if: steps.pkg.outputs.rpm == 'true'
+        env:
+          VER: ${{ steps.ver.outputs.version }}
         run: |
-          sudo apt-get install -y --no-install-recommends rpm
-          # TODO: the spec %install stage must stage the flutter bundle from
-          # client/packages/app/build/linux/*/release/bundle into the buildroot.
-          rpmbuild -bb \
-            --define "_topdir ${PWD}/rpmbuild" \
-            --define "_rpmdir ${PWD}/dist" \
-            --define "app_version ${{ steps.ver.outputs.version }}" \
-            packaging/rpm/slim-m-client.spec
+          docker run --rm -v "${PWD}:/w" -w /w -e VER fedora:latest bash -eo pipefail -c '
+            dnf -y install rpm-build patchelf desktop-file-utils tar gzip >/dev/null
+            mkdir -p rpmbuild/SOURCES
+            cp dist/slim-m-client-*-linux-amd64.tar.gz \
+              packaging/rpm/top.npcserver.slimm.desktop rpmbuild/SOURCES/
+            # The same stamp the copr job applies, so the .rpm on the release and
+            # the one COPR builds carry the same version as the tag.
+            sed "s/^Version:.*/Version:        ${VER}/" \
+              packaging/rpm/slim-m-client.spec > rpmbuild/slim-m-client.spec
+            rpmbuild -bb --define "_topdir /w/rpmbuild" --define "_rpmdir /w/dist" \
+              rpmbuild/slim-m-client.spec
+          '
 
       - name: checksums
-        if: steps.pkg.outputs.ready == 'true'
         working-directory: dist
         run: |
           shopt -s nullglob
-          sha256sum *.flatpak **/*.rpm > SHA256SUMS
+          sha256sum slim-m-client-*-linux-amd64.tar.gz *.flatpak */*.rpm > SHA256SUMS
+          cat SHA256SUMS
 
       - name: sign checksums (optional)
-        if: steps.pkg.outputs.ready == 'true' && env.GPG_PRIVATE_KEY != ''
+        if: env.GPG_PRIVATE_KEY != ''
         working-directory: dist
         run: |
           echo "$GPG_PRIVATE_KEY" | gpg --batch --import
@@ -376,14 +407,95 @@ jobs:
             --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
 
       - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
-        if: steps.pkg.outputs.ready == 'true'
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           files: |
+            dist/slim-m-client-*-linux-amd64.tar.gz
             dist/*.flatpak
-            dist/**/*.rpm
+            dist/*/*.rpm
             dist/SHA256SUMS
             dist/SHA256SUMS.asc
+
+  # Submits the Fedora package to COPR. Inert without COPR_CONFIG or the spec,
+  # and best effort: the .rpm is on the release, so a failure only warns.
+  copr:
+    needs: [release-please, linux-client]
+    if: >-
+      (needs.release-please.result == 'success' &&
+       needs.release-please.outputs.client_released == 'true') ||
+      startsWith(github.ref, 'refs/tags/client-v')
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    environment: release
+    permissions:
+      contents: read
+    env:
+      COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
+    steps:
+      - name: check secret
+        id: gate
+        run: |
+          if [ -n "$COPR_CONFIG" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::COPR_CONFIG is not configured. Add it to enable the Fedora COPR publish. Skipping."
+          fi
+
+      - name: install tooling
+        if: steps.gate.outputs.ready == 'true'
+        run: dnf -y install git copr-cli rpm-build rpmdevtools >/dev/null
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: steps.gate.outputs.ready == 'true'
+
+      - name: resolve version
+        if: steps.gate.outputs.ready == 'true'
+        id: ver
+        run: |
+          if [ -n "${{ needs.release-please.outputs.client_version }}" ]; then
+            echo "version=${{ needs.release-please.outputs.client_version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#client-v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: submit to COPR
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+        run: |
+          set -uo pipefail
+          spec=packaging/rpm/slim-m-client.spec
+          if [ ! -f "$spec" ]; then
+            echo "::warning::${spec} does not exist, so there is nothing to submit to COPR. Skipping."
+            exit 0
+          fi
+          mkdir -p ~/.config
+          printf '%s\n' "$COPR_CONFIG" > ~/.config/copr
+          chmod 600 ~/.config/copr
+          rpmdev-setuptree
+          # A macro file rather than a --define, because spectool and rpmbuild
+          # both read it and only one of them is guaranteed to take the flag.
+          printf '%%app_version %s\n' "$VER" >> ~/.rpmmacros
+          cp "$spec" ~/rpmbuild/SPECS/slim-m-client.spec
+          # spectool below fetches remote sources only, so the local ones have
+          # to be placed by hand or rpmbuild -bs fails on a missing Source.
+          cp packaging/rpm/top.npcserver.slimm.desktop ~/rpmbuild/SOURCES/
+          # Stamp the version only when the spec hardcodes it. A spec that
+          # expands a macro there already has the value and must not be edited.
+          if ! grep -q '^Version:.*%{' ~/rpmbuild/SPECS/slim-m-client.spec; then
+            sed -i "s/^Version:.*/Version:        ${VER}/" ~/rpmbuild/SPECS/slim-m-client.spec
+          fi
+          # COPR's buildroot has no network, so Source0 has to travel inside the
+          # SRPM. spectool downloads it here, while there is still a network.
+          spectool -g -R ~/rpmbuild/SPECS/slim-m-client.spec
+          rpmbuild -bs ~/rpmbuild/SPECS/slim-m-client.spec >/dev/null
+          srpm=$(ls ~/rpmbuild/SRPMS/slim-m-client-*.src.rpm)
+          if copr-cli build nc1107/slim-m "$srpm" --nowait; then
+            echo "submitted slim-m-client ${VER} to COPR (nc1107/slim-m)"
+          else
+            echo "::warning::COPR submit failed for slim-m-client ${VER}. The .rpm is on the release; rebuild manually with 'copr-cli build nc1107/slim-m <srpm>' from ${spec}. See packaging/fedora/README.md."
+          fi
 
   # Upload-signed apk and appbundle. Inert without its three secrets, and it
   # verifies the signer is the upload key, never debug. See docs/ci.md.

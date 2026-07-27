@@ -144,7 +144,7 @@ void main() {
       await container.read(voiceControllerProvider.notifier).join('channel-1');
       await tester.pumpAndSettle();
 
-      expect(find.text('This server has no voice configured.'), findsOneWidget);
+      expect(find.text('This Space has no voice configured.'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Join call'), findsNothing);
     },
   );

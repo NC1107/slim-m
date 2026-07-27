@@ -278,14 +278,14 @@ void main() {
     await tester.pumpAndSettle();
 
     // The voice row sits past the list's cache extent now that appearance
-    // and moderation sit above it, so it does not exist until scrolled to.
+    // and presence sit above it, so it does not exist until scrolled to.
     await tester.scrollUntilVisible(
-      find.text('Voice settings'),
+      find.text('Microphone, screen share, sounds'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Voice settings'));
+    await tester.tap(find.text('Microphone, screen share, sounds'));
     await tester.pumpAndSettle();
 
     expect(find.byType(VoiceSettingsScreen), findsOneWidget);

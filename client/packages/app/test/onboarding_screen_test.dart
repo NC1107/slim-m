@@ -97,7 +97,7 @@ Future<ProviderContainer> _pumpOnboarding(
 /// the identity check does next (silent, a confirmation step, or a warning)
 /// for the test to assert on.
 Future<void> _enterManualServer(WidgetTester tester) async {
-  await tester.tap(find.text('Connect to a server'));
+  await tester.tap(find.text('Connect to a Space'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField), _server);
   await tester.tap(find.widgetWithText(FilledButton, 'Continue'));

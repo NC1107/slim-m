@@ -20,6 +20,7 @@ import 'package:slimm_app/src/widgets/custom_emoji_image.dart';
 import 'package:slimm_app/src/widgets/emoji_catalog.dart';
 import 'package:slimm_app/src/widgets/emoji_picker.dart';
 import 'package:slimm_app/src/widgets/emoji_picker_grid.dart';
+import 'package:slimm_app/src/widgets/emoji_picker_panel.dart' show pickerWidth;
 import 'package:slimm_design_system/design_system.dart';
 
 /// The catalog's own first entries, escaped rather than literal: the hygiene
@@ -63,6 +64,58 @@ List<EmojiCategory> _tabs(WidgetTester tester) =>
 
 List<PickerEmoji> _grid(WidgetTester tester) =>
     tester.widget<EmojiGrid>(find.byType(EmojiGrid)).emoji;
+
+/// The first cell's measured box. A cell draws itself into a [Container] that
+/// wraps whatever it holds, so this is the cell rather than the glyph.
+Size _cellSize(WidgetTester tester) => tester.getSize(
+  find
+      .descendant(of: find.byType(EmojiGrid), matching: find.byType(Container))
+      .first,
+);
+
+/// Opens a sheet at [screen] and hands back what its cells measure.
+Future<Size> _sheetCellSize(WidgetTester tester, Size screen) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = screen;
+  addTearDown(tester.view.reset);
+
+  await tester.pumpWidget(
+    _harness(
+      Builder(
+        builder: (context) => TextButton(
+          onPressed: () => showEmojiPickerSheet(context, onSelect: (_) {}),
+          child: const Text('open'),
+        ),
+      ),
+    ),
+  );
+
+  await tester.tap(find.text('open'));
+  await tester.pumpAndSettle();
+  return _cellSize(tester);
+}
+
+/// Opens the composer's Space sheet on a phone with [count] emoji in it.
+Future<void> _openSpaceSheet(WidgetTester tester, int count) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = const Size(430, 932);
+  addTearDown(tester.view.reset);
+
+  await tester.pumpWidget(
+    _harness(
+      Builder(
+        builder: (context) => TextButton(
+          onPressed: () => showSpaceEmojiSheet(context, onSelect: (_) {}),
+          child: const Text('open'),
+        ),
+      ),
+      custom: [for (var i = 0; i < count; i++) _custom('e$i')],
+    ),
+  );
+
+  await tester.tap(find.text('open'));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -202,7 +255,7 @@ void main() {
       );
 
       expect(_tabs(tester).first, EmojiCategory.custom);
-      expect(find.byTooltip('This server'), findsOneWidget);
+      expect(find.byTooltip('Space emoji'), findsOneWidget);
       expect(find.byType(CustomEmojiImage), findsNWidgets(2));
       expect(find.text(_grinningFace), findsNothing);
 
@@ -263,7 +316,7 @@ void main() {
       ),
     );
 
-    expect(find.byTooltip('This server'), findsNothing);
+    expect(find.byTooltip('Space emoji'), findsNothing);
     expect(find.byType(CustomEmojiImage), findsNothing);
     expect(_tabs(tester).first, EmojiCategory.smileysEmotion);
     expect(find.text(_grinningFace), findsOneWidget);
@@ -298,6 +351,96 @@ void main() {
       tester.getRect(find.byType(EmojiPickerPanel)).bottom,
       lessThanOrEqualTo(844.0 - bottomInset),
       reason: 'the panel must end above the home indicator, not under it',
+    );
+  });
+
+  // The regression: the sheet clamped itself to `pickerWidth`, a desktop
+  // popup size, so a 430pt phone rendered a 320pt panel adrift in it.
+  testWidgets('the sheet uses the width it has, not the desktop popup width', (
+    tester,
+  ) async {
+    const screenWidth = 430.0;
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(screenWidth, 932);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _harness(
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showEmojiPickerSheet(context, onSelect: (_) {}),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    final width = tester.getSize(find.byType(EmojiPickerPanel)).width;
+    expect(
+      width,
+      greaterThan(pickerWidth),
+      reason: 'a phone sheet is wider than a desktop popup, not equal to it',
+    );
+    expect(
+      width,
+      closeTo(screenWidth, 2 * AppSpacing.s8),
+      reason: 'all of it bar a margin on each side',
+    );
+  });
+
+  // Filling the width is only half of it: this sheet is also the desktop
+  // right-click path, where fixed columns made a 624pt panel 71pt cells.
+  for (final (name, screen) in const [
+    ('a phone', Size(430, 932)),
+    ('a desktop', Size(1400, 880)),
+  ]) {
+    testWidgets('$name sheet draws its cells at a tap target', (tester) async {
+      final cell = await _sheetCellSize(tester, screen);
+
+      expect(
+        cell.width,
+        closeTo(EmojiGrid.cellExtent, 4),
+        reason:
+            'a cell is sized by [EmojiGrid.cellExtent], not by the '
+            'surface it landed in',
+      );
+      expect(cell.height, closeTo(cell.width, 0.5), reason: 'cells are square');
+    });
+  }
+
+  // `_SpaceEmojiSheet` documents its 260 as "a ceiling, not a height"; without
+  // the grid shrink-wrapping, four emoji still reserve all 260.
+  testWidgets('a Space with a handful of emoji gets a grid one row tall', (
+    tester,
+  ) async {
+    await _openSpaceSheet(tester, 4);
+
+    final cell = _cellSize(tester);
+    final grid = tester.getSize(find.byType(EmojiGrid));
+
+    expect(find.byType(CustomEmojiImage), findsNWidgets(4));
+    expect(
+      grid.height,
+      lessThan(cell.height * 2),
+      reason: 'one row of cells plus the grid padding, not the 260 ceiling',
+    );
+  });
+
+  // The other half of the same contract: past the ceiling the grid pages
+  // internally rather than growing the sheet past the screen it opened in.
+  testWidgets('a Space with more emoji than fit stops at the ceiling', (
+    tester,
+  ) async {
+    const screenHeight = 932.0;
+    await _openSpaceSheet(tester, 200);
+
+    expect(
+      tester.getSize(find.byType(EmojiGrid)).height,
+      lessThan(screenHeight),
+      reason: 'the grid pages internally rather than growing past the screen',
     );
   });
 }

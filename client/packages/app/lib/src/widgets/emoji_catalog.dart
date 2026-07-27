@@ -55,7 +55,7 @@ const List<EmojiCategory> emojiCategoriesInOrder = [
 
 extension EmojiCategoryInfo on EmojiCategory {
   String get label => switch (this) {
-    EmojiCategory.custom => 'This server',
+    EmojiCategory.custom => 'Space emoji',
     EmojiCategory.recent => 'Recently used',
     EmojiCategory.smileysEmotion => 'Smileys and emotion',
     EmojiCategory.peopleBody => 'People',

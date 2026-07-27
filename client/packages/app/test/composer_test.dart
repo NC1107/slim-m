@@ -9,96 +9,30 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:slimm_app/src/providers/typing_controller.dart';
-import 'package:slimm_app/src/widgets/composer.dart';
 import 'package:slimm_app/src/widgets/composer_extras.dart';
-import 'package:slimm_app/src/widgets/emoji_picker.dart';
-import 'package:slimm_app/src/widgets/emoji_picker_grid.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-/// Stands in for the real controller, which would open a websocket
-/// subscription the moment the first keystroke reaches it.
-class _NoopTyping extends StateNotifier<Set<String>>
-    implements TypingController {
-  _NoopTyping() : super(const {});
-
-  @override
-  void notifyTyping() {}
-}
-
-class _Sends {
-  int count = 0;
-  List<String> ids = const [];
-
-  Future<void> call(List<String> attachmentIds) async {
-    count += 1;
-    ids = attachmentIds;
-  }
-}
-
-Widget _harness({
-  required TextEditingController controller,
-  required _Sends sends,
-  required TargetPlatform platform,
-}) {
-  return ProviderScope(
-    overrides: [
-      typingControllerProvider.overrideWith((ref, channelId) => _NoopTyping()),
-    ],
-    child: MaterialApp(
-      theme: buildTheme(
-        Brightness.light,
-        AppTokens.light,
-      ).copyWith(platform: platform),
-      home: Scaffold(
-        body: Column(
-          children: [
-            const Spacer(),
-            Composer(
-              controller: controller,
-              channelId: 'c1',
-              channelName: 'general',
-              onSend: sends.call,
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-Finder get _sendButton => find.ancestor(
-  of: find.byIcon(AppIcons.send),
-  matching: find.byType(AppIconButton),
-);
+import 'composer_harness.dart';
 
 const _hintKey = Key('composer-newline-hint');
 
-/// The glyph in the picker's first cell, read off the grid rather than
-/// hardcoded: the catalog comes from the third-party `emojis` package, so a
-/// package bump reorders it and a fixed literal would fail for a reason that
-/// has nothing to do with the behaviour under test.
-String _firstGridGlyph(WidgetTester tester) =>
-    tester.widget<EmojiGrid>(find.byType(EmojiGrid)).emoji.first.token;
-
 void main() {
   late TextEditingController controller;
-  late _Sends sends;
+  late Sends sends;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     controller = TextEditingController();
-    sends = _Sends();
+    sends = Sends();
   });
 
   tearDown(() => controller.dispose());
 
   testWidgets('a tap on the send button sends what was typed', (tester) async {
     await tester.pumpWidget(
-      _harness(
+      composerHarness(
         controller: controller,
         sends: sends,
         platform: TargetPlatform.iOS,
@@ -107,7 +41,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'hello there');
     await tester.pump();
-    await tester.tap(_sendButton);
+    await tester.tap(sendButton);
     await tester.pump();
 
     expect(sends.count, 1);
@@ -118,22 +52,22 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _harness(
+      composerHarness(
         controller: controller,
         sends: sends,
         platform: TargetPlatform.iOS,
       ),
     );
 
-    expect(tester.widget<AppIconButton>(_sendButton).onPressed, isNull);
+    expect(tester.widget<AppIconButton>(sendButton).onPressed, isNull);
 
     await tester.enterText(find.byType(TextField), '   ');
     await tester.pump();
-    expect(tester.widget<AppIconButton>(_sendButton).onPressed, isNull);
+    expect(tester.widget<AppIconButton>(sendButton).onPressed, isNull);
 
     await tester.enterText(find.byType(TextField), 'hi');
     await tester.pump();
-    expect(tester.widget<AppIconButton>(_sendButton).onPressed, isNotNull);
+    expect(tester.widget<AppIconButton>(sendButton).onPressed, isNotNull);
   });
 
   testWidgets(
@@ -141,7 +75,7 @@ void main() {
     'a newline',
     (tester) async {
       await tester.pumpWidget(
-        _harness(
+        composerHarness(
           controller: controller,
           sends: sends,
           platform: TargetPlatform.iOS,
@@ -162,7 +96,7 @@ void main() {
     "the soft keyboard's send action sends and leaves the keyboard up",
     (tester) async {
       await tester.pumpWidget(
-        _harness(
+        composerHarness(
           controller: controller,
           sends: sends,
           platform: TargetPlatform.iOS,
@@ -191,7 +125,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _harness(
+      composerHarness(
         controller: controller,
         sends: sends,
         platform: TargetPlatform.iOS,
@@ -219,7 +153,7 @@ void main() {
     'on desktop the field keeps the newline action and its shortcut',
     (tester) async {
       await tester.pumpWidget(
-        _harness(
+        composerHarness(
           controller: controller,
           sends: sends,
           platform: TargetPlatform.linux,
@@ -253,7 +187,7 @@ void main() {
     'the shift + enter hint is hidden on touch and shown on desktop',
     (tester) async {
       await tester.pumpWidget(
-        _harness(
+        composerHarness(
           controller: controller,
           sends: sends,
           platform: TargetPlatform.iOS,
@@ -264,7 +198,7 @@ void main() {
       final touchHeight = tester.getSize(find.byKey(_hintKey)).height;
 
       await tester.pumpWidget(
-        _harness(
+        composerHarness(
           controller: controller,
           sends: sends,
           platform: TargetPlatform.linux,
@@ -286,70 +220,6 @@ void main() {
     },
   );
 
-  testWidgets('the smile button opens the real picker, not a fixed glyph', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _harness(
-        controller: controller,
-        sends: sends,
-        platform: TargetPlatform.iOS,
-      ),
-    );
-
-    await tester.tap(
-      find.byWidgetPredicate(
-        (w) => w is AppIconButton && w.semanticLabel == 'Insert emoji',
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EmojiPickerPanel), findsOneWidget);
-    expect(controller.text, isEmpty);
-  });
-
-  testWidgets('a picked emoji lands at the caret, not at the end', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _harness(
-        controller: controller,
-        sends: sends,
-        platform: TargetPlatform.iOS,
-      ),
-    );
-
-    await tester.enterText(find.byType(TextField), 'hi there');
-    controller.selection = const TextSelection.collapsed(offset: 2);
-    await tester.pump();
-
-    await tester.tap(
-      find.byWidgetPredicate(
-        (w) => w is AppIconButton && w.semanticLabel == 'Insert emoji',
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final glyph = _firstGridGlyph(tester);
-    await tester.tap(
-      find.descendant(of: find.byType(EmojiGrid), matching: find.text(glyph)),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      controller.text,
-      'hi$glyph there',
-      reason: 'nothing asserted the picked emoji reached the field at all',
-    );
-    expect(
-      controller.selection.baseOffset,
-      2 + glyph.length,
-      reason:
-          'the caret must follow what was inserted, or the next '
-          'keystroke lands in front of it',
-    );
-  });
-
   group('touch density', () {
     testWidgets('a phone gets 44pt controls and keeps a usable field', (
       tester,
@@ -359,7 +229,7 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(
-        _harness(
+        composerHarness(
           controller: controller,
           sends: sends,
           platform: TargetPlatform.iOS,
@@ -388,7 +258,7 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(
-        _harness(
+        composerHarness(
           controller: controller,
           sends: sends,
           platform: TargetPlatform.iOS,
@@ -415,7 +285,7 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(
-        _harness(
+        composerHarness(
           controller: controller,
           sends: sends,
           platform: TargetPlatform.linux,

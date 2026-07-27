@@ -86,12 +86,16 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SettingsSectionHeader(
-          'Avatar',
-          description: 'Shown next to your name to other members.',
-        ),
+        const SettingsSectionHeader('Avatar'),
+        // Bottom padding, not just horizontal: the row was the only section
+        // content with none, so the disc sat flush on the divider below it.
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.s16,
+            0,
+            AppSpacing.s16,
+            AppSpacing.s16,
+          ),
           child: Row(
             children: [
               UserAvatar(
