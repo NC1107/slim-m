@@ -1,0 +1,28 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+-- No schema change: a correction to what 0016_custom_emoji.sql claims, which
+-- cannot be edited in place because sqlx checksums a migration's whole file
+-- and would refuse to start any deployment that had already applied it.
+--
+-- 0016 says `ON DELETE RESTRICT` on `custom_emoji.sha256` "keeps the orphan
+-- sweep from removing bytes an emoji still points at". That was believed at
+-- the time and it is wrong. RESTRICT is not a filter. The sweep deletes a
+-- batch in one statement, selecting every aged `attachments` row no MESSAGE
+-- references, and an emoji's image is exactly that: uploaded, never attached
+-- to a message. So the emoji's row entered the candidate set, RESTRICT
+-- aborted the ENTIRE statement, and with foreign keys on (`db.rs`) the sweep
+-- returned "FOREIGN KEY constraint failed" every cycle. Not one orphan was
+-- reclaimed on any deployment holding a single custom emoji, and attachment
+-- storage grew without bound.
+--
+-- What is actually true: RESTRICT is a backstop against a delete that should
+-- never have been attempted, not the thing that keeps the sweep off those
+-- bytes. `Store::sweep_orphaned_attachments` now excludes them itself, with a
+-- second `NOT EXISTS` against `custom_emoji` served by the
+-- `custom_emoji_by_sha` index 0016 created for exactly this question. RESTRICT
+-- stays: it is what makes a future sweep that forgets the exclusion fail
+-- loudly instead of deleting an emoji's image out from under it.
+--
+-- Pinned by `tests/attachment_sweep.rs`, which sweeps a deployment holding one
+-- emoji and one genuine orphan and asserts the orphan goes and the emoji's
+-- bytes stay.
+SELECT 1 WHERE 0;

@@ -49,10 +49,11 @@ class CallControls extends StatelessWidget {
               const SizedBox(width: AppSpacing.s12),
               _ControlButton(
                 icon: AppIcons.screenShare,
-                tooltip: voice.screenSharing
-                    ? 'Stop sharing'
-                    : 'Share a screen or window',
+                tooltip: _shareTooltip(voice),
                 active: voice.screenSharing,
+                // Pending is its own look, never the active one: the lit
+                // button over a share nobody could see was the whole bug.
+                pending: voice.awaitingBroadcast,
                 onPressed: () => _share(context, controller, voice),
               ),
               const SizedBox(width: AppSpacing.s12),
@@ -70,12 +71,22 @@ class CallControls extends StatelessWidget {
     );
   }
 
+  static String _shareTooltip(VoiceState voice) {
+    if (voice.screenSharing) return 'Stop sharing';
+    if (voice.awaitingBroadcast) {
+      return 'Waiting for you to start the broadcast. Tap to cancel.';
+    }
+    return 'Share a screen or window';
+  }
+
   Future<void> _share(
     BuildContext context,
     VoiceController controller,
     VoiceState voice,
   ) async {
-    if (voice.screenSharing) {
+    // Cancelling a request that never became a broadcast goes down the same
+    // path as stopping a live one, which is also what ends the recording.
+    if (voice.screenSharing || voice.awaitingBroadcast) {
       await controller.setScreenShare(false);
       return;
     }
@@ -95,12 +106,20 @@ class _ControlButton extends StatelessWidget {
     required this.active,
     required this.onPressed,
     this.destructive = false,
+    this.pending = false,
   });
 
   final IconData icon;
   final String tooltip;
   final bool active;
   final bool destructive;
+
+  /// Asked for, not in effect yet. Reads as busy rather than on.
+  ///
+  /// On iOS a screen share is a request the user answers in a system picker,
+  /// and nothing is published until they do. Drawing that as active describes
+  /// a share nobody can see.
+  final bool pending;
   final VoidCallback onPressed;
 
   @override
@@ -135,7 +154,18 @@ class _ControlButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadii.control),
               border: Border.all(color: tokens.borderSubtle),
             ),
-            child: Icon(icon, size: 18, color: foreground),
+            child: pending
+                ? Center(
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: tokens.textSecondary,
+                      ),
+                    ),
+                  )
+                : Icon(icon, size: 18, color: foreground),
           ),
         ),
       ),

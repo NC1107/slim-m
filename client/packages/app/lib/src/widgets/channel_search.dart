@@ -51,6 +51,7 @@ class ChannelSearchResults extends StatelessWidget {
     super.key,
     required this.results,
     required this.knownUsernames,
+    this.customEmoji = const {},
     required this.loading,
     required this.failed,
     required this.forbidden,
@@ -61,6 +62,9 @@ class ChannelSearchResults extends StatelessWidget {
   /// means the search genuinely came back with nothing.
   final List<api.Message>? results;
   final Set<String> knownUsernames;
+
+  /// The deployment's custom emoji, name to id. See [MessageBody].
+  final Map<String, String> customEmoji;
   final bool loading;
 
   /// A search that errored. Kept apart from [results] being empty, which
@@ -132,6 +136,7 @@ class ChannelSearchResults extends StatelessWidget {
             MessageBody(
               content: message.content,
               knownUsernames: knownUsernames,
+              customEmoji: customEmoji,
             ),
           ],
         );

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The settings screen's "Community management" section must be gated on
 /// what `GET /me` actually reports, not shown and left to answer 403: a
-/// caller with none of the four bits should see nothing new at all, and a
+/// caller with none of the gating bits should see nothing new at all, and a
 /// caller with one bit should see only the row that bit unlocks.
 library;
 
@@ -113,8 +113,8 @@ void main() {
     );
   });
 
-  testWidgets('an ordinary member with none of the four bits sees no community '
-      'management section at all', (tester) async {
+  testWidgets('an ordinary member with none of the gating bits sees no '
+      'community management section at all', (tester) async {
     await _pump(tester, 0);
 
     expect(find.text('Community management'), findsNothing);
@@ -122,6 +122,7 @@ void main() {
     expect(find.text('Invites'), findsNothing);
     expect(find.text('Roles'), findsNothing);
     expect(find.text('Channel permissions'), findsNothing);
+    expect(find.text('Emoji'), findsNothing);
   });
 
   testWidgets('MANAGE_MESSAGES alone unlocks only the reports row', (
@@ -160,6 +161,29 @@ void main() {
     },
   );
 
+  /// MANAGE_SERVER is the bit the emoji endpoints themselves enforce
+  /// (`require_manage_server` in `crates/slimm-server/src/http/emoji.rs`), so
+  /// it is the bit the row is gated on. It unlocks nothing else: a caller who
+  /// can change what the deployment is cannot thereby read the report queue.
+  testWidgets('MANAGE_SERVER alone unlocks only the emoji row', (tester) async {
+    await _pump(tester, Perm.manageServer);
+
+    expect(find.text('Community management'), findsOneWidget);
+    expect(find.text('Emoji'), findsOneWidget);
+    expect(find.text('Reports'), findsNothing);
+    expect(find.text('Invites'), findsNothing);
+    expect(find.text('Roles'), findsNothing);
+    expect(find.text('Channel permissions'), findsNothing);
+  });
+
+  testWidgets('MANAGE_ROLES does not bring the emoji row with it', (
+    tester,
+  ) async {
+    await _pump(tester, Perm.manageRoles);
+
+    expect(find.text('Emoji'), findsNothing);
+  });
+
   /// The server resolves ADMINISTRATOR into every bit before `/me` ever
   /// answers (see `evaluate()`'s bypass in permissions.rs), so the wire value
   /// a real administrator's client receives already has every bit set; this
@@ -174,5 +198,6 @@ void main() {
     expect(find.text('Invites'), findsOneWidget);
     expect(find.text('Roles'), findsOneWidget);
     expect(find.text('Channel permissions'), findsOneWidget);
+    expect(find.text('Emoji'), findsOneWidget);
   });
 }

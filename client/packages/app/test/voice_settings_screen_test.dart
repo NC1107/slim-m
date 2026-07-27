@@ -98,10 +98,10 @@ class _FakeSession implements VoiceSession {
   Future<bool> setMicrophoneEnabled(bool enabled) async => true;
 
   @override
-  Future<bool> setScreenShareEnabled(
+  Future<ScreenShareOutcome> setScreenShareEnabled(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
-  }) async => enabled;
+  }) async => enabled ? ScreenShareOutcome.started : ScreenShareOutcome.stopped;
 
   @override
   Future<bool> setDeafened(bool value) async => true;

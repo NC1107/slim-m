@@ -21,6 +21,7 @@ class AppChip extends StatelessWidget {
     this.icon,
   })  : _isReaction = false,
         emoji = null,
+        glyph = null,
         count = 0,
         active = false,
         onTap = null;
@@ -31,6 +32,7 @@ class AppChip extends StatelessWidget {
     required this.emoji,
     required this.count,
     required this.active,
+    this.glyph,
     this.onTap,
   })  : _isReaction = true,
         label = null,
@@ -46,7 +48,15 @@ class AppChip extends StatelessWidget {
 
   /// Reaction-only: the emoji glyph. User content, so it is a runtime string
   /// rather than a literal typed into source.
+  ///
+  /// Not always a codepoint: a deployment's own emoji is keyed by its
+  /// `:shortcode:`, which [glyph] then draws in place of this text. It still
+  /// names the reaction to a screen reader either way.
   final String? emoji;
+
+  /// Reaction-only: drawn instead of [emoji]'s text, for a reaction keyed by
+  /// something that has no glyph of its own. The caller sizes it.
+  final Widget? glyph;
 
   /// Reaction-only: how many people reacted.
   final int count;
@@ -121,8 +131,9 @@ class AppChip extends StatelessWidget {
             children: [
               // 13px, lineHeight 1: the design's own literal, not on the
               // AppText scale (nearest steps are caption 12 and ui 14).
-              Text(emoji ?? '',
-                  style: const TextStyle(fontSize: 13, height: 1)),
+              glyph ??
+                  Text(emoji ?? '',
+                      style: const TextStyle(fontSize: 13, height: 1)),
               const SizedBox(width: _reactionGap),
               Text(
                 '$count',

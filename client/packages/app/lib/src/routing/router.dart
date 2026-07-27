@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
 import '../screens/admin/channel_overwrites_screen.dart';
+import '../screens/admin/emoji_screen.dart';
 import '../screens/admin/invites_screen.dart';
 import '../screens/admin/reports_screen.dart';
 import '../screens/admin/roles_screen.dart';
@@ -93,6 +94,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.adminOverwrites,
         builder: (context, state) => const ChannelOverwritesScreen(),
+      ),
+      GoRoute(
+        path: Routes.adminEmoji,
+        builder: (context, state) => const EmojiScreen(),
       ),
       // The shell keeps the channel list alive across conversation changes.
       ShellRoute(

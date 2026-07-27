@@ -42,6 +42,8 @@ const Map<String, String> _allowlist = {
       'fail on',
   'GET /users/{}/avatar': 'reads raw bytes through SlimmApi._fetchBytes, the '
       'same as GET /attachments/{}',
+  'GET /emoji/{}/image': 'reads raw bytes through SlimmApi._fetchBytes, the '
+      'same as GET /attachments/{}',
 };
 
 const _httpMethods = {

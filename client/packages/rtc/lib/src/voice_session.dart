@@ -16,6 +16,9 @@ import 'dart:async';
 
 import 'package:livekit_client/livekit_client.dart' as lk;
 
+import 'broadcast_bridge.dart';
+import 'screen_share.dart';
+
 /// Where a session is in its lifecycle.
 enum VoiceSessionState {
   /// Not in a call.
@@ -73,35 +76,6 @@ class VoiceParticipant {
       identity, name, isSpeaking, isMuted, isLocal, isScreenSharing);
 }
 
-/// How a screen share is published.
-///
-/// Ceilings rather than preferences: an unbounded share on a 4K monitor will
-/// happily saturate a home upload and starve the audio it is supposed to
-/// accompany, and audio degrading is far more noticeable than a slightly softer
-/// screen.
-enum ScreenShareQuality {
-  /// Anything moving. Lower resolution, higher frame rate.
-  smooth(width: 1280, height: 720, fps: 60, maxBitrate: 2500000),
-
-  /// The default. Balanced for a desktop with some motion.
-  balanced(width: 1920, height: 1080, fps: 30, maxBitrate: 2400000),
-
-  /// Reading code. Higher resolution, lower frame rate.
-  crisp(width: 2560, height: 1440, fps: 15, maxBitrate: 3000000);
-
-  const ScreenShareQuality({
-    required this.width,
-    required this.height,
-    required this.fps,
-    required this.maxBitrate,
-  });
-
-  final int width;
-  final int height;
-  final int fps;
-  final int maxBitrate;
-}
-
 /// Builds the LiveKit room a session drives. The injection seam.
 typedef RoomFactory = lk.Room Function();
 
@@ -112,8 +86,9 @@ typedef RoomFactory = lk.Room Function();
 /// disposing, because a user can leave and rejoin without the surrounding
 /// screen being torn down.
 class VoiceSession {
-  VoiceSession({RoomFactory? roomFactory})
-      : _roomFactory = roomFactory ?? _defaultRoomFactory;
+  VoiceSession({RoomFactory? roomFactory, BroadcastBridge? broadcast})
+      : _roomFactory = roomFactory ?? _defaultRoomFactory,
+        _broadcast = broadcast ?? const MethodChannelBroadcastBridge();
 
   static lk.Room _defaultRoomFactory() => lk.Room(
         roomOptions: const lk.RoomOptions(
@@ -125,6 +100,7 @@ class VoiceSession {
       );
 
   final RoomFactory _roomFactory;
+  final BroadcastBridge _broadcast;
 
   lk.Room? _room;
   // room.events.listen returns a cancel function rather than a
@@ -231,14 +207,21 @@ class VoiceSession {
 
   /// Starts or stops sharing a screen, bounded by [quality].
   ///
-  /// Returns whether it ended up on. Stopping is treated as always succeeding
-  /// so a failure cannot strand somebody visibly sharing with no way to stop.
-  Future<bool> setScreenShareEnabled(
+  /// Reports what happened rather than what was asked for, because on iOS
+  /// those differ: see [ScreenShareOutcome]. Stopping asks the platform to end
+  /// any broadcast as well as dropping the track, so the two cannot get out of
+  /// step and leave a phone still recording with nothing published.
+  Future<ScreenShareOutcome> setScreenShareEnabled(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
   }) async {
     final room = _room;
-    if (room == null) return false;
+    if (room == null) return ScreenShareOutcome.failed;
+    // Asked before the request, not after a wait: a build with no extension
+    // shows no picker, so waiting only turns a knowable no into a slow one.
+    if (enabled && !await _broadcast.isAvailable()) {
+      return ScreenShareOutcome.unsupported;
+    }
     try {
       await room.localParticipant?.setScreenShareEnabled(
         enabled,
@@ -255,14 +238,25 @@ class VoiceSession {
               )
             : null,
       );
+      if (!enabled) await _broadcast.requestStop();
       _refreshParticipants();
-      return enabled;
+      if (!enabled) return ScreenShareOutcome.stopped;
+      return _isSharing(room.localParticipant)
+          ? ScreenShareOutcome.started
+          : ScreenShareOutcome.pendingBroadcast;
     } catch (e) {
       _lastError = e;
       _refreshParticipants();
-      return false;
+      return ScreenShareOutcome.failed;
     }
   }
+
+  /// A published screen track is the only thing that means anybody can see a
+  /// screen, so it is what both the roster and the outcome above read.
+  static bool _isSharing(lk.Participant? p) =>
+      p?.videoTrackPublications
+          .any((t) => t.source == lk.TrackSource.screenShareVideo) ??
+      false;
 
   /// Silences (or restores) every remote participant's audio locally, by
   /// disabling the underlying WebRTC track rather than unsubscribing from
@@ -341,8 +335,6 @@ class VoiceSession {
   VoiceParticipant _toParticipant(lk.Participant p, {required bool isLocal}) {
     final audio = p.audioTrackPublications;
     final muted = audio.isEmpty || audio.every((t) => t.muted);
-    final sharing = p.videoTrackPublications
-        .any((t) => t.source == lk.TrackSource.screenShareVideo);
     return VoiceParticipant(
       identity: p.identity,
       // Falls back to the identity rather than showing an empty row: a
@@ -351,7 +343,7 @@ class VoiceSession {
       isSpeaking: p.isSpeaking,
       isMuted: muted,
       isLocal: isLocal,
-      isScreenSharing: sharing,
+      isScreenSharing: _isSharing(p),
     );
   }
 

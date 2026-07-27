@@ -25,7 +25,7 @@ import 'message_row_harness.dart';
 /// package bump reorders it and a fixed literal would fail for a reason that
 /// has nothing to do with the behaviour under test.
 String _firstGridGlyph(WidgetTester tester) =>
-    tester.widget<EmojiGrid>(find.byType(EmojiGrid)).emoji.first.char;
+    tester.widget<EmojiGrid>(find.byType(EmojiGrid)).emoji.first.token;
 
 void main() {
   Widget row(MessageActions actions, {ValueChanged<String>? onPickReaction}) =>

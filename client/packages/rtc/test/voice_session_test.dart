@@ -29,6 +29,38 @@ class _FailingRoom extends lk.Room {
   }
 }
 
+/// A room that connects without an SFU behind it. Its `localParticipant`
+/// stays null, which is exactly the shape iOS produces on a share request:
+/// the call returns having published nothing.
+class _EmptyRoom extends lk.Room {
+  @override
+  Future<void> connect(
+    String url,
+    String token, {
+    lk.ConnectOptions? connectOptions,
+    lk.RoomOptions? roomOptions,
+    lk.FastConnectOptions? fastConnectOptions,
+  }) async {}
+}
+
+/// Stands in for the iOS host. [available] is what the app reports about its
+/// broadcast extension.
+class _FakeBridge implements BroadcastBridge {
+  _FakeBridge({this.available = true});
+
+  final bool available;
+  int stopRequests = 0;
+
+  @override
+  bool get usesBroadcastExtension => true;
+
+  @override
+  Future<bool> isAvailable() async => available;
+
+  @override
+  Future<void> requestStop() async => stopRequests++;
+}
+
 void main() {
   test('a fresh session is idle and holds no error', () {
     final session = VoiceSession(roomFactory: () => lk.Room());
@@ -77,9 +109,64 @@ void main() {
     // These must not act on a torn-down room, and must say so rather than
     // throwing into whatever called them. Deafening follows the same rule.
     expect(await session.setMicrophoneEnabled(true), isFalse);
-    expect(await session.setScreenShareEnabled(true), isFalse);
+    expect(
+      await session.setScreenShareEnabled(true),
+      ScreenShareOutcome.failed,
+    );
     expect(await session.setDeafened(true), isFalse);
     expect(session.deafened, isFalse);
+  });
+
+  group('screen share outcome', () {
+    // A bool cannot say what iOS does: the call returns with nothing
+    // published, and reporting that as success lit the share button anyway.
+
+    test('publishing nothing reports a pending broadcast, not success',
+        () async {
+      final session = VoiceSession(
+        roomFactory: _EmptyRoom.new,
+        broadcast: _FakeBridge(),
+      );
+      addTearDown(session.dispose);
+
+      await session.join(url: 'wss://a.invalid', token: 't');
+      expect(
+        await session.setScreenShareEnabled(true),
+        ScreenShareOutcome.pendingBroadcast,
+        reason: 'no screen track is published, so nobody can see a screen',
+      );
+    });
+
+    test('a host with no broadcast extension is refused up front', () async {
+      final session = VoiceSession(
+        roomFactory: _EmptyRoom.new,
+        broadcast: _FakeBridge(available: false),
+      );
+      addTearDown(session.dispose);
+
+      await session.join(url: 'wss://a.invalid', token: 't');
+      expect(
+        await session.setScreenShareEnabled(true),
+        ScreenShareOutcome.unsupported,
+        reason: 'waiting on a picker that cannot appear helps nobody',
+      );
+    });
+
+    test('stopping also ends the platform broadcast', () async {
+      // Dropping the track without this leaves the phone still recording,
+      // red status bar and all, with nothing being published.
+      final bridge = _FakeBridge();
+      final session =
+          VoiceSession(roomFactory: _EmptyRoom.new, broadcast: bridge);
+      addTearDown(session.dispose);
+
+      await session.join(url: 'wss://a.invalid', token: 't');
+      expect(
+        await session.setScreenShareEnabled(false),
+        ScreenShareOutcome.stopped,
+      );
+      expect(bridge.stopRequests, 1);
+    });
   });
 
   group('deafen', () {

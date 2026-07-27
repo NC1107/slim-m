@@ -54,6 +54,7 @@ class MessageRow extends StatelessWidget {
     required this.editing,
     required this.onSubmitEdit,
     required this.onCancelEdit,
+    this.customEmoji = const {},
     this.isWebhook = false,
     this.reactions = const [],
     this.attachments = const [],
@@ -73,12 +74,17 @@ class MessageRow extends StatelessWidget {
   /// [MessageBody].
   final Set<String> knownUsernames;
 
+  /// The deployment's custom emoji, name to id. Resolves a `:shortcode:` in
+  /// the body ([MessageBody]) and on a reaction chip ([ReactionsRow]) alike.
+  final Map<String, String> customEmoji;
+
   final VoidCallback onRetry;
   final VoidCallback onDiscard;
 
-  /// Called with the emoji character the add-reaction picker chose, from the
-  /// hover-revealed button in [ReactionsRow] or from the long-press menu's
-  /// own sheet, which is the only one of the two a finger can reach.
+  /// Called with the token the add-reaction picker chose (a codepoint, or a
+  /// `:shortcode:` for one of the deployment's own), from the hover-revealed
+  /// button in [ReactionsRow] or from the long-press menu's own sheet, which
+  /// is the only one of the two a finger can reach.
   final ValueChanged<String> onPickReaction;
 
   /// Toggles the caller's own reaction for an existing chip: on if
@@ -177,6 +183,7 @@ class MessageRow extends StatelessWidget {
                               : MessageBody(
                                   content: message.content,
                                   knownUsernames: knownUsernames,
+                                  customEmoji: customEmoji,
                                   dim: _unsent,
                                 ),
                           if (message.editedAt != null && !editing)
@@ -200,6 +207,7 @@ class MessageRow extends StatelessWidget {
                               reactions: reactions,
                               onReactionTap: onReactionTap,
                               onPickReaction: onPickReaction,
+                              customEmoji: customEmoji,
                               showAddButton: hovered,
                             ),
                           if (message.failed)

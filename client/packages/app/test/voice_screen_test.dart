@@ -65,10 +65,10 @@ class _NoopSession implements VoiceSession {
   Future<bool> setMicrophoneEnabled(bool enabled) async => true;
 
   @override
-  Future<bool> setScreenShareEnabled(
+  Future<ScreenShareOutcome> setScreenShareEnabled(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
-  }) async => true;
+  }) async => ScreenShareOutcome.started;
 
   @override
   Future<bool> setDeafened(bool value) async => true;
