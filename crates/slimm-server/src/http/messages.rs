@@ -204,7 +204,7 @@ async fn send(
         return Err(ApiError::Forbidden);
     }
 
-    let content = validate_content(&req.content)?;
+    let content = validate_content(&req.content, !attachment_ids.is_empty())?;
     let id = MessageId(parse_uuid(&req.id)?);
     let sent = state
         .store
@@ -376,7 +376,9 @@ async fn edit(
         return Err(ApiError::Forbidden);
     }
 
-    let content = validate_content(&req.content)?;
+    // An edit carries no attachment list, so it can never be the case that a
+    // file is left standing in for the text being cleared.
+    let content = validate_content(&req.content, false)?;
     let updated = state
         .store
         .edit_message(message_id, content)
@@ -434,8 +436,12 @@ pub(crate) async fn with_reactions(
 
 // --- Validation ---
 
-fn validate_content(content: &str) -> Result<&str, ApiError> {
-    if content.trim().is_empty() {
+/// Bounds a message's text. [`empty_ok`] is set by a send that carries
+/// attachments, where the file is the message and the text is genuinely
+/// optional; every other caller passes false, so the relaxation cannot spread
+/// by being the default.
+fn validate_content(content: &str, empty_ok: bool) -> Result<&str, ApiError> {
+    if !empty_ok && content.trim().is_empty() {
         return Err(ApiError::BadRequest("message content must not be empty"));
     }
     if content.chars().count() > MESSAGE_MAX_CHARS {

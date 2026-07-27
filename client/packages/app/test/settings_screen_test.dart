@@ -17,6 +17,7 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/presence_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/settings_screen.dart';
+import 'package:slimm_app/src/widgets/user_avatar.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -193,6 +194,44 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  /// The avatar disc used to sit flush on the hairline under it: its bottom
+  /// edge and the divider's top edge were both at y=209 on a 390pt viewport,
+  /// which reads as the picture overlapping the rule.
+  testWidgets('the avatar clears the divider under it at phone width', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+
+    final requests = <Uri>[];
+    final container = _signedInContainer(requests);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_screen(container));
+    await tester.pumpAndSettle();
+
+    final avatar = tester.getRect(find.byType(UserAvatar));
+    // The first divider whose top is at or below the avatar's own top: the
+    // one the avatar was overlapping, whatever else the list gains above it.
+    final below =
+        tester
+            .widgetList<Divider>(find.byType(Divider))
+            .map((d) => tester.getRect(find.byWidget(d)))
+            .where((r) => r.top >= avatar.top)
+            .toList()
+          ..sort((a, b) => a.top.compareTo(b.top));
+    expect(below, isNotEmpty, reason: 'no divider under the avatar to clear');
+
+    expect(
+      avatar.bottom,
+      lessThan(below.first.top),
+      reason:
+          'the avatar (bottom ${avatar.bottom}) touches or crosses the '
+          'divider below it (top ${below.first.top})',
+    );
+  });
+
   testWidgets('picking a presence option sends it and updates the display', (
     tester,
   ) async {
@@ -229,9 +268,8 @@ void main() {
     );
   });
 
-  // The regression: the overflow was once fixed by scrolling the four options
-  // horizontally, hiding two of them (one the privacy control) off the edge.
-  // They live in a sheet now, so the same property is asserted there.
+  // The overflow was once fixed by scrolling the four options horizontally,
+  // hiding two (one the privacy control); they live in a sheet now.
   testWidgets('every presence option is on screen and tappable at 390pt', (
     tester,
   ) async {

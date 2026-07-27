@@ -99,7 +99,7 @@ class _ManageChannelSheetState extends ConsumerState<_ManageChannelSheet> {
         title: Text('Delete "${widget.channel.name}"?'),
         content: const Text(
           'This deletes the channel and its message history for everyone '
-          'in the deployment. This cannot be undone.',
+          'in the Space. This cannot be undone.',
         ),
         actions: [
           TextButton(

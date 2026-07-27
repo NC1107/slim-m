@@ -59,6 +59,13 @@ class AppTokens extends ThemeExtension<AppTokens> {
 
   /// A step below [surfaceBase], for the rails. Six surfaces were not enough to
   /// draw the shell without the panes bleeding into each other.
+  ///
+  /// The three surfaces are a ramp, and the two steps in it are meant to be
+  /// comparable: a lower step much smaller than the upper one reads as two
+  /// surfaces rather than three, which is exactly the bleeding this token was
+  /// added to stop. `surface_ramp_test.dart` measures both steps in OKLab
+  /// lightness and fails if either is under half the other. [trueBlack] is
+  /// exempt and sets this equal to [surfaceBase] on purpose; see its doc.
   final Color surfaceSunken;
   final Color surfaceBase;
   final Color surfaceRaised;
@@ -69,6 +76,13 @@ class AppTokens extends ThemeExtension<AppTokens> {
 
   /// The separator for something that must read as an edge rather than a hint:
   /// a focused input, a menu against the surface it floats over.
+  ///
+  /// Of those two, only the menu uses it: [AppInput] authors its own focus
+  /// treatment in `accentFill` because the source design does, and says so at
+  /// the top of its file. Until 2026-07-27 the menu did not use it either, so
+  /// this token was declared, valued in three themes, copied and lerped, and
+  /// referenced by no widget - which meant a system with two border weights
+  /// only ever drew the weaker one.
   final Color borderStrong;
 
   final Color textPrimary;
@@ -178,7 +192,9 @@ class AppTokens extends ThemeExtension<AppTokens> {
 
   /// Hand-tuned dark theme (not a mechanical inversion of light).
   static const AppTokens dark = AppTokens(
-    surfaceSunken: Color(0xFF131518),
+    // Was #131518, which put the rails only 1.77 OKLab L below base while base
+    // sits 3.80 below raised. Even steps, the way light's ramp already is.
+    surfaceSunken: Color(0xFF0F1113),
     surfaceBase: Color(0xFF17191C),
     surfaceRaised: Color(0xFF1F2226),
     borderSubtle: Color(0xFF2E333A),

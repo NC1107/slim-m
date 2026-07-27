@@ -148,7 +148,7 @@ class VoiceController extends StateNotifier<VoiceState> {
     } on api.NotConfiguredException {
       state = state.copyWith(
         state: VoiceSessionState.failed,
-        error: 'This server has no voice configured.',
+        error: 'This Space has no voice configured.',
         retryable: false,
       );
     } on api.ForbiddenException {

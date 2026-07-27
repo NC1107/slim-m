@@ -47,29 +47,45 @@ class EmojiCategoryTabs extends StatelessWidget {
   }
 }
 
-/// A fixed-column grid of [emoji], with [highlighted] drawing the one
-/// keyboard `ArrowUp`/`ArrowDown` navigation currently sits on. Own scroll
-/// view: the panel gives it a bounded height and lets it page internally.
+/// A grid of [emoji], with [highlighted] drawing the one keyboard
+/// `ArrowUp`/`ArrowDown` navigation currently sits on. Own scroll view: the
+/// panel gives it a bounded height and lets it page internally.
+///
+/// Sized by cell rather than by column count. A fixed count makes the cell as
+/// wide as whatever surface it lands in, and the same grid serves a 320pt
+/// anchored popup and a bottom sheet that is 414pt on a phone and 624pt on a
+/// desktop; at eight columns that last one drew 71pt cells around a 20pt
+/// glyph. Against [cellExtent] the column count varies instead and every cell
+/// lands between roughly 38 and 44pt on all three.
 class EmojiGrid extends StatelessWidget {
   const EmojiGrid({
     super.key,
     required this.emoji,
     required this.highlighted,
     required this.onTap,
+    this.shrinkWrap = false,
   });
 
   final List<PickerEmoji> emoji;
   final int highlighted;
   final ValueChanged<PickerEmoji> onTap;
 
-  static const int columns = 8;
+  /// On for a caller that bounds the grid by a maximum rather than a fixed
+  /// height, so a handful of tiles occupies a handful of rows.
+  final bool shrinkWrap;
+
+  /// A cell's target size, and the ceiling on its measured one. It is
+  /// [AppSizes.rowTouch] because a cell is a tap target: the sheet is the
+  /// touch surface, and nothing here should ask for a smaller one.
+  static const double cellExtent = AppSizes.rowTouch;
 
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
+      shrinkWrap: shrinkWrap,
       padding: const EdgeInsets.all(AppSpacing.s8),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: cellExtent,
         mainAxisSpacing: AppSpacing.s4,
         crossAxisSpacing: AppSpacing.s4,
       ),

@@ -82,20 +82,20 @@ class OnboardingScreen extends ConsumerWidget {
                   _Entry(
                     icon: AppIcons.add,
                     title: 'I have an invite',
-                    description: 'Someone sent you a code for their server.',
+                    description: 'Someone sent you a code for their Space.',
                     onTap: () => _redeemFlow(context),
                   ),
                   const SizedBox(height: AppSpacing.s12),
                   _Entry(
                     icon: AppIcons.settings,
-                    title: 'Connect to a server',
+                    title: 'Connect to a Space',
                     description: 'You run your own, or you have its address.',
                     onTap: () => _manualFlow(context, ref),
                   ),
                   const SizedBox(height: AppSpacing.s12),
                   _Entry(
                     icon: AppIcons.members,
-                    title: 'Join the official server',
+                    title: 'Join the official Space',
                     description: officialServer,
                     onTap: () =>
                         onServerChosen(Uri.parse(officialServer), null),
@@ -288,7 +288,7 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
             contentPadding: EdgeInsets.zero,
             controlAffinity: ListTileControlAffinity.leading,
             title: const Text(
-              'I accept the terms of use for this server.',
+              'I accept the terms of use for this Space.',
               style: TextStyle(fontSize: 13),
             ),
           ),
@@ -363,7 +363,7 @@ class _ManualServerDialogState extends State<_ManualServerDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Connect to a server'),
+      title: const Text('Connect to a Space'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -379,7 +379,7 @@ class _ManualServerDialogState extends State<_ManualServerDialog> {
           ),
           const SizedBox(height: AppSpacing.s16),
           Text(
-            'Whoever runs this server can read the messages sent through it. '
+            'Whoever runs this Space can read the messages sent through it. '
             'Only connect to one you trust.',
             style: TextStyle(
               fontSize: 13,

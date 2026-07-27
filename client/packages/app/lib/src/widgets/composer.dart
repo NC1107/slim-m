@@ -42,19 +42,23 @@ class Composer extends ConsumerStatefulWidget {
 
 class _ComposerState extends ConsumerState<Composer> {
   /// Two flags, one purpose each. [_hasText] drives the placeholder and is
-  /// deliberately untrimmed, so typed spaces hide it; [_canSend] is trimmed,
-  /// because the send path drops whitespace-only text.
+  /// deliberately untrimmed, so typed spaces hide it; [_hasSendableText] is
+  /// trimmed, because the send path drops whitespace-only text.
   bool _hasText = false;
-  bool _canSend = false;
+  bool _hasSendableText = false;
   bool _uploading = false;
   final List<api.Attachment> _pendingAttachments = [];
   final FocusNode _focus = FocusNode();
+
+  /// A staged file is sendable on its own: a photo needs no caption, and the
+  /// server accepts an empty body precisely when attachments ride along.
+  bool get _canSend => _hasSendableText || _pendingAttachments.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
     _hasText = widget.controller.text.isNotEmpty;
-    _canSend = widget.controller.text.trim().isNotEmpty;
+    _hasSendableText = widget.controller.text.trim().isNotEmpty;
     widget.controller.addListener(_handleChange);
   }
 
@@ -67,11 +71,11 @@ class _ComposerState extends ConsumerState<Composer> {
 
   void _handleChange() {
     final hasText = widget.controller.text.isNotEmpty;
-    final canSend = widget.controller.text.trim().isNotEmpty;
-    if (hasText == _hasText && canSend == _canSend) return;
+    final sendable = widget.controller.text.trim().isNotEmpty;
+    if (hasText == _hasText && sendable == _hasSendableText) return;
     setState(() {
       _hasText = hasText;
-      _canSend = canSend;
+      _hasSendableText = sendable;
     });
   }
 
@@ -93,8 +97,17 @@ class _ComposerState extends ConsumerState<Composer> {
 
   void _insertCodeFence() => _insert('``', caretOffset: 1);
 
-  void _pickEmoji() =>
-      unawaited(showEmojiPickerSheet(context, onSelect: _insert));
+  /// The Space's own emoji only. Native ones come from the keyboard already
+  /// under the field, which searches and skin-tones better than this could.
+  void _pickEmoji() => unawaited(
+    showSpaceEmojiSheet(
+      context,
+      onSelect: (emoji) {
+        _focus.requestFocus();
+        _insert(emoji);
+      },
+    ),
+  );
 
   void _openActions() => unawaited(
     showComposerActionsSheet(
@@ -112,17 +125,23 @@ class _ComposerState extends ConsumerState<Composer> {
     unawaited(_send());
   }
 
+  /// Re-focuses the field on every exit, including a cancelled pick: the
+  /// native picker takes focus with it, and without this the caret never
+  /// comes back and typing goes nowhere.
   Future<void> _pickAttachment() async {
     final FilePickerResult? result;
     try {
       result = await FilePicker.pickFiles();
     } catch (e) {
       if (!mounted) return;
+      _focus.requestFocus();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not open the file picker. $e')),
       );
       return;
     }
+    if (!mounted) return;
+    _focus.requestFocus();
     final files = result?.files ?? const <PlatformFile>[];
     if (files.isEmpty) return;
     final file = files.first;

@@ -42,7 +42,7 @@ abstract final class Perm {
     (speak, 'Speak in voice channels'),
     (useCanvas, 'Use the voice canvas'),
     (manageCanvas, 'Manage the voice canvas'),
-    (manageServer, 'Manage community settings'),
+    (manageServer, 'Manage Space settings'),
   ];
 }
 

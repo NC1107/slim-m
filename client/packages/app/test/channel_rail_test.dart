@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Tests for the rail's user footer: the avatar is the status switcher, and
-/// the bar keeps its content clear of the home indicator.
+/// Tests for the rail's fixed bars: the header's menu, and the user footer
+/// where the avatar is the status switcher and the bar keeps its content clear
+/// of the home indicator.
 ///
-/// Both halves shipped broken. The avatar was a bare widget with no gesture
-/// wrapper anywhere in the file, so the only way to appear offline was two
-/// taps and a scroll into settings; and the footer painted its lower 34
-/// points under the home indicator on every notched phone.
+/// Both halves of the footer shipped broken. The avatar was a bare widget with
+/// no gesture wrapper anywhere in the file, so the only way to appear offline
+/// was two taps and a scroll into settings; and the footer painted its lower
+/// 34 points under the home indicator on every notched phone.
 library;
 
 import 'dart:convert';
@@ -147,6 +148,24 @@ Future<void> _pumpFooter(
   await tester.pumpAndSettle();
 }
 
+/// Pumps the header alone, which needs no insets: what it is asked about here
+/// is the menu its chevron opens, not where the bar sits.
+Future<void> _pumpHeader(
+  WidgetTester tester,
+  ProviderContainer container,
+) async {
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: const Scaffold(body: Column(children: [RailHeader()])),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 /// The footer's own painted background, which its [Container] builds as the
 /// outermost [DecoratedBox] under [RailUserFooter].
 ///
@@ -279,5 +298,20 @@ void main() {
       expect(tester.takeException(), isNull, reason: 'text scale $scale');
       setup.container.dispose();
     }
+  });
+
+  // One deployment is a Space. The header's chevron opens what that Space is
+  // and how it is run, so "Server menu" named the machine behind it instead.
+  testWidgets('the header menu is announced as the Space menu, and opens the '
+      "Space's settings", (tester) async {
+    final setup = _setup(SyncStatus.live);
+    addTearDown(setup.container.dispose);
+    await _pumpHeader(tester, setup.container);
+
+    expect(find.bySemanticsLabel('Server menu'), findsNothing);
+    await tester.tap(find.bySemanticsLabel('Space menu'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Settings'), findsOneWidget);
   });
 }

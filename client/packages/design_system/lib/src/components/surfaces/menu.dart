@@ -6,6 +6,16 @@
 /// [AppMenu] is one of exactly two places in this system allowed a shadow
 /// ([AppShadows.menu]) rather than a hairline, because it is the one thing
 /// here that is genuinely above the plane rather than part of it.
+///
+/// Its outer edge is [AppTokens.borderStrong], the case that token's own doc
+/// names: "a menu against the surface it floats over". It was drawn in
+/// `borderSubtle` until 2026-07-27, which left `borderStrong` referenced by no
+/// widget at all and every edge in the app at the same weakest hairline. In
+/// dark that edge went from 1.38:1 against the surface below it to 3.76:1, and
+/// in true black from 1.62:1 to 4.48:1. A menu is unambiguously a UI component
+/// rather than an incidental separator, so unlike the in-pane hairlines
+/// discussed in `contrast_test.dart` it is not exempt from the 3:1 of WCAG
+/// 1.4.11 - though light still does not reach it, at 1.55:1.
 library;
 
 import 'package:flutter/material.dart';
@@ -43,7 +53,7 @@ class AppMenu extends StatelessWidget {
         width: width,
         decoration: BoxDecoration(
           color: tokens.surfaceRaised,
-          border: Border.all(color: tokens.borderSubtle),
+          border: Border.all(color: tokens.borderStrong),
           borderRadius: BorderRadius.circular(AppRadii.card),
           boxShadow: floating ? AppShadows.menu : null,
         ),

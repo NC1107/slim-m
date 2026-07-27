@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The rail's fixed top and bottom bars: the server header (with its menu)
+/// The rail's fixed top and bottom bars: the Space header (with its menu)
 /// and the signed-in user's footer.
 library;
 
@@ -76,7 +76,7 @@ class RailHeader extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const _ServerMenuButton(),
+                const _SpaceMenuButton(),
               ],
             ),
           ),
@@ -86,14 +86,14 @@ class RailHeader extends ConsumerWidget {
   }
 }
 
-class _ServerMenuButton extends StatefulWidget {
-  const _ServerMenuButton();
+class _SpaceMenuButton extends StatefulWidget {
+  const _SpaceMenuButton();
 
   @override
-  State<_ServerMenuButton> createState() => _ServerMenuButtonState();
+  State<_SpaceMenuButton> createState() => _SpaceMenuButtonState();
 }
 
-class _ServerMenuButtonState extends State<_ServerMenuButton> {
+class _SpaceMenuButtonState extends State<_SpaceMenuButton> {
   final _controller = OverlayPortalController();
   final _link = LayerLink();
 
@@ -134,7 +134,7 @@ class _ServerMenuButtonState extends State<_ServerMenuButton> {
         ),
         child: AppIconButton(
           icon: AppIcons.chevronDown,
-          semanticLabel: 'Server menu',
+          semanticLabel: 'Space menu',
           onPressed: _controller.toggle,
         ),
       ),
