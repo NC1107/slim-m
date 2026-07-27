@@ -51,6 +51,10 @@ const _noActions = MessageActions(
   canManagePins: false,
   pinned: false,
   onTogglePin: _noop,
+  canReport: false,
+  onReport: _noop,
+  canBlockAuthor: false,
+  onBlockAuthor: _noop,
 );
 
 // The leading avatar is provider-backed now (it resolves the author's own
@@ -486,6 +490,10 @@ void main() {
         canManagePins: false,
         pinned: false,
         onTogglePin: _noop,
+        canReport: false,
+        onReport: _noop,
+        canBlockAuthor: false,
+        onBlockAuthor: _noop,
       )));
 
       await tester.tapAt(pressPoint(tester),
@@ -506,6 +514,10 @@ void main() {
         canManagePins: true,
         pinned: true,
         onTogglePin: _noop,
+        canReport: false,
+        onReport: _noop,
+        canBlockAuthor: false,
+        onBlockAuthor: _noop,
       )));
 
       await tester.longPressAt(pressPoint(tester));
@@ -525,6 +537,10 @@ void main() {
         canManagePins: false,
         pinned: false,
         onTogglePin: _noop,
+        canReport: false,
+        onReport: _noop,
+        canBlockAuthor: false,
+        onBlockAuthor: _noop,
       )));
 
       await tester.longPressAt(pressPoint(tester));
@@ -532,6 +548,45 @@ void main() {
       await tester.tap(find.text('Delete'));
 
       expect(deleted, isTrue);
+    });
+
+    // The bug this covers: SlimmApi.report had no call site anywhere in
+    // packages/app despite the endpoint, the wire model, and a full admin
+    // triage screen all existing. Nothing gated that regressing, so this
+    // fails without a rendered "Report message" item for someone else's
+    // message the caller is allowed to report.
+    testWidgets('a message not authored by the caller offers Report and Block',
+        (tester) async {
+      var reported = false;
+      var blocked = false;
+      await tester.pumpWidget(rowWith(MessageActions(
+        canEdit: false,
+        onEdit: _noop,
+        canDelete: false,
+        onDelete: _noop,
+        canManagePins: false,
+        pinned: false,
+        onTogglePin: _noop,
+        canReport: true,
+        onReport: () => reported = true,
+        canBlockAuthor: true,
+        onBlockAuthor: () => blocked = true,
+      )));
+
+      await tester.longPressAt(pressPoint(tester));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Report message'), findsOneWidget);
+      expect(find.text('Block user'), findsOneWidget);
+
+      await tester.tap(find.text('Report message'));
+      await tester.pumpAndSettle();
+      expect(reported, isTrue);
+
+      await tester.longPressAt(pressPoint(tester));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Block user'));
+      expect(blocked, isTrue);
     });
   });
 

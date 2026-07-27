@@ -21,7 +21,7 @@ import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../../widgets/confirm_dialog.dart';
-import '../../widgets/member_pane.dart' show membersProvider;
+import 'overwrite_target_picker_sheets.dart';
 import 'permission_overwrite_row.dart';
 
 class ChannelOverwritesScreen extends ConsumerStatefulWidget {
@@ -79,21 +79,11 @@ class _ChannelOverwritesScreenState
 
   Future<void> _pickTarget() async {
     if (_kind == api.OverwriteTarget.role) {
-      final roles = ref.read(rolesProvider).valueOrNull ?? const [];
       final picked = await showModalBottomSheet<api.Role>(
         context: context,
+        isScrollControlled: true,
         showDragHandle: true,
-        builder: (context) => ListView(
-          shrinkWrap: true,
-          children: [
-            for (final r in roles)
-              ListTile(
-                leading: const Icon(AppIcons.shield),
-                title: Text(r.name),
-                onTap: () => Navigator.of(context).pop(r),
-              ),
-          ],
-        ),
+        builder: (context) => const RolePickerSheet(),
       );
       if (picked == null || !mounted) return;
       setState(() {
@@ -102,22 +92,11 @@ class _ChannelOverwritesScreenState
         _resetState();
       });
     } else {
-      final members = ref.read(membersProvider).valueOrNull ?? const [];
       final picked = await showModalBottomSheet<api.UserProfile>(
         context: context,
+        isScrollControlled: true,
         showDragHandle: true,
-        builder: (context) => ListView(
-          shrinkWrap: true,
-          children: [
-            for (final m in members)
-              ListTile(
-                leading: const Icon(AppIcons.account),
-                title: Text(m.displayName),
-                subtitle: Text('@${m.username}'),
-                onTap: () => Navigator.of(context).pop(m),
-              ),
-          ],
-        ),
+        builder: (context) => const MemberPickerSheet(),
       );
       if (picked == null || !mounted) return;
       setState(() {
@@ -229,11 +208,17 @@ class _ChannelOverwritesScreenState
           const SizedBox(height: AppSpacing.s16),
           AppCard(
             title: 'Channel',
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(_channel?.name ?? 'Choose a channel'),
-              trailing: const Icon(AppIcons.chevronRight),
-              onTap: _pickChannel,
+            // The card's own background sits between a bare ListTile and the
+            // Scaffold's Material, which swallows its ink splash; a
+            // transparent Material here gives the splash somewhere to paint.
+            child: Material(
+              type: MaterialType.transparency,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_channel?.name ?? 'Choose a channel'),
+                trailing: const Icon(AppIcons.chevronRight),
+                onTap: _pickChannel,
+              ),
             ),
           ),
           if (_channel != null) ...[
@@ -255,12 +240,15 @@ class _ChannelOverwritesScreenState
             const SizedBox(height: AppSpacing.s12),
             AppCard(
               title: _kind == api.OverwriteTarget.role ? 'Role' : 'Member',
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(_targetLabel ??
-                    'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}'),
-                trailing: const Icon(AppIcons.chevronRight),
-                onTap: _pickTarget,
+              child: Material(
+                type: MaterialType.transparency,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(_targetLabel ??
+                      'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}'),
+                  trailing: const Icon(AppIcons.chevronRight),
+                  onTap: _pickTarget,
+                ),
               ),
             ),
           ],

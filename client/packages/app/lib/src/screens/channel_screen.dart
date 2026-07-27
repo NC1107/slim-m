@@ -25,6 +25,7 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/message_context_menu.dart';
 import '../widgets/message_row.dart';
+import '../widgets/report_dialog.dart';
 
 export '../ids.dart' show newMessageId;
 
@@ -65,6 +66,15 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// The message currently swapped into its inline edit field, if any. At
   /// most one at a time: starting a new edit implicitly cancels another.
   String? _editingId;
+
+  /// The highest seq this state has already asked the store and server to
+  /// mark read, per channel. Keyed by channel because this state outlives a
+  /// channel switch: [ConversationPane] builds this widget with no key, so
+  /// navigating between channels reuses the same [State] rather than a fresh
+  /// one. Without the guard, every rebuild of an already-read channel (a
+  /// reaction landing, a typing indicator, anything) would re-fire both
+  /// calls for a seq that is already recorded as read.
+  final Map<String, int> _markedReadSeq = {};
 
   @override
   void initState() {
@@ -223,6 +233,41 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     }
   }
 
+  Future<void> _reportMessage(Message message) async {
+    final reason =
+        await promptReportReason(context, subjectLabel: 'this message');
+    if (reason == null || !mounted) return;
+    try {
+      await ref.read(apiProvider).report(
+            subject: api.ReportSubject.message,
+            subjectId: message.id,
+            reason: reason,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Report filed. A moderator will review it.')));
+    } on api.ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not file the report. ${e.message}')));
+    }
+  }
+
+  Future<void> _blockAuthor(Message message) async {
+    final authorId = message.authorId;
+    if (authorId == null) return;
+    try {
+      await ref.read(apiProvider).blockUser(authorId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Blocked. Their messages are hidden for you.')));
+    } on api.ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not block that user. ${e.message}')));
+    }
+  }
+
   void _toggleSearch() {
     setState(() {
       _searchOpen = !_searchOpen;
@@ -281,6 +326,45 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         _searchLoading = false;
         _searchFailed = true;
       });
+    }
+  }
+
+  /// Advances the read marker to the newest message actually rendered.
+  ///
+  /// Pending sends are skipped: they carry seq 0 until the server
+  /// acknowledges them, so treating one as "read" would either no-op or,
+  /// once the real send lands with its assigned seq, immediately look
+  /// unread again for a message the user already sees on screen.
+  ///
+  /// The local write and the network call are both monotonic and idempotent
+  /// (`MessageStore.setReadMarker`, the server's `PUT .../read`), so a
+  /// redundant call is harmless; [_markedReadSeq] exists only to keep a busy
+  /// channel from re-sending the same seq on every unrelated rebuild.
+  void _markReadUpToLatest(List<Message> messages, int lastReadSeq) {
+    Message? newest;
+    for (final message in messages.reversed) {
+      if (!message.pending) {
+        newest = message;
+        break;
+      }
+    }
+    if (newest == null) return;
+    final seq = newest.seq;
+    if (seq <= lastReadSeq) return;
+    if ((_markedReadSeq[widget.channelId] ?? 0) >= seq) return;
+    _markedReadSeq[widget.channelId] = seq;
+    unawaited(_markRead(widget.channelId, seq));
+  }
+
+  Future<void> _markRead(String channelId, int seq) async {
+    final store = await ref.read(storeProvider.future);
+    await store.setReadMarker(channelId, seq);
+    try {
+      await ref.read(apiProvider).markRead(channelId: channelId, seq: seq);
+    } on api.ApiException {
+      // Best-effort: the local marker already advanced, so the UI is
+      // already correct, and the next message or reconnect gives the
+      // server another chance to hear it.
     }
   }
 
@@ -361,6 +445,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                 syncStatus: ref.watch(syncControllerProvider));
                           }
                           final lastReadSeq = channel?.lastReadSeq ?? 0;
+                          _markReadUpToLatest(messages, lastReadSeq);
                           // The design fills the column from the bottom, so a
                           // short conversation sits against the composer
                           // rather than stranding it below empty space.
@@ -416,6 +501,13 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   pinned: pinned,
                                   onTogglePin: () =>
                                       unawaited(_togglePin(message, pinned)),
+                                  canReport: canReportMessage(message, myId),
+                                  onReport: () =>
+                                      unawaited(_reportMessage(message)),
+                                  canBlockAuthor:
+                                      canBlockMessageAuthor(message, myId),
+                                  onBlockAuthor: () =>
+                                      unawaited(_blockAuthor(message)),
                                 ),
                               );
                             },

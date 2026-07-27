@@ -22,6 +22,10 @@ class MessageActions {
     required this.canManagePins,
     required this.pinned,
     required this.onTogglePin,
+    required this.canReport,
+    required this.onReport,
+    required this.canBlockAuthor,
+    required this.onBlockAuthor,
   });
 
   final bool canEdit;
@@ -37,6 +41,16 @@ class MessageActions {
   /// [canManagePins] is false, since the item is absent either way.
   final bool pinned;
   final VoidCallback onTogglePin;
+
+  /// False for a message you authored: reporting your own content has
+  /// nothing to investigate that deleting it would not already resolve.
+  final bool canReport;
+  final VoidCallback onReport;
+
+  /// False for your own message and for one with no live author (a
+  /// deleted account's content is anonymized and has nobody left to block).
+  final bool canBlockAuthor;
+  final VoidCallback onBlockAuthor;
 }
 
 /// Wraps [child] so a right-click or long-press over it opens a menu for
@@ -85,45 +99,67 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
       link: _link,
       child: OverlayPortal(
         controller: _controller,
-        overlayChildBuilder: (context) => CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          targetAnchor: Alignment.topLeft,
-          followerAnchor: Alignment.topLeft,
-          offset: const Offset(24, 12),
-          child: TapRegion(
-            onTapOutside: (_) => _setOpen(false),
-            child: AppMenu(
-              width: 200,
-              children: [
-                AppMenuItem(
-                  label: 'Copy text',
-                  leading: AppIcons.copy,
-                  onTap: () => _run(() =>
-                      Clipboard.setData(ClipboardData(text: widget.content))),
-                ),
-                if (actions.canEdit)
+        // Positioned so the follower sizes to its content: an overlay child is
+        // otherwise laid out against the whole screen, which a Column fills.
+        overlayChildBuilder: (context) => Positioned(
+          left: 0,
+          top: 0,
+          child: CompositedTransformFollower(
+            link: _link,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.topLeft,
+            followerAnchor: Alignment.topLeft,
+            offset: const Offset(24, 12),
+            child: TapRegion(
+              onTapOutside: (_) => _setOpen(false),
+              child: AppMenu(
+                width: 200,
+                children: [
                   AppMenuItem(
-                    label: 'Edit',
-                    leading: AppIcons.edit,
-                    onTap: () => _run(actions.onEdit),
+                    label: 'Copy text',
+                    leading: AppIcons.copy,
+                    onTap: () => _run(() =>
+                        Clipboard.setData(ClipboardData(text: widget.content))),
                   ),
-                if (actions.canManagePins)
-                  AppMenuItem(
-                    label: actions.pinned ? 'Unpin' : 'Pin',
-                    leading: AppIcons.pin,
-                    onTap: () => _run(actions.onTogglePin),
-                  ),
-                if (actions.canDelete) ...[
-                  const AppMenuDivider(),
-                  AppMenuItem(
-                    label: 'Delete',
-                    leading: AppIcons.delete,
-                    tone: AppMenuItemTone.danger,
-                    onTap: () => _run(actions.onDelete),
-                  ),
+                  if (actions.canEdit)
+                    AppMenuItem(
+                      label: 'Edit',
+                      leading: AppIcons.edit,
+                      onTap: () => _run(actions.onEdit),
+                    ),
+                  if (actions.canManagePins)
+                    AppMenuItem(
+                      label: actions.pinned ? 'Unpin' : 'Pin',
+                      leading: AppIcons.pin,
+                      onTap: () => _run(actions.onTogglePin),
+                    ),
+                  if (actions.canReport || actions.canBlockAuthor) ...[
+                    const AppMenuDivider(),
+                    if (actions.canReport)
+                      AppMenuItem(
+                        label: 'Report message',
+                        leading: AppIcons.report,
+                        onTap: () => _run(actions.onReport),
+                      ),
+                    if (actions.canBlockAuthor)
+                      AppMenuItem(
+                        label: 'Block user',
+                        leading: AppIcons.revoke,
+                        tone: AppMenuItemTone.danger,
+                        onTap: () => _run(actions.onBlockAuthor),
+                      ),
+                  ],
+                  if (actions.canDelete) ...[
+                    const AppMenuDivider(),
+                    AppMenuItem(
+                      label: 'Delete',
+                      leading: AppIcons.delete,
+                      tone: AppMenuItemTone.danger,
+                      onTap: () => _run(actions.onDelete),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

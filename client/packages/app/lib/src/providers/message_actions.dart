@@ -89,6 +89,19 @@ bool canManageMessagePin(Message message, int myPermissions) =>
     !message.failed &&
     myPermissions.hasPermission(Perm.manageMessages);
 
+/// Any live message not your own. The server enforces no authorship rule
+/// on `/reports`; this is purely a client-side UX gate.
+bool canReportMessage(Message message, String? myUserId) =>
+    !message.pending && !message.failed && !_isAuthor(message, myUserId);
+
+/// Blocking is keyed by author id, so a message with no live author (its
+/// account was deleted and the content anonymized) has nobody left to block.
+bool canBlockMessageAuthor(Message message, String? myUserId) =>
+    !message.pending &&
+    !message.failed &&
+    message.authorId != null &&
+    !_isAuthor(message, myUserId);
+
 /// Edits a message, then applies the server's returned copy (with its
 /// fresh `edited_at`) to the local store and the extras cache the same way
 /// a live `message.edited` event would, so the row's own edited marker

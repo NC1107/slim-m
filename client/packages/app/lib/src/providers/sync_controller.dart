@@ -4,6 +4,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_data/data.dart';
@@ -60,6 +61,10 @@ class SyncController extends StateNotifier<SyncStatus> {
   bool _disposed = false;
   int _attempt = 0;
 
+  /// The in-flight refresh from a live event naming an unknown channel, so a
+  /// burst of such frames shares one round trip rather than firing one each.
+  Future<void>? _channelRefresh;
+
   /// Every event this session receives, broadcast to whoever else wants one
   /// (presence, typing, reactions, pins, polls): a second, independent
   /// listener on top of the store-application switch below, so those
@@ -110,10 +115,38 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// channel table under the same shape, so everything downstream (the
   /// rail, sync cursors, read state) treats a DM exactly like any other
   /// channel once it is here.
+  ///
+  /// Also hydrates each channel's read marker from the server. `ScopeDelta`
+  /// carries no read state, so `/sync` can never do this, and
+  /// `MessageStore.clear()` wipes the local marker on every sign-out; without
+  /// this, a reinstall or a second device shows every channel unread
+  /// forever, however recently it was actually read elsewhere.
   Future<void> _refreshChannels(SlimmApi api, MessageStore store) async {
     final channels = await api.listChannels();
     final dms = await api.listDirectMessages();
-    await store.upsertChannels([...channels, ...dms.map(channelFromDm)]);
+    final all = [...channels, ...dms.map(channelFromDm)];
+    await store.upsertChannels(all);
+
+    // Per channel, not bundled with the listing above: the server does not
+    // hand back read state for a list of channels in one call. One channel's
+    // read state failing to fetch must not stop the rest from hydrating.
+    await Future.wait(all.map((channel) async {
+      try {
+        final read = await api.readState(channel.id);
+        await store.setReadMarker(channel.id, read.lastReadSeq);
+      } on ApiException {
+        // Best-effort: the next refresh (reconnect, or the next start())
+        // tries again, and until then the channel just reads as unread.
+      }
+    }));
+  }
+
+  /// [_refreshChannels], but a concurrent caller joins the one already
+  /// running instead of starting a second. See [_channelRefresh].
+  Future<void> _refreshChannelsOnce(SlimmApi api, MessageStore store) {
+    return _channelRefresh ??= _refreshChannels(api, store).whenComplete(() {
+      _channelRefresh = null;
+    });
   }
 
   /// Catches every known scope up in one request, applying deltas in order.
@@ -163,27 +196,48 @@ class SyncController extends StateNotifier<SyncStatus> {
         // about, say, ReactionsChanged must not depend on this switch ever
         // learning about that event type.
         _liveEvents.add(event);
-        switch (event) {
-          case MessageCreated(:final message):
-          case MessageEdited(:final message):
-            await store.applyMessage(message);
-          case MessageDeleted(:final messageId):
-            // Closes a real gap: this switch previously had no case for a
-            // delete at all, so a message removed by another user (or this
-            // account's own delete looping back) never left the local store
-            // and stayed visible until the next full resync.
-            await store.discard(messageId);
-          case ErrorEvent(:final needsResync) when needsResync:
-            // The connection fell behind and the server closed it; a restart
-            // re-runs catch-up, which is exactly the recovery.
-            unawaited(start());
-          case _:
-            break;
-        }
+        await _applyServerEvent(api, store, event);
       },
       onError: (_) => _onDropped(),
       onDone: _onDropped,
     );
+  }
+
+  /// How one frame from the socket changes local state. A method of its own
+  /// so [applyServerEventForTest] can drive it without a real socket.
+  Future<void> _applyServerEvent(
+      SlimmApi api, MessageStore store, ServerEvent event) async {
+    switch (event) {
+      case MessageCreated(:final message):
+      case MessageEdited(:final message):
+        // A DM's first message is a channel this client has never
+        // fetched; materialise it first or applyMessage lands silently.
+        if (!await store.hasChannel(message.channelId)) {
+          await _refreshChannelsOnce(api, store);
+        }
+        await store.applyMessage(message);
+      case MessageDeleted(:final messageId):
+        // Closes a real gap: this switch previously had no case for a
+        // delete at all, so a message removed by another user (or this
+        // account's own delete looping back) never left the local store
+        // and stayed visible until the next full resync.
+        await store.discard(messageId);
+      case ErrorEvent(:final needsResync) when needsResync:
+        // The connection fell behind and the server closed it; a restart
+        // re-runs catch-up, which is exactly the recovery.
+        unawaited(start());
+      case _:
+        break;
+    }
+  }
+
+  /// Applies one live event the way [_attach]'s listener would, without
+  /// needing a real socket. For tests only.
+  @visibleForTesting
+  Future<void> applyServerEventForTest(ServerEvent event) async {
+    final api = _ref.read(apiProvider);
+    final store = await _ref.read(storeProvider.future);
+    await _applyServerEvent(api, store, event);
   }
 
   void _onDropped() {

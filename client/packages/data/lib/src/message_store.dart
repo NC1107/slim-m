@@ -49,6 +49,15 @@ class MessageStore {
     return row?.cursor ?? 0;
   }
 
+  /// Whether a channel row exists locally. Unlike [cursorFor], which returns
+  /// 0 for both "unknown" and "known but unread", this tells them apart.
+  Future<bool> hasChannel(String channelId) async {
+    final row = await (db.select(db.channels)
+          ..where((c) => c.id.equals(channelId)))
+        .getSingleOrNull();
+    return row != null;
+  }
+
   /// Every channel's cursor, for a bundled catch-up request.
   Future<List<api.ScopeCursor>> allCursors() async {
     final rows = await db.select(db.channels).get();

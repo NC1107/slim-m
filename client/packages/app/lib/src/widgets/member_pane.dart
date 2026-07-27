@@ -12,6 +12,8 @@
 /// in-voice flag on a profile, so the design's speaker glyph is left off.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,10 +21,50 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/dms.dart';
+import '../providers/live_events.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
+import 'context_menu_region.dart';
+import 'report_dialog.dart';
 import 'user_avatar.dart';
+
+/// Files a report against a member, from the row's context menu.
+Future<void> _reportUser(
+    BuildContext context, WidgetRef ref, api.UserProfile profile) async {
+  final reason = await promptReportReason(context, subjectLabel: 'this member');
+  if (reason == null || !context.mounted) return;
+  try {
+    await ref.read(apiProvider).report(
+          subject: api.ReportSubject.user,
+          subjectId: profile.id,
+          reason: reason,
+        );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Report filed. A moderator will review it.')));
+  } on api.ApiException catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not file the report. ${e.message}')));
+  }
+}
+
+/// Blocks a member from the row's context menu; see `SlimmApi.blockUser`
+/// for why the blocked member is never told.
+Future<void> _blockUser(
+    BuildContext context, WidgetRef ref, api.UserProfile profile) async {
+  try {
+    await ref.read(apiProvider).blockUser(profile.id);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Blocked. Their messages are hidden for you.')));
+  } on api.ApiException catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not block that user. ${e.message}')));
+  }
+}
 
 /// The deployment's members. Real endpoint, real data.
 final membersProvider = FutureProvider.autoDispose<List<api.UserProfile>>(
@@ -40,6 +82,47 @@ final _presenceSeedProvider = FutureProvider.autoDispose<void>((ref) async {
   await ref
       .read(presenceControllerProvider.notifier)
       .refresh(members.map((m) => m.id));
+});
+
+/// Mirrors `MEMBERS_MAX_LIMIT` in `crates/slimm-server/src/http/users.rs`.
+/// Below it, an unknown id means a stale cache; at or above it, an unknown
+/// id is normal (a member off this page), so it must not force a refetch.
+const _memberPageCeiling = 200;
+
+/// Coalesces a burst of joins (or one join's presence-then-message pair)
+/// into a single refetch rather than one per event.
+const _rosterKeepAliveDebounce = Duration(milliseconds: 500);
+
+/// There is no `MemberJoined` event (`hub.rs` has no such [Event] variant),
+/// so [membersProvider] never notices a new member on its own. This infers
+/// a join from what one already produces on the live socket - a presence
+/// frame, or, failing that, the author id on a first message - and
+/// invalidates the cached roster so the pane catches up without a reload.
+final _memberRosterKeepAliveProvider = Provider.autoDispose<void>((ref) {
+  Timer? debounce;
+  final sub = ref.read(liveEventsProvider).listen((event) {
+    final candidateId = switch (event) {
+      api.PresenceChanged(:final userId) => userId,
+      api.MessageCreated(:final message) => message.authorId,
+      _ => null,
+    };
+    if (candidateId == null) return;
+
+    final members = ref.read(membersProvider).valueOrNull;
+    // No cached roster yet, or a full page: neither case says the id is a
+    // stale gap, so leave any pending refetch as it was.
+    if (members == null || members.length >= _memberPageCeiling) return;
+    if (members.any((m) => m.id == candidateId)) return;
+
+    debounce?.cancel();
+    debounce = Timer(_rosterKeepAliveDebounce, () {
+      ref.invalidate(membersProvider);
+    });
+  });
+  ref.onDispose(() {
+    debounce?.cancel();
+    unawaited(sub.cancel());
+  });
 });
 
 /// Whether the member pane is shown at expanded width. Defaults open; the
@@ -100,6 +183,9 @@ class AppMemberPane extends ConsumerWidget {
     // Purely to start the seed fetch; the actual statuses come back through
     // presenceControllerProvider below, watched per row.
     ref.watch(_presenceSeedProvider);
+    // Purely a side-effect subscription; it never itself has a value the
+    // pane renders, only an invalidate it may trigger on membersProvider.
+    ref.watch(_memberRosterKeepAliveProvider);
     final presence = ref.watch(presenceControllerProvider);
     final myId = ref.watch(meProvider).valueOrNull?.id;
 
@@ -255,7 +341,7 @@ class _MemberRow extends ConsumerWidget {
     // grows with role count would push the name out of a 236px pane.
     final badge = profile.roles.isEmpty ? null : profile.roles.first;
 
-    return AppListRow(
+    final row = AppListRow(
       // Taller than a channel row: the design pairs a 26px avatar with a
       // status dot hanging off its corner, which crops at the default height.
       height: 36,
@@ -277,6 +363,34 @@ class _MemberRow extends ConsumerWidget {
               final channelId = await openDirectMessage(ref, profile.id);
               if (context.mounted) context.go(Routes.channel(channelId));
             },
+    );
+
+    // No report/block affordance on your own row: reporting yourself has
+    // nothing to investigate, and there is no concept of blocking yourself.
+    if (isSelf) return row;
+
+    return ContextMenuRegion(
+      itemsBuilder: (close) => [
+        AppMenuItem(
+          label: 'Report user',
+          leading: AppIcons.report,
+          onTap: () {
+            close();
+            unawaited(_reportUser(context, ref, profile));
+          },
+        ),
+        const AppMenuDivider(),
+        AppMenuItem(
+          label: 'Block',
+          leading: AppIcons.revoke,
+          tone: AppMenuItemTone.danger,
+          onTap: () {
+            close();
+            unawaited(_blockUser(context, ref, profile));
+          },
+        ),
+      ],
+      child: row,
     );
   }
 }

@@ -58,17 +58,23 @@ class _EmojiPickerButtonState extends State<EmojiPickerButton> {
       link: _link,
       child: OverlayPortal(
         controller: _controller,
-        overlayChildBuilder: (context) => CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          targetAnchor: Alignment.bottomLeft,
-          followerAnchor: Alignment.topLeft,
-          offset: const Offset(0, 4),
-          child: TapRegion(
-            onTapOutside: (_) => _setOpen(false),
-            child: EmojiPickerPanel(
-              onSelect: _select,
-              onClose: () => _setOpen(false),
+        // Positioned so the follower sizes to its content: an overlay child is
+        // otherwise laid out against the whole screen, which a Column fills.
+        overlayChildBuilder: (context) => Positioned(
+          left: 0,
+          top: 0,
+          child: CompositedTransformFollower(
+            link: _link,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.bottomLeft,
+            followerAnchor: Alignment.topLeft,
+            offset: const Offset(0, 4),
+            child: TapRegion(
+              onTapOutside: (_) => _setOpen(false),
+              child: EmojiPickerPanel(
+                onSelect: _select,
+                onClose: () => _setOpen(false),
+              ),
             ),
           ),
         ),
