@@ -26,13 +26,13 @@ class FingerprintDisplay extends StatelessWidget {
     height: 1.7,
   );
 
+  /// Everything rendered here comes off the wire from a server this screen
+  /// exists because you may not trust, so a malformed identity must render
+  /// oddly and never throw: a hostile server crashing the screen built to catch
+  /// it is the wrong failure.
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    // Everything here comes off the wire from a server this screen exists
-    // because you may not trust. A malformed identity must render oddly, never
-    // throw: a hostile server crashing the screen built to catch it is the
-    // wrong failure.
     final groups = identity.fingerprintGroups;
     final firstRow = groups.take(4).join('  ');
     final secondRow = groups.skip(4).take(4).join('  ');
@@ -59,9 +59,8 @@ class FingerprintDisplay extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.s16),
-        // Decorative reinforcement of the hex above, not independent
-        // information, so it stays out of the announced label entirely
-        // rather than doubling it.
+        // Decorative reinforcement of the hex, not independent information,
+        // so it stays out of the announced label rather than doubling it.
         ExcludeSemantics(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,

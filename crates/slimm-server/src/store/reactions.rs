@@ -71,9 +71,8 @@ impl Store {
         // the write lock from the start; see Store::begin_write.
         let mut tx = self.begin_write().await?;
 
-        // Existence is checked inside the transaction rather than before it,
-        // so a message deleted concurrently cannot slip a reaction in behind
-        // the check.
+        // Inside the transaction, not before it, so a concurrent delete cannot
+        // slip a reaction in behind the check.
         let exists = sqlx::query_scalar!(
             r#"SELECT 1 AS "one!: i64" FROM messages WHERE id = ? AND deleted_at IS NULL"#,
             message_id
@@ -85,9 +84,8 @@ impl Store {
             return Err(ReactError::UnknownMessage);
         }
 
-        // Counting only when the emoji is new to this message keeps a busy
-        // message with few distinct emoji cheap, and bounds the one case that
-        // actually grows the row count.
+        // Counting only for an emoji new to this message keeps a busy message
+        // with few distinct emoji cheap, and bounds the case that does grow.
         let is_new = sqlx::query_scalar!(
             r#"SELECT 1 AS "one!: i64" FROM reactions WHERE message_id = ? AND emoji = ? LIMIT 1"#,
             message_id,

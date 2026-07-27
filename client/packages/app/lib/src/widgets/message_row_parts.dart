@@ -56,12 +56,12 @@ class ReactionsRow extends StatelessWidget {
   /// existing reactions without it.
   final bool showAddButton;
 
+  /// The design shows a reactions row only on a message that has one. A
+  /// permanent add-button under every message costs a row of vertical space
+  /// each and turns a quiet list into a grid of identical glyphs, so the
+  /// affordance belongs on hover with the row absent until then.
   @override
   Widget build(BuildContext context) {
-    // The design shows a reactions row only on a message that has one. A
-    // permanent add-button under every message costs a row of vertical space
-    // each and turns a quiet list into a grid of identical glyphs; the
-    // affordance belongs on hover, with the row absent until then.
     if (reactions.isEmpty && !showAddButton) return const SizedBox.shrink();
 
     return Padding(

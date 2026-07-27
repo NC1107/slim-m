@@ -96,9 +96,8 @@ class VoiceSettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Voice settings'),
-        // Same reasoning as SettingsScreen's own back button: this route can
-        // be reached directly (a deep link, a restored tab), so there is not
-        // always a Navigator stack to pop.
+        // Same reasoning as SettingsScreen's back button: this route can be
+        // reached directly, so there is not always a stack to pop.
         leading: IconButton(
           icon: const Icon(AppIcons.back),
           tooltip: 'Back to settings',

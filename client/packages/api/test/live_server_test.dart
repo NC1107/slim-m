@@ -20,10 +20,10 @@ import 'dart:math';
 import 'package:slimm_api/api.dart';
 import 'package:test/test.dart';
 
+/// A real v7: 48-bit big-endian millisecond prefix, version and variant bits
+/// set, the rest random. Time-ordered, which is what the server's storage
+/// locality assumes.
 String _uuidV7() {
-  // A real v7: 48-bit big-endian millisecond prefix, version and variant bits
-  // set, the rest random. Time-ordered, which is what the server's storage
-  // locality assumes.
   final now = DateTime.now().millisecondsSinceEpoch;
   final random = List<int>.generate(10, (_) => _rand.nextInt(256));
   final bytes = <int>[
@@ -56,10 +56,8 @@ void main() {
   late SlimmApi api;
   late TokenPair shared;
 
-  // Register once and reuse. The server's password rate-limit class is
-  // deliberately tight (a burst of five, refilling slowly), so registering an
-  // account per test would spend the budget and start getting 429s. Sharing an
-  // account is also closer to how a real client behaves.
+  // One account for all tests: the password rate limit is a burst of five
+  // refilling slowly, and sharing is closer to a real client anyway.
   setUpAll(() async {
     final bootstrap = SlimmApi(baseUrl: base);
     shared = await bootstrap.register(

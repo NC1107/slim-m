@@ -181,6 +181,16 @@ async fn update(
 /// delete of an already-deleted channel is not an error, matching the rest of
 /// this API's delete verbs; a channel id that was never real is a plain 404,
 /// same as it would be for any other resource a manager is allowed to see.
+///
+/// The row is fetched regardless of `deleted_at`, because telling "already
+/// gone" apart from "never existed" is what makes that retry succeed.
+///
+/// A DM is a channel of kind `dm` in the same table, and it is not a
+/// manageable channel: its only access rule is membership of the pair, which
+/// this deployment-wide check knows nothing about. The store refuses it too,
+/// but it can only answer "no rows matched", which this handler would report
+/// as the last-channel conflict. Answering 404 here keeps the status honest
+/// and matches how a DM is invisible to `GET /channels`.
 async fn delete(
     Authed(ctx): Authed,
     parts: Parts,
@@ -199,21 +209,15 @@ async fn delete(
         return Err(ApiError::Forbidden);
     }
 
-    // Fetched regardless of `deleted_at`: a retry against an already-deleted
-    // channel must succeed rather than 404, so this needs to see that row to
-    // tell "already gone" apart from "never existed".
+    // Includes soft-deleted rows so a retry succeeds; see the note above.
     let channel = state
         .store
         .channel_including_deleted(channel_id)
         .await?
         .ok_or(ApiError::NotFound("channel not found"))?;
 
-    // A DM is a channel of kind `dm` in the same table, and it is not a
-    // manageable channel: its only access rule is membership of the pair, which
-    // this deployment-wide check knows nothing about. The store refuses it too,
-    // but it can only answer "no rows matched", which this handler would report
-    // as the last-channel conflict. Answering 404 here keeps the status honest
-    // and matches how a DM is invisible to `GET /channels`.
+    // 404 rather than letting the store's "no rows" surface as a conflict;
+    // see the note above.
     if channel.kind == DM_CHANNEL_KIND {
         return Err(ApiError::NotFound("channel not found"));
     }
@@ -227,9 +231,7 @@ async fn delete(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------------
+// --- Validation ---
 
 /// Normalizes a topic edit. A blank (or whitespace-only) value clears the
 /// topic back to `None` rather than being stored as an empty string: a topic

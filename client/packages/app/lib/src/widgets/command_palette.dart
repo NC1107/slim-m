@@ -40,9 +40,8 @@ Future<void> openCommandPalette(BuildContext context) async {
         FadeTransition(opacity: animation, child: child),
   );
 
-  // The dialog may have outlived whatever held focus before it opened (a
-  // closed channel, a disposed field); only claim it back if it is still
-  // attached to something that can take it.
+  // The dialog may have outlived whatever held focus before it opened, so only
+  // claim it back if it is still attached to something that can take it.
   if (previousFocus != null && previousFocus.context != null) {
     previousFocus.requestFocus();
   }

@@ -67,9 +67,7 @@ pub fn routes() -> Router<AppState> {
     profile.merge(avatar_upload)
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 #[derive(Serialize)]
 struct UserDto {
@@ -136,13 +134,15 @@ struct MeDto {
     permissions: i64,
 }
 
+/// The editable half of a profile.
+///
+/// Username is deliberately not a field: it backs the live per-account
+/// uniqueness index (`users_username_live`), and changing it needs a dedicated
+/// flow that can handle the resulting collision. That is why it is absent
+/// rather than accepted and quietly ignored.
 #[derive(Deserialize)]
 struct UpdateMeRequest {
     display_name: String,
-    // Username is deliberately not a field here: it backs the live
-    // per-account uniqueness index (`users_username_live`), and changing it
-    // needs a dedicated flow that can handle the resulting collision. That is
-    // why it is absent rather than accepted and quietly ignored.
 }
 
 #[derive(Deserialize)]
@@ -156,9 +156,7 @@ struct ListMembersParams {
     limit: Option<i64>,
 }
 
-// ---------------------------------------------------------------------------
-// Handlers: /me
-// ---------------------------------------------------------------------------
+// --- Handlers: /me ---
 
 async fn get_me(
     Authed(ctx): Authed,
@@ -197,9 +195,7 @@ async fn update_me(
     Ok(Json(to_dto(&state.store, user).await?))
 }
 
-// ---------------------------------------------------------------------------
-// Handlers: /users
-// ---------------------------------------------------------------------------
+// --- Handlers: /users ---
 
 async fn get_user(
     Authed(_ctx): Authed,
@@ -240,9 +236,7 @@ async fn list_users(
     Ok(Json(to_dtos(&state.store, users).await?))
 }
 
-// ---------------------------------------------------------------------------
-// Handlers: /members
-// ---------------------------------------------------------------------------
+// --- Handlers: /members ---
 
 /// Lists the deployment's live members for a member list. Any authenticated
 /// caller may read it: a member list is deployment-wide, not scoped to any
@@ -267,9 +261,7 @@ async fn list_members(
     Ok(Json(to_dtos(&state.store, members).await?))
 }
 
-// ---------------------------------------------------------------------------
-// Handlers: avatars
-// ---------------------------------------------------------------------------
+// --- Handlers: avatars ---
 
 /// Uploads (or replaces) the caller's avatar. Deliberately not an attachment:
 /// one mutable image per user, keyed by user id rather than content hash, and
@@ -279,6 +271,11 @@ async fn list_members(
 /// between the two steps leaves the old row pointing at bytes that were just
 /// overwritten (self-heals on the next successful upload) rather than a row
 /// that promises an avatar no file backs.
+///
+/// An avatar is always a picture: sniffed against the same allowlist as a
+/// message attachment, but only the inline (image) entries qualify - a PDF is
+/// a valid attachment and not a valid avatar. The content type itself is not
+/// stored here; [`get_avatar`] re-sniffs it from disk.
 async fn upload_avatar(
     Authed(ctx): Authed,
     parts: Parts,
@@ -293,10 +290,8 @@ async fn upload_avatar(
     if body.len() as u64 > AVATAR_MAX_BYTES {
         return Err(ApiError::BadRequest("avatar is too large"));
     }
-    // An avatar is always a picture: sniffed against the same allowlist as a
-    // message attachment, but only the inline (image) entries qualify - a
-    // PDF is a valid attachment and not a valid avatar. The content type
-    // itself is not stored here; `get_avatar` re-sniffs it from disk.
+    // Inline (image) entries of the attachment allowlist only; see the note
+    // on this function.
     let is_image = media::sniff_content_type(&body).is_some_and(media::is_inline);
     if !is_image {
         return Err(ApiError::BadRequest("unsupported avatar type"));

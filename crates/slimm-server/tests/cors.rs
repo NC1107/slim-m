@@ -80,6 +80,9 @@ fn header<'a>(headers: &'a axum::http::HeaderMap, name: &str) -> Option<&'a str>
     headers.get(name).map(|value| value.to_str().unwrap())
 }
 
+/// The preflight is left to fall through to the method router, which is what
+/// produced the 405 that started this. Deny by default means the browser
+/// refuses the real request, not that the server pretends to allow it.
 #[tokio::test]
 async fn an_unconfigured_deployment_sends_no_cors_headers() {
     let (status, headers) =
@@ -87,9 +90,6 @@ async fn an_unconfigured_deployment_sends_no_cors_headers() {
     assert_eq!(status, StatusCode::OK, "the request itself still succeeds");
     assert_eq!(header(&headers, "access-control-allow-origin"), None);
 
-    // The preflight is left to fall through to the method router, which is
-    // what produced the 405 that started this. Deny by default means the
-    // browser refuses the real request, not that the server pretends to allow it.
     let (status, headers) =
         headers_of(app(CorsPolicy::disabled()).await, preflight(WEB_CLIENT)).await;
     assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);

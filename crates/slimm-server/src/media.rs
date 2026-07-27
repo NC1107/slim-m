@@ -30,9 +30,7 @@ use uuid::Uuid;
 /// Matches `default_attachment_max_bytes` in `src/config.rs`.
 const DEFAULT_ATTACHMENT_MAX_BYTES: u64 = 10 * 1024 * 1024;
 
-// ---------------------------------------------------------------------------
-// Content-type allowlist
-// ---------------------------------------------------------------------------
+// --- Content-type allowlist ---
 
 /// One entry in the upload allowlist: the content type stored bytes matching
 /// its magic number are served as, and whether that type is safe to render
@@ -152,9 +150,7 @@ pub fn from_hex(s: &str) -> Option<Vec<u8>> {
         .collect()
 }
 
-// ---------------------------------------------------------------------------
-// Filesystem storage
-// ---------------------------------------------------------------------------
+// --- Filesystem storage ---
 
 /// A cloneable handle to the on-disk blob store. Cheap to clone (two
 /// `PathBuf`s and a `u64`).

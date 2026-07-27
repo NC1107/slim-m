@@ -82,9 +82,7 @@ pub struct Report {
 }
 
 impl Store {
-    // -------------------------------------------------------------------------
-    // Devices
-    // -------------------------------------------------------------------------
+    // --- Devices ---
 
     /// The account's devices, newest first, flagging the caller's own.
     pub async fn list_devices(
@@ -149,9 +147,7 @@ impl Store {
         Ok(Some(sessions))
     }
 
-    // -------------------------------------------------------------------------
-    // Blocking
-    // -------------------------------------------------------------------------
+    // --- Blocking ---
 
     /// Blocks a user. Idempotent, and deliberately silent: the blocked user is
     /// never told, because telling them turns blocking into a provocation.
@@ -210,9 +206,7 @@ impl Store {
         Ok(found.is_some())
     }
 
-    // -------------------------------------------------------------------------
-    // Reports
-    // -------------------------------------------------------------------------
+    // --- Reports ---
 
     /// Files a report for a human to review.
     ///

@@ -70,9 +70,8 @@ impl Store {
         let code = generate_secret();
         let hash = hash_secret(&code);
 
-        // The existence check rides inside the INSERT itself (matching how
-        // `Store::open_session` guards its device insert), so there is no
-        // separate read-then-write gap for the account to vanish in.
+        // The existence check rides inside the INSERT (as `Store::open_session`
+        // guards its device insert), leaving no gap for the account to vanish.
         let inserted = sqlx::query!(
             "INSERT INTO password_reset_codes (code_hash, user_id, issued_by, issued_at, expires_at)
              SELECT ?, ?, ?, ?, ?
@@ -134,9 +133,8 @@ impl Store {
         .rows_affected();
         tx.commit().await?;
         if updated == 0 {
-            // The account was deleted between issuing the code and consuming
-            // it. The code is spent either way, and there is nothing left to
-            // secure, so this is not an error from the caller's point of view.
+            // The account went away between issue and consume. The code is
+            // spent regardless and there is nothing left to secure.
             return Ok(Vec::new());
         }
 

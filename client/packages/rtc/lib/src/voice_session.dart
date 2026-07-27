@@ -117,9 +117,8 @@ class VoiceSession {
 
   static lk.Room _defaultRoomFactory() => lk.Room(
         roomOptions: const lk.RoomOptions(
-          // Only what is on screen is subscribed to and only at the size it is
-          // shown, which is what keeps a call with several video tiles from
-          // costing the same as one with all of them at full resolution.
+          // Only what is on screen is subscribed, at the size shown, so
+          // several video tiles do not cost the same as all at full size.
           adaptiveStream: true,
           dynacast: true,
         ),
@@ -178,9 +177,8 @@ class VoiceSession {
       _room = room;
       _listen(room);
       await room.connect(url, token);
-      // Publishing is a separate step from connecting on purpose: the join
-      // preview lets somebody arrive muted, and a token without SPEAK cannot
-      // publish at all, so failing to open a mic must not fail the join.
+      // Publishing is separate from connecting on purpose: a join preview
+      // can arrive muted, and a token without SPEAK must not fail the join.
       if (microphoneEnabled) {
         await _trySetMicrophone(true);
       }
@@ -305,11 +303,11 @@ class VoiceSession {
     }
   }
 
+  /// One coarse listener rather than a subscription per event type. Every
+  /// event this cares about ends in the same place, "recompute who is in the
+  /// call and what they are doing", so an event LiveKit adds later is picked
+  /// up rather than silently ignored.
   void _listen(lk.Room room) {
-    // One coarse listener rather than a subscription per event type. Every
-    // event this cares about ends in the same place, which is "recompute who is
-    // in the call and what they are doing", and a change LiveKit adds later is
-    // then picked up rather than silently ignored.
     _cancelEvents?.call();
     _cancelEvents = room.events.listen((_) => _refreshParticipants());
   }
@@ -318,9 +316,8 @@ class VoiceSession {
     final room = _room;
     if (room == null || _disposed) return;
 
-    // Reapplied on every refresh, not only when the toggle changes, so a
-    // participant (or track) that appears after deafening starts is
-    // silenced too; see [_applyDeafenState].
+    // Reapplied on every refresh, not only on toggle, so a participant or
+    // track appearing after deafening starts is silenced too.
     unawaited(_applyDeafenState(room));
 
     final next = <VoiceParticipant>[];
@@ -332,9 +329,8 @@ class VoiceSession {
       next.add(_toParticipant(remote, isLocal: false));
     }
 
-    // Only emit on a real change. The events stream is chatty (audio level
-    // updates arrive constantly), and rebuilding a roster on every one of them
-    // is how a call screen ends up janky.
+    // Only emit on a real change: the events stream is chatty (audio levels
+    // arrive constantly) and rebuilding the roster each time is how it janks.
     if (_listEquals(next, _participants)) return;
     _participants = List.unmodifiable(next);
     if (!_participantsController.isClosed) {

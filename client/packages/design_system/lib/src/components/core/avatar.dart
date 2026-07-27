@@ -148,8 +148,7 @@ class AppAvatar extends StatelessWidget {
     );
 
     // A ring is drawn as a foreground overlay (like a CSS box-shadow) rather
-    // than a bordered wrapper, so it never changes the avatar's own layout
-    // size.
+    // than a bordered wrapper, so it never changes the avatar's own layout size.
     final ring = speaking ? tokens.accentFill : ringColor;
     if (ring != null) {
       content = Container(

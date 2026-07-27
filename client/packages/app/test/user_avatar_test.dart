@@ -65,6 +65,10 @@ void main() {
     expect(requested, isFalse);
   });
 
+  /// Deliberately does not assert the initials are gone: the bytes below are
+  /// not valid image data, so [Image.errorBuilder] fires and repaints them
+  /// right back in. What matters here is that the right bytes actually
+  /// reached the widget, which the path assertion already establishes.
   testWidgets('a known userId with resolved bytes renders through Image',
       (tester) async {
     final bytes = Uint8List.fromList(const [1, 2, 3, 4]);
@@ -79,10 +83,6 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // Not asserting the initials are gone: the bytes above are not valid
-    // image data, so [Image.errorBuilder] fires and repaints them right back
-    // in. What matters here is that the right bytes actually reached the
-    // widget, which the assertion above already establishes.
     final image = tester.widget<Image>(find.byType(Image));
     expect((image.image as MemoryImage).bytes, bytes);
   });

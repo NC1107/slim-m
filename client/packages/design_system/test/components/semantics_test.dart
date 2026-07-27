@@ -75,9 +75,8 @@ void main() {
 
   testWidgets('a presence dot names its state rather than its colour',
       (tester) async {
-    // The dot has no text, so the label is the only thing carrying the state to
-    // a screen reader. "green circle" would describe the pixels and tell a
-    // listener nothing.
+    // The dot has no text, so the label is the only thing carrying its state to
+    // a screen reader; "green circle" describes pixels and says nothing.
     for (final status in AppPresence.values) {
       await tester.pumpWidget(_host(AppStatusDot(status: status)));
       final semantics = tester.getSemantics(find.byType(AppStatusDot));

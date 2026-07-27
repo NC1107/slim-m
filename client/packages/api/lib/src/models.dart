@@ -9,9 +9,8 @@
 /// was expected, so treat the schema as the record and change both together.
 library;
 
-// Split into companion files purely to stay under this repo's line budget;
-// each is exported here so importing this one file still surfaces every
-// model, exactly as if they had all been written in one place.
+// Split for the line budget; each is exported here so importing this one file
+// still surfaces every model, as if they had all been written in one place.
 export 'models_admin.dart';
 export 'models_attachments.dart';
 export 'models_dms.dart';
@@ -25,9 +24,8 @@ export 'models_reactions.dart';
 export 'models_roles.dart';
 export 'models_users.dart';
 
-// Version and Message below need the ServerIdentity, Attachment, Poll, and
-// ReactionSummary types, which import alone (not export) grants; the exports
-// above are what re-surface them to callers of this file.
+// Version and Message need these in scope here, which only `import` grants;
+// the exports above are what re-surface them to callers of this file.
 import 'models_attachments.dart';
 import 'models_identity.dart';
 import 'models_polls.dart';
@@ -164,9 +162,8 @@ class Message {
     required this.content,
     required this.createdAt,
     required this.editedAt,
-    // Empty is the honest default and by far the common case: most messages
-    // carry neither. Requiring them at every construction site bought no
-    // safety and broke every existing caller and test.
+    // Empty is the honest default and the common case; requiring these at
+    // every construction site bought no safety and broke every caller.
     this.reactions = const [],
     this.attachments = const [],
     this.poll,
@@ -216,9 +213,8 @@ class Message {
         content: json['content'] as String,
         createdAt: json['created_at'] as int,
         editedAt: json['edited_at'] as int?,
-        // Not in the schema's own `required` list, despite the description
-        // promising it is always sent; fall back to empty rather than crash
-        // a caller on a technically-conformant response with the key absent.
+        // Not in the schema's `required` list despite its description promising
+        // it is always sent; empty beats crashing on a conformant response.
         reactions: (json['reactions'] as List<dynamic>?)
                 ?.map(
                     (r) => ReactionSummary.fromJson(r as Map<String, dynamic>))

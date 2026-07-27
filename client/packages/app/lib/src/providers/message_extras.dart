@@ -109,6 +109,9 @@ class MessageExtrasController
     }
   }
 
+  /// Replaces the cached tallies from a broadcast, carrying `reacted` over from
+  /// what this client already knew: it is per-viewer and never broadcast (see
+  /// [api.ReactionTally]'s own doc), so it has to be preserved, not guessed.
   void _applyReactionsChanged(
       String messageId, List<api.ReactionTally> tallies) {
     final known = extrasFor(messageId).reactions;
@@ -118,9 +121,6 @@ class MessageExtrasController
         api.ReactionSummary(
           emoji: tally.emoji,
           count: tally.count,
-          // `reacted` is per-viewer and never broadcast (see ReactionTally's
-          // own doc comment), so this keeps whatever this client already
-          // knew about its own reaction rather than guessing.
           reacted: known
               .firstWhere((r) => r.emoji == tally.emoji, orElse: () => unknown)
               .reacted,
@@ -165,11 +165,12 @@ class MessageExtrasController
     _set(messageId, extrasFor(messageId).copyWith(reactions: next));
   }
 
+  /// Merges a broadcast tally into the cached poll, dropping it when no poll is
+  /// known yet: a bare tally carries neither the question nor the option
+  /// labels, so there is nothing to merge it into until some REST fetch has
+  /// taught this cache those. The next fetch including this message picks it up.
   void _applyPollTally(String messageId, List<api.PollOptionTally> tallies) {
     final poll = extrasFor(messageId).poll;
-    // Unknown until some REST fetch has taught this cache the question and
-    // option labels; a bare tally has neither, so there is nothing to merge
-    // it into yet. The next fetch that includes this message picks it up.
     if (poll == null) return;
     final byPosition = {for (final t in tallies) t.position: t.votes};
     final options = [

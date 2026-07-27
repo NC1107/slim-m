@@ -216,6 +216,11 @@ class _ManagedChannelRow extends StatelessWidget {
   }
 }
 
+/// The participant strip renders only for the channel the caller has actually
+/// joined, sourced from real participant data, and not at all otherwise: the
+/// server exposes no per-channel voice roster, only the participants of a room
+/// already joined, so for any other voice channel there is no way to know who
+/// (if anyone) is in it. See the `TODO(ui-backend)` in [build].
 class _VoiceChannelRow extends StatelessWidget {
   const _VoiceChannelRow(
       {required this.channel, required this.selected, required this.voice});
@@ -254,12 +259,8 @@ class _VoiceChannelRow extends StatelessWidget {
               : null,
           onTap: () => context.go(Routes.channel(channel.id)),
         ),
-        // TODO(ui-backend): for any voice channel besides the one the caller
-        // has actually joined, there is no way to know who (if anyone) is in
-        // it: the server exposes no per-channel voice roster, only the
-        // participants of a room already joined. So this strip renders only
-        // for [voice]'s own channel, sourced from real participant data,
-        // and nothing at all otherwise.
+        // TODO(ui-backend): no per-channel voice roster on the server, so only
+        // the joined channel can show one. See this class's doc.
         if (_inCall) _ParticipantStrip(participants: voice.participants),
       ],
     );

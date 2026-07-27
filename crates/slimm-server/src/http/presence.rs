@@ -36,9 +36,7 @@ pub fn routes() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 #[derive(Serialize)]
 struct PresenceDto {
@@ -56,9 +54,7 @@ struct VisibilityDto {
     visibility: String,
 }
 
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
+// --- Handlers ---
 
 /// Batch presence lookup. An id with nothing live to report (never existed,
 /// or deleted) is simply absent from the result, the same contract

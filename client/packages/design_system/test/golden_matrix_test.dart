@@ -148,9 +148,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // No overflow at any scale. This is the assertion that matters most:
-        // clipped text at 200% is an accessibility failure, and it is invisible
-        // in a 100% screenshot.
+        // No overflow at any scale, the one that matters most: clipped text at
+        // 200% is an accessibility failure, invisible in a 100% screenshot.
         expect(tester.takeException(), isNull);
 
         // Pixel comparison only where the reference images were produced.

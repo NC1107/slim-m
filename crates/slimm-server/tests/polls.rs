@@ -475,9 +475,7 @@ async fn poll_creation_is_rate_limited() {
     );
 }
 
-// ---------------------------------------------------------------------------
-// Fan-out privacy, over a real WebSocket
-// ---------------------------------------------------------------------------
+// --- Fan-out privacy, over a real WebSocket ---
 
 async fn user_ticket(store: &Store, name: &str) -> (String, String) {
     let user = store.create_user(name, name).await.unwrap();
@@ -567,9 +565,8 @@ async fn poll_vote_event_never_reveals_the_voter() {
         None,
     )
     .await;
-    // Drain frames up to and including the poll's own message.created, since
-    // this connection also receives its own presence-changed frame on
-    // connect and the ordering between the two is not guaranteed.
+    // Drain up to and including the poll's own message.created: this connection
+    // also gets its own presence-changed frame, in no guaranteed order.
     read_frame_of_type(&mut alice_ws, "message.created").await;
 
     let message_id = poll["id"].as_str().unwrap().to_owned();

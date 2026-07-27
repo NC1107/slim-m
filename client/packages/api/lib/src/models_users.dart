@@ -44,9 +44,8 @@ class UserProfile {
         displayName: json['display_name'] as String,
         createdAt: json['created_at'] as int,
         avatarUpdatedAt: json['avatar_updated_at'] as int?,
-        // Absent on a server older than the roles field, which is not the same
-        // as a member holding none; both render no badge, so an empty list is
-        // the honest reading of either.
+        // Absent on a server older than the roles field is not the same as a
+        // member holding none, but both render no badge, so empty reads either.
         roles: (json['roles'] as List<dynamic>?)?.cast<String>() ?? const [],
       );
 }

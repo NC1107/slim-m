@@ -241,6 +241,11 @@ async fn typing_lapses_without_a_refresh() {
 
 /// A refresh sent well within the TTL keeps the state alive rather than
 /// letting it lapse, and does not re-fan-out a second `typing.started`.
+///
+/// Waiting up to t=650ms is comfortably past the original (now-superseded)
+/// t=400ms deadline while staying clear of the refreshed one, so nothing
+/// arriving proves both halves at once: no rebroadcast of "started", and no
+/// "stopped" let through by the old deadline either.
 #[tokio::test]
 async fn a_refresh_within_the_ttl_does_not_lapse_or_repeat() {
     let store = new_store().await;
@@ -273,10 +278,8 @@ async fn a_refresh_within_the_ttl_does_not_lapse_or_repeat() {
     tokio::time::sleep(Duration::from_millis(300)).await;
     send_typing(&mut alice_ws, &channel.id.to_string()).await;
 
-    // Nothing should arrive for a good while: no rebroadcast of "started",
-    // and no "stopped" either, even once the *original* (now-superseded)
-    // deadline at t=400ms passes. Waiting up to t=650ms is comfortably past
-    // that original deadline while staying clear of the refreshed one.
+    // Nothing should arrive for a good while, out to t=650ms; see this test's
+    // doc comment for why that window proves both halves.
     let nothing = tokio::time::timeout(Duration::from_millis(350), read_frame(&mut bob_ws)).await;
     assert!(
         nothing.is_err(),

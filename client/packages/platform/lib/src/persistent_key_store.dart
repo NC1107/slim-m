@@ -46,16 +46,18 @@ import 'key_store.dart';
 
 /// The platform keychain, through flutter_secure_storage. Use on iOS and
 /// Android, where the OS itself guarantees a secure backend.
+///
+/// The iOS accessibility is device-bound: excluded from iCloud sync and from
+/// local device backups, and it never migrates to a new device. The default
+/// (kSecAttrAccessibleWhenUnlocked) rides into both, which hands a 30-day
+/// refresh token and the push private key to whatever restores that backup.
 class SecureKeyStore implements KeyStore {
   SecureKeyStore({FlutterSecureStorage? storage})
       : _storage = storage ??
             const FlutterSecureStorage(
               iOptions: IOSOptions(
-                // Device-bound: excluded from iCloud sync and from local
-                // device backups, and never migrates to a new device. The
-                // default (kSecAttrAccessibleWhenUnlocked) rides into both,
-                // which hands a 30-day refresh token and the push private key
-                // to whatever restores that backup.
+                // Device-bound; the default would ride into iCloud and local
+                // backups. See the class doc comment.
                 accessibility: KeychainAccessibility.unlocked_this_device,
               ),
             );

@@ -118,6 +118,10 @@ async fn token(
 /// This does not stop them asking for a new token. It is not meant to: taking
 /// away `CONNECT` is what bars someone from a room, and this is what makes that
 /// take effect immediately instead of whenever their current token lapses.
+///
+/// A configured SFU that cannot be reached answers 503, not 500: that is
+/// upstream being down rather than this server malfunctioning, and it is the
+/// difference a caller needs to decide whether retrying is worth anything.
 async fn kick(
     Authed(ctx): Authed,
     parts: Parts,
@@ -141,9 +145,7 @@ async fn kick(
         Err(VoiceError::Unavailable) => Err(ApiError::NotConfigured(
             "this server has no voice configured",
         )),
-        // A configured SFU that cannot be reached is upstream being down, not
-        // this server malfunctioning, and 503 is the difference a caller needs
-        // to decide whether retrying is worth anything.
+        // Unreachable SFU is a 503, not a 500; see the note on this function.
         Err(VoiceError::Internal(err)) => {
             tracing::warn!(%err, "could not evict a voice participant");
             Err(ApiError::Unavailable)

@@ -45,9 +45,7 @@ pub fn routes() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(SYNC_BODY_LIMIT))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 #[derive(Deserialize)]
 struct MarkReadRequest {
@@ -86,9 +84,7 @@ struct ScopeDelta {
     reset: bool,
 }
 
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
+// --- Handlers ---
 
 async fn get_read(
     Authed(ctx): Authed,
@@ -140,6 +136,14 @@ async fn put_read(
     }))
 }
 
+/// Catches a client up across several channels at once, under a per-scope, an
+/// aggregate and a snapshot-gap cap.
+///
+/// Deltas go through `with_reactions`, exactly as list and search do, rather
+/// than a bare `MessageDto::from`. The bare conversion leaves `reactions`
+/// empty, so a message that arrived by catch-up came back with no reactions at
+/// all while the same message fetched by list carried them, and a client that
+/// trusts its local store showed the difference.
 async fn sync(
     Authed(ctx): Authed,
     State(state): State<AppState>,
@@ -200,12 +204,8 @@ async fn sync(
                 let has_more = rows.len() as i64 > limit;
                 rows.truncate(limit as usize);
                 budget -= rows.len() as i64;
-                // Through with_reactions, exactly as list and search go, rather
-                // than a bare MessageDto::from. The bare conversion leaves
-                // `reactions` empty, so a message that arrived by catch-up came
-                // back with no reactions at all while the same message fetched
-                // by list carried them, and a client that trusts its local
-                // store showed the difference.
+                // `with_reactions`, never a bare `MessageDto::from`; see the
+                // note on this function.
                 ScopeDelta {
                     channel_id: cursor.channel_id,
                     messages: with_reactions(&state, ctx.user_id, rows).await?,

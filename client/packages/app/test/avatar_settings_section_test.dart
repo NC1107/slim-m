@@ -115,6 +115,11 @@ void main() {
     expect(find.text('Remove'), findsNothing);
   });
 
+  /// No platform implementation is registered for file_picker's method
+  /// channel in a widget test, so the tap below either throws (caught, shown
+  /// as a snack bar) or resolves with no file chosen; either way, the point
+  /// under test is that nothing ever reaches the upload endpoint from a
+  /// picker that produced nothing to upload.
   testWidgets(
       'tapping Upload photo with no picker result available never calls upload',
       (tester) async {
@@ -144,11 +149,6 @@ void main() {
     await tester.pumpWidget(_harness(container));
     await tester.pumpAndSettle();
 
-    // No platform implementation is registered for file_picker's method
-    // channel in a widget test, so this either throws (caught, shown as a
-    // snack bar) or resolves with no file chosen; either way, the point
-    // under test is that nothing ever reaches the upload endpoint from a
-    // picker that produced nothing to upload.
     await tester.tap(find.text('Upload photo'));
     await tester.pumpAndSettle();
 

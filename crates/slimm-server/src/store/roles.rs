@@ -91,6 +91,12 @@ impl Store {
     /// caller's own effective permissions; this only guards the structural
     /// invariant, rolling back if the update would leave the deployment with
     /// no administrator.
+    ///
+    /// That guard runs whenever permissions were touched at all, rather than
+    /// trying to detect whether the ADMINISTRATOR bit specifically moved. Only
+    /// a permissions change can remove an administrator, and checking the
+    /// broader condition stays correct even when the bit arrives folded into a
+    /// larger change.
     pub async fn update_role(
         &self,
         role_id: RoleId,
@@ -143,11 +149,7 @@ impl Store {
             return Ok(None);
         }
 
-        // Only a permissions change can possibly remove an administrator, but
-        // checking whenever permissions were touched at all (rather than
-        // trying to detect whether the ADMINISTRATOR bit specifically moved)
-        // keeps this correct even if the bit arrives folded into a larger
-        // change.
+        // Guarded on any permissions change; see the note on this function.
         if permissions.is_some() && administrator_count(&mut tx).await? == 0 {
             return Err(RoleGuardError::LastAdministrator);
         }
@@ -157,10 +159,15 @@ impl Store {
 
     /// Deletes a role. `Ok(None)` if it does not exist. Refuses to delete
     /// `@everyone`, and refuses if doing so would leave no administrator.
+    ///
+    /// Clears the role's channel overwrites by hand: no foreign key ties an
+    /// overwrite to a role (the column is polymorphic across role and member
+    /// targets), so they would otherwise sit inert but unreachable and the
+    /// table would accumulate dead rows. `member_roles` does cascade away on
+    /// the role's own foreign key.
     pub async fn delete_role(&self, role_id: RoleId) -> Result<Option<()>, RoleGuardError> {
-        // Reads the role and the administrator count before deciding whether to
-        // delete, so it must hold the write lock from the start; see
-        // Store::begin_write.
+        // Reads the role and the administrator count before deciding, so it
+        // must hold the write lock from the start; see `Store::begin_write`.
         let mut tx = self.begin_write().await?;
 
         let is_everyone = sqlx::query_scalar!(
@@ -176,10 +183,8 @@ impl Store {
             return Err(RoleGuardError::IsEveryone);
         }
 
-        // No FK ties an overwrite to a role (the column is polymorphic across
-        // role and member targets), so a deleted role's overwrites would
-        // otherwise sit there inert but unreachable; clear them so the table
-        // does not accumulate dead rows.
+        // Cleared by hand, since no FK covers them; see the note on this
+        // function.
         sqlx::query!(
             "DELETE FROM channel_overwrites WHERE target_type = 'role' AND target_id = ?",
             role_id

@@ -45,14 +45,8 @@ jobs:
         working-directory: client
         run: dart format --output=none --set-exit-if-changed .
 
-      # Golden-test note: golden-file assertions (matchesGoldenFile) live inside each
-      # package's ordinary `flutter test` suite below; they are not a separate job here.
-      # Golden PNGs are sensitive to the exact Flutter engine/Skia build and to font
-      # rendering, so keep goldens generated and verified on this same `stable` channel
-      # on ubuntu-latest. If goldens start flaking across runs, pin an exact Flutter
-      # version here (instead of floating on `stable`) and regenerate goldens with
-      # `flutter test --update-goldens` on that same pinned version, so both sides
-      # render identically.
+      # Goldens run inside these suites, not a job of their own, and only ever on
+      # this channel and runner. If they start flaking, see docs/ci.md.
       - name: test (every workspace package)
         working-directory: client
         run: |
@@ -68,15 +62,8 @@ jobs:
           done
           exit "$status"
 
-  # The CallKit synchronous-report invariant is a real termination risk, not a
-  # style rule: iOS kills an app that takes a VoIP push without reporting a
-  # call before the handler returns, and repeat offences cost it VoIP push
-  # entirely. That makes it worth a macOS runner of its own, because the
-  # ubuntu job above runs Dart tests and cannot compile a line of Swift.
-  #
-  # Simulator only, so it needs no signing identity and no secrets: this
-  # compiles the Swift and runs XCTest, it does not produce a shippable build.
-  # The signed device build stays in the release workflow.
+  # The CallKit synchronous-report invariant is a termination risk, not a style
+  # rule, so it gets a macOS runner. Simulator only; see docs/ci.md.
   ios-unit-tests:
     name: ios unit tests (callkit invariant)
     runs-on: macos-latest
@@ -93,16 +80,14 @@ jobs:
         working-directory: client
         run: flutter pub get
 
-      # xcodebuild needs the generated Flutter config and the plugin registrant
-      # to exist before the project will open, and only a Flutter build makes
-      # them. --no-codesign keeps it to compiling, with no identity involved.
+      # xcodebuild will not open the project until a Flutter build has generated
+      # its config and plugin registrant. --no-codesign keeps it to compiling.
       - name: generate the ios project
         working-directory: client/packages/app
         run: flutter build ios --simulator --no-codesign
 
-      # The simulator is chosen from what the runner actually has rather than
-      # by name. A hardcoded 'iPhone 16' broke the first time this ran, and it
-      # would break again silently every time GitHub rolls the image forward.
+      # Chosen from what the runner actually has, not by name: a hardcoded
+      # 'iPhone 16' broke on day one and would break on every image roll.
       - name: pick an available simulator
         id: sim
         run: |

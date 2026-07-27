@@ -40,9 +40,7 @@ pub fn routes() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(AUTH_BODY_LIMIT))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 #[derive(Deserialize)]
 struct RegisterRequest {
@@ -92,9 +90,7 @@ fn token_response(tokens: &IssuedTokens) -> TokenResponse {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
+// --- Handlers ---
 
 /// Creates an account.
 ///
@@ -103,6 +99,10 @@ fn token_response(tokens: &IssuedTokens) -> TokenResponse {
 /// same transaction as the account insert. The "no code at all" case is
 /// answered before hashing, so the cheapest way to hammer this endpoint does
 /// not also buy an Argon2id run per attempt.
+///
+/// The first account to register also claims an unclaimed deployment, seeding
+/// the @everyone and admin roles and a general channel. Without that a fresh
+/// server has no roles and no channels, so nobody could do anything.
 async fn register(
     _limited: RateLimited<PASSWORD>,
     State(state): State<AppState>,
@@ -141,9 +141,8 @@ async fn register(
         Err(RegisterError::Internal(err)) => return Err(err.into()),
     };
 
-    // The first account to register claims an unclaimed deployment, seeding the
-    // @everyone and admin roles and a general channel. Without this a fresh
-    // server has no roles and no channels, so nobody could do anything.
+    // Seeds roles and a general channel on an unclaimed deployment; see the
+    // note on this function.
     if let Bootstrap::Claimed = state.store.bootstrap_deployment(account.id).await? {
         tracing::info!(user_id = %account.id, "deployment claimed by its first account");
     }
@@ -248,9 +247,7 @@ async fn delete_account(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ---------------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------------
+// --- Validation ---
 
 fn validate_username(username: &str) -> Result<(), ApiError> {
     let len = username.chars().count();

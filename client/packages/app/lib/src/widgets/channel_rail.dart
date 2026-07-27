@@ -58,9 +58,8 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
           const RailHeader(),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-            // A real field would gain focus and a keyboard on tap; this one
-            // exists only to open the palette, so pointer events stop at the
-            // AbsorbPointer and the tap reaches the trigger below it instead.
+            // A real field would take focus and a keyboard; this only opens the
+            // palette, so AbsorbPointer stops events and the trigger gets them.
             child: GestureDetector(
               key: const Key('rail-search-trigger'),
               onTap: () => openCommandPalette(context),

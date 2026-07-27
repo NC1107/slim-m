@@ -175,14 +175,14 @@ class _ChannelOverwritesScreenState
     }
   }
 
+  /// [myPermissionsProvider] is a floor here, not the exact figure. The server
+  /// checks "allow" against the caller's effective permissions in this specific
+  /// channel, which a per-channel overwrite of the caller's own can raise above
+  /// their base set. There is no endpoint to read that per-channel figure, so
+  /// this uses the base (deployment-level) set from `/me` as a safe, possibly
+  /// stricter, stand-in.
   @override
   Widget build(BuildContext context) {
-    // A floor, not the exact figure: the server checks "allow" against the
-    // caller's effective permissions in this specific channel, which a
-    // per-channel overwrite of the caller's own can raise above their base
-    // set. There is no endpoint to read that per-channel figure, so this
-    // uses the base (deployment-level) set from `/me` as a safe, possibly
-    // stricter, stand-in.
     final myPermissions = ref.watch(myPermissionsProvider);
 
     return Scaffold(
@@ -208,9 +208,8 @@ class _ChannelOverwritesScreenState
           const SizedBox(height: AppSpacing.s16),
           AppCard(
             title: 'Channel',
-            // The card's own background sits between a bare ListTile and the
-            // Scaffold's Material, which swallows its ink splash; a
-            // transparent Material here gives the splash somewhere to paint.
+            // The card's background hides the Scaffold Material the ListTile
+            // would splash on; a transparent one gives it somewhere to paint.
             child: Material(
               type: MaterialType.transparency,
               child: ListTile(

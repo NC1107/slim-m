@@ -31,14 +31,23 @@ void main() {
     );
   });
 
+  /// Signed out, so deleteAccount() (like every other authenticated call this
+  /// screen makes) fails fast with UnauthorizedException before any request
+  /// is sent; the point under test is that the failure reaches the screen
+  /// instead of disappearing into an unhandled Future.
+  ///
+  /// The account section is last in the list and below the fold on the
+  /// default test viewport. ListView builds every child eagerly, so the
+  /// finder already resolves before any scrolling; the drag is direct rather
+  /// than through scrollUntilVisible, which only scrolls until the finder
+  /// resolves at all, not until the target is actually within the viewport.
+  /// The drag is deliberately larger than the list's content: Flutter clamps
+  /// to `maxScrollExtent` rather than erroring, so it reaches the bottom
+  /// regardless of exactly how tall the sections above it are.
   testWidgets(
       'a failed account deletion is shown on screen, not silently left '
       'signed in with sync already stopped and the push key already gone',
       (tester) async {
-    // Signed out, so deleteAccount() (like every other authenticated call
-    // this screen makes) fails fast with UnauthorizedException before any
-    // request is sent; the point under test is that the failure reaches the
-    // screen instead of disappearing into an unhandled Future.
     final container = ProviderContainer(overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       apiProvider.overrideWith((ref) {
@@ -65,14 +74,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Below the fold on the default test viewport; the account section is
-    // last in the list. ListView builds every child eagerly, so the finder
-    // already resolves before any scrolling; drag directly rather than via
-    // scrollUntilVisible, which only scrolls until the finder resolves at
-    // all, not until the target is actually within the viewport. The drag
-    // is deliberately larger than the list's content: Flutter clamps to
-    // `maxScrollExtent` rather than erroring, so this reaches the bottom
-    // regardless of exactly how tall the sections above it are.
+    // Deliberately larger than the list's content; see this test's doc.
     await tester.drag(find.byType(ListView), const Offset(0, -2000));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete account'));
@@ -87,6 +89,10 @@ void main() {
     );
   });
 
+  /// The rest of the screen (devices, blocks, the caller's own profile for
+  /// the avatar section) renders alongside the presence section this test is
+  /// about, so the mock answers each of them honestly rather than with a
+  /// shape only `/presence` expects.
   testWidgets('picking a presence option sends it and updates the display',
       (tester) async {
     const tokens = TokenPair(
@@ -105,10 +111,6 @@ void main() {
           session: ref.watch(sessionProvider),
           httpClient: MockClient((request) async {
             requests.add(request.url);
-            // The rest of the screen (devices, blocks, the caller's own
-            // profile for the avatar section) renders alongside the presence
-            // section this test is about; each gets an honest answer rather
-            // than a shape only `/presence` expects.
             if (request.url.path == '/devices' ||
                 request.url.path == '/blocks') {
               return http.Response('[]', 200,
@@ -151,15 +153,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Defaults to showing Online: there is no endpoint that reports back a
-    // caller's own visibility preference, so nothing here could show
-    // anything else on first load.
+    // Defaults to Online: no endpoint reports back a caller's own visibility
+    // preference, so nothing here could show anything else on first load.
     expect(container.read(presenceVisibilityDisplayProvider),
         PresenceVisibility.online);
 
-    // The avatar section above it pushes Presence far enough down that it
-    // is not always within the default test viewport; ensure it is in view
-    // rather than assume the fold falls wherever it used to.
+    // The avatar section pushes Presence out of the default test viewport;
+    // ensure it is in view rather than assume where the fold falls.
     await tester.ensureVisible(find.text('Away'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Away'));

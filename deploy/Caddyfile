@@ -21,15 +21,8 @@
 	reverse_proxy server:8080
 }
 
-# LiveKit routing note: this block only fronts LiveKit's WebSocket signaling
-# channel, which is plain HTTPS/WSS - Caddy reverse-proxies it exactly like
-# any other HTTP traffic and passes the Upgrade: websocket handshake through
-# with no special configuration. Call media never goes through this
-# Caddyfile or port 443: LiveKit's TURN (UDP) and TURN/TLS listeners bind
-# their own documented ports directly on the host, and the UDP media range
-# is published straight through to the livekit container. See
-# docker-compose.yml (the livekit service) for those ports and the
-# TURN/TLS trade-off notes. Caddy is not, and cannot be, in that path.
+# LiveKit's WSS signaling channel only. Call media never passes through Caddy
+# or 443; it binds its own ports on the host. See deploy/README.md.
 {$LIVEKIT_DOMAIN} {
 	reverse_proxy livekit:7880
 }

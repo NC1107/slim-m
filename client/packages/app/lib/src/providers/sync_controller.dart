@@ -121,15 +121,17 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// `MessageStore.clear()` wipes the local marker on every sign-out; without
   /// this, a reinstall or a second device shows every channel unread
   /// forever, however recently it was actually read elsewhere.
+  ///
+  /// Those read markers are fetched per channel rather than bundled with the
+  /// listing because the server has no call that hands back read state for a
+  /// list of channels, and one channel's fetch failing must not stop the rest
+  /// from hydrating.
   Future<void> _refreshChannels(SlimmApi api, MessageStore store) async {
     final channels = await api.listChannels();
     final dms = await api.listDirectMessages();
     final all = [...channels, ...dms.map(channelFromDm)];
     await store.upsertChannels(all);
 
-    // Per channel, not bundled with the listing above: the server does not
-    // hand back read state for a list of channels in one call. One channel's
-    // read state failing to fetch must not stop the rest from hydrating.
     await Future.wait(all.map((channel) async {
       try {
         final read = await api.readState(channel.id);
@@ -150,6 +152,13 @@ class SyncController extends StateNotifier<SyncStatus> {
   }
 
   /// Catches every known scope up in one request, applying deltas in order.
+  ///
+  /// At most one continuation is scheduled per round, however many scopes are
+  /// behind. Scheduling inside the loop meant every backlogged channel started
+  /// its own full-cursor resync, so ten of them fanned out into ten overlapping
+  /// `/sync` calls that each re-requested all ten scopes. It runs on the next
+  /// tick rather than straight through, so a long backlog does not block the
+  /// first paint.
   Future<void> _catchUp(SlimmApi api, MessageStore store) async {
     final cursors = await store.allCursors();
     if (cursors.isEmpty) return;
@@ -169,11 +178,6 @@ class SyncController extends StateNotifier<SyncStatus> {
       more = more || delta.hasMore;
     }
 
-    // At most one continuation per round, however many scopes are behind.
-    // Scheduling inside the loop meant every backlogged channel started its own
-    // full-cursor resync, so ten of them fanned out into ten overlapping /sync
-    // calls that each re-requested all ten scopes. Next tick rather than
-    // straight through, so a long backlog does not block the first paint.
     if (more) {
       unawaited(
           Future<void>.delayed(Duration.zero, () => _catchUp(api, store)));
@@ -182,6 +186,10 @@ class SyncController extends StateNotifier<SyncStatus> {
 
   /// Attaches the live socket. Its closure schedules a full restart, so the
   /// next connection catches up before trusting live events again.
+  ///
+  /// Every frame is broadcast on [_liveEvents] first and unconditionally: a
+  /// listener that only cares about, say, `ReactionsChanged` must not depend on
+  /// [_applyServerEvent]'s switch ever learning about that event type.
   Future<void> _attach(SlimmApi api, MessageStore store) async {
     final ticket = await api.webSocketTicket();
     final connection = await EventConnection.connect(
@@ -192,9 +200,6 @@ class SyncController extends StateNotifier<SyncStatus> {
 
     _events = connection.events.listen(
       (event) async {
-        // Broadcast first and unconditionally: a listener that only cares
-        // about, say, ReactionsChanged must not depend on this switch ever
-        // learning about that event type.
         _liveEvents.add(event);
         await _applyServerEvent(api, store, event);
       },
@@ -205,6 +210,11 @@ class SyncController extends StateNotifier<SyncStatus> {
 
   /// How one frame from the socket changes local state. A method of its own
   /// so [applyServerEventForTest] can drive it without a real socket.
+  ///
+  /// The [MessageDeleted] case closes a real gap: this switch previously had no
+  /// case for a delete at all, so a message removed by another user (or this
+  /// account's own delete looping back) never left the local store and stayed
+  /// visible until the next full resync.
   Future<void> _applyServerEvent(
       SlimmApi api, MessageStore store, ServerEvent event) async {
     switch (event) {
@@ -217,10 +227,6 @@ class SyncController extends StateNotifier<SyncStatus> {
         }
         await store.applyMessage(message);
       case MessageDeleted(:final messageId):
-        // Closes a real gap: this switch previously had no case for a
-        // delete at all, so a message removed by another user (or this
-        // account's own delete looping back) never left the local store
-        // and stayed visible until the next full resync.
         await store.discard(messageId);
       case ErrorEvent(:final needsResync) when needsResync:
         // The connection fell behind and the server closed it; a restart
