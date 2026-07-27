@@ -11,6 +11,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart';
+import 'avatar_crop_sheet.dart';
 import 'settings_section_header.dart';
 import 'user_avatar.dart';
 
@@ -40,7 +41,13 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
     if (files.isEmpty) return;
     // readAsBytes streams from disk; file_picker 12 deprecated withData and
     // PlatformFile.bytes because eager loading OOMs on a large pick.
-    final bytes = await files.first.readAsBytes();
+    final picked = await files.first.readAsBytes();
+    if (!mounted) return;
+
+    // Cropped before upload, not after: the server caps an avatar at 2 MB and
+    // a phone photo is routinely past that, so the raw pick simply failed.
+    final bytes = await showAvatarCropSheet(context, picked);
+    if (bytes == null || !mounted) return;
 
     setState(() => _busy = true);
     try {

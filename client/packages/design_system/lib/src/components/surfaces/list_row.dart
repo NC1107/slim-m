@@ -148,10 +148,14 @@ class _AppListRowState extends State<AppListRow> {
             ),
           ),
           if (widget.meta != null)
-            Text(
-              widget.meta!,
-              overflow: TextOverflow.ellipsis,
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            // Flexible, not a bare Text: ellipsis only engages under a bounded
+            // width, so without this a long meta overflows instead of eliding.
+            Flexible(
+              child: Text(
+                widget.meta!,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
             ),
           if (trailingContent != null) trailingContent,
         ],

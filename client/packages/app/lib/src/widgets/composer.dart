@@ -173,7 +173,7 @@ class _ComposerState extends ConsumerState<Composer> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -192,8 +192,12 @@ class _ComposerState extends ConsumerState<Composer> {
                   ],
                 ),
               ),
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 2),
+              child: TypingIndicator(channelId: widget.channelId),
+            ),
             Container(
-              padding: const EdgeInsets.fromLTRB(12, 9, 10, 9),
+              padding: const EdgeInsets.fromLTRB(12, 5, 10, 5),
               decoration: BoxDecoration(
                 color: tokens.surfaceRaised,
                 border: Border.all(color: tokens.borderSubtle),
@@ -258,13 +262,11 @@ class _ComposerState extends ConsumerState<Composer> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
-              child: Row(
-                children: [
-                  Expanded(child: TypingIndicator(channelId: widget.channelId)),
-                  const Flexible(child: NewlineHint()),
-                ],
+            const Padding(
+              padding: EdgeInsets.fromLTRB(4, 4, 4, 0),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: NewlineHint(),
               ),
             ),
           ],

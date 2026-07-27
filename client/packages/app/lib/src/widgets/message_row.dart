@@ -8,6 +8,8 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../routing/breakpoints.dart';
+
 import 'attachment_view.dart';
 import 'emoji_picker.dart';
 import 'message_context_menu.dart';
@@ -127,6 +129,7 @@ class MessageRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = LayoutClass.of(context) == LayoutClass.compact;
     return _HoverReveal(
       builder: (context, hovered) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -138,7 +141,14 @@ class MessageRow extends StatelessWidget {
             onAddReaction: () =>
                 showEmojiPickerSheet(context, onSelect: onPickReaction),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+              // Tighter side gutters on a phone: 20 each side plus the avatar
+              // column leaves a narrow measure at 430pt.
+              padding: EdgeInsets.fromLTRB(
+                compact ? 10 : 20,
+                8,
+                compact ? 10 : 20,
+                4,
+              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

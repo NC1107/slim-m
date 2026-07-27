@@ -153,8 +153,15 @@ class _FocusableTapTargetState extends State<FocusableTapTarget> {
             child: Container(
               constraints:
                   BoxConstraints(minWidth: hitExtent, minHeight: hitExtent),
-              alignment: Alignment.center,
-              child: ring,
+              // Size factors, not Container's alignment: an Align with no
+              // factor expands to its constraints, so a chip in a Wrap took
+              // the whole line instead of gaining a 44pt hit box.
+              child: Align(
+                alignment: Alignment.center,
+                widthFactor: 1,
+                heightFactor: 1,
+                child: ring,
+              ),
             ),
           ),
         ),

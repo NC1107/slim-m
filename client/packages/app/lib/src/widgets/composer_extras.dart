@@ -242,10 +242,10 @@ class NewlineHint extends StatelessWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Visibility(
       key: const Key('composer-newline-hint'),
+      // No maintainSize: it is the only thing on its row now that the typing
+      // indicator sits above the card, so reserving its height on a phone,
+      // where it is never shown, is pure wasted space.
       visible: !usesSoftKeyboard(context),
-      maintainSize: true,
-      maintainAnimation: true,
-      maintainState: true,
       child: Text(
         'shift + enter for newline',
         maxLines: 1,

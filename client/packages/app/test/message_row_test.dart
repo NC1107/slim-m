@@ -450,4 +450,59 @@ void main() {
       );
     }
   });
+
+  testWidgets('reactions sit side by side and hug their content, rather than '
+      'each taking a whole line', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 932);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      harness(
+        MessageRow(
+          message: message(),
+          grouped: false,
+          showNewDivider: false,
+          knownUsernames: const {},
+          onRetry: () {},
+          onDiscard: () {},
+          onPickReaction: (_) {},
+          onReactionTap: (_) {},
+          onVote: (_) {},
+          actions: noActions,
+          editing: false,
+          onSubmitEdit: (_) {},
+          onCancelEdit: () {},
+          reactions: const [
+            api.ReactionSummary(emoji: 'a', count: 1, reacted: false),
+            api.ReactionSummary(emoji: 'b', count: 1, reacted: false),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final chips = find.byType(AppChip);
+    expect(chips, findsNWidgets(2));
+    final first = tester.getRect(chips.at(0));
+    final second = tester.getRect(chips.at(1));
+
+    // The regression: FocusableTapTarget gave its hit box an Align with no
+    // size factor, so every chip expanded to the full column width.
+    expect(
+      first.width,
+      lessThan(120),
+      reason: 'a reaction chip must hug its emoji and count, not fill the row',
+    );
+    expect(
+      second.top,
+      first.top,
+      reason: 'two short reactions belong on one line',
+    );
+    expect(
+      second.left,
+      greaterThan(first.right),
+      reason: 'the second chip sits beside the first, not under it',
+    );
+  });
 }

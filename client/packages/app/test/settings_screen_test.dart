@@ -211,13 +211,15 @@ void main() {
     // Presence now sits past the viewport's cache extent, so the option is
     // not merely off screen: it does not exist to be found until scrolled to.
     await tester.scrollUntilVisible(
-      find.text('Away'),
+      find.text('Status'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.ensureVisible(find.text('Away'));
+    await tester.ensureVisible(find.text('Status'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Away'));
+    await tester.tap(find.text('Status'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Away').last);
     await tester.pumpAndSettle();
 
     expect(requests.where((u) => u.path == '/presence'), hasLength(1));
@@ -227,8 +229,9 @@ void main() {
     );
   });
 
-  // The regression: the overflow was fixed by scrolling the four options
+  // The regression: the overflow was once fixed by scrolling the four options
   // horizontally, hiding two of them (one the privacy control) off the edge.
+  // They live in a sheet now, so the same property is asserted there.
   testWidgets('every presence option is on screen and tappable at 390pt', (
     tester,
   ) async {
@@ -243,10 +246,12 @@ void main() {
     await tester.pumpWidget(_screen(container));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Appear offline'),
+      find.text('Status'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Status'));
     await tester.pumpAndSettle();
 
     for (final label in const [
@@ -255,7 +260,7 @@ void main() {
       'Do not disturb',
       'Appear offline',
     ]) {
-      final rect = tester.getRect(find.text(label));
+      final rect = tester.getRect(find.text(label).last);
       expect(rect.left, greaterThanOrEqualTo(0.0), reason: '$label is cut off');
       expect(
         rect.right,

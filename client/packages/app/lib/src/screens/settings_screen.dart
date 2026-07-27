@@ -22,6 +22,7 @@ import '../widgets/appearance_settings_section.dart';
 import '../widgets/avatar_settings_section.dart';
 import '../widgets/moderation_settings_section.dart';
 import '../widgets/settings_section_header.dart';
+import '../widgets/settings_select_row.dart';
 
 /// The account's devices, refetched when invalidated.
 final devicesProvider = FutureProvider.autoDispose<List<api.Device>>(
@@ -213,7 +214,6 @@ class _PresenceSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(presenceVisibilityDisplayProvider);
-    final index = _options.indexWhere((option) => option.$1 == selected);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,40 +222,28 @@ class _PresenceSection extends ConsumerWidget {
           'Presence',
           description: 'What other members see next to your name.',
         ),
-        // Cards, like the appearance picker below: inline needs 614pt for
-        // four options, and scrolling that hid two of them on a phone.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s16,
-            0,
-            AppSpacing.s16,
-            AppSpacing.s16,
-          ),
-          child: IntrinsicHeight(
-            child: AppSegmentedControl.cards(
-              semanticLabel: 'Presence visibility',
-              options: [
-                for (final option in _options)
-                  AppSegmentedOption(label: option.$2),
-              ],
-              selectedIndex: index < 0 ? 0 : index,
-              onSegmentSelected: (i) async {
-                final visibility = _options[i].$1;
-                ref.read(presenceVisibilityDisplayProvider.notifier).state =
-                    visibility;
-                try {
-                  await ref.read(apiProvider).setPresenceVisibility(visibility);
-                } on api.ApiException catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Could not update presence. ${e.message}'),
-                    ),
-                  );
-                }
-              },
-            ),
-          ),
+        SettingsSelectRow<api.PresenceVisibility>(
+          label: 'Status',
+          sheetTitle: 'Presence',
+          value: selected ?? _options.first.$1,
+          choices: [
+            for (final option in _options)
+              SettingsChoice(value: option.$1, label: option.$2),
+          ],
+          onChanged: (visibility) async {
+            ref.read(presenceVisibilityDisplayProvider.notifier).state =
+                visibility;
+            try {
+              await ref.read(apiProvider).setPresenceVisibility(visibility);
+            } on api.ApiException catch (e) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Could not update presence. ${e.message}'),
+                ),
+              );
+            }
+          },
         ),
       ],
     );
