@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Integration tests for the bulk emoji import.
+//!
+//! Split by what a file's fate is rather than by which function decides it:
+//! [`importing`] covers a file becoming an emoji, [`refusals`] a file the
+//! report has to explain, and [`limits`] the two ceilings. [`fixtures`] is the
+//! temp database, temp directories and magic-number images they share.
+
+mod fixtures;
+mod importing;
+mod limits;
+mod refusals;

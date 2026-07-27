@@ -130,6 +130,78 @@ Ubuntu and Fedora run systemd-resolved, whose `/etc/resolv.conf` names a `127.0.
 The `dns:` block on the livekit service is there for this; point it at whichever resolvers you prefer.
 Nothing else in the container uses them: that one STUN lookup is all they serve, and its target is a public Google host either way.
 
+## Custom emoji, and importing them in bulk
+
+**slim-m ships no emoji of its own.**
+There is no bundled set, no default pack, and nothing is fetched from anywhere at startup or on first run.
+A deployment has exactly the emoji somebody put into it, which means the images are yours to supply and yours to be sure you have the rights to distribute to everyone on the deployment.
+Most emoji packs you can download are somebody's copyrighted artwork under a licence worth reading first.
+
+Anyone with MANAGE_SERVER can upload them one at a time from the client.
+For seeding a new deployment, the server binary takes a whole directory at once:
+
+```bash
+docker compose run --rm -v /path/to/your/emoji:/emoji:ro server import-emoji /emoji
+```
+
+That reuses the `server` service's environment and its `slimm_data` volume, so it writes to the same database and the same media directory the running server reads.
+It is safe to run while the server is up.
+The container runs as an unprivileged user, so the directory you mount has to be world-readable, and mounting it `:ro` is enough because the import only ever reads from it.
+Running the binary directly instead of through compose works the same way: it reads the same `SLIMM_DATABASE_PATH` and `SLIMM_ATTACHMENTS_DIR` the server does, so point those at the deployment and give it a directory.
+
+Each file becomes one emoji named after its filename, minus the extension, lowercased, with spaces and dashes turned into underscores and anything else dropped.
+`Big Smile.png` becomes `:big_smile:`, and so does `big-smile.png`.
+That is the same normalisation an upload through the client goes through, so a bulk-imported emoji is indistinguishable from an uploaded one afterwards.
+
+What is left has to fit in 32 characters, and that is worth checking a downloaded pack against before you point the import at it, because long descriptive filenames are the norm in one.
+A name that does not fit is refused rather than shortened: a truncated name is one that two files can quietly end up sharing, and the report telling you about it is better than an emoji you did not name appearing under a name you did not choose.
+
+You get a line per file and a summary:
+
+```
+!!!.png           refused, the filename leaves no usable name (a-z, 0-9 or _)
+Big Smile.png     imported as :big_smile:
+README.txt        refused, not a supported image, whatever the extension claims
+nested            refused, not a regular file, and the import does not recurse
+party-parrot.gif  imported as :party_parrot:
+2 imported, 0 unchanged, 0 skipped, 3 refused, 0 over the limit
+```
+
+Running it again over the same directory reports the two as unchanged and does nothing else:
+
+```
+!!!.png           refused, the filename leaves no usable name (a-z, 0-9 or _)
+Big Smile.png     unchanged, :big_smile: already has these bytes
+README.txt        refused, not a supported image, whatever the extension claims
+nested            refused, not a regular file, and the import does not recurse
+party-parrot.gif  unchanged, :party_parrot: already has these bytes
+0 imported, 2 unchanged, 0 skipped, 3 refused, 0 over the limit
+```
+
+What it accepts, and what it will not:
+
+- PNG, JPEG, GIF and WebP, decided by reading the first few bytes of each file rather than by trusting the extension.
+  A zip named `.png` is refused, and so is an SVG, which is a script that renders rather than an image.
+  A PDF is refused here too, even though the server does accept one as a message attachment: an emoji is drawn inline at the size of a word, and that is a narrower thing than a file somebody downloads.
+- One megabyte per file, which is already generous for something drawn at about the size of a line of text.
+- Thirty-two characters of name, counted after normalising and without the extension.
+  `blobcat_happy_extremely_pleased_indeed.png` is refused with `the name is 38 characters, over the 32 character limit`, which is a different line from the one a filename with no usable characters at all gets, so you are never sent looking for an illegal character that is not there.
+- Five hundred emoji per deployment.
+  Every client fetches the whole list to render `:shortcode:` at all, so this is a real ceiling and not a soft one.
+- The directory you name and no deeper.
+  A subdirectory is reported rather than descended into, because a nested pack is how two files quietly end up claiming the same name.
+
+Re-running the same import is safe and is the expected way to add to a pack later.
+A file whose emoji already exists with those exact bytes is reported as unchanged and nothing happens.
+A file whose name is already taken by a *different* image is skipped, and the image your members already recognise stays exactly as it is.
+Changing an emoji's picture is deliberately an explicit act: delete it in the client, then import again.
+
+If the deployment hits the five hundred limit part way through, the emoji imported up to that point stay imported, and every file that did not fit is listed as over the limit.
+A file that did not fit leaves nothing behind: both the limit and the name are checked before the image is stored, so a refused file writes no bytes into the media directory and no row into the database, and there is nothing to clean up afterwards.
+
+The command exits non-zero if any file in the directory did not end up as an emoji, so a script notices, and the report above it says which files and why.
+A pack folder with a `README` or a `LICENSE` in it will therefore exit non-zero on a run that was otherwise fine, with those files named as the reason.
+
 ## Files
 
 - `docker-compose.yml` (repository root) - the stack itself.
