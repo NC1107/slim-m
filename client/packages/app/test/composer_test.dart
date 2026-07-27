@@ -275,8 +275,15 @@ void main() {
       await tester.pump(kThemeAnimationDuration);
       expect(tester.widget<Visibility>(find.byKey(_hintKey)).visible, isTrue);
       expect(find.text('shift + enter for newline'), findsOneWidget);
-      // Hiding it must not move the composer: the row keeps its height.
-      expect(tester.getSize(find.byKey(_hintKey)).height, touchHeight);
+      // It collapses on touch rather than reserving its height. The hint can
+      // never be shown there, so holding a row open for it is wasted space on
+      // the one layout with the least of it.
+      expect(touchHeight, 0.0);
+      expect(
+        tester.getSize(find.byKey(_hintKey)).height,
+        greaterThan(0.0),
+        reason: 'desktop still shows it, so it still occupies its row',
+      );
     },
   );
 

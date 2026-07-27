@@ -38,8 +38,12 @@ class CompactChannelAppBar extends ConsumerWidget
   final String channelId;
   final VoidCallback onBack;
 
+  /// 48 rather than kToolbarHeight's 56: the bar carries one line and three
+  /// icons, and on a phone it sits under a 59pt status inset already.
+  static const double height = 48;
+
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => const Size.fromHeight(height);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -61,6 +65,7 @@ class CompactChannelAppBar extends ConsumerWidget
   AppBar _bar(Channel? channel) {
     final isVoice = channel?.kind == 'voice';
     return AppBar(
+      toolbarHeight: height,
       leading: IconButton(
         icon: const Icon(AppIcons.back),
         tooltip: 'Back to channels',
