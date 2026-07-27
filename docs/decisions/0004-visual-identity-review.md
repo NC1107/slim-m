@@ -1,7 +1,8 @@
 # 0004 - Visual identity review
 
 Date: 2026-07-26.
-Status: accepted, with one decision still open (the accent hue).
+Status: accepted.
+The one decision it left open, the accent hue, was settled on 2026-07-27 in the section below, which also records why its stated reason did not survive measurement.
 
 Owner decision 8 said a real designer review had to happen before the token
 palette was locked, because the accent is a from-scratch brand choice and the
@@ -92,21 +93,50 @@ Adding it immediately paid for itself by exposing a real defect: the light accen
 cleared base at 4.53:1 but only reached 4.26:1 on sunken, and the rails carry
 accent (active channel marker, unread badge). Corrected to `#1D7A72`.
 
-## Still open: the accent hue
+## The accent hue: decided, glacier cyan
 
-The shipped teal collides with the online-status green. At 9 to 10px, `#4FBDB4`
-and a conventional online green sit two rows apart in the member list and read as
-one colour to a deuteranope. The redundant-cue rule means the dots survive, but
-the accent stops meaning "interactive" the moment presence uses a neighbouring
-hue.
+**Decided 2026-07-27: option B, glacier cyan.**
+The anchors are the ones the review named, `#58B4D8` dark and `#1B6F91` light, taken verbatim.
+
+The review's argument for moving was this.
+
+> The shipped teal collides with the online-status green. At 9 to 10px, `#4FBDB4`
+> and a conventional online green sit two rows apart in the member list and read as
+> one colour to a deuteranope. The redundant-cue rule means the dots survive, but
+> the accent stops meaning "interactive" the moment presence uses a neighbouring
+> hue.
+
+That argument is wrong, and it was measured to be wrong before the change was made.
+The right answer came out anyway, which is the only reason this section records a decision rather than a reversal.
+
+### What was measured
+
+The shell was rendered at 1400x880 with the real fonts and a seeded session, the same harness described in `CLAUDE.md`, and the accent and the online green were taken out of that render and put through a Vienot-Brettel-Mollon LMS simulation of dichromatic vision, rather than argued about on a hue wheel.
+
+Under simulated deuteranopia the two colours move **apart**, not together.
+CIEDE2000 between the accent and the online green goes from 20.2 to 29.3.
+The simulation is a per-pixel colour transform, so it says nothing on its own about acuity at 9 to 10px; what it does say is that the mechanism the review named is not there to be helped by size either way.
+
+What does happen is worse in a quieter way.
+Teal loses about 74% of its chroma under that simulation, CIE LCh C* falling from 33.7 to 8.8, which is close enough to neutral that the accent stops reading as a colour at all.
+For a deuteranope the accent does not become confusable with the presence green; it becomes a grey that carries no signal, so every one of the seven accent roles below loses the hue half of its cue and is left with only its shape.
+Glacier cyan keeps effectively all of its chroma through the same simulation, C* 31.3 to 31.5, so the accent still reads as a colour.
+
+One factual correction to the review while this is being written down.
+It says the accent and the online green sit "two rows apart" in the member list.
+They do not: they are on the same rows.
+Nick and Priya each carry an online dot and an accent role badge, so the two colours sit side by side within one row rather than two rows apart.
+The proximity is therefore worse than the review said and the confusability is not there anyway, which is a fair summary of the whole finding.
+
+### The options, as drawn
 
 Three options were drawn against the same probe (accent beside a status dot, a
 role badge, a mention, a filled button, a poll bar):
 
 | Option | Dark / light | Hue | Verdict |
 |---|---|---|---|
-| A, muted teal | `#4FBDB4` / `#1D7A72` | 178 | Shipped. This is the collision. |
-| B, glacier cyan | `#58B4D8` / `#1B6F91` | 202 | **Recommended.** 24 degrees further from green, clears amber, red and grey, reads cooler and more technical. Teams' blue is an indigo at 265, so no collision there either. |
+| A, muted teal | `#4FBDB4` / `#1D7A72` | 178 | Was shipped. Not the collision the review claimed, but it desaturates to near-grey under deuteranopia. |
+| B, glacier cyan | `#58B4D8` / `#1B6F91` | 202 | **Adopted.** 24 degrees further from green, clears amber, red and grey, reads cooler and more technical. Teams' blue is an indigo at 265, so no collision there either. |
 | C, copper | `#C98F63` / `#8F5A2E` | 48 | Strongest identity, but moves the collision rather than solving it: copper then sits beside the away amber. Only viable if away loses amber or becomes shape-only. |
 
 The argument for B is that the accent is the cheap thing to move and the
@@ -119,14 +149,38 @@ colour reserved entirely for status and canvas content. Maximum longevity and
 zero collisions, but it leaves the app icon with no brand colour and gives new
 users nothing to learn "this is clickable" from.
 
-**Not decided here.** Changing it is one primitive value in `app_tokens.dart`
-plus regenerating goldens.
+### What actually changed in the code
+
+The review expected this to be "one primitive value", and it was close to that but not quite.
+The accent is five tokens per theme, not one, and three themes carry it, so it is fifteen values.
+
+Only two of them were decided: the anchors above.
+The other thirteen were derived by taking the teal family's own OKLCh offset from its own anchor, per theme and per role, and applying the same offset to the new anchor.
+So `accentOn` keeps its lightness delta and its chroma ratio and only rotates hue, `accentSoft` keeps the lightness and saturation relationship it already had, `accentRing` keeps its alpha byte over the new fill, and `trueBlack`'s accent is the same brighter, more saturated step off `dark` that the teal family made.
+The point of doing it that way is that nothing was re-judged by eye, so this is a hue move and not a redesign smuggled in behind one.
+
+The resulting values, all of which clear the existing contrast gate:
+
+| Role | Light | Dark | True black |
+|---|---|---|---|
+| accent, accentFill, focusRing | `#1B6F91` | `#58B4D8` | `#40B6D9` |
+| accentOn | `#FFFFFF` | `#070E12` | `#030E12` |
+| accentSoft | `#D8E7F0` | `#1D2B33` | `#12262D` |
+| accentRing | `0x381B6F91` | `0x4058B4D8` | `0x3D40B6D9` |
+
+Light improves against the surface it was tightest on: accent-as-text on `surface.sunken` goes from 4.55:1 to 4.97:1.
+Dark and true black each give up a little headroom on `surface.base`, 7.78:1 to 7.49:1 and 9.27:1 to 8.91:1, both far above the 4.5:1 the gate asks for.
+`focusRing` is still the same value as `accentFill` in every theme, as `app_tokens.dart` requires.
+Note that no test asserts that equality: `surfaces_test.dart` checks a focus ring is drawn in whatever colour it is handed, so a divergence would pass today.
+
+No goldens need regenerating, contrary to what the review estimated.
+The reference images have never been generated at all, and `matchesGoldenFile` sits behind a `SLIMM_GOLDENS` environment flag, so nothing compares against them; see the golden note in `CLAUDE.md`.
 
 ## The seven accent roles, closed
 
-Whatever hue wins, the accent's value is that it is rare. The failure mode is not
-a wrong hue, it is the sixteenth contributor adding an accent border to a card
-because it looked plain. The list:
+The hue is settled now, but it was never the point: the accent's value is that it is rare.
+The failure mode is not a wrong hue, it is the sixteenth contributor adding an accent border to a card because it looked plain.
+The list:
 
 1. Active channel (2px marker plus soft tint)
 2. Unread badge
