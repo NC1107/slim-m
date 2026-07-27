@@ -64,7 +64,9 @@ jobs:
             echo "::error::compose started with no LiveKit credentials set"
             exit 1
           fi
-          grep -q "LIVEKIT_API_KEY" err.txt || {
+          # Either name is a correct refusal: compose stops at the first
+          # variable it interpolates, and that order is not ours to fix.
+          grep -qE "LIVEKIT_API_(KEY|SECRET)" err.txt || {
             echo "::error::compose refused but did not name the missing variable"
             cat err.txt
             exit 1
