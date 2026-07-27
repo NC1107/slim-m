@@ -10,12 +10,13 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'member_pane.dart';
-import 'user_avatar.dart';
+import 'presence_menu.dart';
 
 /// The server's own identity, for the header's name line. Real endpoint;
 /// there is no separate per-deployment "workspace name" concept, so this is
@@ -33,43 +34,53 @@ class RailHeader extends ConsumerWidget {
     final server = ref.watch(serverInfoProvider);
     final members = ref.watch(membersProvider);
 
+    // The decoration bleeds to the screen edge while [SafeArea] insets only
+    // the content, so the rail's own colour fills the status-bar strip.
     return Container(
-      height: 52,
-      padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 52,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
+            child: Row(
               children: [
-                Text(
-                  server.valueOrNull?.name ?? 'slim-m',
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.body.copyWith(
-                    color: tokens.textPrimary,
-                    fontWeight: AppWeights.semi,
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        server.valueOrNull?.name ?? 'slim-m',
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.body.copyWith(
+                          color: tokens.textPrimary,
+                          fontWeight: AppWeights.semi,
+                        ),
+                      ),
+                      Text(
+                        members.maybeWhen(
+                          data: (list) =>
+                              '${list.length} members · self-hosted',
+                          orElse: () => 'self-hosted',
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.micro.copyWith(
+                          color: tokens.textSecondary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  members.maybeWhen(
-                    data: (list) => '${list.length} members · self-hosted',
-                    orElse: () => 'self-hosted',
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.micro.copyWith(
-                    color: tokens.textSecondary,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
+                const _ServerMenuButton(),
               ],
             ),
           ),
-          const _ServerMenuButton(),
-        ],
+        ),
       ),
     );
   }
@@ -177,77 +188,86 @@ class RailUserFooter extends ConsumerWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final me = ref.watch(meProvider);
     final syncStatus = ref.watch(syncControllerProvider);
+    final visibility = ref.watch(presenceVisibilityDisplayProvider);
     final voice = ref.watch(voiceControllerProvider);
     final voiceController = ref.read(voiceControllerProvider.notifier);
     final inCall = voice.state == VoiceSessionState.connected;
 
-    // This device's own connection state, never another user's presence: the
-    // one presence-shaped claim this client can make honestly.
+    // A disconnected device reports its connection instead of the chosen
+    // status: claiming "online" while nothing is arriving would be a lie.
     final (statusLabel, presence) = switch (syncStatus) {
-      SyncStatus.live => ('online', AppPresence.online),
+      SyncStatus.live => presenceDisplayOf(visibility),
       SyncStatus.connecting => ('connecting', AppPresence.away),
       SyncStatus.offline => ('offline', AppPresence.offline),
     };
 
+    // Mirrors [RailHeader]: the raised bar and its top border bleed to the
+    // screen edge while [SafeArea] lifts the content off the home indicator.
     return Container(
-      height: 56,
-      padding: const EdgeInsets.fromLTRB(12, 0, 10, 0),
       decoration: BoxDecoration(
         color: tokens.surfaceRaised,
         border: Border(top: BorderSide(color: tokens.borderSubtle)),
       ),
-      child: Row(
-        children: [
-          UserAvatar(
-            userId: me.valueOrNull?.id,
-            avatarUpdatedAt: me.valueOrNull?.avatarUpdatedAt,
-            name: me.valueOrNull?.displayName ?? '',
-            size: 28,
-            status: presence,
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 56,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 10, 0),
+            child: Row(
               children: [
-                Text(
-                  me.valueOrNull?.displayName ?? '',
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.ui.copyWith(
-                    color: tokens.textPrimary,
-                    fontWeight: AppWeights.medium,
-                    height: 1.25,
+                PresenceMenuButton(presence: presence),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        me.valueOrNull?.displayName ?? '',
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.ui.copyWith(
+                          color: tokens.textPrimary,
+                          fontWeight: AppWeights.medium,
+                          height: 1.25,
+                        ),
+                      ),
+                      Text(
+                        statusLabel,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.micro.copyWith(
+                          color: tokens.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  statusLabel,
-                  style: AppText.micro.copyWith(color: tokens.textSecondary),
+                AppIconButton(
+                  icon: voice.microphoneEnabled
+                      ? AppIcons.mic
+                      : AppIcons.micOff,
+                  semanticLabel: voice.microphoneEnabled ? 'Mute' : 'Unmute',
+                  tooltip: inCall ? null : 'Not in a call',
+                  onPressed: inCall ? voiceController.toggleMicrophone : null,
+                ),
+                // Same icon either way, the toggle carried by `active`: there
+                // is no dedicated "deafened" glyph in AppIcons.
+                AppIconButton(
+                  icon: AppIcons.headphones,
+                  semanticLabel: voice.deafened ? 'Undeafen' : 'Deafen',
+                  active: voice.deafened,
+                  tooltip: inCall ? null : 'Not in a call',
+                  onPressed: inCall ? voiceController.toggleDeafen : null,
+                ),
+                AppIconButton(
+                  icon: AppIcons.settings,
+                  semanticLabel: 'Settings',
+                  onPressed: () => context.go(Routes.settings),
                 ),
               ],
             ),
           ),
-          AppIconButton(
-            icon: voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
-            semanticLabel: voice.microphoneEnabled ? 'Mute' : 'Unmute',
-            tooltip: inCall ? null : 'Not in a call',
-            onPressed: inCall ? voiceController.toggleMicrophone : null,
-          ),
-          // Same icon either way, toggled through `active`: AppIcons has no
-          // "deafened" glyph, and this system styles toggles, not swaps them.
-          AppIconButton(
-            icon: AppIcons.headphones,
-            semanticLabel: voice.deafened ? 'Undeafen' : 'Deafen',
-            active: voice.deafened,
-            tooltip: inCall ? null : 'Not in a call',
-            onPressed: inCall ? voiceController.toggleDeafen : null,
-          ),
-          AppIconButton(
-            icon: AppIcons.settings,
-            semanticLabel: 'Settings',
-            onPressed: () => context.go(Routes.settings),
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -40,6 +40,72 @@ jobs:
           fi
           echo "ios purpose strings present"
 
+      # Orientation is locked to portrait on phones only, and the two halves
+      # fail in opposite directions if either is quietly edited: landscape
+      # back in the iPhone array stretches the phone-sized shell across a
+      # 932pt-wide window that the layout classes as a two-pane tablet, and
+      # dropping landscape from the ~ipad array (or from the sw600dp Android
+      # override) freezes a tablet in portrait it has no reason to be in.
+      # Neither shows up in a diff as a behaviour change, hence the gate.
+      - name: orientation is locked on phones only
+        run: |
+          plist=client/packages/app/ios/Runner/Info.plist
+          res=client/packages/app/android/app/src/main/res
+          fail=0
+
+          phone=$(awk '/<key>UISupportedInterfaceOrientations<\/key>/{f=1}
+                       f{print}
+                       f&&/<\/array>/{exit}' "$plist")
+          ipad=$(awk '/<key>UISupportedInterfaceOrientations~ipad<\/key>/{f=1}
+                      f{print}
+                      f&&/<\/array>/{exit}' "$plist")
+
+          if [ -z "$phone" ] || [ -z "$ipad" ]; then
+            echo "::error::$plist is missing an orientation array"
+            fail=1
+          fi
+          if grep -q 'Landscape' <<<"$phone"; then
+            echo "::error::$plist allows landscape on iPhone"
+            fail=1
+          fi
+          for side in LandscapeLeft LandscapeRight; do
+            grep -q "UIInterfaceOrientation$side" <<<"$ipad" || {
+              echo "::error::$plist no longer allows $side on iPad"
+              fail=1
+            }
+          done
+
+          grep -q '<bool name="slimm_portrait_only">true</bool>' \
+            "$res/values/bools.xml" || {
+            echo "::error::$res/values/bools.xml must lock phones to portrait"
+            fail=1
+          }
+          grep -q '<bool name="slimm_portrait_only">false</bool>' \
+            "$res/values-sw600dp/bools.xml" || {
+            echo "::error::$res/values-sw600dp/bools.xml must free tablets"
+            fail=1
+          }
+
+          # Both resources can stay exactly as they are while the only code
+          # that reads them is deleted, which is a silent unlock.
+          kt=client/packages/app/android/app/src/main/kotlin/top/npcserver/slimm/MainActivity.kt
+          code=$(sed -e 's://.*::' "$kt" |
+                 awk '/\/\*/{c=1} !c{print} /\*\//{c=0}')
+          for token in 'override fun onCreate' \
+                       'R.bool.slimm_portrait_only' \
+                       'requestedOrientation' \
+                       'SCREEN_ORIENTATION_PORTRAIT'; do
+            grep -qF "$token" <<<"$code" || {
+              echo "::error::$kt no longer applies the lock ($token is gone)"
+              fail=1
+            }
+          done
+
+          if [ $fail -eq 0 ]; then
+            echo "orientation locked on phones only"
+          fi
+          exit $fail
+
       - name: no emoji in UI source
         run: |
           # Emoji are user content (reactions), never chrome; chrome is Lucide.

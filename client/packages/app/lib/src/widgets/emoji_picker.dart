@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The emoji picker: a floating, searchable, categorised surface opened from
-/// the add-reaction control on a message hover.
+/// the add-reaction control on a message hover, or from a bottom sheet where
+/// there is no pointer to hover with.
 library;
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:emojis/emoji.dart';
 import 'package:flutter/material.dart';
@@ -97,10 +99,20 @@ class EmojiPickerPanel extends ConsumerStatefulWidget {
     super.key,
     required this.onSelect,
     required this.onClose,
+    this.autofocusSearch = true,
+    this.width = _pickerWidth,
   });
 
   final ValueChanged<String> onSelect;
   final VoidCallback onClose;
+
+  /// Off in a sheet: an autofocused search field raises the soft keyboard
+  /// over the grid before the user has seen any of it.
+  final bool autofocusSearch;
+
+  /// Overridable so the panel can shrink to a narrow phone rather than
+  /// overflow its sheet.
+  final double width;
 
   @override
   ConsumerState<EmojiPickerPanel> createState() => _EmojiPickerPanelState();
@@ -194,14 +206,14 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
       child: Material(
         type: MaterialType.transparency,
         child: AppMenu(
-          width: _pickerWidth,
+          width: widget.width,
           children: [
             Padding(
               padding: const EdgeInsets.all(AppSpacing.s8),
               child: AppInput(
                 controller: _searchController,
                 focusNode: _searchFocus,
-                autofocus: true,
+                autofocus: widget.autofocusSearch,
                 placeholder: 'Search emoji',
                 icon: Icon(
                   AppIcons.search,
@@ -247,4 +259,47 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
       ),
     );
   }
+}
+
+/// Opens the picker as a bottom sheet: the touch-reachable counterpart to
+/// [EmojiPickerButton]'s hover-anchored overlay, wrapping the same panel
+/// rather than a second implementation of it.
+///
+/// [onSelect] runs after the sheet has popped, so a caller that moves focus
+/// (the composer re-focusing its field) is not fighting the closing route.
+Future<void> showEmojiPickerSheet(
+  BuildContext context, {
+  required ValueChanged<String> onSelect,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (context) => Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      // Inside the keyboard inset, so the two cancel out: the route already
+      // removes the top padding, which is why this matches its sibling sheet.
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            EmojiPickerPanel(
+              autofocusSearch: false,
+              width: math.min(
+                _pickerWidth,
+                MediaQuery.sizeOf(context).width - AppSpacing.s32,
+              ),
+              onSelect: (emoji) {
+                Navigator.of(context).pop();
+                onSelect(emoji);
+              },
+              onClose: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

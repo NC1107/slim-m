@@ -253,12 +253,68 @@ final storeProvider = FutureProvider<MessageStore>((ref) async {
 });
 
 /// Ordinary app settings, kept separate from [keyStoreProvider]: nothing
-/// stored here is a secret. Today this backs exactly one thing,
-/// [hasLaunchedBeforeKey], and it backs it precisely because this file does
-/// NOT survive an iOS/Android reinstall the way the platform keychain does.
+/// stored here is a secret. Today this backs the first-launch flag
+/// ([hasLaunchedBeforeKey]), the voice preferences, and the appearance
+/// choice ([themeChoiceKey]); the first of those is here precisely because
+/// this file does NOT survive an iOS/Android reinstall the way the platform
+/// keychain does.
 final preferencesProvider = FutureProvider<SharedPreferences>(
   (ref) => SharedPreferences.getInstance(),
 );
+
+/// The handle the appearance choice is stored under, in [preferencesProvider].
+/// Follows the same `slimm.<area>.<thing>` convention as the voice keys.
+const themeChoiceKey = 'slimm.appearance.theme';
+
+/// Which colours the app uses.
+///
+/// [system] is the default, and is what every install has effectively been on
+/// since there was no control at all, so nothing changes for a user with
+/// nothing stored. It follows the operating system's light/dark setting and
+/// deliberately resolves to the ordinary dark palette, never to true black:
+/// true black is a choice made for a specific OLED panel, and no OS setting
+/// reports one.
+enum AppThemeChoice { system, light, dark, trueBlack }
+
+/// The stored appearance choice.
+///
+/// [restore] is a method main() awaits before `runApp`, rather than a load
+/// started from the constructor, because a constructor load resolves a frame
+/// or more after the first paint: on a true-black phone that is a white flash
+/// before the chosen theme lands.
+class ThemeController extends StateNotifier<AppThemeChoice> {
+  ThemeController(this._ref) : super(AppThemeChoice.system);
+
+  final Ref _ref;
+
+  /// Reads the stored choice back. A missing or unrecognised value leaves the
+  /// default alone, so a preference written by a later version that dropped an
+  /// option degrades to following the system rather than throwing.
+  Future<void> restore() async {
+    try {
+      final prefs = await _ref.read(preferencesProvider.future);
+      final stored = prefs.getString(themeChoiceKey);
+      state = AppThemeChoice.values.firstWhere(
+        (choice) => choice.name == stored,
+        orElse: () => AppThemeChoice.system,
+      );
+    } catch (_) {
+      // Appearance is not worth failing a launch over, and the default is
+      // always a usable answer.
+    }
+  }
+
+  /// Applies the choice, then persists it. That order is deliberate: the
+  /// repaint is immediate and does not wait on storage.
+  Future<void> select(AppThemeChoice choice) async {
+    state = choice;
+    final prefs = await _ref.read(preferencesProvider.future);
+    await prefs.setString(themeChoiceKey, choice.name);
+  }
+}
+
+final themeControllerProvider =
+    StateNotifierProvider<ThemeController, AppThemeChoice>(ThemeController.new);
 
 /// Where device secrets live: the session token pair and the push private key
 /// today, later signing and agreement keys for E2EE. The platform keychain on

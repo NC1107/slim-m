@@ -52,51 +52,56 @@ class OnboardingScreen extends ConsumerWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.s24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'slim-m',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: tokens.textPrimary,
-                    fontWeight: FontWeight.w600,
+      // Both edges: this screen has no AppBar, so nothing else clears the
+      // notch, and its content runs the full height of the view.
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.s24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'slim-m',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: tokens.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.s8),
-                Text(
-                  'Where are you joining?',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: tokens.textSecondary),
-                ),
-                const SizedBox(height: AppSpacing.s32),
-                _Entry(
-                  icon: AppIcons.add,
-                  title: 'I have an invite',
-                  description: 'Someone sent you a code for their server.',
-                  onTap: () => _redeemFlow(context),
-                ),
-                const SizedBox(height: AppSpacing.s12),
-                _Entry(
-                  icon: AppIcons.settings,
-                  title: 'Connect to a server',
-                  description: 'You run your own, or you have its address.',
-                  onTap: () => _manualFlow(context, ref),
-                ),
-                const SizedBox(height: AppSpacing.s12),
-                _Entry(
-                  icon: AppIcons.members,
-                  title: 'Join the official server',
-                  description: officialServer,
-                  onTap: () => onServerChosen(Uri.parse(officialServer), null),
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.s8),
+                  Text(
+                    'Where are you joining?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: tokens.textSecondary),
+                  ),
+                  const SizedBox(height: AppSpacing.s32),
+                  _Entry(
+                    icon: AppIcons.add,
+                    title: 'I have an invite',
+                    description: 'Someone sent you a code for their server.',
+                    onTap: () => _redeemFlow(context),
+                  ),
+                  const SizedBox(height: AppSpacing.s12),
+                  _Entry(
+                    icon: AppIcons.settings,
+                    title: 'Connect to a server',
+                    description: 'You run your own, or you have its address.',
+                    onTap: () => _manualFlow(context, ref),
+                  ),
+                  const SizedBox(height: AppSpacing.s12),
+                  _Entry(
+                    icon: AppIcons.members,
+                    title: 'Join the official server',
+                    description: officialServer,
+                    onTap: () =>
+                        onServerChosen(Uri.parse(officialServer), null),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

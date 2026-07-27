@@ -20,6 +20,71 @@ import 'package:slimm_app/src/screens/settings_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+const _signedIn = TokenPair(
+  userId: 'self',
+  accessToken: 'access',
+  refreshToken: 'refresh',
+  accessExpiresAt: 0,
+);
+
+/// A signed-in container whose every request is answered, so the presence
+/// section renders alongside the rest of the screen rather than beside error
+/// states that would change the layout under test. Every request lands in
+/// [requests].
+ProviderContainer _signedInContainer(List<Uri> requests) {
+  return ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(SessionStore(tokens: _signedIn)),
+      apiProvider.overrideWith((ref) {
+        final api = SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: MockClient((request) async {
+            requests.add(request.url);
+            if (request.url.path == '/devices' ||
+                request.url.path == '/blocks') {
+              return http.Response(
+                '[]',
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            if (request.url.path == '/me') {
+              return http.Response(
+                jsonEncode({
+                  'id': 'self',
+                  'username': 'self',
+                  'display_name': 'Self',
+                  'created_at': 0,
+                  'permissions': 0,
+                }),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            return http.Response(
+              jsonEncode({'visibility': 'away'}),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        );
+        ref.onDispose(api.close);
+        return api;
+      }),
+    ],
+  );
+}
+
+Widget _screen(ProviderContainer container) => UncontrolledProviderScope(
+  container: container,
+  child: MaterialApp(
+    theme: buildTheme(Brightness.light, AppTokens.light),
+    home: const SettingsScreen(),
+  ),
+);
+
 void main() {
   setUpAll(() {
     PackageInfo.setMockInitialValues(
@@ -87,58 +152,21 @@ void main() {
     expect(find.textContaining('Could not delete the account'), findsOneWidget);
   });
 
-  testWidgets('picking a presence option sends it and updates the display', (
-    tester,
-  ) async {
-    const tokens = TokenPair(
-      userId: 'self',
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      accessExpiresAt: 0,
-    );
-    final requests = <Uri>[];
+  testWidgets('the whole screen lays out at phone width', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+
     final container = ProviderContainer(
       overrides: [
         keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(SessionStore(tokens: tokens)),
         apiProvider.overrideWith((ref) {
           final api = SlimmApi(
             baseUrl: Uri.parse('http://localhost:8080'),
             session: ref.watch(sessionProvider),
-            httpClient: MockClient((request) async {
-              requests.add(request.url);
-
-              /// The rest of the screen (devices, blocks, the caller's own
-              /// profile for the avatar section) renders alongside the presence
-              /// section this test is about; each gets an honest answer rather
-              /// than a shape only `/presence` expects.
-              if (request.url.path == '/devices' ||
-                  request.url.path == '/blocks') {
-                return http.Response(
-                  '[]',
-                  200,
-                  headers: {'content-type': 'application/json'},
-                );
-              }
-              if (request.url.path == '/me') {
-                return http.Response(
-                  jsonEncode({
-                    'id': 'self',
-                    'username': 'self',
-                    'display_name': 'Self',
-                    'created_at': 0,
-                    'permissions': 0,
-                  }),
-                  200,
-                  headers: {'content-type': 'application/json'},
-                );
-              }
-              return http.Response(
-                jsonEncode({'visibility': 'away'}),
-                200,
-                headers: {'content-type': 'application/json'},
-              );
-            }),
+            httpClient: MockClient(
+              (_) async => throw StateError('unexpected call'),
+            ),
           );
           ref.onDispose(api.close);
           return api;
@@ -157,18 +185,36 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    // Every section, not just the ones above the fold: the presence control
+    // overflowed by 264pt here and no test viewport was ever this narrow.
+    await tester.drag(find.byType(ListView), const Offset(0, -2000));
+    await tester.pumpAndSettle();
 
-    /// Defaults to showing Online: there is no endpoint that reports back a
-    /// caller's own visibility preference, so nothing here could show
-    /// anything else on first load.
-    expect(
-      container.read(presenceVisibilityDisplayProvider),
-      PresenceVisibility.online,
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('picking a presence option sends it and updates the display', (
+    tester,
+  ) async {
+    final requests = <Uri>[];
+    final container = _signedInContainer(requests);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_screen(container));
+    await tester.pumpAndSettle();
+
+    /// Null, not Online: no endpoint reports a caller's own visibility back,
+    /// and the preference is durable server-side, so claiming online here
+    /// would tell someone still hidden that they are visible.
+    expect(container.read(presenceVisibilityDisplayProvider), isNull);
+
+    // Presence now sits past the viewport's cache extent, so the option is
+    // not merely off screen: it does not exist to be found until scrolled to.
+    await tester.scrollUntilVisible(
+      find.text('Away'),
+      200,
+      scrollable: find.byType(Scrollable).first,
     );
-
-    /// The avatar section above it pushes Presence far enough down that it
-    /// is not always within the default test viewport; ensure it is in view
-    /// rather than assume the fold falls wherever it used to.
     await tester.ensureVisible(find.text('Away'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Away'));
@@ -179,5 +225,53 @@ void main() {
       container.read(presenceVisibilityDisplayProvider),
       PresenceVisibility.away,
     );
+  });
+
+  // The regression: the overflow was fixed by scrolling the four options
+  // horizontally, hiding two of them (one the privacy control) off the edge.
+  testWidgets('every presence option is on screen and tappable at 390pt', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+
+    final requests = <Uri>[];
+    final container = _signedInContainer(requests);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_screen(container));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Appear offline'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    for (final label in const [
+      'Online',
+      'Away',
+      'Do not disturb',
+      'Appear offline',
+    ]) {
+      final rect = tester.getRect(find.text(label));
+      expect(rect.left, greaterThanOrEqualTo(0.0), reason: '$label is cut off');
+      expect(
+        rect.right,
+        lessThanOrEqualTo(390.0),
+        reason: '$label runs past the right edge of the screen',
+      );
+    }
+
+    // Reachable, not merely painted: an option outside the viewport takes no
+    // tap, so this is what a horizontal scroll view could not satisfy.
+    await tester.tap(find.text('Appear offline'));
+    await tester.pumpAndSettle();
+    expect(
+      container.read(presenceVisibilityDisplayProvider),
+      PresenceVisibility.hidden,
+    );
+    expect(requests.where((u) => u.path == '/presence'), hasLength(1));
   });
 }

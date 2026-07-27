@@ -16,6 +16,7 @@ import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import '../widgets/channel_rail.dart';
 import '../widgets/command_palette.dart';
+import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/member_pane.dart';
 import 'channel_screen.dart';
 import 'voice_screen.dart';
@@ -58,13 +59,15 @@ class HomeShell extends ConsumerWidget {
     } else if (selected != null) {
       // Compact: the conversation replaces the list, with a way back.
       scaffold = Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(AppIcons.back),
-            tooltip: 'Back to channels',
-            onPressed: () => context.go(Routes.channels),
-          ),
-          title: _ChannelTitle(channelId: selected),
+        appBar: CompactChannelAppBar(
+          channelId: selected,
+          onBack: () => context.go(Routes.channels),
+        ),
+        // The roster slides in from the right instead of docking beside the
+        // conversation, which is the only pane there is at this width.
+        endDrawer: const Drawer(
+          width: AppMemberPane.width,
+          child: SafeArea(child: AppMemberPane()),
         ),
         body: child,
       );
@@ -98,11 +101,11 @@ class NoChannelSelected extends StatelessWidget {
 /// calls, decided from the local store so it needs no round trip to know
 /// which to show.
 ///
-/// [ChannelScreen] owns and renders its own full header (search, the pin
-/// pill, the member-pane toggle) at any width that shows it, since only that
-/// screen holds the state (search open or not) the header needs. Voice
-/// channels have no such header of their own, so this still supplies a
-/// minimal one here at wide layouts, unchanged from before.
+/// [ChannelScreen] renders its own full header (search, the pin pill, the
+/// member-pane toggle) at any width that shows it. At compact width there is
+/// no room for one, and [CompactChannelAppBar] carries the same four
+/// affordances instead. Voice channels have no header of their own either
+/// way, so this still supplies a minimal one at wide layouts, as before.
 class ConversationPane extends ConsumerWidget {
   const ConversationPane({required this.channelId, super.key});
 

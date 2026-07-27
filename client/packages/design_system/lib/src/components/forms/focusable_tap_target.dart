@@ -20,6 +20,7 @@ import 'package:flutter/services.dart';
 
 import '../../app_metrics.dart';
 import '../../app_tokens.dart';
+import '../../touch_targets.dart';
 
 /// The gap between a control's edge and its focus ring, and the ring's own
 /// stroke width. There is no dedicated token for either: both are reserved
@@ -28,15 +29,13 @@ import '../../app_tokens.dart';
 const double focusRingGap = 2;
 const double focusRingWidth = 2;
 
-/// The width below which rows compact to touch sizing, mirroring the layout
-/// class breakpoint the app shell uses for its panes. Mirrored here rather
-/// than imported so this package does not depend on the app shell package;
-/// a form control and the row it sits in still agree on what "the touch
-/// size" is, because both read the same width.
+/// The hit-target floor this subtree is at.
+///
+/// Reads [AppTouchTargets], which is where the width rule the form controls
+/// always applied now lives, so a form control, the row it sits in and the
+/// button beside it cannot end up at three different densities.
 double minHitExtent(BuildContext context) =>
-    MediaQuery.sizeOf(context).width < 600
-        ? AppSizes.rowTouch
-        : AppSizes.rowPointer;
+    AppTouchTargets.of(context) ? AppSizes.rowTouch : AppSizes.rowPointer;
 
 typedef FocusableTapBuilder = Widget Function(
   BuildContext context,

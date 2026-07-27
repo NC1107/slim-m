@@ -8,12 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
-import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
+import 'channel_rail_channel_rows.dart';
 import 'create_channel_sheet.dart';
-import 'manage_channel_sheet.dart';
 
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text, {this.onAdd, this.addSemanticLabel});
@@ -28,8 +27,11 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    // The add button's hit box grows around a glyph that does not, so the
+    // trailing padding comes off to leave the glyph where the design puts it.
+    final addPad = AppTouchTargets.of(context) ? 0.0 : 4.0;
     return Padding(
-      padding: EdgeInsets.fromLTRB(8, 10, onAdd != null ? 4 : 8, 6),
+      padding: EdgeInsets.fromLTRB(8, 10, onAdd != null ? addPad : 8, 6),
       child: Row(
         children: [
           Expanded(
@@ -128,7 +130,7 @@ class TextChannelsSection extends StatelessWidget {
           addSemanticLabel: 'Create a text channel',
         ),
         for (final channel in channels)
-          _ManagedChannelRow(
+          ManagedChannelRow(
             canManage: canManage,
             channel: channel,
             row: AppListRow(
@@ -176,138 +178,16 @@ class VoiceChannelsSection extends ConsumerWidget {
           addSemanticLabel: 'Create a voice channel',
         ),
         for (final channel in channels)
-          _ManagedChannelRow(
+          ManagedChannelRow(
             canManage: canManage,
             channel: channel,
-            row: _VoiceChannelRow(
+            row: VoiceChannelRow(
               channel: channel,
               selected: channel.id == selectedId,
               voice: voice,
             ),
           ),
       ],
-    );
-  }
-}
-
-/// Pairs a channel row with its manage-sheet trigger, kept as a sibling
-/// rather than [AppListRow.trailing] so it never displaces that slot's own
-/// job (the unread dot, the voice channel's live head count).
-class _ManagedChannelRow extends StatelessWidget {
-  const _ManagedChannelRow({
-    required this.canManage,
-    required this.channel,
-    required this.row,
-  });
-
-  final bool canManage;
-  final Channel channel;
-  final Widget row;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!canManage) return row;
-    return Row(
-      children: [
-        Expanded(child: row),
-        AppIconButton(
-          icon: AppIcons.moreVertical,
-          semanticLabel: 'Manage ${channel.name}',
-          size: AppIconButtonSize.sm,
-          onPressed: () => showManageChannelSheet(context, channel),
-        ),
-      ],
-    );
-  }
-}
-
-/// The participant strip renders only for the channel the caller has actually
-/// joined, sourced from real participant data, and not at all otherwise: the
-/// server exposes no per-channel voice roster, only the participants of a room
-/// already joined, so for any other voice channel there is no way to know who
-/// (if anyone) is in it. See the `TODO(ui-backend)` in [build].
-class _VoiceChannelRow extends StatelessWidget {
-  const _VoiceChannelRow({
-    required this.channel,
-    required this.selected,
-    required this.voice,
-  });
-
-  final Channel channel;
-  final bool selected;
-  final VoiceState voice;
-
-  bool get _inCall =>
-      voice.state == VoiceSessionState.connected &&
-      voice.channelId == channel.id;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final iconColor = _inCall
-        ? tokens.accent
-        : tokens.textSecondary.withValues(alpha: 0.7);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AppListRow(
-          label: channel.name,
-          selected: selected,
-          unread: _inCall,
-          leading: Icon(
-            AppIcons.voice,
-            size: AppSizes.icon16,
-            color: iconColor,
-          ),
-          trailing: _inCall
-              ? Text(
-                  '${voice.participants.length}',
-                  style: AppText.micro.copyWith(
-                    color: tokens.textSecondary,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                )
-              : null,
-          onTap: () => context.go(Routes.channel(channel.id)),
-        ),
-        // TODO(ui-backend): no per-channel voice roster on the server, so only
-        // the joined channel can show one. See this class's doc.
-        if (_inCall) _ParticipantStrip(participants: voice.participants),
-      ],
-    );
-  }
-}
-
-class _ParticipantStrip extends StatelessWidget {
-  const _ParticipantStrip({required this.participants});
-
-  final List<VoiceParticipant> participants;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(30, 2, 8, 4),
-      child: Row(
-        children: [
-          for (final participant in participants.take(8))
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.s4),
-              child: participant.isSpeaking
-                  ? Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: tokens.accentFill, width: 2),
-                      ),
-                      child: AppAvatar(name: participant.name, size: 20),
-                    )
-                  : AppAvatar(name: participant.name, size: 20),
-            ),
-          if (participants.any((p) => p.isScreenSharing))
-            Icon(AppIcons.screenShare, size: 13, color: tokens.textSecondary),
-        ],
-      ),
     );
   }
 }

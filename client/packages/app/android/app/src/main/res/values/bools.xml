@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The default (phone) answer: lock to portrait. Read by MainActivity at
+     runtime rather than set as android:screenOrientation in the manifest,
+     because the manifest is parsed with the default configuration, so a
+     resource reference there would never resolve to the values-sw600dp
+     override and tablets would be locked too. -->
+<resources>
+    <bool name="slimm_portrait_only">true</bool>
+</resources>

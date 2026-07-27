@@ -199,101 +199,107 @@ class _ChannelOverwritesScreenState
           onPressed: () => context.go(Routes.settings),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.s16),
-        children: [
-          const AppCallout(
-            tone: AppCalloutTone.info,
-            child: Text(
-              'There is no way to read an existing overwrite back, so this '
-              'always starts from "inherit". Setting one replaces whatever '
-              'was there for every permission at once.',
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s16),
-          AppCard(
-            title: 'Channel',
-            // The card's background hides the Scaffold Material the ListTile
-            // would splash on; a transparent one gives it somewhere to paint.
-            child: Material(
-              type: MaterialType.transparency,
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(_channel?.name ?? 'Choose a channel'),
-                trailing: const Icon(AppIcons.chevronRight),
-                onTap: _pickChannel,
+      // top: false because the AppBar already clears the status bar.
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.s16),
+          children: [
+            const AppCallout(
+              tone: AppCalloutTone.info,
+              child: Text(
+                'There is no way to read an existing overwrite back, so this '
+                'always starts from "inherit". Setting one replaces whatever '
+                'was there for every permission at once.',
               ),
             ),
-          ),
-          if (_channel != null) ...[
-            const SizedBox(height: AppSpacing.s12),
-            AppSegmentedControl.inline(
-              semanticLabel: 'Overwrite target kind',
-              options: const [
-                AppSegmentedOption(label: 'Role'),
-                AppSegmentedOption(label: 'Member'),
-              ],
-              selectedIndex: _kind == api.OverwriteTarget.role ? 0 : 1,
-              onSegmentSelected: (i) => setState(() {
-                _kind = i == 0
-                    ? api.OverwriteTarget.role
-                    : api.OverwriteTarget.member;
-                _resetTarget();
-              }),
-            ),
-            const SizedBox(height: AppSpacing.s12),
+            const SizedBox(height: AppSpacing.s16),
             AppCard(
-              title: _kind == api.OverwriteTarget.role ? 'Role' : 'Member',
+              title: 'Channel',
+
+              /// The card's own background sits between a bare ListTile and the
+              /// Scaffold's Material, which swallows its ink splash; a
+              /// transparent Material here gives the splash somewhere to paint.
               child: Material(
                 type: MaterialType.transparency,
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    _targetLabel ??
-                        'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}',
-                  ),
+                  title: Text(_channel?.name ?? 'Choose a channel'),
                   trailing: const Icon(AppIcons.chevronRight),
-                  onTap: _pickTarget,
+                  onTap: _pickChannel,
                 ),
               ),
             ),
-          ],
-          if (_targetId != null) ...[
+            if (_channel != null) ...[
+              const SizedBox(height: AppSpacing.s12),
+              AppSegmentedControl.inline(
+                semanticLabel: 'Overwrite target kind',
+                options: const [
+                  AppSegmentedOption(label: 'Role'),
+                  AppSegmentedOption(label: 'Member'),
+                ],
+                selectedIndex: _kind == api.OverwriteTarget.role ? 0 : 1,
+                onSegmentSelected: (i) => setState(() {
+                  _kind = i == 0
+                      ? api.OverwriteTarget.role
+                      : api.OverwriteTarget.member;
+                  _resetTarget();
+                }),
+              ),
+              const SizedBox(height: AppSpacing.s12),
+              AppCard(
+                title: _kind == api.OverwriteTarget.role ? 'Role' : 'Member',
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      _targetLabel ??
+                          'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}',
+                    ),
+                    trailing: const Icon(AppIcons.chevronRight),
+                    onTap: _pickTarget,
+                  ),
+                ),
+              ),
+            ],
+            if (_targetId != null) ...[
+              const SizedBox(height: AppSpacing.s16),
+              for (final (bit, label) in Perm.editable)
+                PermissionOverwriteRow(
+                  label: label,
+                  value: _state[bit]!,
+                  allowEnabled: myPermissions.hasPermission(bit),
+                  onChanged: (v) => setState(() => _state[bit] = v),
+                ),
+              const SizedBox(height: AppSpacing.s8),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: 'Clear',
+                      variant: AppButtonVariant.danger,
+                      full: true,
+                      disabled: _busy,
+                      onPressed: _clear,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s8),
+                  Expanded(
+                    child: AppButton(
+                      label: 'Set overwrite',
+                      variant: AppButtonVariant.primary,
+                      full: true,
+                      disabled: _busy,
+                      onPressed: _set,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: AppSpacing.s16),
-            for (final (bit, label) in Perm.editable)
-              PermissionOverwriteRow(
-                label: label,
-                value: _state[bit]!,
-                allowEnabled: myPermissions.hasPermission(bit),
-                onChanged: (v) => setState(() => _state[bit] = v),
-              ),
-            const SizedBox(height: AppSpacing.s8),
-            Row(
-              children: [
-                Expanded(
-                  child: AppButton(
-                    label: 'Clear',
-                    variant: AppButtonVariant.danger,
-                    full: true,
-                    disabled: _busy,
-                    onPressed: _clear,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.s8),
-                Expanded(
-                  child: AppButton(
-                    label: 'Set overwrite',
-                    variant: AppButtonVariant.primary,
-                    full: true,
-                    disabled: _busy,
-                    onPressed: _set,
-                  ),
-                ),
-              ],
-            ),
           ],
-          const SizedBox(height: AppSpacing.s16),
-        ],
+        ),
       ),
     );
   }

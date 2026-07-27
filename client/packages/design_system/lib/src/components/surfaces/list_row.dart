@@ -8,11 +8,14 @@
 /// trailing content to carry that meaning instead.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../app_metrics.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
+import '../../touch_targets.dart';
 
 /// A single-line row: optional leading content, a label, an optional `meta`
 /// caption, an optional trailing widget, and four states that combine freely.
@@ -30,7 +33,7 @@ import '../../app_typography.dart';
 ///   rather than swapping in a "disabled" text colour: `textDisabled` means
 ///   "not actionable", which a muted channel still is.
 /// - [touch]: raises the row to [AppSizes.rowTouch]; nothing else about the
-///   row changes.
+///   row changes. Left unset it follows [AppTouchTargets.of].
 ///
 /// Keyboard focus draws a full-row outline in [AppTokens.focusRing]; selection
 /// draws a left marker plus a fill in [AppTokens.accentSoft]. The two tokens
@@ -47,7 +50,7 @@ class AppListRow extends StatefulWidget {
     this.selected = false,
     this.unread = false,
     this.muted = false,
-    this.touch = false,
+    this.touch,
     this.height,
     this.onTap,
     this.focusNode,
@@ -64,12 +67,14 @@ class AppListRow extends StatefulWidget {
   final bool selected;
   final bool unread;
   final bool muted;
-  final bool touch;
 
-  /// Overrides the derived height. The member list uses this: its rows pair a
-  /// larger avatar with a status dot on the corner, which crops at the
-  /// channel-row default. [touch] still wins, so a touch layout is never
-  /// shrunk below its hit target by a caller.
+  /// Null means "whatever this subtree is at", read from [AppTouchTargets].
+  final bool? touch;
+
+  /// Raises the row above its derived height. The member list uses this: its
+  /// rows pair a larger avatar with a status dot on the corner, which crops at
+  /// the channel-row default. It is a floor rather than an override, so a
+  /// touch layout is never shrunk below its hit target by a caller.
   final double? height;
   final VoidCallback? onTap;
 
@@ -102,9 +107,11 @@ class _AppListRowState extends State<AppListRow> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final rowHeight = widget.touch
-        ? AppSizes.rowTouch
-        : (widget.height ?? AppSizes.rowPointer);
+    final touch = widget.touch ?? AppTouchTargets.of(context);
+    final rowHeight = math.max(
+      touch ? AppSizes.rowTouch : AppSizes.rowPointer,
+      widget.height ?? 0,
+    );
 
     // The source lifts colour and weight together for `selected || unread`, so
     // the dot below is what keeps unread legible when both are set at once.

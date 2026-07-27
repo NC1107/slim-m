@@ -35,6 +35,14 @@ abstract final class AppRadii {
   static const double full = 999;
 }
 
+/// The width below which one pane fits at a time and a finger, not a pointer,
+/// is the likely input.
+///
+/// Named here rather than in the app because `AppTouchTargets` falls back to
+/// it; the app's `LayoutClass.compact` reads this same value, so the layout
+/// and the hit targets cannot drift apart.
+const double kCompactWidth = 600;
+
 /// Minimum interactive sizes.
 ///
 /// [rowPointer] and [rowTouch] are the same row at two input classes, not two

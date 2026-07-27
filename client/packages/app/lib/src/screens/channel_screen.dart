@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../ids.dart';
 import '../providers/admin_providers.dart';
+import '../providers/channel_search_controller.dart';
 import '../providers/message_actions.dart';
 import '../providers/message_extras.dart';
 import '../providers/pins_controller.dart';
@@ -42,26 +43,10 @@ class ChannelScreen extends ConsumerStatefulWidget {
 class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   final _composer = TextEditingController();
   final _scroll = ScrollController();
+
+  /// The query text only; the search itself (open, hits, failure) lives in
+  /// [channelSearchProvider], which the compact app bar drives too.
   final _searchController = TextEditingController();
-  bool _searchOpen = false;
-
-  /// Search hits straight from the server, not the local store: `api.Message`
-  /// here, never the local `Message` row the rest of this screen otherwise
-  /// uses, since a search result was never necessarily written locally.
-  List<api.Message>? _searchResults;
-
-  /// The last query actually submitted, null once cleared. Distinct from
-  /// [_searchResults] being null: that also happens mid-request and on a
-  /// failure, neither of which is "no search running".
-  String? _searchQuery;
-  bool _searchLoading = false;
-
-  /// Set on a failed search, cleared on the next attempt. Kept apart from
-  /// [_searchResults] so "the request failed" never renders identically to
-  /// "the request came back with nothing", which is the loading/empty
-  /// confusion this screen exists to avoid.
-  bool _searchFailed = false;
-  bool _searchForbidden = false;
 
   /// The message currently swapped into its inline edit field, if any. At
   /// most one at a time: starting a new edit implicitly cancels another.
@@ -82,14 +67,14 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     unawaited(_hydrateExtras());
   }
 
-  /// Fills the reaction/attachment/poll cache for the visible window, which is
-  /// what makes it correct after a restart: the local database has no columns
-  /// for any of the three (see `message_extras.dart`), and sync only ever
-  /// fetches messages newer than the cursor, so an old message's enrichment
-  /// would otherwise never come back.
-  ///
-  /// Best-effort and silent. A failure leaves the cache as it was, and the row
-  /// still renders from the local store either way.
+  @override
+  void didUpdateWidget(ChannelScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // This State outlives a channel switch (see [_markedReadSeq]), so the
+    // field would otherwise still hold the previous channel's query.
+    if (oldWidget.channelId != widget.channelId) _searchController.clear();
+  }
+
   Future<void> _hydrateExtras() async {
     try {
       final recent = await ref
@@ -112,22 +97,18 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
 
   /// Sends, showing the message immediately and reconciling with the server's
   /// copy when it lands. The id is generated here and reused on retry, so a
-  /// retry after an uncertain failure can never post twice.
-  ///
-  /// A failed send keeps the text as a failed row rather than dropping it, so
-  /// the user can retry or discard and either way does not lose what they
-  /// wrote. Note a retry only resends the text: the local store has nowhere to
-  /// keep the attachment ids of a message that has not landed yet, so a retried
-  /// send goes out without them.
+  /// retry after an uncertain failure can never post twice. The field is
+  /// cleared before the first await, so two calls in one turn cannot both
+  /// read the same text: the second finds it empty and returns.
   Future<void> _send(List<String> attachmentIds) async {
     final text = _composer.text.trim();
     if (text.isEmpty) return;
+    _composer.clear();
 
     final store = await ref.read(storeProvider.future);
     final session = ref.read(sessionProvider);
     final id = newMessageId();
 
-    _composer.clear();
     await store.addPending(
       id: id,
       channelId: widget.channelId,
@@ -292,66 +273,13 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     }
   }
 
-  void _toggleSearch() {
-    setState(() {
-      _searchOpen = !_searchOpen;
-      if (!_searchOpen) {
-        _searchQuery = null;
-        _searchResults = null;
-        _searchLoading = false;
-        _searchFailed = false;
-        _searchForbidden = false;
-        _searchController.clear();
-      }
-    });
-  }
+  /// Both the flag and the query live in [channelSearchProvider] so the
+  /// compact layout's app bar, built above this screen, can drive them too.
+  void _search(String query) =>
+      ref.read(channelSearchProvider(widget.channelId).notifier).run(query);
 
-  Future<void> _runSearch(String query) async {
-    final trimmed = query.trim();
-    if (trimmed.isEmpty) {
-      setState(() {
-        _searchQuery = null;
-        _searchResults = null;
-        _searchLoading = false;
-        _searchFailed = false;
-        _searchForbidden = false;
-      });
-      return;
-    }
-    setState(() {
-      _searchQuery = trimmed;
-      _searchLoading = true;
-      _searchFailed = false;
-      _searchForbidden = false;
-    });
-    try {
-      final results = await ref
-          .read(apiProvider)
-          .searchMessages(widget.channelId, q: trimmed);
-      if (!mounted) return;
-      setState(() {
-        _searchResults = results;
-        _searchLoading = false;
-      });
-    } on api.ForbiddenException {
-      if (!mounted) return;
-      // Not transient: the same query will fail again until the caller's
-      // permissions change, so a retry button here would only waste a tap.
-      setState(() {
-        _searchResults = null;
-        _searchLoading = false;
-        _searchFailed = true;
-        _searchForbidden = true;
-      });
-    } on api.ApiException {
-      if (!mounted) return;
-      setState(() {
-        _searchResults = null;
-        _searchLoading = false;
-        _searchFailed = true;
-      });
-    }
-  }
+  void _toggleSearch() =>
+      ref.read(channelSearchProvider(widget.channelId).notifier).toggle();
 
   /// Advances the read marker to the newest message actually rendered.
   ///
@@ -407,6 +335,15 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   Widget build(BuildContext context) {
     final storeAsync = ref.watch(storeProvider);
     final layout = LayoutClass.of(context);
+    final search = ref.watch(channelSearchProvider(widget.channelId));
+    // Search can now be closed from the app bar as well as from the header,
+    // and either way the field it typed into has to empty with it.
+    ref.listen(channelSearchProvider(widget.channelId).select((s) => s.open), (
+      _,
+      open,
+    ) {
+      if (!open) _searchController.clear();
+    });
     final knownUsernames = ref
         .watch(membersProvider)
         .maybeWhen(
@@ -445,23 +382,23 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                   name: channelName,
                   topic: channel?.topic,
                   isVoice: false,
-                  searchOpen: _searchOpen,
+                  searchOpen: search.open,
                   onToggleSearch: _toggleSearch,
                 ),
-              if (_searchOpen)
+              if (search.open)
                 ChannelSearchBar(
                   controller: _searchController,
-                  onChanged: _runSearch,
+                  onChanged: _search,
                 ),
               Expanded(
-                child: _searchQuery != null
+                child: search.query != null
                     ? ChannelSearchResults(
-                        results: _searchResults,
+                        results: search.results,
                         knownUsernames: knownUsernames,
-                        loading: _searchLoading,
-                        failed: _searchFailed,
-                        forbidden: _searchForbidden,
-                        onRetry: () => _runSearch(_searchQuery!),
+                        loading: search.loading,
+                        failed: search.failed,
+                        forbidden: search.forbidden,
+                        onRetry: () => _search(search.query!),
                       )
                     : StreamBuilder<List<Message>>(
                         stream: store.watchChannel(widget.channelId),

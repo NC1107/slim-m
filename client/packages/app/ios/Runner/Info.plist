@@ -86,11 +86,15 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<!-- Portrait only on iPhone. The layout is width-driven and a phone in
+	     landscape reports ~932pt, which crosses into the two-pane medium
+	     class and stretches a phone-sized shell across it. UIKit intersects
+	     this array with FlutterViewController's permissive default, so this
+	     key is the ceiling; the ~ipad array below keeps tablets free.
+	     The hygiene workflow gates both halves. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
