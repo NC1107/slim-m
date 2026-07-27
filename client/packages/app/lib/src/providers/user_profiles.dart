@@ -18,13 +18,11 @@ import 'providers.dart';
 
 /// Null for a deleted or anonymized account (a 404), exactly like
 /// [api.SlimmApiUsers.getUser] itself.
-final userProfileProvider =
-    FutureProvider.autoDispose.family<api.UserProfile?, String>(
-  (ref, userId) async {
-    try {
-      return await ref.watch(apiProvider).getUser(userId);
-    } on api.NotFoundException {
-      return null;
-    }
-  },
-);
+final userProfileProvider = FutureProvider.autoDispose
+    .family<api.UserProfile?, String>((ref, userId) async {
+      try {
+        return await ref.watch(apiProvider).getUser(userId);
+      } on api.NotFoundException {
+        return null;
+      }
+    });

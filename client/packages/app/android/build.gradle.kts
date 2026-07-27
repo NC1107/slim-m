@@ -19,10 +19,11 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// file_picker 11.0.2 drops the Kotlin plugin whenever AGP is 9+, assuming built-in
-// Kotlin compiles it; this build keeps that off, so nothing would. Fixed in 12.0.0-beta.3.
+// device_info_plus 13 and package_info_plus 10 drop the Kotlin plugin on AGP 9+
+// without checking android.builtInKotlin, which this build sets to false.
+val kotlinlessPlugins = setOf("device_info_plus", "package_info_plus")
 subprojects {
-    if (name == "file_picker") {
+    if (name in kotlinlessPlugins) {
         pluginManager.withPlugin("com.android.library") {
             pluginManager.apply("org.jetbrains.kotlin.android")
             extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension> {

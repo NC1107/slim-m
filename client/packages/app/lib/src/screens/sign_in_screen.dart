@@ -6,11 +6,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
+import '../routing/routes.dart';
 
 /// Sign in or create an account on a chosen server.
 ///
@@ -151,7 +153,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       _error = null;
     });
 
-    ref.read(serverUrlProvider.notifier).state = address;
+    ref.read(chosenServerProvider.notifier).choose(address);
     final api = ref.read(apiProvider);
 
     final invite = ref.read(pendingInviteProvider);
@@ -189,18 +191,20 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     } on ApiException catch (e) {
       // Say what actually happened. "Something went wrong" tells the user
       // nothing about whether to fix their password or wait.
-      setState(() => _error = switch (e) {
-            UnauthorizedException() =>
-              'That username and password did not match.',
-            ConflictException() => 'That username is already taken.',
-            BadRequestException(:final message) => message,
-            RateLimitedException() =>
-              'Too many attempts just now. Wait a moment and try again.',
-            UnavailableException() => 'The server is busy. Try again shortly.',
-            TransportException() =>
-              'Could not reach that server. Check the address and your connection.',
-            _ => 'The server refused that. ${e.message}',
-          });
+      setState(
+        () => _error = switch (e) {
+          UnauthorizedException() =>
+            'That username and password did not match.',
+          ConflictException() => 'That username is already taken.',
+          BadRequestException(:final message) => message,
+          RateLimitedException() =>
+            'Too many attempts just now. Wait a moment and try again.',
+          UnavailableException() => 'The server is busy. Try again shortly.',
+          TransportException() =>
+            'Could not reach that server. Check the address and your connection.',
+          _ => 'The server refused that. ${e.message}',
+        },
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -223,9 +227,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 Text(
                   'slim-m',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: tokens.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: tokens.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.s8),
@@ -304,8 +308,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     liveRegion: true,
                     child: Text(
                       _error!,
-                      style:
-                          TextStyle(color: Theme.of(context).colorScheme.error),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   ),
                 ],
@@ -325,14 +330,20 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   onPressed: _busy
                       ? null
                       : () => setState(() {
-                            _creatingAccount = !_creatingAccount;
-                            _error = null;
-                          }),
+                          _creatingAccount = !_creatingAccount;
+                          _error = null;
+                        }),
                   child: Text(
                     _creatingAccount
                         ? 'I already have an account'
                         : 'Create an account instead',
                   ),
+                ),
+                // Once a server is remembered, sign-in is where a signed-out
+                // user lands, so this is the only way back to invite redemption.
+                TextButton(
+                  onPressed: _busy ? null : () => context.go(Routes.onboarding),
+                  child: const Text('Use a different server'),
                 ),
               ],
             ),

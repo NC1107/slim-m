@@ -24,11 +24,11 @@ const String dmChannelKind = 'dm';
 /// off the local store rather than the server's channel list, so this is
 /// the only place that substitution needs to happen.
 api.Channel channelFromDm(api.DmConversation dm) => api.Channel(
-      id: dm.channelId,
-      name: dm.user.displayName,
-      kind: dmChannelKind,
-      createdAt: dm.createdAt,
-    );
+  id: dm.channelId,
+  name: dm.user.displayName,
+  kind: dmChannelKind,
+  createdAt: dm.createdAt,
+);
 
 /// Opens (or returns) the DM with [userId] and gets it into the local store,
 /// so the screen this navigates to has a name and kind to render

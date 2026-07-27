@@ -65,12 +65,15 @@ An OpenAPI 3.1 schema object *is* a JSON Schema 2020-12 schema, so a general JSO
 
 ## Client holds
 
-### `package_info_plus` is held at 9.x
+### `package_info_plus` was held at 9.x, and is not any more
 
-10.x moves to `win32` 6, and every other Windows-only package in the tree is still on `win32` 5: `device_info_plus` (which `livekit_client` pulls in), `flutter_secure_storage_windows`, and `win32_registry`.
+Kept here because the reason is not obvious and the trap can recur.
 
-The non-obvious part, and the reason this is not a Windows-only concern: those libraries type-check on a Linux build even though none of their code ever runs there.
-A `win32` major-version mismatch is therefore a hard build failure on every platform, not a problem you discover when you first build for Windows.
+9.x was held because 10.x moves to `win32` 6, while every other Windows-only package in the tree sat on `win32` 5: `device_info_plus` (which `livekit_client` pulls in), `flutter_secure_storage_windows`, and `win32_registry`.
+The non-obvious part is that this was never a Windows-only concern: those libraries type-check on a Linux build even though none of their code ever runs there, so a `win32` major mismatch is a hard build failure on every platform.
 
-What the hold buys is current `livekit_client` and `flutter_webrtc`.
-That is the constraint to weigh against, so resolving this by bumping the other `win32` packages is the wrong move: they are pinned by what `livekit_client` depends on, not by preference.
+`file_picker` 12 needs `win32` 6, so the whole tree moved rather than the hold being lifted on its own merits.
+That is also why `device_info_plus` now carries a `dependency_overrides` entry: `livekit_client` 2.8.1 pins `^12.3.0`, and forcing 13.x is what lets `win32` 6 resolve.
+That override was checked rather than assumed - see the pull request that introduced it - but it is the thing to look at first if voice starts misbehaving on a client build.
+
+If a future conflict looks like this again, the wrong move is still to bump the other `win32` packages: they follow `livekit_client`, not preference.

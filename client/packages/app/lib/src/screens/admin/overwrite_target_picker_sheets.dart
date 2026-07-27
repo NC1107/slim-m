@@ -103,9 +103,11 @@ class _PickerError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(message,
-                style: TextStyle(color: tokens.textSecondary),
-                textAlign: TextAlign.center),
+            Text(
+              message,
+              style: TextStyle(color: tokens.textSecondary),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: AppSpacing.s12),
             TextButton(onPressed: onRetry, child: const Text('Retry')),
           ],

@@ -92,8 +92,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// still renders from the local store either way.
   Future<void> _hydrateExtras() async {
     try {
-      final recent =
-          await ref.read(apiProvider).listMessages(widget.channelId, limit: 50);
+      final recent = await ref
+          .read(apiProvider)
+          .listMessages(widget.channelId, limit: 50);
       if (!mounted) return;
       ref.read(messageExtrasProvider.notifier).applyMessages(recent);
     } on api.ApiException {
@@ -136,7 +137,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     _scrollToLatest();
 
     try {
-      final sent = await ref.read(apiProvider).sendMessage(
+      final sent = await ref
+          .read(apiProvider)
+          .sendMessage(
             channelId: widget.channelId,
             id: id,
             content: text,
@@ -160,7 +163,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       content: message.content,
     );
     try {
-      final sent = await ref.read(apiProvider).sendMessage(
+      final sent = await ref
+          .read(apiProvider)
+          .sendMessage(
             channelId: message.channelId,
             id: message.id,
             content: message.content,
@@ -173,11 +178,11 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   }
 
   Future<void> _pickReaction(Message message, String emoji) => setReaction(
-        ref,
-        message.id,
-        emoji,
-        wasActive: hasReacted(ref, message.id, emoji),
-      );
+    ref,
+    message.id,
+    emoji,
+    wasActive: hasReacted(ref, message.id, emoji),
+  );
 
   Future<void> _toggleReaction(Message message, api.ReactionSummary reaction) =>
       setReaction(ref, message.id, reaction.emoji, wasActive: reaction.reacted);
@@ -197,7 +202,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     } on api.ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save the edit. ${e.message}')));
+        SnackBar(content: Text('Could not save the edit. ${e.message}')),
+      );
     }
   }
 
@@ -205,7 +211,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     final confirmed = await confirmDangerousAction(
       context,
       title: 'Delete message?',
-      message: 'This removes it for everyone in the channel. '
+      message:
+          'This removes it for everyone in the channel. '
           'This cannot be undone.',
       confirmLabel: 'Delete',
     );
@@ -214,14 +221,16 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       await deleteMessageAction(ref, message);
     } on api.ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Could not delete the message. ${e.message}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete the message. ${e.message}')),
+      );
     }
   }
 
   Future<void> _togglePin(Message message, bool pinned) async {
-    final controller =
-        ref.read(pinsControllerProvider(widget.channelId).notifier);
+    final controller = ref.read(
+      pinsControllerProvider(widget.channelId).notifier,
+    );
     try {
       if (pinned) {
         await controller.unpin(message.id);
@@ -231,27 +240,36 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     } on api.ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update the pin. ${e.message}')));
+        SnackBar(content: Text('Could not update the pin. ${e.message}')),
+      );
     }
   }
 
   Future<void> _reportMessage(Message message) async {
-    final reason =
-        await promptReportReason(context, subjectLabel: 'this message');
+    final reason = await promptReportReason(
+      context,
+      subjectLabel: 'this message',
+    );
     if (reason == null || !mounted) return;
     try {
-      await ref.read(apiProvider).report(
+      await ref
+          .read(apiProvider)
+          .report(
             subject: api.ReportSubject.message,
             subjectId: message.id,
             reason: reason,
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Report filed. A moderator will review it.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Report filed. A moderator will review it.'),
+        ),
+      );
     } on api.ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not file the report. ${e.message}')));
+        SnackBar(content: Text('Could not file the report. ${e.message}')),
+      );
     }
   }
 
@@ -261,12 +279,16 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     try {
       await ref.read(apiProvider).blockUser(authorId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Blocked. Their messages are hidden for you.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Blocked. Their messages are hidden for you.'),
+        ),
+      );
     } on api.ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not block that user. ${e.message}')));
+        SnackBar(content: Text('Could not block that user. ${e.message}')),
+      );
     }
   }
 
@@ -385,7 +407,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   Widget build(BuildContext context) {
     final storeAsync = ref.watch(storeProvider);
     final layout = LayoutClass.of(context);
-    final knownUsernames = ref.watch(membersProvider).maybeWhen(
+    final knownUsernames = ref
+        .watch(membersProvider)
+        .maybeWhen(
           data: (members) =>
               members.map((m) => m.username.toLowerCase()).toSet(),
           orElse: () => const <String>{},
@@ -426,7 +450,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                 ),
               if (_searchOpen)
                 ChannelSearchBar(
-                    controller: _searchController, onChanged: _runSearch),
+                  controller: _searchController,
+                  onChanged: _runSearch,
+                ),
               Expanded(
                 child: _searchQuery != null
                     ? ChannelSearchResults(
@@ -443,7 +469,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                           final messages = snapshot.data ?? const <Message>[];
                           if (messages.isEmpty) {
                             return _EmptyMessages(
-                                syncStatus: ref.watch(syncControllerProvider));
+                              syncStatus: ref.watch(syncControllerProvider),
+                            );
                           }
                           final lastReadSeq = channel?.lastReadSeq ?? 0;
                           _markReadUpToLatest(messages, lastReadSeq);
@@ -452,16 +479,18 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                           return ListView.builder(
                             controller: _scroll,
                             reverse: true,
-                            padding:
-                                const EdgeInsets.only(bottom: AppSpacing.s8),
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.s8,
+                            ),
                             itemCount: messages.length,
                             itemBuilder: (context, i) {
                               // Index 0 is the newest; `previous` stays the row
                               // visually above, so grouping still reads right.
                               final index = messages.length - 1 - i;
                               final message = messages[index];
-                              final previous =
-                                  index == 0 ? null : messages[index - 1];
+                              final previous = index == 0
+                                  ? null
+                                  : messages[index - 1];
                               final extras =
                                   extrasById[message.id] ?? MessageExtras.empty;
                               final pinned = pinnedIds.contains(message.id);
@@ -469,12 +498,15 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                 message: message,
                                 grouped: _isGrouped(message, previous),
                                 showNewDivider: _startsUnread(
-                                    message, previous, lastReadSeq),
+                                  message,
+                                  previous,
+                                  lastReadSeq,
+                                ),
                                 knownUsernames: knownUsernames,
                                 onRetry: () => _retry(message),
-                                onDiscard: () async =>
-                                    (await ref.read(storeProvider.future))
-                                        .discard(message.id),
+                                onDiscard: () async => (await ref.read(
+                                  storeProvider.future,
+                                )).discard(message.id),
                                 onPickReaction: (emoji) =>
                                     _pickReaction(message, emoji),
                                 onReactionTap: (reaction) =>
@@ -491,19 +523,26 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   canEdit: canEditMessage(message, myId),
                                   onEdit: () => _startEdit(message),
                                   canDelete: canDeleteMessage(
-                                      message, myId, myPermissions),
+                                    message,
+                                    myId,
+                                    myPermissions,
+                                  ),
                                   onDelete: () =>
                                       unawaited(_deleteMessage(message)),
                                   canManagePins: canManageMessagePin(
-                                      message, myPermissions),
+                                    message,
+                                    myPermissions,
+                                  ),
                                   pinned: pinned,
                                   onTogglePin: () =>
                                       unawaited(_togglePin(message, pinned)),
                                   canReport: canReportMessage(message, myId),
                                   onReport: () =>
                                       unawaited(_reportMessage(message)),
-                                  canBlockAuthor:
-                                      canBlockMessageAuthor(message, myId),
+                                  canBlockAuthor: canBlockMessageAuthor(
+                                    message,
+                                    myId,
+                                  ),
                                   onBlockAuthor: () =>
                                       unawaited(_blockAuthor(message)),
                                 ),
@@ -514,10 +553,11 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                       ),
               ),
               Composer(
-                  controller: _composer,
-                  channelId: widget.channelId,
-                  channelName: channelName,
-                  onSend: _send),
+                controller: _composer,
+                channelId: widget.channelId,
+                channelName: channelName,
+                onSend: _send,
+              ),
             ],
           );
         },
@@ -539,29 +579,35 @@ class _EmptyMessages extends StatelessWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return switch (syncStatus) {
       SyncStatus.connecting => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(height: AppSpacing.s12),
-              Text('Catching up on messages...',
-                  style: TextStyle(color: tokens.textSecondary)),
-            ],
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            Text(
+              'Catching up on messages...',
+              style: TextStyle(color: tokens.textSecondary),
+            ),
+          ],
         ),
+      ),
       SyncStatus.offline => Center(
-          child: Text('Offline. Messages will appear once reconnected.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: tokens.textSecondary)),
+        child: Text(
+          'Offline. Messages will appear once reconnected.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: tokens.textSecondary),
         ),
+      ),
       SyncStatus.live => Center(
-          child: Text('No messages yet.',
-              style: TextStyle(color: tokens.textSecondary)),
+        child: Text(
+          'No messages yet.',
+          style: TextStyle(color: tokens.textSecondary),
         ),
+      ),
     };
   }
 }

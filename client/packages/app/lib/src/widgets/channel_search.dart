@@ -25,15 +25,20 @@ class ChannelSearchBar extends StatelessWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Container(
       padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s16, vertical: AppSpacing.s8),
+        horizontal: AppSpacing.s16,
+        vertical: AppSpacing.s8,
+      ),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
       ),
       child: AppInput(
         controller: controller,
         placeholder: 'Search this channel',
-        icon: Icon(AppIcons.search,
-            size: AppSizes.icon16, color: tokens.textSecondary),
+        icon: Icon(
+          AppIcons.search,
+          size: AppSizes.icon16,
+          color: tokens.textSecondary,
+        ),
         autofocus: true,
         onChanged: onChanged,
       ),
@@ -98,8 +103,10 @@ class ChannelSearchResults extends StatelessWidget {
     final list = results ?? const <api.Message>[];
     if (list.isEmpty) {
       return Center(
-        child:
-            Text('No matches.', style: TextStyle(color: tokens.textSecondary)),
+        child: Text(
+          'No matches.',
+          style: TextStyle(color: tokens.textSecondary),
+        ),
       );
     }
     return ListView.separated(
@@ -108,7 +115,8 @@ class ChannelSearchResults extends StatelessWidget {
       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s12),
       itemBuilder: (context, i) {
         final message = list[i];
-        final name = message.authorDisplayName ??
+        final name =
+            message.authorDisplayName ??
             (message.authorId == null ? 'Deleted user' : 'Unknown');
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,11 +124,15 @@ class ChannelSearchResults extends StatelessWidget {
             Text(
               name,
               style: AppText.ui.copyWith(
-                  color: tokens.textPrimary, fontWeight: AppWeights.semi),
+                color: tokens.textPrimary,
+                fontWeight: AppWeights.semi,
+              ),
             ),
             const SizedBox(height: AppSpacing.s4),
             MessageBody(
-                content: message.content, knownUsernames: knownUsernames),
+              content: message.content,
+              knownUsernames: knownUsernames,
+            ),
           ],
         );
       },

@@ -16,8 +16,11 @@ import 'member_pane.dart';
 /// non-interactive and there is no dedicated "remove" glyph in
 /// [AppIcons] to reach for instead.
 class StagedAttachmentChip extends StatelessWidget {
-  const StagedAttachmentChip(
-      {super.key, required this.filename, required this.onRemove});
+  const StagedAttachmentChip({
+    super.key,
+    required this.filename,
+    required this.onRemove,
+  });
 
   final String filename;
   final VoidCallback onRemove;
@@ -41,11 +44,15 @@ class StagedAttachmentChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(filename,
-                  style: AppText.caption.copyWith(color: tokens.textPrimary)),
+              Text(
+                filename,
+                style: AppText.caption.copyWith(color: tokens.textPrimary),
+              ),
               const SizedBox(width: AppSpacing.s4),
-              Text('x',
-                  style: AppText.caption.copyWith(color: tokens.textSecondary)),
+              Text(
+                'x',
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
             ],
           ),
         ),
@@ -74,7 +81,11 @@ class TypingIndicator extends ConsumerWidget {
         .firstWhere(
           (m) => m.id == id,
           orElse: () => api.UserProfile(
-              id: id, username: id, displayName: 'Someone', createdAt: 0),
+            id: id,
+            username: id,
+            displayName: 'Someone',
+            createdAt: 0,
+          ),
         )
         .displayName;
 
@@ -83,7 +94,9 @@ class TypingIndicator extends ConsumerWidget {
         ? '${names.first} is typing…'
         : '${names.join(', ')} are typing…';
 
-    return Text(label,
-        style: AppText.code.copyWith(color: tokens.textSecondary));
+    return Text(
+      label,
+      style: AppText.code.copyWith(color: tokens.textSecondary),
+    );
   }
 }

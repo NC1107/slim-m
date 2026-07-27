@@ -160,8 +160,10 @@ class RailConnectionBar extends ConsumerWidget {
       ),
       child: Semantics(
         liveRegion: true,
-        child: Text(label,
-            style: AppText.caption.copyWith(color: tokens.textSecondary)),
+        child: Text(
+          label,
+          style: AppText.caption.copyWith(color: tokens.textSecondary),
+        ),
       ),
     );
   }
@@ -218,8 +220,10 @@ class RailUserFooter extends ConsumerWidget {
                     height: 1.25,
                   ),
                 ),
-                Text(statusLabel,
-                    style: AppText.micro.copyWith(color: tokens.textSecondary)),
+                Text(
+                  statusLabel,
+                  style: AppText.micro.copyWith(color: tokens.textSecondary),
+                ),
               ],
             ),
           ),

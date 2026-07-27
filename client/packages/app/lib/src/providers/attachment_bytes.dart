@@ -16,6 +16,8 @@ import 'providers.dart';
 
 final attachmentBytesProvider = FutureProvider.autoDispose
     .family<Uint8List, String>((ref, attachmentId) async {
-  final fetched = await ref.watch(apiProvider).fetchAttachment(attachmentId);
-  return fetched.bytes;
-});
+      final fetched = await ref
+          .watch(apiProvider)
+          .fetchAttachment(attachmentId);
+      return fetched.bytes;
+    });

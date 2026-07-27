@@ -60,8 +60,9 @@ class PinsController extends StateNotifier<PinsState> {
 
   Future<void> refresh() async {
     try {
-      final pinned =
-          await _ref.read(apiProvider).listPinnedMessages(_channelId);
+      final pinned = await _ref
+          .read(apiProvider)
+          .listPinnedMessages(_channelId);
       state = PinsState(pinned: pinned);
     } on api.ForbiddenException {
       state = PinsState(pinned: state.pinned, failed: true, forbidden: true);
@@ -73,18 +74,16 @@ class PinsController extends StateNotifier<PinsState> {
   /// Pins a message, or leaves the timestamp alone if it already was one
   /// (idempotent server-side).
   Future<void> pin(String messageId) async {
-    await _ref.read(apiProvider).pinMessage(
-          channelId: _channelId,
-          messageId: messageId,
-        );
+    await _ref
+        .read(apiProvider)
+        .pinMessage(channelId: _channelId, messageId: messageId);
     await refresh();
   }
 
   Future<void> unpin(String messageId) async {
-    await _ref.read(apiProvider).unpinMessage(
-          channelId: _channelId,
-          messageId: messageId,
-        );
+    await _ref
+        .read(apiProvider)
+        .unpinMessage(channelId: _channelId, messageId: messageId);
     await refresh();
   }
 
@@ -97,4 +96,5 @@ class PinsController extends StateNotifier<PinsState> {
 
 final pinsControllerProvider = StateNotifierProvider.autoDispose
     .family<PinsController, PinsState, String>(
-        (ref, channelId) => PinsController(ref, channelId));
+      (ref, channelId) => PinsController(ref, channelId),
+    );

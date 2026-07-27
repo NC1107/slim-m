@@ -28,36 +28,37 @@ Widget _harness(Widget child, {required List<Override> overrides}) =>
 
 List<Override> _apiOverrides(
   Future<http.Response> Function(http.Request request) handler,
-) =>
-    [
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: SessionStore(
-            tokens: const TokenPair(
-              userId: 'self',
-              accessToken: 'access',
-              refreshToken: 'refresh',
-              accessExpiresAt: 0,
-            ),
-          ),
-          httpClient: MockClient(handler),
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-    ];
+) => [
+  apiProvider.overrideWith((ref) {
+    final api = SlimmApi(
+      baseUrl: Uri.parse('http://localhost:8080'),
+      session: SessionStore(
+        tokens: const TokenPair(
+          userId: 'self',
+          accessToken: 'access',
+          refreshToken: 'refresh',
+          accessExpiresAt: 0,
+        ),
+      ),
+      httpClient: MockClient(handler),
+    );
+    ref.onDispose(api.close);
+    return api;
+  }),
+];
 
 void main() {
   testWidgets('no userId renders initials and makes no fetch', (tester) async {
     var requested = false;
-    await tester.pumpWidget(_harness(
-      const UserAvatar(name: 'Priya Shah', size: 40),
-      overrides: _apiOverrides((request) async {
-        requested = true;
-        return http.Response('', 404);
-      }),
-    ));
+    await tester.pumpWidget(
+      _harness(
+        const UserAvatar(name: 'Priya Shah', size: 40),
+        overrides: _apiOverrides((request) async {
+          requested = true;
+          return http.Response('', 404);
+        }),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('PR'), findsOneWidget);
@@ -65,78 +66,106 @@ void main() {
     expect(requested, isFalse);
   });
 
-  /// Deliberately does not assert the initials are gone: the bytes below are
-  /// not valid image data, so [Image.errorBuilder] fires and repaints them
-  /// right back in. What matters here is that the right bytes actually
-  /// reached the widget, which the path assertion already establishes.
-  testWidgets('a known userId with resolved bytes renders through Image',
-      (tester) async {
+  testWidgets('a known userId with resolved bytes renders through Image', (
+    tester,
+  ) async {
     final bytes = Uint8List.fromList(const [1, 2, 3, 4]);
-    await tester.pumpWidget(_harness(
-      const UserAvatar(
-          name: 'Priya Shah', userId: 'u1', avatarUpdatedAt: 42, size: 40),
-      overrides: _apiOverrides((request) async {
-        expect(request.url.path, '/users/u1/avatar');
-        return http.Response.bytes(bytes, 200,
-            headers: {'content-type': 'image/png'});
-      }),
-    ));
+    await tester.pumpWidget(
+      _harness(
+        const UserAvatar(
+          name: 'Priya Shah',
+          userId: 'u1',
+          avatarUpdatedAt: 42,
+          size: 40,
+        ),
+        overrides: _apiOverrides((request) async {
+          expect(request.url.path, '/users/u1/avatar');
+          return http.Response.bytes(
+            bytes,
+            200,
+            headers: {'content-type': 'image/png'},
+          );
+        }),
+      ),
+    );
     await tester.pumpAndSettle();
 
+    /// Not asserting the initials are gone: the bytes above are not valid
+    /// image data, so [Image.errorBuilder] fires and repaints them right back
+    /// in. What matters here is that the right bytes actually reached the
+    /// widget, which the assertion above already establishes.
     final image = tester.widget<Image>(find.byType(Image));
     expect((image.image as MemoryImage).bytes, bytes);
   });
 
-  testWidgets('a 404 (no avatar on the server) still falls back to initials',
-      (tester) async {
-    await tester.pumpWidget(_harness(
-      const UserAvatar(
-          name: 'Priya Shah', userId: 'u1', avatarUpdatedAt: 42, size: 40),
-      overrides: _apiOverrides((request) async => http.Response('', 404)),
-    ));
+  testWidgets('a 404 (no avatar on the server) still falls back to initials', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        const UserAvatar(
+          name: 'Priya Shah',
+          userId: 'u1',
+          avatarUpdatedAt: 42,
+          size: 40,
+        ),
+        overrides: _apiOverrides((request) async => http.Response('', 404)),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('PR'), findsOneWidget);
     expect(find.byType(Image), findsNothing);
   });
 
-  testWidgets('AuthorAvatar resolves the profile before fetching the picture',
-      (tester) async {
+  testWidgets('AuthorAvatar resolves the profile before fetching the picture', (
+    tester,
+  ) async {
     final bytes = Uint8List.fromList(const [9, 9, 9]);
-    await tester.pumpWidget(_harness(
-      const AuthorAvatar(name: 'Kess', userId: 'u2', size: 36),
-      overrides: _apiOverrides((request) async {
-        if (request.url.path == '/users/u2') {
-          return http.Response(
-            jsonEncode({
-              'id': 'u2',
-              'username': 'kess',
-              'display_name': 'Kess',
-              'created_at': 0,
-              'avatar_updated_at': 7,
-            }),
+    await tester.pumpWidget(
+      _harness(
+        const AuthorAvatar(name: 'Kess', userId: 'u2', size: 36),
+        overrides: _apiOverrides((request) async {
+          if (request.url.path == '/users/u2') {
+            return http.Response(
+              jsonEncode({
+                'id': 'u2',
+                'username': 'kess',
+                'display_name': 'Kess',
+                'created_at': 0,
+                'avatar_updated_at': 7,
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          expect(request.url.path, '/users/u2/avatar');
+          return http.Response.bytes(
+            bytes,
             200,
-            headers: {'content-type': 'application/json'},
+            headers: {'content-type': 'image/png'},
           );
-        }
-        expect(request.url.path, '/users/u2/avatar');
-        return http.Response.bytes(bytes, 200,
-            headers: {'content-type': 'image/png'});
-      }),
-    ));
+        }),
+      ),
+    );
     await tester.pumpAndSettle();
 
     final image = tester.widget<Image>(find.byType(Image));
     expect((image.image as MemoryImage).bytes, bytes);
   });
 
-  testWidgets('a null author id (a deleted account) never triggers a lookup',
-      (tester) async {
-    await tester.pumpWidget(_harness(
-      const AuthorAvatar(name: 'Deleted user', userId: null, size: 36),
-      overrides: _apiOverrides((request) async =>
-          throw StateError('unexpected request: ${request.url}')),
-    ));
+  testWidgets('a null author id (a deleted account) never triggers a lookup', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        const AuthorAvatar(name: 'Deleted user', userId: null, size: 36),
+        overrides: _apiOverrides(
+          (request) async =>
+              throw StateError('unexpected request: ${request.url}'),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('DE'), findsOneWidget);

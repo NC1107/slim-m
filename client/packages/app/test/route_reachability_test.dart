@@ -36,8 +36,11 @@ final _comment = RegExp(r'^\s*//.*$', multiLine: true);
 void main() {
   test('every route is reachable from somewhere in the app', () {
     final lib = Directory('lib');
-    expect(lib.existsSync(), isTrue,
-        reason: 'run this from the app package root');
+    expect(
+      lib.existsSync(),
+      isTrue,
+      reason: 'run this from the app package root',
+    );
 
     final routesFile = File('lib/src/routing/routes.dart');
     final names = RegExp(r'static const (\w+) =')
@@ -59,15 +62,17 @@ void main() {
         .replaceAll(_registration, '')
         .replaceAll(_locationCheck, '');
 
-    final unreachable = names
-        .where((name) => !RegExp('Routes\\.$name\\b').hasMatch(uses))
-        .toList()
-      ..sort();
+    final unreachable =
+        names
+            .where((name) => !RegExp('Routes\\.$name\\b').hasMatch(uses))
+            .toList()
+          ..sort();
 
     expect(
       unreachable,
       isEmpty,
-      reason: 'these routes are registered but nothing sends a user to them, '
+      reason:
+          'these routes are registered but nothing sends a user to them, '
           'so the screens behind them cannot be opened: '
           '${unreachable.join(', ')}',
     );

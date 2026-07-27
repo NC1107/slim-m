@@ -58,10 +58,12 @@ List<MessageBlock> splitMessageBlocks(String content) {
       if (close != -1) {
         flushText();
         final lang = open.group(1)!.trim();
-        blocks.add(CodeBlock(
-          lang.isEmpty ? null : lang,
-          lines.sublist(i + 1, close).join('\n'),
-        ));
+        blocks.add(
+          CodeBlock(
+            lang.isEmpty ? null : lang,
+            lines.sublist(i + 1, close).join('\n'),
+          ),
+        );
         i = close + 1;
         continue;
       }

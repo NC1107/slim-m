@@ -2,16 +2,20 @@
 name: slimm_app
 description: slim-m client application shell.
 publish_to: none
-# Feeds CFBundleShortVersionString and CFBundleVersion; without it an archive
-# builds but cannot be submitted, and TestFlight uploads collide on the number.
+# Feeds CFBundleShortVersionString and CFBundleVersion. Without it an archive
+# builds but cannot be submitted, and every TestFlight upload would collide on
+# the same missing build number.
 version: 0.1.0+4
 resolution: workspace
 environment:
-  sdk: ^3.6.0
-  flutter: ">=3.27.0"
+  sdk: ^3.10.0
+  flutter: ">=3.38.1"
 dependencies:
   emojis: ^3.2.0
-  file_picker: ^11.0.0
+  # Pinned exactly, not a caret. `^12.0.0` matches no version at all (a caret
+  # without a prerelease excludes every prerelease), and `^12.0.0-beta.7` would
+  # float onto later betas, which have broken each other three times already.
+  file_picker: 12.0.0-beta.7
   firebase_core: ^3.15.0
   firebase_messaging: ^15.2.0
   flutter:
@@ -24,9 +28,9 @@ dependencies:
   slimm_platform:
   slimm_rtc:
   drift: ^2.20.0
-  # Held on 9.x: a win32 major mismatch fails the build on every platform, not
-  # just Windows. Full reasoning in docs/dependencies.md, "Client holds".
-  package_info_plus: ^9.0.1
+  # 10.x, not 9.x: file_picker 12 requires win32 6, so the whole tree moves
+  # off win32 5 and the old hold on 9.x no longer resolves.
+  package_info_plus: ^10.2.1
   path: ^1.9.0
   path_provider: ^2.1.0
   shared_preferences: ^2.3.0

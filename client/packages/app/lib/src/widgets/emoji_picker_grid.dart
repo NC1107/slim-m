@@ -118,8 +118,9 @@ class _EmojiCellState extends State<_EmojiCell> {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: fill,
-        border:
-            widget.highlighted ? Border.all(color: tokens.accentFill) : null,
+        border: widget.highlighted
+            ? Border.all(color: tokens.accentFill)
+            : null,
         borderRadius: BorderRadius.circular(AppRadii.control),
       ),
       foregroundDecoration: _focused
@@ -128,10 +129,14 @@ class _EmojiCellState extends State<_EmojiCell> {
               borderRadius: BorderRadius.circular(AppRadii.control),
             )
           : null,
-      // 20 is off AppText's scale: sized as a legible glyph, not a text style,
-      // the same literal exception AppChip.reaction documents for its own.
-      child: Text(widget.emoji.char,
-          style: const TextStyle(fontSize: 20, height: 1)),
+
+      /// 20, not on AppText's scale: sized to read as a legible glyph rather
+      /// than any text style, the same literal exception AppChip.reaction
+      /// documents for its own emoji glyph.
+      child: Text(
+        widget.emoji.char,
+        style: const TextStyle(fontSize: 20, height: 1),
+      ),
     );
 
     return Semantics(

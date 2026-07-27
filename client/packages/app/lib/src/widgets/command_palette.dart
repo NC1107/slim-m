@@ -159,8 +159,11 @@ class _CommandPaletteContentState
                   focusNode: _focusNode,
                   autofocus: true,
                   placeholder: 'Search channels, members and messages',
-                  icon: Icon(AppIcons.search,
-                      size: AppSizes.icon16, color: tokens.textSecondary),
+                  icon: Icon(
+                    AppIcons.search,
+                    size: AppSizes.icon16,
+                    color: tokens.textSecondary,
+                  ),
                   onChanged: _onQueryChanged,
                   onSubmitted: (_) => _runHighlighted(),
                   semanticLabel: 'Search channels, members and messages',
@@ -208,8 +211,10 @@ class _CommandPaletteContentState
     if (flat.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(AppSpacing.s16),
-        child: Text('No matches.',
-            style: AppText.body.copyWith(color: tokens.textSecondary)),
+        child: Text(
+          'No matches.',
+          style: AppText.body.copyWith(color: tokens.textSecondary),
+        ),
       );
     }
 
@@ -220,14 +225,16 @@ class _CommandPaletteContentState
       for (final item in group.$2) {
         final at = index;
         index++;
-        rows.add(AppMenuItem(
-          label: item.label,
-          leading: item.leading,
-          trailing: item.trailing,
-          selected: at == _highlighted,
-          semanticLabel: item.semanticLabel,
-          onTap: () => _run(item),
-        ));
+        rows.add(
+          AppMenuItem(
+            label: item.label,
+            leading: item.leading,
+            trailing: item.trailing,
+            selected: at == _highlighted,
+            semanticLabel: item.semanticLabel,
+            onTap: () => _run(item),
+          ),
+        );
       }
     }
 

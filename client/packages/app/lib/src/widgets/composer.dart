@@ -77,8 +77,9 @@ class _ComposerState extends ConsumerState<Composer> {
     final end = selection.end < 0 ? value.length : selection.end;
     controller.value = TextEditingValue(
       text: value.replaceRange(start, end, text),
-      selection:
-          TextSelection.collapsed(offset: start + (caretOffset ?? text.length)),
+      selection: TextSelection.collapsed(
+        offset: start + (caretOffset ?? text.length),
+      ),
     );
   }
 
@@ -88,23 +89,26 @@ class _ComposerState extends ConsumerState<Composer> {
   Future<void> _pickAttachment() async {
     final FilePickerResult? result;
     try {
-      result = await FilePicker.pickFiles(withData: true);
+      result = await FilePicker.pickFiles();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open the file picker. $e')));
+        SnackBar(content: Text('Could not open the file picker. $e')),
+      );
       return;
     }
     final files = result?.files ?? const <PlatformFile>[];
     if (files.isEmpty) return;
     final file = files.first;
-    if (file.bytes == null) return;
 
     setState(() => _uploading = true);
     try {
+      // readAsBytes streams from disk; file_picker 12 deprecated withData and
+      // PlatformFile.bytes because eager loading OOMs on a large pick.
+      final bytes = await file.readAsBytes();
       final attachment = await ref
           .read(apiProvider)
-          .uploadAttachment(file.bytes!, filename: file.name);
+          .uploadAttachment(bytes, filename: file.name);
       if (!mounted) return;
       setState(() {
         _pendingAttachments.add(attachment);
@@ -114,7 +118,8 @@ class _ComposerState extends ConsumerState<Composer> {
       if (!mounted) return;
       setState(() => _uploading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not attach the file. ${e.message}')));
+        SnackBar(content: Text('Could not attach the file. ${e.message}')),
+      );
     }
   }
 
@@ -174,13 +179,14 @@ class _ComposerState extends ConsumerState<Composer> {
                 ),
                 const SizedBox(width: AppSpacing.s8),
                 Expanded(
-                    child: _Field(
-                  controller: widget.controller,
-                  channelName: widget.channelName,
-                  hasText: _hasText,
-                  onSend: _send,
-                  onTyping: _onTyping,
-                )),
+                  child: _Field(
+                    controller: widget.controller,
+                    channelName: widget.channelName,
+                    hasText: _hasText,
+                    onSend: _send,
+                    onTyping: _onTyping,
+                  ),
+                ),
                 const SizedBox(width: AppSpacing.s8),
                 AppIconButton(
                   icon: AppIcons.poll,

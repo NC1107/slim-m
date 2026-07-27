@@ -17,17 +17,17 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
 Map<String, dynamic> _pinJson(String id) => {
-      'id': id,
-      'channel_id': 'c1',
-      'author_id': 'author-1',
-      'author_display_name': 'Priya',
-      'seq': 1,
-      'content': 'hello',
-      'created_at': 0,
-      'edited_at': null,
-      'pinned_at': 0,
-      'pinned_by': 'author-1',
-    };
+  'id': id,
+  'channel_id': 'c1',
+  'author_id': 'author-1',
+  'author_display_name': 'Priya',
+  'seq': 1,
+  'content': 'hello',
+  'created_at': 0,
+  'edited_at': null,
+  'pinned_at': 0,
+  'pinned_by': 'author-1',
+};
 
 const _tokens = TokenPair(
   userId: 'self',
@@ -37,22 +37,27 @@ const _tokens = TokenPair(
 );
 
 ProviderContainer _containerWithPins(List<Map<String, dynamic>> pins) {
-  return ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-    sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-    apiProvider.overrideWith((ref) {
-      final api = SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: ref.watch(sessionProvider),
-        httpClient: MockClient((request) async {
-          return http.Response(jsonEncode(pins), 200,
-              headers: {'content-type': 'application/json'});
-        }),
-      );
-      ref.onDispose(api.close);
-      return api;
-    }),
-  ]);
+  return ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+      apiProvider.overrideWith((ref) {
+        final api = SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: MockClient((request) async {
+            return http.Response(
+              jsonEncode(pins),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        );
+        ref.onDispose(api.close);
+        return api;
+      }),
+    ],
+  );
 }
 
 void main() {
@@ -87,8 +92,9 @@ void main() {
     expect(find.text('-'), findsNothing);
   });
 
-  testWidgets('a channel with nothing pinned shows zero, not a dash',
-      (tester) async {
+  testWidgets('a channel with nothing pinned shows zero, not a dash', (
+    tester,
+  ) async {
     final container = _containerWithPins(const []);
     addTearDown(container.dispose);
 
@@ -114,8 +120,9 @@ void main() {
     expect(find.text('0'), findsOneWidget);
   });
 
-  testWidgets('tapping the pill opens the pinned messages sheet',
-      (tester) async {
+  testWidgets('tapping the pill opens the pinned messages sheet', (
+    tester,
+  ) async {
     final container = _containerWithPins([_pinJson('m1')]);
     addTearDown(container.dispose);
 

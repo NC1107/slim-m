@@ -58,8 +58,11 @@ class _SectionLabel extends StatelessWidget {
 /// DM from here directly; that lives on a member's row in [AppMemberPane],
 /// which is where a person already is when they decide to message someone.
 class DirectMessagesSection extends StatelessWidget {
-  const DirectMessagesSection(
-      {super.key, required this.channels, required this.selectedId});
+  const DirectMessagesSection({
+    super.key,
+    required this.channels,
+    required this.selectedId,
+  });
 
   final List<Channel> channels;
   final String? selectedId;
@@ -74,7 +77,9 @@ class DirectMessagesSection extends StatelessWidget {
         if (channels.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
+              horizontal: AppSpacing.s8,
+              vertical: AppSpacing.s4,
+            ),
             child: Text(
               'No direct messages yet. Open one from a member in the list.',
               style: AppText.caption.copyWith(color: tokens.textSecondary),
@@ -222,8 +227,11 @@ class _ManagedChannelRow extends StatelessWidget {
 /// already joined, so for any other voice channel there is no way to know who
 /// (if anyone) is in it. See the `TODO(ui-backend)` in [build].
 class _VoiceChannelRow extends StatelessWidget {
-  const _VoiceChannelRow(
-      {required this.channel, required this.selected, required this.voice});
+  const _VoiceChannelRow({
+    required this.channel,
+    required this.selected,
+    required this.voice,
+  });
 
   final Channel channel;
   final bool selected;
@@ -236,8 +244,9 @@ class _VoiceChannelRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final iconColor =
-        _inCall ? tokens.accent : tokens.textSecondary.withValues(alpha: 0.7);
+    final iconColor = _inCall
+        ? tokens.accent
+        : tokens.textSecondary.withValues(alpha: 0.7);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,8 +255,11 @@ class _VoiceChannelRow extends StatelessWidget {
           label: channel.name,
           selected: selected,
           unread: _inCall,
-          leading:
-              Icon(AppIcons.voice, size: AppSizes.icon16, color: iconColor),
+          leading: Icon(
+            AppIcons.voice,
+            size: AppSizes.icon16,
+            color: iconColor,
+          ),
           trailing: _inCall
               ? Text(
                   '${voice.participants.length}',

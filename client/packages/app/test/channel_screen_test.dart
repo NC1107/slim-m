@@ -46,139 +46,158 @@ const _tokens = api.TokenPair(
 );
 
 api.Message _message(String id, int seq) => api.Message(
-      id: id,
-      channelId: 'c1',
-      authorId: 'alice',
-      authorDisplayName: 'Alice',
-      seq: seq,
-      content: 'message $seq',
-      createdAt: seq * 1000,
-      editedAt: null,
-    );
+  id: id,
+  channelId: 'c1',
+  authorId: 'alice',
+  authorDisplayName: 'Alice',
+  seq: seq,
+  content: 'message $seq',
+  createdAt: seq * 1000,
+  editedAt: null,
+);
 
 Map<String, dynamic> _meJson() => {
-      'id': 'bob',
-      'username': 'bob',
-      'display_name': 'Bob',
-      'created_at': 0,
-      'permissions': 0,
-    };
+  'id': 'bob',
+  'username': 'bob',
+  'display_name': 'Bob',
+  'created_at': 0,
+  'permissions': 0,
+};
 
-http.Response _emptyJsonList() => http.Response(jsonEncode([]), 200,
-    headers: {'content-type': 'application/json'});
+http.Response _emptyJsonList() => http.Response(
+  jsonEncode([]),
+  200,
+  headers: {'content-type': 'application/json'},
+);
 
 void main() {
-  /// Three things this test does deliberately, each of which looks like
-  /// cruft and fails the test when tidied away.
-  ///
-  /// The repro is seeded straight into the local store: unread activity
-  /// already sitting there (as if from a prior sync while a different tab
-  /// had focus), with no read marker recorded for it, exactly the state the
-  /// bug report starts from.
-  ///
-  /// It pumps a bounded number of frames rather than calling
-  /// `pumpAndSettle`, which loops until a frame goes by with nothing
-  /// scheduled and never sees one here, because `AppIconButton`'s
-  /// ripple/hover machinery keeps requesting a frame on every empty repaint
-  /// in this environment. A fixed number of pumps is more than enough to
-  /// flush the drift stream's first emission and the two read-marking calls
-  /// this test is actually about.
-  ///
-  /// It unmounts explicitly at the end rather than letting flutter_test's
-  /// own teardown do it: `ChannelScreen`'s `StreamBuilder`s cancel their
-  /// drift query streams on dispose, and drift defers that cleanup by one
-  /// event loop turn on a zero-duration `Timer`. Left to the framework's
-  /// teardown, the "no pending timers" check runs before that timer gets its
-  /// turn and fails the test on a false positive that has nothing to do with
-  /// what this test covers.
   testWidgets(
-      'opening a channel and seeing its newest message clears the unread '
-      'marker, locally and on the server', (tester) async {
-    // Compact, so the header (and everything it pulls in) never builds; the
-    // read-marking path under test does not need it.
-    tester.view.physicalSize = const Size(500, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+    'opening a channel and seeing its newest message clears the unread '
+    'marker, locally and on the server',
+    (tester) async {
+      // Compact, so the header (and everything it pulls in) never builds; the
+      // read-marking path under test does not need it.
+      tester.view.physicalSize = const Size(500, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final markReadSeqs = <int>[];
-    final db = SlimmDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    final store = MessageStore(db);
+      final markReadSeqs = <int>[];
+      final db = SlimmDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final store = MessageStore(db);
 
-    // Unread activity already in the local store, with no read marker.
-    await store.upsertChannels([
-      const api.Channel(id: 'c1', name: 'general', kind: 'text', createdAt: 0),
-    ]);
-    await store.applyMessages([_message('m1', 1), _message('m2', 2)]);
-
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-      storeProvider.overrideWith((ref) async => store),
-      // Avoids the real SyncController, and the websocket it would fail to
-      // open, purely to satisfy the pins/typing seams ChannelScreen builds.
-      syncControllerProvider.overrideWith((ref) => _NoopSyncController(ref)),
-      apiProvider.overrideWith((ref) {
-        final client = api.SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient: MockClient((request) async {
-            if (request.method == 'PUT' &&
-                request.url.path == '/channels/c1/read') {
-              final body = jsonDecode(request.body) as Map<String, dynamic>;
-              final seq = body['seq'] as int;
-              markReadSeqs.add(seq);
-              return http.Response(
-                jsonEncode({'last_read_seq': seq, 'unread': 0}),
-                200,
-                headers: {'content-type': 'application/json'},
-              );
-            }
-            if (request.method == 'GET' && request.url.path == '/me') {
-              return http.Response(jsonEncode(_meJson()), 200,
-                  headers: {'content-type': 'application/json'});
-            }
-            // Members, pins, and the extras-hydration message fetch: none
-            // of them are what this test is about, so they all answer empty.
-            return _emptyJsonList();
-          }),
-        );
-        ref.onDispose(client.close);
-        return client;
-      }),
-    ]);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const Scaffold(body: ChannelScreen(channelId: 'c1')),
+      /// Seed the repro directly: unread activity already sitting in the local
+      /// store (as if from a prior sync while a different tab had focus), with
+      /// no read marker recorded for it, exactly the state the bug report
+      /// starts from.
+      await store.upsertChannels([
+        const api.Channel(
+          id: 'c1',
+          name: 'general',
+          kind: 'text',
+          createdAt: 0,
         ),
-      ),
-    );
-    // A bounded pump count, not pumpAndSettle; see this test's doc comment.
-    for (var i = 0; i < 10; i++) {
-      await tester.pump(const Duration(milliseconds: 20));
-    }
+      ]);
+      await store.applyMessages([_message('m1', 1), _message('m2', 2)]);
 
-    expect(markReadSeqs, contains(2),
-        reason: 'the newest message rendered on screen must be reported to '
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+          storeProvider.overrideWith((ref) async => store),
+
+          /// Avoids constructing the real SyncController (and the websocket it
+          /// would try, and fail, to open) purely to satisfy the pins/typing
+          /// seams ChannelScreen builds alongside the message list.
+          syncControllerProvider.overrideWith(
+            (ref) => _NoopSyncController(ref),
+          ),
+          apiProvider.overrideWith((ref) {
+            final client = api.SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((request) async {
+                if (request.method == 'PUT' &&
+                    request.url.path == '/channels/c1/read') {
+                  final body = jsonDecode(request.body) as Map<String, dynamic>;
+                  final seq = body['seq'] as int;
+                  markReadSeqs.add(seq);
+                  return http.Response(
+                    jsonEncode({'last_read_seq': seq, 'unread': 0}),
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }
+                if (request.method == 'GET' && request.url.path == '/me') {
+                  return http.Response(
+                    jsonEncode(_meJson()),
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }
+                // Members, pins, and the extras-hydration message fetch: none
+                // of them are what this test is about, so they all answer empty.
+                return _emptyJsonList();
+              }),
+            );
+            ref.onDispose(client.close);
+            return client;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const Scaffold(body: ChannelScreen(channelId: 'c1')),
+          ),
+        ),
+      );
+
+      /// A bounded pump count, not pumpAndSettle: `pumpAndSettle` loops until a
+      /// frame goes by with nothing scheduled, and it never sees one here,
+      /// because `AppIconButton`'s ripple/hover machinery keeps requesting a
+      /// frame on every empty repaint in this environment. A fixed number of
+      /// pumps is more than enough to flush the drift stream's first emission
+      /// and the two read-marking calls this test is actually about.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+
+      expect(
+        markReadSeqs,
+        contains(2),
+        reason:
+            'the newest message rendered on screen must be reported to '
             'PUT /channels/{id}/read, or the server never learns the '
-            'channel was read');
+            'channel was read',
+      );
 
-    final row = await (db.select(db.channels)..where((c) => c.id.equals('c1')))
-        .getSingle();
-    expect(row.lastReadSeq, 2,
-        reason: 'the local marker must advance immediately so the unread '
-            'dot clears without waiting on the network call');
+      final row = await (db.select(
+        db.channels,
+      )..where((c) => c.id.equals('c1'))).getSingle();
+      expect(
+        row.lastReadSeq,
+        2,
+        reason:
+            'the local marker must advance immediately so the unread '
+            'dot clears without waiting on the network call',
+      );
 
-    // Unmount deliberately, with one more pump, rather than leaving it to
-    // flutter_test's own teardown; see this test's doc comment.
-    await tester.pumpWidget(const SizedBox.shrink());
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 1));
-    }
-  });
+      /// Unmount deliberately, with one more pump, rather than letting
+      /// flutter_test's own end-of-test teardown do it: `ChannelScreen`'s
+      /// `StreamBuilder`s cancel their drift query streams on dispose, and
+      /// drift defers that cleanup by one event loop turn on a zero-duration
+      /// `Timer`. Left to the framework's own teardown, the "no pending timers"
+      /// check runs before that timer gets its turn and fails the test on a
+      /// false positive that has nothing to do with what this test covers.
+      await tester.pumpWidget(const SizedBox.shrink());
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 1));
+      }
+    },
+  );
 }

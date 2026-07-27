@@ -70,7 +70,8 @@ class _RoleCardState extends ConsumerState<_RoleCard> {
     final confirmed = await confirmDangerousAction(
       context,
       title: 'Delete "${widget.role.name}"?',
-      message: 'Members holding this role lose whatever it grants '
+      message:
+          'Members holding this role lose whatever it grants '
           'immediately. This cannot be undone.',
       confirmLabel: 'Delete',
     );
@@ -93,8 +94,9 @@ class _RoleCardState extends ConsumerState<_RoleCard> {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final role = widget.role;
-    final count =
-        Perm.editable.where((e) => role.permissions.hasPermission(e.$1)).length;
+    final count = Perm.editable
+        .where((e) => role.permissions.hasPermission(e.$1))
+        .length;
 
     return AppCard(
       child: Row(
@@ -105,12 +107,16 @@ class _RoleCardState extends ConsumerState<_RoleCard> {
               children: [
                 Row(
                   children: [
-                    Text(role.name,
-                        style: TextStyle(color: tokens.textPrimary)),
+                    Text(
+                      role.name,
+                      style: TextStyle(color: tokens.textPrimary),
+                    ),
                     const SizedBox(width: AppSpacing.s8),
                     if (role.isEveryone)
                       const AppBadge(
-                          variant: AppBadgeVariant.tag, label: 'Everyone'),
+                        variant: AppBadgeVariant.tag,
+                        label: 'Everyone',
+                      ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.s4),

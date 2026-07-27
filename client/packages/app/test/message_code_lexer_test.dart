@@ -10,8 +10,9 @@ import 'package:slimm_design_system/design_system.dart';
 
 /// The (text, role) pairs of one lexed line, in order, for asserting on
 /// without depending on [AppCodeSpan] having value equality.
-List<(String, AppCodeRole)> _spansOf(AppCodeLine line) =>
-    [for (final span in line.spans) (span.text, span.role)];
+List<(String, AppCodeRole)> _spansOf(AppCodeLine line) => [
+  for (final span in line.spans) (span.text, span.role),
+];
 
 void main() {
   test('an unrecognised language renders every line unhighlighted', () {
@@ -27,8 +28,7 @@ void main() {
     expect(_spansOf(lines.single), [('anything', AppCodeRole.plain)]);
   });
 
-  test(
-      'a keyword, a number, an operator, and a line comment each get their '
+  test('a keyword, a number, an operator, and a line comment each get their '
       'own role', () {
     final lines = lexCodeBlock('let x = 1; // hi', 'rust');
     expect(_spansOf(lines.single), [
@@ -59,9 +59,7 @@ void main() {
 
   test('an unclosed block comment runs to the end of its line', () {
     final lines = lexCodeBlock('/* never closed', 'c');
-    expect(_spansOf(lines.single), [
-      ('/* never closed', AppCodeRole.comment),
-    ]);
+    expect(_spansOf(lines.single), [('/* never closed', AppCodeRole.comment)]);
   });
 
   test('python uses a hash comment, not a slash one', () {

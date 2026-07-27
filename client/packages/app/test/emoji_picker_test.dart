@@ -22,43 +22,53 @@ const _rofl = '\u{1F923}'; // Unique shortName "rofl"; a safe search probe.
 const _grapes = '\u{1F347}'; // First "Food and drink" category entry.
 
 Widget _harness(Widget child) => ProviderScope(
-      child: MaterialApp(
-        theme: buildTheme(Brightness.light, AppTokens.light),
-        home: Scaffold(body: Align(alignment: Alignment.topLeft, child: child)),
-      ),
-    );
+  child: MaterialApp(
+    theme: buildTheme(Brightness.light, AppTokens.light),
+    home: Scaffold(
+      body: Align(alignment: Alignment.topLeft, child: child),
+    ),
+  ),
+);
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets(
-      'defaults to the smileys category, and picking a tile reports its '
-      'emoji and records it as recently used', (tester) async {
-    String? picked;
-    late ProviderContainer container;
+    'defaults to the smileys category, and picking a tile reports its '
+    'emoji and records it as recently used',
+    (tester) async {
+      String? picked;
+      late ProviderContainer container;
 
-    await tester.pumpWidget(_harness(Builder(builder: (context) {
-      container = ProviderScope.containerOf(context);
-      return EmojiPickerPanel(
-        onSelect: (emoji) => picked = emoji,
-        onClose: () {},
+      await tester.pumpWidget(
+        _harness(
+          Builder(
+            builder: (context) {
+              container = ProviderScope.containerOf(context);
+              return EmojiPickerPanel(
+                onSelect: (emoji) => picked = emoji,
+                onClose: () {},
+              );
+            },
+          ),
+        ),
       );
-    })));
 
-    expect(find.text(_grinningFace), findsOneWidget);
-    await tester.tap(find.text(_grinningFace));
-    await tester.pump();
+      expect(find.text(_grinningFace), findsOneWidget);
+      await tester.tap(find.text(_grinningFace));
+      await tester.pump();
 
-    expect(picked, _grinningFace);
-    expect(container.read(recentEmojiProvider), contains(_grinningFace));
-  });
+      expect(picked, _grinningFace);
+      expect(container.read(recentEmojiProvider), contains(_grinningFace));
+    },
+  );
 
-  testWidgets('a search query filters the whole catalog and hides the tabs',
-      (tester) async {
-    await tester.pumpWidget(_harness(EmojiPickerPanel(
-      onSelect: (_) {},
-      onClose: () {},
-    )));
+  testWidgets('a search query filters the whole catalog and hides the tabs', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(EmojiPickerPanel(onSelect: (_) {}, onClose: () {})),
+    );
 
     expect(find.byTooltip('Food and drink'), findsOneWidget);
 
@@ -70,12 +80,12 @@ void main() {
     expect(find.byTooltip('Food and drink'), findsNothing);
   });
 
-  testWidgets('a category tab switches which group the grid shows',
-      (tester) async {
-    await tester.pumpWidget(_harness(EmojiPickerPanel(
-      onSelect: (_) {},
-      onClose: () {},
-    )));
+  testWidgets('a category tab switches which group the grid shows', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(EmojiPickerPanel(onSelect: (_) {}, onClose: () {})),
+    );
 
     expect(find.text(_grinningFace), findsOneWidget);
 
@@ -86,13 +96,15 @@ void main() {
     expect(find.text(_grinningFace), findsNothing);
   });
 
-  testWidgets('arrow-down moves the highlight and Enter picks it',
-      (tester) async {
+  testWidgets('arrow-down moves the highlight and Enter picks it', (
+    tester,
+  ) async {
     String? picked;
-    await tester.pumpWidget(_harness(EmojiPickerPanel(
-      onSelect: (emoji) => picked = emoji,
-      onClose: () {},
-    )));
+    await tester.pumpWidget(
+      _harness(
+        EmojiPickerPanel(onSelect: (emoji) => picked = emoji, onClose: () {}),
+      ),
+    );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
@@ -106,10 +118,11 @@ void main() {
 
   testWidgets('Escape calls onClose', (tester) async {
     var closed = false;
-    await tester.pumpWidget(_harness(EmojiPickerPanel(
-      onSelect: (_) {},
-      onClose: () => closed = true,
-    )));
+    await tester.pumpWidget(
+      _harness(
+        EmojiPickerPanel(onSelect: (_) {}, onClose: () => closed = true),
+      ),
+    );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pump();
@@ -118,17 +131,17 @@ void main() {
   });
 
   testWidgets(
-      'the recent tab only appears once there is a history, and shows it',
-      (tester) async {
-    await tester.pumpWidget(_harness(EmojiPickerPanel(
-      onSelect: (_) {},
-      onClose: () {},
-    )));
-    expect(find.byTooltip('Recently used'), findsNothing);
+    'the recent tab only appears once there is a history, and shows it',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(EmojiPickerPanel(onSelect: (_) {}, onClose: () {})),
+      );
+      expect(find.byTooltip('Recently used'), findsNothing);
 
-    await tester.tap(find.text(_grinningFace));
-    await tester.pump();
+      await tester.tap(find.text(_grinningFace));
+      await tester.pump();
 
-    expect(find.byTooltip('Recently used'), findsOneWidget);
-  });
+      expect(find.byTooltip('Recently used'), findsOneWidget);
+    },
+  );
 }

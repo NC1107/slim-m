@@ -25,8 +25,12 @@ jobs:
         run: |
           plist=client/packages/app/ios/Runner/Info.plist
           missing=()
+          # NSLocationWhenInUseUsageDescription is here for an API the app
+          # never calls: ITMS-90683 rejected build 82 over a linked SDK's
+          # Core Location reference, and dropping the key repeats that.
           for key in NSCameraUsageDescription NSMicrophoneUsageDescription \
-                     NSPhotoLibraryUsageDescription; do
+                     NSPhotoLibraryUsageDescription \
+                     NSLocationWhenInUseUsageDescription; do
             grep -q "<key>$key</key>" "$plist" || missing+=("$key")
           done
           if [ ${#missing[@]} -gt 0 ]; then

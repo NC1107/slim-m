@@ -27,8 +27,9 @@ class VoiceScreen extends ConsumerWidget {
     return Container(
       color: tokens.surfaceBase,
       child: switch (voice.state) {
-        VoiceSessionState.connected when inThisChannel =>
-          _InCall(channelId: channelId),
+        VoiceSessionState.connected when inThisChannel => _InCall(
+          channelId: channelId,
+        ),
         VoiceSessionState.connecting when inThisChannel => const _Connecting(),
         _ => _JoinPreview(channelId: channelId),
       },
@@ -132,15 +133,17 @@ class _JoinPreview extends ConsumerWidget {
               // than one that only invites the same failure a second time.
               if (canRetry)
                 FilledButton(
-                  onPressed: showingLastAttempt &&
+                  onPressed:
+                      showingLastAttempt &&
                           voice.state == VoiceSessionState.connecting
                       ? null
                       : () => controller.join(channelId),
                   style: FilledButton.styleFrom(
                     backgroundColor: tokens.accentFill,
                     foregroundColor: tokens.accentOn,
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.s16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.s16,
+                    ),
                   ),
                   child: const Text('Join call'),
                 ),
@@ -388,13 +391,13 @@ class _ControlButton extends StatelessWidget {
     final background = destructive
         ? Theme.of(context).colorScheme.error
         : active
-            ? tokens.accentSoft
-            : tokens.surfaceRaised;
+        ? tokens.accentSoft
+        : tokens.surfaceRaised;
     final foreground = destructive
         ? Theme.of(context).colorScheme.onError
         : active
-            ? tokens.accent
-            : tokens.textSecondary;
+        ? tokens.accent
+        : tokens.textSecondary;
 
     return Tooltip(
       message: tooltip,
@@ -463,10 +466,10 @@ class _ShareQualityDialog extends StatelessWidget {
   }
 
   static String _label(ScreenShareQuality q) => switch (q) {
-        ScreenShareQuality.smooth => 'Smooth, for anything moving',
-        ScreenShareQuality.balanced => 'Balanced',
-        ScreenShareQuality.crisp => 'Crisp, for reading code',
-      };
+    ScreenShareQuality.smooth => 'Smooth, for anything moving',
+    ScreenShareQuality.balanced => 'Balanced',
+    ScreenShareQuality.crisp => 'Crisp, for reading code',
+  };
 }
 
 /// Shown in the channel list for a voice channel the user is in.

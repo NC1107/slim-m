@@ -39,60 +39,65 @@ const _tokens = api.TokenPair(
 );
 
 api.UserProfile _profile(String id, String name) => api.UserProfile(
-      id: id,
-      username: name.toLowerCase(),
-      displayName: name,
-      createdAt: 0,
-    );
+  id: id,
+  username: name.toLowerCase(),
+  displayName: name,
+  createdAt: 0,
+);
 
 /// Everything but `/dms/*` throws, matching the rest of this test suite's
 /// convention of an otherwise-always-failing client so an unexpected call
 /// surfaces immediately instead of returning something plausible-looking.
 http.Client _fakeClient() => MockClient((request) async {
-      if (request.method == 'POST' && request.url.path == '/dms/other') {
-        return http.Response(
-          jsonEncode({
-            'channel_id': 'dm-1',
-            'user': {
-              'id': 'other',
-              'username': 'ren',
-              'display_name': 'Ren',
-              'created_at': 0,
-            },
-            'unread': 0,
-            'created_at': 0,
-          }),
-          200,
-        );
-      }
-      throw StateError('unexpected request in this test: ${request.url}');
-    });
+  if (request.method == 'POST' && request.url.path == '/dms/other') {
+    return http.Response(
+      jsonEncode({
+        'channel_id': 'dm-1',
+        'user': {
+          'id': 'other',
+          'username': 'ren',
+          'display_name': 'Ren',
+          'created_at': 0,
+        },
+        'unread': 0,
+        'created_at': 0,
+      }),
+      200,
+    );
+  }
+  throw StateError('unexpected request in this test: ${request.url}');
+});
 
 ({ProviderContainer container, SlimmDatabase db}) _setup() {
   final db = SlimmDatabase(NativeDatabase.memory());
-  final container = ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-    sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-    apiProvider.overrideWith((ref) {
-      final client = api.SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: ref.watch(sessionProvider),
-        httpClient: _fakeClient(),
-      );
-      ref.onDispose(client.close);
-      return client;
-    }),
-    databaseProvider.overrideWith((ref) => db),
-    meProvider.overrideWith((ref) async => _me),
-    membersProvider.overrideWith((ref) async => [_profile('other', 'Ren')]),
-  ]);
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+      apiProvider.overrideWith((ref) {
+        final client = api.SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: _fakeClient(),
+        );
+        ref.onDispose(client.close);
+        return client;
+      }),
+      databaseProvider.overrideWith((ref) => db),
+      meProvider.overrideWith((ref) async => _me),
+      membersProvider.overrideWith((ref) async => [_profile('other', 'Ren')]),
+    ],
+  );
   return (container: container, db: db);
 }
 
 /// See home_shell_test.dart for why unmounting and pumping past Drift's
 /// stream-cache timer, before disposing, is required here.
 Future<void> _teardown(
-    WidgetTester tester, ProviderContainer container, SlimmDatabase db) async {
+  WidgetTester tester,
+  ProviderContainer container,
+  SlimmDatabase db,
+) async {
   await tester.pumpWidget(const SizedBox());
   await tester.pump(const Duration(milliseconds: 1));
   container.dispose();
@@ -100,25 +105,25 @@ Future<void> _teardown(
 }
 
 GoRouter _testRouter() => GoRouter(
-      initialLocation: '/channels',
-      routes: [
-        GoRoute(
-          path: '/channels',
-          builder: (context, state) =>
-              const HomeShell(child: Center(child: Text('conversation'))),
-        ),
-        GoRoute(
-          path: Routes.channelPattern,
-          builder: (context, state) =>
-              const HomeShell(child: Center(child: Text('conversation'))),
-        ),
-        GoRoute(
-          path: Routes.settings,
-          builder: (context, state) =>
-              const Scaffold(body: Text('settings-screen')),
-        ),
-      ],
-    );
+  initialLocation: '/channels',
+  routes: [
+    GoRoute(
+      path: '/channels',
+      builder: (context, state) =>
+          const HomeShell(child: Center(child: Text('conversation'))),
+    ),
+    GoRoute(
+      path: Routes.channelPattern,
+      builder: (context, state) =>
+          const HomeShell(child: Center(child: Text('conversation'))),
+    ),
+    GoRoute(
+      path: Routes.settings,
+      builder: (context, state) =>
+          const Scaffold(body: Text('settings-screen')),
+    ),
+  ],
+);
 
 Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
   tester.view.physicalSize = const Size(1400, 900);
@@ -153,11 +158,9 @@ Finder _inPalette(String text) =>
 void main() {
   testWidgets('Ctrl+K opens the command palette', (tester) async {
     final setup = _setup();
-    await MessageStore(setup.db).upsertChannels(
-      const [
-        api.Channel(id: 'ch1', name: 'general', kind: 'text', createdAt: 0)
-      ],
-    );
+    await MessageStore(setup.db).upsertChannels(const [
+      api.Channel(id: 'ch1', name: 'general', kind: 'text', createdAt: 0),
+    ]);
     await _pump(tester, setup.container);
 
     expect(find.byKey(const Key('command-palette-input')), findsNothing);
@@ -167,8 +170,9 @@ void main() {
     await _teardown(tester, setup.container, setup.db);
   });
 
-  testWidgets('tapping the rail search field opens the command palette',
-      (tester) async {
+  testWidgets('tapping the rail search field opens the command palette', (
+    tester,
+  ) async {
     final setup = _setup();
     await _pump(tester, setup.container);
 
@@ -181,11 +185,9 @@ void main() {
 
   testWidgets('results are grouped, and typing narrows them', (tester) async {
     final setup = _setup();
-    await MessageStore(setup.db).upsertChannels(
-      const [
-        api.Channel(id: 'ch1', name: 'general', kind: 'text', createdAt: 0)
-      ],
-    );
+    await MessageStore(setup.db).upsertChannels(const [
+      api.Channel(id: 'ch1', name: 'general', kind: 'text', createdAt: 0),
+    ]);
     await _pump(tester, setup.container);
     await _pressCtrlK(tester);
 
@@ -196,7 +198,9 @@ void main() {
     expect(_inPalette('Ren'), findsOneWidget);
 
     await tester.enterText(
-        find.byKey(const Key('command-palette-input')), 'zzz-no-match');
+      find.byKey(const Key('command-palette-input')),
+      'zzz-no-match',
+    );
     await tester.pumpAndSettle();
     expect(_inPalette('general'), findsNothing);
     expect(_inPalette('Ren'), findsNothing);
@@ -205,14 +209,13 @@ void main() {
     await _teardown(tester, setup.container, setup.db);
   });
 
-  testWidgets('selecting a channel result navigates to it and closes',
-      (tester) async {
+  testWidgets('selecting a channel result navigates to it and closes', (
+    tester,
+  ) async {
     final setup = _setup();
-    await MessageStore(setup.db).upsertChannels(
-      const [
-        api.Channel(id: 'ch1', name: 'general', kind: 'text', createdAt: 0)
-      ],
-    );
+    await MessageStore(setup.db).upsertChannels(const [
+      api.Channel(id: 'ch1', name: 'general', kind: 'text', createdAt: 0),
+    ]);
     await _pump(tester, setup.container);
     await _pressCtrlK(tester);
 
@@ -226,8 +229,9 @@ void main() {
     await _teardown(tester, setup.container, setup.db);
   });
 
-  testWidgets('arrow keys move the highlight and Enter runs it',
-      (tester) async {
+  testWidgets('arrow keys move the highlight and Enter runs it', (
+    tester,
+  ) async {
     final setup = _setup();
     await MessageStore(setup.db).upsertChannels(const [
       api.Channel(id: 'ch1', name: 'general', kind: 'text', createdAt: 0),
@@ -265,8 +269,9 @@ void main() {
     await _teardown(tester, setup.container, setup.db);
   });
 
-  testWidgets('selecting a member opens a DM and closes the palette',
-      (tester) async {
+  testWidgets('selecting a member opens a DM and closes the palette', (
+    tester,
+  ) async {
     final setup = _setup();
     await _pump(tester, setup.container);
     await _pressCtrlK(tester);
@@ -281,8 +286,9 @@ void main() {
     await _teardown(tester, setup.container, setup.db);
   });
 
-  testWidgets('selecting "Open settings" navigates to settings',
-      (tester) async {
+  testWidgets('selecting "Open settings" navigates to settings', (
+    tester,
+  ) async {
     final setup = _setup();
     await _pump(tester, setup.container);
     await _pressCtrlK(tester);
@@ -295,30 +301,33 @@ void main() {
     await _teardown(tester, setup.container, setup.db);
   });
 
-  testWidgets('closing the palette restores focus to what held it before',
-      (tester) async {
+  testWidgets('closing the palette restores focus to what held it before', (
+    tester,
+  ) async {
     final setup = _setup();
     final fieldFocus = FocusNode();
     addTearDown(fieldFocus.dispose);
 
     // openCommandPalette reads the current route, so even this isolated
     // harness needs a real GoRouter ancestor rather than a bare MaterialApp.
-    final router = GoRouter(routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => Scaffold(
-          body: Column(
-            children: [
-              TextField(focusNode: fieldFocus, autofocus: true),
-              ElevatedButton(
-                onPressed: () => openCommandPalette(context),
-                child: const Text('open'),
-              ),
-            ],
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => Scaffold(
+            body: Column(
+              children: [
+                TextField(focusNode: fieldFocus, autofocus: true),
+                ElevatedButton(
+                  onPressed: () => openCommandPalette(context),
+                  child: const Text('open'),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    ]);
+      ],
+    );
 
     await tester.pumpWidget(
       UncontrolledProviderScope(

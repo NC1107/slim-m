@@ -40,39 +40,48 @@ Future<ProviderContainer> _pump(WidgetTester tester, int permissions) async {
     refreshToken: 'refresh',
     accessExpiresAt: 0,
   );
-  final container = ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-    sessionProvider.overrideWithValue(SessionStore(tokens: tokens)),
-    apiProvider.overrideWith((ref) {
-      final api = SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: ref.watch(sessionProvider),
-        httpClient: MockClient((request) async {
-          if (request.url.path == '/devices' || request.url.path == '/blocks') {
-            return http.Response('[]', 200,
-                headers: {'content-type': 'application/json'});
-          }
-          if (request.url.path == '/me') {
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(SessionStore(tokens: tokens)),
+      apiProvider.overrideWith((ref) {
+        final api = SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: MockClient((request) async {
+            if (request.url.path == '/devices' ||
+                request.url.path == '/blocks') {
+              return http.Response(
+                '[]',
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            if (request.url.path == '/me') {
+              return http.Response(
+                jsonEncode({
+                  'id': 'self',
+                  'username': 'self',
+                  'display_name': 'Self',
+                  'created_at': 0,
+                  'permissions': permissions,
+                }),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
             return http.Response(
-              jsonEncode({
-                'id': 'self',
-                'username': 'self',
-                'display_name': 'Self',
-                'created_at': 0,
-                'permissions': permissions,
-              }),
-              200,
+              '{}',
+              404,
               headers: {'content-type': 'application/json'},
             );
-          }
-          return http.Response('{}', 404,
-              headers: {'content-type': 'application/json'});
-        }),
-      );
-      ref.onDispose(api.close);
-      return api;
-    }),
-  ]);
+          }),
+        );
+        ref.onDispose(api.close);
+        return api;
+      }),
+    ],
+  );
   addTearDown(container.dispose);
 
   await tester.pumpWidget(
@@ -104,8 +113,7 @@ void main() {
     );
   });
 
-  testWidgets(
-      'an ordinary member with none of the four bits sees no community '
+  testWidgets('an ordinary member with none of the four bits sees no community '
       'management section at all', (tester) async {
     await _pump(tester, 0);
 
@@ -116,8 +124,9 @@ void main() {
     expect(find.text('Channel permissions'), findsNothing);
   });
 
-  testWidgets('MANAGE_MESSAGES alone unlocks only the reports row',
-      (tester) async {
+  testWidgets('MANAGE_MESSAGES alone unlocks only the reports row', (
+    tester,
+  ) async {
     await _pump(tester, Perm.manageMessages);
 
     expect(find.text('Community management'), findsOneWidget);
@@ -127,8 +136,9 @@ void main() {
     expect(find.text('Channel permissions'), findsNothing);
   });
 
-  testWidgets('CREATE_INVITE alone unlocks only the invites row',
-      (tester) async {
+  testWidgets('CREATE_INVITE alone unlocks only the invites row', (
+    tester,
+  ) async {
     await _pump(tester, Perm.createInvite);
 
     expect(find.text('Invites'), findsOneWidget);
@@ -138,16 +148,17 @@ void main() {
   });
 
   testWidgets(
-      'MANAGE_ROLES alone unlocks both the roles and channel permissions '
-      'rows together, since one screen sets up targets the other edits',
-      (tester) async {
-    await _pump(tester, Perm.manageRoles);
+    'MANAGE_ROLES alone unlocks both the roles and channel permissions '
+    'rows together, since one screen sets up targets the other edits',
+    (tester) async {
+      await _pump(tester, Perm.manageRoles);
 
-    expect(find.text('Roles'), findsOneWidget);
-    expect(find.text('Channel permissions'), findsOneWidget);
-    expect(find.text('Reports'), findsNothing);
-    expect(find.text('Invites'), findsNothing);
-  });
+      expect(find.text('Roles'), findsOneWidget);
+      expect(find.text('Channel permissions'), findsOneWidget);
+      expect(find.text('Reports'), findsNothing);
+      expect(find.text('Invites'), findsNothing);
+    },
+  );
 
   /// The server resolves ADMINISTRATOR into every bit before `/me` ever
   /// answers (see `evaluate()`'s bypass in permissions.rs), so the wire value

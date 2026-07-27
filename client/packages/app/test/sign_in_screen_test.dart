@@ -30,87 +30,96 @@ const _tokens = TokenPair(
 );
 
 void main() {
-  /// The container here is disposed explicitly at the end of the test body
-  /// rather than through `addTearDown`: a failed sync attempt schedules a
-  /// real retry Timer, and flutter_test's pending-timer check runs before
-  /// addTearDown callbacks do, so relying on addTearDown would fail the test
-  /// on that check rather than on what this test is actually about.
-  ///
-  /// Reading `syncControllerProvider` up front mirrors main(), where the
-  /// controller is constructed and its session listener subscribed before any
-  /// navigation can reach this screen. That ordering is the point: the
-  /// listener, not an explicit call from the sign-in screen, is the one thing
-  /// that starts sync.
-  ///
-  /// The 404 on `/auth/ws-ticket` cuts start() short right after the channel
-  /// refresh this test counts. start()'s own try/catch reads it as offline
-  /// and schedules the retry, well before any real socket is attempted.
   testWidgets(
-      'a successful sign-in starts sync exactly once, not twice racing to '
-      'open the socket', (tester) async {
-    var listChannelsCalls = 0;
-    final httpClient = MockClient((request) async {
-      if (request.method == 'POST' && request.url.path == '/auth/login') {
-        return http.Response(
-          jsonEncode(_tokens.toJson()),
-          200,
-          headers: const {'content-type': 'application/json'},
-        );
-      }
-      if (request.method == 'GET' && request.url.path == '/channels') {
-        listChannelsCalls++;
-        return http.Response('[]', 200,
-            headers: const {'content-type': 'application/json'});
-      }
-      // Cuts sync's start() short right after the channel refresh this test
-      // counts; see this test's doc comment.
-      if (request.method == 'POST' && request.url.path == '/auth/ws-ticket') {
-        return http.Response('{"error":"not found"}', 404);
-      }
-      return http.Response('{}', 200);
-    });
+    'a successful sign-in starts sync exactly once, not twice racing to '
+    'open the socket',
+    (tester) async {
+      var listChannelsCalls = 0;
+      final httpClient = MockClient((request) async {
+        if (request.method == 'POST' && request.url.path == '/auth/login') {
+          return http.Response(
+            jsonEncode(_tokens.toJson()),
+            200,
+            headers: const {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'GET' && request.url.path == '/channels') {
+          listChannelsCalls++;
+          return http.Response(
+            '[]',
+            200,
+            headers: const {'content-type': 'application/json'},
+          );
+        }
 
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient: httpClient,
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-      storeProvider.overrideWith((ref) async {
-        final db = SlimmDatabase(NativeDatabase.memory());
-        ref.onDispose(db.close);
-        return MessageStore(db);
-      }),
-    ]);
-    // Mirrors main()'s construction order; see this test's doc comment.
-    container.read(syncControllerProvider);
+        /// Cut sync's start() short right after the channel refresh this test
+        /// counts: a 404 here is caught by start()'s own try/catch (offline,
+        /// retry scheduled) well before any real socket is ever attempted.
+        if (request.method == 'POST' && request.url.path == '/auth/ws-ticket') {
+          return http.Response('{"error":"not found"}', 404);
+        }
+        return http.Response('{}', 200);
+      });
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const SignInScreen(),
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: httpClient,
+            );
+            ref.onDispose(api.close);
+            return api;
+          }),
+          storeProvider.overrideWith((ref) async {
+            final db = SlimmDatabase(NativeDatabase.memory());
+            ref.onDispose(db.close);
+            return MessageStore(db);
+          }),
+        ],
+      );
+
+      /// Disposed explicitly at the end of the test body, not via addTearDown:
+      /// a failed sync attempt schedules a real retry Timer, and
+      /// flutter_test's pending-timer check runs before addTearDown callbacks
+      /// do, so relying on addTearDown here would fail the test on that check
+      /// rather than on what this test is actually about.
+
+      /// Mirrors main(): SyncController is constructed, and its session
+      /// listener subscribed, before any navigation can reach the sign-in
+      /// screen - exactly like the real app, and exactly what makes the
+      /// listener (not an explicit call from this screen) the one thing that
+      /// starts sync.
+      container.read(syncControllerProvider);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const SignInScreen(),
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.enterText(find.byType(TextField).at(1), 'alice');
-    await tester.enterText(find.byType(TextField).at(2), 'hunter2');
-    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
-    await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(1), 'alice');
+      await tester.enterText(find.byType(TextField).at(2), 'hunter2');
+      await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+      await tester.pumpAndSettle();
 
-    expect(listChannelsCalls, 1,
-        reason: 'two start() calls each refresh channels once; a single, '
-            'session-driven start is the only thing allowed to run');
+      expect(
+        listChannelsCalls,
+        1,
+        reason:
+            'two start() calls each refresh channels once; a single, '
+            'session-driven start is the only thing allowed to run',
+      );
 
-    container.dispose();
-  });
+      container.dispose();
+    },
+  );
 
   group('push reachability', () {
     /// Pumps the screen with /version answering [versionBody] and returns
@@ -130,12 +139,14 @@ void main() {
         return http.Response('{}', 200);
       });
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        probeApiProvider.overrideWithValue(
-          (baseUrl) => SlimmApi(baseUrl: baseUrl, httpClient: httpClient),
-        ),
-      ]);
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          probeApiProvider.overrideWithValue(
+            (baseUrl) => SlimmApi(baseUrl: baseUrl, httpClient: httpClient),
+          ),
+        ],
+      );
       addTearDown(container.dispose);
 
       await tester.pumpWidget(
@@ -152,8 +163,9 @@ void main() {
       return find.textContaining('cannot send push notifications');
     }
 
-    testWidgets('a server that reports no push says so before sign-in',
-        (tester) async {
+    testWidgets('a server that reports no push says so before sign-in', (
+      tester,
+    ) async {
       final notice = await pumpWithVersion(tester, {
         'name': 'slim-m',
         'version': '0.8.0',
@@ -173,8 +185,9 @@ void main() {
       expect(notice, findsNothing);
     });
 
-    testWidgets('a server too old to say is not accused of having no push',
-        (tester) async {
+    testWidgets('a server too old to say is not accused of having no push', (
+      tester,
+    ) async {
       final notice = await pumpWithVersion(tester, {
         'name': 'slim-m',
         'version': '0.6.0',
@@ -183,12 +196,11 @@ void main() {
       expect(notice, findsNothing);
     });
 
-    /// The prefilled server hangs until told to fail; the typed one answers
-    /// no-push immediately. The stale failure arriving after the fresh answer
-    /// is exactly the interleaving the guard exists for.
-    testWidgets(
-        'editing the field re-probes, and a slow failure from the old '
+    testWidgets('editing the field re-probes, and a slow failure from the old '
         'address cannot wipe the notice the new one earned', (tester) async {
+      /// The prefilled server hangs until told to fail; the typed one
+      /// answers no-push immediately. The stale failure arriving after the
+      /// fresh answer is exactly the interleaving the guard exists for.
       final oldServerGate = Completer<void>();
       final httpClient = MockClient((request) async {
         if (request.url.host == 'old.example') {
@@ -207,14 +219,17 @@ void main() {
         );
       });
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        serverUrlProvider
-            .overrideWith((ref) => Uri.parse('http://old.example')),
-        probeApiProvider.overrideWithValue(
-          (baseUrl) => SlimmApi(baseUrl: baseUrl, httpClient: httpClient),
-        ),
-      ]);
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          serverUrlProvider.overrideWith(
+            (ref) => Uri.parse('http://old.example'),
+          ),
+          probeApiProvider.overrideWithValue(
+            (baseUrl) => SlimmApi(baseUrl: baseUrl, httpClient: httpClient),
+          ),
+        ],
+      );
       addTearDown(container.dispose);
 
       await tester.pumpWidget(
@@ -232,47 +247,60 @@ void main() {
       expect(notice, findsNothing);
 
       await tester.enterText(
-          find.byType(TextField).first, 'http://new.example');
+        find.byType(TextField).first,
+        'http://new.example',
+      );
       // Past the debounce, then let the probe's response apply.
       await tester.pump(const Duration(milliseconds: 700));
       await tester.pump();
-      expect(notice, findsOneWidget,
-          reason: 'editing the field must probe the new address');
+      expect(
+        notice,
+        findsOneWidget,
+        reason: 'editing the field must probe the new address',
+      );
 
       // Now the old address's probe finally fails. The notice belongs to
       // the current address and must survive the stale failure.
       oldServerGate.complete();
       await tester.pump();
       await tester.pump();
-      expect(notice, findsOneWidget,
-          reason: 'a stale failure for a previous address must not '
-              'relabel the current one as unknown');
+      expect(
+        notice,
+        findsOneWidget,
+        reason:
+            'a stale failure for a previous address must not '
+            'relabel the current one as unknown',
+      );
     });
   });
 
   testWidgets(
-      'the server field starts from the onboarding choice, not a hardcoded '
-      'address', (tester) async {
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      serverUrlProvider.overrideWith(
-        (ref) => Uri.parse('https://chat.example'),
-      ),
-    ]);
-    addTearDown(container.dispose);
+    'the server field starts from the onboarding choice, not a hardcoded '
+    'address',
+    (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          serverUrlProvider.overrideWith(
+            (ref) => Uri.parse('https://chat.example'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const SignInScreen(),
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const SignInScreen(),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    final field = tester.widget<TextField>(find.byType(TextField).first);
-    expect(field.controller!.text, 'https://chat.example');
-  });
+      final field = tester.widget<TextField>(find.byType(TextField).first);
+      expect(field.controller!.text, 'https://chat.example');
+    },
+  );
 }
