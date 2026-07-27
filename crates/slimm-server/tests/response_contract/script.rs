@@ -19,7 +19,7 @@ use super::world::{Contract, Payload};
 mod content;
 mod people;
 
-use content::{channel_calls, message_calls};
+use content::{channel_calls, emoji_calls, message_calls};
 use people::{moderation_calls, profile_calls, safety_calls};
 
 const PASSWORD: &str = "a-long-enough-password";
@@ -125,6 +125,7 @@ pub async fn run(c: &mut Contract) {
 
     let channel = channel_calls(c, root, &bob_id).await;
     let message = message_calls(c, root, &channel).await;
+    emoji_calls(c, root).await;
     moderation_calls(c, root, bob_token, &message).await;
 
     c.json(

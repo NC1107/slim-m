@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sha256 AS \"sha256!\" FROM custom_emoji WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "sha256!",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9535cc6b0d77ee6eb6482e137831e87df01b494aafd56b594176acd7fe5974c3"
+}
