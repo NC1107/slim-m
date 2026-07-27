@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/NC1107/slim-m/compare/client-v0.3.0...client-v0.4.0) (2026-07-27)
+
+
+### Features
+
+* **client:** custom emoji end to end ([#76](https://github.com/NC1107/slim-m/issues/76)) ([c39d953](https://github.com/NC1107/slim-m/commit/c39d9538a247cf49b4af92bbc77a67f6c8cc9acc))
+
+
+### Bug Fixes
+
+* **mobile:** reaction layout, avatar cropping, and reclaimed space ([#71](https://github.com/NC1107/slim-m/issues/71)) ([b059134](https://github.com/NC1107/slim-m/commit/b059134bd3ae87ccf0cb9ccb0957d20ef00858fc))
+
 ## [0.3.0](https://github.com/NC1107/slim-m/compare/client-v0.2.3...client-v0.3.0) (2026-07-27)
 
 
