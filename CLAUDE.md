@@ -363,7 +363,7 @@ One backend deployment is one community. Direct messages work only between users
 Read receipts to other users are deferred; presence has a hide/appear-offline option.
 Self-hosted account recovery is an admin-issued one-time reset code (no email).
 The official instance is single-process with state behind a swappable interface.
-A designer review precedes design-token lock. The accent is teal, on a neutral cool-slate palette, IBM Plex Sans, border-first elevation, flat grouped messages.
+A designer review precedes design-token lock. The accent is glacier cyan (`#1B6F91` light, `#58B4D8` dark, decided 2026-07-27; teal until then), on a neutral cool-slate palette, IBM Plex Sans, border-first elevation, flat grouped messages.
 The UI uses Lucide icons and never emoji as chrome. Emoji are user content (reactions) only.
 Join and leave sounds default off above roughly 8 participants. The official instance publishes no moderation SLA.
 
@@ -424,8 +424,21 @@ Test databases are temp SQLite files (`Config { port, database_path }` then `db:
 - Commit with `git commit -s` (DCO sign-off). NEVER add an AI attribution or co-author trailer to anything.
 - Never use the em dash character; use a plain dash. In long Markdown files, put each full sentence on its own physical line.
 - No emoji as interface chrome (a CI gate enforces this); use Lucide icons. SPDX headers on every source file (a CI gate checks the Rust ones).
-- Keep files small (a soft 300-line review budget, generated code excluded).
+- **Files: 300 lines soft, 500 hard.** 300 is the review budget, and a file over it should be split before it grows again.
+  500 is a ceiling rather than a budget: a file past it does not get reviewed properly, so split it in the change that would cross the line.
+  Generated code is excluded (`*.g.dart`, `*.freezed.dart`, `.sqlx/`, generated protobuf), because its size is not a human's decision.
+- **Functions: 7 parameters.** This is not an invented number.
+  Clippy's `too_many_arguments` fires at 8 and SonarQube's equivalent rule is also 7, so both linters already in this stack enforce it for free.
+  Dart **named** parameters on a widget or data-class constructor are exempt: a Flutter widget legitimately takes many, and a named argument is self-describing at the call site in a way a positional one is not.
+  Past 7 positional parameters, the fix is a struct or a parameter object, not a longer signature.
 - **No comment may exceed two lines.** Code explains how; a comment explains why, and two lines is enough for a why. If the reason genuinely needs more room it belongs in a doc comment on the item, in `docs/`, or in the decision record - not in a block above a statement. A long comment above a confusing function is a sign the function should be refactored, which is the rule this one exists to enforce.
+  **Scope, settled 2026-07-27:** the two-line cap is on plain comments (`//`, `#`) only.
+  Doc comments (`///`, `//!`, `/**`) are exempt, because they carry an item's contract to its callers and to `cargo doc` / `dart doc`, which is a different job from explaining a line.
+  A doc comment that has grown past roughly ten lines is still a signal: that is reference material, and it belongs in `docs/` with the doc comment linking to it.
+  Test files are in scope. A long comment there is usually a why worth keeping, so shorten it or move it to a doc comment on the test rather than deleting the reasoning.
+  **One exemption, for languages with no doc-comment syntax.** In YAML, TOML and shell, a `#` block at the very top of the file is that file's only documentation mechanism, so a file header there is treated as a doc comment and is exempt.
+  A `#` block anywhere else in those files is an ordinary comment and capped at two lines like everything else.
+  The point of the rule is that reasoning should live somewhere durable and findable, not that reasoning should be deleted: when shortening, move the why to a doc comment or to `docs/`, never drop it.
 - Anything published under the owner's name (PR titles and bodies, issues, review comments, releases) is written in Nick's voice: read `~/.claude/Voice.md`. It is plain, hedged, anti-hype, lowercase product names, no emoji or exclamation points, and it walks through how a thing works. Commit messages, code, and working conversation stay in the normal clear register.
 - Subagent model selection (from the owner's global instructions): haiku for trivial ops, sonnet for default coding and analysis, opus only for orchestration or hard reasoning; never use fable for engineering. Prefer sonnet-4-6 over sonnet-5. Workflow/Agent tooling only accepts tier aliases (haiku/sonnet/opus/fable), so full model ids cannot be passed there.
 - schema/openapi.yaml is gated against the router: `crates/slimm-server/tests/openapi_contract.rs` parses the routes axum actually serves out of `src/http.rs`/`src/http/*.rs` and the paths documented under `paths:` in the schema, and fails `cargo test` (locally and in CI, via server-ci, no separate workflow to remember) if either side has something the other does not. This is why adding, removing, or renaming a route belongs in the same change as the matching edit to `schema/openapi.yaml`: the build will not pass otherwise, and the failure names the exact method, path, and file that drifted.

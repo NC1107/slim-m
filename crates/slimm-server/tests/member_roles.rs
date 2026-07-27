@@ -94,13 +94,14 @@ async fn register(store: &Store, username: &str) -> (String, String) {
 /// holds it, so it would be a badge with no information - and a member with
 /// nothing beyond that base role comes back with an empty list, not
 /// `@everyone` itself.
+///
+/// Alice needs no extra setup: the first account to register claims the
+/// deployment and bootstrap assigns it a real (non-`@everyone`) "admin" role,
+/// so she is already a member holding a role.
 #[tokio::test]
 async fn member_list_carries_role_names_excluding_everyone() {
     let store = new_store().await;
     let app = app(store.clone());
-    // The first account to register claims the deployment and bootstrap
-    // assigns it a real (non-`@everyone`) "admin" role - a member who
-    // already holds a role with no extra setup needed here.
     let (token, alice_id) = register(&store, "alice").await;
     let (_, bob_id) = register(&store, "bob").await;
     let (_, carol_id) = register(&store, "carol").await;

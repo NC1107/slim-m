@@ -56,11 +56,11 @@ const _noActions = MessageActions(
   onBlockAuthor: _noop,
 );
 
-// The leading avatar is provider-backed now (it resolves the author's own
-// avatar), so every row needs a ProviderScope even when a test cares about
-// nothing avatar-related; the default, unauthenticated apiProvider fails
-// fast on that lookup and the row falls back to initials, same as a real
-// signed-out state would.
+/// The leading avatar is provider-backed now (it resolves the author's own
+/// avatar), so every row needs a ProviderScope even when a test cares about
+/// nothing avatar-related; the default, unauthenticated apiProvider fails
+/// fast on that lookup and the row falls back to initials, same as a real
+/// signed-out state would.
 Widget _harness(Widget child) => ProviderScope(
   child: MaterialApp(
     theme: buildTheme(Brightness.light, AppTokens.light),
@@ -251,9 +251,9 @@ void main() {
             onSubmitEdit: (_) {},
             onCancelEdit: () {},
             reactions: const [
-              // Escaped rather than literal: the hygiene gate forbids emoji
-              // codepoints in client source, and these are user content standing in
-              // for a reaction, not interface chrome.
+              /// Escaped rather than literal: the hygiene gate forbids emoji
+              /// codepoints in client source, and these are user content standing in
+              /// for a reaction, not interface chrome.
               api.ReactionSummary(emoji: '\u{1F44D}', count: 3, reacted: true),
               api.ReactionSummary(emoji: '\u{1F389}', count: 1, reacted: false),
             ],
@@ -478,9 +478,9 @@ void main() {
     final panel = find.byType(EmojiPickerPanel);
     expect(panel, findsOneWidget, reason: 'tapping should open the panel');
 
-    // The failure this exists for: the panel occludes the row, so the pointer
-    // leaves the MouseRegion and the button used to unmount, taking the panel
-    // with it before any tile could be clicked.
+    /// The failure this exists for: the panel occludes the row, so the pointer
+    /// leaves the MouseRegion and the button used to unmount, taking the panel
+    /// with it before any tile could be clicked.
     await mouse.moveTo(tester.getCenter(panel));
     await tester.pumpAndSettle();
     expect(
@@ -520,12 +520,12 @@ void main() {
       ),
     );
 
-    // A press over the row's message text does not open the menu in this
-    // bare harness (a Scaffold(body: MessageRow(...)) with no bounding
-    // ListView around it, unlike every real call site): something between
-    // the text and this widget's ancestor recognizers swallows it there.
-    // Pressing near the region's own top-left corner, over the leading
-    // avatar rather than the text, reliably reaches the menu instead.
+    /// A press over the row's message text does not open the menu in this
+    /// bare harness (a Scaffold(body: MessageRow(...)) with no bounding
+    /// ListView around it, unlike every real call site): something between
+    /// the text and this widget's ancestor recognizers swallows it there.
+    /// Pressing near the region's own top-left corner, over the leading
+    /// avatar rather than the text, reliably reaches the menu instead.
     Offset pressPoint(WidgetTester tester) =>
         tester.getTopLeft(find.byType(MessageContextMenuRegion)) +
         const Offset(30, 30);
@@ -636,11 +636,11 @@ void main() {
       expect(deleted, isTrue);
     });
 
-    // The bug this covers: SlimmApi.report had no call site anywhere in
-    // packages/app despite the endpoint, the wire model, and a full admin
-    // triage screen all existing. Nothing gated that regressing, so this
-    // fails without a rendered "Report message" item for someone else's
-    // message the caller is allowed to report.
+    /// The bug this covers: SlimmApi.report had no call site anywhere in
+    /// packages/app despite the endpoint, the wire model, and a full admin
+    /// triage screen all existing. Nothing gated that regressing, so this
+    /// fails without a rendered "Report message" item for someone else's
+    /// message the caller is allowed to report.
     testWidgets(
       'a message not authored by the caller offers Report and Block',
       (tester) async {

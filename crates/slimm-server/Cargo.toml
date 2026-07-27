@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 [package]
 name = "slimm-server"
-version = "0.12.0"
+version = "0.13.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -42,17 +42,12 @@ ed25519-dalek.workspace = true
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
-# tower::ServiceExt::oneshot drives the HTTP round-trip tests in-process without
-# binding a socket; tokio-tungstenite is a real WebSocket client for the
-# two-client fan-out test.
+# tower::ServiceExt::oneshot drives the HTTP round-trip tests in-process with no
+# socket; tokio-tungstenite is a real client for the fan-out test.
 tower = { version = "0.5", features = ["util"] }
 tokio-tungstenite = "0.24"
-# tests/response_contract.rs validates real responses against schema/openapi.yaml.
-# An OpenAPI 3.1 schema object *is* a JSON Schema 2020-12 schema, so a general
-# JSON Schema validator checks it directly rather than a hand-written copy of
-# each shape drifting alongside the real one. `default-features = false` drops
-# the file and http `$ref` resolvers (and the reqwest/aws-lc-rs they drag in):
-# every `$ref` here is a local pointer into the one document.
+# Validates real responses against schema/openapi.yaml in tests/response_contract.rs.
+# The `default-features = false` cut is deliberate; see docs/dependencies.md.
 jsonschema = { version = "0.49", default-features = false }
 # The maintained fork of the archived serde_yaml, only to turn the schema into
 # a serde_json::Value the validator can compile.

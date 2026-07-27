@@ -129,9 +129,10 @@ class _EmojiCellState extends State<_EmojiCell> {
               borderRadius: BorderRadius.circular(AppRadii.control),
             )
           : null,
-      // 20, not on AppText's scale: sized to read as a legible glyph rather
-      // than any text style, the same literal exception AppChip.reaction
-      // documents for its own emoji glyph.
+
+      /// 20, not on AppText's scale: sized to read as a legible glyph rather
+      /// than any text style, the same literal exception AppChip.reaction
+      /// documents for its own emoji glyph.
       child: Text(
         widget.emoji.char,
         style: const TextStyle(fontSize: 20, height: 1),

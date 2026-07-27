@@ -3,6 +3,12 @@
 /// md 38, lg 44) and a constant body-size font across all three: size only
 /// changes the row, never the type, matching the rest of this system's
 /// "the row grows, nothing else about it changes" convention.
+///
+/// Focus is drawn as two rings: the inner 1px border swaps to accent-fill and
+/// the 2px ring outside it is accent-ring. Neither is `focusRing`, because the
+/// source design authors this control's own focus treatment explicitly (a
+/// `focused` prop), unlike the other form controls, which do not model focus at
+/// all and so fall back to this package's own accessibility ring.
 library;
 
 import 'package:flutter/material.dart';
@@ -91,11 +97,11 @@ class _AppInputState extends State<AppInput> {
     super.dispose();
   }
 
-  // The design's three sizes (32/38/44) do not line up with any existing
-  // AppSizes control-height token (controlMd is 34, controlLg is 38, and
-  // there is no 32 or 44 step besides rowTouch, which is a hit-target floor
-  // rather than a size). Reported as a token gap rather than bent to fit;
-  // these are the design's own numbers.
+  /// The design's three sizes (32/38/44) do not line up with any existing
+  /// AppSizes control-height token (controlMd is 34, controlLg is 38, and
+  /// there is no 32 or 44 step besides rowTouch, which is a hit-target floor
+  /// rather than a size). Reported as a token gap rather than bent to fit;
+  /// these are the design's own numbers.
   double get _height => switch (widget.size) {
         AppInputSize.sm => 32,
         AppInputSize.md => 38,
@@ -112,11 +118,8 @@ class _AppInputState extends State<AppInput> {
       fontFamily: widget.mono ? AppFonts.mono : AppFonts.sans,
     );
 
-    // The inner 1px border swaps to accent-fill on focus; the 2px ring
-    // outside it is accent-ring. Neither is `focusRing`: the source design
-    // authors this control's own focus treatment explicitly (a `focused`
-    // prop), unlike the other form controls, which do not model focus at all
-    // and so fall back to this package's own accessibility ring.
+    // Accent-fill on focus, not `focusRing`: this control authors its own focus
+    // treatment. See the library doc at the top of the file.
     final borderColor = !widget.enabled
         ? tokens.borderSubtle
         : hasError

@@ -102,9 +102,7 @@ async fn issue_code(app: &Router, admin_token: &str, user_id: &str) -> String {
         .to_owned()
 }
 
-// ---------------------------------------------------------------------------
-// Issuing
-// ---------------------------------------------------------------------------
+// --- Issuing ---
 
 #[tokio::test]
 async fn only_an_administrator_can_issue_a_code() {
@@ -145,9 +143,7 @@ async fn issuing_for_a_nonexistent_user_is_not_found() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
-// ---------------------------------------------------------------------------
-// Consuming
-// ---------------------------------------------------------------------------
+// --- Consuming ---
 
 #[tokio::test]
 async fn a_wrong_code_is_refused() {

@@ -251,10 +251,8 @@ void main() {
         final focusNode = FocusNode();
         addTearDown(focusNode.dispose);
 
-        // The focus *highlight* (as opposed to focus itself) is normally
-        // only shown for keyboard-style interaction; force it on so a
-        // programmatic requestFocus in a test actually renders the ring
-        // this test checks.
+        // The focus *highlight*, unlike focus itself, is normally shown only
+        // for keyboard interaction; force it on so requestFocus draws the ring.
         final previousStrategy = FocusManager.instance.highlightStrategy;
         FocusManager.instance.highlightStrategy =
             FocusHighlightStrategy.alwaysTraditional;

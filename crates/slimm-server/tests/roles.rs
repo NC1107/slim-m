@@ -97,9 +97,7 @@ async fn admin_role_id(store: &Store) -> String {
         .to_string()
 }
 
-// ---------------------------------------------------------------------------
-// The MANAGE_ROLES gate
-// ---------------------------------------------------------------------------
+// --- The MANAGE_ROLES gate ---
 
 /// Every role-management verb refuses a caller without MANAGE_ROLES, whether
 /// or not the resource named in the path exists.
@@ -135,9 +133,7 @@ async fn every_verb_requires_manage_roles() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Escalation: nobody can grant what they do not hold
-// ---------------------------------------------------------------------------
+// --- Escalation: nobody can grant what they do not hold ---
 
 /// A MANAGE_ROLES holder who is not themselves an administrator cannot create
 /// a role carrying ADMINISTRATOR: MANAGE_ROLES is not a shortcut to it.
@@ -259,9 +255,7 @@ async fn unknown_permission_bits_are_rejected() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
-// ---------------------------------------------------------------------------
-// The last-administrator invariant
-// ---------------------------------------------------------------------------
+// --- The last-administrator invariant ---
 
 /// The sole administrator cannot remove their own admin role: that would
 /// leave the deployment with no administrator and no recovery path.
@@ -413,9 +407,7 @@ async fn cannot_delete_everyone_role() {
     assert_eq!(response.status(), StatusCode::CONFLICT);
 }
 
-// ---------------------------------------------------------------------------
-// Happy path
-// ---------------------------------------------------------------------------
+// --- Happy path ---
 
 #[tokio::test]
 async fn admin_can_create_update_list_and_the_role_takes_effect() {

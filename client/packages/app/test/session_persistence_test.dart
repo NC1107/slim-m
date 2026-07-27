@@ -125,10 +125,10 @@ class _FlakyKeyStore implements KeyStore {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // Every restoreSession() call reads the first-launch flag from
-  // SharedPreferences; marking the app as "already launched" is what makes
-  // these tests the ordinary "restart", not a fresh install, unless a test
-  // is specifically about that first-launch behaviour.
+  /// Every restoreSession() call reads the first-launch flag from
+  /// SharedPreferences; marking the app as "already launched" is what makes
+  /// these tests the ordinary "restart", not a fresh install, unless a test
+  /// is specifically about that first-launch behaviour.
   setUp(
     () => SharedPreferences.setMockInitialValues({hasLaunchedBeforeKey: true}),
   );
@@ -171,9 +171,10 @@ void main() {
     test('a session with no persisted server address is dropped rather than '
         'restored against the useless default', () async {
       final keyStore = InMemoryKeyStore();
-      // A session persisted with no matching server address: the exact shape
-      // of the bug this guards, reproduced directly rather than only through
-      // the write path.
+
+      /// A session persisted with no matching server address: the exact shape
+      /// of the bug this guards, reproduced directly rather than only through
+      /// the write path.
       await keyStore.put(sessionTokenHandle, jsonEncode(_tokens.toJson()));
 
       final container = ProviderContainer(
@@ -412,10 +413,11 @@ void main() {
         refreshToken: 'refresh-second',
         accessExpiresAt: 0,
       );
-      // Two changes back to back, neither awaited individually: exactly the
-      // shape of a restore immediately followed by a refresh. The first
-      // write is held open by the gate; an unchained implementation lets the
-      // second race ahead of it regardless.
+
+      /// Two changes back to back, neither awaited individually: exactly the
+      /// shape of a restore immediately followed by a refresh. The first
+      /// write is held open by the gate; an unchained implementation lets the
+      /// second race ahead of it regardless.
       session.set(first);
       session.set(second);
       await pumpEventQueue();
@@ -513,10 +515,10 @@ void main() {
     test(
       'drops the cached channels and messages the session was reading',
       () async {
-        // The local database is one file for the whole app, not one per account
-        // or per server. Without this, the next person to sign in on the device
-        // opens straight onto the previous account's channel list and message
-        // text, before any sync could correct it.
+        /// The local database is one file for the whole app, not one per account
+        /// or per server. Without this, the next person to sign in on the device
+        /// opens straight onto the previous account's channel list and message
+        /// text, before any sync could correct it.
         final db = SlimmDatabase(NativeDatabase.memory());
         addTearDown(db.close);
         final store = MessageStore(db);

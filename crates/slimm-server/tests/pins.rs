@@ -75,15 +75,16 @@ async fn json_body(response: axum::response::Response) -> Value {
 /// is an invite-gated policy decision covered by its own tests in
 /// `registration_gate.rs`. These tests only need somebody signed in, so going
 /// through the store keeps them independent of that policy.
+///
+/// The first account through here would normally claim the deployment, but
+/// every test pre-creates its own `@everyone` role with the exact permissions
+/// it needs, so `bootstrap_deployment` always finds one already set up and is a
+/// no-op past the account itself.
 async fn register(store: &Store, username: &str) -> (String, String) {
     let account = store
         .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    // The first account through here would normally claim the deployment,
-    // but every test pre-creates its own @everyone role with the exact
-    // permissions it needs, so this always finds one already set up and is a
-    // no-op past the account itself.
     store.bootstrap_deployment(account.id).await.unwrap();
     let tokens = store.open_session(account.id, "cli").await.unwrap();
     (tokens.access_token, account.id.to_string())

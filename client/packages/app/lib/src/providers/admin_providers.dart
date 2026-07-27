@@ -6,6 +6,12 @@
 /// [blocksProvider] in `settings_screen.dart`: nothing here is long-lived
 /// state, so a screen refetches on entry and a mutation invalidates the one
 /// list it touched.
+///
+/// The member list for the role-assignment picker is deliberately not here: it
+/// is `membersProvider` from `widgets/member_pane.dart`, reused rather than
+/// redefined, because it is the same `GET /members` page the rail header and
+/// member pane already show and a second copy would invalidate independently
+/// of theirs.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,8 +40,3 @@ final invitesProvider = FutureProvider.autoDispose<List<api.Invite>>(
 final rolesProvider = FutureProvider.autoDispose<List<api.Role>>(
   (ref) => ref.watch(apiProvider).listRoles(),
 );
-
-// The member list for the role-assignment picker is [membersProvider] from
-// `widgets/member_pane.dart`, reused rather than redefined: it is the same
-// `GET /members` page the rail header and member pane already show, and a
-// second copy here would invalidate independently of theirs.

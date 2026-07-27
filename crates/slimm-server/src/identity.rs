@@ -132,6 +132,10 @@ fn hex_lower(bytes: &[u8]) -> String {
 /// it by the standard Ed25519 key schedule rather than stored independently,
 /// so the two halves can never disagree. Both persist in `server_identity`,
 /// so the fingerprint a client has pinned survives every restart.
+///
+/// If another process (or another connection racing startup) inserts first,
+/// the row that actually landed is read back rather than the key generated in
+/// this call, so every caller ends up agreeing on the same identity.
 pub async fn load_or_create(pool: &SqlitePool) -> anyhow::Result<ServerIdentity> {
     if let Some(identity) = read(pool).await? {
         return Ok(identity);
@@ -156,10 +160,8 @@ pub async fn load_or_create(pool: &SqlitePool) -> anyhow::Result<ServerIdentity>
 
     match claim {
         Ok(_) => Ok(ServerIdentity { public_key }),
-        // Another process (or another connection racing startup) generated
-        // an identity in between; read back whichever one actually landed
-        // rather than trusting the one generated in this call, so every
-        // caller ends up agreeing on the same identity.
+        // Lost the insert race, so read back the winner; see the note on
+        // this function.
         Err(sqlx::Error::Database(e)) if e.is_unique_violation() => read(pool)
             .await?
             .context("server_identity insert lost a race but no row is readable"),
@@ -212,6 +214,9 @@ mod tests {
         assert_eq!(groups.join(""), identity(7).fingerprint_hex());
     }
 
+    /// The inequality at the end is not a mathematical certainty for one
+    /// arbitrary pair of keys, but it holds for this pair, and it is worth
+    /// catching if a future edit makes the strip ignore the key entirely.
     #[test]
     fn the_color_strip_is_deterministic_and_derived_from_the_fingerprint() {
         let a = identity(9).color_strip();
@@ -223,10 +228,7 @@ mod tests {
             assert!(index < PALETTE_COLORS);
         }
 
-        // A different key gives a different strip in general; not a
-        // mathematical certainty for one arbitrary pair, but true for this
-        // one, and worth catching if a future edit makes the strip ignore
-        // the key entirely.
+        // A different key gives a different strip; see the note on this test.
         assert_ne!(a, identity(200).color_strip());
     }
 }

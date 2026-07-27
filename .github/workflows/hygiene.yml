@@ -19,10 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # App Store review rejects a binary whose linked SDKs reference a
-      # sensitive API without a purpose string, and it does it asynchronously:
-      # altool uploads, the job goes green, and the rejection arrives by email
-      # some minutes later. This turns that into a red PR instead.
+      # App Store review rejects a missing purpose string asynchronously, by
+      # email after CI is green. This makes it a red PR; see docs/ci.md.
       - name: ios purpose strings are present
         run: |
           plist=client/packages/app/ios/Runner/Info.plist
@@ -44,11 +42,8 @@ jobs:
 
       - name: no emoji in UI source
         run: |
-          # Emoji are user content (reactions), never interface chrome.
-          # Chrome uses Lucide icons. This gate fails on any emoji codepoint in
-          # client source.
-          # Text sources only, and --binary-files=without-match, so a compiled
-          # artifact that happens to contain those bytes cannot trip the gate.
+          # Emoji are user content (reactions), never chrome; chrome is Lucide.
+          # Text sources only, so a compiled artifact cannot trip it.
           if grep -rlP --binary-files=without-match \
                --include='*.dart' --include='*.yaml' --include='*.arb' \
                '[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE0F}\x{200D}]' \

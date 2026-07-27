@@ -222,9 +222,8 @@ async fn farewell_calls(c: &mut Contract, root: &str, bob_id: &str, code: &str, 
     )
     .await;
 
-    // Dave writes before he leaves, so the listing afterwards carries the
-    // anonymized author shape the schema documents and nothing else here
-    // would ever produce.
+    // Dave writes before he leaves, so the later listing carries the anonymized
+    // author shape the schema documents and nothing else here would produce.
     let dave = c
         .call(
             "register",

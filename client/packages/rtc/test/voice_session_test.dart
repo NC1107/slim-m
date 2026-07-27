@@ -49,9 +49,8 @@ void main() {
     session.states.listen(seen.add);
 
     await session.join(url: 'wss://example.invalid', token: 'nope');
-    // states is a broadcast stream, so its events land on a later microtask
-    // than the synchronous state field. Pump before asserting on what a
-    // listener actually received.
+    // states is a broadcast stream, so its events land a microtask later than
+    // the synchronous state field. Pump before asserting what a listener got.
     await pumpEventQueue();
 
     expect(session.state, VoiceSessionState.failed);
@@ -75,9 +74,8 @@ void main() {
     await session.join(url: 'wss://example.invalid', token: 'nope');
     expect(session.participants, isEmpty);
 
-    // The mic control must not act on a room that was torn down, and must say
-    // so rather than throwing into whatever called it. Deafening follows the
-    // same convention.
+    // These must not act on a torn-down room, and must say so rather than
+    // throwing into whatever called them. Deafening follows the same rule.
     expect(await session.setMicrophoneEnabled(true), isFalse);
     expect(await session.setScreenShareEnabled(true), isFalse);
     expect(await session.setDeafened(true), isFalse);
@@ -138,9 +136,8 @@ void main() {
 
   group('screen share ceilings', () {
     test('every quality is bounded on all four axes', () {
-      // The point of the enum is that no path publishes an unbounded share: a
-      // 4K screen at 60fps will saturate a home upload and starve the audio it
-      // is meant to accompany.
+      // The point of the enum is that no path publishes an unbounded share: 4K
+      // at 60fps saturates a home upload and starves the audio it accompanies.
       for (final q in ScreenShareQuality.values) {
         expect(q.width, greaterThan(0));
         expect(q.height, greaterThan(0));
@@ -151,9 +148,8 @@ void main() {
     });
 
     test('quality trades resolution against frame rate, not just size', () {
-      // Smooth is for motion, crisp is for reading code. If crisp were also the
-      // highest frame rate it would simply be "more", and the choice would be
-      // meaningless.
+      // Smooth is for motion, crisp is for reading code. If crisp were also
+      // the highest frame rate it would just be "more", and mean nothing.
       expect(ScreenShareQuality.crisp.width,
           greaterThan(ScreenShareQuality.smooth.width));
       expect(ScreenShareQuality.crisp.fps,

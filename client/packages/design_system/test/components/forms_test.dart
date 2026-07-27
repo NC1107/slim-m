@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
+/// Widget tests for the form controls in `components/forms`.
+///
+/// The slider's "tall, muted, metered with ticks" case exists because the custom
+/// track and thumb paint code is the newest, highest-risk part of that widget.
+/// It exercises every optional feature at once so a bad rect (for example a
+/// meter fraction that clips negative) surfaces here rather than the first time
+/// a caller combines them.
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -97,9 +106,8 @@ void main() {
       await tester
           .pumpWidget(_wrap(const AppToggle(value: false, onChanged: null)));
 
-      // A disabled toggle must not merely ignore the callback: the tap
-      // handler itself is absent, so assistive tech reports it as
-      // non-interactive rather than as a button that silently does nothing.
+      // A disabled toggle must not merely ignore the callback: the tap handler
+      // is absent, so assistive tech reports it non-interactive, not a button.
       final gestureDetector =
           tester.widget<GestureDetector>(find.byType(GestureDetector));
       expect(gestureDetector.onTap, isNull);
@@ -219,10 +227,8 @@ void main() {
 
     testWidgets('tall, muted, metered slider with ticks paints without error',
         (tester) async {
-      // The custom track/thumb paint code is the newest, highest-risk part
-      // of this widget; exercise every optional feature at once so a bad
-      // rect (e.g. a meter fraction that clips negative) surfaces here
-      // rather than the first time a caller combines them.
+      // Every optional feature at once, because the custom paint code is this
+      // widget's highest risk. See the library doc at the top of the file.
       await tester.pumpWidget(
         _wrap(
           SizedBox(

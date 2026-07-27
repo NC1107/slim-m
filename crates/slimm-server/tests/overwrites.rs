@@ -124,9 +124,7 @@ async fn send_message(app: &Router, channel_id: &str, token: &str) -> StatusCode
         .status()
 }
 
-// ---------------------------------------------------------------------------
-// Existence hiding
-// ---------------------------------------------------------------------------
+// --- Existence hiding ---
 
 /// A channel that does not exist grants MANAGE_ROLES to nobody, administrator
 /// included, since `permissions_in_channel` returns nothing at all before an
@@ -157,9 +155,7 @@ async fn nonexistent_channel_refuses_identically_for_everyone() {
     );
 }
 
-// ---------------------------------------------------------------------------
-// Escalation
-// ---------------------------------------------------------------------------
+// --- Escalation ---
 
 /// A MANAGE_ROLES holder in a channel cannot force-allow a permission they do
 /// not themselves hold there, even for themselves.
@@ -210,9 +206,7 @@ async fn allow_cannot_grant_a_permission_the_caller_lacks() {
     assert_eq!(allowed.status(), StatusCode::NO_CONTENT);
 }
 
-// ---------------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------------
+// --- Validation ---
 
 #[tokio::test]
 async fn kind_must_be_role_or_member() {
@@ -269,9 +263,7 @@ async fn setting_an_overwrite_for_a_nonexistent_target_is_not_found() {
     assert_eq!(no_such_member.status(), StatusCode::NOT_FOUND);
 }
 
-// ---------------------------------------------------------------------------
-// The evaluator actually honours what gets set
-// ---------------------------------------------------------------------------
+// --- The evaluator actually honours what gets set ---
 
 /// Denying SEND_MESSAGES for `@everyone` in a channel takes effect at once,
 /// a member overwrite re-grants it to one person despite that, and clearing

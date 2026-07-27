@@ -1,13 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 name: push-relay-contract
 
-# The server and the relay agree on the push envelope's wire framing (field
-# names, types, the platform/kind vocabulary, the payload size limit) but
-# live in separate repos and languages, so nothing else here would notice one
-# side changing it. This is the only job that checks out both and runs a
-# server-produced request through the relay's real HTTP handler; see
-# crates/slimm-server/tests/push_relay_contract_fixture.rs and
-# slim-m-relay's internal/api/push_relay_contract_test.go.
+# The push envelope's wire framing spans two repos and two languages, so nothing
+# else would notice one side changing it. Why and how: docs/ci.md.
 on:
   push:
     branches: [main]
@@ -48,12 +43,8 @@ jobs:
         with:
           repository: NC1107/slim-m-relay
           path: slim-m-relay
-          # No explicit token: input. An empty string is a provided value, not
-          # "unset", so it overrides checkout's own `default: ${{ github.token }}`
-          # and the step authenticates with a blank bearer instead of falling
-          # back to it - GitHub responds 401 rather than serving the clone
-          # anonymously. Leaving this unset lets the default apply, which is
-          # already sufficient to read a public repo.
+          # Deliberately no `token:` input. An empty string is a provided value
+          # and 401s rather than falling back to the default; see docs/ci.md.
 
       - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
@@ -66,10 +57,8 @@ jobs:
         env:
           SLIMM_PUSH_CONTRACT_FIXTURE_OUT: ${{ github.workspace }}/slim-m-relay/internal/api/testdata/push_relay_contract.generated.json
 
-      # A silently broken generation step (wrong env var name, wrong path, a
-      # future refactor of the fixture test that stops writing the file)
-      # must not be allowed to fall through into "drive it through the real
-      # relay handler" quietly skipping and the job still going green.
+      # A generation step that silently wrote nothing must not fall through into
+      # the relay step quietly skipping and going green; see docs/ci.md.
       - name: assert the fixture landed
         run: |
           fixture="slim-m-relay/internal/api/testdata/push_relay_contract.generated.json"
@@ -81,19 +70,14 @@ jobs:
       - name: drive it through the real relay handler
         working-directory: slim-m-relay
         env:
-          # A missing fixture at this point is a bug in this workflow (see
-          # the assertion step above), not a normal local-dev situation, so
-          # the test must fail loudly rather than the t.Skipf it uses for an
-          # ordinary `go test ./...` run without a sibling slim-m checkout.
+          # A missing fixture here is a bug in this workflow, so the Go test must
+          # fail rather than take its local-dev t.Skipf; see docs/ci.md.
           SLIMM_PUSH_CONTRACT_FIXTURE_REQUIRED: "1"
         run: |
           set -euo pipefail
-          # `-run` silently matching zero tests exits 0 with nothing asserted,
-          # same failure shape as the skip this guards against; requiring the
-          # test's own PASS line means a typo'd pattern or a skip both fail
-          # this step instead of the job going green having asserted nothing.
+          # `-run` matching zero tests exits 0 having asserted nothing, so the
+          # test's own PASS line is what this gates on; see docs/ci.md.
           go test ./internal/api/... -run '^TestPushRelayContract$' -v | tee /tmp/push-relay-contract.log
-          # go test -v prints the duration after the name ("--- PASS: X (0.00s)"),
-          # so anchoring on the name alone would never match and this gate
-          # would fail every run regardless of the result.
+          # The trailing `\(` is load-bearing: go test -v prints the duration
+          # after the name, so anchoring on the name alone never matches.
           grep -qE '^--- PASS: TestPushRelayContract \('  /tmp/push-relay-contract.log

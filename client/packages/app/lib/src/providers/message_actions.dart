@@ -53,15 +53,17 @@ bool hasReacted(WidgetRef ref, String messageId, String emoji) => ref
 /// reactions are: `poll.voted` never reports back who voted, only the
 /// refreshed tally, so the voter's own [api.Poll.votedOption] would
 /// otherwise never update on their own screen.
+///
+/// A failed request is swallowed rather than reverted. There is no clean revert
+/// for a vote the way there is for a reaction, since the previous choice is
+/// already folded into the locally merged tally, so this leans on the next
+/// `poll.voted` broadcast or re-fetch to correct the screen.
 Future<void> castVote(WidgetRef ref, String messageId, int option) async {
   ref.read(messageExtrasProvider.notifier).applyLocalVote(messageId, option);
   try {
     await ref.read(apiProvider).votePoll(messageId: messageId, option: option);
   } on api.ApiException {
-    // Best-effort: the next poll.voted broadcast or a re-fetch corrects
-    // this. There is no clean revert for a vote the way there is for a
-    // reaction, since the previous choice is already folded into the
-    // locally merged tally.
+    // Best-effort: the next tally corrects this, and a vote has no clean revert.
   }
 }
 

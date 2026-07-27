@@ -91,6 +91,11 @@ pub(super) struct SealedMessage {
 /// parsed as an X25519 public key: a corrupt key means that one device cannot
 /// receive push until it re-registers, not that the batch should fail or fall
 /// back to something unencrypted.
+///
+/// Each sealed box draws its own randomness. There is no long-lived secret
+/// here for a bad RNG to compromise beyond one message's onward
+/// confidentiality, but `OsRng` is what the rest of this codebase already
+/// trusts for key and token generation, so it is what this uses too.
 pub(super) fn seal_for_message(
     channel_id: ChannelId,
     message_id: MessageId,
@@ -118,10 +123,8 @@ pub(super) fn seal_for_message(
         };
         let public_key = PublicKey::from_bytes(key_bytes);
 
-        // A sealed box needs its own randomness per call; there is no secret
-        // here for a bad RNG to compromise beyond this one message's onward
-        // confidentiality, but OsRng is what the rest of this codebase already
-        // trusts for key and token generation.
+        // Fresh randomness per sealed box, from the same OsRng this codebase
+        // already trusts for key and token generation.
         let Ok(ciphertext) = public_key.seal(&mut OsRng.unwrap_err(), &plaintext) else {
             tracing::warn!(device_id = %target.device_id, "push: sealing failed, skipping this device");
             continue;

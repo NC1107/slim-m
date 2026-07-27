@@ -51,9 +51,10 @@ void main() {
             headers: const {'content-type': 'application/json'},
           );
         }
-        // Cut sync's start() short right after the channel refresh this test
-        // counts: a 404 here is caught by start()'s own try/catch (offline,
-        // retry scheduled) well before any real socket is ever attempted.
+
+        /// Cut sync's start() short right after the channel refresh this test
+        /// counts: a 404 here is caught by start()'s own try/catch (offline,
+        /// retry scheduled) well before any real socket is ever attempted.
         if (request.method == 'POST' && request.url.path == '/auth/ws-ticket') {
           return http.Response('{"error":"not found"}', 404);
         }
@@ -79,17 +80,18 @@ void main() {
           }),
         ],
       );
-      // Disposed explicitly at the end of the test body, not via addTearDown:
-      // a failed sync attempt schedules a real retry Timer, and
-      // flutter_test's pending-timer check runs before addTearDown callbacks
-      // do, so relying on addTearDown here would fail the test on that check
-      // rather than on what this test is actually about.
 
-      // Mirrors main(): SyncController is constructed, and its session
-      // listener subscribed, before any navigation can reach the sign-in
-      // screen - exactly like the real app, and exactly what makes the
-      // listener (not an explicit call from this screen) the one thing that
-      // starts sync.
+      /// Disposed explicitly at the end of the test body, not via addTearDown:
+      /// a failed sync attempt schedules a real retry Timer, and
+      /// flutter_test's pending-timer check runs before addTearDown callbacks
+      /// do, so relying on addTearDown here would fail the test on that check
+      /// rather than on what this test is actually about.
+
+      /// Mirrors main(): SyncController is constructed, and its session
+      /// listener subscribed, before any navigation can reach the sign-in
+      /// screen - exactly like the real app, and exactly what makes the
+      /// listener (not an explicit call from this screen) the one thing that
+      /// starts sync.
       container.read(syncControllerProvider);
 
       await tester.pumpWidget(
@@ -196,9 +198,9 @@ void main() {
 
     testWidgets('editing the field re-probes, and a slow failure from the old '
         'address cannot wipe the notice the new one earned', (tester) async {
-      // The prefilled server hangs until told to fail; the typed one
-      // answers no-push immediately. The stale failure arriving after the
-      // fresh answer is exactly the interleaving the guard exists for.
+      /// The prefilled server hangs until told to fail; the typed one
+      /// answers no-push immediately. The stale failure arriving after the
+      /// fresh answer is exactly the interleaving the guard exists for.
       final oldServerGate = Completer<void>();
       final httpClient = MockClient((request) async {
         if (request.url.host == 'old.example') {

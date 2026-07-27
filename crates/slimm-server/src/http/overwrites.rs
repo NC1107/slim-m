@@ -88,6 +88,12 @@ async fn require_manage_roles_here(
 /// Sets (or replaces) an overwrite. Rejects unknown permission bits outright,
 /// and rejects any `allow` bit the caller does not themselves currently hold
 /// in this channel.
+///
+/// "Grants" is not the same as the `allow` bits: clearing a `deny` hands out
+/// that permission just as surely as setting an `allow` does. Judging by
+/// `allow` alone let a caller who held MANAGE_ROLES but not, say,
+/// MANAGE_SERVER strip an existing deny and give themselves the very bit they
+/// could not have granted directly.
 async fn set(
     Authed(ctx): Authed,
     parts: Parts,
@@ -105,11 +111,8 @@ async fn set(
     if !Permissions::ALL.contains(allow) || !Permissions::ALL.contains(deny) {
         return Err(ApiError::BadRequest("unknown permission bits"));
     }
-    // What this write actually grants, which is not the same as its `allow`
-    // bits: clearing a `deny` hands out that permission just as surely as
-    // setting an `allow` does. Judging by `allow` alone let a caller who held
-    // MANAGE_ROLES but not, say, MANAGE_SERVER strip an existing deny and give
-    // themselves the very bit they could not have granted directly.
+    // Compares against what the write really grants, cleared denies included;
+    // see the note on this function.
     let (target_type, target_id) = match target {
         Target::Role(role_id) => ("role", role_id.0),
         Target::Member(user_id) => ("member", user_id.0),
@@ -150,6 +153,10 @@ async fn set(
 /// Clears an overwrite. Idempotent: clearing one that is not set still
 /// succeeds, so this needs no existence check on the target beyond the
 /// channel itself.
+///
+/// Clearing an overwrite grants back every bit it was denying, so it needs the
+/// same check setting one does; otherwise the guard on [`set`] is trivial to
+/// walk around by deleting instead of rewriting.
 async fn clear(
     Authed(ctx): Authed,
     parts: Parts,
@@ -161,9 +168,8 @@ async fn clear(
     let caller_permissions = require_manage_roles_here(&state, ctx.user_id, channel_id).await?;
     let target = parse_target(&kind, &id)?;
 
-    // Clearing an overwrite grants back every bit it was denying, so it needs
-    // the same check setting one does; otherwise the guard on `set` is trivial
-    // to walk around by deleting instead of rewriting.
+    // Checked against the bits being handed back; see the note on this
+    // function.
     let (target_type, target_id) = match target {
         Target::Role(role_id) => ("role", role_id.0),
         Target::Member(user_id) => ("member", user_id.0),

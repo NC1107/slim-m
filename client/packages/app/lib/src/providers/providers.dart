@@ -107,11 +107,11 @@ final sessionProvider = Provider<SessionStore>((ref) {
     pending = pending
         .then((_) => _persistSession(keyStore, tokens, serverUrl))
         .catchError((Object _, StackTrace __) {
-          // The server rotates refresh tokens with reuse detection: a write that
-          // failed here may have left a stale, already-spent token on disk, and
-          // replaying that on the next launch reads as reuse and revokes the
-          // whole family. Dropping the stored session outright degrades to a
-          // fresh sign-in instead of that false replay.
+          /// The server rotates refresh tokens with reuse detection: a write that
+          /// failed here may have left a stale, already-spent token on disk, and
+          /// replaying that on the next launch reads as reuse and revokes the
+          /// whole family. Dropping the stored session outright degrades to a
+          /// fresh sign-in instead of that false replay.
           if (tokens != null) {
             return keyStore.delete(sessionTokenHandle).catchError((_) {});
           }
@@ -157,11 +157,11 @@ Future<void> _persistSession(
 Future<void> restoreSession(ProviderContainer container) async {
   final keyStore = container.read(keyStoreProvider);
   try {
-    // The iOS/Android keychain outlives app deletion; this flag does not, so
-    // its absence means this is the first launch since an install (fresh, or
-    // a reinstall over one that was supposedly wiped). Whatever is already in
-    // the keychain at that point belongs to the account signed in before,
-    // not to this install, and must not come back as if nothing happened.
+    /// The iOS/Android keychain outlives app deletion; this flag does not, so
+    /// its absence means this is the first launch since an install (fresh, or
+    /// a reinstall over one that was supposedly wiped). Whatever is already in
+    /// the keychain at that point belongs to the account signed in before,
+    /// not to this install, and must not come back as if nothing happened.
     final prefs = await container.read(preferencesProvider.future);
     if (prefs.getBool(hasLaunchedBeforeKey) != true) {
       await keyStore.clear();

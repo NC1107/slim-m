@@ -15,20 +15,27 @@ import 'src/providers/sync_controller.dart';
 import 'src/push/android_push_messages.dart';
 import 'src/routing/router.dart';
 
+/// Entry point, with two ordering constraints that are not obvious from the
+/// statements themselves.
+///
+/// [restoreSession] runs before [runApp] because it is local-only and so cannot
+/// hang startup on a dead connection (see its own doc), and because doing it
+/// first is what lets the router's very first redirect already know the answer,
+/// instead of showing sign-in and then jumping to channels a frame later.
+///
+/// The sync and push controllers are read here rather than left to whichever
+/// screen happens to want them: they react to session changes for their whole
+/// lives (push retries on resume, sync starts and stops with the session), and
+/// a restored session never passes through the sign-in screen that would
+/// otherwise have touched them.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _initAndroidPush();
 
   final container = ProviderContainer();
-  // Local-only, so it cannot hang startup on a dead connection; see
-  // restoreSession. Doing this before runApp is what lets the router's very
-  // first redirect already know the answer, instead of showing sign-in and
-  // then jumping to channels a frame later.
+  // Before runApp so the router's first redirect knows the answer.
   await restoreSession(container);
-  // These react to session changes for their whole lives: push retries on
-  // resume, sync starts and stops with the session. Reading them here keeps
-  // that reaction alive for a restored session, which never passes through
-  // the sign-in screen that would otherwise have touched them.
+  // Keeps their session reactions alive for a restored session.
   container.read(syncControllerProvider);
   container.read(pushControllerProvider);
 
@@ -52,16 +59,18 @@ Future<void> main() async {
 /// a contributor's build with no `google-services.json` (see
 /// `android/app/build.gradle.kts`) throws here, and push, like on iOS, must
 /// never be the reason the rest of the app fails to start.
+///
+/// Swallowing that throw loses nothing, because the same missing credentials or
+/// absent Play Services also degrade push registration through
+/// `FcmTokenChannel`, and showing notifications cannot work without a token to
+/// register in the first place.
 Future<void> _initAndroidPush() async {
   if (!isAndroidHost) return;
   try {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   } catch (_) {
-    // No Firebase credentials, or no Play Services on this device: push
-    // registration itself degrades the same way through FcmTokenChannel, and
-    // showing notifications simply cannot work without a token to register
-    // in the first place.
+    // No Firebase credentials or no Play Services: push degrades either way.
   }
 }
 

@@ -22,33 +22,23 @@
 
 services:
   server:
-    # Pin to a released server tag and bump it on every upgrade; the published
-    # tags are at https://github.com/NC1107/slim-m/releases, and a rolling
-    # `latest` is published alongside each one.
-    #
-    # SLIMM_VERSION in .env overrides this without editing the file. Do not
-    # leave an old tag here: a stale server is one that predates every security
-    # fix since, and this file used to ship pinned to the very first release.
+    # Set SLIMM_VERSION in .env to pin a release, and bump it on every upgrade:
+    # a stale tag predates every security fix since. See deploy/README.md.
     image: ghcr.io/nc1107/slim-m-server:${SLIMM_VERSION:-latest}
     restart: unless-stopped
     environment:
       SLIMM_LOG: ${SLIMM_LOG:-info}
-      # Empty by default, which means no CORS layer at all and every
-      # cross-origin browser request refused. Only a web build of the client
-      # served from another origin needs this; see deploy/README.md.
+      # Empty means no CORS layer at all and every cross-origin browser request
+      # refused. Only a web build on another origin needs it; deploy/README.md.
       SLIMM_CORS_ALLOWED_ORIGINS: ${SLIMM_CORS_ALLOWED_ORIGINS:-}
-      # Without these the server has no SFU and answers 501 for voice, which is
-      # a supported way to run text-only but is not what somebody who brought up
-      # the livekit service below is asking for. The URL is the one clients
-      # reach from outside, not the compose-internal name, because it is handed
-      # to the client alongside a join token.
+      # Unset means no SFU and 501 for every voice request. The URL is the one
+      # clients reach from outside, not the internal name; deploy/README.md.
       SLIMM_LIVEKIT_URL: wss://${LIVEKIT_DOMAIN:?set LIVEKIT_DOMAIN in .env}
       SLIMM_LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set in .env, see deploy/README.md}
       SLIMM_LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set in .env to a random value of at least 32 characters}
     volumes:
-      # SLIMM_DATABASE_PATH defaults to /data/slimm.db inside the image; the
-      # whole /data directory is the volume so Litestream (below) can see the
-      # database file and its WAL alongside it.
+      # The whole directory is the volume (SLIMM_DATABASE_PATH defaults to
+      # /data/slimm.db) so Litestream can see the database file and its WAL.
       - slimm_data:/data
     # The image already ships a HEALTHCHECK that runs the server's own
     # `--healthcheck` subcommand; no need to redeclare it here.
@@ -89,53 +79,33 @@ services:
     # Pin to an exact release; check github.com/livekit/livekit/releases for newer patches.
     image: livekit/livekit-server:v1.10.1
     restart: unless-stopped
-    # No bundled healthcheck: the image has no verified shell/HTTP client to
-    # probe with, so this relies on `restart: unless-stopped` plus normal
-    # log/monitoring rather than a Docker HEALTHCHECK.
-    # LiveKit resolves a STUN hostname at startup to discover the address peers
-    # must reach it on, and exits if it cannot. On a host running
-    # systemd-resolved - the default on Ubuntu and Fedora - /etc/resolv.conf
-    # names the 127.0.0.53 stub, which does not exist inside a container, so
-    # LiveKit crashloops with "could not resolve external IP". Giving it real
-    # resolvers is the fix. Change them to whatever you prefer; the STUN lookup
-    # is the only thing they serve, and its target is a public Google host
-    # either way.
+    # No healthcheck: the image ships no verified shell or HTTP client to probe
+    # with, so this relies on `restart: unless-stopped`. See deploy/README.md.
+
+    # LiveKit exits if its STUN hostname will not resolve, and systemd-resolved's
+    # 127.0.0.53 stub does not exist in a container. See deploy/README.md.
     dns:
       - 1.1.1.1
       - 8.8.8.8
     expose:
       - "7880" # WebSocket signaling, reverse-proxied by Caddy - not published to the host
     ports:
-      # TCP fallback for clients that cannot do UDP at all. Configurable
-      # because 7881 is a popular port and this may not be the only SFU on the
-      # host.
+      # TCP fallback for clients that cannot do UDP at all. Configurable because
+      # 7881 is popular and this may not be the only SFU on the host.
       - "${LIVEKIT_TCP_PORT:-7881}:${LIVEKIT_TCP_PORT:-7881}"
       # STUN/TURN (UDP), the default LiveKit/TURN port.
       - "${LIVEKIT_TURN_UDP_PORT:-3478}:${LIVEKIT_TURN_UDP_PORT:-3478}/udp"
-      # TURN's relay ports, a block distinct from the media range below. Easy
-      # to miss, and missing it is worse than having no TURN at all: LiveKit
-      # still advertises relay candidates, and every one of them times out.
+      # TURN's relay ports, distinct from the media range below. Missing them is
+      # worse than no TURN: relay candidates are advertised and all time out.
       - "${LIVEKIT_TURN_RELAY_PORT_START:-30000}-${LIVEKIT_TURN_RELAY_PORT_END:-30100}:${LIVEKIT_TURN_RELAY_PORT_START:-30000}-${LIVEKIT_TURN_RELAY_PORT_END:-30100}/udp"
       - "${LIVEKIT_UDP_PORT_START:-50000}-${LIVEKIT_UDP_PORT_END:-50100}:${LIVEKIT_UDP_PORT_START:-50000}-${LIVEKIT_UDP_PORT_END:-50100}/udp"
-      # TURN/TLS (TURNS) is deliberately NOT on 443 - Caddy already owns that
-      # port for the API and LiveKit signaling domains, and TURN is not an
-      # HTTP protocol Caddy can share it with. LiveKit's TURN/TLS listener
-      # gets its own documented port instead (5349, the IANA default for
-      # turns:). Uncomment the line below together with the matching `turn:`
-      # block in LIVEKIT_CONFIG if you need it (see that block for the
-      # trade-off this implies for very restrictive client networks).
+      # TURN/TLS gets 5349, never 443: Caddy owns 443 and TURN is not an HTTP
+      # protocol it can share it with. To enable, see deploy/README.md.
+
       # - "5349:5349"
     environment:
-      # LIVEKIT_CONFIG is LiveKit's own env binding for a full config.yaml
-      # body - no separate config file needed for this example.
-      #
-      # The two key variables below deliberately have no ":-default" fallback,
-      # unlike every other variable in this file. They authorize minting a room
-      # token, so a placeholder default would be a publicly known credential on
-      # a publicly reachable SFU, and anyone could forge a join token for any
-      # room. The ":?" form makes compose refuse to start and name the missing
-      # variable, which is the only safe way for this to fail. Generate a pair
-      # with: docker run --rm livekit/livekit-server:v1.10.1 generate-keys
+      # LiveKit's own env binding for a full config.yaml body. The key and secret
+      # take `:?` and never a default, on purpose; see deploy/README.md.
       LIVEKIT_CONFIG: |
         port: 7880
         bind_addresses:
@@ -150,34 +120,16 @@ services:
         turn:
           enabled: true
           udp_port: ${LIVEKIT_TURN_UDP_PORT:-3478}
-          # TURN hands each session a relay port out of this range, separate
-          # from the media range above and published separately. LiveKit's own
-          # default is 30000-40000, which nobody publishes ten thousand ports
-          # for; the effect is TURN that looks enabled and connects nothing.
+          # Narrowed from LiveKit's 30000-40000 default: nobody publishes ten
+          # thousand ports, and unpublished relay ports connect nothing.
           relay_range_start: ${LIVEKIT_TURN_RELAY_PORT_START:-30000}
           relay_range_end: ${LIVEKIT_TURN_RELAY_PORT_END:-30100}
-          # TURN/TLS, off by default. Its listener needs its own certificate -
-          # it cannot borrow Caddy's, since Caddy's ACME storage layout is not
-          # a stable path to rely on. To turn it on: point a third DNS name at
-          # this host (for example turn.${SLIMM_API_DOMAIN}), get a cert/key
-          # for it by whatever means you like, mount them into this
-          # container, and uncomment these four lines plus the matching
-          # "5349:5349" port above.
-          # domain: turn.example.com
-          # tls_port: 5349
-          # cert_file: /etc/livekit/turn.crt
-          # key_file: /etc/livekit/turn.key
-          #
-          # Note: clients on networks so locked-down that only outbound 443
-          # is allowed will not be able to use TURN/TLS to escape them, since
-          # it is not on 443 here. Accepted trade-off for a friend-group
-          # deployment; plain UDP TURN above covers ordinary home/NAT networks.
+          # TURN/TLS is off: its listener needs a certificate of its own and
+          # cannot borrow Caddy's. The four keys to add: deploy/README.md.
 
   litestream:
-    # Pin to an exact release; check hub.docker.com/r/litestream/litestream/tags
-    # for newer 0.3.x patches. Deliberately not on the 0.5.x line: 0.5
-    # replaced the replica format (WAL segments -> LTX) and this example
-    # targets the longer-documented, more stable 0.3 config/CLI surface.
+    # Held on 0.3.x deliberately: 0.5 replaced the replica format (WAL segments
+    # became LTX), so moving is a migration. See deploy/README.md.
     image: litestream/litestream:0.3.14
     # Disabled by default - this whole service only starts when the
     # "litestream" profile is enabled (see deploy/.env.example).
@@ -193,9 +145,8 @@ services:
       # Litestream reads these two exact variable names natively.
       LITESTREAM_ACCESS_KEY_ID: ${LITESTREAM_ACCESS_KEY_ID:-}
       LITESTREAM_SECRET_ACCESS_KEY: ${LITESTREAM_SECRET_ACCESS_KEY:-}
-    # No config file: the S3-compatible endpoint and region are passed as
-    # query parameters on the replica URL, which the 0.3.x CLI supports
-    # directly (force-path-style is auto-enabled whenever `endpoint` is set).
+    # No config file: endpoint and region ride as query parameters on the replica
+    # URL, and 0.3.x auto-enables force-path-style whenever `endpoint` is set.
     command: >
       replicate /data/slimm.db
       "s3://${LITESTREAM_S3_BUCKET}/${LITESTREAM_S3_PATH:-slimm}?endpoint=${LITESTREAM_S3_ENDPOINT}&region=${LITESTREAM_S3_REGION:-auto}"

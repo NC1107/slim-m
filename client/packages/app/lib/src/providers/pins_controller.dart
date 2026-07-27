@@ -35,6 +35,12 @@ class PinsState {
   final bool forbidden;
 }
 
+/// Keeps [PinsState] current for one channel.
+///
+/// A pin event triggers a full refetch rather than an incremental patch: the
+/// live frame carries only the one message id, and the list is small enough
+/// (self-hosted friend groups, not a public forum) that re-fetching it whole is
+/// simpler than reconstructing pin order from a delta.
 class PinsController extends StateNotifier<PinsState> {
   PinsController(this._ref, this._channelId) : super(const PinsState()) {
     _sub = _ref.read(liveEventsProvider).listen((event) {
@@ -43,10 +49,6 @@ class PinsController extends StateNotifier<PinsState> {
         api.MessageUnpinned(:final channelId) => channelId == _channelId,
         _ => false,
       };
-      // A full refetch rather than an incremental patch: the live frame
-      // carries only the one message id, and the list is small enough
-      // (self-hosted friend groups, not a public forum) that re-fetching it
-      // whole is simpler than reconstructing pin order from a delta.
       if (matches) unawaited(refresh());
     });
     unawaited(refresh());

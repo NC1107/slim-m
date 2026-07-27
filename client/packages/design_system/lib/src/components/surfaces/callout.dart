@@ -95,9 +95,8 @@ class AppCallout extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: AppSpacing.s8,
           children: [
-            // `margin-top: 1` in the source: the icon sits at the top of the
-            // row rather than centred, nudged down 1px to align with the cap
-            // height of the first text line.
+            // `margin-top: 1` in the source: top-aligned rather than centred,
+            // nudged 1px to meet the cap height of the first text line.
             Padding(
               padding: const EdgeInsets.only(top: 1),
               child: Icon(icon ?? _defaultIcon(),

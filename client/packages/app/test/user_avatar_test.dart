@@ -90,10 +90,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Not asserting the initials are gone: the bytes above are not valid
-    // image data, so [Image.errorBuilder] fires and repaints them right back
-    // in. What matters here is that the right bytes actually reached the
-    // widget, which the assertion above already establishes.
+    /// Not asserting the initials are gone: the bytes above are not valid
+    /// image data, so [Image.errorBuilder] fires and repaints them right back
+    /// in. What matters here is that the right bytes actually reached the
+    /// widget, which the assertion above already establishes.
     final image = tester.widget<Image>(find.byType(Image));
     expect((image.image as MemoryImage).bytes, bytes);
   });

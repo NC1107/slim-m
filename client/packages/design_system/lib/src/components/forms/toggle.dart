@@ -33,9 +33,9 @@ class AppToggle extends StatelessWidget {
   final FocusNode? focusNode;
   final String? semanticLabel;
 
-  // Exact design constants (track 40x22, thumb 16, padding 2), not derived
-  // from spacing tokens: AppSizes has no switch metric and these do not sum
-  // cleanly from AppSpacing steps.
+  /// Exact design constants (track 40x22, thumb 16, padding 2), not derived
+  /// from spacing tokens: AppSizes has no switch metric and these do not sum
+  /// cleanly from AppSpacing steps.
   static const double _trackWidth = 40;
   static const double _trackHeight = 22;
   static const double _thumbSize = 16;

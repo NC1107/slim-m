@@ -321,6 +321,10 @@ async fn check_bytes(app: &Router, code: &str) -> Vec<u8> {
         .to_vec()
 }
 
+/// The four answers are compared as raw bytes, not just as logically equal
+/// JSON: a parsed comparison would not notice a stray field or a formatting
+/// quirk, so a future edit that adds so much as one extra byte to only one of
+/// these branches must fail here rather than only at a future security review.
 #[tokio::test]
 async fn expired_spent_and_never_issued_invites_are_byte_for_byte_identical() {
     let (store, app, admin, member) = fixture().await;
@@ -386,10 +390,6 @@ async fn expired_spent_and_never_issued_invites_are_byte_for_byte_identical() {
     let spent_bytes = check_bytes(&app, &spent_code).await;
     let revoked_bytes = check_bytes(&app, &revoked_code).await;
 
-    // Not just logically equal (a parsed-JSON comparison would not notice a
-    // stray field or a formatting quirk): the actual bytes on the wire, so a
-    // future edit that adds so much as one extra byte to only one of these
-    // branches fails this test rather than only a future security review.
     assert_eq!(
         expired_bytes, never_issued,
         "expired must answer exactly like never-issued"

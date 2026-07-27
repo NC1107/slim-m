@@ -244,10 +244,10 @@ void main() {
     },
   );
 
+  /// Uses the same controller throughout. An earlier version of this test
+  /// built a second one, whose retryable defaults to true, so it passed even
+  /// with the reset deleted.
   test('a retry after a non-retryable failure resets once it starts', () async {
-    // The same controller throughout. An earlier version of this test built a
-    // second one, whose retryable defaults to true, so it passed even with the
-    // reset deleted.
     var status = 501;
     final client = MockClient((request) async {
       if (!request.url.path.endsWith('/voice/token')) {

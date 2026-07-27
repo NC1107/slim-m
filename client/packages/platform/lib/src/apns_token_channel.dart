@@ -116,16 +116,19 @@ class ApnsTokenChannel {
 
   /// The device token, distinguishing every way one can be missing so a
   /// caller can report push status honestly instead of a flat null.
+  ///
+  /// The completer is installed before the first probe, not after it. Each
+  /// probe is an async round trip to the native side, and the token can land in
+  /// the gap between them; with nothing waiting, that delivery is dropped and
+  /// the wait then times out having already been handed the answer. Since a
+  /// dropped token means the device registers for push and never tells the
+  /// server, it fails as silence rather than an error.
   Future<ApnsTokenResult> fetch(
       {Duration timeout = const Duration(seconds: 10)}) async {
     if (!_isIOS) return const ApnsUnsupported();
 
-    // The sink is installed before the first probe, not after it. Each probe is
-    // an async round trip to the native side, and the token can land in the gap
-    // between them; with no completer waiting, that delivery is dropped and the
-    // wait below then times out having already been handed the answer. Since a
-    // dropped token means the device registers for push and never tells the
-    // server, it fails as silence rather than an error.
+    // Installed before the first probe so a token landing between probes is
+    // not dropped. See the doc comment above.
     final pending = _pending ??= Completer<String?>();
     try {
       final cached = await _channel.invokeMethod<String>('getToken');
@@ -142,9 +145,8 @@ class ApnsTokenChannel {
         return ApnsRegistrationFailed(error);
       }
 
-      // Neither has arrived yet; wait for whichever the native side delivers
-      // first, capped so a permission prompt nobody answers cannot hang
-      // registration forever.
+      // Neither has arrived; wait for whichever the native side delivers first,
+      // capped so an unanswered permission prompt cannot hang registration.
       final token = await pending.future.timeout(timeout, onTimeout: () {
         _pending = null;
         return null;

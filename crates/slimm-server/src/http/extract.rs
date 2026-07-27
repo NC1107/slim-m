@@ -44,14 +44,16 @@ impl FromRequestParts<AppState> for Authed {
 /// there is one, otherwise the peer address. Authenticated callers are keyed by
 /// user so a limit follows the account across devices and networks, rather than
 /// being shed by reconnecting from a new address.
+///
+/// The unauthenticated key is deliberately the peer address, not a forwarded
+/// header: this server may sit behind a proxy it does not control, and a
+/// spoofable header would let a caller mint unlimited keys. A reverse proxy
+/// that terminates for real clients should apply its own per-IP limit as well.
 pub(crate) fn limit_key(parts: &Parts, ctx: Option<&SessionContext>) -> String {
     if let Some(ctx) = ctx {
         return format!("u:{}", ctx.user_id);
     }
-    // Deliberately the peer address, not a forwarded header: this server may sit
-    // behind a proxy it does not control, and a spoofable header would let a
-    // caller mint unlimited keys. A reverse proxy that terminates for real
-    // clients should apply its own per-IP limit as well.
+    // Peer address, never a forwarded header; see the note on this function.
     parts
         .extensions
         .get::<ConnectInfo<SocketAddr>>()

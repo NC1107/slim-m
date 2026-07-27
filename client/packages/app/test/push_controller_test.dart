@@ -142,12 +142,12 @@ void main() {
   group('PushController construction', () {
     test('a token source whose rotation stream throws synchronously cannot '
         'break constructing the controller', () async {
-      // Signed in at construction, so the constructor also fires its own
-      // already-signed-in registration attempt over the iOS channel below -
-      // the point under test is that reading fcmTokenChannelProvider's
-      // onTokenRefresh getter, which throws here the way FirebaseMessaging
-      // does with no default Firebase app, never gets the chance to take
-      // that down with it.
+      /// Signed in at construction, so the constructor also fires its own
+      /// already-signed-in registration attempt over the iOS channel below -
+      /// the point under test is that reading fcmTokenChannelProvider's
+      /// onTokenRefresh getter, which throws here the way FirebaseMessaging
+      /// does with no default Firebase app, never gets the chance to take
+      /// that down with it.
       _mock(
         (call) async => switch (call.method) {
           'getToken' => 'abcd1234',
@@ -173,9 +173,9 @@ void main() {
         returnsNormally,
       );
 
-      // Construction surviving is the headline assertion, but the rest of
-      // the controller must still work normally afterwards too: nothing
-      // about the guard should leave it half-built.
+      /// Construction surviving is the headline assertion, but the rest of
+      /// the controller must still work normally afterwards too: nothing
+      /// about the guard should leave it half-built.
       await pumpEventQueue();
       expect(container.read(pushControllerProvider), PushStatus.registered);
     });
@@ -183,9 +183,9 @@ void main() {
 
   group('PushController.register', () {
     test('without a session, nothing is attempted', () async {
-      // The default sessionProvider starts signed out; nothing is overridden,
-      // so a real network call or a real MethodChannel round-trip would both
-      // be surfaced failures, proving the session check runs before either.
+      /// The default sessionProvider starts signed out; nothing is overridden,
+      /// so a real network call or a real MethodChannel round-trip would both
+      /// be surfaced failures, proving the session check runs before either.
       final container = _container(
         httpClient: MockClient((_) async => http.Response('unused', 500)),
       );
@@ -239,9 +239,9 @@ void main() {
     test(
       'no answer at all is reported as still waiting, not a silent no-op',
       () async {
-        // No mock handler is installed, so the channel throws
-        // MissingPluginException exactly as a genuine timeout would eventually
-        // resolve, without this test having to wait one out.
+        /// No mock handler is installed, so the channel throws
+        /// MissingPluginException exactly as a genuine timeout would eventually
+        /// resolve, without this test having to wait one out.
         _mock(null);
         final session = SessionStore(tokens: _tokens);
         final container = _container(
@@ -303,9 +303,9 @@ void main() {
 
     test('a session already signed in when the controller is created '
         'registers without an explicit call', () async {
-      // Stands in for a session restored on launch: nothing on the sign-in
-      // screen ever ran, so the only thing that can start registration is the
-      // controller noticing it was constructed already signed in.
+      /// Stands in for a session restored on launch: nothing on the sign-in
+      /// screen ever ran, so the only thing that can start registration is the
+      /// controller noticing it was constructed already signed in.
       _mock(
         (call) async => switch (call.method) {
           'getToken' => 'abcd1234',
@@ -371,10 +371,10 @@ void main() {
       );
       addTearDown(() => _mock(null));
 
-      // Starts signed out, so touching the notifier below does not also fire
-      // the constructor's own already-signed-in registration attempt
-      // alongside this test's: signing in afterwards is the single, clean
-      // trigger this test counts against.
+      /// Starts signed out, so touching the notifier below does not also fire
+      /// the constructor's own already-signed-in registration attempt
+      /// alongside this test's: signing in afterwards is the single, clean
+      /// trigger this test counts against.
       final session = SessionStore();
       final container = _container(
         session: session,
@@ -453,9 +453,9 @@ void main() {
       expect(container.read(pushControllerProvider), PushStatus.registered);
       expect(getTokenCalls, 1);
 
-      // The server rotates access tokens well inside a live session, not
-      // just at sign-in and sign-out; a non-null token pair replacing another
-      // non-null one is that same rotation, not a new sign-in.
+      /// The server rotates access tokens well inside a live session, not
+      /// just at sign-in and sign-out; a non-null token pair replacing another
+      /// non-null one is that same rotation, not a new sign-in.
       session.set(
         const TokenPair(
           userId: 'user-1',
@@ -486,9 +486,9 @@ void main() {
       );
       addTearDown(() => _mock(null));
 
-      // Already signed in at construction, so touching the notifier below
-      // also fires the constructor's own already-signed-in attempt: a third,
-      // uncoordinated caller alongside the two explicit ones.
+      /// Already signed in at construction, so touching the notifier below
+      /// also fires the constructor's own already-signed-in attempt: a third,
+      /// uncoordinated caller alongside the two explicit ones.
       final session = SessionStore(tokens: _tokens);
       final container = _container(
         session: session,
@@ -815,16 +815,16 @@ void main() {
           channel: ApnsTokenChannel(isIOS: true),
         );
 
-        // Already signed in, so construction registers and reports the
-        // current (foreground) lifecycle once on its own, exactly as it
-        // does today on a fresh registration.
+        /// Already signed in, so construction registers and reports the
+        /// current (foreground) lifecycle once on its own, exactly as it
+        /// does today on a fresh registration.
         container.read(pushControllerProvider.notifier);
         async.flushMicrotasks();
         expect(lifecycleReports, ['foreground']);
 
-        // Stay right where it is for well past a minute, with no lifecycle
-        // transition of any kind - the exact shape of someone reading a
-        // channel for a few minutes.
+        /// Stay right where it is for well past a minute, with no lifecycle
+        /// transition of any kind - the exact shape of someone reading a
+        /// channel for a few minutes.
         async.elapse(const Duration(minutes: 3));
 
         expect(

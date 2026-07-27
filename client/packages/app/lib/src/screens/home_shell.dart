@@ -33,9 +33,8 @@ class HomeShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final layout = LayoutClass.of(context);
     final selected = selectedChannelId(context);
-    // The member pane never shows below expanded width, whatever the toggle
-    // in the channel header says; the toggle can only hide it, not summon
-    // room for it that is not there.
+    // Never below expanded width, whatever the header toggle says: it can only
+    // hide the pane, not summon room for it that is not there.
     final showMembers =
         layout == LayoutClass.expanded && ref.watch(memberPaneVisibleProvider);
 
@@ -80,9 +79,8 @@ class HomeShell extends ConsumerWidget {
       bindings: {
         if (quickSwitch != null) quickSwitch: () => openCommandPalette(context),
       },
-      // CallbackShortcuts only fires for a descendant that has focus; this
-      // gives the shell a default one, so the shortcut works the instant the
-      // app opens rather than only once something else has been clicked.
+      // CallbackShortcuts only fires for a focused descendant, so this default
+      // makes the shortcut work the instant the app opens.
       child: Focus(autofocus: true, child: scaffold),
     );
   }

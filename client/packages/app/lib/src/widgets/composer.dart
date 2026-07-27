@@ -248,9 +248,8 @@ class _Field extends StatelessWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     return CallbackShortcuts(
-      // Plain Enter sends; Shift+Enter does not match this activator (its
-      // modifier flags default to "must be unpressed"), so it falls through
-      // to the field's own default newline insertion untouched.
+      // Shift+Enter does not match this activator (modifier flags default to
+      // "must be unpressed"), so it falls through to the field's own newline.
       bindings: {
         const SingleActivator(LogicalKeyboardKey.enter): () => onSend(),
       },

@@ -64,6 +64,11 @@ pub(super) async fn presence_status(
 /// limiter and channel permissions allow it. Silent on every rejection:
 /// typing is a low-stakes hint, not worth an error frame or closing the
 /// socket over.
+///
+/// The permission bar is the same one a send would have to clear: viewing is
+/// required so this cannot probe for a channel's existence, and sending is
+/// required so a read-only member cannot show up as "about to post" somewhere
+/// they could not.
 pub(super) async fn handle_typing(
     store: &Store,
     hub: &Hub,
@@ -80,9 +85,7 @@ pub(super) async fn handle_typing(
         return;
     }
 
-    // Same bar a send would have to clear: viewing is required so this
-    // cannot probe for a channel's existence, and sending is required so a
-    // read-only member cannot show up as "about to post" where they could not.
+    // Same bar a send would clear; see the note on this function.
     let needed = Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES);
     match store.has_permission(ctx.user_id, channel_id, needed).await {
         Ok(true) => {}
@@ -99,9 +102,8 @@ pub(super) async fn handle_typing(
         });
     }
 
-    // The self-expiry: scheduled once per refresh, and a no-op if a later
-    // refresh already bumped the generation past this one (see
-    // `crate::typing::TypingTracker::expire`).
+    // Self-expiry, one per refresh and a no-op once a later refresh bumps the
+    // generation past this one (`crate::typing::TypingTracker::expire`).
     let hub = hub.clone();
     let ttl = hub.typing().ttl();
     let user_id = ctx.user_id;

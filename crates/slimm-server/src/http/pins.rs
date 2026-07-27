@@ -37,9 +37,7 @@ pub fn routes() -> Router<AppState> {
         .route("/channels/{channel_id}/pins/count", get(count))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 /// A pinned message: the full message, flattened, plus when and by whom it
 /// was pinned. Flattened rather than nested so a client that already has a
@@ -68,9 +66,7 @@ struct PinCountDto {
     count: i64,
 }
 
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
+// --- Handlers ---
 
 async fn pin(
     Authed(ctx): Authed,
@@ -136,9 +132,8 @@ async fn list(
     }
 
     let pins = state.store.list_pinned_messages(channel_id).await?;
-    // Reactions are batch-attached the same way the plain message list does,
-    // so a pinned message never shows a stale (empty) reaction summary just
-    // because it went through this endpoint instead of that one.
+    // Batch-attached exactly as the plain message list does it, so a pin never
+    // shows an empty reaction summary just for coming through this endpoint.
     let (messages, meta): (Vec<_>, Vec<_>) = pins
         .into_iter()
         .map(|p| (p.message, (p.pinned_at, p.pinned_by)))

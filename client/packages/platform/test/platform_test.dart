@@ -29,9 +29,8 @@ void main() {
     });
 
     test('signing is refused rather than faked', () async {
-      // The seam exists so a hardware backend can implement sign() and never
-      // implement read() for key material. Quietly returning a bogus signature
-      // here would hide that gap until it mattered.
+      // The seam exists so a hardware backend can implement sign() without
+      // read(). A bogus signature here would hide that gap until it mattered.
       await store.put('identity', 'x');
       expect(
         () => store.sign('identity', [1, 2, 3]),

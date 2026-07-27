@@ -138,9 +138,8 @@ class _ManageChannelSheetState extends ConsumerState<_ManageChannelSheet> {
       // longer exists in the local store.
       if (wasOpen) router.go(Routes.channels);
     } on api.ConflictException {
-      // The server's own wording ("cannot delete the deployment's last
-      // channel") is accurate but terse; say why in a full sentence instead
-      // of surfacing a bare error, per this feature's own requirement.
+      // The server's wording is accurate but terse, and this feature's own
+      // requirement is a full sentence rather than a bare error.
       if (!mounted) return;
       setState(() {
         _deleting = false;

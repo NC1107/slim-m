@@ -464,7 +464,8 @@ Decision: one deployment is one community, so the leftmost rail is both account 
 See [research/ux.md](research/ux.md) and [research/design-language.md](research/design-language.md).
 Layout is responsive by window width (Material compact, medium, and expanded classes via a LayoutBuilder-driven adaptive shell), never by Platform.isX, so a resized Linux window or rotated iPad reflows live.
 
-Visual direction: a neutral-first cool slate UI with one restrained teal accent, not a brand-saturated palette, in the durable lineage of Linear, GitHub, and VS Code.
+Visual direction: a neutral-first cool slate UI with one restrained accent, not a brand-saturated palette, in the durable lineage of Linear, GitHub, and VS Code.
+The accent is a glacier cyan as of 2026-07-27 (`#1B6F91` light, `#58B4D8` dark); it was a teal until then, and [decisions/0004-visual-identity-review.md](decisions/0004-visual-identity-review.md) records both the change and why the reason originally given for it did not hold up when it was measured.
 Typography is IBM Plex Sans (variable) with IBM Plex Mono for code, weight capped at 600.
 Elevation is border-first (1px hairlines, only two shadow tokens for truly floating surfaces), messages are flat and grouped rather than chat bubbles, and motion is short and functional in the chrome with the Voice Canvas as the deliberate expressive exception.
 
@@ -491,7 +492,7 @@ Client connection lifecycle is lazy-connect: a live WebSocket is held only to th
 
 Rejected alternatives: Discord's one-account-many-communities model and a unified cross-server inbox that hides sender identity; Platform.isX branching; a fixed non-remappable keymap; auto-join-on-click for voice; separate join-call and open-canvas navigation steps; deriving dark mode by inverting light mode; a decorative display typeface; backdrop-blur frosted glass.
 
-Accepted risks: one backend hosting multiple communities is unserved in v1 (revisit if self-hosters ask); near-zero chrome motion can read as lifeless, with the canvas as the intentional counterweight; the accent teal is a from-scratch brand choice pending the designer review.
+Accepted risks: one backend hosting multiple communities is unserved in v1 (revisit if self-hosters ask); near-zero chrome motion can read as lifeless, with the canvas as the intentional counterweight; the accent is a from-scratch brand choice, settled as a glacier cyan by the designer review and the deuteranopia measurement that followed it.
 
 ### Audio Design
 

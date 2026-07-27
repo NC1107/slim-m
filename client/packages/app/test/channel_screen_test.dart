@@ -86,10 +86,10 @@ void main() {
       addTearDown(db.close);
       final store = MessageStore(db);
 
-      // Seed the repro directly: unread activity already sitting in the local
-      // store (as if from a prior sync while a different tab had focus), with
-      // no read marker recorded for it, exactly the state the bug report
-      // starts from.
+      /// Seed the repro directly: unread activity already sitting in the local
+      /// store (as if from a prior sync while a different tab had focus), with
+      /// no read marker recorded for it, exactly the state the bug report
+      /// starts from.
       await store.upsertChannels([
         const api.Channel(
           id: 'c1',
@@ -105,9 +105,10 @@ void main() {
           keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
           sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
           storeProvider.overrideWith((ref) async => store),
-          // Avoids constructing the real SyncController (and the websocket it
-          // would try, and fail, to open) purely to satisfy the pins/typing
-          // seams ChannelScreen builds alongside the message list.
+
+          /// Avoids constructing the real SyncController (and the websocket it
+          /// would try, and fail, to open) purely to satisfy the pins/typing
+          /// seams ChannelScreen builds alongside the message list.
           syncControllerProvider.overrideWith(
             (ref) => _NoopSyncController(ref),
           ),
@@ -155,12 +156,13 @@ void main() {
           ),
         ),
       );
-      // A bounded pump count, not pumpAndSettle: `pumpAndSettle` loops until a
-      // frame goes by with nothing scheduled, and it never sees one here,
-      // because `AppIconButton`'s ripple/hover machinery keeps requesting a
-      // frame on every empty repaint in this environment. A fixed number of
-      // pumps is more than enough to flush the drift stream's first emission
-      // and the two read-marking calls this test is actually about.
+
+      /// A bounded pump count, not pumpAndSettle: `pumpAndSettle` loops until a
+      /// frame goes by with nothing scheduled, and it never sees one here,
+      /// because `AppIconButton`'s ripple/hover machinery keeps requesting a
+      /// frame on every empty repaint in this environment. A fixed number of
+      /// pumps is more than enough to flush the drift stream's first emission
+      /// and the two read-marking calls this test is actually about.
       for (var i = 0; i < 10; i++) {
         await tester.pump(const Duration(milliseconds: 20));
       }
@@ -185,13 +187,13 @@ void main() {
             'dot clears without waiting on the network call',
       );
 
-      // Unmount deliberately, with one more pump, rather than letting
-      // flutter_test's own end-of-test teardown do it: `ChannelScreen`'s
-      // `StreamBuilder`s cancel their drift query streams on dispose, and
-      // drift defers that cleanup by one event loop turn on a zero-duration
-      // `Timer`. Left to the framework's own teardown, the "no pending timers"
-      // check runs before that timer gets its turn and fails the test on a
-      // false positive that has nothing to do with what this test covers.
+      /// Unmount deliberately, with one more pump, rather than letting
+      /// flutter_test's own end-of-test teardown do it: `ChannelScreen`'s
+      /// `StreamBuilder`s cancel their drift query streams on dispose, and
+      /// drift defers that cleanup by one event loop turn on a zero-duration
+      /// `Timer`. Left to the framework's own teardown, the "no pending timers"
+      /// check runs before that timer gets its turn and fails the test on a
+      /// false positive that has nothing to do with what this test covers.
       await tester.pumpWidget(const SizedBox.shrink());
       for (var i = 0; i < 5; i++) {
         await tester.pump(const Duration(milliseconds: 1));

@@ -138,9 +138,7 @@ async fn file_a_report(
     json_body(filed).await["id"].as_str().unwrap().to_owned()
 }
 
-// ---------------------------------------------------------------------------
-// Gating
-// ---------------------------------------------------------------------------
+// --- Gating ---
 
 #[tokio::test]
 async fn listing_and_resolving_require_manage_messages() {
@@ -187,9 +185,7 @@ async fn listing_and_resolving_require_manage_messages() {
     assert_eq!(admin_list.status(), StatusCode::OK);
 }
 
-// ---------------------------------------------------------------------------
-// Happy path and the queue's lifecycle
-// ---------------------------------------------------------------------------
+// --- Happy path and the queue's lifecycle ---
 
 #[tokio::test]
 async fn the_queue_carries_the_snapshot_and_resolving_removes_it() {
@@ -302,13 +298,13 @@ async fn resolving_a_nonexistent_report_is_not_found() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
+/// Listing already hides a report from a moderator denied MANAGE_MESSAGES in
+/// the channel it came from, because the queue carries the reported content
+/// verbatim. Resolving checked only the deployment-wide permission, so that
+/// same moderator could still dismiss reports from the one channel they were
+/// deliberately kept out of, quietly emptying its queue.
 #[tokio::test]
 async fn a_report_you_cannot_read_is_one_you_cannot_resolve_either() {
-    // Listing already hides a report from a moderator denied MANAGE_MESSAGES in
-    // the channel it came from, because the queue carries the reported content
-    // verbatim. Resolving checked only the deployment-wide permission, so that
-    // same moderator could still dismiss reports from the one channel they were
-    // deliberately kept out of, quietly emptying its queue.
     let store = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;

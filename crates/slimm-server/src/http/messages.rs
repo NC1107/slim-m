@@ -47,9 +47,7 @@ pub fn routes() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(MESSAGE_BODY_LIMIT))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 #[derive(Serialize)]
 pub(crate) struct MessageDto {
@@ -158,10 +156,29 @@ struct ListParams {
     limit: Option<i64>,
 }
 
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
+// --- Handlers ---
 
+/// Sends a message, idempotent by the client-generated message id.
+///
+/// A nonexistent channel grants no permissions, so this refuses both "you
+/// cannot post here" and "no such channel" identically, revealing neither.
+/// ATTACH_FILES is only demanded when the send actually carries something, so
+/// an ordinary text message never needs it.
+///
+/// A retry of a send that already succeeded returns the stored message so the
+/// client gets its acknowledgement, but must not repeat what already happened
+/// once. Fanning it out again would show it twice to anyone whose client does
+/// not de-duplicate, and pushing again would wake every idle recipient a
+/// second time, outside the debounce window that exists to stop exactly that.
+///
+/// Push work is handed to a detached background task, because the message is
+/// already committed and its response already on the way: a relay outage can
+/// never turn a successful send into an error.
+///
+/// Unlike reactions and polls, attachments can exist the instant a message is
+/// created (they were uploaded before this call and just linked inside it), so
+/// the echoed response needs its own lookup rather than staying empty the way
+/// a fresh message's reactions correctly do.
 async fn send(
     Authed(ctx): Authed,
     Path(channel_id): Path<String>,
@@ -173,10 +190,8 @@ async fn send(
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
     let attachment_ids = parse_attachment_ids(&req.attachment_ids)?;
 
-    // A nonexistent channel grants no permissions, so this refuses both "you
-    // cannot post here" and "no such channel" identically, revealing neither.
-    // ATTACH_FILES is only demanded when the send actually carries something,
-    // so an ordinary text message never needs it.
+    // ATTACH_FILES only when the send carries something; see this function's
+    // note for why a missing channel and a denied one look the same.
     let mut needed = Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES);
     if !attachment_ids.is_empty() {
         needed = needed.union(Permissions::ATTACH_FILES);
@@ -196,21 +211,15 @@ async fn send(
         .send_message(channel_id, ctx.user_id, id, content, &attachment_ids)
         .await?;
 
-    // A retry of a send that already succeeded returns the stored message so
-    // the client gets its acknowledgement, but must not repeat what already
-    // happened once. Fanning it out again would show it twice to anyone whose
-    // client does not de-duplicate, and pushing again would wake every idle
-    // recipient a second time, outside the debounce window that exists to stop
-    // exactly that.
+    // An idempotent retry must not fan out or push again; see the note on
+    // this function.
     if sent.fresh {
         state
             .hub
             .publish(Event::MessageCreated(sent.message.clone()));
 
-        // The message is already committed and its response is already on the
-        // way; this only ever makes a cheap in-memory decision here, handing
-        // any actual push work to a detached background task, so a relay
-        // outage can never turn this successful send into an error.
+        // Cheap in-memory decision only, real work detached; see the note on
+        // this function.
         state.push.notify_message(
             state.store.clone(),
             channel_id,
@@ -221,10 +230,8 @@ async fn send(
     }
 
     let mut dto: MessageDto = sent.message.into();
-    // Unlike reactions and polls, attachments can exist the instant a message
-    // is created (they were uploaded before this call and just linked inside
-    // it), so the echoed response needs its own lookup rather than staying
-    // empty the way a fresh message's reactions correctly do.
+    // Attachments, unlike reactions, can exist on a brand new message; see
+    // the note on this function.
     if let Some((_, summaries)) = state
         .store
         .attachments_for_messages(&[id])
@@ -261,6 +268,17 @@ async fn list(
     Ok(Json(dtos))
 }
 
+/// Soft-deletes a message. Deleting your own is allowed; deleting another's
+/// needs MANAGE_MESSAGES, the same split as edit.
+///
+/// The row is fetched regardless of `deleted_at`, because a second delete must
+/// succeed rather than 404, and telling "already gone" apart from "never
+/// existed in this channel" is what makes that possible.
+///
+/// Freed attachment files are reclaimed best-effort and only logged on
+/// failure. The database rows went in the same transaction as the soft delete
+/// and the caller has already succeeded, so a leftover file is wasted disk,
+/// not a correctness bug.
 async fn delete(
     Authed(ctx): Authed,
     parts: Parts,
@@ -281,9 +299,7 @@ async fn delete(
         return Err(ApiError::Forbidden);
     }
 
-    // Fetched regardless of `deleted_at`: deleting an already-deleted message
-    // must succeed rather than 404, so this needs to see that row to tell
-    // "already gone" apart from "never existed in this channel".
+    // Includes soft-deleted rows so a retry succeeds; see the note above.
     let message = state
         .store
         .message_including_deleted(message_id)
@@ -309,10 +325,7 @@ async fn delete(
             channel_id,
             message_id,
         });
-        // The database rows are already gone (same transaction as the soft
-        // delete); this only reclaims the file. Best-effort and logged, not
-        // propagated: the delete already succeeded from the caller's point of
-        // view, and a leftover file is wasted disk, not a correctness bug.
+        // File reclamation only, best-effort; see the note on this function.
         for hex in outcome.freed_attachments {
             if let Err(err) = state.media.delete_attachment(&hex).await {
                 tracing::warn!(error = %err, attachment = %hex, "failed to delete a freed attachment file");
@@ -373,9 +386,7 @@ async fn edit(
     Ok(Json(updated.into()))
 }
 
-// ---------------------------------------------------------------------------
-// Shared enrichment
-// ---------------------------------------------------------------------------
+// --- Shared enrichment ---
 
 /// Batch-attaches each message's reaction summary and, if it carries one,
 /// its poll, to its DTO - in a fixed small number of queries rather than one
@@ -415,16 +426,13 @@ pub(crate) async fn with_reactions(
         }
         dtos.push(dto);
     }
-    // `ids` and `dtos` stay in the same order and length: `dtos` is built by
-    // pushing exactly one entry per `messages` element above, the same list
-    // `ids` was drawn from.
+    // `attach_polls` pairs the two lists positionally, which holds because the
+    // loop above pushes exactly one `dtos` entry per `ids` entry.
     super::polls::attach_polls(state, viewer, &ids, &mut dtos).await?;
     Ok(dtos)
 }
 
-// ---------------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------------
+// --- Validation ---
 
 fn validate_content(content: &str) -> Result<&str, ApiError> {
     if content.trim().is_empty() {
