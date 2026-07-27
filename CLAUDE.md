@@ -60,6 +60,31 @@ Two accessibility rules the components enforce and test, worth not breaking:
 - **Presence is never colour alone.** Five states, five silhouettes: filled disc, triangle, notched square, hollow ring, and a slashed ring for appearing offline. Contrast ratio is deliberately *not* asserted between two status hues, because it measures luminance only and the away amber sits within 1.04:1 of the dnd red while being obviously a different colour. Shape carries it.
 - **`focusRing` and `accentFill` are the same value in every theme**, which the design intends. Focus is told from selection by shape: selection is a fill plus a marker, focus is an outline ring. An earlier doc comment claimed the two were different colours; they never were, and a test written against that claim found it.
 
+## The Phase 5 canvas spike (2026-07-27)
+
+Both halves are done and both bets hold, but neither for the reason the roadmap assumed.
+Full findings in [docs/research/canvas-spike-server.md](docs/research/canvas-spike-server.md) and [docs/research/canvas-spike-client.md](docs/research/canvas-spike-client.md).
+Read those before writing production canvas code in Phase 6.
+
+**An R-Tree that prunes nothing is the trap here, and it is silent.**
+On a database that has never been `ANALYZE`d, which is every slim-m deployment, SQLite plans the natural `JOIN` as the rtree module's rowid-equality strategy: it reads every object in the channel and probes the index once per row to confirm what it already had.
+Right answer, zero pruning, 7.1x slower than no index at all.
+Running `ANALYZE` while investigating makes the planner pick correctly on its own, which is exactly how this ships broken.
+`CROSS JOIN` pins the order, and `tests/canvas_index.rs` reads the SQL out of `src/store/canvas.rs` rather than a copy and asserts the plan, so a later edit that reintroduces it fails.
+
+**Neither index is justified by the stated soft caps.**
+At 20,000 objects a plain scan takes 1.56 ms server-side, and client-side a brute-force linear scan culls in 26 us against the grid's 16 us, on a 16.6 ms frame budget.
+The server index earns its place past the cap, across several canvases in one index, and under a pan firing continuously; the client grid saves 11 us per frame and costs a rebuild, no incremental update, and an 8.5x regression when objects cluster in one cell, which is the normal way people use a shared board.
+Whether the client keeps the grid at all is a Phase 6 decision; the adaptive seam reports which branch it took, so it is a runtime call rather than a rewrite.
+
+**Both fall over on viewport shape, not object count.**
+Server-side the index loses past roughly four screens of viewport (0.8x at eight screens, 0.6x for the whole world).
+Client-side, zooming out probes cells by world area while object count stays flat: 880,704 probes at zoom 0.001, an 11.8 ms frame, 71% of budget. A linear-scan fallback when cell span exceeds object count turns that into 72 us.
+
+Two smaller results worth keeping: the client cell size should be 1024, not the planned 2048, and sensitivity is asymmetric so err small; and `StreamProvider` values are not observable until the event loop turns, so a stream physically cannot deliver inside the frame that produced it. The no-Riverpod-in-the-render-loop rule is a correctness property, not a performance preference.
+
+Known gaps the spike leaves for Phase 6: the client index has no `remove` or `move` and a full rebuild costs 1.3 ms, while dragging is the canvas's primary interaction; and a soft delete does not advance an object's `seq`, so no cursor over the viewport endpoint can report a removal. Removals belong to the canvas op stream, and patching that into the object cursor would create a second ordering authority.
+
 ## Current state (2026-07-25)
 
 Phases 0 (foundations), 1 (server and protocol core), and 2 (client shell and text messaging) are complete.

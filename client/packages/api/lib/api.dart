@@ -21,6 +21,7 @@ export 'src/client.dart'
         SessionStore,
         SlimmApiAdmin,
         SlimmApiAttachments,
+        SlimmApiCanvas,
         SlimmApiChannelAdmin,
         SlimmApiDms,
         SlimmApiMessages,

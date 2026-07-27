@@ -10,4 +10,9 @@ dependencies:
   flutter:
     sdk: flutter
 dev_dependencies:
+  # Dev-only on purpose. The Phase 5 bet is that Riverpod stays out of the
+  # render loop, so the package cannot import it and the benchmark can.
+  flutter_riverpod: ^2.5.0
   flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter

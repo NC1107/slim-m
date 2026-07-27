@@ -16,6 +16,7 @@ use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
 mod attachments;
 mod bootstrap;
+mod canvas;
 mod channels;
 mod dms;
 mod invites;
@@ -35,6 +36,7 @@ mod users;
 
 pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
 pub use bootstrap::Bootstrap;
+pub use canvas::{CanvasObject, PlaceError, Rect, ViewportQuery, WORLD_LIMIT};
 pub use channels::DeleteChannelError;
 pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};

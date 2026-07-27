@@ -1,0 +1,190 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! The Voice Canvas viewport read, backed by the R-Tree migration 0015 keeps
+//! in sync.
+//!
+//! One route serves both the cold fetch and the pan. A client that is panning
+//! sends the rectangle it is leaving alongside the one it is entering and gets
+//! back only what it does not already hold; a client opening the canvas sends
+//! the new rectangle alone. They are the same query with one extra predicate,
+//! so they are one route rather than two that would drift apart.
+//!
+//! It is a pull, not a server-held subscription, and that is deliberate. The
+//! client is the only party that knows when it panned, a pull keeps no
+//! per-connection spatial state on the server to leak or to rebuild after a
+//! reconnect, and a repeated pan is idempotent rather than a stream of
+//! corrections. What it does not cover is objects removed while the caller was
+//! looking at them: a soft delete does not advance the row's `seq`, so no
+//! cursor over `canvas_objects` can observe one. That belongs to the
+//! `canvas_ops` stream, which Phase 6 materializes this table from.
+
+use axum::extract::{Path, Query, State};
+use axum::routing::get;
+use axum::{Json, Router};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use super::AppState;
+use super::error::ApiError;
+use super::extract::Authed;
+use super::messages::parse_uuid;
+use crate::ids::ChannelId;
+use crate::permissions::Permissions;
+use crate::store::{CanvasObject, Rect, ViewportQuery, WORLD_LIMIT};
+
+/// Default and maximum objects returned for one viewport read. The ceiling is
+/// well above a screenful at any sane zoom, and is here so a client asking for
+/// the whole world gets a bounded answer instead of the canvas.
+const DEFAULT_LIMIT: i64 = 500;
+const MAX_LIMIT: i64 = 2000;
+
+/// The canvas routes, mounted by [`super::router`].
+pub fn routes() -> Router<AppState> {
+    Router::new().route("/channels/{channel_id}/canvas/objects", get(viewport))
+}
+
+// ---------------------------------------------------------------------------
+// Wire types
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct ViewportParams {
+    min_x: f64,
+    min_y: f64,
+    max_x: f64,
+    max_y: f64,
+    prev_min_x: Option<f64>,
+    prev_min_y: Option<f64>,
+    prev_max_x: Option<f64>,
+    prev_max_y: Option<f64>,
+    after_seq: Option<i64>,
+    limit: Option<i64>,
+}
+
+#[derive(Serialize)]
+struct CanvasObjectDto {
+    id: String,
+    kind: String,
+    z_index: i64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    props: Value,
+    author_id: Option<String>,
+    seq: i64,
+    created_at: i64,
+}
+
+impl From<CanvasObject> for CanvasObjectDto {
+    fn from(object: CanvasObject) -> Self {
+        Self {
+            id: object.id.to_string(),
+            kind: object.kind,
+            z_index: object.z_index,
+            x: object.x,
+            y: object.y,
+            w: object.w,
+            h: object.h,
+            // `props` is opaque to the server, so an unparseable one degrades
+            // to an empty object rather than failing the whole viewport.
+            props: serde_json::from_str(&object.props)
+                .unwrap_or_else(|_| Value::Object(serde_json::Map::new())),
+            author_id: object.author_id.map(|id| id.to_string()),
+            seq: object.seq.0,
+            created_at: object.created_at,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ViewportDto {
+    objects: Vec<CanvasObjectDto>,
+    /// More objects intersect this viewport than the limit allowed. A client
+    /// seeing this should zoom in or raise its limit, not paginate: there is
+    /// no stable cursor across a region query.
+    has_more: bool,
+    /// The channel's canvas high-water mark, to send back as `after_seq`.
+    latest_seq: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Handler
+// ---------------------------------------------------------------------------
+
+async fn viewport(
+    Authed(ctx): Authed,
+    Path(channel_id): Path<String>,
+    Query(params): Query<ViewportParams>,
+    State(state): State<AppState>,
+) -> Result<Json<ViewportDto>, ApiError> {
+    let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    // Both bits from one per-channel evaluation, in which a nonexistent
+    // channel grants nothing, so a missing canvas is not distinguishable.
+    let permissions = state
+        .store
+        .permissions_in_channel(ctx.user_id, channel_id)
+        .await?;
+    if !permissions.contains(Permissions::VIEW_CHANNEL.union(Permissions::USE_CANVAS)) {
+        return Err(ApiError::Forbidden);
+    }
+
+    let view = rect(params.min_x, params.min_y, params.max_x, params.max_y)?;
+    let previous = match (
+        params.prev_min_x,
+        params.prev_min_y,
+        params.prev_max_x,
+        params.prev_max_y,
+    ) {
+        (Some(min_x), Some(min_y), Some(max_x), Some(max_y)) => {
+            Some(rect(min_x, min_y, max_x, max_y)?)
+        }
+        (None, None, None, None) => None,
+        _ => {
+            return Err(ApiError::BadRequest(
+                "the previous viewport needs all four bounds or none",
+            ));
+        }
+    };
+
+    let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+    let query = ViewportQuery {
+        view,
+        previous,
+        after_seq: params.after_seq.unwrap_or(0),
+        // One over the limit, so "there are more" is answered by the same read
+        // rather than a second counting query over the same region.
+        limit: limit + 1,
+    };
+
+    let mut objects = state.store.viewport_objects(channel_id, &query).await?;
+    let has_more = objects.len() as i64 > limit;
+    objects.truncate(limit as usize);
+
+    Ok(Json(ViewportDto {
+        objects: objects.into_iter().map(CanvasObjectDto::from).collect(),
+        has_more,
+        latest_seq: state.store.latest_canvas_seq(channel_id).await?,
+    }))
+}
+
+/// Validates one rectangle. Clamping silently instead would answer a query the
+/// caller did not ask, which on a canvas means quietly showing the wrong part
+/// of the world.
+fn rect(min_x: f64, min_y: f64, max_x: f64, max_y: f64) -> Result<Rect, ApiError> {
+    let bounds = [min_x, min_y, max_x, max_y];
+    if !bounds.iter().all(|v| v.is_finite()) {
+        return Err(ApiError::BadRequest("viewport bounds must be finite"));
+    }
+    if min_x > max_x || min_y > max_y {
+        return Err(ApiError::BadRequest("viewport bounds are inverted"));
+    }
+    if bounds.iter().any(|v| v.abs() > WORLD_LIMIT) {
+        return Err(ApiError::BadRequest("viewport is outside the world"));
+    }
+    Ok(Rect {
+        min_x,
+        min_y,
+        max_x,
+        max_y,
+    })
+}

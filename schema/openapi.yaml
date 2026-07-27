@@ -93,6 +93,10 @@ tags:
     description: >
       Who is online, away, do-not-disturb, or has chosen to appear offline,
       and typing indicators over the WebSocket.
+  - name: canvas
+    description: >
+      The Voice Canvas: reading the objects in a region of a channel's
+      canvas, and the delta a client receives as it pans.
 
 security:
   - bearerAuth: []
@@ -1916,6 +1920,91 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /channels/{channelId}/canvas/objects:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: listCanvasViewport
+      tags: [canvas]
+      summary: Read the canvas objects in a region of a channel's canvas.
+      description: >
+        Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel.
+        Returns every live object whose bounding box intersects the rectangle
+        given by `min_x`, `min_y`, `max_x` and `max_y`, in paint order (`z_index`
+        then `seq`), backed by a spatial index rather than a scan of the canvas.
+
+
+        A client that is panning also sends the rectangle it is leaving as
+        `prev_min_x` and the rest, plus the `latest_seq` it last saw as
+        `after_seq`. The answer is then the delta: objects in the new rectangle
+        that are not in the old one, plus anything inside both that is newer
+        than the cursor. All four previous bounds are sent together or not at
+        all. Omitting them is a cold fetch of the whole region.
+
+
+        The delta covers objects arriving, not objects removed. A soft delete
+        does not advance an object's `seq`, so no cursor over this endpoint can
+        report one; removals belong to the canvas op stream.
+      parameters:
+        - name: min_x
+          in: query
+          required: true
+          schema: { type: number, format: double }
+        - name: min_y
+          in: query
+          required: true
+          schema: { type: number, format: double }
+        - name: max_x
+          in: query
+          required: true
+          schema: { type: number, format: double }
+        - name: max_y
+          in: query
+          required: true
+          schema: { type: number, format: double }
+        - name: prev_min_x
+          in: query
+          description: The leaving rectangle. Send all four bounds or none.
+          schema: { type: number, format: double }
+        - name: prev_min_y
+          in: query
+          schema: { type: number, format: double }
+        - name: prev_max_x
+          in: query
+          schema: { type: number, format: double }
+        - name: prev_max_y
+          in: query
+          schema: { type: number, format: double }
+        - name: after_seq
+          in: query
+          description: >
+            Hold back objects at or below this canvas `seq` that the leaving
+            rectangle already covered. Ignored without a leaving rectangle.
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          description: Page size; the server clamps it.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2000
+            default: 500
+      responses:
+        "200":
+          description: The objects in the region, in paint order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CanvasViewport"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /channels/{channelId}/voice/token:
     post:
       operationId: mintVoiceToken
@@ -2733,6 +2822,75 @@ components:
           format: int64
           default: 0
           description: Bits to force off.
+
+    CanvasObject:
+      type: object
+      required: [id, kind, z_index, x, y, w, h, props, seq, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Client-generated UUIDv7; also the idempotency key.
+        kind:
+          type: string
+          description: What the object is - a stroke, an image, a gif, a window.
+        z_index:
+          type: integer
+          format: int64
+          description: >-
+            Paint order, lowest first. Seeded from `seq`, so the default order
+            is the order things were drawn in.
+        x:
+          type: number
+          format: double
+        y:
+          type: number
+          format: double
+        w:
+          type: number
+          format: double
+        h:
+          type: number
+          format: double
+        props:
+          type: object
+          description: >-
+            Kind-specific fields, opaque to the server. An object it cannot
+            parse is reported as an empty one rather than failing the read.
+        author_id:
+          type: [string, "null"]
+          format: uuid
+          description: Null once the author's account has been deleted.
+        seq:
+          type: integer
+          format: int64
+          description: >-
+            Per-channel monotonic order key on the canvas stream, which is
+            independent of the same channel's message stream.
+        created_at:
+          type: integer
+          format: int64
+
+    CanvasViewport:
+      type: object
+      required: [objects, has_more, latest_seq]
+      properties:
+        objects:
+          type: array
+          items:
+            $ref: "#/components/schemas/CanvasObject"
+        has_more:
+          type: boolean
+          description: >-
+            More objects intersect this region than the limit allowed. There is
+            no stable cursor across a region query, so the answer is to ask for
+            a smaller region, not a next page.
+        latest_seq:
+          type: integer
+          format: int64
+          description: >-
+            The channel's highest assigned canvas `seq`, to send back as
+            `after_seq` on the next read.
 
     Message:
       type: object
