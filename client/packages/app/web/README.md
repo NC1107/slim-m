@@ -5,8 +5,11 @@ The web build exists to drive this UI automatically.
 Native Linux runs, but no synthetic input reaches it on a Wayland desktop, and a browser can be driven over the DevTools protocol.
 It is a test surface, not a distribution target.
 
-Two of the files here are binaries rather than source, and both are pinned to versions in `client/pubspec.lock`.
-Neither is hand-written, and neither should be edited.
+Two of the files the build needs are binaries rather than source. **Neither is committed.**
+`tool/fetch_web_assets.sh` downloads both, refusing to run if the versions it pins have drifted from `client/pubspec.lock`, and checking each against a recorded sha256.
+
+They are fetched rather than vendored because this is a test surface: 355KB of minified worker in git bought nothing and cost a static-analysis finding on every line of it.
+Run the script before `flutter build web`; it is a no-op once the files are present and their digests match.
 
 ## `sqlite3.wasm`
 
@@ -36,6 +39,8 @@ Drift also exposes `WasmDatabase.workerMainForOpen`, so this file can be compile
 The published artifact is used because it is what the drift documentation points at, and because compiling it locally adds a build step nothing else in this repo needs.
 
 ## Refreshing them
+
+Bumping `drift` or `sqlite3` means updating the version *and* the sha256 in `tool/fetch_web_assets.sh` in the same change; the script refuses to fetch against a lockfile it was not written for.
 
 Both are read at runtime by `packages/data/lib/src/connection/web.dart`, by fixed name, from the app's own origin.
 Bumping `drift` or `sqlite3` in `pubspec.yaml` means re-downloading the matching file here in the same change: a worker from one drift version talking to a client from another is not a supported combination, and the failure shows up as a runtime protocol error in the browser rather than a build failure.
