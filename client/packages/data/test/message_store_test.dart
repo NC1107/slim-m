@@ -192,6 +192,21 @@ void main() {
         reason: 'refetch from the start');
   });
 
+  test('removeChannel forgets the channel and only its own messages', () async {
+    await store.applyMessages([
+      _message(id: 'm1', seq: 1),
+      _message(id: 'm2', channelId: 'chan-2', seq: 1),
+    ]);
+
+    await store.removeChannel('chan-1');
+
+    expect(await store.watchChannels().first,
+        isNot(contains(predicate((c) => (c as Channel).id == 'chan-1'))));
+    expect(await store.watchChannel('chan-1').first, isEmpty);
+    expect(await store.watchChannel('chan-2').first, hasLength(1),
+        reason: 'a sibling channel is untouched');
+  });
+
   test('clear leaves nothing at all for whoever signs in next', () async {
     // The database is one file for the whole app, not one per account or
     // server, so anything surviving a sign-out is read by the next person to

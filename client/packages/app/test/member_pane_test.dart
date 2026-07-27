@@ -184,4 +184,73 @@ void main() {
     expect(find.text('Priya'), findsOneWidget);
     expect(find.text('Kess'), findsOneWidget);
   });
+
+  testWidgets('a failed member fetch says so and offers a working retry',
+      (tester) async {
+    var fail = true;
+    final container = ProviderContainer(overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+      apiProvider.overrideWith((ref) {
+        final api = _fakeApi(ref.watch(sessionProvider));
+        ref.onDispose(api.close);
+        return api;
+      }),
+      membersProvider.overrideWith((ref) async {
+        if (fail) throw const TransportException('offline');
+        return [_profile('1', 'Priya')];
+      }),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(body: AppMemberPane()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load members.'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+
+    fail = false;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Priya'), findsOneWidget);
+  });
+
+  testWidgets('a 403 explains the denial and offers no retry', (tester) async {
+    final container = ProviderContainer(overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+      apiProvider.overrideWith((ref) {
+        final api = _fakeApi(ref.watch(sessionProvider));
+        ref.onDispose(api.close);
+        return api;
+      }),
+      membersProvider
+          .overrideWith((ref) async => throw const ForbiddenException('nope')),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(body: AppMemberPane()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load members.'), findsOneWidget);
+    expect(find.text('Retry'), findsNothing,
+        reason: 'a 403 will not succeed on retry, so none is offered');
+  });
 }

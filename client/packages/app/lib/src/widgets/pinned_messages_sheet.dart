@@ -11,6 +11,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/pins_controller.dart';
+import 'user_avatar.dart';
 
 Future<void> showPinnedMessagesSheet(BuildContext context, String channelId) {
   return showModalBottomSheet<void>(
@@ -37,7 +38,7 @@ class _PinnedMessagesSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final pinned = ref.watch(pinsControllerProvider(channelId));
+    final pins = ref.watch(pinsControllerProvider(channelId));
 
     return SizedBox(
       height: MediaQuery.of(context).size.height * 0.6,
@@ -62,7 +63,7 @@ class _PinnedMessagesSheet extends ConsumerWidget {
               ],
             ),
           ),
-          Expanded(child: _Body(channelId: channelId, pinned: pinned)),
+          Expanded(child: _Body(channelId: channelId, pins: pins)),
         ],
       ),
     );
@@ -70,16 +71,46 @@ class _PinnedMessagesSheet extends ConsumerWidget {
 }
 
 class _Body extends ConsumerWidget {
-  const _Body({required this.channelId, required this.pinned});
+  const _Body({required this.channelId, required this.pins});
 
   final String channelId;
-  final List<api.PinnedMessage>? pinned;
+  final PinsState pins;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final list = pinned;
+    final list = pins.pinned;
 
+    // A failed refresh with an older list on hand falls through to that list
+    // below instead: it is stale, not wrong, and the live events correct it.
+    if (list == null && pins.failed) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.s16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                pins.forbidden
+                    ? 'You do not have permission to see pins here.'
+                    : 'Could not load pinned messages.',
+                style: TextStyle(color: tokens.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              if (!pins.forbidden) ...[
+                const SizedBox(height: AppSpacing.s12),
+                TextButton(
+                  onPressed: () => ref
+                      .read(pinsControllerProvider(channelId).notifier)
+                      .refresh(),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
     if (list == null) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
@@ -96,8 +127,10 @@ class _Body extends ConsumerWidget {
       itemBuilder: (context, i) {
         final pin = list[i];
         return ListTile(
-          leading: AppAvatar(
-              name: _authorLabel(pin.message), size: AppSizes.icon20 + 8),
+          leading: AuthorAvatar(
+              userId: pin.message.authorId,
+              name: _authorLabel(pin.message),
+              size: AppSizes.icon20 + 8),
           title: Text(_authorLabel(pin.message)),
           subtitle: Text(
             pin.message.content,

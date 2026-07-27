@@ -11,10 +11,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
+import '../screens/admin/channel_overwrites_screen.dart';
+import '../screens/admin/invites_screen.dart';
+import '../screens/admin/reports_screen.dart';
+import '../screens/admin/roles_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/settings_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/sign_in_screen.dart';
+import '../screens/voice_settings_screen.dart';
 import 'routes.dart';
 
 /// The app's router.
@@ -57,6 +62,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.settings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.voiceSettings,
+        builder: (context, state) => const VoiceSettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.adminReports,
+        builder: (context, state) => const ReportsScreen(),
+      ),
+      GoRoute(
+        path: Routes.adminInvites,
+        builder: (context, state) => const InvitesScreen(),
+      ),
+      GoRoute(
+        path: Routes.adminRoles,
+        builder: (context, state) => const RolesScreen(),
+      ),
+      GoRoute(
+        path: Routes.adminOverwrites,
+        builder: (context, state) => const ChannelOverwritesScreen(),
       ),
       // The shell keeps the channel list alive across conversation changes.
       ShellRoute(

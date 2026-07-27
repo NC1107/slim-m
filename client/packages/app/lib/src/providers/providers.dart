@@ -9,12 +9,8 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_data/data.dart';
@@ -191,11 +187,7 @@ final signedInProvider = StreamProvider<bool>((ref) {
 
 /// The local database. Opened once and closed with the container.
 final databaseProvider = FutureProvider<SlimmDatabase>((ref) async {
-  final directory = await getApplicationSupportDirectory();
-  final db = SlimmDatabase(
-    NativeDatabase.createInBackground(
-        File(p.join(directory.path, 'slimm.sqlite'))),
-  );
+  final db = SlimmDatabase(await openSlimmDatabase());
   ref.onDispose(db.close);
   return db;
 });

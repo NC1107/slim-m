@@ -2,13 +2,12 @@
 /// The slim-m client.
 library;
 
-import 'dart:io';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
 
 import 'src/providers/providers.dart';
 import 'src/providers/push_controller.dart';
@@ -49,12 +48,12 @@ Future<void> main() async {
 /// here specifically rather than from a provider or a widget: FCM invokes it
 /// in its own isolate with no widget tree and no [ProviderContainer], so it
 /// has to already be a reachable top-level function before that isolate can
-/// exist. A no-op on iOS and Linux, and best-effort even on Android: a
-/// contributor's build with no `google-services.json` (see
+/// exist. A no-op on iOS, Linux and the web, and best-effort even on Android:
+/// a contributor's build with no `google-services.json` (see
 /// `android/app/build.gradle.kts`) throws here, and push, like on iOS, must
 /// never be the reason the rest of the app fails to start.
 Future<void> _initAndroidPush() async {
-  if (!Platform.isAndroid) return;
+  if (!isAndroidHost) return;
   try {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);

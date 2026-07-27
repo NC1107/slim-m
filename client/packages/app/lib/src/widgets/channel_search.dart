@@ -46,15 +46,57 @@ class ChannelSearchResults extends StatelessWidget {
     super.key,
     required this.results,
     required this.knownUsernames,
+    required this.loading,
+    required this.failed,
+    required this.forbidden,
+    required this.onRetry,
   });
 
-  final List<api.Message> results;
+  /// Null while loading or after a failure; only an empty (not null) list
+  /// means the search genuinely came back with nothing.
+  final List<api.Message>? results;
   final Set<String> knownUsernames;
+  final bool loading;
+
+  /// A search that errored. Kept apart from [results] being empty, which
+  /// otherwise reads identically to a real "no matches".
+  final bool failed;
+
+  /// A 403: retrying the same query will not succeed, so no retry is offered.
+  final bool forbidden;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    if (results.isEmpty) {
+    if (loading) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    if (failed) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.s16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                forbidden
+                    ? 'You do not have permission to search this channel.'
+                    : 'Search failed.',
+                style: TextStyle(color: tokens.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              if (!forbidden) ...[
+                const SizedBox(height: AppSpacing.s12),
+                TextButton(onPressed: onRetry, child: const Text('Retry')),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    final list = results ?? const <api.Message>[];
+    if (list.isEmpty) {
       return Center(
         child:
             Text('No matches.', style: TextStyle(color: tokens.textSecondary)),
@@ -62,10 +104,10 @@ class ChannelSearchResults extends StatelessWidget {
     }
     return ListView.separated(
       padding: const EdgeInsets.all(AppSpacing.s16),
-      itemCount: results.length,
+      itemCount: list.length,
       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s12),
       itemBuilder: (context, i) {
-        final message = results[i];
+        final message = list[i];
         final name = message.authorDisplayName ??
             (message.authorId == null ? 'Deleted user' : 'Unknown');
         return Column(

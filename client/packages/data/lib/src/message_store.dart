@@ -164,6 +164,19 @@ class MessageStore {
     });
   }
 
+  /// Drops a channel this account deleted server-side, along with its
+  /// cached messages. [upsertChannels] only ever inserts or updates, so a
+  /// channel removed on the server would otherwise sit in the local list
+  /// forever; this is the one path that actually forgets a row.
+  Future<void> removeChannel(String channelId) async {
+    await db.transaction(() async {
+      await (db.delete(db.messages)
+            ..where((m) => m.channelId.equals(channelId)))
+          .go();
+      await (db.delete(db.channels)..where((c) => c.id.equals(channelId))).go();
+    });
+  }
+
   /// Drops everything this device has cached: every channel, every message,
   /// every cursor and read marker, including pending sends.
   ///
@@ -208,7 +221,10 @@ class MessageStore {
         const MessagesCompanion(pending: Value(false), failed: Value(true)));
   }
 
-  /// Discards a pending or failed message the user chose not to keep.
+  /// Drops one message's local row: a pending or failed send the user chose
+  /// not to keep, or one just deleted server-side (this device's own delete
+  /// call, or a live `message.deleted` event for someone else's) that must
+  /// vanish from every view. Same operation either way.
   Future<void> discard(String id) async {
     await (db.delete(db.messages)..where((m) => m.id.equals(id))).go();
   }

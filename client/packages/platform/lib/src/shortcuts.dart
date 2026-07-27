@@ -89,3 +89,17 @@ Map<ShortcutActivator, AppAction> resolveBindings({
   }
   return resolved;
 }
+
+/// The single activator currently bound to [action], or null once it has been
+/// unbound. For a caller that wants one action's key rather than the whole
+/// resolved table, so a global shortcut is never hardcoded a second time.
+ShortcutActivator? activatorFor(
+  AppAction action, {
+  Map<AppAction, ShortcutActivator?> overrides = const {},
+}) {
+  final resolved = resolveBindings(overrides: overrides);
+  for (final entry in resolved.entries) {
+    if (entry.value == action) return entry.key;
+  }
+  return null;
+}

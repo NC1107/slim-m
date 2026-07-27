@@ -12,20 +12,40 @@ import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
+import 'create_channel_sheet.dart';
+import 'manage_channel_sheet.dart';
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
+  const _SectionLabel(this.text, {this.onAdd, this.addSemanticLabel});
 
   final String text;
+
+  /// Present only for a section a caller may create into; absent hides the
+  /// affordance entirely rather than showing it disabled.
+  final VoidCallback? onAdd;
+  final String? addSemanticLabel;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
-      child: Text(
-        text.toUpperCase(),
-        style: AppText.label.copyWith(color: tokens.textSecondary),
+      padding: EdgeInsets.fromLTRB(8, 10, onAdd != null ? 4 : 8, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              text.toUpperCase(),
+              style: AppText.label.copyWith(color: tokens.textSecondary),
+            ),
+          ),
+          if (onAdd != null)
+            AppIconButton(
+              icon: AppIcons.add,
+              semanticLabel: addSemanticLabel ?? 'Create channel',
+              size: AppIconButtonSize.sm,
+              onPressed: onAdd,
+            ),
+        ],
       ),
     );
   }
@@ -75,11 +95,19 @@ class DirectMessagesSection extends StatelessWidget {
 }
 
 class TextChannelsSection extends StatelessWidget {
-  const TextChannelsSection(
-      {super.key, required this.channels, required this.selectedId});
+  const TextChannelsSection({
+    super.key,
+    required this.channels,
+    required this.selectedId,
+    this.canManage = false,
+  });
 
   final List<Channel> channels;
   final String? selectedId;
+
+  /// Whether the signed-in member holds MANAGE_CHANNELS (read from `GET
+  /// /me` by the caller). Gates every create/manage affordance below.
+  final bool canManage;
 
   @override
   Widget build(BuildContext context) {
@@ -87,20 +115,30 @@ class TextChannelsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel('Text'),
+        _SectionLabel(
+          'Text',
+          onAdd: canManage
+              ? () => showCreateChannelSheet(context, initialKind: 'text')
+              : null,
+          addSemanticLabel: 'Create a text channel',
+        ),
         for (final channel in channels)
-          AppListRow(
-            label: channel.name,
-            selected: channel.id == selectedId,
-            unread: channel.cursor > channel.lastReadSeq,
-            leading: Icon(
-              AppIcons.hash,
-              size: AppSizes.icon16,
-              color: channel.id == selectedId
-                  ? tokens.accent
-                  : tokens.textSecondary,
+          _ManagedChannelRow(
+            canManage: canManage,
+            channel: channel,
+            row: AppListRow(
+              label: channel.name,
+              selected: channel.id == selectedId,
+              unread: channel.cursor > channel.lastReadSeq,
+              leading: Icon(
+                AppIcons.hash,
+                size: AppSizes.icon16,
+                color: channel.id == selectedId
+                    ? tokens.accent
+                    : tokens.textSecondary,
+              ),
+              onTap: () => context.go(Routes.channel(channel.id)),
             ),
-            onTap: () => context.go(Routes.channel(channel.id)),
           ),
       ],
     );
@@ -108,11 +146,16 @@ class TextChannelsSection extends StatelessWidget {
 }
 
 class VoiceChannelsSection extends ConsumerWidget {
-  const VoiceChannelsSection(
-      {super.key, required this.channels, required this.selectedId});
+  const VoiceChannelsSection({
+    super.key,
+    required this.channels,
+    required this.selectedId,
+    this.canManage = false,
+  });
 
   final List<Channel> channels;
   final String? selectedId;
+  final bool canManage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -120,13 +163,54 @@ class VoiceChannelsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel('Voice'),
+        _SectionLabel(
+          'Voice',
+          onAdd: canManage
+              ? () => showCreateChannelSheet(context, initialKind: 'voice')
+              : null,
+          addSemanticLabel: 'Create a voice channel',
+        ),
         for (final channel in channels)
-          _VoiceChannelRow(
+          _ManagedChannelRow(
+            canManage: canManage,
             channel: channel,
-            selected: channel.id == selectedId,
-            voice: voice,
+            row: _VoiceChannelRow(
+              channel: channel,
+              selected: channel.id == selectedId,
+              voice: voice,
+            ),
           ),
+      ],
+    );
+  }
+}
+
+/// Pairs a channel row with its manage-sheet trigger, kept as a sibling
+/// rather than [AppListRow.trailing] so it never displaces that slot's own
+/// job (the unread dot, the voice channel's live head count).
+class _ManagedChannelRow extends StatelessWidget {
+  const _ManagedChannelRow({
+    required this.canManage,
+    required this.channel,
+    required this.row,
+  });
+
+  final bool canManage;
+  final Channel channel;
+  final Widget row;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!canManage) return row;
+    return Row(
+      children: [
+        Expanded(child: row),
+        AppIconButton(
+          icon: AppIcons.moreVertical,
+          semanticLabel: 'Manage ${channel.name}',
+          size: AppIconButtonSize.sm,
+          onPressed: () => showManageChannelSheet(context, channel),
+        ),
       ],
     );
   }

@@ -13,11 +13,15 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../permissions.dart';
+import '../providers/admin_providers.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../providers/sync_controller.dart';
 import '../routing/routes.dart';
+import '../widgets/avatar_settings_section.dart';
+import '../widgets/settings_section_header.dart';
 
 /// The account's devices, refetched when invalidated.
 final devicesProvider = FutureProvider.autoDispose<List<api.Device>>(
@@ -55,57 +59,22 @@ class SettingsScreen extends ConsumerWidget {
       ),
       body: ListView(
         children: const [
+          AvatarSettingsSection(),
+          Divider(height: 1),
           _DevicesSection(),
           Divider(height: 1),
           _NotificationsSection(),
           Divider(height: 1),
+          _VoiceSection(),
+          Divider(height: 1),
           _PresenceSection(),
           Divider(height: 1),
           _BlockedSection(),
+          _ModerationSection(),
           Divider(height: 1),
           _AccountSection(),
           Divider(height: 1),
           _AboutSection(),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title, {this.description});
-
-  final String title;
-  final String? description;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.s16,
-        AppSpacing.s24,
-        AppSpacing.s16,
-        AppSpacing.s8,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: tokens.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-            ),
-          ),
-          if (description != null) ...[
-            const SizedBox(height: AppSpacing.s4),
-            Text(
-              description!,
-              style: TextStyle(color: tokens.textSecondary, fontSize: 13),
-            ),
-          ],
         ],
       ),
     );
@@ -123,7 +92,7 @@ class _DevicesSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader(
+        const SettingsSectionHeader(
           'Devices',
           description: 'Everywhere this account is signed in.',
         ),
@@ -151,7 +120,9 @@ class _DevicesSection extends ConsumerWidget {
                       : TextButton(
                           onPressed: () async {
                             await ref.read(apiProvider).removeDevice(device.id);
-                            ref.invalidate(devicesProvider);
+                            if (context.mounted) {
+                              ref.invalidate(devicesProvider);
+                            }
                           },
                           child: const Text('Sign out'),
                         ),
@@ -180,7 +151,7 @@ class _NotificationsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader(
+        const SettingsSectionHeader(
           'Notifications',
           description: 'Whether this device is registered for push.',
         ),
@@ -194,6 +165,31 @@ class _NotificationsSection extends ConsumerWidget {
                     : tokens.textSecondary,
           ),
           title: Text(status.label),
+        ),
+      ],
+    );
+  }
+}
+
+/// Voice call preferences: microphone, screen share quality, and sounds.
+/// A separate screen rather than inline rows, matching how much is on it.
+class _VoiceSection extends StatelessWidget {
+  const _VoiceSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SettingsSectionHeader(
+          'Voice',
+          description: 'Microphone, screen share, and call sounds.',
+        ),
+        ListTile(
+          leading: const Icon(AppIcons.mic),
+          title: const Text('Voice settings'),
+          trailing: const Icon(AppIcons.chevronRight),
+          onTap: () => context.push(Routes.voiceSettings),
         ),
       ],
     );
@@ -222,7 +218,7 @@ class _PresenceSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader(
+        const SettingsSectionHeader(
           'Presence',
           description: 'What other members see next to your name.',
         ),
@@ -267,7 +263,7 @@ class _BlockedSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader(
+        const SettingsSectionHeader(
           'Blocked',
           description:
               'They are not told, and unblocking restores their messages.',
@@ -300,7 +296,7 @@ class _BlockedSection extends ConsumerWidget {
                         trailing: TextButton(
                           onPressed: () async {
                             await ref.read(apiProvider).unblockUser(userId);
-                            ref.invalidate(blocksProvider);
+                            if (context.mounted) ref.invalidate(blocksProvider);
                           },
                           child: const Text('Unblock'),
                         ),
@@ -308,6 +304,70 @@ class _BlockedSection extends ConsumerWidget {
                   ],
                 ),
         ),
+      ],
+    );
+  }
+}
+
+/// Moderation and administration: the reports queue, invite management,
+/// roles, and channel permission overwrites. Each row is gated on the
+/// server bit its screen requires, per `GET /me`'s base permissions, rather
+/// than shown and left to answer 403: a member without MANAGE_ROLES should
+/// not see role editing exists at all.
+///
+/// Hidden entirely, divider included, for a caller with none of the four
+/// bits, so an ordinary member's settings screen looks exactly as it did
+/// before this section existed.
+class _ModerationSection extends ConsumerWidget {
+  const _ModerationSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final permissions = ref.watch(myPermissionsProvider);
+    final canModerate = permissions.hasPermission(Perm.manageMessages);
+    final canInvite = permissions.hasPermission(Perm.createInvite);
+    final canManageRoles = permissions.hasPermission(Perm.manageRoles);
+
+    if (!canModerate && !canInvite && !canManageRoles) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 1),
+        const SettingsSectionHeader(
+          'Community management',
+          description: 'Only shown for what your roles let you do here.',
+        ),
+        if (canModerate)
+          ListTile(
+            leading: const Icon(AppIcons.report),
+            title: const Text('Reports'),
+            trailing: const Icon(AppIcons.chevronRight),
+            onTap: () => context.push(Routes.adminReports),
+          ),
+        if (canInvite)
+          ListTile(
+            leading: const Icon(AppIcons.invite),
+            title: const Text('Invites'),
+            trailing: const Icon(AppIcons.chevronRight),
+            onTap: () => context.push(Routes.adminInvites),
+          ),
+        if (canManageRoles) ...[
+          ListTile(
+            leading: const Icon(AppIcons.shield),
+            title: const Text('Roles'),
+            trailing: const Icon(AppIcons.chevronRight),
+            onTap: () => context.push(Routes.adminRoles),
+          ),
+          ListTile(
+            leading: const Icon(AppIcons.permissions),
+            title: const Text('Channel permissions'),
+            trailing: const Icon(AppIcons.chevronRight),
+            onTap: () => context.push(Routes.adminOverwrites),
+          ),
+        ],
       ],
     );
   }
@@ -321,7 +381,7 @@ class _AccountSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader('Account'),
+        const SettingsSectionHeader('Account'),
         ListTile(
           leading: const Icon(AppIcons.signOut),
           title: const Text('Sign out'),
@@ -424,7 +484,7 @@ class _AboutSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader('About'),
+        const SettingsSectionHeader('About'),
         ListTile(
           leading: const Icon(AppIcons.info),
           title: const Text('Version'),

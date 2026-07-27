@@ -85,6 +85,39 @@ Two smaller results worth keeping: the client cell size should be 1024, not the 
 
 Known gaps the spike leaves for Phase 6: the client index has no `remove` or `move` and a full rebuild costs 1.3 ms, while dragging is the canvas's primary interaction; and a soft delete does not advance an object's `seq`, so no cursor over the viewport endpoint can report a removal. Removals belong to the canvas op stream, and patching that into the object cursor would create a second ordering authority.
 
+## Cross-origin access, moderation UI, and channel administration (2026-07-27)
+
+**`SLIMM_CORS_ALLOWED_ORIGINS`** (`crates/slimm-server/src/config.rs`, `crates/slimm-server/src/cors.rs`) adds an opt-in CORS layer so a web build of the client can reach the server.
+Unset or empty means no layer at all, not an empty allow-list: an empty `CorsLayer` would still intercept preflights and answer them without an allow header, which is a different, worse thing than refusing to add it.
+A native client sends no `Origin` header and is unaffected either way.
+`*` is refused at startup rather than accepted as a shortcut: a self-host usually sits on a network the operator's own browser can route to and the internet cannot, and an open policy would hand every page they visit the run of that perimeter.
+`Access-Control-Allow-Credentials` is never sent: this API authenticates with a client-attached `Authorization: Bearer` header, not a cookie, so credentialed mode would buy nothing here while adding the ambient authority that turns one wrong origin into a full account takeover.
+A malformed origin fails the process at startup, named in the error, rather than surfacing as a browser console error later.
+Full operator-facing writeup in `deploy/README.md`.
+
+Settings gained a "Community management" section (`_ModerationSection` in `settings_screen.dart`), hidden entirely, including its divider, when the caller holds none of the four gating permission bits.
+Four screens: a reports queue (MANAGE_MESSAGES), invites (CREATE_INVITE), roles (MANAGE_ROLES), and per-channel permission overwrites (MANAGE_ROLES).
+The overwrites screen cannot show an existing overwrite because the API has no `GET` for one, only set or clear, and it says so in a callout rather than faking current state.
+Its "Allow" option is meant to be unavailable when the caller lacks that bit themselves, the same restriction the server enforces, but `AppSegmentedOption` (`design_system/.../segmented_control.dart`) has no disabled concept, so the tap is silently redirected to "Deny" instead: the opposite of what was asked for.
+The wrong state is visible on screen before submit, which is why this shipped, but it is a real correctness gap and not yet fixed.
+
+Channel management (create, rename or clear topic, delete) is gated on MANAGE_CHANNELS, read from `GET /me`.
+Delete refuses the deployment's last non-DM channel (409) and is idempotent on one already deleted.
+There is deliberately no client-side duplicate-channel-name handling: `store/channels.rs` and the migrations confirm the server has no uniqueness constraint on channel name, so there is no such failure mode to surface.
+
+The message context menu (long-press or right-click) adds edit, delete, and pin/unpin, each gated per-message on authorship and MANAGE_MESSAGES.
+Found and fixed along the way: `SyncController` never handled the `message.deleted` live event, so a message deleted by another device (or looped back from this device's own delete) never left the local store.
+
+An audit of empty/loading/error states fixed several places that rendered a failure identically to a genuine empty result: channel search (a failed fetch no longer reads as "no matches"), pinned messages (a failed load now says so and offers a retry, except on 403, which explains the denial instead), the member pane (added a retry), and the channel message list (empty now distinguishes "still catching up", "offline", and genuinely empty by reading `SyncController`'s status).
+The voice join preview gained a `VoiceState.retryable` flag: a 501 (no voice configured) or 403 (permission denied) hides the Join button instead of inviting a retry that is guaranteed to fail the same way again.
+That flag also fixed a real cross-channel leak: `VoiceController` is one instance for the whole app, so an error from channel A was being shown, and could block joining, in channel B's preview; both the displayed error and the button-hiding are now gated on the error belonging to the channel currently being previewed.
+
+Known issues surfaced by review, not yet fixed:
+
+- **`ref.invalidate` after the widget is disposed can crash.** A confirm-then-await-then-invalidate sequence (revoke an invite, remove a device, upload or remove an avatar) throws `StateError` if the user navigates away before the request resolves, because Riverpod's `invalidate` asserts the element is still mounted and the surrounding `on api.ApiException catch` does not catch a `StateError`. Sites: `invites_screen.dart` (:113, :238), `reports_screen.dart` (:93), `roles_screen.dart` (:82), `role_editor_sheet.dart` (:77), `role_assign_sheet.dart` (:46), `avatar_settings_section.dart` (:46, :60), and two pre-existing ones in `settings_screen.dart` this work did not introduce. Fix is a `context.mounted`/`ref.mounted` guard before each `invalidate` call.
+- **`voice_controller_test.dart`'s "resets once it starts" retry test is vacuous.** It joins a *fresh* `VoiceController` rather than retrying the same one, so it passes even with the reset logic it claims to guard deleted entirely. `VoiceState.retryable` defaults to `true` on a new controller regardless. Fix is calling `join` again on the same controller, which the fake session already supports.
+- **`manage_channel_sheet.dart` duplicates `confirmDangerousAction` almost verbatim** because the shared helper hardcodes `Text('Cancel')` with no `cancelLabel` parameter, and this sheet wants "Keep channel". Add the parameter rather than the duplicate.
+
 ## Current state (2026-07-25)
 
 Phases 0 (foundations), 1 (server and protocol core), and 2 (client shell and text messaging) are complete.
@@ -220,7 +253,7 @@ The pubspec `+N` is now only a local-build default and does not need touching pe
 Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 leans on them:
 - **The UI has been driven by a human only lightly.** The live instance holds real messages from the owner, so the primary flow has been exercised, but there is no record of a full sign-up-to-send pass written down.
 - **Golden images are not committed.** The matrix asserts no overflow at any scale (machine-independent, runs everywhere); the pixel comparison is behind `SLIMM_GOLDENS` with no reference images, because images generated off-CI would never match the runner and would mean a permanently red build. Generate them once on the CI runner and enable the flag there.
-- Reactions UI, the shared context menu, the quick switcher, haptics, and history pagination are not built. The server side of reactions exists (PUT/DELETE on `/messages/{id}/reactions/{emoji}`, summaries on list, a ReactionsChanged event).
+- The shared message context menu (edit, delete, pin/unpin) is now built; see "Cross-origin access, moderation UI, and channel administration" above. Reactions UI, the quick switcher, and haptics are not. The server side of reactions exists (PUT/DELETE on `/messages/{id}/reactions/{emoji}`, summaries on list, a ReactionsChanged event). History pagination is not built either.
 - The shortcut table exists but is not yet bound into the widget tree.
 
 Open follow-ups noted during reviews: malformed query/JSON bodies still return axum's default error rather than the uniform JSON error contract (low); `revoke_device` does not itself publish `SessionRevoked` (the logout and deletion paths do).

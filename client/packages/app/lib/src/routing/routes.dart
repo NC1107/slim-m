@@ -10,6 +10,11 @@ abstract final class Routes {
   static const signIn = '/sign-in';
   static const channels = '/channels';
   static const settings = '/settings';
+  static const voiceSettings = '/settings/voice';
+  static const adminReports = '/settings/reports';
+  static const adminInvites = '/settings/invites';
+  static const adminRoles = '/settings/roles';
+  static const adminOverwrites = '/settings/permissions';
 
   /// The messages of one channel.
   static String channel(String id) => '/channels/$id';

@@ -22,6 +22,7 @@ import '../providers/dms.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
+import 'user_avatar.dart';
 
 /// The deployment's members. Real endpoint, real data.
 final membersProvider = FutureProvider.autoDispose<List<api.UserProfile>>(
@@ -124,10 +125,24 @@ class AppMemberPane extends ConsumerWidget {
               child: Center(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.s16),
-                  child: Text(
-                    'Could not load members.',
-                    style: TextStyle(color: tokens.textSecondary),
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Could not load members.',
+                        style: TextStyle(color: tokens.textSecondary),
+                        textAlign: TextAlign.center,
+                      ),
+                      // A 403 means a lost permission, not a fault: the
+                      // same request would only fail again.
+                      if (error is! api.ForbiddenException) ...[
+                        const SizedBox(height: AppSpacing.s12),
+                        TextButton(
+                          onPressed: () => ref.invalidate(membersProvider),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
@@ -249,7 +264,9 @@ class _MemberRow extends ConsumerWidget {
       trailing: badge == null
           ? null
           : AppBadge(variant: AppBadgeVariant.role, label: badge),
-      leading: AppAvatar(
+      leading: UserAvatar(
+        userId: profile.id,
+        avatarUpdatedAt: profile.avatarUpdatedAt,
         name: profile.displayName,
         size: 26,
         status: status,

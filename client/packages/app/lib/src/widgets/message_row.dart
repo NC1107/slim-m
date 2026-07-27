@@ -9,9 +9,12 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'attachment_view.dart';
+import 'message_context_menu.dart';
+import 'message_edit_field.dart';
 import 'message_row_parts.dart';
 import 'message_text.dart';
 import 'poll_view.dart';
+import 'user_avatar.dart';
 
 /// The avatar column's width, and therefore also the continuation gutter's:
 /// the design's 36px message-row avatar, named once so both agree.
@@ -41,9 +44,13 @@ class MessageRow extends StatelessWidget {
     required this.knownUsernames,
     required this.onRetry,
     required this.onDiscard,
-    required this.onQuickReact,
+    required this.onPickReaction,
     required this.onReactionTap,
     required this.onVote,
+    required this.actions,
+    required this.editing,
+    required this.onSubmitEdit,
+    required this.onCancelEdit,
     this.isWebhook = false,
     this.reactions = const [],
     this.attachments = const [],
@@ -66,9 +73,9 @@ class MessageRow extends StatelessWidget {
   final VoidCallback onRetry;
   final VoidCallback onDiscard;
 
-  /// Adds the fixed quick-react glyph. Stands in for a full picker; see
-  /// [ReactionsRow].
-  final VoidCallback onQuickReact;
+  /// Called with the emoji character the [ReactionsRow] add-reaction picker
+  /// chose.
+  final ValueChanged<String> onPickReaction;
 
   /// Toggles the caller's own reaction for an existing chip: on if
   /// [api.ReactionSummary.reacted] was false, off if it was true.
@@ -78,6 +85,23 @@ class MessageRow extends StatelessWidget {
   /// required, like every other callback here, even though it is only ever
   /// invoked when there is a poll to vote on.
   final ValueChanged<int> onVote;
+
+  /// What this row's context menu can do here: edit, delete, and pin/unpin,
+  /// each gated by whatever the caller already knows about authorship and
+  /// permissions.
+  final MessageActions actions;
+
+  /// True while this is the one row being edited inline. At most one row in
+  /// a channel is ever true at once; [ChannelScreen] enforces that by
+  /// keeping a single editing-message id, not this widget.
+  final bool editing;
+
+  /// Called with the trimmed new content when an inline edit is saved.
+  final ValueChanged<String> onSubmitEdit;
+
+  /// Called to leave edit mode without saving, however that happened
+  /// (Escape, the Cancel button, or submitting empty text).
+  final VoidCallback onCancelEdit;
 
   /// TODO(ui-backend): always false at every real call site. The schema's
   /// `Message` has no bot/webhook flag (there is no webhook or bot-account
@@ -106,59 +130,72 @@ class MessageRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (showNewDivider) const NewMessagesDivider(),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _Leading(
-                          grouped: grouped,
-                          isWebhook: isWebhook,
-                          message: message),
-                      const SizedBox(width: AppSpacing.s12),
-                      Expanded(
-                        child: ConstrainedBox(
-                          constraints:
-                              const BoxConstraints(maxWidth: kMessageColumnMax),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (!grouped)
-                                _Header(message: message, isWebhook: isWebhook),
-                              MessageBody(
-                                content: message.content,
-                                knownUsernames: knownUsernames,
-                                dim: _unsent,
-                              ),
-                              if (message.editedAt != null)
-                                const EditedMarker(),
-                              if (poll != null)
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.only(top: AppSpacing.s4),
-                                  child: PollView(poll: poll!, onVote: onVote),
-                                ),
-                              for (final attachment in attachments)
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.only(top: AppSpacing.s4),
-                                  child: AttachmentView(attachment: attachment),
-                                ),
-                              if (!_unsent)
-                                ReactionsRow(
-                                  reactions: reactions,
-                                  onReactionTap: onReactionTap,
-                                  onQuickReact: onQuickReact,
-                                  showAddButton: hovered,
-                                ),
-                              if (message.failed)
-                                FailedRow(
-                                    onRetry: onRetry, onDiscard: onDiscard),
-                            ],
+                MessageContextMenuRegion(
+                  content: message.content,
+                  actions: actions,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _Leading(
+                            grouped: grouped,
+                            isWebhook: isWebhook,
+                            message: message),
+                        const SizedBox(width: AppSpacing.s12),
+                        Expanded(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                                maxWidth: kMessageColumnMax),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (!grouped)
+                                  _Header(
+                                      message: message, isWebhook: isWebhook),
+                                editing
+                                    ? MessageEditField(
+                                        initialContent: message.content,
+                                        onSubmit: onSubmitEdit,
+                                        onCancel: onCancelEdit,
+                                      )
+                                    : MessageBody(
+                                        content: message.content,
+                                        knownUsernames: knownUsernames,
+                                        dim: _unsent,
+                                      ),
+                                if (message.editedAt != null && !editing)
+                                  const EditedMarker(),
+                                if (poll != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                        top: AppSpacing.s4),
+                                    child:
+                                        PollView(poll: poll!, onVote: onVote),
+                                  ),
+                                for (final attachment in attachments)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                        top: AppSpacing.s4),
+                                    child:
+                                        AttachmentView(attachment: attachment),
+                                  ),
+                                if (!_unsent)
+                                  ReactionsRow(
+                                    reactions: reactions,
+                                    onReactionTap: onReactionTap,
+                                    onPickReaction: onPickReaction,
+                                    showAddButton: hovered,
+                                  ),
+                                if (message.failed)
+                                  FailedRow(
+                                      onRetry: onRetry, onDiscard: onDiscard),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -182,15 +219,45 @@ class _HoverReveal extends StatefulWidget {
 
 class _HoverRevealState extends State<_HoverReveal> {
   bool _hovered = false;
+  bool _pinned = false;
+
+  void _pin(bool pinned) {
+    if (_pinned != pinned) setState(() => _pinned = pinned);
+  }
 
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: widget.builder(context, _hovered),
+      child: HoverRevealScope(
+        pin: _pin,
+        child: widget.builder(context, _hovered || _pinned),
+      ),
     );
   }
+}
+
+/// Lets a hover-revealed control keep itself mounted while it has a popup open.
+///
+/// Without it, moving the pointer onto the popup leaves the row's [MouseRegion],
+/// which unmounts the control and the popup with it - so the thing can be opened
+/// and never clicked.
+class HoverRevealScope extends InheritedWidget {
+  const HoverRevealScope({
+    super.key,
+    required this.pin,
+    required super.child,
+  });
+
+  final ValueChanged<bool> pin;
+
+  /// Null outside a hover-revealed subtree, where nothing needs pinning.
+  static HoverRevealScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<HoverRevealScope>();
+
+  @override
+  bool updateShouldNotify(HoverRevealScope oldWidget) => pin != oldWidget.pin;
 }
 
 class _Leading extends StatelessWidget {
@@ -239,7 +306,11 @@ class _Leading extends StatelessWidget {
       );
     }
 
-    return AppAvatar(name: _authorLabel(message), size: _avatarSize);
+    return AuthorAvatar(
+      userId: message.authorId,
+      name: _authorLabel(message),
+      size: _avatarSize,
+    );
   }
 }
 

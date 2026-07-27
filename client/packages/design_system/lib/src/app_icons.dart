@@ -22,6 +22,9 @@ abstract final class AppIcons {
   static const IconData chevronDown = LucideIcons.chevronDown;
   static const IconData pin = LucideIcons.pin;
 
+  /// The trigger for a per-row overflow menu (a channel's manage sheet).
+  static const IconData moreVertical = LucideIcons.moreVertical;
+
   // Messaging.
   static const IconData send = LucideIcons.send;
   static const IconData edit = LucideIcons.pencil;
@@ -31,6 +34,18 @@ abstract final class AppIcons {
   static const IconData poll = LucideIcons.barChart2;
   static const IconData code = LucideIcons.code;
   static const IconData smile = LucideIcons.smile;
+
+  // The emoji picker's category tabs. `smileysEmotion` reuses [smile] above
+  // and `recent` reuses [clock] below; these eight cover the rest of the
+  // `emojis` package's [EmojiGroup] set.
+  static const IconData peopleBody = LucideIcons.footprints;
+  static const IconData animalsNature = LucideIcons.pawPrint;
+  static const IconData foodDrink = LucideIcons.utensils;
+  static const IconData activities = LucideIcons.volleyball;
+  static const IconData travelPlaces = LucideIcons.planeTakeoff;
+  static const IconData objects = LucideIcons.lightbulb;
+  static const IconData symbols = LucideIcons.asterisk;
+  static const IconData flags = LucideIcons.flag;
 
   /// A staleness cue distinct from [pending]: the same glyph, a different
   /// role (an expiring device or invite rather than an in-flight send), kept
@@ -63,4 +78,15 @@ abstract final class AppIcons {
   static const IconData check = LucideIcons.check;
   static const IconData chevronRight = LucideIcons.chevronRight;
   static const IconData copy = LucideIcons.copy;
+
+  // Moderation and administration: the reports queue, invite management,
+  // roles, and channel permission overwrites.
+  static const IconData report = LucideIcons.messageSquareWarning;
+  static const IconData invite = LucideIcons.mailPlus;
+  static const IconData shield = LucideIcons.shield;
+  static const IconData delete = LucideIcons.trash2;
+  static const IconData revoke = LucideIcons.ban;
+  static const IconData dismiss = LucideIcons.x;
+  static const IconData assignRole = LucideIcons.userCog;
+  static const IconData permissions = LucideIcons.lock;
 }

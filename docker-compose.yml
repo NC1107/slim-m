@@ -33,6 +33,10 @@ services:
     restart: unless-stopped
     environment:
       SLIMM_LOG: ${SLIMM_LOG:-info}
+      # Empty by default, which means no CORS layer at all and every
+      # cross-origin browser request refused. Only a web build of the client
+      # served from another origin needs this; see deploy/README.md.
+      SLIMM_CORS_ALLOWED_ORIGINS: ${SLIMM_CORS_ALLOWED_ORIGINS:-}
       # Without these the server has no SFU and answers 501 for voice, which is
       # a supported way to run text-only but is not what somebody who brought up
       # the livekit service below is asking for. The URL is the one clients

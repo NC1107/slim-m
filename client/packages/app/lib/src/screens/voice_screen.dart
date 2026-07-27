@@ -8,11 +8,9 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
-import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 
 class VoiceScreen extends ConsumerWidget {
@@ -73,6 +71,12 @@ class _JoinPreview extends ConsumerWidget {
     final voice = ref.watch(voiceControllerProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
 
+    // One controller for the whole app: its error belongs to whichever
+    // channel it last tried, so a denial there must not leak in here.
+    final showingLastAttempt = voice.channelId == channelId;
+    final error = showingLastAttempt ? voice.error : null;
+    final canRetry = !showingLastAttempt || voice.retryable;
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
@@ -112,11 +116,11 @@ class _JoinPreview extends ConsumerWidget {
               // Camera is deliberately absent rather than shown disabled: there
               // is no camera path yet, and a dead control reads as broken.
               const SizedBox(height: AppSpacing.s16),
-              if (voice.error != null)
+              if (error != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.s12),
                   child: Text(
-                    voice.error!,
+                    error,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
@@ -124,17 +128,22 @@ class _JoinPreview extends ConsumerWidget {
                     ),
                   ),
                 ),
-              FilledButton(
-                onPressed: voice.state == VoiceSessionState.connecting
-                    ? null
-                    : () => controller.join(channelId),
-                style: FilledButton.styleFrom(
-                  backgroundColor: tokens.accentFill,
-                  foregroundColor: tokens.accentOn,
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s16),
+              // No button at all for a failure retrying cannot fix, rather
+              // than one that only invites the same failure a second time.
+              if (canRetry)
+                FilledButton(
+                  onPressed: showingLastAttempt &&
+                          voice.state == VoiceSessionState.connecting
+                      ? null
+                      : () => controller.join(channelId),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: tokens.accentFill,
+                    foregroundColor: tokens.accentOn,
+                    padding:
+                        const EdgeInsets.symmetric(vertical: AppSpacing.s16),
+                  ),
+                  child: const Text('Join call'),
                 ),
-                child: const Text('Join call'),
-              ),
             ],
           ),
         ),
@@ -501,14 +510,3 @@ class VoiceStripIndicator extends ConsumerWidget {
     );
   }
 }
-
-/// Whether this deployment offers voice at all, so the UI can hide it rather
-/// than offer a button that always fails.
-final voiceAvailableProvider = FutureProvider<bool>((ref) async {
-  try {
-    final version = await ref.watch(apiProvider).version();
-    return version.pushEnabled != null;
-  } on api.ApiException {
-    return true;
-  }
-});

@@ -167,6 +167,12 @@ class SyncController extends StateNotifier<SyncStatus> {
           case MessageCreated(:final message):
           case MessageEdited(:final message):
             await store.applyMessage(message);
+          case MessageDeleted(:final messageId):
+            // Closes a real gap: this switch previously had no case for a
+            // delete at all, so a message removed by another user (or this
+            // account's own delete looping back) never left the local store
+            // and stayed visible until the next full resync.
+            await store.discard(messageId);
           case ErrorEvent(:final needsResync) when needsResync:
             // The connection fell behind and the server closed it; a restart
             // re-runs catch-up, which is exactly the recovery.

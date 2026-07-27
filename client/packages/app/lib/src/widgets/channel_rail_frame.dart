@@ -15,6 +15,7 @@ import '../providers/sync_controller.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'member_pane.dart';
+import 'user_avatar.dart';
 
 /// The server's own identity, for the header's name line. Real endpoint;
 /// there is no separate per-deployment "workspace name" concept, so this is
@@ -190,7 +191,9 @@ class RailUserFooter extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          AppAvatar(
+          UserAvatar(
+            userId: me.valueOrNull?.id,
+            avatarUpdatedAt: me.valueOrNull?.avatarUpdatedAt,
             name: me.valueOrNull?.displayName ?? '',
             size: 28,
             status: presence,

@@ -78,5 +78,28 @@ void main() {
       expect(resolved.values, isNot(contains(AppAction.quickSwitch)));
       expect(resolved.values, contains(AppAction.focusComposer));
     });
+
+    test('activatorFor finds the key currently bound to an action', () {
+      // SingleActivator has no value equality, so a freshly resolved map's
+      // key never `==` one from an earlier call; compare fields instead.
+      final expected = resolveBindings()
+          .entries
+          .firstWhere((e) => e.value == AppAction.quickSwitch)
+          .key as SingleActivator;
+      final activator = activatorFor(AppAction.quickSwitch) as SingleActivator?;
+      expect(activator, isNotNull);
+      expect(activator!.trigger, expected.trigger);
+      expect(activator.control, expected.control);
+      expect(activator.meta, expected.meta);
+      expect(activator.shift, expected.shift);
+    });
+
+    test('activatorFor returns null once the action is unbound', () {
+      final activator = activatorFor(
+        AppAction.quickSwitch,
+        overrides: {AppAction.quickSwitch: null},
+      );
+      expect(activator, isNull);
+    });
   });
 }

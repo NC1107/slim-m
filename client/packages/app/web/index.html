@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    Replaced by the value of `flutter build`'s `--base-href` argument. Must
+    start and end with a slash.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="A lightweight, self-hostable messaging client.">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="slim-m">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F7F8F9">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#17191C">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>slim-m</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    /*
+      The canvas is transparent until Flutter paints its first frame, so
+      without this the browser's default white shows through and a dark-theme
+      user gets a full-page white flash on every load. Both values track
+      AppTokens.surfaceBase.
+    */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #F7F8F9;
+    }
+    @media (prefers-color-scheme: dark) {
+      html, body { background-color: #17191C; }
+    }
+  </style>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

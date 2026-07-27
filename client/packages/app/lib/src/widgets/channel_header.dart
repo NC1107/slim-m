@@ -117,16 +117,16 @@ class _PinPill extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final pinned = ref.watch(pinsControllerProvider(channelId));
-    final label = pinned == null ? '-' : '${pinned.length}';
+    final pins = ref.watch(pinsControllerProvider(channelId));
+    final label = pins.pinned == null ? '-' : '${pins.pinned!.length}';
 
     return GestureDetector(
       onTap: () => showPinnedMessagesSheet(context, channelId),
       child: Semantics(
         button: true,
-        label: pinned == null
+        label: pins.pinned == null
             ? 'Pinned messages, loading'
-            : 'Pinned messages, ${pinned.length}',
+            : 'Pinned messages, ${pins.pinned!.length}',
         child: Container(
           height: 28,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),

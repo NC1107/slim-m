@@ -22,6 +22,15 @@
 /// already running as this same OS account - but it is not readable by a
 /// different account on a shared machine, which is the threat this desktop
 /// build actually faces today.
+///
+/// The web build does use flutter_secure_storage, because its browser backend
+/// is the only storage a browser has: values are AES-GCM encrypted under a key
+/// that itself lives in `localStorage`, so this is obfuscation against a
+/// casual look, not secrecy against script running on the same origin. It is
+/// also refused outright outside a secure context, so a plain-http LAN server
+/// gets no persisted session at all. The web build exists to drive this UI
+/// automatically; it is not a distribution target, and nothing here should be
+/// read as a claim that a browser stores secrets as well as a phone does.
 library;
 
 import 'dart:convert';
@@ -32,6 +41,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'host_platform.dart';
 import 'key_store.dart';
 
 /// The platform keychain, through flutter_secure_storage. Use on iOS and
@@ -185,10 +195,12 @@ class FileKeyStore implements KeyStore {
 }
 
 /// Picks the right backend for this platform: the OS keychain on iOS and
-/// Android, an owner-only-permissioned file everywhere else (today that
-/// means the Linux desktop build, the only other platform this app ships
-/// to).
+/// Android, browser storage on the web (see the library doc for how much
+/// weaker that is), and an owner-only-permissioned file everywhere else,
+/// which today means the Linux desktop build.
 KeyStore createPersistentKeyStore() {
-  if (Platform.isIOS || Platform.isAndroid) return SecureKeyStore();
+  // Web is grouped with mobile rather than desktop because a browser has no
+  // filesystem to write an owner-only file to.
+  if (kIsWeb || isIOSHost || isAndroidHost) return SecureKeyStore();
   return FileKeyStore();
 }

@@ -6,6 +6,7 @@
 
 pub mod auth;
 pub mod config;
+pub mod cors;
 pub mod db;
 pub mod http;
 pub mod hub;
@@ -30,6 +31,9 @@ use tokio::net::{TcpListener, TcpStream};
 pub async fn run() -> anyhow::Result<()> {
     init_tracing();
     let config = config::Config::from_env()?;
+    // Before the database is touched, so a misconfigured origin list is a
+    // startup error and not a half-initialized deployment.
+    let cors = cors::CorsPolicy::new(&config)?;
     let pool = db::connect(&config).await?;
 
     let store = store::Store::new(pool);
@@ -41,7 +45,7 @@ pub async fn run() -> anyhow::Result<()> {
     let limiter = ratelimit::RateLimiter::new();
     let push = push::PushSender::new(&config)?;
     let voice = voice::VoiceService::new(&config)?;
-    let app = http::router(http::AppState {
+    let app = cors.apply(http::router(http::AppState {
         store,
         auth,
         hub,
@@ -49,7 +53,7 @@ pub async fn run() -> anyhow::Result<()> {
         push,
         voice,
         media,
-    });
+    }));
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;
     tracing::info!(%addr, version = env!("CARGO_PKG_VERSION"), "slim-m server listening");

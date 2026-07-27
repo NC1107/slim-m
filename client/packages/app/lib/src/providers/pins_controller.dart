@@ -15,11 +15,28 @@ import 'package:slimm_api/api.dart' as api;
 import 'live_events.dart';
 import 'providers.dart';
 
-/// A channel's pinned messages, newest pin first (matching the endpoint).
-/// Null means not yet loaded, distinct from an empty list: the header pill
-/// shows a dash for the former and "0" for the latter.
-class PinsController extends StateNotifier<List<api.PinnedMessage>?> {
-  PinsController(this._ref, this._channelId) : super(null) {
+/// A channel's pinned messages, newest pin first (matching the endpoint), plus
+/// whether the most recent fetch failed.
+///
+/// [pinned] is null only until the first fetch lands, distinct from an empty
+/// list: the header pill shows a dash for the former and "0" for the latter.
+/// A failed refresh leaves [pinned] exactly as it was (never blanks a pill
+/// already showing a real number) but still sets [failed], which is what lets
+/// the sheet tell "still loading" apart from "loading did not work" instead of
+/// spinning forever on a request that already came back.
+class PinsState {
+  const PinsState({this.pinned, this.failed = false, this.forbidden = false});
+
+  final List<api.PinnedMessage>? pinned;
+  final bool failed;
+
+  /// True when the failure was a 403: not a channel this account can see
+  /// pins in right now, and retrying the same request will not change that.
+  final bool forbidden;
+}
+
+class PinsController extends StateNotifier<PinsState> {
+  PinsController(this._ref, this._channelId) : super(const PinsState()) {
     _sub = _ref.read(liveEventsProvider).listen((event) {
       final matches = switch (event) {
         api.MessagePinned(:final channelId) => channelId == _channelId,
@@ -43,11 +60,22 @@ class PinsController extends StateNotifier<List<api.PinnedMessage>?> {
     try {
       final pinned =
           await _ref.read(apiProvider).listPinnedMessages(_channelId);
-      state = pinned;
+      state = PinsState(pinned: pinned);
+    } on api.ForbiddenException {
+      state = PinsState(pinned: state.pinned, failed: true, forbidden: true);
     } on api.ApiException {
-      // Leave whatever was last known rather than blanking a pill that was
-      // already showing a real number over one failed refresh.
+      state = PinsState(pinned: state.pinned, failed: true);
     }
+  }
+
+  /// Pins a message, or leaves the timestamp alone if it already was one
+  /// (idempotent server-side).
+  Future<void> pin(String messageId) async {
+    await _ref.read(apiProvider).pinMessage(
+          channelId: _channelId,
+          messageId: messageId,
+        );
+    await refresh();
   }
 
   Future<void> unpin(String messageId) async {
@@ -66,5 +94,5 @@ class PinsController extends StateNotifier<List<api.PinnedMessage>?> {
 }
 
 final pinsControllerProvider = StateNotifierProvider.autoDispose
-    .family<PinsController, List<api.PinnedMessage>?, String>(
+    .family<PinsController, PinsState, String>(
         (ref, channelId) => PinsController(ref, channelId));

@@ -10,10 +10,10 @@
 /// this one's settings in place.
 library;
 
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+import 'host_platform.dart';
 
 /// This app's one notification channel today. See the library doc for why a
 /// future change in importance mints a new, differently-versioned id rather
@@ -61,17 +61,19 @@ class _PluginPermissionRequester implements AndroidPermissionRequester {
 /// Displays the fixed local notification a data-only push needs on Android,
 /// and creates the versioned channel it displays through.
 ///
-/// A clean no-op on iOS and Linux: iOS shows its alert straight from APNs
-/// with no app code involved (a `kind` that should alert already carries a
-/// plain-text `aps.alert` the OS renders itself), and Linux has no push
-/// channel at all.
+/// A clean no-op on iOS, Linux and the web: iOS shows its alert straight from
+/// APNs with no app code involved (a `kind` that should alert already carries
+/// a plain-text `aps.alert` the OS renders itself), and neither Linux nor a
+/// browser has a push channel to display anything from. flutter_local_
+/// notifications ships no web implementation either, so there is nothing
+/// behind the plugin to call there.
 class LocalNotifications {
   LocalNotifications({
     FlutterLocalNotificationsPlugin? plugin,
     bool? isAndroid,
     AndroidPermissionRequester? permissionRequester,
   })  : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
-        _isAndroid = isAndroid ?? Platform.isAndroid,
+        _isAndroid = isAndroid ?? isAndroidHost,
         _permissionRequester = permissionRequester;
 
   final FlutterLocalNotificationsPlugin _plugin;
