@@ -41,12 +41,21 @@ use world::Contract;
 
 /// Operations this test cannot drive, each with the reason. Anything not on
 /// this list must be called.
-const UNCOVERED: &[(&str, &str)] = &[(
-    "connectWebSocket",
-    "an upgrade, not a request/response: the only statuses it documents are 101 and \
+const UNCOVERED: &[(&str, &str)] = &[
+    (
+        "kickVoiceParticipant",
+        "the only path to its 204 goes through a reachable LiveKit room service, \
+         which this harness has none of. Nothing is lost by not driving it: the \
+         success response is 204 with no body, so there is no shape to check. Its \
+         permission gate is covered in tests/voice.rs.",
+    ),
+    (
+        "connectWebSocket",
+        "an upgrade, not a request/response: the only statuses it documents are 101 and \
      503 and neither carries a body. The frames that flow afterwards are exercised by \
      tests/ws.rs against a real socket.",
-)];
+    ),
+];
 
 #[tokio::test]
 async fn responses_match_the_schema() {

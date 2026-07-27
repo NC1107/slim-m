@@ -1965,6 +1965,52 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /channels/{channelId}/voice/participants/{userId}/kick:
+    parameters:
+      - name: channelId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: kickVoiceParticipant
+      tags: [voice]
+      summary: Evict a participant from a channel's voice room.
+      description: >
+        Requires KICK_MEMBERS in that channel, evaluated per channel rather
+        than deployment-wide. Idempotent: removing somebody who is not
+        connected succeeds, since the SFU is the authority on who is in the
+        room and a retried request must not report a kick that landed as a
+        failure.
+
+
+        This does not prevent the target requesting a new token. Removing
+        CONNECT is what bars someone from a room; this is what makes that take
+        effect immediately rather than when their current token expires.
+      responses:
+        "204":
+          description: The participant is no longer in the room.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "501":
+          description: This deployment has no voice configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /sync:
     post:
       operationId: sync
