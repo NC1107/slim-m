@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Moderation and administration: the reports queue, invite management,
-/// roles, and channel permission overwrites.
+/// roles, channel permission overwrites, and the deployment's custom emoji.
 ///
 /// Moved out of `settings_screen.dart` unchanged, to get that file back under
 /// the project's 500-line hard limit before another section was added to it.
@@ -20,7 +20,7 @@ import 'settings_section_header.dart';
 /// base permissions, rather than shown and left to answer 403: a member
 /// without MANAGE_ROLES should not see role editing exists at all.
 ///
-/// Hidden entirely, divider included, for a caller with none of the four
+/// Hidden entirely, divider included, for a caller with none of the gating
 /// bits, so an ordinary member's settings screen looks exactly as it did
 /// before this section existed.
 class ModerationSettingsSection extends ConsumerWidget {
@@ -32,8 +32,9 @@ class ModerationSettingsSection extends ConsumerWidget {
     final canModerate = permissions.hasPermission(Perm.manageMessages);
     final canInvite = permissions.hasPermission(Perm.createInvite);
     final canManageRoles = permissions.hasPermission(Perm.manageRoles);
+    final canManageServer = permissions.hasPermission(Perm.manageServer);
 
-    if (!canModerate && !canInvite && !canManageRoles) {
+    if (!canModerate && !canInvite && !canManageRoles && !canManageServer) {
       return const SizedBox.shrink();
     }
 
@@ -73,6 +74,13 @@ class ModerationSettingsSection extends ConsumerWidget {
             onTap: () => context.push(Routes.adminOverwrites),
           ),
         ],
+        if (canManageServer)
+          ListTile(
+            leading: const Icon(AppIcons.smile),
+            title: const Text('Emoji'),
+            trailing: const Icon(AppIcons.chevronRight),
+            onTap: () => context.push(Routes.adminEmoji),
+          ),
       ],
     );
   }

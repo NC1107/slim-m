@@ -40,3 +40,14 @@ final invitesProvider = FutureProvider.autoDispose<List<api.Invite>>(
 final rolesProvider = FutureProvider.autoDispose<List<api.Role>>(
   (ref) => ref.watch(apiProvider).listRoles(),
 );
+
+/// Every custom emoji in the deployment, oldest first.
+///
+/// The one list, not the administration screen's own: `customEmojiIndexProvider`
+/// in `emoji_catalog_provider.dart` reads it too, so uploading or removing one
+/// here is what makes the next message render (or stop rendering) it. Two
+/// providers over `GET /emoji` would leave a freshly uploaded emoji
+/// unrenderable until relaunch.
+final customEmojiProvider = FutureProvider.autoDispose<List<api.CustomEmoji>>(
+  (ref) => ref.watch(apiProvider).listCustomEmoji(),
+);

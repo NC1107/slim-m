@@ -22,6 +22,7 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/admin/channel_overwrites_screen.dart';
+import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
 import 'package:slimm_app/src/screens/admin/invites_screen.dart';
 import 'package:slimm_app/src/screens/admin/reports_screen.dart';
 import 'package:slimm_app/src/screens/admin/roles_screen.dart';
@@ -120,10 +121,10 @@ class _FakeSession implements VoiceSession {
   Future<bool> setMicrophoneEnabled(bool enabled) async => true;
 
   @override
-  Future<bool> setScreenShareEnabled(
+  Future<ScreenShareOutcome> setScreenShareEnabled(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
-  }) async => enabled;
+  }) async => enabled ? ScreenShareOutcome.started : ScreenShareOutcome.stopped;
 
   @override
   Future<bool> setDeafened(bool value) async => true;
@@ -249,6 +250,12 @@ void main() {
           .first,
       "the reports queue's empty state",
     );
+  });
+
+  testWidgets('the emoji list is inset', (tester) async {
+    await _pump(tester, const EmojiScreen());
+
+    _expectClearOfIndicator(tester, find.byType(ListView), 'the emoji list');
   });
 
   testWidgets('the channel overwrites list is inset', (tester) async {

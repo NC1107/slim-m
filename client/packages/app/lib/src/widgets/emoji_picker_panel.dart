@@ -1,0 +1,203 @@
+// SPDX-License-Identifier: Apache-2.0
+/// The picker surface itself: search, category tabs, and the grid they
+/// filter. Its two entry points (a hover-anchored button and a bottom sheet)
+/// live in `emoji_picker.dart`, which re-exports this.
+library;
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_api/api.dart' show CustomEmoji;
+import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
+
+import '../providers/admin_providers.dart';
+import '../providers/recent_emoji.dart';
+import 'emoji_catalog.dart';
+import 'emoji_picker_grid.dart';
+
+/// The panel's own measured width, like the command palette's `_paletteWidth`
+/// beside it; neither is on the spacing grid.
+const double pickerWidth = 320;
+const double _gridHeight = 260;
+
+/// Exposed on its own so a test can pump it without the button's overlay
+/// plumbing around it.
+class EmojiPickerPanel extends ConsumerStatefulWidget {
+  const EmojiPickerPanel({
+    super.key,
+    required this.onSelect,
+    required this.onClose,
+    this.autofocusSearch = true,
+    this.width = pickerWidth,
+  });
+
+  /// Called with the picked emoji's token: the character itself for a unicode
+  /// emoji, `:name:` for one of the deployment's own.
+  final ValueChanged<String> onSelect;
+  final VoidCallback onClose;
+
+  /// Off in a sheet: an autofocused search field raises the soft keyboard
+  /// over the grid before the user has seen any of it.
+  final bool autofocusSearch;
+
+  /// Overridable so the panel can shrink to a narrow phone rather than
+  /// overflow its sheet.
+  final double width;
+
+  @override
+  ConsumerState<EmojiPickerPanel> createState() => _EmojiPickerPanelState();
+}
+
+class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
+  String _query = '';
+
+  /// Null until a tab is tapped, so the panel can open on whichever one
+  /// leads; see [effectiveCategory].
+  EmojiCategory? _category;
+  int _highlighted = 0;
+
+  /// The last frame's flat result list, so a key handler (which runs outside
+  /// build) can act on exactly what is on screen, the same convention the
+  /// command palette uses for its own `_visible`.
+  List<PickerEmoji> _visible = const [];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  void _onQueryChanged(String value) {
+    setState(() {
+      _query = value;
+      _highlighted = 0;
+    });
+  }
+
+  void _selectCategory(EmojiCategory category) {
+    setState(() {
+      _category = category;
+      _query = '';
+      _searchController.clear();
+      _highlighted = 0;
+    });
+  }
+
+  void _move(int delta) {
+    if (_visible.isEmpty) return;
+    setState(() {
+      _highlighted = (_highlighted + delta) % _visible.length;
+      if (_highlighted < 0) _highlighted += _visible.length;
+    });
+  }
+
+  void _pick(PickerEmoji emoji) {
+    unawaited(ref.read(recentEmojiProvider.notifier).use(emoji.token));
+    widget.onSelect(emoji.token);
+  }
+
+  void _pickHighlighted() {
+    if (_visible.isEmpty) return;
+    _pick(_visible[_highlighted]);
+  }
+
+  Map<ShortcutActivator, VoidCallback> _bindings() {
+    final close = activatorFor(AppAction.escape);
+    return {
+      const SingleActivator(LogicalKeyboardKey.arrowDown): () => _move(1),
+      const SingleActivator(LogicalKeyboardKey.arrowUp): () => _move(-1),
+      if (close != null) close: widget.onClose,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final recent = ref.watch(recentEmojiProvider);
+
+    /// A deployment with none, one still loading, and one whose list could
+    /// not be fetched are all the same picker: the one there has always been.
+    final custom =
+        ref.watch(customEmojiProvider).valueOrNull ?? const <CustomEmoji>[];
+    final searching = _query.trim().isNotEmpty;
+    final category = effectiveCategory(_category, hasCustom: custom.isNotEmpty);
+
+    final results = pickerResults(
+      query: _query,
+      category: category,
+      recent: recent,
+      custom: custom,
+    );
+    _visible = results;
+    if (_highlighted >= results.length) {
+      _highlighted = results.isEmpty ? 0 : results.length - 1;
+    }
+
+    return CallbackShortcuts(
+      bindings: _bindings(),
+      child: Material(
+        type: MaterialType.transparency,
+        child: AppMenu(
+          width: widget.width,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.s8),
+              child: AppInput(
+                controller: _searchController,
+                focusNode: _searchFocus,
+                autofocus: widget.autofocusSearch,
+                placeholder: 'Search emoji',
+                icon: Icon(
+                  AppIcons.search,
+                  size: AppSizes.icon16,
+                  color: tokens.textSecondary,
+                ),
+                onChanged: _onQueryChanged,
+                onSubmitted: (_) => _pickHighlighted(),
+                semanticLabel: 'Search emoji',
+              ),
+            ),
+            if (!searching) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+                child: EmojiCategoryTabs(
+                  categories: pickerTabs(
+                    hasCustom: custom.isNotEmpty,
+                    hasRecent: recent.isNotEmpty,
+                  ),
+                  selected: category,
+                  onSelect: _selectCategory,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s4),
+            ],
+            const AppMenuDivider(),
+            SizedBox(
+              height: _gridHeight,
+              child: results.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No matches.',
+                        style: AppText.body.copyWith(
+                          color: tokens.textSecondary,
+                        ),
+                      ),
+                    )
+                  : EmojiGrid(
+                      emoji: results,
+                      highlighted: _highlighted,
+                      onTap: _pick,
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

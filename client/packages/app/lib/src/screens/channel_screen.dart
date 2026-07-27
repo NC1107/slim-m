@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The conversation: history, live arrivals, search, and the composer.
+///
+/// This screen holds the state a channel view has to carry across a rebuild
+/// (what is being edited, what has been marked read, where the scroll is) and
+/// wires the pieces together. The two things it used to also do live next
+/// door now: `channel_message_actions.dart` acts on a single message, and
+/// `widgets/message_transcript.dart` lays the list out.
 library;
 
 import 'dart:async';
@@ -8,11 +14,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
-import 'package:slimm_design_system/design_system.dart';
 
 import '../ids.dart';
 import '../providers/admin_providers.dart';
 import '../providers/channel_search_controller.dart';
+import '../providers/emoji_catalog_provider.dart';
 import '../providers/message_actions.dart';
 import '../providers/message_extras.dart';
 import '../providers/pins_controller.dart';
@@ -22,11 +28,10 @@ import '../routing/breakpoints.dart';
 import '../widgets/channel_header.dart';
 import '../widgets/channel_search.dart';
 import '../widgets/composer.dart';
-import '../widgets/confirm_dialog.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/message_context_menu.dart';
-import '../widgets/message_row.dart';
-import '../widgets/report_dialog.dart';
+import '../widgets/message_transcript.dart';
+import 'channel_message_actions.dart';
 
 export '../ids.dart' show newMessageId;
 
@@ -96,66 +101,24 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   }
 
   /// Sends, showing the message immediately and reconciling with the server's
-  /// copy when it lands. The id is generated here and reused on retry, so a
-  /// retry after an uncertain failure can never post twice. The field is
-  /// cleared before the first await, so two calls in one turn cannot both
-  /// read the same text: the second finds it empty and returns.
+  /// copy when it lands. The field is cleared before the first await, so two
+  /// calls in one turn cannot both read the same text: the second finds it
+  /// empty and returns.
   Future<void> _send(List<String> attachmentIds) async {
     final text = _composer.text.trim();
     if (text.isEmpty) return;
     _composer.clear();
 
-    final store = await ref.read(storeProvider.future);
-    final session = ref.read(sessionProvider);
-    final id = newMessageId();
-
-    await store.addPending(
-      id: id,
+    await sendOptimistically(
+      ref,
+      id: newMessageId(),
       channelId: widget.channelId,
-      authorId: session.tokens?.userId ?? '',
+      authorId: ref.read(sessionProvider).tokens?.userId ?? '',
       content: text,
+      attachmentIds: attachmentIds,
+      onQueued: _scrollToLatest,
     );
     _scrollToLatest();
-
-    try {
-      final sent = await ref
-          .read(apiProvider)
-          .sendMessage(
-            channelId: widget.channelId,
-            id: id,
-            content: text,
-            attachmentIds: attachmentIds,
-          );
-      // Lands on the same row, because it carries the same id.
-      await store.applyMessage(sent);
-      ref.read(messageExtrasProvider.notifier).applyMessage(sent);
-    } on api.ApiException {
-      await store.markFailed(id);
-    }
-    _scrollToLatest();
-  }
-
-  Future<void> _retry(Message message) async {
-    final store = await ref.read(storeProvider.future);
-    await store.addPending(
-      id: message.id,
-      channelId: message.channelId,
-      authorId: message.authorId ?? '',
-      content: message.content,
-    );
-    try {
-      final sent = await ref
-          .read(apiProvider)
-          .sendMessage(
-            channelId: message.channelId,
-            id: message.id,
-            content: message.content,
-          );
-      await store.applyMessage(sent);
-      ref.read(messageExtrasProvider.notifier).applyMessage(sent);
-    } on api.ApiException {
-      await store.markFailed(message.id);
-    }
   }
 
   Future<void> _pickReaction(Message message, String emoji) => setReaction(
@@ -168,109 +131,45 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   Future<void> _toggleReaction(Message message, api.ReactionSummary reaction) =>
       setReaction(ref, message.id, reaction.emoji, wasActive: reaction.reacted);
 
-  Future<void> _vote(Message message, int option) =>
-      castVote(ref, message.id, option);
-
   void _startEdit(Message message) => setState(() => _editingId = message.id);
 
   void _cancelEdit() => setState(() => _editingId = null);
 
-  Future<void> _submitEdit(Message message, String content) async {
+  void _submitEdit(Message message, String content) {
     setState(() => _editingId = null);
-    if (content == message.content) return;
-    try {
-      await editMessageAction(ref, message, content);
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save the edit. ${e.message}')),
-      );
-    }
+    unawaited(submitMessageEdit(ref, context, message, content));
   }
 
-  Future<void> _deleteMessage(Message message) async {
-    final confirmed = await confirmDangerousAction(
-      context,
-      title: 'Delete message?',
-      message:
-          'This removes it for everyone in the channel. '
-          'This cannot be undone.',
-      confirmLabel: 'Delete',
-    );
-    if (!confirmed || !mounted) return;
-    try {
-      await deleteMessageAction(ref, message);
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete the message. ${e.message}')),
-      );
-    }
-  }
-
-  Future<void> _togglePin(Message message, bool pinned) async {
-    final controller = ref.read(
-      pinsControllerProvider(widget.channelId).notifier,
-    );
-    try {
-      if (pinned) {
-        await controller.unpin(message.id);
-      } else {
-        await controller.pin(message.id);
-      }
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update the pin. ${e.message}')),
-      );
-    }
-  }
-
-  Future<void> _reportMessage(Message message) async {
-    final reason = await promptReportReason(
-      context,
-      subjectLabel: 'this message',
-    );
-    if (reason == null || !mounted) return;
-    try {
-      await ref
-          .read(apiProvider)
-          .report(
-            subject: api.ReportSubject.message,
-            subjectId: message.id,
-            reason: reason,
-          );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Report filed. A moderator will review it.'),
+  /// What this viewer may do to [message], which is the screen's business:
+  /// it is the one holding the session and the permission bits.
+  MessageActions _actionsFor(
+    Message message, {
+    required String? myId,
+    required int myPermissions,
+    required Set<String> pinnedIds,
+  }) {
+    final pinned = pinnedIds.contains(message.id);
+    return MessageActions(
+      canEdit: canEditMessage(message, myId),
+      onEdit: () => _startEdit(message),
+      canDelete: canDeleteMessage(message, myId, myPermissions),
+      onDelete: () => unawaited(confirmAndDeleteMessage(ref, context, message)),
+      canManagePins: canManageMessagePin(message, myPermissions),
+      pinned: pinned,
+      onTogglePin: () => unawaited(
+        toggleMessagePin(
+          ref,
+          context,
+          channelId: widget.channelId,
+          message: message,
+          pinned: pinned,
         ),
-      );
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not file the report. ${e.message}')),
-      );
-    }
-  }
-
-  Future<void> _blockAuthor(Message message) async {
-    final authorId = message.authorId;
-    if (authorId == null) return;
-    try {
-      await ref.read(apiProvider).blockUser(authorId);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Blocked. Their messages are hidden for you.'),
-        ),
-      );
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not block that user. ${e.message}')),
-      );
-    }
+      ),
+      canReport: canReportMessage(message, myId),
+      onReport: () => unawaited(reportMessage(ref, context, message)),
+      canBlockAuthor: canBlockMessageAuthor(message, myId),
+      onBlockAuthor: () => unawaited(blockMessageAuthor(ref, context, message)),
+    );
   }
 
   /// Both the flag and the query live in [channelSearchProvider] so the
@@ -351,10 +250,12 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               members.map((m) => m.username.toLowerCase()).toSet(),
           orElse: () => const <String>{},
         );
+    final customEmoji = ref.watch(customEmojiIndexProvider);
     final extrasById = ref.watch(messageExtrasProvider);
+    final syncStatus = ref.watch(syncControllerProvider);
     final myId = ref.watch(meProvider).valueOrNull?.id;
     final myPermissions = ref.watch(myPermissionsProvider);
-    final pinnedIds = {
+    final pinnedIds = <String>{
       for (final p
           in ref.watch(pinsControllerProvider(widget.channelId)).pinned ??
               const [])
@@ -400,6 +301,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                       ? ChannelSearchResults(
                           results: search.results,
                           knownUsernames: knownUsernames,
+                          customEmoji: customEmoji,
                           loading: search.loading,
                           failed: search.failed,
                           forbidden: search.forbidden,
@@ -409,88 +311,34 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                           stream: store.watchChannel(widget.channelId),
                           builder: (context, snapshot) {
                             final messages = snapshot.data ?? const <Message>[];
-                            if (messages.isEmpty) {
-                              return _EmptyMessages(
-                                syncStatus: ref.watch(syncControllerProvider),
-                              );
-                            }
                             final lastReadSeq = channel?.lastReadSeq ?? 0;
                             _markReadUpToLatest(messages, lastReadSeq);
-                            // Reversed so the design's bottom-filled column puts
-                            // a short conversation against the composer.
-                            return ListView.builder(
-                              controller: _scroll,
-                              reverse: true,
-                              padding: const EdgeInsets.only(
-                                bottom: AppSpacing.s8,
+                            return MessageTranscript(
+                              messages: messages,
+                              syncStatus: syncStatus,
+                              scrollController: _scroll,
+                              lastReadSeq: lastReadSeq,
+                              editingId: _editingId,
+                              knownUsernames: knownUsernames,
+                              customEmoji: customEmoji,
+                              extrasById: extrasById,
+                              actionsFor: (message) => _actionsFor(
+                                message,
+                                myId: myId,
+                                myPermissions: myPermissions,
+                                pinnedIds: pinnedIds,
                               ),
-                              itemCount: messages.length,
-                              itemBuilder: (context, i) {
-                                // Index 0 is the newest; `previous` stays the row
-                                // visually above, so grouping still reads right.
-                                final index = messages.length - 1 - i;
-                                final message = messages[index];
-                                final previous = index == 0
-                                    ? null
-                                    : messages[index - 1];
-                                final extras =
-                                    extrasById[message.id] ??
-                                    MessageExtras.empty;
-                                final pinned = pinnedIds.contains(message.id);
-                                return MessageRow(
-                                  message: message,
-                                  grouped: _isGrouped(message, previous),
-                                  showNewDivider: _startsUnread(
-                                    message,
-                                    previous,
-                                    lastReadSeq,
-                                  ),
-                                  knownUsernames: knownUsernames,
-                                  onRetry: () => _retry(message),
-                                  onDiscard: () async => (await ref.read(
-                                    storeProvider.future,
-                                  )).discard(message.id),
-                                  onPickReaction: (emoji) =>
-                                      _pickReaction(message, emoji),
-                                  onReactionTap: (reaction) =>
-                                      _toggleReaction(message, reaction),
-                                  onVote: (option) => _vote(message, option),
-                                  reactions: extras.reactions,
-                                  attachments: extras.attachments,
-                                  poll: extras.poll,
-                                  editing: message.id == _editingId,
-                                  onSubmitEdit: (content) =>
-                                      unawaited(_submitEdit(message, content)),
-                                  onCancelEdit: _cancelEdit,
-                                  actions: MessageActions(
-                                    canEdit: canEditMessage(message, myId),
-                                    onEdit: () => _startEdit(message),
-                                    canDelete: canDeleteMessage(
-                                      message,
-                                      myId,
-                                      myPermissions,
-                                    ),
-                                    onDelete: () =>
-                                        unawaited(_deleteMessage(message)),
-                                    canManagePins: canManageMessagePin(
-                                      message,
-                                      myPermissions,
-                                    ),
-                                    pinned: pinned,
-                                    onTogglePin: () =>
-                                        unawaited(_togglePin(message, pinned)),
-                                    canReport: canReportMessage(message, myId),
-                                    onReport: () =>
-                                        unawaited(_reportMessage(message)),
-                                    canBlockAuthor: canBlockMessageAuthor(
-                                      message,
-                                      myId,
-                                    ),
-                                    onBlockAuthor: () =>
-                                        unawaited(_blockAuthor(message)),
-                                  ),
-                                );
-                              },
+                              onRetry: (m) => unawaited(retryMessage(ref, m)),
+                              onDiscard: (m) =>
+                                  unawaited(discardMessage(ref, m)),
+                              onPickReaction: (m, emoji) =>
+                                  unawaited(_pickReaction(m, emoji)),
+                              onReactionTap: (m, reaction) =>
+                                  unawaited(_toggleReaction(m, reaction)),
+                              onVote: (m, option) =>
+                                  unawaited(castVote(ref, m.id, option)),
+                              onSubmitEdit: _submitEdit,
+                              onCancelEdit: _cancelEdit,
                             );
                           },
                         ),
@@ -509,63 +357,3 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     );
   }
 }
-
-/// What an empty message list means depends on whether catch-up has actually
-/// run: a channel can look empty because it is, or because sync has not
-/// reached it yet, and those read as opposite things to the person waiting.
-class _EmptyMessages extends StatelessWidget {
-  const _EmptyMessages({required this.syncStatus});
-
-  final SyncStatus syncStatus;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return switch (syncStatus) {
-      SyncStatus.connecting => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const SizedBox(height: AppSpacing.s12),
-            Text(
-              'Catching up on messages...',
-              style: TextStyle(color: tokens.textSecondary),
-            ),
-          ],
-        ),
-      ),
-      SyncStatus.offline => Center(
-        child: Text(
-          'Offline. Messages will appear once reconnected.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: tokens.textSecondary),
-        ),
-      ),
-      SyncStatus.live => Center(
-        child: Text(
-          'No messages yet.',
-          style: TextStyle(color: tokens.textSecondary),
-        ),
-      ),
-    };
-  }
-}
-
-/// A continuation of the same author's previous message inside the density's
-/// grouping window drops its avatar and header.
-bool _isGrouped(Message message, Message? previous) =>
-    previous != null &&
-    previous.authorId == message.authorId &&
-    (message.createdAt - previous.createdAt).abs() <
-        AppDensity.normal.groupWindow.inMilliseconds;
-
-/// True for the first message past the read marker, so the "New" divider
-/// lands exactly once, directly above it.
-bool _startsUnread(Message message, Message? previous, int lastReadSeq) =>
-    message.seq > lastReadSeq &&
-    (previous == null || previous.seq <= lastReadSeq);

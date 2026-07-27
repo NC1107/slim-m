@@ -82,7 +82,7 @@ const _hintKey = Key('composer-newline-hint');
 /// package bump reorders it and a fixed literal would fail for a reason that
 /// has nothing to do with the behaviour under test.
 String _firstGridGlyph(WidgetTester tester) =>
-    tester.widget<EmojiGrid>(find.byType(EmojiGrid)).emoji.first.char;
+    tester.widget<EmojiGrid>(find.byType(EmojiGrid)).emoji.first.token;
 
 void main() {
   late TextEditingController controller;
@@ -275,9 +275,8 @@ void main() {
       await tester.pump(kThemeAnimationDuration);
       expect(tester.widget<Visibility>(find.byKey(_hintKey)).visible, isTrue);
       expect(find.text('shift + enter for newline'), findsOneWidget);
-      // It collapses on touch rather than reserving its height. The hint can
-      // never be shown there, so holding a row open for it is wasted space on
-      // the one layout with the least of it.
+      // It collapses on touch rather than reserving its height: the hint can
+      // never show there, so a held-open row is wasted space on the tightest.
       expect(touchHeight, 0.0);
       expect(
         tester.getSize(find.byKey(_hintKey)).height,

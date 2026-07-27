@@ -22,6 +22,7 @@ class VoiceState {
     this.participants = const [],
     this.microphoneEnabled = true,
     this.screenSharing = false,
+    this.awaitingBroadcast = false,
     this.canPublish = true,
     this.deafened = false,
     this.error,
@@ -38,6 +39,12 @@ class VoiceState {
   /// without SPEAK cannot open a microphone however the toggle is set.
   final bool microphoneEnabled;
   final bool screenSharing;
+
+  /// iOS only: sharing has been asked for and the system is waiting on the
+  /// user to start a broadcast. Nobody can see a screen yet, so this is
+  /// deliberately not [screenSharing]; showing it as sharing is the exact
+  /// lie this field exists to stop.
+  final bool awaitingBroadcast;
 
   /// Whether the token allows publishing at all, mirroring the SPEAK grant.
   final bool canPublish;
@@ -60,6 +67,7 @@ class VoiceState {
     List<VoiceParticipant>? participants,
     bool? microphoneEnabled,
     bool? screenSharing,
+    bool? awaitingBroadcast,
     bool? canPublish,
     bool? deafened,
     String? error,
@@ -71,6 +79,7 @@ class VoiceState {
     participants: participants ?? this.participants,
     microphoneEnabled: microphoneEnabled ?? this.microphoneEnabled,
     screenSharing: screenSharing ?? this.screenSharing,
+    awaitingBroadcast: awaitingBroadcast ?? this.awaitingBroadcast,
     canPublish: canPublish ?? this.canPublish,
     deafened: deafened ?? this.deafened,
     error: clearError ? null : (error ?? this.error),
@@ -79,26 +88,38 @@ class VoiceState {
 }
 
 class VoiceController extends StateNotifier<VoiceState> {
-  VoiceController(this._ref, {VoiceSession? session})
-    : _session = session ?? VoiceSession(),
-      super(const VoiceState()) {
+  VoiceController(
+    this._ref, {
+    VoiceSession? session,
+    this.broadcastStartTimeout = const Duration(seconds: 30),
+  }) : _session = session ?? VoiceSession(),
+       super(const VoiceState()) {
     _states = _session.states.listen((s) {
       state = state.copyWith(state: s);
     });
     _participants = _session.participantChanges.listen((p) {
+      // Trust the session's view of the local participant over the local
+      // toggle: the SFU is what actually decides whether a track is live.
+      final sharing = p.any((x) => x.isLocal && x.isScreenSharing);
+      if (sharing) _cancelBroadcastDeadline();
       state = state.copyWith(
         participants: p,
-        // Trust the session's view of the local participant over the local
-        // toggle: the SFU is what actually decides whether a track is live.
-        screenSharing: p.any((x) => x.isLocal && x.isScreenSharing),
+        screenSharing: sharing,
+        awaitingBroadcast: sharing ? false : state.awaitingBroadcast,
       );
     });
   }
+
+  /// How long to wait for iOS to actually start a broadcast before saying so.
+  /// Long enough for the picker, its confirmation and a three second
+  /// countdown; short enough that a build with no extension is not a mystery.
+  final Duration broadcastStartTimeout;
 
   final Ref _ref;
   final VoiceSession _session;
   late final StreamSubscription<VoiceSessionState> _states;
   late final StreamSubscription<List<VoiceParticipant>> _participants;
+  Timer? _broadcastDeadline;
 
   /// Sets the microphone preference before joining. Has no effect on a live
   /// call; use [toggleMicrophone] for that.
@@ -146,6 +167,7 @@ class VoiceController extends StateNotifier<VoiceState> {
   }
 
   Future<void> leave() async {
+    _cancelBroadcastDeadline();
     await _session.leave();
     state = const VoiceState();
   }
@@ -181,18 +203,66 @@ class VoiceController extends StateNotifier<VoiceState> {
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
   }) async {
-    final got = await _session.setScreenShareEnabled(enabled, quality: quality);
-    state = state.copyWith(
-      screenSharing: got,
-      error: enabled && !got
-          ? 'Could not start sharing. The desktop may have refused the capture.'
-          : null,
-      clearError: !(enabled && !got),
+    _cancelBroadcastDeadline();
+    final outcome = await _session.setScreenShareEnabled(
+      enabled,
+      quality: quality,
     );
+    switch (outcome) {
+      case ScreenShareOutcome.started:
+        state = state.copyWith(screenSharing: true, clearError: true);
+      case ScreenShareOutcome.stopped:
+        state = state.copyWith(screenSharing: false, clearError: true);
+      case ScreenShareOutcome.pendingBroadcast:
+        state = state.copyWith(awaitingBroadcast: true, clearError: true);
+        _broadcastDeadline = Timer(
+          broadcastStartTimeout,
+          _reportBroadcastNeverStarted,
+        );
+      case ScreenShareOutcome.unsupported:
+        state = state.copyWith(
+          screenSharing: false,
+          awaitingBroadcast: false,
+          error:
+              'This build cannot share a screen: its screen recording '
+              'extension is missing or not set up.',
+          retryable: false,
+        );
+      case ScreenShareOutcome.failed:
+        state = state.copyWith(
+          screenSharing: false,
+          awaitingBroadcast: false,
+          error: enabled
+              ? 'Could not start sharing. The system refused the capture.'
+              : 'Could not stop sharing.',
+        );
+    }
+  }
+
+  /// The user was shown a broadcast picker and nothing came of it: they
+  /// dismissed it, or there was nothing in it to pick. Either way the share
+  /// is not happening, and saying nothing would leave the button pretending.
+  void _reportBroadcastNeverStarted() {
+    _broadcastDeadline = null;
+    if (!state.awaitingBroadcast) return;
+    state = state.copyWith(
+      awaitingBroadcast: false,
+      screenSharing: false,
+      error:
+          'Screen sharing never started. Tap share again and choose Start '
+          'Broadcast. If nothing appeared to choose, this build has no screen '
+          'recording extension.',
+    );
+  }
+
+  void _cancelBroadcastDeadline() {
+    _broadcastDeadline?.cancel();
+    _broadcastDeadline = null;
   }
 
   @override
   void dispose() {
+    _cancelBroadcastDeadline();
     unawaited(_states.cancel());
     unawaited(_participants.cancel());
     unawaited(_session.dispose());

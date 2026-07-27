@@ -8,7 +8,12 @@ import 'package:flutter/material.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import 'custom_emoji_image.dart';
 import 'emoji_picker.dart';
+
+/// 16, not the 13 the chip's text glyph uses: 13 is a font size, and an emoji
+/// face draws well inside its em box while an image fills whatever box it gets.
+const double _reactionEmojiSize = 16;
 
 class EditedMarker extends StatelessWidget {
   const EditedMarker({super.key});
@@ -37,12 +42,18 @@ class EditedMarker extends StatelessWidget {
 /// Tapping an existing chip calls [onReactionTap] with that summary; the
 /// caller decides whether that means adding or removing based on whether it
 /// was already active.
+///
+/// A reaction key is not always a codepoint. The server keys a reaction on
+/// whatever short string it is given, so one of the deployment's own emoji
+/// rides there as its `:shortcode:` and is drawn here through [customEmoji],
+/// the same index a message body resolves against.
 class ReactionsRow extends StatelessWidget {
   const ReactionsRow({
     super.key,
     required this.reactions,
     required this.onReactionTap,
     required this.onPickReaction,
+    this.customEmoji = const {},
     this.showAddButton = false,
   });
 
@@ -51,6 +62,11 @@ class ReactionsRow extends StatelessWidget {
 
   /// Called with the emoji character the picker chose.
   final ValueChanged<String> onPickReaction;
+
+  /// The deployment's custom emoji, lower-cased name to id. Empty while the
+  /// set is loading or unfetchable, which leaves a shortcode reaction as the
+  /// literal text it already was, exactly as a message body degrades.
+  final Map<String, String> customEmoji;
 
   /// Whether to offer the add-a-reaction control. The row keeps rendering
   /// existing reactions without it.
@@ -76,6 +92,13 @@ class ReactionsRow extends StatelessWidget {
               emoji: reaction.emoji,
               count: reaction.count,
               active: reaction.reacted,
+              glyph: switch (customEmojiIdFor(reaction.emoji, customEmoji)) {
+                final String id => CustomEmojiImage(
+                  emojiId: id,
+                  size: _reactionEmojiSize,
+                ),
+                null => null,
+              },
               onTap: () => onReactionTap(reaction),
             ),
           if (showAddButton) EmojiPickerButton(onSelect: onPickReaction),

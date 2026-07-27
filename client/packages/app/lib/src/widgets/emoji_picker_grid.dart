@@ -2,10 +2,10 @@
 /// The emoji picker's category tab row and result grid.
 library;
 
-import 'package:emojis/emoji.dart';
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'custom_emoji_image.dart';
 import 'emoji_catalog.dart';
 
 /// The row of category tabs above the grid. Hidden by the panel while a
@@ -58,9 +58,9 @@ class EmojiGrid extends StatelessWidget {
     required this.onTap,
   });
 
-  final List<Emoji> emoji;
+  final List<PickerEmoji> emoji;
   final int highlighted;
-  final ValueChanged<Emoji> onTap;
+  final ValueChanged<PickerEmoji> onTap;
 
   static const int columns = 8;
 
@@ -95,7 +95,7 @@ class _EmojiCell extends StatefulWidget {
     required this.onTap,
   });
 
-  final Emoji emoji;
+  final PickerEmoji emoji;
   final bool highlighted;
   final VoidCallback onTap;
 
@@ -132,15 +132,19 @@ class _EmojiCellState extends State<_EmojiCell> {
 
       /// 20, not on AppText's scale: sized to read as a legible glyph rather
       /// than any text style, the same literal exception AppChip.reaction
-      /// documents for its own emoji glyph.
-      child: Text(
-        widget.emoji.char,
-        style: const TextStyle(fontSize: 20, height: 1),
-      ),
+      /// documents for its own emoji glyph. An uploaded image is drawn to the
+      /// same 20 so the two kinds sit on one visual line.
+      child: switch (widget.emoji) {
+        UnicodeEmoji(:final emoji) => Text(
+          emoji.char,
+          style: const TextStyle(fontSize: 20, height: 1),
+        ),
+        DeploymentEmoji(:final emoji) => CustomEmojiImage(emojiId: emoji.id),
+      },
     );
 
     return Semantics(
-      label: widget.emoji.name,
+      label: widget.emoji.label,
       button: true,
       selected: widget.highlighted,
       child: FocusableActionDetector(

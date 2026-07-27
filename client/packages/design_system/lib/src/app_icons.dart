@@ -47,6 +47,11 @@ abstract final class AppIcons {
   static const IconData symbols = LucideIcons.asterisk;
   static const IconData flags = LucideIcons.flag;
 
+  /// The picker's tab for the deployment's own uploaded emoji, and the
+  /// placeholder a tile falls back to when that image cannot be fetched.
+  static const IconData customEmoji = LucideIcons.sticker;
+  static const IconData imageMissing = LucideIcons.imageOff;
+
   /// A staleness cue distinct from [pending]: the same glyph, a different
   /// role (an expiring device or invite rather than an in-flight send), kept
   /// as its own name so the two are never conflated at a call site.

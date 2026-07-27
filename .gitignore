@@ -55,6 +55,11 @@ client/**/macos/Flutter/ephemeral/
 # belong in CLAUDE.md or a decision record.
 human-todos.md
 
+# Work parked out of a release, held as an appliable patch rather than as
+# source that compiles nowhere. Same reasoning as human-todos.md above.
+*.parked.patch
+ios-broadcast-extension.patch
+
 # Fetched by tool/fetch_web_assets.sh, pinned to pubspec.lock and digest-checked.
 # The web build is a test surface, so these are not vendored into git.
 client/packages/app/web/drift_worker.js
