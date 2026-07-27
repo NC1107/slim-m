@@ -7,6 +7,7 @@
 library;
 
 import 'package:flutter/widgets.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 enum LayoutClass {
   /// One pane at a time; navigating pushes.
@@ -21,8 +22,11 @@ enum LayoutClass {
   static LayoutClass of(BuildContext context) =>
       fromWidth(MediaQuery.sizeOf(context).width);
 
+  /// [kCompactWidth] is shared with the design system, which raises hit
+  /// targets to touch size at the same width: one pane and a finger are the
+  /// same situation, and two thresholds for it would drift.
   static LayoutClass fromWidth(double width) => switch (width) {
-        < 600 => LayoutClass.compact,
+        < kCompactWidth => LayoutClass.compact,
         < 1000 => LayoutClass.medium,
         _ => LayoutClass.expanded,
       };

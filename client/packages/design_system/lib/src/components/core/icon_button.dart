@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../app_metrics.dart';
 import '../../app_tokens.dart';
+import '../../touch_targets.dart';
 
 enum AppIconButtonVariant { ghost, outline, danger }
 
@@ -35,7 +36,7 @@ double _diameterFor(AppIconButtonSize size) => switch (size) {
 /// minimum. [touch] (matching [AppListRow]'s parameter of the same name)
 /// grows the invisible tap area to [AppSizes.rowTouch] without growing the
 /// glyph, the same "small control, bigger tap target" split the row height
-/// already uses.
+/// already uses. Left unset it follows [AppTouchTargets.of].
 class AppIconButton extends StatefulWidget {
   const AppIconButton({
     super.key,
@@ -45,7 +46,7 @@ class AppIconButton extends StatefulWidget {
     this.variant = AppIconButtonVariant.ghost,
     this.size = AppIconButtonSize.md,
     this.active = false,
-    this.touch = false,
+    this.touch,
     this.iconSize = AppSizes.icon20,
     this.tooltip,
     this.focusNode,
@@ -61,7 +62,9 @@ class AppIconButton extends StatefulWidget {
   final AppIconButtonVariant variant;
   final AppIconButtonSize size;
   final bool active;
-  final bool touch;
+
+  /// Null means "whatever this subtree is at", read from [AppTouchTargets].
+  final bool? touch;
   final double iconSize;
   final String? tooltip;
   final FocusNode? focusNode;
@@ -81,7 +84,8 @@ class _AppIconButtonState extends State<AppIconButton> {
     final visualSize = _diameterFor(widget.size);
     final radius =
         visualSize >= AppSizes.controlMd ? AppRadii.card : AppRadii.control;
-    final hitTarget = widget.touch ? AppSizes.rowTouch : AppSizes.rowPointer;
+    final touch = widget.touch ?? AppTouchTargets.of(context);
+    final hitTarget = touch ? AppSizes.rowTouch : AppSizes.rowPointer;
     final outerSize = visualSize > hitTarget ? visualSize : hitTarget;
 
     Color ink;

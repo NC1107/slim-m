@@ -25,6 +25,9 @@ Future<void> main() async {
   // first redirect already know the answer, instead of showing sign-in and
   // then jumping to channels a frame later.
   await restoreSession(container);
+  // Awaited for the same reason, and free: restoreSession has already
+  // resolved the preference store this reads from.
+  await container.read(themeControllerProvider.notifier).restore();
   // These react to session changes for their whole lives: push retries on
   // resume, sync starts and stops with the session. Reading them here keeps
   // that reaction alive for a restored session, which never passes through
@@ -67,18 +70,36 @@ Future<void> _initAndroidPush() async {
 
 /// The root. Which surface is shown follows the session, enforced by the
 /// router's redirect: a revoked session lands on sign-in from wherever the user
-/// was, without any screen checking for itself.
+/// was, without any screen checking for itself. How it looks follows the
+/// stored appearance choice, which is restored before the first frame.
 class SlimMApp extends ConsumerWidget {
   const SlimMApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final choice = ref.watch(themeControllerProvider);
+
     return MaterialApp.router(
       title: 'slim-m',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light, AppTokens.light),
-      darkTheme: buildTheme(Brightness.dark, AppTokens.dark),
+      darkTheme: buildTheme(Brightness.dark, _darkTokensFor(choice)),
+      // Without this line MaterialApp's own ThemeMode.system default applies,
+      // and no choice the user makes can reach the theme; that is what shipped.
+      themeMode: _themeModeFor(choice),
       routerConfig: ref.watch(routerProvider),
     );
   }
 }
+
+ThemeMode _themeModeFor(AppThemeChoice choice) => switch (choice) {
+      AppThemeChoice.system => ThemeMode.system,
+      AppThemeChoice.light => ThemeMode.light,
+      AppThemeChoice.dark || AppThemeChoice.trueBlack => ThemeMode.dark,
+    };
+
+/// True black is a third palette rather than a fourth mode: it is the dark
+/// theme built from a different token set, so it needs no second dark slot
+/// that MaterialApp does not have.
+AppTokens _darkTokensFor(AppThemeChoice choice) =>
+    choice == AppThemeChoice.trueBlack ? AppTokens.trueBlack : AppTokens.dark;

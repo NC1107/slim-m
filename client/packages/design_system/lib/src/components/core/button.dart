@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import '../../app_metrics.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
+import '../../touch_targets.dart';
 
 enum AppButtonVariant { primary, secondary, ghost, soft, danger }
 
@@ -99,7 +100,7 @@ _Look _lookFor(AppButtonVariant variant, AppTokens tokens) => switch (variant) {
 /// button itself, not an invisible tap box around it, to meet
 /// [AppSizes.rowTouch]: unlike [AppIconButton], a text button's whole body is
 /// already visible content, so the touch floor should change what is drawn
-/// rather than pad around it.
+/// rather than pad around it. Left unset it follows [AppTouchTargets.of].
 class AppButton extends StatefulWidget {
   const AppButton({
     super.key,
@@ -110,7 +111,7 @@ class AppButton extends StatefulWidget {
     this.icon,
     this.full = false,
     this.disabled = false,
-    this.touch = false,
+    this.touch,
     this.semanticLabel,
     this.focusNode,
   });
@@ -130,7 +131,8 @@ class AppButton extends StatefulWidget {
   /// valid, say) rather than having to null it out and reattach it later.
   final bool disabled;
 
-  final bool touch;
+  /// Null means "whatever this subtree is at", read from [AppTouchTargets].
+  final bool? touch;
   final String? semanticLabel;
   final FocusNode? focusNode;
 
@@ -147,7 +149,8 @@ class _AppButtonState extends State<AppButton> {
     final enabled = !widget.disabled && widget.onPressed != null;
     final metrics = _metricsFor(widget.size);
     final look = _lookFor(widget.variant, tokens);
-    final hitTarget = widget.touch ? AppSizes.rowTouch : AppSizes.rowPointer;
+    final touch = widget.touch ?? AppTouchTargets.of(context);
+    final hitTarget = touch ? AppSizes.rowTouch : AppSizes.rowPointer;
     final height = metrics.height > hitTarget ? metrics.height : hitTarget;
 
     final content = Row(
@@ -157,10 +160,16 @@ class _AppButtonState extends State<AppButton> {
           Icon(widget.icon, size: AppSizes.icon16, color: look.foreground),
           const SizedBox(width: AppSpacing.s8),
         ],
-        Text(
-          widget.label,
-          style: metrics.textStyle.copyWith(
-              color: look.foreground, fontWeight: look.weight, height: 1),
+        // Flexible so a long label at a large text scale ellipsizes instead of
+        // overflowing; with room to spare the intrinsic width is unchanged.
+        Flexible(
+          child: Text(
+            widget.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: metrics.textStyle.copyWith(
+                color: look.foreground, fontWeight: look.weight, height: 1),
+          ),
         ),
       ],
     );

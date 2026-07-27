@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: Apache-2.0
+/// Shared fixtures for the three suites that pump a [MessageRow]: the row's
+/// own rendering, its context menu, and its inline edit field.
+///
+/// Not a `_test.dart` file, so `flutter test` does not try to run it. It
+/// exists because the row takes thirteen required callbacks and every one of
+/// those suites needs the same message, the same all-denied action set and the
+/// same provider-backed harness around it.
+library;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_app/src/widgets/message_context_menu.dart';
+import 'package:slimm_data/data.dart';
+import 'package:slimm_design_system/design_system.dart';
+
+Message message({
+  String id = 'm1',
+  String? authorId = 'author-1',
+  String? authorDisplayName = 'Priya',
+  int createdAt = 1700000000000,
+  int? editedAt,
+  bool pending = false,
+  bool failed = false,
+}) =>
+    Message(
+      id: id,
+      channelId: 'c1',
+      authorId: authorId,
+      authorDisplayName: authorDisplayName,
+      seq: 5,
+      content: 'hello there',
+      createdAt: createdAt,
+      editedAt: editedAt,
+      pending: pending,
+      failed: failed,
+    );
+
+void noop() {}
+
+/// Every item hidden. Most tests care about nothing the context menu does, so
+/// they pass this unchanged; the context menu suite builds its own with just
+/// the flags it needs.
+const noActions = MessageActions(
+  canEdit: false,
+  onEdit: noop,
+  canDelete: false,
+  onDelete: noop,
+  canManagePins: false,
+  pinned: false,
+  onTogglePin: noop,
+  canReport: false,
+  onReport: noop,
+  canBlockAuthor: false,
+  onBlockAuthor: noop,
+);
+
+/// The leading avatar is provider-backed (it resolves the author's own
+/// avatar), so every row needs a ProviderScope even when a test cares about
+/// nothing avatar-related; the default, unauthenticated apiProvider fails
+/// fast on that lookup and the row falls back to initials, same as a real
+/// signed-out state would.
+Widget harness(Widget child) => ProviderScope(
+      child: MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: Scaffold(body: child),
+      ),
+    );

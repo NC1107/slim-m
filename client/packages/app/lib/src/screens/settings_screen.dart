@@ -13,14 +13,14 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../permissions.dart';
-import '../providers/admin_providers.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../providers/sync_controller.dart';
 import '../routing/routes.dart';
+import '../widgets/appearance_settings_section.dart';
 import '../widgets/avatar_settings_section.dart';
+import '../widgets/moderation_settings_section.dart';
 import '../widgets/settings_section_header.dart';
 
 /// The account's devices, refetched when invalidated.
@@ -61,6 +61,8 @@ class SettingsScreen extends ConsumerWidget {
         children: const [
           AvatarSettingsSection(),
           Divider(height: 1),
+          AppearanceSettingsSection(),
+          Divider(height: 1),
           _DevicesSection(),
           Divider(height: 1),
           _NotificationsSection(),
@@ -70,7 +72,7 @@ class SettingsScreen extends ConsumerWidget {
           _PresenceSection(),
           Divider(height: 1),
           _BlockedSection(),
-          _ModerationSection(),
+          ModerationSettingsSection(),
           Divider(height: 1),
           _AccountSection(),
           Divider(height: 1),
@@ -222,29 +224,35 @@ class _PresenceSection extends ConsumerWidget {
           'Presence',
           description: 'What other members see next to your name.',
         ),
+        // Cards, like the appearance picker below: inline needs 614pt for
+        // four options, and scrolling that hid two of them on a phone.
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-          child: AppSegmentedControl.inline(
-            semanticLabel: 'Presence visibility',
-            options: [
-              for (final option in _options)
-                AppSegmentedOption(label: option.$2),
-            ],
-            selectedIndex: index < 0 ? 0 : index,
-            onSegmentSelected: (i) async {
-              final visibility = _options[i].$1;
-              ref.read(presenceVisibilityDisplayProvider.notifier).state =
-                  visibility;
-              try {
-                await ref.read(apiProvider).setPresenceVisibility(visibility);
-              } on api.ApiException catch (e) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Could not update presence. ${e.message}')),
-                );
-              }
-            },
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s16, 0, AppSpacing.s16, AppSpacing.s16),
+          child: IntrinsicHeight(
+            child: AppSegmentedControl.cards(
+              semanticLabel: 'Presence visibility',
+              options: [
+                for (final option in _options)
+                  AppSegmentedOption(label: option.$2),
+              ],
+              selectedIndex: index < 0 ? 0 : index,
+              onSegmentSelected: (i) async {
+                final visibility = _options[i].$1;
+                ref.read(presenceVisibilityDisplayProvider.notifier).state =
+                    visibility;
+                try {
+                  await ref.read(apiProvider).setPresenceVisibility(visibility);
+                } on api.ApiException catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content:
+                            Text('Could not update presence. ${e.message}')),
+                  );
+                }
+              },
+            ),
           ),
         ),
       ],
@@ -304,70 +312,6 @@ class _BlockedSection extends ConsumerWidget {
                   ],
                 ),
         ),
-      ],
-    );
-  }
-}
-
-/// Moderation and administration: the reports queue, invite management,
-/// roles, and channel permission overwrites. Each row is gated on the
-/// server bit its screen requires, per `GET /me`'s base permissions, rather
-/// than shown and left to answer 403: a member without MANAGE_ROLES should
-/// not see role editing exists at all.
-///
-/// Hidden entirely, divider included, for a caller with none of the four
-/// bits, so an ordinary member's settings screen looks exactly as it did
-/// before this section existed.
-class _ModerationSection extends ConsumerWidget {
-  const _ModerationSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final permissions = ref.watch(myPermissionsProvider);
-    final canModerate = permissions.hasPermission(Perm.manageMessages);
-    final canInvite = permissions.hasPermission(Perm.createInvite);
-    final canManageRoles = permissions.hasPermission(Perm.manageRoles);
-
-    if (!canModerate && !canInvite && !canManageRoles) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Divider(height: 1),
-        const SettingsSectionHeader(
-          'Community management',
-          description: 'Only shown for what your roles let you do here.',
-        ),
-        if (canModerate)
-          ListTile(
-            leading: const Icon(AppIcons.report),
-            title: const Text('Reports'),
-            trailing: const Icon(AppIcons.chevronRight),
-            onTap: () => context.push(Routes.adminReports),
-          ),
-        if (canInvite)
-          ListTile(
-            leading: const Icon(AppIcons.invite),
-            title: const Text('Invites'),
-            trailing: const Icon(AppIcons.chevronRight),
-            onTap: () => context.push(Routes.adminInvites),
-          ),
-        if (canManageRoles) ...[
-          ListTile(
-            leading: const Icon(AppIcons.shield),
-            title: const Text('Roles'),
-            trailing: const Icon(AppIcons.chevronRight),
-            onTap: () => context.push(Routes.adminRoles),
-          ),
-          ListTile(
-            leading: const Icon(AppIcons.permissions),
-            title: const Text('Channel permissions'),
-            trailing: const Icon(AppIcons.chevronRight),
-            onTap: () => context.push(Routes.adminOverwrites),
-          ),
-        ],
       ],
     );
   }

@@ -13,3 +13,4 @@ export 'src/app_typography.dart';
 export 'src/components/core.dart';
 export 'src/components/forms.dart';
 export 'src/components/surfaces.dart';
+export 'src/touch_targets.dart';

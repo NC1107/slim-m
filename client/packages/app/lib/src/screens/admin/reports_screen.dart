@@ -34,24 +34,28 @@ class ReportsScreen extends ConsumerWidget {
           onPressed: () => context.go(Routes.settings),
         ),
       ),
-      body: reports.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Text('Could not load reports. $e',
-              style: TextStyle(color: tokens.textSecondary)),
+      // top: false because the AppBar already clears the status bar.
+      body: SafeArea(
+        top: false,
+        child: reports.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(
+            child: Text('Could not load reports. $e',
+                style: TextStyle(color: tokens.textSecondary)),
+          ),
+          data: (list) => list.isEmpty
+              ? Center(
+                  child: Text('The queue is empty.',
+                      style: TextStyle(color: tokens.textSecondary)),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(AppSpacing.s16),
+                  itemCount: list.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppSpacing.s12),
+                  itemBuilder: (context, i) => _ReportCard(report: list[i]),
+                ),
         ),
-        data: (list) => list.isEmpty
-            ? Center(
-                child: Text('The queue is empty.',
-                    style: TextStyle(color: tokens.textSecondary)),
-              )
-            : ListView.separated(
-                padding: const EdgeInsets.all(AppSpacing.s16),
-                itemCount: list.length,
-                separatorBuilder: (_, __) =>
-                    const SizedBox(height: AppSpacing.s12),
-                itemBuilder: (context, i) => _ReportCard(report: list[i]),
-              ),
       ),
     );
   }

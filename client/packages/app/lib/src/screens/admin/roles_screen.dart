@@ -40,14 +40,18 @@ class RolesScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: roles.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Could not load roles. $e')),
-        data: (list) => ListView.separated(
-          padding: const EdgeInsets.all(AppSpacing.s16),
-          itemCount: list.length,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s8),
-          itemBuilder: (context, i) => _RoleCard(role: list[i]),
+      // top: false because the AppBar already clears the status bar.
+      body: SafeArea(
+        top: false,
+        child: roles.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Could not load roles. $e')),
+          data: (list) => ListView.separated(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            itemCount: list.length,
+            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s8),
+            itemBuilder: (context, i) => _RoleCard(role: list[i]),
+          ),
         ),
       ),
     );

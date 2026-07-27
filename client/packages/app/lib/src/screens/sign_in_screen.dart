@@ -204,130 +204,135 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.s24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'slim-m',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: tokens.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.s8),
-                Text(
-                  _creatingAccount ? 'Create an account' : 'Sign in',
-                  style: TextStyle(color: tokens.textSecondary),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.s24),
-                TextField(
-                  controller: _server,
-                  decoration: const InputDecoration(
-                    labelText: 'Server',
-                    helperText: 'The address of the server you are joining.',
-                  ),
-                  keyboardType: TextInputType.url,
-                  autocorrect: false,
-                  onChanged: _onServerEdited,
-                ),
-                if (_pushEnabled == false) ...[
-                  const SizedBox(height: AppSpacing.s8),
-                  Semantics(
-                    liveRegion: true,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          AppIcons.notificationsOff,
-                          size: 16,
-                          color: tokens.textSecondary,
+      // Both edges: this screen has no AppBar, so nothing else clears the
+      // notch, and its form runs the full height of the view.
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.s24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'slim-m',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          color: tokens.textPrimary,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(width: AppSpacing.s8),
-                        Expanded(
-                          child: Text(
-                            'This server cannot send push notifications. '
-                            'You can still use it, but phones will only see '
-                            'new messages while the app is open.',
-                            style: TextStyle(
-                              color: tokens.textSecondary,
-                              fontSize: 13,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.s8),
+                  Text(
+                    _creatingAccount ? 'Create an account' : 'Sign in',
+                    style: TextStyle(color: tokens.textSecondary),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.s24),
+                  TextField(
+                    controller: _server,
+                    decoration: const InputDecoration(
+                      labelText: 'Server',
+                      helperText: 'The address of the server you are joining.',
+                    ),
+                    keyboardType: TextInputType.url,
+                    autocorrect: false,
+                    onChanged: _onServerEdited,
+                  ),
+                  if (_pushEnabled == false) ...[
+                    const SizedBox(height: AppSpacing.s8),
+                    Semantics(
+                      liveRegion: true,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            AppIcons.notificationsOff,
+                            size: 16,
+                            color: tokens.textSecondary,
+                          ),
+                          const SizedBox(width: AppSpacing.s8),
+                          Expanded(
+                            child: Text(
+                              'This server cannot send push notifications. '
+                              'You can still use it, but phones will only see '
+                              'new messages while the app is open.',
+                              style: TextStyle(
+                                color: tokens.textSecondary,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.s16),
-                TextField(
-                  controller: _username,
-                  decoration: const InputDecoration(labelText: 'Username'),
-                  autocorrect: false,
-                  autofillHints: const [AutofillHints.username],
-                ),
-                if (_creatingAccount) ...[
+                  ],
                   const SizedBox(height: AppSpacing.s16),
                   TextField(
-                    controller: _displayName,
-                    decoration: const InputDecoration(
-                      labelText: 'Display name',
-                      helperText: 'What others see. Defaults to your username.',
-                    ),
+                    controller: _username,
+                    decoration: const InputDecoration(labelText: 'Username'),
+                    autocorrect: false,
+                    autofillHints: const [AutofillHints.username],
                   ),
-                ],
-                const SizedBox(height: AppSpacing.s16),
-                TextField(
-                  controller: _password,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  obscureText: true,
-                  autofillHints: const [AutofillHints.password],
-                  onSubmitted: (_) => _busy ? null : _submit(),
-                ),
-                if (_error != null) ...[
+                  if (_creatingAccount) ...[
+                    const SizedBox(height: AppSpacing.s16),
+                    TextField(
+                      controller: _displayName,
+                      decoration: const InputDecoration(
+                        labelText: 'Display name',
+                        helperText:
+                            'What others see. Defaults to your username.',
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.s16),
-                  Semantics(
-                    liveRegion: true,
+                  TextField(
+                    controller: _password,
+                    decoration: const InputDecoration(labelText: 'Password'),
+                    obscureText: true,
+                    autofillHints: const [AutofillHints.password],
+                    onSubmitted: (_) => _busy ? null : _submit(),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: AppSpacing.s16),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        _error!,
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.s24),
+                  FilledButton(
+                    onPressed: _busy ? null : _submit,
+                    child: _busy
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_creatingAccount ? 'Create account' : 'Sign in'),
+                  ),
+                  const SizedBox(height: AppSpacing.s8),
+                  TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () => setState(() {
+                              _creatingAccount = !_creatingAccount;
+                              _error = null;
+                            }),
                     child: Text(
-                      _error!,
-                      style:
-                          TextStyle(color: Theme.of(context).colorScheme.error),
+                      _creatingAccount
+                          ? 'I already have an account'
+                          : 'Create an account instead',
                     ),
                   ),
                 ],
-                const SizedBox(height: AppSpacing.s24),
-                FilledButton(
-                  onPressed: _busy ? null : _submit,
-                  child: _busy
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(_creatingAccount ? 'Create account' : 'Sign in'),
-                ),
-                const SizedBox(height: AppSpacing.s8),
-                TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () => setState(() {
-                            _creatingAccount = !_creatingAccount;
-                            _error = null;
-                          }),
-                  child: Text(
-                    _creatingAccount
-                        ? 'I already have an account'
-                        : 'Create an account instead',
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

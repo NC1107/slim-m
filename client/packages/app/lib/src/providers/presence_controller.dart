@@ -59,16 +59,24 @@ final presenceControllerProvider =
     StateNotifierProvider<PresenceController, Map<String, api.PresenceState>>(
         (ref) => PresenceController(ref));
 
-/// What the settings screen shows as the caller's own visibility choice.
+/// The caller's own visibility choice as far as this client knows it, or null
+/// for "not known", which is the state every launch starts in.
 ///
-/// There is deliberately no way to read this back from the server: `PATCH
-/// /presence` (`setPresenceVisibility`) reports only the value it just set,
-/// and `GET /presence` resolves a caller's own id to their true connection
-/// state regardless of a `hidden` preference (`presence.rs`'s
-/// `status_for`, confirmed by its own `hidden_reads_as_offline_to_others_
-/// but_true_to_self` test), never the preference itself. So this is a
-/// display-only local echo of the last choice made in this session, not a
-/// fetched value; a fresh app launch has no way to know what was chosen
-/// last time and defaults to showing "online" rather than guessing.
-final presenceVisibilityDisplayProvider = StateProvider<api.PresenceVisibility>(
-    (ref) => api.PresenceVisibility.online);
+/// The preference itself is durable and does not need re-applying: the server
+/// stores it in `users.presence_visibility` (migration 0008), so relaunching
+/// or reconnecting does not make someone who chose appear-offline visible
+/// again. What is missing is a way to read it back. `PATCH /presence` echoes
+/// only the value it just set, and `GET /presence` resolves a caller's own id
+/// to their true connection state rather than the preference (`presence.rs`'s
+/// `status_for`, and its `hidden_reads_as_offline_to_others_but_true_to_self`
+/// test), so a hidden user's own client cannot tell hidden from online.
+///
+/// KNOWN GAP, deliberately left open here: closing it needs a read-back on the
+/// server, not a cache on the device. Persisting the last choice locally and
+/// re-applying it on connect would let a device holding a stale value silently
+/// un-hide someone who chose appear-offline from another device, which is a
+/// worse failure than not knowing. Until that endpoint exists, every surface
+/// showing this must render null as "no choice known" rather than asserting
+/// one, which is why the type is nullable rather than defaulting to online.
+final presenceVisibilityDisplayProvider =
+    StateProvider<api.PresenceVisibility?>((ref) => null);

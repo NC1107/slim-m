@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- sw600dp is Android's own phone/tablet line, and above it both the
+     two-pane layout and the hardware make sense in landscape, so the lock is
+     lifted. Android 16 ignores orientation locks on large screens anyway;
+     this means slim-m is not fighting that rather than losing to it. -->
+<resources>
+    <bool name="slimm_portrait_only">false</bool>
+</resources>

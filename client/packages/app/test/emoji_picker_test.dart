@@ -131,4 +131,29 @@ void main() {
 
     expect(find.byTooltip('Recently used'), findsOneWidget);
   });
+
+  // The regression: this sheet ran to the physical bottom edge while its
+  // sibling sheet did not, so the last emoji row sat under the home indicator.
+  testWidgets('the sheet keeps its last row clear of the home indicator',
+      (tester) async {
+    const bottomInset = 34.0;
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.padding = const FakeViewPadding(bottom: bottomInset);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_harness(Builder(
+      builder: (context) => TextButton(
+        onPressed: () => showEmojiPickerSheet(context, onSelect: (_) {}),
+        child: const Text('open'),
+      ),
+    )));
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(find.byType(EmojiPickerPanel)).bottom,
+        lessThanOrEqualTo(844.0 - bottomInset),
+        reason: 'the panel must end above the home indicator, not under it');
+  });
 }

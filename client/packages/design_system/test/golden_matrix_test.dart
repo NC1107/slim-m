@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The golden matrix: every theme at 100% and 200% text scale.
+/// The golden matrix: every theme at 100% and 200% text scale, at both a
+/// pointer-width and a compact-width viewport.
+///
+/// The width axis exists because [AppTouchTargets.of] falls back to the window
+/// width, so every phone takes a branch (44pt rows, 48pt menu items, and a
+/// menu-item type step from [AppText.ui] to [AppText.body]) that a
+/// desktop-width-only matrix never renders at all.
 ///
 /// The layout assertions (no overflow at any scale) run everywhere and are the
 /// part that catches real regressions.
@@ -30,6 +36,13 @@ const _themes = <String, AppTokens>{
 
 /// Text scales. 2.0 is the accessibility ceiling the roadmap commits to.
 const _scales = <String, double>{'100': 1.0, '200': 2.0};
+
+/// The two input classes, named by width. 390x844 is a phone; 800x900 sits
+/// above [kCompactWidth] and is the pointer case.
+const _viewports = <String, Size>{
+  'w800': Size(800, 900),
+  'w390': Size(390, 844),
+};
 
 /// A representative slice of chrome: a header, a selected and unselected row,
 /// and a body message. Enough surface that a token or spacing regression shows
@@ -95,6 +108,7 @@ Widget _sample(AppTokens tokens) {
                 ],
               ),
             ),
+            const _Controls(),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.s16),
@@ -125,42 +139,102 @@ Widget _sample(AppTokens tokens) {
   );
 }
 
+/// The four controls whose drawn size or type changes with density, laid out
+/// the way a real settings body lays them out.
+class _Controls extends StatelessWidget {
+  const _Controls();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.all(AppSpacing.s16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: AppSpacing.s8,
+        children: [
+          AppListRow(label: 'Priya Raman', meta: 'admin'),
+          AppMenuItem(label: 'Copy message link', leading: AppIcons.copy),
+          Row(
+            spacing: AppSpacing.s8,
+            children: [
+              AppIconButton(icon: AppIcons.add, semanticLabel: 'Add'),
+              Expanded(
+                child: AppButton(
+                  label: 'Save changes',
+                  variant: AppButtonVariant.primary,
+                  full: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 void main() {
   for (final theme in _themes.entries) {
     for (final scale in _scales.entries) {
-      testWidgets('${theme.key} at ${scale.key} percent', (tester) async {
-        tester.view.physicalSize = const Size(800, 900);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
+      for (final viewport in _viewports.entries) {
+        final name =
+            '${theme.key} at ${scale.key} percent, ${viewport.key} wide';
+        testWidgets(name, (tester) async {
+          tester.view.physicalSize = viewport.value;
+          tester.view.devicePixelRatio = 1.0;
+          addTearDown(tester.view.reset);
 
-        await tester.pumpWidget(
-          MediaQuery(
-            data: MediaQueryData(textScaler: TextScaler.linear(scale.value)),
-            child: MaterialApp(
-              debugShowCheckedModeBanner: false,
-              theme: buildTheme(
-                theme.key == 'light' ? Brightness.light : Brightness.dark,
-                theme.value,
+          await tester.pumpWidget(
+            MediaQuery(
+              // From the view, not a bare MediaQueryData: a fresh one reports
+              // Size.zero, which reads as compact and hides the width axis.
+              data: MediaQueryData.fromView(tester.view)
+                  .copyWith(textScaler: TextScaler.linear(scale.value)),
+              child: MaterialApp(
+                debugShowCheckedModeBanner: false,
+                theme: buildTheme(
+                  theme.key == 'light' ? Brightness.light : Brightness.dark,
+                  theme.value,
+                ),
+                home: _sample(theme.value),
               ),
-              home: _sample(theme.value),
             ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        // No overflow at any scale. This is the assertion that matters most:
-        // clipped text at 200% is an accessibility failure, and it is invisible
-        // in a 100% screenshot.
-        expect(tester.takeException(), isNull);
-
-        // Pixel comparison only where the reference images were produced.
-        if (const bool.fromEnvironment('SLIMM_GOLDENS')) {
-          await expectLater(
-            find.byType(MaterialApp),
-            matchesGoldenFile('goldens/${theme.key}_${scale.key}.png'),
           );
-        }
-      });
+          await tester.pumpAndSettle();
+
+          // No overflow at any scale. This is the assertion that matters most:
+          // clipped text at 200% is an accessibility failure, and it is
+          // invisible in a 100% screenshot.
+          expect(tester.takeException(), isNull);
+
+          // The width axis is only worth its runtime if it actually lands on
+          // the other density, so pin that rather than trusting the size.
+          final touch = viewport.value.width < kCompactWidth;
+          expect(
+            tester.getSize(find.byType(AppButton)).height,
+            touch ? AppSizes.rowTouch : AppSizes.controlMd,
+            reason: 'the $name pass must render at the density it claims',
+          );
+          expect(
+            tester.getSize(find.byType(AppListRow)).height,
+            touch ? AppSizes.rowTouch : AppSizes.rowPointer,
+          );
+          expect(
+            tester.getSize(find.byType(AppMenuItem)).height,
+            touch ? 48.0 : AppSizes.controlMd,
+          );
+
+          // Pixel comparison only where the reference images were produced.
+          if (const bool.fromEnvironment('SLIMM_GOLDENS')) {
+            await expectLater(
+              find.byType(MaterialApp),
+              matchesGoldenFile(
+                'goldens/${theme.key}_${scale.key}_${viewport.key}.png',
+              ),
+            );
+          }
+        });
+      }
     }
   }
 

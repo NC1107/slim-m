@@ -66,7 +66,11 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
               onTap: () => openCommandPalette(context),
               child: AbsorbPointer(
                 child: AppInput(
-                  size: AppInputSize.sm,
+                  // The whole field is the tap target, so it takes the
+                  // design's 44pt size rather than its 32pt one on a phone.
+                  size: AppTouchTargets.of(context)
+                      ? AppInputSize.lg
+                      : AppInputSize.sm,
                   placeholder: 'Search',
                   icon: Icon(AppIcons.search,
                       size: AppSizes.icon16, color: tokens.textSecondary),

@@ -39,26 +39,30 @@ class InvitesScreen extends ConsumerWidget {
           onPressed: () => context.go(Routes.settings),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.s16),
-        children: [
-          const _CreateInviteCard(),
-          const SizedBox(height: AppSpacing.s16),
-          invites.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => _Message('Could not load invites. $e'),
-            data: (list) => list.isEmpty
-                ? const _Message('No invites yet.')
-                : Column(
-                    children: [
-                      for (final invite in list) ...[
-                        _InviteRow(invite: invite),
-                        const SizedBox(height: AppSpacing.s8),
+      // top: false because the AppBar already clears the status bar.
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.s16),
+          children: [
+            const _CreateInviteCard(),
+            const SizedBox(height: AppSpacing.s16),
+            invites.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => _Message('Could not load invites. $e'),
+              data: (list) => list.isEmpty
+                  ? const _Message('No invites yet.')
+                  : Column(
+                      children: [
+                        for (final invite in list) ...[
+                          _InviteRow(invite: invite),
+                          const SizedBox(height: AppSpacing.s8),
+                        ],
                       ],
-                    ],
-                  ),
-          ),
-        ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

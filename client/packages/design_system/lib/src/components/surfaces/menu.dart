@@ -14,6 +14,7 @@ import '../../app_icons.dart';
 import '../../app_metrics.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
+import '../../touch_targets.dart';
 
 /// A floating container for [AppMenuItem], [AppMenuLabel] and
 /// [AppMenuDivider] children.
@@ -105,7 +106,7 @@ enum AppMenuItemTone { normal, warn, danger }
 /// [touch] raises the row to a literal 48px (the source's own value; no
 /// [AppSizes] step matches it, the nearest being `rowTouch` at 44) and widens
 /// the leading gap to `space-12`; the pointer row is 34px, which does match
-/// [AppSizes.controlMd] exactly.
+/// [AppSizes.controlMd] exactly. Left unset it follows [AppTouchTargets.of].
 class AppMenuItem extends StatefulWidget {
   const AppMenuItem({
     super.key,
@@ -115,7 +116,7 @@ class AppMenuItem extends StatefulWidget {
     this.submenu = false,
     this.selected = false,
     this.tone = AppMenuItemTone.normal,
-    this.touch = false,
+    this.touch,
     this.onTap,
     this.semanticLabel,
   });
@@ -133,7 +134,9 @@ class AppMenuItem extends StatefulWidget {
   /// [tone] is [AppMenuItemTone.warn].
   final bool selected;
   final AppMenuItemTone tone;
-  final bool touch;
+
+  /// Null means "whatever this subtree is at", read from [AppTouchTargets].
+  final bool? touch;
   final VoidCallback? onTap;
   final String? semanticLabel;
 
@@ -155,6 +158,7 @@ class _AppMenuItemState extends State<AppMenuItem> {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final active = widget.onTap != null;
+    final touch = widget.touch ?? AppTouchTargets.of(context);
     final ink = _toneColor(tokens);
     // The source dims the icon to text-secondary for the normal tone even
     // though the label itself is text-primary; warn/danger keep the icon in
@@ -167,7 +171,7 @@ class _AppMenuItemState extends State<AppMenuItem> {
         : tokens.accentSoft;
 
     final content = Container(
-      height: widget.touch ? 48 : AppSizes.controlMd,
+      height: touch ? 48 : AppSizes.controlMd,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: widget.selected
@@ -182,7 +186,7 @@ class _AppMenuItemState extends State<AppMenuItem> {
             )
           : null,
       child: Row(
-        spacing: widget.touch ? AppSpacing.s12 : AppSpacing.s8,
+        spacing: touch ? AppSpacing.s12 : AppSpacing.s8,
         children: [
           if (widget.leading != null)
             Icon(widget.leading, size: AppSizes.icon16, color: iconInk),
@@ -193,8 +197,7 @@ class _AppMenuItemState extends State<AppMenuItem> {
               child: Text(
                 widget.label,
                 overflow: TextOverflow.ellipsis,
-                style: (widget.touch ? AppText.body : AppText.ui)
-                    .copyWith(color: ink),
+                style: (touch ? AppText.body : AppText.ui).copyWith(color: ink),
               ),
             ),
           ),

@@ -105,16 +105,21 @@ class VoiceSettingsScreen extends ConsumerWidget {
           onPressed: () => context.go(Routes.settings),
         ),
       ),
-      body: ListView(
-        children: const [
-          _MicrophoneSection(),
-          Divider(height: 1),
-          _DeviceSection(),
-          Divider(height: 1),
-          _ScreenShareSection(),
-          Divider(height: 1),
-          _SoundsSection(),
-        ],
+      // top: false because the AppBar already clears the status bar; without
+      // the bottom edge the last section runs under the home indicator.
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          children: const [
+            _MicrophoneSection(),
+            Divider(height: 1),
+            _DeviceSection(),
+            Divider(height: 1),
+            _ScreenShareSection(),
+            Divider(height: 1),
+            _SoundsSection(),
+          ],
+        ),
       ),
     );
   }

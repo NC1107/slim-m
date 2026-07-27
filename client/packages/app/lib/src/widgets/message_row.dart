@@ -9,6 +9,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'attachment_view.dart';
+import 'emoji_picker.dart';
 import 'message_context_menu.dart';
 import 'message_edit_field.dart';
 import 'message_row_parts.dart';
@@ -73,8 +74,9 @@ class MessageRow extends StatelessWidget {
   final VoidCallback onRetry;
   final VoidCallback onDiscard;
 
-  /// Called with the emoji character the [ReactionsRow] add-reaction picker
-  /// chose.
+  /// Called with the emoji character the add-reaction picker chose, from the
+  /// hover-revealed button in [ReactionsRow] or from the long-press menu's
+  /// own sheet, which is the only one of the two a finger can reach.
   final ValueChanged<String> onPickReaction;
 
   /// Toggles the caller's own reaction for an existing chip: on if
@@ -133,6 +135,8 @@ class MessageRow extends StatelessWidget {
                 MessageContextMenuRegion(
                   content: message.content,
                   actions: actions,
+                  onAddReaction: () =>
+                      showEmojiPickerSheet(context, onSelect: onPickReaction),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
                     child: Row(
