@@ -4,7 +4,7 @@
 name: slim_m_workspace
 # release-please tracks the client version here; kept explicit so the first
 # client release is 0.1.0 rather than defaulting to 1.0.0.
-version: 0.0.0
+version: 0.3.0
 publish_to: none
 environment:
   sdk: ^3.10.0
