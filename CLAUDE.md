@@ -452,7 +452,10 @@ Workflows: server-ci, client-ci, schema-ci, hygiene, perf, release. All green on
 - `sigstore/cosign-installer` has no moving `v4` tag; pin it to an exact version (currently `@v4.1.2`). The docker/* actions do publish moving major tags, so `@v4`/`@v7` are fine there.
 - Publish jobs gate on `(release-please success && released) || startsWith(github.ref, 'refs/tags/server-v')`, and server-image-merge has an explicit `if`, so re-pushing a tag can re-publish.
 - `SQLX_OFFLINE: "true"` is set at the top of server-ci and perf, and in the Dockerfile builder; the `.sqlx/` cache is committed.
-- release-please keeps a STANDING "release server X" PR open by design; it is the release button, not review work, and reopens after each server-affecting merge. The client was removed from `release-please-config.json` until it has real content (re-add in Phase 2), because it kept proposing a bogus client 1.0.0.
+- release-please keeps a STANDING release PR open per component by design; it is the release button, not review work, and reopens after each affecting merge.
+  **The client is registered again as of 2026-07-27**, tracked at `client/` with the version in `client/pubspec.yaml`, and the manifest seeded to 0.2.3 so it continues from the last hand-cut tag rather than proposing 1.0.0. It was pulled during Phase 1 "until it has real content" and that note outlived its reason by several phases, which is why every client release since had to be tagged by hand.
+  The pipeline never stopped expecting it: `release.yml` already read `client--release_created`, `client--tag_name` and `client--version`, and only the `packages` entry was missing.
+  A client release is now the same two steps as a server one: merge the work, then merge the `chore(main): release client X.Y.Z` PR it opens. That second merge is what tags `client-vX.Y.Z` and builds the TestFlight and Play artifacts. Hand-tagging still works, since the jobs keep their `refs/tags/client-v` branch.
 - `dart format` is strict (tall style, Flutter 3.44.x). Write short unambiguous lines; the client cannot be formatted or analyzed locally here, so CI is the check.
 
 Environment note: the Claude Code auto-mode classifier blocks creating GitHub repositories and some repo-settings changes; the owner must do those (or grant `Bash(gh:*)`). Plain `git push` works.
