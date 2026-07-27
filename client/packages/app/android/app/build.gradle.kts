@@ -13,6 +13,15 @@ val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
+    // Present but incomplete means CI wrote an empty or malformed secret. Left
+    // alone that silently debug-signs a release, which only a later step
+    // catches and only if someone added one.
+    val required = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    val absent = required.filter { keystoreProperties[it]?.toString().isNullOrBlank() }
+    require(absent.isEmpty()) {
+        "key.properties exists but is missing: $absent. Refusing to fall back " +
+            "to debug signing for a release build."
+    }
 }
 
 // The Google Services plugin processes google-services.json into the string
