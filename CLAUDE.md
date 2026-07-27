@@ -363,7 +363,7 @@ One backend deployment is one community. Direct messages work only between users
 Read receipts to other users are deferred; presence has a hide/appear-offline option.
 Self-hosted account recovery is an admin-issued one-time reset code (no email).
 The official instance is single-process with state behind a swappable interface.
-A designer review precedes design-token lock. The accent is teal, on a neutral cool-slate palette, IBM Plex Sans, border-first elevation, flat grouped messages.
+A designer review precedes design-token lock. The accent is glacier cyan (`#1B6F91` light, `#58B4D8` dark, decided 2026-07-27; teal until then), on a neutral cool-slate palette, IBM Plex Sans, border-first elevation, flat grouped messages.
 The UI uses Lucide icons and never emoji as chrome. Emoji are user content (reactions) only.
 Join and leave sounds default off above roughly 8 participants. The official instance publishes no moderation SLA.
 
