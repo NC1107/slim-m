@@ -20,11 +20,11 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
 UserProfile _profile(String id, String name) => UserProfile(
-      id: id,
-      username: name.toLowerCase(),
-      displayName: name,
-      createdAt: 0,
-    );
+  id: id,
+  username: name.toLowerCase(),
+  displayName: name,
+  createdAt: 0,
+);
 
 const _tokens = TokenPair(
   userId: 'self',
@@ -37,8 +37,10 @@ const _tokens = TokenPair(
 /// widget test that watches [meProvider] or seeds presence never reaches
 /// the network. Signed in: both endpoints require a session, and an
 /// unauthenticated call would fail before ever reaching either answer.
-SlimmApi _fakeApi(SessionStore session,
-    {Map<String, PresenceState> presence = const {}}) {
+SlimmApi _fakeApi(
+  SessionStore session, {
+  Map<String, PresenceState> presence = const {},
+}) {
   return SlimmApi(
     baseUrl: Uri.parse('http://localhost:8080'),
     session: session,
@@ -72,17 +74,16 @@ SlimmApi _fakeApi(SessionStore session,
 List<Override> _overrides({
   required List<UserProfile> members,
   Map<String, PresenceState> presence = const {},
-}) =>
-    [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-      apiProvider.overrideWith((ref) {
-        final api = _fakeApi(ref.watch(sessionProvider), presence: presence);
-        ref.onDispose(api.close);
-        return api;
-      }),
-      membersProvider.overrideWith((ref) async => members),
-    ];
+}) => [
+  keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+  sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+  apiProvider.overrideWith((ref) {
+    final api = _fakeApi(ref.watch(sessionProvider), presence: presence);
+    ref.onDispose(api.close);
+    return api;
+  }),
+  membersProvider.overrideWith((ref) async => members),
+];
 
 void main() {
   group('groupMembersByPresence', () {
@@ -114,8 +115,10 @@ void main() {
         '3': AppPresence.offline,
       });
 
-      expect(
-          grouped.online.map((m) => m.displayName), ['Away Anna', 'Busy Bo']);
+      expect(grouped.online.map((m) => m.displayName), [
+        'Away Anna',
+        'Busy Bo',
+      ]);
       expect(grouped.offline.single.displayName, 'Offline Otto');
     });
 
@@ -135,39 +138,42 @@ void main() {
   });
 
   testWidgets(
-      'the pane groups real members as offline before presence resolves',
-      (tester) async {
-    final container = ProviderContainer(
+    'the pane groups real members as offline before presence resolves',
+    (tester) async {
+      final container = ProviderContainer(
         overrides: _overrides(
-      members: [_profile('1', 'Priya'), _profile('2', 'Kess')],
-    ));
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const Scaffold(body: AppMemberPane()),
+          members: [_profile('1', 'Priya'), _profile('2', 'Kess')],
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      addTearDown(container.dispose);
 
-    // Before the presence fetch resolves, both members default to offline
-    // rather than being guessed as online.
-    expect(find.textContaining('OFFLINE · 2'), findsOneWidget);
-    expect(find.text('Priya'), findsOneWidget);
-    expect(find.text('Kess'), findsOneWidget);
-    expect(find.textContaining('MEMBERS · 2'), findsOneWidget);
-  });
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const Scaffold(body: AppMemberPane()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Before the presence fetch resolves, both members default to offline
+      // rather than being guessed as online.
+      expect(find.textContaining('OFFLINE · 2'), findsOneWidget);
+      expect(find.text('Priya'), findsOneWidget);
+      expect(find.text('Kess'), findsOneWidget);
+      expect(find.textContaining('MEMBERS · 2'), findsOneWidget);
+    },
+  );
 
   testWidgets('the pane regroups once real presence resolves', (tester) async {
     final container = ProviderContainer(
-        overrides: _overrides(
-      members: [_profile('1', 'Priya'), _profile('2', 'Kess')],
-      presence: {'1': PresenceState.online, '2': PresenceState.offline},
-    ));
+      overrides: _overrides(
+        members: [_profile('1', 'Priya'), _profile('2', 'Kess')],
+        presence: {'1': PresenceState.online, '2': PresenceState.offline},
+      ),
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -187,22 +193,25 @@ void main() {
     expect(find.text('Kess'), findsOneWidget);
   });
 
-  testWidgets('a failed member fetch says so and offers a working retry',
-      (tester) async {
+  testWidgets('a failed member fetch says so and offers a working retry', (
+    tester,
+  ) async {
     var fail = true;
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-      apiProvider.overrideWith((ref) {
-        final api = _fakeApi(ref.watch(sessionProvider));
-        ref.onDispose(api.close);
-        return api;
-      }),
-      membersProvider.overrideWith((ref) async {
-        if (fail) throw const TransportException('offline');
-        return [_profile('1', 'Priya')];
-      }),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = _fakeApi(ref.watch(sessionProvider));
+          ref.onDispose(api.close);
+          return api;
+        }),
+        membersProvider.overrideWith((ref) async {
+          if (fail) throw const TransportException('offline');
+          return [_profile('1', 'Priya')];
+        }),
+      ],
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -227,17 +236,20 @@ void main() {
   });
 
   testWidgets('a 403 explains the denial and offers no retry', (tester) async {
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-      apiProvider.overrideWith((ref) {
-        final api = _fakeApi(ref.watch(sessionProvider));
-        ref.onDispose(api.close);
-        return api;
-      }),
-      membersProvider
-          .overrideWith((ref) async => throw const ForbiddenException('nope')),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = _fakeApi(ref.watch(sessionProvider));
+          ref.onDispose(api.close);
+          return api;
+        }),
+        membersProvider.overrideWith(
+          (ref) async => throw const ForbiddenException('nope'),
+        ),
+      ],
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -252,8 +264,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Could not load members.'), findsOneWidget);
-    expect(find.text('Retry'), findsNothing,
-        reason: 'a 403 will not succeed on retry, so none is offered');
+    expect(
+      find.text('Retry'),
+      findsNothing,
+      reason: 'a 403 will not succeed on retry, so none is offered',
+    );
   });
 
   group('roster keep-alive', () {
@@ -262,30 +277,34 @@ void main() {
     /// happen, so a test can mutate the list mid-flight the way a real
     /// join would and assert whether a refetch followed.
     ({ProviderContainer container, StreamController<ServerEvent> events})
-        buildKeepAliveContainer(
-            List<UserProfile> Function() members, void Function() onFetch) {
+    buildKeepAliveContainer(
+      List<UserProfile> Function() members,
+      void Function() onFetch,
+    ) {
       final events = StreamController<ServerEvent>.broadcast();
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-        apiProvider.overrideWith((ref) {
-          final api = _fakeApi(ref.watch(sessionProvider));
-          ref.onDispose(api.close);
-          return api;
-        }),
-        liveEventsProvider.overrideWithValue(events.stream),
-        membersProvider.overrideWith((ref) async {
-          onFetch();
-          return members();
-        }),
-      ]);
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final api = _fakeApi(ref.watch(sessionProvider));
+            ref.onDispose(api.close);
+            return api;
+          }),
+          liveEventsProvider.overrideWithValue(events.stream),
+          membersProvider.overrideWith((ref) async {
+            onFetch();
+            return members();
+          }),
+        ],
+      );
       return (container: container, events: events);
     }
 
-    testWidgets(
-        'a live presence event for an unknown id refetches the roster '
-        'after the debounce, so a new member appears without a reload',
-        (tester) async {
+    testWidgets('a live presence event for an unknown id refetches the roster '
+        'after the debounce, so a new member appears without a reload', (
+      tester,
+    ) async {
       var members = [_profile('1', 'Priya')];
       var fetchCount = 0;
       final built = buildKeepAliveContainer(() => members, () => fetchCount++);
@@ -309,7 +328,8 @@ void main() {
       // presence frame is the first trace of him Alice's client sees.
       members = [_profile('1', 'Priya'), _profile('2', 'Bob')];
       built.events.add(
-          const PresenceChanged(userId: '2', status: PresenceState.online));
+        const PresenceChanged(userId: '2', status: PresenceState.online),
+      );
 
       // Before the debounce elapses the stale roster is still showing.
       await tester.pump(const Duration(milliseconds: 100));
@@ -324,8 +344,7 @@ void main() {
       expect(find.text('Bob'), findsOneWidget);
     });
 
-    testWidgets(
-        'a burst of unknown ids within the debounce window yields one '
+    testWidgets('a burst of unknown ids within the debounce window yields one '
         'refetch, not one per event', (tester) async {
       var members = [_profile('1', 'Priya')];
       var fetchCount = 0;
@@ -348,23 +367,28 @@ void main() {
       members = [
         _profile('1', 'Priya'),
         _profile('2', 'Bob'),
-        _profile('3', 'Cass')
+        _profile('3', 'Cass'),
       ];
       built.events.add(
-          const PresenceChanged(userId: '2', status: PresenceState.online));
+        const PresenceChanged(userId: '2', status: PresenceState.online),
+      );
       await tester.pump(const Duration(milliseconds: 200));
       built.events.add(
-          const PresenceChanged(userId: '3', status: PresenceState.online));
+        const PresenceChanged(userId: '3', status: PresenceState.online),
+      );
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pumpAndSettle();
 
-      expect(fetchCount, 2,
-          reason: 'two unknown ids close together must still coalesce '
-              'into a single refetch');
+      expect(
+        fetchCount,
+        2,
+        reason:
+            'two unknown ids close together must still coalesce '
+            'into a single refetch',
+      );
     });
 
-    testWidgets(
-        'a message from an already-known author does not refetch the '
+    testWidgets('a message from an already-known author does not refetch the '
         'roster', (tester) async {
       var fetchCount = 0;
       final members = [_profile('1', 'Priya')];
@@ -384,22 +408,30 @@ void main() {
       await tester.pumpAndSettle();
       expect(fetchCount, 1);
 
-      built.events.add(MessageCreated(Message(
-        id: 'm1',
-        channelId: 'c1',
-        authorId: '1',
-        authorDisplayName: 'Priya',
-        seq: 1,
-        content: 'hello',
-        createdAt: 0,
-        editedAt: null,
-      )));
+      built.events.add(
+        MessageCreated(
+          Message(
+            id: 'm1',
+            channelId: 'c1',
+            authorId: '1',
+            authorDisplayName: 'Priya',
+            seq: 1,
+            content: 'hello',
+            createdAt: 0,
+            editedAt: null,
+          ),
+        ),
+      );
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pumpAndSettle();
 
-      expect(fetchCount, 1,
-          reason: 'the author is already on the roster, so nothing is '
-              'stale');
+      expect(
+        fetchCount,
+        1,
+        reason:
+            'the author is already on the roster, so nothing is '
+            'stale',
+      );
     });
   });
 }

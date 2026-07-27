@@ -17,8 +17,9 @@ void main() {
   });
 
   test('text, a labelled fence, and more text split into three blocks', () {
-    final blocks =
-        splitMessageBlocks('before\n```dart\nfinal x = 1;\n```\nafter');
+    final blocks = splitMessageBlocks(
+      'before\n```dart\nfinal x = 1;\n```\nafter',
+    );
     expect(blocks, hasLength(3));
     expect((blocks[0] as TextBlock).text, 'before');
     final code = blocks[1] as CodeBlock;
@@ -47,8 +48,7 @@ void main() {
     expect(code.code, 'line one\nline two');
   });
 
-  test(
-      'an unterminated fence has nowhere to end, so it renders as plain text '
+  test('an unterminated fence has nowhere to end, so it renders as plain text '
       'instead of swallowing the rest of the message', () {
     final blocks = splitMessageBlocks('hi\n```js\nconsole.log(1)');
     expect(blocks, hasLength(1));
@@ -56,8 +56,7 @@ void main() {
     expect(text.text, 'hi\n```js\nconsole.log(1)');
   });
 
-  test(
-      'a fence marker embedded in a line of prose (as inline code might '
+  test('a fence marker embedded in a line of prose (as inline code might '
       'contain) does not start a fence, since it does not occupy its own '
       'line', () {
     final blocks = splitMessageBlocks('before `a ```b` after');

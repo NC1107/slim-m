@@ -28,17 +28,19 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
   Future<void> _upload() async {
     final FilePickerResult? result;
     try {
-      result = await FilePicker.pickFiles(withData: true, type: FileType.image);
+      result = await FilePicker.pickFiles(type: FileType.image);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open the file picker. $e')));
+        SnackBar(content: Text('Could not open the file picker. $e')),
+      );
       return;
     }
     final files = result?.files ?? const <PlatformFile>[];
     if (files.isEmpty) return;
-    final bytes = files.first.bytes;
-    if (bytes == null) return;
+    // readAsBytes streams from disk; file_picker 12 deprecated withData and
+    // PlatformFile.bytes because eager loading OOMs on a large pick.
+    final bytes = await files.first.readAsBytes();
 
     setState(() => _busy = true);
     try {
@@ -47,7 +49,8 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
     } on api.ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not upload the avatar. ${e.message}')));
+        SnackBar(content: Text('Could not upload the avatar. ${e.message}')),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -61,7 +64,8 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
     } on api.ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not remove the avatar. ${e.message}')));
+        SnackBar(content: Text('Could not remove the avatar. ${e.message}')),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }

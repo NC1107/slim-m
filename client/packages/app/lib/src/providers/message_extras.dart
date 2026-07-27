@@ -45,12 +45,11 @@ class MessageExtras {
     List<api.ReactionSummary>? reactions,
     List<api.Attachment>? attachments,
     api.Poll? poll,
-  }) =>
-      MessageExtras(
-        reactions: reactions ?? this.reactions,
-        attachments: attachments ?? this.attachments,
-        poll: poll ?? this.poll,
-      );
+  }) => MessageExtras(
+    reactions: reactions ?? this.reactions,
+    attachments: attachments ?? this.attachments,
+    poll: poll ?? this.poll,
+  );
 
   static const empty = MessageExtras();
 }
@@ -110,7 +109,9 @@ class MessageExtrasController
   }
 
   void _applyReactionsChanged(
-      String messageId, List<api.ReactionTally> tallies) {
+    String messageId,
+    List<api.ReactionTally> tallies,
+  ) {
     final known = extrasFor(messageId).reactions;
     const unknown = api.ReactionSummary(emoji: '', count: 0, reacted: false);
     final next = [
@@ -144,7 +145,10 @@ class MessageExtrasController
         final current = next[index];
         if (!current.reacted) {
           next[index] = api.ReactionSummary(
-              emoji: emoji, count: current.count + 1, reacted: true);
+            emoji: emoji,
+            count: current.count + 1,
+            reacted: true,
+          );
         }
       } else {
         next.add(api.ReactionSummary(emoji: emoji, count: 1, reacted: true));
@@ -157,8 +161,11 @@ class MessageExtrasController
         if (count <= 0) {
           next.removeAt(index);
         } else {
-          next[index] =
-              api.ReactionSummary(emoji: emoji, count: count, reacted: false);
+          next[index] = api.ReactionSummary(
+            emoji: emoji,
+            count: count,
+            reacted: false,
+          );
         }
       }
     }
@@ -208,12 +215,16 @@ class MessageExtrasController
       for (final o in poll.options)
         if (o.position == option)
           api.PollOption(
-              position: o.position, label: o.label, votes: o.votes + 1)
+            position: o.position,
+            label: o.label,
+            votes: o.votes + 1,
+          )
         else if (o.position == previous)
           api.PollOption(
-              position: o.position,
-              label: o.label,
-              votes: (o.votes - 1).clamp(0, 1 << 31))
+            position: o.position,
+            label: o.label,
+            votes: (o.votes - 1).clamp(0, 1 << 31),
+          )
         else
           o,
     ];
@@ -245,4 +256,5 @@ class MessageExtrasController
 
 final messageExtrasProvider =
     StateNotifierProvider<MessageExtrasController, Map<String, MessageExtras>>(
-        (ref) => MessageExtrasController(ref));
+      (ref) => MessageExtrasController(ref),
+    );

@@ -25,43 +25,48 @@ const _tokens = TokenPair(
 );
 
 Map<String, dynamic> _meJson(int? avatarUpdatedAt) => {
-      'id': 'self',
-      'username': 'self',
-      'display_name': 'Self',
-      'created_at': 0,
-      'permissions': 0,
-      if (avatarUpdatedAt != null) 'avatar_updated_at': avatarUpdatedAt,
-    };
+  'id': 'self',
+  'username': 'self',
+  'display_name': 'Self',
+  'created_at': 0,
+  'permissions': 0,
+  if (avatarUpdatedAt != null) 'avatar_updated_at': avatarUpdatedAt,
+};
 
 Widget _harness(ProviderContainer container) => UncontrolledProviderScope(
-      container: container,
-      child: MaterialApp(
-        theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const Scaffold(body: AvatarSettingsSection()),
-      ),
-    );
+  container: container,
+  child: MaterialApp(
+    theme: buildTheme(Brightness.light, AppTokens.light),
+    home: const Scaffold(body: AvatarSettingsSection()),
+  ),
+);
 
 void main() {
   testWidgets('no avatar set shows only the upload action', (tester) async {
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient: MockClient((request) async {
-            if (request.url.path == '/me') {
-              return http.Response(jsonEncode(_meJson(null)), 200,
-                  headers: {'content-type': 'application/json'});
-            }
-            return http.Response('', 404);
-          }),
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((request) async {
+              if (request.url.path == '/me') {
+                return http.Response(
+                  jsonEncode(_meJson(null)),
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
+              return http.Response('', 404);
+            }),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+      ],
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(_harness(container));
@@ -72,86 +77,98 @@ void main() {
   });
 
   testWidgets(
-      'an existing avatar offers Remove, and removing it clears the preview',
-      (tester) async {
-    int? avatarUpdatedAt = 555;
-    final requests = <String>[];
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient: MockClient((request) async {
-            requests.add('${request.method} ${request.url.path}');
-            if (request.url.path == '/me') {
-              return http.Response(jsonEncode(_meJson(avatarUpdatedAt)), 200,
-                  headers: {'content-type': 'application/json'});
-            }
-            if (request.method == 'DELETE' &&
-                request.url.path == '/me/avatar') {
-              avatarUpdatedAt = null;
-              return http.Response('', 204);
-            }
-            return http.Response('', 404);
+    'an existing avatar offers Remove, and removing it clears the preview',
+    (tester) async {
+      int? avatarUpdatedAt = 555;
+      final requests = <String>[];
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((request) async {
+                requests.add('${request.method} ${request.url.path}');
+                if (request.url.path == '/me') {
+                  return http.Response(
+                    jsonEncode(_meJson(avatarUpdatedAt)),
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }
+                if (request.method == 'DELETE' &&
+                    request.url.path == '/me/avatar') {
+                  avatarUpdatedAt = null;
+                  return http.Response('', 204);
+                }
+                return http.Response('', 404);
+              }),
+            );
+            ref.onDispose(api.close);
+            return api;
           }),
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-    ]);
-    addTearDown(container.dispose);
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(_harness(container));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_harness(container));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Remove'), findsOneWidget);
+      expect(find.text('Remove'), findsOneWidget);
 
-    await tester.tap(find.text('Remove'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
 
-    expect(requests, contains('DELETE /me/avatar'));
-    expect(find.text('Remove'), findsNothing);
-  });
+      expect(requests, contains('DELETE /me/avatar'));
+      expect(find.text('Remove'), findsNothing);
+    },
+  );
 
   testWidgets(
-      'tapping Upload photo with no picker result available never calls upload',
-      (tester) async {
-    final requests = <String>[];
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient: MockClient((request) async {
-            requests.add('${request.method} ${request.url.path}');
-            if (request.url.path == '/me') {
-              return http.Response(jsonEncode(_meJson(null)), 200,
-                  headers: {'content-type': 'application/json'});
-            }
-            return http.Response('', 404);
+    'tapping Upload photo with no picker result available never calls upload',
+    (tester) async {
+      final requests = <String>[];
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((request) async {
+                requests.add('${request.method} ${request.url.path}');
+                if (request.url.path == '/me') {
+                  return http.Response(
+                    jsonEncode(_meJson(null)),
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }
+                return http.Response('', 404);
+              }),
+            );
+            ref.onDispose(api.close);
+            return api;
           }),
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-    ]);
-    addTearDown(container.dispose);
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(_harness(container));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_harness(container));
+      await tester.pumpAndSettle();
 
-    // No platform implementation is registered for file_picker's method
-    // channel in a widget test, so this either throws (caught, shown as a
-    // snack bar) or resolves with no file chosen; either way, the point
-    // under test is that nothing ever reaches the upload endpoint from a
-    // picker that produced nothing to upload.
-    await tester.tap(find.text('Upload photo'));
-    await tester.pumpAndSettle();
+      // No platform implementation is registered for file_picker's method
+      // channel in a widget test, so this either throws (caught, shown as a
+      // snack bar) or resolves with no file chosen; either way, the point
+      // under test is that nothing ever reaches the upload endpoint from a
+      // picker that produced nothing to upload.
+      await tester.tap(find.text('Upload photo'));
+      await tester.pumpAndSettle();
 
-    expect(requests, isNot(contains('POST /me/avatar')));
-  });
+      expect(requests, isNot(contains('POST /me/avatar')));
+    },
+  );
 }

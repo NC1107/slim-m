@@ -22,10 +22,10 @@ enum LayoutClass {
       fromWidth(MediaQuery.sizeOf(context).width);
 
   static LayoutClass fromWidth(double width) => switch (width) {
-        < 600 => LayoutClass.compact,
-        < 1000 => LayoutClass.medium,
-        _ => LayoutClass.expanded,
-      };
+    < 600 => LayoutClass.compact,
+    < 1000 => LayoutClass.medium,
+    _ => LayoutClass.expanded,
+  };
 
   /// Whether the list and the conversation are visible at the same time.
   bool get showsBothPanes => this != LayoutClass.compact;

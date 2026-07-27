@@ -68,8 +68,9 @@ class FingerprintDisplay extends StatelessWidget {
             children: [
               for (final index in identity.colorStrip)
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s4,
+                  ),
                   child: Container(
                     width: AppSizes.icon24,
                     height: AppSizes.icon24,

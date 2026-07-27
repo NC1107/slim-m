@@ -55,24 +55,26 @@ Future<void> _pumpToTargetPicker(
 
   await tester.pumpWidget(
     UncontrolledProviderScope(
-      container: ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-        meProvider.overrideWith((ref) async => _me),
-        apiProvider.overrideWith((ref) {
-          final api = SlimmApi(
-            baseUrl: Uri.parse('http://localhost:8080'),
-            session: ref.watch(sessionProvider),
-            httpClient: MockClient((request) async => handler(request)),
-          );
-          ref.onDispose(api.close);
-          return api;
-        }),
-        storeProvider.overrideWith((ref) async {
-          ref.onDispose(db.close);
-          return MessageStore(db);
-        }),
-      ]),
+      container: ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          meProvider.overrideWith((ref) async => _me),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((request) async => handler(request)),
+            );
+            ref.onDispose(api.close);
+            return api;
+          }),
+          storeProvider.overrideWith((ref) async {
+            ref.onDispose(db.close);
+            return MessageStore(db);
+          }),
+        ],
+      ),
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
         home: const ChannelOverwritesScreen(),
@@ -90,8 +92,9 @@ Future<void> _pumpToTargetPicker(
 }
 
 void main() {
-  testWidgets('the role picker sheet lists the roles once they load',
-      (tester) async {
+  testWidgets('the role picker sheet lists the roles once they load', (
+    tester,
+  ) async {
     await _pumpToTargetPicker(
       tester,
       handler: (request) => request.url.path == '/roles'
@@ -117,13 +120,15 @@ void main() {
     expect(
       find.text('Moderators'),
       findsOneWidget,
-      reason: 'the sheet must render the role once rolesProvider resolves, '
+      reason:
+          'the sheet must render the role once rolesProvider resolves, '
           'not stay empty forever',
     );
   });
 
-  testWidgets('the member picker sheet lists the members once they load',
-      (tester) async {
+  testWidgets('the member picker sheet lists the members once they load', (
+    tester,
+  ) async {
     await _pumpToTargetPicker(
       tester,
       handler: (request) => request.url.path == '/members'
@@ -149,7 +154,8 @@ void main() {
     expect(
       find.text('Kit'),
       findsOneWidget,
-      reason: 'the sheet must render the member once membersProvider '
+      reason:
+          'the sheet must render the member once membersProvider '
           'resolves, not stay empty forever',
     );
   });

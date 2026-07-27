@@ -161,8 +161,8 @@ class _NotificationsSection extends ConsumerWidget {
             color: registered
                 ? tokens.accent
                 : blocked
-                    ? Theme.of(context).colorScheme.error
-                    : tokens.textSecondary,
+                ? Theme.of(context).colorScheme.error
+                : tokens.textSecondary,
           ),
           title: Text(status.label),
         ),
@@ -241,7 +241,8 @@ class _PresenceSection extends ConsumerWidget {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                      content: Text('Could not update presence. ${e.message}')),
+                    content: Text('Could not update presence. ${e.message}'),
+                  ),
                 );
               }
             },

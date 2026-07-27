@@ -25,20 +25,23 @@ import 'package:slimm_platform/platform.dart';
 /// the test binding uses; see [_teardown] for why that matters.
 ({ProviderContainer container, SlimmDatabase db}) _setup() {
   final db = SlimmDatabase(NativeDatabase.memory());
-  final container = ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-    apiProvider.overrideWith((ref) {
-      final api = SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: ref.watch(sessionProvider),
-        httpClient: MockClient(
-            (_) async => throw StateError('no network in this test')),
-      );
-      ref.onDispose(api.close);
-      return api;
-    }),
-    databaseProvider.overrideWith((ref) => db),
-  ]);
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      apiProvider.overrideWith((ref) {
+        final api = SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: MockClient(
+            (_) async => throw StateError('no network in this test'),
+          ),
+        );
+        ref.onDispose(api.close);
+        return api;
+      }),
+      databaseProvider.overrideWith((ref) => db),
+    ],
+  );
   return (container: container, db: db);
 }
 
@@ -50,7 +53,10 @@ import 'package:slimm_platform/platform.dart';
 /// tripping that assertion or hanging forever waiting on a timer the fake
 /// test clock never advances on its own.
 Future<void> _teardown(
-    WidgetTester tester, ProviderContainer container, SlimmDatabase db) async {
+  WidgetTester tester,
+  ProviderContainer container,
+  SlimmDatabase db,
+) async {
   await tester.pumpWidget(const SizedBox());
   await tester.pump(const Duration(milliseconds: 1));
   container.dispose();
@@ -61,18 +67,21 @@ Future<void> _teardown(
 /// onboarding, which is not what this test is about) with a router that
 /// unconditionally shows [HomeShell].
 GoRouter _testRouter() => GoRouter(
-      initialLocation: '/channels',
-      routes: [
-        GoRoute(
-          path: '/channels',
-          builder: (context, state) =>
-              const HomeShell(child: Center(child: Text('conversation'))),
-        ),
-      ],
-    );
+  initialLocation: '/channels',
+  routes: [
+    GoRoute(
+      path: '/channels',
+      builder: (context, state) =>
+          const HomeShell(child: Center(child: Text('conversation'))),
+    ),
+  ],
+);
 
 Future<void> _pumpAtWidth(
-    WidgetTester tester, ProviderContainer container, double width) async {
+  WidgetTester tester,
+  ProviderContainer container,
+  double width,
+) async {
   tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -93,7 +102,10 @@ void main() {
   testWidgets('the member pane is absent below expanded width', (tester) async {
     final setup = _setup();
     await _pumpAtWidth(
-        tester, setup.container, 700); // medium: two panes, no member pane.
+      tester,
+      setup.container,
+      700,
+    ); // medium: two panes, no member pane.
     expect(find.byType(AppMemberPane), findsNothing);
     await _teardown(tester, setup.container, setup.db);
   });
@@ -106,16 +118,17 @@ void main() {
   });
 
   testWidgets(
-      'hiding the pane at expanded width removes it, not just styles it',
-      (tester) async {
-    final setup = _setup();
-    await _pumpAtWidth(tester, setup.container, 1400);
-    expect(find.byType(AppMemberPane), findsOneWidget);
+    'hiding the pane at expanded width removes it, not just styles it',
+    (tester) async {
+      final setup = _setup();
+      await _pumpAtWidth(tester, setup.container, 1400);
+      expect(find.byType(AppMemberPane), findsOneWidget);
 
-    setup.container.read(memberPaneVisibleProvider.notifier).state = false;
-    await tester.pumpAndSettle();
-    expect(find.byType(AppMemberPane), findsNothing);
+      setup.container.read(memberPaneVisibleProvider.notifier).state = false;
+      await tester.pumpAndSettle();
+      expect(find.byType(AppMemberPane), findsNothing);
 
-    await _teardown(tester, setup.container, setup.db);
-  });
+      await _teardown(tester, setup.container, setup.db);
+    },
+  );
 }

@@ -28,18 +28,19 @@ void main() {
       expect(LayoutClass.expanded.showsBothPanes, isTrue);
     });
 
-    testWidgets('the class follows the window, not a fixed guess',
-        (tester) async {
+    testWidgets('the class follows the window, not a fixed guess', (
+      tester,
+    ) async {
       late LayoutClass observed;
       Widget probe(Size size) => MediaQuery(
-            data: MediaQueryData(size: size),
-            child: Builder(
-              builder: (context) {
-                observed = LayoutClass.of(context);
-                return const SizedBox();
-              },
-            ),
-          );
+        data: MediaQueryData(size: size),
+        child: Builder(
+          builder: (context) {
+            observed = LayoutClass.of(context);
+            return const SizedBox();
+          },
+        ),
+      );
 
       await tester.pumpWidget(probe(const Size(400, 800)));
       expect(observed, LayoutClass.compact);
@@ -54,8 +55,9 @@ void main() {
     test('are well-formed uuid v7', () {
       final id = newMessageId();
       expect(
-        RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
-            .hasMatch(id),
+        RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+        ).hasMatch(id),
         isTrue,
         reason: 'version 7 and the RFC variant bits must be set: $id',
       );
@@ -86,8 +88,9 @@ void main() {
       }
     });
 
-    testWidgets('a widget reads colours from tokens, not literals',
-        (tester) async {
+    testWidgets('a widget reads colours from tokens, not literals', (
+      tester,
+    ) async {
       late AppTokens resolved;
       await tester.pumpWidget(
         MaterialApp(

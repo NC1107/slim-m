@@ -22,12 +22,12 @@ typedef AvatarKey = ({String userId, int? updatedAt});
 
 /// Null both while there is genuinely no avatar (a 404) and, transiently,
 /// while the fetch is in flight; callers fall back to initials either way.
-final avatarBytesProvider =
-    FutureProvider.autoDispose.family<Uint8List?, AvatarKey>((ref, key) async {
-  try {
-    final fetched = await ref.watch(apiProvider).fetchAvatar(key.userId);
-    return fetched.bytes;
-  } on NotFoundException {
-    return null;
-  }
-});
+final avatarBytesProvider = FutureProvider.autoDispose
+    .family<Uint8List?, AvatarKey>((ref, key) async {
+      try {
+        final fetched = await ref.watch(apiProvider).fetchAvatar(key.userId);
+        return fetched.bytes;
+      } on NotFoundException {
+        return null;
+      }
+    });

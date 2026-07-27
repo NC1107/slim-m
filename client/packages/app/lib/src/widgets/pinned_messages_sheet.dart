@@ -47,11 +47,18 @@ class _PinnedMessagesSheet extends ConsumerWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(
-                AppSpacing.s16, 0, AppSpacing.s16, AppSpacing.s12),
+              AppSpacing.s16,
+              0,
+              AppSpacing.s16,
+              AppSpacing.s12,
+            ),
             child: Row(
               children: [
-                Icon(AppIcons.pin,
-                    size: AppSizes.icon16, color: tokens.textSecondary),
+                Icon(
+                  AppIcons.pin,
+                  size: AppSizes.icon16,
+                  color: tokens.textSecondary,
+                ),
                 const SizedBox(width: AppSpacing.s8),
                 Text(
                   'Pinned messages',
@@ -63,7 +70,9 @@ class _PinnedMessagesSheet extends ConsumerWidget {
               ],
             ),
           ),
-          Expanded(child: _Body(channelId: channelId, pins: pins)),
+          Expanded(
+            child: _Body(channelId: channelId, pins: pins),
+          ),
         ],
       ),
     );
@@ -116,8 +125,10 @@ class _Body extends ConsumerWidget {
     }
     if (list.isEmpty) {
       return Center(
-        child: Text('Nothing pinned yet.',
-            style: TextStyle(color: tokens.textSecondary)),
+        child: Text(
+          'Nothing pinned yet.',
+          style: TextStyle(color: tokens.textSecondary),
+        ),
       );
     }
 
@@ -128,9 +139,10 @@ class _Body extends ConsumerWidget {
         final pin = list[i];
         return ListTile(
           leading: AuthorAvatar(
-              userId: pin.message.authorId,
-              name: _authorLabel(pin.message),
-              size: AppSizes.icon20 + 8),
+            userId: pin.message.authorId,
+            name: _authorLabel(pin.message),
+            size: AppSizes.icon20 + 8,
+          ),
           title: Text(_authorLabel(pin.message)),
           subtitle: Text(
             pin.message.content,

@@ -48,7 +48,8 @@ class _RoleAssignSheet extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text('Could not update the assignment. ${e.message}')),
+          content: Text('Could not update the assignment. ${e.message}'),
+        ),
       );
     }
   }
@@ -64,13 +65,19 @@ class _RoleAssignSheet extends ConsumerWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(
-                AppSpacing.s16, AppSpacing.s8, AppSpacing.s16, AppSpacing.s8),
+              AppSpacing.s16,
+              AppSpacing.s8,
+              AppSpacing.s16,
+              AppSpacing.s8,
+            ),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Assign "${role.name}"',
                 style: AppText.heading.copyWith(
-                    color: tokens.textPrimary, fontWeight: AppWeights.semi),
+                  color: tokens.textPrimary,
+                  fontWeight: AppWeights.semi,
+                ),
               ),
             ),
           ),
@@ -78,8 +85,10 @@ class _RoleAssignSheet extends ConsumerWidget {
             child: members.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
-                child: Text('Could not load members. $e',
-                    style: TextStyle(color: tokens.textSecondary)),
+                child: Text(
+                  'Could not load members. $e',
+                  style: TextStyle(color: tokens.textSecondary),
+                ),
               ),
               data: (list) => ListView.builder(
                 itemCount: list.length,
@@ -89,8 +98,10 @@ class _RoleAssignSheet extends ConsumerWidget {
                   return ListTile(
                     leading: const Icon(AppIcons.account),
                     title: Text(member.displayName),
-                    subtitle: Text('@${member.username}',
-                        style: TextStyle(color: tokens.textSecondary)),
+                    subtitle: Text(
+                      '@${member.username}',
+                      style: TextStyle(color: tokens.textSecondary),
+                    ),
                     trailing: AppToggle(
                       value: has,
                       onChanged: (v) => _toggle(ref, context, member, v),

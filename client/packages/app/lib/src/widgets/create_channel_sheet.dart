@@ -58,10 +58,9 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
       _error = null;
     });
     try {
-      final created = await ref.read(apiProvider).createChannel(
-            name: _name.text.trim(),
-            kind: _kind,
-          );
+      final created = await ref
+          .read(apiProvider)
+          .createChannel(name: _name.text.trim(), kind: _kind);
       final store = await ref.read(storeProvider.future);
       await store.upsertChannels([created]);
       if (!mounted) return;
@@ -124,8 +123,10 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
             ),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.s8),
-              Text(_error!,
-                  style: AppText.caption.copyWith(color: tokens.dangerText)),
+              Text(
+                _error!,
+                style: AppText.caption.copyWith(color: tokens.dangerText),
+              ),
             ],
             const SizedBox(height: AppSpacing.s12),
             AppButton(

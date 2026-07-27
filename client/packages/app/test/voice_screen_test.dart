@@ -68,8 +68,7 @@ class _NoopSession implements VoiceSession {
   Future<bool> setScreenShareEnabled(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
-  }) async =>
-      true;
+  }) async => true;
 
   @override
   Future<bool> setDeafened(bool value) async => true;
@@ -82,27 +81,27 @@ class _NoopSession implements VoiceSession {
 }
 
 http.Client _tokenApi(int status) => MockClient((request) async {
-      if (status == 200) {
-        return http.Response(
-          jsonEncode({
-            'url': 'wss://sfu.example.com',
-            'room': 'channel-1',
-            'token': 'jwt',
-            'expires_at': 0,
-            'can_publish': true,
-          }),
-          200,
-          headers: {'content-type': 'application/json'},
-        );
-      }
-      return http.Response(
-        jsonEncode({
-          'error': {'code': 'nope', 'message': 'refused'}
-        }),
-        status,
-        headers: {'content-type': 'application/json'},
-      );
-    });
+  if (status == 200) {
+    return http.Response(
+      jsonEncode({
+        'url': 'wss://sfu.example.com',
+        'room': 'channel-1',
+        'token': 'jwt',
+        'expires_at': 0,
+        'can_publish': true,
+      }),
+      200,
+      headers: {'content-type': 'application/json'},
+    );
+  }
+  return http.Response(
+    jsonEncode({
+      'error': {'code': 'nope', 'message': 'refused'},
+    }),
+    status,
+    headers: {'content-type': 'application/json'},
+  );
+});
 
 Widget _harness(Widget child, ProviderContainer container) =>
     UncontrolledProviderScope(
@@ -115,67 +114,79 @@ Widget _harness(Widget child, ProviderContainer container) =>
 
 void main() {
   testWidgets(
-      'a server with no voice hides the join button rather than inviting a retry',
-      (tester) async {
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient: _tokenApi(501),
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-      voiceControllerProvider
-          .overrideWith((ref) => VoiceController(ref, session: _NoopSession())),
-    ]);
-    addTearDown(container.dispose);
+    'a server with no voice hides the join button rather than inviting a retry',
+    (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: _tokenApi(501),
+            );
+            ref.onDispose(api.close);
+            return api;
+          }),
+          voiceControllerProvider.overrideWith(
+            (ref) => VoiceController(ref, session: _NoopSession()),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(
-        _harness(const VoiceScreen(channelId: 'channel-1'), container));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _harness(const VoiceScreen(channelId: 'channel-1'), container),
+      );
+      await tester.pumpAndSettle();
 
-    await container.read(voiceControllerProvider.notifier).join('channel-1');
-    await tester.pumpAndSettle();
+      await container.read(voiceControllerProvider.notifier).join('channel-1');
+      await tester.pumpAndSettle();
 
-    expect(find.text('This server has no voice configured.'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Join call'), findsNothing);
-  });
+      expect(find.text('This server has no voice configured.'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Join call'), findsNothing);
+    },
+  );
 
   testWidgets(
-      "a permission denial in one channel does not block joining another",
-      (tester) async {
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient: _tokenApi(403),
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-      voiceControllerProvider
-          .overrideWith((ref) => VoiceController(ref, session: _NoopSession())),
-    ]);
-    addTearDown(container.dispose);
+    "a permission denial in one channel does not block joining another",
+    (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: _tokenApi(403),
+            );
+            ref.onDispose(api.close);
+            return api;
+          }),
+          voiceControllerProvider.overrideWith(
+            (ref) => VoiceController(ref, session: _NoopSession()),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await container.read(voiceControllerProvider.notifier).join('channel-a');
+      await container.read(voiceControllerProvider.notifier).join('channel-a');
 
-    // Now looking at a different voice channel this account was never
-    // refused: its join preview must start clean.
-    await tester.pumpWidget(
-        _harness(const VoiceScreen(channelId: 'channel-b'), container));
-    await tester.pumpAndSettle();
+      // Now looking at a different voice channel this account was never
+      // refused: its join preview must start clean.
+      await tester.pumpWidget(
+        _harness(const VoiceScreen(channelId: 'channel-b'), container),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('You do not have permission to join this channel.'),
+      expect(
+        find.text('You do not have permission to join this channel.'),
         findsNothing,
-        reason: 'channel-a\'s denial must not leak into channel-b\'s preview');
-    expect(find.widgetWithText(FilledButton, 'Join call'), findsOneWidget);
-  });
+        reason: 'channel-a\'s denial must not leak into channel-b\'s preview',
+      );
+      expect(find.widgetWithText(FilledButton, 'Join call'), findsOneWidget);
+    },
+  );
 }

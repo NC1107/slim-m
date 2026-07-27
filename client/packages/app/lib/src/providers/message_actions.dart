@@ -107,8 +107,13 @@ bool canBlockMessageAuthor(Message message, String? myUserId) =>
 /// a live `message.edited` event would, so the row's own edited marker
 /// updates without waiting for that broadcast to loop back.
 Future<void> editMessageAction(
-    WidgetRef ref, Message message, String content) async {
-  final updated = await ref.read(apiProvider).editMessage(
+  WidgetRef ref,
+  Message message,
+  String content,
+) async {
+  final updated = await ref
+      .read(apiProvider)
+      .editMessage(
         channelId: message.channelId,
         messageId: message.id,
         content: content,
@@ -122,10 +127,9 @@ Future<void> editMessageAction(
 /// from this device immediately rather than waiting for the `message.deleted`
 /// broadcast [SyncController] applies the same way.
 Future<void> deleteMessageAction(WidgetRef ref, Message message) async {
-  await ref.read(apiProvider).deleteMessage(
-        channelId: message.channelId,
-        messageId: message.id,
-      );
+  await ref
+      .read(apiProvider)
+      .deleteMessage(channelId: message.channelId, messageId: message.id);
   final store = await ref.read(storeProvider.future);
   await store.discard(message.id);
 }

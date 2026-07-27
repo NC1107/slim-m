@@ -31,27 +31,30 @@ void main() {
     );
   });
 
-  testWidgets(
-      'a failed account deletion is shown on screen, not silently left '
-      'signed in with sync already stopped and the push key already gone',
-      (tester) async {
+  testWidgets('a failed account deletion is shown on screen, not silently left '
+      'signed in with sync already stopped and the push key already gone', (
+    tester,
+  ) async {
     // Signed out, so deleteAccount() (like every other authenticated call
     // this screen makes) fails fast with UnauthorizedException before any
     // request is sent; the point under test is that the failure reaches the
     // screen instead of disappearing into an unhandled Future.
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient:
-              MockClient((_) async => throw StateError('unexpected call')),
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient(
+              (_) async => throw StateError('unexpected call'),
+            ),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+      ],
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -81,14 +84,12 @@ void main() {
     await tester.tap(find.text('Delete permanently'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.textContaining('Could not delete the account'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Could not delete the account'), findsOneWidget);
   });
 
-  testWidgets('picking a presence option sends it and updates the display',
-      (tester) async {
+  testWidgets('picking a presence option sends it and updates the display', (
+    tester,
+  ) async {
     const tokens = TokenPair(
       userId: 'self',
       accessToken: 'access',
@@ -96,48 +97,53 @@ void main() {
       accessExpiresAt: 0,
     );
     final requests = <Uri>[];
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(SessionStore(tokens: tokens)),
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient: MockClient((request) async {
-            requests.add(request.url);
-            // The rest of the screen (devices, blocks, the caller's own
-            // profile for the avatar section) renders alongside the presence
-            // section this test is about; each gets an honest answer rather
-            // than a shape only `/presence` expects.
-            if (request.url.path == '/devices' ||
-                request.url.path == '/blocks') {
-              return http.Response('[]', 200,
-                  headers: {'content-type': 'application/json'});
-            }
-            if (request.url.path == '/me') {
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((request) async {
+              requests.add(request.url);
+              // The rest of the screen (devices, blocks, the caller's own
+              // profile for the avatar section) renders alongside the presence
+              // section this test is about; each gets an honest answer rather
+              // than a shape only `/presence` expects.
+              if (request.url.path == '/devices' ||
+                  request.url.path == '/blocks') {
+                return http.Response(
+                  '[]',
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
+              if (request.url.path == '/me') {
+                return http.Response(
+                  jsonEncode({
+                    'id': 'self',
+                    'username': 'self',
+                    'display_name': 'Self',
+                    'created_at': 0,
+                    'permissions': 0,
+                  }),
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
               return http.Response(
-                jsonEncode({
-                  'id': 'self',
-                  'username': 'self',
-                  'display_name': 'Self',
-                  'created_at': 0,
-                  'permissions': 0,
-                }),
+                jsonEncode({'visibility': 'away'}),
                 200,
                 headers: {'content-type': 'application/json'},
               );
-            }
-            return http.Response(
-              jsonEncode({'visibility': 'away'}),
-              200,
-              headers: {'content-type': 'application/json'},
-            );
-          }),
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-    ]);
+            }),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+      ],
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -154,8 +160,10 @@ void main() {
     // Defaults to showing Online: there is no endpoint that reports back a
     // caller's own visibility preference, so nothing here could show
     // anything else on first load.
-    expect(container.read(presenceVisibilityDisplayProvider),
-        PresenceVisibility.online);
+    expect(
+      container.read(presenceVisibilityDisplayProvider),
+      PresenceVisibility.online,
+    );
 
     // The avatar section above it pushes Presence far enough down that it
     // is not always within the default test viewport; ensure it is in view
@@ -166,7 +174,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(requests.where((u) => u.path == '/presence'), hasLength(1));
-    expect(container.read(presenceVisibilityDisplayProvider),
-        PresenceVisibility.away);
+    expect(
+      container.read(presenceVisibilityDisplayProvider),
+      PresenceVisibility.away,
+    );
   });
 }

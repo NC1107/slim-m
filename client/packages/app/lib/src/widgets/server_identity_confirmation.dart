@@ -60,10 +60,8 @@ Future<bool> confirmServerIdentity(
         )
       : await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (context) => ServerIdentityChangedStep(
-              address: server,
-              identity: identity!,
-            ),
+            builder: (context) =>
+                ServerIdentityChangedStep(address: server, identity: identity!),
           ),
         );
 

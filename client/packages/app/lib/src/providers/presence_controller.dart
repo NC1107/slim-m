@@ -57,7 +57,8 @@ class PresenceController extends StateNotifier<Map<String, api.PresenceState>> {
 /// so there is no reason to lose it and refetch every time the pane toggles.
 final presenceControllerProvider =
     StateNotifierProvider<PresenceController, Map<String, api.PresenceState>>(
-        (ref) => PresenceController(ref));
+      (ref) => PresenceController(ref),
+    );
 
 /// What the settings screen shows as the caller's own visibility choice.
 ///
@@ -71,4 +72,5 @@ final presenceControllerProvider =
 /// fetched value; a fresh app launch has no way to know what was chosen
 /// last time and defaults to showing "online" rather than guessing.
 final presenceVisibilityDisplayProvider = StateProvider<api.PresenceVisibility>(
-    (ref) => api.PresenceVisibility.online);
+  (ref) => api.PresenceVisibility.online,
+);

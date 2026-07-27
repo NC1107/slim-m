@@ -31,38 +31,54 @@ import 'user_avatar.dart';
 
 /// Files a report against a member, from the row's context menu.
 Future<void> _reportUser(
-    BuildContext context, WidgetRef ref, api.UserProfile profile) async {
+  BuildContext context,
+  WidgetRef ref,
+  api.UserProfile profile,
+) async {
   final reason = await promptReportReason(context, subjectLabel: 'this member');
   if (reason == null || !context.mounted) return;
   try {
-    await ref.read(apiProvider).report(
+    await ref
+        .read(apiProvider)
+        .report(
           subject: api.ReportSubject.user,
           subjectId: profile.id,
           reason: reason,
         );
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Report filed. A moderator will review it.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Report filed. A moderator will review it.'),
+      ),
+    );
   } on api.ApiException catch (e) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not file the report. ${e.message}')));
+      SnackBar(content: Text('Could not file the report. ${e.message}')),
+    );
   }
 }
 
 /// Blocks a member from the row's context menu; see `SlimmApi.blockUser`
 /// for why the blocked member is never told.
 Future<void> _blockUser(
-    BuildContext context, WidgetRef ref, api.UserProfile profile) async {
+  BuildContext context,
+  WidgetRef ref,
+  api.UserProfile profile,
+) async {
   try {
     await ref.read(apiProvider).blockUser(profile.id);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Blocked. Their messages are hidden for you.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Blocked. Their messages are hidden for you.'),
+      ),
+    );
   } on api.ApiException catch (e) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not block that user. ${e.message}')));
+      SnackBar(content: Text('Could not block that user. ${e.message}')),
+    );
   }
 }
 
@@ -137,11 +153,11 @@ final memberPaneVisibleProvider = StateProvider<bool>((ref) => true);
 /// which is the distinction that bucket exists to draw, and the row itself
 /// still shows the more specific dot shape/colour.
 AppPresence _presenceOf(api.PresenceState? state) => switch (state) {
-      api.PresenceState.online => AppPresence.online,
-      api.PresenceState.away => AppPresence.away,
-      api.PresenceState.dnd => AppPresence.dnd,
-      api.PresenceState.offline || null => AppPresence.offline,
-    };
+  api.PresenceState.online => AppPresence.online,
+  api.PresenceState.away => AppPresence.away,
+  api.PresenceState.dnd => AppPresence.dnd,
+  api.PresenceState.offline || null => AppPresence.offline,
+};
 
 /// Splits and sorts [members] by presence. A member absent from [statusOf]
 /// counts as offline, which is the only honest default when presence is
@@ -150,7 +166,7 @@ AppPresence _presenceOf(api.PresenceState? state) => switch (state) {
 /// with a status layered on top, and grouping either under "Offline" would
 /// read as a lie the row's own presence dot then has to contradict.
 ({List<api.UserProfile> online, List<api.UserProfile> offline})
-    groupMembersByPresence(
+groupMembersByPresence(
   List<api.UserProfile> members,
   Map<String, AppPresence> statusOf,
 ) {
@@ -158,7 +174,8 @@ AppPresence _presenceOf(api.PresenceState? state) => switch (state) {
   final offline = <api.UserProfile>[];
   for (final member in members) {
     final status = statusOf[member.id];
-    final isOnlineGroup = status == AppPresence.online ||
+    final isOnlineGroup =
+        status == AppPresence.online ||
         status == AppPresence.away ||
         status == AppPresence.dnd;
     (isOnlineGroup ? online : offline).add(member);
@@ -200,8 +217,8 @@ class AppMemberPane extends ConsumerWidget {
           children: [
             const _Header(count: null),
             const Expanded(
-                child:
-                    Center(child: CircularProgressIndicator(strokeWidth: 2))),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
           ],
         ),
         error: (error, _) => Column(
@@ -247,7 +264,9 @@ class AppMemberPane extends ConsumerWidget {
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.s8, vertical: AppSpacing.s8),
+                    horizontal: AppSpacing.s8,
+                    vertical: AppSpacing.s8,
+                  ),
                   children: [
                     if (grouped.online.isNotEmpty) ...[
                       _GroupLabel('Online · ${grouped.online.length}'),
@@ -311,8 +330,10 @@ class _GroupLabel extends StatelessWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
-      child: Text(text.toUpperCase(),
-          style: AppText.label.copyWith(color: tokens.textSecondary)),
+      child: Text(
+        text.toUpperCase(),
+        style: AppText.label.copyWith(color: tokens.textSecondary),
+      ),
     );
   }
 }

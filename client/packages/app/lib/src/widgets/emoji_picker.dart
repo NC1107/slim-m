@@ -177,8 +177,8 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
     final results = searching
         ? searchEmoji(_query)
         : (_category == EmojiCategory.recent
-            ? recentEmojiEntries(recent)
-            : emojiForCategory(_category.group!));
+              ? recentEmojiEntries(recent)
+              : emojiForCategory(_category.group!));
     _visible = results;
     if (_highlighted >= results.length) {
       _highlighted = results.isEmpty ? 0 : results.length - 1;
@@ -203,8 +203,11 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
                 focusNode: _searchFocus,
                 autofocus: true,
                 placeholder: 'Search emoji',
-                icon: Icon(AppIcons.search,
-                    size: AppSizes.icon16, color: tokens.textSecondary),
+                icon: Icon(
+                  AppIcons.search,
+                  size: AppSizes.icon16,
+                  color: tokens.textSecondary,
+                ),
                 onChanged: _onQueryChanged,
                 onSubmitted: (_) => _pickHighlighted(),
                 semanticLabel: 'Search emoji',
@@ -228,8 +231,9 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
                   ? Center(
                       child: Text(
                         'No matches.',
-                        style:
-                            AppText.body.copyWith(color: tokens.textSecondary),
+                        style: AppText.body.copyWith(
+                          color: tokens.textSecondary,
+                        ),
                       ),
                     )
                   : EmojiGrid(

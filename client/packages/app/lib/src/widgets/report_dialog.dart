@@ -23,9 +23,7 @@ Future<String?> promptReportReason(
           autofocus: true,
           maxLines: 3,
           maxLength: 2000,
-          decoration: const InputDecoration(
-            hintText: 'What is wrong with it?',
-          ),
+          decoration: const InputDecoration(hintText: 'What is wrong with it?'),
         ),
         actions: [
           TextButton(

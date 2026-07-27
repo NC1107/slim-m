@@ -133,10 +133,9 @@ List<AppCodeSpan> _lexLine(String line, LangSpec spec) {
       final word = line.substring(i, j);
       final key = spec.caseInsensitiveKeywords ? word.toUpperCase() : word;
       add(
-          word,
-          spec.keywords.contains(key)
-              ? AppCodeRole.keyword
-              : AppCodeRole.plain);
+        word,
+        spec.keywords.contains(key) ? AppCodeRole.keyword : AppCodeRole.plain,
+      );
       i = j;
       continue;
     }

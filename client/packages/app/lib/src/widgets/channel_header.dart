@@ -44,8 +44,11 @@ class ChannelHeader extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(isVoice ? AppIcons.voice : AppIcons.hash,
-              size: AppSizes.icon16, color: tokens.textSecondary),
+          Icon(
+            isVoice ? AppIcons.voice : AppIcons.hash,
+            size: AppSizes.icon16,
+            color: tokens.textSecondary,
+          ),
           const SizedBox(width: AppSpacing.s8),
           Flexible(
             child: Text(
@@ -63,11 +66,7 @@ class ChannelHeader extends ConsumerWidget {
           ),
           if (topic != null && topic!.isNotEmpty) ...[
             const SizedBox(width: AppSpacing.s12),
-            Container(
-              width: 1,
-              height: 20,
-              color: tokens.borderSubtle,
-            ),
+            Container(width: 1, height: 20, color: tokens.borderSubtle),
             const SizedBox(width: AppSpacing.s12),
             Flexible(
               flex: 2,
@@ -92,9 +91,9 @@ class ChannelHeader extends ConsumerWidget {
             icon: AppIcons.members,
             semanticLabel: 'Toggle member list',
             active: membersVisible,
-            onPressed: () => ref
-                .read(memberPaneVisibleProvider.notifier)
-                .state = !membersVisible,
+            onPressed: () =>
+                ref.read(memberPaneVisibleProvider.notifier).state =
+                    !membersVisible,
           ),
         ],
       ),

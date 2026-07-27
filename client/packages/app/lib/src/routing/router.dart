@@ -24,13 +24,23 @@ import 'routes.dart';
 
 /// The app's router.
 ///
-/// Redirection is driven by the session, so a revoked session lands the user on
-/// sign-in wherever they were, without any screen needing to check for itself.
+/// Redirection is driven by two facts, not one. The session decides whether the
+/// signed-in surfaces are reachable, so a revoked session lands the user on the
+/// join flow wherever they were. Which end of that flow they land on is decided
+/// by whether a server has ever been chosen: someone who already has one is
+/// signed out, not new, and sending them to onboarding asks them to retype an
+/// address the app is holding.
 final routerProvider = Provider<GoRouter>((ref) {
   final session = ref.watch(sessionProvider);
 
+  // Read, not watched: main() awaits restoreSession before the router is
+  // built, so a remembered server is already in place by this point.
+  String signedOutHome() => ref.read(chosenServerProvider) == null
+      ? Routes.onboarding
+      : Routes.signIn;
+
   return GoRouter(
-    initialLocation: Routes.onboarding,
+    initialLocation: signedOutHome(),
     // Rebuilds the redirect whenever the session changes, which is what makes
     // sign-out and revocation take effect immediately.
     refreshListenable: _SessionListenable(ref),
@@ -39,8 +49,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       final onJoinFlow =
           location == Routes.signIn || location == Routes.onboarding;
-      // Signed out belongs in the join flow; signed in never does.
-      if (!signedIn) return onJoinFlow ? null : Routes.onboarding;
+      // Anywhere in the join flow is left alone, so a signed-out user can walk
+      // back to onboarding to pick a different server or redeem an invite.
+      if (!signedIn) return onJoinFlow ? null : signedOutHome();
       if (onJoinFlow) return Routes.channels;
       return null;
     },
@@ -49,7 +60,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.onboarding,
         builder: (context, state) => OnboardingScreen(
           onServerChosen: (server, invite) {
-            ref.read(serverUrlProvider.notifier).state = server;
+            ref.read(chosenServerProvider.notifier).choose(server);
             ref.read(pendingInviteProvider.notifier).state = invite;
             context.go(Routes.signIn);
           },

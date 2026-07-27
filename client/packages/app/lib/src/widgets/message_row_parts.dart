@@ -123,11 +123,16 @@ class FailedRow extends StatelessWidget {
       padding: const EdgeInsets.only(top: AppSpacing.s4),
       child: Row(
         children: [
-          Icon(AppIcons.failed,
-              size: AppSizes.icon16, color: tokens.dangerText),
+          Icon(
+            AppIcons.failed,
+            size: AppSizes.icon16,
+            color: tokens.dangerText,
+          ),
           const SizedBox(width: AppSpacing.s8),
-          Text('Not sent.',
-              style: AppText.caption.copyWith(color: tokens.dangerText)),
+          Text(
+            'Not sent.',
+            style: AppText.caption.copyWith(color: tokens.dangerText),
+          ),
           TextButton(onPressed: onRetry, child: const Text('Retry')),
           TextButton(onPressed: onDiscard, child: const Text('Discard')),
         ],

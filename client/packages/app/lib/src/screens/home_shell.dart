@@ -183,8 +183,10 @@ class _ChannelTitle extends ConsumerWidget {
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(channel?.kind == 'voice' ? AppIcons.voice : AppIcons.hash,
-                  size: 16),
+              Icon(
+                channel?.kind == 'voice' ? AppIcons.voice : AppIcons.hash,
+                size: 16,
+              ),
               const SizedBox(width: AppSpacing.s8),
               Text(
                 channel?.name ?? '',

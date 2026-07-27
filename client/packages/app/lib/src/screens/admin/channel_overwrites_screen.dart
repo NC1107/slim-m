@@ -122,7 +122,9 @@ class _ChannelOverwritesScreenState
     }
     setState(() => _busy = true);
     try {
-      await ref.read(apiProvider).setChannelOverwrite(
+      await ref
+          .read(apiProvider)
+          .setChannelOverwrite(
             channelId: _channel!.id,
             kind: _kind,
             id: _targetId!,
@@ -147,7 +149,8 @@ class _ChannelOverwritesScreenState
     final confirmed = await confirmDangerousAction(
       context,
       title: 'Clear this overwrite?',
-      message: 'Every permission for $_targetLabel in "${_channel!.name}" '
+      message:
+          'Every permission for $_targetLabel in "${_channel!.name}" '
           'goes back to inheriting from their roles. This cannot be undone.',
       confirmLabel: 'Clear',
     );
@@ -155,7 +158,9 @@ class _ChannelOverwritesScreenState
 
     setState(() => _busy = true);
     try {
-      await ref.read(apiProvider).deleteChannelOverwrite(
+      await ref
+          .read(apiProvider)
+          .deleteChannelOverwrite(
             channelId: _channel!.id,
             kind: _kind,
             id: _targetId!,
@@ -244,8 +249,10 @@ class _ChannelOverwritesScreenState
                 type: MaterialType.transparency,
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(_targetLabel ??
-                      'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}'),
+                  title: Text(
+                    _targetLabel ??
+                        'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}',
+                  ),
                   trailing: const Icon(AppIcons.chevronRight),
                   onTap: _pickTarget,
                 ),

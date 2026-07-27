@@ -118,8 +118,11 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
                   AppMenuItem(
                     label: 'Copy text',
                     leading: AppIcons.copy,
-                    onTap: () => _run(() =>
-                        Clipboard.setData(ClipboardData(text: widget.content))),
+                    onTap: () => _run(
+                      () => Clipboard.setData(
+                        ClipboardData(text: widget.content),
+                      ),
+                    ),
                   ),
                   if (actions.canEdit)
                     AppMenuItem(

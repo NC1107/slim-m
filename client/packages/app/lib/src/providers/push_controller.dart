@@ -15,22 +15,25 @@ import 'providers.dart';
 /// The native bridge for this device's APNs token. A provider, rather than a
 /// field [PushController] constructs itself, so a test can substitute one
 /// that does not depend on the test runner actually being iOS.
-final apnsTokenChannelProvider =
-    Provider<ApnsTokenChannel>((ref) => ApnsTokenChannel());
+final apnsTokenChannelProvider = Provider<ApnsTokenChannel>(
+  (ref) => ApnsTokenChannel(),
+);
 
 /// The bridge for this device's FCM registration token, Android's
 /// counterpart to [apnsTokenChannelProvider]. A provider for the same
 /// reason: a test can substitute one that does not depend on the test
 /// runner actually being Android.
-final fcmTokenChannelProvider =
-    Provider<FcmTokenChannel>((ref) => FcmTokenChannel());
+final fcmTokenChannelProvider = Provider<FcmTokenChannel>(
+  (ref) => FcmTokenChannel(),
+);
 
 /// The seam onto Android's local-notification channel: creating it, and
 /// asking for runtime permission to use it. A provider, for the same reason
 /// as the two above - a test can substitute one that reports "denied"
 /// without a real Android device or plugin channel behind it.
-final localNotificationsProvider =
-    Provider<LocalNotifications>((ref) => LocalNotifications());
+final localNotificationsProvider = Provider<LocalNotifications>(
+  (ref) => LocalNotifications(),
+);
 
 /// This device's push registration state, plain enough to read at a glance
 /// off the settings screen rather than guessing from server logs, which is
@@ -69,15 +72,15 @@ enum PushStatus {
 /// A plain-English label for [PushStatus], for the settings screen.
 extension PushStatusLabel on PushStatus {
   String get label => switch (this) {
-        PushStatus.notSignedIn => 'Not signed in',
-        PushStatus.unsupportedPlatform => 'Not available on this device',
-        PushStatus.noTokenYet => 'Waiting on the notification permission',
-        PushStatus.registrationFailed => 'The device could not register',
-        PushStatus.serverError => 'Could not reach the server',
-        PushStatus.registered => 'Registered for notifications',
-        PushStatus.registeredNotificationsBlocked =>
-          'Registered, but notifications are blocked in system settings',
-      };
+    PushStatus.notSignedIn => 'Not signed in',
+    PushStatus.unsupportedPlatform => 'Not available on this device',
+    PushStatus.noTokenYet => 'Waiting on the notification permission',
+    PushStatus.registrationFailed => 'The device could not register',
+    PushStatus.serverError => 'Could not reach the server',
+    PushStatus.registered => 'Registered for notifications',
+    PushStatus.registeredNotificationsBlocked =>
+      'Registered, but notifications are blocked in system settings',
+  };
 }
 
 /// Registers this device's push token and encryption public key, and reports
@@ -214,8 +217,11 @@ class PushController extends StateNotifier<PushStatus>
       final pendingToken = _pendingAndroidToken;
       if (pendingToken != null) {
         _pendingAndroidToken = null;
-        unawaited(_runRegistering(() =>
-            _registerWithServer(platform: 'android', token: pendingToken)));
+        unawaited(
+          _runRegistering(
+            () => _registerWithServer(platform: 'android', token: pendingToken),
+          ),
+        );
       }
     });
     _registering = future;
@@ -318,7 +324,8 @@ class PushController extends StateNotifier<PushStatus>
       return inFlight;
     }
     return _runRegistering(
-        () => _registerWithServer(platform: 'android', token: token));
+      () => _registerWithServer(platform: 'android', token: token),
+    );
   }
 
   Future<void> _registerWithServer({
@@ -329,7 +336,9 @@ class PushController extends StateNotifier<PushStatus>
       final keyStore = _ref.read(keyStoreProvider);
       final publicKey = await DevicePushKeys(keyStore).publicKeyBase64();
 
-      await _ref.read(apiProvider).registerPush(
+      await _ref
+          .read(apiProvider)
+          .registerPush(
             platform: platform,
             pushToken: token,
             pushPublicKey: publicKey,
@@ -353,9 +362,9 @@ class PushController extends StateNotifier<PushStatus>
   /// background would notify someone who is looking straight at the screen, so
   /// only a genuinely hidden app counts as background.
   static String _stateLabel(AppLifecycleState state) => switch (state) {
-        AppLifecycleState.resumed || AppLifecycleState.inactive => 'foreground',
-        _ => 'background',
-      };
+    AppLifecycleState.resumed || AppLifecycleState.inactive => 'foreground',
+    _ => 'background',
+  };
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -443,4 +452,5 @@ class PushController extends StateNotifier<PushStatus>
 
 final pushControllerProvider =
     StateNotifierProvider<PushController, PushStatus>(
-        (ref) => PushController(ref));
+      (ref) => PushController(ref),
+    );

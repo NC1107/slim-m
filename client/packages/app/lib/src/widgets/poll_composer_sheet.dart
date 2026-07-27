@@ -66,7 +66,9 @@ class _PollComposerSheetState extends ConsumerState<_PollComposerSheet> {
       _error = null;
     });
     try {
-      final sent = await ref.read(apiProvider).sendPollMessage(
+      final sent = await ref
+          .read(apiProvider)
+          .sendPollMessage(
             channelId: widget.channelId,
             id: newMessageId(),
             question: _question.text.trim(),
@@ -124,8 +126,10 @@ class _PollComposerSheetState extends ConsumerState<_PollComposerSheet> {
               const SizedBox(height: AppSpacing.s8),
             ],
             if (_error != null) ...[
-              Text(_error!,
-                  style: AppText.caption.copyWith(color: tokens.dangerText)),
+              Text(
+                _error!,
+                style: AppText.caption.copyWith(color: tokens.dangerText),
+              ),
               const SizedBox(height: AppSpacing.s8),
             ],
             AppButton(

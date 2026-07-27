@@ -37,8 +37,9 @@ class _RoleEditorSheet extends ConsumerStatefulWidget {
 }
 
 class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
-  late final TextEditingController _name =
-      TextEditingController(text: widget.role?.name ?? '');
+  late final TextEditingController _name = TextEditingController(
+    text: widget.role?.name ?? '',
+  );
   late int _permissions = widget.role?.permissions ?? 0;
   bool _submitting = false;
   String? _error;
@@ -68,7 +69,9 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
         // and resending it verbatim would still be refused as "not a subset
         // of the caller's own permissions" even though nothing moved.
         final changed = _permissions != widget.role!.permissions;
-        await ref.read(apiProvider).updateRole(
+        await ref
+            .read(apiProvider)
+            .updateRole(
               roleId: widget.role!.id,
               name: _name.text.trim(),
               permissions: changed ? _permissions : null,
@@ -105,7 +108,9 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
             Text(
               _isCreate ? 'New role' : 'Edit role',
               style: AppText.heading.copyWith(
-                  color: tokens.textPrimary, fontWeight: AppWeights.semi),
+                color: tokens.textPrimary,
+                fontWeight: AppWeights.semi,
+              ),
             ),
             const SizedBox(height: AppSpacing.s12),
             AppInput(
@@ -114,8 +119,10 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: AppSpacing.s16),
-            Text('Permissions',
-                style: AppText.label.copyWith(color: tokens.textSecondary)),
+            Text(
+              'Permissions',
+              style: AppText.label.copyWith(color: tokens.textSecondary),
+            ),
             const SizedBox(height: AppSpacing.s4),
             for (final (bit, label) in Perm.editable)
               _PermissionRow(
@@ -123,14 +130,17 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
                 value: _permissions.hasPermission(bit),
                 enabled: myPermissions.hasPermission(bit),
                 onChanged: (v) => setState(() {
-                  _permissions =
-                      v ? (_permissions | bit) : (_permissions & ~bit);
+                  _permissions = v
+                      ? (_permissions | bit)
+                      : (_permissions & ~bit);
                 }),
               ),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.s8),
-              Text(_error!,
-                  style: AppText.caption.copyWith(color: tokens.dangerText)),
+              Text(
+                _error!,
+                style: AppText.caption.copyWith(color: tokens.dangerText),
+              ),
             ],
             const SizedBox(height: AppSpacing.s12),
             AppButton(
