@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+# Named for the GTK application id set in client/packages/app/linux/CMakeLists.txt.
+# Wayland matches a window to its launcher entry by that id, so the two must agree.
+[Desktop Entry]
+Type=Application
+Name=slim-m
+GenericName=Messaging
+Comment=Chat, voice, and screen share on a slim-m server
+Exec=slim-m
+# No icon file is shipped; the repo has no slim-m artwork yet. The key is here so
+# dropping top.npcserver.slimm.png into hicolor is all it takes to light it up.
+Icon=top.npcserver.slimm
+Terminal=false
+StartupNotify=true
+StartupWMClass=top.npcserver.slimm
+Categories=Network;InstantMessaging;
+Keywords=chat;messaging;voice;

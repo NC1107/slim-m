@@ -208,11 +208,21 @@ Each arch builds its own musl target natively on a native runner, with no `cross
 
 ### linux-client
 
-The Flutter Linux build is real and wired.
-Packaging is a deliberate skeleton, gated on two repo files that do not exist yet: `packaging/flatpak/org.slimm.Client.yaml` (a flatpak-builder manifest) and `packaging/rpm/slim-m-client.spec` (an rpmbuild spec).
-Until both exist the job emits a warning and uploads nothing; it never fakes a package.
-Once they are added, the gated steps produce and attach the real bundles.
-The flatpak manifest will need to reference the Flutter build output in `client/packages/app/build/linux/*/release/bundle` as the app source, and the rpm spec's `%install` stage will need to stage that same bundle into the buildroot.
+The job publishes `slim-m-client-<version>-linux-amd64.tar.gz` on every client release, gated on nothing.
+It is the Flutter bundle as built, plus the licence and `packaging/linux/README.md`, under one top-level directory.
+That one artifact serves both readers: it is the download for a user whose distribution has no package, and it is the `Source0` the rpm spec fetches from the release.
+Naming follows the server binaries in this same workflow (`slimm-server-<version>-linux-<arch>`), so one release page does not call the same machine `amd64` in one asset and `x86_64` in another.
+
+Packaging then gates per format, not on both at once: `packaging/flatpak/org.slimm.Client.yaml` enables the Flatpak step and `packaging/rpm/slim-m-client.spec` enables the rpm step, independently.
+An earlier version required both, which would have held a working rpm behind a flatpak manifest nobody had written.
+Each missing input still warns by name, and the tarball ships either way.
+
+The rpm is built inside a `fedora:latest` container rather than on the runner, because the spec is written against Fedora's macros and dependency generators and Ubuntu's `rpm` has neither.
+It builds from the tarball staged moments earlier in the same job, not from the URL in `Source0`, since that release asset does not exist yet at that point in the run.
+The `copr` job below is the one that goes through the published URL.
+Both stamp the tag's version over the spec's `Version:` line, so a spec that is behind in git cannot mislabel a release.
+
+The flatpak step is still a skeleton; its manifest will need to reference the same bundle as its app source.
 
 `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` are optional here too, for signing the checksums only.
 
@@ -220,6 +230,27 @@ The job installs `libsecret-1-dev` as a system build dependency.
 `flutter_secure_storage` is a normal pub dependency of the platform package, used on iOS and Android (see `persistent_key_store.dart`), and pub has no per-target scoping that would keep its Linux plugin `flutter_secure_storage_linux` out of a Linux build's dependency graph.
 That plugin's CMake config hard-requires `libsecret-1-dev` to even configure, regardless of whether the app ever calls into it on this platform.
 Installing the one system package is simpler to maintain than splitting the platform package apart just to keep Linux out of that graph.
+
+### copr
+
+Submits the Fedora package to COPR at `nc1107/slim-m`, so `dnf copr enable` reaches a built and signed repository rather than a release page.
+It runs in a `fedora:latest` container because `copr-cli`, `rpmbuild` and `spectool` are Fedora packages and installing them onto the Ubuntu runner is more work than using the distribution that ships them.
+
+Two things make it inert rather than red.
+It skips with a visible warning when `COPR_CONFIG` is unset, the same shape as the Android and iOS jobs, and it skips again when `packaging/rpm/slim-m-client.spec` does not exist, which is the same condition `linux-client` already gates its packaging steps on.
+A submit that is attempted and fails is also only a warning: the `.rpm` is already attached to the release by then, so COPR being unreachable must not fail a release that has otherwise published everything.
+
+`COPR_CONFIG` is the verbatim contents of `~/.config/copr`, the `[copr-cli]` block that <https://copr.fedorainfracloud.org/api/> generates.
+It is a bearer credential for the whole COPR account, not just this project, and it expires: the token page states an expiry date and a build submitted after it fails with an authentication error rather than anything that names expiry.
+
+The version reaches the spec through an `%app_version` macro appended to `~/.rpmmacros`, rather than a `--define` flag, because both `spectool` and `rpmbuild` read the macro file and the job needs the same value in both.
+The `Version:` line is rewritten only when the spec hardcodes it; a spec that expands a macro there is left alone.
+
+`spectool -g -R` downloads `Source0` into the SRPM before submitting.
+That step is the whole reason this job exists in this shape: COPR builds in a mock buildroot with no network, so anything `Source0` points at has to already be inside the SRPM when it arrives.
+It is also why the package repackages the release tarball instead of building from source, since a Flutter build resolves pub dependencies over the network and could never run there.
+
+Operator-facing detail, including how to submit a build by hand, is in `packaging/fedora/README.md`.
 
 ### android-client
 
