@@ -390,104 +390,111 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                   controller: _searchController,
                   onChanged: _search,
                 ),
+              // Tapping the transcript dismisses the keyboard, which on a phone
+              // is otherwise covering most of what the tap was aiming at.
               Expanded(
-                child: search.query != null
-                    ? ChannelSearchResults(
-                        results: search.results,
-                        knownUsernames: knownUsernames,
-                        loading: search.loading,
-                        failed: search.failed,
-                        forbidden: search.forbidden,
-                        onRetry: () => _search(search.query!),
-                      )
-                    : StreamBuilder<List<Message>>(
-                        stream: store.watchChannel(widget.channelId),
-                        builder: (context, snapshot) {
-                          final messages = snapshot.data ?? const <Message>[];
-                          if (messages.isEmpty) {
-                            return _EmptyMessages(
-                              syncStatus: ref.watch(syncControllerProvider),
-                            );
-                          }
-                          final lastReadSeq = channel?.lastReadSeq ?? 0;
-                          _markReadUpToLatest(messages, lastReadSeq);
-                          // Reversed so the design's bottom-filled column puts
-                          // a short conversation against the composer.
-                          return ListView.builder(
-                            controller: _scroll,
-                            reverse: true,
-                            padding: const EdgeInsets.only(
-                              bottom: AppSpacing.s8,
-                            ),
-                            itemCount: messages.length,
-                            itemBuilder: (context, i) {
-                              // Index 0 is the newest; `previous` stays the row
-                              // visually above, so grouping still reads right.
-                              final index = messages.length - 1 - i;
-                              final message = messages[index];
-                              final previous = index == 0
-                                  ? null
-                                  : messages[index - 1];
-                              final extras =
-                                  extrasById[message.id] ?? MessageExtras.empty;
-                              final pinned = pinnedIds.contains(message.id);
-                              return MessageRow(
-                                message: message,
-                                grouped: _isGrouped(message, previous),
-                                showNewDivider: _startsUnread(
-                                  message,
-                                  previous,
-                                  lastReadSeq,
-                                ),
-                                knownUsernames: knownUsernames,
-                                onRetry: () => _retry(message),
-                                onDiscard: () async => (await ref.read(
-                                  storeProvider.future,
-                                )).discard(message.id),
-                                onPickReaction: (emoji) =>
-                                    _pickReaction(message, emoji),
-                                onReactionTap: (reaction) =>
-                                    _toggleReaction(message, reaction),
-                                onVote: (option) => _vote(message, option),
-                                reactions: extras.reactions,
-                                attachments: extras.attachments,
-                                poll: extras.poll,
-                                editing: message.id == _editingId,
-                                onSubmitEdit: (content) =>
-                                    unawaited(_submitEdit(message, content)),
-                                onCancelEdit: _cancelEdit,
-                                actions: MessageActions(
-                                  canEdit: canEditMessage(message, myId),
-                                  onEdit: () => _startEdit(message),
-                                  canDelete: canDeleteMessage(
-                                    message,
-                                    myId,
-                                    myPermissions,
-                                  ),
-                                  onDelete: () =>
-                                      unawaited(_deleteMessage(message)),
-                                  canManagePins: canManageMessagePin(
-                                    message,
-                                    myPermissions,
-                                  ),
-                                  pinned: pinned,
-                                  onTogglePin: () =>
-                                      unawaited(_togglePin(message, pinned)),
-                                  canReport: canReportMessage(message, myId),
-                                  onReport: () =>
-                                      unawaited(_reportMessage(message)),
-                                  canBlockAuthor: canBlockMessageAuthor(
-                                    message,
-                                    myId,
-                                  ),
-                                  onBlockAuthor: () =>
-                                      unawaited(_blockAuthor(message)),
-                                ),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () => FocusScope.of(context).unfocus(),
+                  child: search.query != null
+                      ? ChannelSearchResults(
+                          results: search.results,
+                          knownUsernames: knownUsernames,
+                          loading: search.loading,
+                          failed: search.failed,
+                          forbidden: search.forbidden,
+                          onRetry: () => _search(search.query!),
+                        )
+                      : StreamBuilder<List<Message>>(
+                          stream: store.watchChannel(widget.channelId),
+                          builder: (context, snapshot) {
+                            final messages = snapshot.data ?? const <Message>[];
+                            if (messages.isEmpty) {
+                              return _EmptyMessages(
+                                syncStatus: ref.watch(syncControllerProvider),
                               );
-                            },
-                          );
-                        },
-                      ),
+                            }
+                            final lastReadSeq = channel?.lastReadSeq ?? 0;
+                            _markReadUpToLatest(messages, lastReadSeq);
+                            // Reversed so the design's bottom-filled column puts
+                            // a short conversation against the composer.
+                            return ListView.builder(
+                              controller: _scroll,
+                              reverse: true,
+                              padding: const EdgeInsets.only(
+                                bottom: AppSpacing.s8,
+                              ),
+                              itemCount: messages.length,
+                              itemBuilder: (context, i) {
+                                // Index 0 is the newest; `previous` stays the row
+                                // visually above, so grouping still reads right.
+                                final index = messages.length - 1 - i;
+                                final message = messages[index];
+                                final previous = index == 0
+                                    ? null
+                                    : messages[index - 1];
+                                final extras =
+                                    extrasById[message.id] ??
+                                    MessageExtras.empty;
+                                final pinned = pinnedIds.contains(message.id);
+                                return MessageRow(
+                                  message: message,
+                                  grouped: _isGrouped(message, previous),
+                                  showNewDivider: _startsUnread(
+                                    message,
+                                    previous,
+                                    lastReadSeq,
+                                  ),
+                                  knownUsernames: knownUsernames,
+                                  onRetry: () => _retry(message),
+                                  onDiscard: () async => (await ref.read(
+                                    storeProvider.future,
+                                  )).discard(message.id),
+                                  onPickReaction: (emoji) =>
+                                      _pickReaction(message, emoji),
+                                  onReactionTap: (reaction) =>
+                                      _toggleReaction(message, reaction),
+                                  onVote: (option) => _vote(message, option),
+                                  reactions: extras.reactions,
+                                  attachments: extras.attachments,
+                                  poll: extras.poll,
+                                  editing: message.id == _editingId,
+                                  onSubmitEdit: (content) =>
+                                      unawaited(_submitEdit(message, content)),
+                                  onCancelEdit: _cancelEdit,
+                                  actions: MessageActions(
+                                    canEdit: canEditMessage(message, myId),
+                                    onEdit: () => _startEdit(message),
+                                    canDelete: canDeleteMessage(
+                                      message,
+                                      myId,
+                                      myPermissions,
+                                    ),
+                                    onDelete: () =>
+                                        unawaited(_deleteMessage(message)),
+                                    canManagePins: canManageMessagePin(
+                                      message,
+                                      myPermissions,
+                                    ),
+                                    pinned: pinned,
+                                    onTogglePin: () =>
+                                        unawaited(_togglePin(message, pinned)),
+                                    canReport: canReportMessage(message, myId),
+                                    onReport: () =>
+                                        unawaited(_reportMessage(message)),
+                                    canBlockAuthor: canBlockMessageAuthor(
+                                      message,
+                                      myId,
+                                    ),
+                                    onBlockAuthor: () =>
+                                        unawaited(_blockAuthor(message)),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                ),
               ),
               Composer(
                 controller: _composer,

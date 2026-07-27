@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_app/main.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/appearance_settings_section.dart';
+import 'package:slimm_app/src/widgets/settings_select_row.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -114,8 +115,8 @@ void main() {
           theme: buildTheme(Brightness.light, AppTokens.light),
           home: MediaQuery(
             data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
-            // A list is what settings is, and it gives its children no height
-            // bound, which is the constraint the card variant needs one for.
+            // A list is what settings is. The row states its current value,
+            // which is the thing that used to overflow at this text scale.
             child: ListView(children: const [AppearanceSettingsSection()]),
           ),
         ),
@@ -124,7 +125,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('True black'), findsOneWidget);
+    expect(find.text('Theme'), findsOneWidget);
+    expect(find.text('System'), findsOneWidget);
   });
 
   testWidgets('tapping a segment is what actually changes the theme', (
@@ -136,8 +138,7 @@ void main() {
 
     expect(container.read(themeControllerProvider), AppThemeChoice.system);
 
-    await tester.tap(find.text('True black'));
-    await tester.pumpAndSettle();
+    await _choose(tester, 'True black');
 
     expect(
       container.read(themeControllerProvider),
@@ -148,11 +149,9 @@ void main() {
           'about whether it is wired to anything',
     );
     expect(
-      tester
-          .widget<AppSegmentedControl>(find.byType(AppSegmentedControl))
-          .selectedIndex,
-      AppThemeChoice.values.indexOf(AppThemeChoice.trueBlack),
-      reason: 'the control has to redraw on the choice it just reported',
+      find.text('True black'),
+      findsOneWidget,
+      reason: 'the row has to restate the choice it just reported',
     );
 
     // A relaunch reads the preference store, so this is the tap proving it
@@ -173,8 +172,7 @@ void main() {
           AppThemeChoice.light;
       await _pumpSection(tester, container);
 
-      await tester.tap(find.text(_labelOf(choice)));
-      await tester.pumpAndSettle();
+      await _choose(tester, _labelOf(choice));
 
       expect(
         container.read(themeControllerProvider),
@@ -238,4 +236,14 @@ void main() {
     // true black is an OLED decision no operating system reports.
     expect(_paintedTheme(tester).extension<AppTokens>(), AppTokens.dark);
   });
+}
+
+/// Opens the row's sheet and picks [label]. The options are no longer segments
+/// on the screen itself, so a tap has to go through the sheet to prove the row
+/// is wired to anything.
+Future<void> _choose(WidgetTester tester, String label) async {
+  await tester.tap(find.byType(SettingsSelectRow<AppThemeChoice>));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label).last);
+  await tester.pumpAndSettle();
 }
