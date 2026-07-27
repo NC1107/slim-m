@@ -29,20 +29,16 @@ void main() {
 
   group('channel constants', () {
     test('the messages channel id carries an explicit version', () {
-      // A version in the id, not just a comment, is what makes a later
-      // importance change safe: Android forbids editing an existing
-      // channel's importance, so the fix is a new id, and this string is the
-      // one every call site and every device's already-created channel
-      // agree on.
+      // A version in the id is what makes a later importance change safe:
+      // Android forbids editing an existing channel's, so the fix is a new id.
       expect(messagesChannelId, 'messages_v1');
     });
   });
 
   group('LocalNotifications.show', () {
     test('a non-Android platform never touches the plugin', () async {
-      // No mock handler is installed for the plugin's method channel, so a
-      // call that reached it here would throw MissingPluginException; this
-      // completing at all is what proves the platform gate ran first.
+      // No mock handler is installed, so a call reaching the plugin would throw
+      // MissingPluginException; completing proves the platform gate ran first.
       final notifications = LocalNotifications(isAndroid: false);
 
       await expectLater(notifications.show('New message'), completes);

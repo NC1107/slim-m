@@ -47,10 +47,8 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
-        // Explicit rather than relying on the implicit back button: settings
-        // is reached with go(), which replaces the location instead of
-        // pushing, so there is no stack for Navigator to pop and the default
-        // arrow never appears.
+        // Settings is reached with go(), which replaces rather than pushes, so
+        // there is no stack to pop and the implicit back arrow never appears.
         leading: IconButton(
           icon: const Icon(AppIcons.back),
           tooltip: 'Back to channels',
@@ -163,8 +161,8 @@ class _NotificationsSection extends ConsumerWidget {
             color: registered
                 ? tokens.accent
                 : blocked
-                    ? Theme.of(context).colorScheme.error
-                    : tokens.textSecondary,
+                ? Theme.of(context).colorScheme.error
+                : tokens.textSecondary,
           ),
           title: Text(status.label),
         ),
@@ -228,7 +226,11 @@ class _PresenceSection extends ConsumerWidget {
         // four options, and scrolling that hid two of them on a phone.
         Padding(
           padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s16, 0, AppSpacing.s16, AppSpacing.s16),
+            AppSpacing.s16,
+            0,
+            AppSpacing.s16,
+            AppSpacing.s16,
+          ),
           child: IntrinsicHeight(
             child: AppSegmentedControl.cards(
               semanticLabel: 'Presence visibility',
@@ -247,8 +249,8 @@ class _PresenceSection extends ConsumerWidget {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                        content:
-                            Text('Could not update presence. ${e.message}')),
+                      content: Text('Could not update presence. ${e.message}'),
+                    ),
                   );
                 }
               },
@@ -331,10 +333,8 @@ class _AccountSection extends ConsumerWidget {
           title: const Text('Sign out'),
           onTap: () async {
             await ref.read(syncControllerProvider.notifier).stop();
-            // Drop the push registration first, while the session that owns it
-            // is still valid. Otherwise this handset keeps waking for an
-            // account nobody is signed into, which on a shared or handed-on
-            // device means notifying the wrong person.
+            // First, while the session owning it is still valid: otherwise this
+            // handset keeps waking for an account nobody is signed into.
             await ref.read(pushControllerProvider.notifier).unregister();
             try {
               await ref.read(apiProvider).logout();
@@ -364,6 +364,17 @@ class _AccountSection extends ConsumerWidget {
   /// Deletion is irreversible, so it asks plainly and states what survives.
   /// Saying "your messages stay" up front is more honest than a vague warning,
   /// and it is the thing people are actually surprised by afterwards.
+  ///
+  /// Push is unregistered before the delete for the same reason sign-out does
+  /// it: the device's push key has to go while the session that registered it
+  /// is still valid, so it is not left to be inherited by whichever account
+  /// signs into this device next.
+  ///
+  /// A failed delete deliberately leaves the session alone. Unlike sign-out,
+  /// deletion is not safe to assume happened just because the request failed,
+  /// and clearing it would orphan the account with no session left to retry
+  /// from. The failure still has to reach the screen, or the user is stranded
+  /// with no idea why nothing updates any more.
   Future<void> _confirmDeletion(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -394,19 +405,10 @@ class _AccountSection extends ConsumerWidget {
     if (confirmed != true) return;
 
     await ref.read(syncControllerProvider.notifier).stop();
-    // Same reasoning as sign-out: clear the device's push key while the
-    // session that registered it is still valid, so it is not sitting around
-    // to be inherited by whichever account signs into this device next.
     await ref.read(pushControllerProvider.notifier).unregister();
     try {
       await ref.read(apiProvider).deleteAccount();
     } on api.ApiException catch (e) {
-      // Sync is already stopped and the push key already dropped by this
-      // point. The session is deliberately left alone (unlike sign-out,
-      // deletion is not safe to assume happened just because the request
-      // failed) so the account is not orphaned with no session left to retry
-      // from, but the failure still has to reach the screen instead of
-      // leaving the user stranded with no idea why nothing updates any more.
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not delete the account. ${e.message}')),

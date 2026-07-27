@@ -10,6 +10,7 @@ license = "AGPL-3.0-only"
 repository = "https://github.com/NC1107/slim-m"
 
 # Shared dependency versions live here so every crate stays in lockstep.
+# Why each crate and feature set is what it is: docs/dependencies.md.
 [workspace.dependencies]
 axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net", "io-util", "sync", "time"] }
@@ -25,42 +26,28 @@ uuid = { version = "1", features = ["v7"] }
 jiff = "0.2"
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate", "uuid"] }
 anyhow = "1"
-# Auth primitives, all long-established audited crates (RustCrypto + BurntSushi),
-# not fresh single-maintainer projects: Argon2id password hashing, SHA-256 token
-# hashing, and URL-safe base64 for opaque token secrets.
+# Auth primitives: Argon2id hashing, SHA-256 token hashing, URL-safe base64.
+# All long-established audited crates, not fresh single-maintainer projects.
 argon2 = "0.5"
 sha2 = "0.10"
-# HMAC-SHA256 for the LiveKit access tokens, which are HS256 JWTs. Only ever
-# signed here, never verified, so none of the JWT verification pitfalls
-# (alg=none, algorithm confusion) are in play and a full JWT library would
-# be carrying parsing code this never runs. Same RustCrypto family as the
-# sha2 above, and already in the tree transitively.
+# HMAC-SHA256 for the LiveKit access tokens, which are HS256 JWTs. Signed here
+# and never verified, so a full JWT library would be dead parsing code.
 hmac = "0.12"
 base64 = "0.22"
-# The `getrandom` feature turns on rand_core's OS entropy source (OsRng), which
-# both the Argon2 salt and the opaque token secrets draw from. This is the same
-# rand_core that argon2's password-hash uses, so the feature simply unifies onto it.
+# `getrandom` turns on rand_core's OsRng, the entropy behind both the Argon2
+# salt and the opaque token secrets, unifying onto argon2's own rand_core.
 rand_core = { version = "0.6", features = ["getrandom"] }
-# Anonymous sealed boxes (libsodium crypto_box_seal, X25519 + XSalsa20Poly1305)
-# for the content-free push envelope. Pre-release because the `seal` API this
-# needs has not had a 0.10 stable cut yet; pinned to an exact version rather
-# than a range so a new pre-release cannot silently change behavior underfoot.
+# Anonymous sealed boxes for the content-free push envelope. Exact-pinned
+# because the `seal` API is still pre-release; see docs/dependencies.md.
 crypto_box = { version = "=0.10.0-pre.0", features = ["seal"] }
-# The push relay HTTP client. `rustls-tls` (not the default native-tls) so the
-# static musl release binary and distroless image never need OpenSSL; its ring
-# crypto provider needs only a C compiler, not cmake, so it fits the existing
-# Alpine builder unchanged.
+# The push relay HTTP client. `rustls-tls` so the static musl binary and the
+# distroless image never need OpenSSL; see docs/dependencies.md.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-# Already pulled in transitively by reqwest; named explicitly so the push relay
-# URL's scheme and host can be validated at startup without hand-rolled parsing.
+# Transitive through reqwest; named so the relay URL's scheme and host can be
+# validated at startup without hand-rolled parsing.
 url = "2"
-# The server's long-lived identity keypair (trust-on-first-use fingerprint).
-# `zeroize` only: no `std`, `rand_core`, or `fast` (precomputed tables), since
-# nothing here signs anything yet and a derive-then-store-the-public-half at
-# boot is the only operation this crate performs. Held at 2.x rather than the
-# freshly cut 3.0.0: 3.0.0 depends on curve25519-dalek's stable 5.0.0, which
-# cargo cannot resolve alongside crypto_box's pinned 5.0.0-pre.1 in the same
-# tree (a pre-release satisfies nothing outside its own pre-release line).
+# The server's trust-on-first-use identity keypair. Feature cuts and the 2.x
+# version hold are both load-bearing; see docs/dependencies.md.
 ed25519-dalek = { version = "2.2", default-features = false, features = ["zeroize"] }
 
 [profile.release]

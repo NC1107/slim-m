@@ -46,18 +46,21 @@ class _NoopSyncController extends SyncController {
 /// error state would still prove reachability, but it would also hide a
 /// widget that only builds on success.
 MockClient _quietClient() => MockClient((request) async {
-      final body = request.url.path == '/me'
-          ? {
-              'id': 'bob',
-              'username': 'bob',
-              'display_name': 'Bob',
-              'created_at': 0,
-              'permissions': 0,
-            }
-          : const <Object>[];
-      return http.Response(jsonEncode(body), 200,
-          headers: {'content-type': 'application/json'});
-    });
+  final body = request.url.path == '/me'
+      ? {
+          'id': 'bob',
+          'username': 'bob',
+          'display_name': 'Bob',
+          'created_at': 0,
+          'permissions': 0,
+        }
+      : const <Object>[];
+  return http.Response(
+    jsonEncode(body),
+    200,
+    headers: {'content-type': 'application/json'},
+  );
+});
 
 const _tokens = api.TokenPair(
   userId: 'bob',
@@ -76,26 +79,30 @@ const _tokens = api.TokenPair(
   bool signedIn = false,
 }) {
   final db = SlimmDatabase(NativeDatabase.memory());
-  final container = ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-    // Every authenticated call refuses before it reaches the transport
-    // otherwise, which would leave the pin count reading "loading" forever.
-    if (signedIn)
-      sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-    syncControllerProvider.overrideWith(_NoopSyncController.new),
-    apiProvider.overrideWith((ref) {
-      final client = api.SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: ref.watch(sessionProvider),
-        httpClient: httpClient ??
-            MockClient(
-                (_) async => throw StateError('no network in this test')),
-      );
-      ref.onDispose(client.close);
-      return client;
-    }),
-    databaseProvider.overrideWith((ref) => db),
-  ]);
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      // Every authenticated call refuses before it reaches the transport
+      // otherwise, which would leave the pin count reading "loading" forever.
+      if (signedIn)
+        sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+      syncControllerProvider.overrideWith(_NoopSyncController.new),
+      apiProvider.overrideWith((ref) {
+        final client = api.SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient:
+              httpClient ??
+              MockClient(
+                (_) async => throw StateError('no network in this test'),
+              ),
+        );
+        ref.onDispose(client.close);
+        return client;
+      }),
+      databaseProvider.overrideWith((ref) => db),
+    ],
+  );
   return (container: container, db: db);
 }
 
@@ -107,7 +114,10 @@ const _tokens = api.TokenPair(
 /// tripping that assertion or hanging forever waiting on a timer the fake
 /// test clock never advances on its own.
 Future<void> _teardown(
-    WidgetTester tester, ProviderContainer container, SlimmDatabase db) async {
+  WidgetTester tester,
+  ProviderContainer container,
+  SlimmDatabase db,
+) async {
   await tester.pumpWidget(const SizedBox());
   await tester.pump(const Duration(milliseconds: 1));
   container.dispose();
@@ -119,28 +129,28 @@ Future<void> _teardown(
 /// unconditionally shows [HomeShell], nesting the conversation route under
 /// the shell exactly as `router.dart` does.
 GoRouter _testRouter(String location) => GoRouter(
-      initialLocation: location,
+  initialLocation: location,
+  routes: [
+    ShellRoute(
+      builder: (context, state, child) => HomeShell(child: child),
       routes: [
-        ShellRoute(
-          builder: (context, state, child) => HomeShell(child: child),
+        GoRoute(
+          path: '/channels',
+          builder: (context, state) =>
+              const Center(child: Text('conversation')),
           routes: [
             GoRoute(
-              path: '/channels',
-              builder: (context, state) =>
-                  const Center(child: Text('conversation')),
-              routes: [
-                GoRoute(
-                  path: ':channelId',
-                  builder: (context, state) => ConversationPane(
-                    channelId: state.pathParameters['channelId']!,
-                  ),
-                ),
-              ],
+              path: ':channelId',
+              builder: (context, state) => ConversationPane(
+                channelId: state.pathParameters['channelId']!,
+              ),
             ),
           ],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 Future<void> _pumpAtWidth(
   WidgetTester tester,
@@ -167,7 +177,8 @@ Future<void> _pumpAtWidth(
 /// A phone-width shell with one channel open, seeded so the app bar has a
 /// real name and topic to show.
 Future<({ProviderContainer container, SlimmDatabase db})> _pumpCompactChannel(
-    WidgetTester tester) async {
+  WidgetTester tester,
+) async {
   final setup = _setup(httpClient: _quietClient(), signedIn: true);
   await MessageStore(setup.db).upsertChannels([
     const api.Channel(
@@ -186,7 +197,10 @@ void main() {
   testWidgets('the member pane is absent below expanded width', (tester) async {
     final setup = _setup();
     await _pumpAtWidth(
-        tester, setup.container, 700); // medium: two panes, no member pane.
+      tester,
+      setup.container,
+      700,
+    ); // medium: two panes, no member pane.
     expect(find.byType(AppMemberPane), findsNothing);
     await _teardown(tester, setup.container, setup.db);
   });
@@ -199,27 +213,33 @@ void main() {
   });
 
   testWidgets(
-      'hiding the pane at expanded width removes it, not just styles it',
-      (tester) async {
-    final setup = _setup();
-    await _pumpAtWidth(tester, setup.container, 1400);
-    expect(find.byType(AppMemberPane), findsOneWidget);
+    'hiding the pane at expanded width removes it, not just styles it',
+    (tester) async {
+      final setup = _setup();
+      await _pumpAtWidth(tester, setup.container, 1400);
+      expect(find.byType(AppMemberPane), findsOneWidget);
 
-    setup.container.read(memberPaneVisibleProvider.notifier).state = false;
-    await tester.pumpAndSettle();
-    expect(find.byType(AppMemberPane), findsNothing);
+      setup.container.read(memberPaneVisibleProvider.notifier).state = false;
+      await tester.pumpAndSettle();
+      expect(find.byType(AppMemberPane), findsNothing);
 
-    await _teardown(tester, setup.container, setup.db);
-  });
+      await _teardown(tester, setup.container, setup.db);
+    },
+  );
 
-  testWidgets('the channel topic is on screen at compact width',
-      (tester) async {
+  testWidgets('the channel topic is on screen at compact width', (
+    tester,
+  ) async {
     final setup = await _pumpCompactChannel(tester);
 
     expect(find.text('general'), findsOneWidget);
-    expect(find.text('Anything and everything'), findsOneWidget,
-        reason: 'the topic only ever lived in ChannelHeader, which this '
-            'width never builds');
+    expect(
+      find.text('Anything and everything'),
+      findsOneWidget,
+      reason:
+          'the topic only ever lived in ChannelHeader, which this '
+          'width never builds',
+    );
 
     await _teardown(tester, setup.container, setup.db);
   });
@@ -240,8 +260,9 @@ void main() {
     await _teardown(tester, setup.container, setup.db);
   });
 
-  testWidgets('the pinned-messages sheet opens from the compact app bar',
-      (tester) async {
+  testWidgets('the pinned-messages sheet opens from the compact app bar', (
+    tester,
+  ) async {
     final setup = await _pumpCompactChannel(tester);
 
     await tester.tap(find.bySemanticsLabel('Pinned messages, 0'));
@@ -262,9 +283,13 @@ void main() {
     expect(find.byType(AppMemberPane), findsNothing);
     await tester.tap(find.bySemanticsLabel('Show members'));
     await tester.pumpAndSettle();
-    expect(find.byType(AppMemberPane), findsOneWidget,
-        reason: 'the roster has no room to dock beside the conversation at '
-            'this width, so the app bar has to summon it');
+    expect(
+      find.byType(AppMemberPane),
+      findsOneWidget,
+      reason:
+          'the roster has no room to dock beside the conversation at '
+          'this width, so the app bar has to summon it',
+    );
 
     await _teardown(tester, setup.container, setup.db);
   });

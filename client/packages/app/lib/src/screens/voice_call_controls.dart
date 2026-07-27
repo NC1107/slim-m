@@ -14,8 +14,11 @@ import 'package:slimm_rtc/rtc.dart';
 import '../providers/voice_controller.dart';
 
 class CallControls extends StatelessWidget {
-  const CallControls(
-      {super.key, required this.controller, required this.voice});
+  const CallControls({
+    super.key,
+    required this.controller,
+    required this.voice,
+  });
 
   final VoiceController controller;
   final VoiceState voice;
@@ -106,13 +109,13 @@ class _ControlButton extends StatelessWidget {
     final background = destructive
         ? Theme.of(context).colorScheme.error
         : active
-            ? tokens.accentSoft
-            : tokens.surfaceRaised;
+        ? tokens.accentSoft
+        : tokens.surfaceRaised;
     final foreground = destructive
         ? Theme.of(context).colorScheme.onError
         : active
-            ? tokens.accent
-            : tokens.textSecondary;
+        ? tokens.accent
+        : tokens.textSecondary;
 
     return Tooltip(
       message: tooltip,
@@ -181,8 +184,8 @@ class _ShareQualityDialog extends StatelessWidget {
   }
 
   static String _label(ScreenShareQuality q) => switch (q) {
-        ScreenShareQuality.smooth => 'Smooth, for anything moving',
-        ScreenShareQuality.balanced => 'Balanced',
-        ScreenShareQuality.crisp => 'Crisp, for reading code',
-      };
+    ScreenShareQuality.smooth => 'Smooth, for anything moving',
+    ScreenShareQuality.balanced => 'Balanced',
+    ScreenShareQuality.crisp => 'Crisp, for reading code',
+  };
 }

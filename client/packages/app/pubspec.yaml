@@ -8,11 +8,14 @@ publish_to: none
 version: 0.1.0+4
 resolution: workspace
 environment:
-  sdk: ^3.6.0
-  flutter: ">=3.27.0"
+  sdk: ^3.10.0
+  flutter: ">=3.38.1"
 dependencies:
   emojis: ^3.2.0
-  file_picker: ^11.0.0
+  # Pinned exactly, not a caret. `^12.0.0` matches no version at all (a caret
+  # without a prerelease excludes every prerelease), and `^12.0.0-beta.7` would
+  # float onto later betas, which have broken each other three times already.
+  file_picker: 12.0.0-beta.7
   firebase_core: ^3.15.0
   firebase_messaging: ^15.2.0
   flutter:
@@ -25,14 +28,9 @@ dependencies:
   slimm_platform:
   slimm_rtc:
   drift: ^2.20.0
-  # Held on 9.x deliberately. 10.x moved to win32 6, and every other
-  # Windows-only package in the tree (device_info_plus, which
-  # livekit_client pulls, plus flutter_secure_storage_windows and
-  # win32_registry) is still on win32 5. Those libraries type-check on a
-  # Linux build even though they never run there, so the mismatch is a
-  # hard build failure rather than a Windows-only concern. Staying on 9.x
-  # is what lets the client use current livekit_client and flutter_webrtc.
-  package_info_plus: ^9.0.1
+  # 10.x, not 9.x: file_picker 12 requires win32 6, so the whole tree moves
+  # off win32 5 and the old hold on 9.x no longer resolves.
+  package_info_plus: ^10.2.1
   path: ^1.9.0
   path_provider: ^2.1.0
   shared_preferences: ^2.3.0

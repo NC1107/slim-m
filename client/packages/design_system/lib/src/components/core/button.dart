@@ -190,9 +190,8 @@ class _AppButtonState extends State<AppButton> {
               borderRadius: BorderRadius.circular(AppRadii.control),
             )
           : null,
-      // The label and icon are purely visual here: without this, the Text's
-      // own auto-generated semantics merges with the explicit label below
-      // into a single doubled announcement ("Save\nSave").
+      // The label and icon are purely visual: without this their own semantics
+      // merge with the explicit label below into a doubled "Save\nSave".
       child: ExcludeSemantics(child: content),
     );
 

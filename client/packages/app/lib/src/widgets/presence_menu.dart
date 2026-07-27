@@ -40,8 +40,9 @@ const presenceOptions = <(api.PresenceVisibility, String, AppPresence)>[
 /// visible; see [presenceVisibilityDisplayProvider].
 (String, AppPresence) presenceDisplayOf(api.PresenceVisibility? visibility) {
   if (visibility == null) return ('connected', AppPresence.online);
-  final option =
-      presenceOptions.firstWhere((option) => option.$1 == visibility);
+  final option = presenceOptions.firstWhere(
+    (option) => option.$1 == visibility,
+  );
   return (option.$2.toLowerCase(), option.$3);
 }
 
@@ -162,7 +163,8 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton> {
                   onTap: () {
                     _controller.hide();
                     unawaited(
-                        applyPresenceVisibility(context, ref, visibility));
+                      applyPresenceVisibility(context, ref, visibility),
+                    );
                   },
                 ),
             ],

@@ -189,8 +189,8 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
     final results = searching
         ? searchEmoji(_query)
         : (_category == EmojiCategory.recent
-            ? recentEmojiEntries(recent)
-            : emojiForCategory(_category.group!));
+              ? recentEmojiEntries(recent)
+              : emojiForCategory(_category.group!));
     _visible = results;
     if (_highlighted >= results.length) {
       _highlighted = results.isEmpty ? 0 : results.length - 1;
@@ -215,8 +215,11 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
                 focusNode: _searchFocus,
                 autofocus: widget.autofocusSearch,
                 placeholder: 'Search emoji',
-                icon: Icon(AppIcons.search,
-                    size: AppSizes.icon16, color: tokens.textSecondary),
+                icon: Icon(
+                  AppIcons.search,
+                  size: AppSizes.icon16,
+                  color: tokens.textSecondary,
+                ),
                 onChanged: _onQueryChanged,
                 onSubmitted: (_) => _pickHighlighted(),
                 semanticLabel: 'Search emoji',
@@ -240,8 +243,9 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
                   ? Center(
                       child: Text(
                         'No matches.',
-                        style:
-                            AppText.body.copyWith(color: tokens.textSecondary),
+                        style: AppText.body.copyWith(
+                          color: tokens.textSecondary,
+                        ),
                       ),
                     )
                   : EmojiGrid(
@@ -272,8 +276,9 @@ Future<void> showEmojiPickerSheet(
     isScrollControlled: true,
     showDragHandle: true,
     builder: (context) => Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       // Inside the keyboard inset, so the two cancel out: the route already
       // removes the top padding, which is why this matches its sibling sheet.
       child: SafeArea(
@@ -282,8 +287,10 @@ Future<void> showEmojiPickerSheet(
           children: [
             EmojiPickerPanel(
               autofocusSearch: false,
-              width: math.min(_pickerWidth,
-                  MediaQuery.sizeOf(context).width - AppSpacing.s32),
+              width: math.min(
+                _pickerWidth,
+                MediaQuery.sizeOf(context).width - AppSpacing.s32,
+              ),
               onSelect: (emoji) {
                 Navigator.of(context).pop();
                 onSelect(emoji);

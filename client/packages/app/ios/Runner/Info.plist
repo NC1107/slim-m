@@ -69,6 +69,14 @@
 	<string>slim-m uses the microphone when you join a voice call.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>slim-m opens your photo library when you attach an image to a message.</string>
+	<!-- ITMS-90683 on build 82: a linked SDK referenced Core Location with no
+	     purpose string. The reference came from DKImagePickerController, which
+	     file_picker 11 pulled in and file_picker 12 no longer uses. The key
+	     stays anyway: Apple wants a string for any referenced API, and whether
+	     the reference is really gone cannot be confirmed without a macOS
+	     archive. Nothing in slim-m calls a location API. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>slim-m never asks for your location. This entry exists because DKImagePickerController (an image-attachment picker) links against Core Location for photo EXIF geotag handling; we never request or transmit location data.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>voip</string>

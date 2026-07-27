@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 part of 'events.dart';
 
-// A `part of` file rather than its own library: `ServerEvent` is `sealed`,
-// and Dart only allows a sealed class to be extended from within its own
-// library, which for a split file means a `part`, not a separate `import`.
+// A `part of` rather than its own library: `ServerEvent` is `sealed`, and Dart
+// only allows a sealed class to be extended from inside its own library.
 
 /// A message was deleted (soft, but gone from every live view).
 class MessageDeleted extends ServerEvent {

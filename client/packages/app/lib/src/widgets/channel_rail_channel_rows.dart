@@ -50,11 +50,12 @@ class ManagedChannelRow extends StatelessWidget {
 }
 
 class VoiceChannelRow extends StatelessWidget {
-  const VoiceChannelRow(
-      {super.key,
-      required this.channel,
-      required this.selected,
-      required this.voice});
+  const VoiceChannelRow({
+    super.key,
+    required this.channel,
+    required this.selected,
+    required this.voice,
+  });
 
   final Channel channel;
   final bool selected;
@@ -67,8 +68,9 @@ class VoiceChannelRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final iconColor =
-        _inCall ? tokens.accent : tokens.textSecondary.withValues(alpha: 0.7);
+    final iconColor = _inCall
+        ? tokens.accent
+        : tokens.textSecondary.withValues(alpha: 0.7);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -77,8 +79,11 @@ class VoiceChannelRow extends StatelessWidget {
           label: channel.name,
           selected: selected,
           unread: _inCall,
-          leading:
-              Icon(AppIcons.voice, size: AppSizes.icon16, color: iconColor),
+          leading: Icon(
+            AppIcons.voice,
+            size: AppSizes.icon16,
+            color: iconColor,
+          ),
           trailing: _inCall
               ? Text(
                   '${voice.participants.length}',

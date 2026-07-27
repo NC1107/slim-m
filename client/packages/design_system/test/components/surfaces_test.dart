@@ -90,9 +90,8 @@ void main() {
       );
       final unreadStyle = tester.widget<Text>(find.text('general')).style!;
 
-      // Two independent, non-colour cues: a shape (the dot) appears, and the
-      // label's font weight changes. Either alone would still leave a purely
-      // colour-only reading possible if the other regressed; both must hold.
+      // Two independent, non-colour cues: the dot appears and the label's
+      // weight changes. Either alone leaves a colour-only reading possible.
       expect(find.byKey(AppListRow.unreadDotKey), findsOneWidget);
       expect(
         unreadStyle.fontWeight,
@@ -216,8 +215,7 @@ void main() {
       // alongside selection, not swallowed by it.
       expect(find.byKey(AppListRow.unreadDotKey), findsOneWidget);
       // Focus's cue (the outline ring) is present alongside both, even though
-      // focusRing and accent share the exact same hex in every theme: shape
-      // keeps the three legible together, not hue.
+      // focusRing and accent share a hex in every theme: shape keeps them apart.
       expect(_hasFocusRing(tester, tokens.focusRing), isTrue);
     });
   });
@@ -283,9 +281,8 @@ void main() {
         tokens: tokens,
       );
 
-      // Merge every RichText under the block (the header's language label is
-      // one, the body is another) rather than assuming tree order, so the
-      // lookup does not depend on which one happens to come first.
+      // Merge every RichText under the block (header language label, body)
+      // rather than assuming tree order, so lookup ignores which comes first.
       final byText = <String, Color>{};
       for (final richText in tester.widgetList<RichText>(
         find.descendant(
@@ -294,9 +291,8 @@ void main() {
         byText.addAll(_spanColorsByText(richText.text));
       }
 
-      // Each span's colour must trace back to the matching AppCodeColors
-      // role, not a hardcoded literal: assert the exact (text, role) pairing
-      // rather than just "some colour from the set appeared somewhere".
+      // Each span's colour must trace to the matching AppCodeColors role, not a
+      // literal: assert exact (text, role) pairs, not "some colour appeared".
       expect(byText['let'], tokens.code.keyword);
       expect(byText['1'], tokens.code.number);
       expect(byText[' // c'], tokens.code.comment);

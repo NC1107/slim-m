@@ -7,7 +7,12 @@ name: slim_m_workspace
 version: 0.0.0
 publish_to: none
 environment:
-  sdk: ^3.6.0
+  sdk: ^3.10.0
+# Only honoured at the workspace root, which is why it is not in packages/app.
+# livekit_client 2.8.1 pins device_info_plus ^12.3.0, which caps win32 at 5.x;
+# file_picker 12 needs win32 ^6.3.0. Drop when livekit ships a 13.x.
+dependency_overrides:
+  device_info_plus: ^13.2.0
 workspace:
   - packages/api
   - packages/design_system

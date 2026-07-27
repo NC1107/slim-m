@@ -45,7 +45,7 @@ class ChannelSearchState {
 
 class ChannelSearchController extends StateNotifier<ChannelSearchState> {
   ChannelSearchController(this._ref, this._channelId)
-      : super(const ChannelSearchState());
+    : super(const ChannelSearchState());
 
   final Ref _ref;
   final String _channelId;
@@ -66,14 +66,19 @@ class ChannelSearchController extends StateNotifier<ChannelSearchState> {
     }
     state = ChannelSearchState(open: true, query: trimmed, loading: true);
     try {
-      final results =
-          await _ref.read(apiProvider).searchMessages(_channelId, q: trimmed);
+      final results = await _ref
+          .read(apiProvider)
+          .searchMessages(_channelId, q: trimmed);
       if (!mounted) return;
       state = ChannelSearchState(open: true, query: trimmed, results: results);
     } on api.ForbiddenException {
       if (!mounted) return;
       state = ChannelSearchState(
-          open: true, query: trimmed, failed: true, forbidden: true);
+        open: true,
+        query: trimmed,
+        failed: true,
+        forbidden: true,
+      );
     } on api.ApiException {
       if (!mounted) return;
       state = ChannelSearchState(open: true, query: trimmed, failed: true);
@@ -83,4 +88,5 @@ class ChannelSearchController extends StateNotifier<ChannelSearchState> {
 
 final channelSearchProvider = StateNotifierProvider.autoDispose
     .family<ChannelSearchController, ChannelSearchState, String>(
-        (ref, channelId) => ChannelSearchController(ref, channelId));
+      (ref, channelId) => ChannelSearchController(ref, channelId),
+    );

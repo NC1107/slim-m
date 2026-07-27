@@ -15,21 +15,25 @@ import 'message_row_harness.dart';
 
 void main() {
   testWidgets('editing swaps the body for a pre-filled field', (tester) async {
-    await tester.pumpWidget(harness(MessageRow(
-      message: message(),
-      grouped: false,
-      showNewDivider: false,
-      knownUsernames: const {},
-      onRetry: () {},
-      onDiscard: () {},
-      onPickReaction: (_) {},
-      onReactionTap: (_) {},
-      onVote: (_) {},
-      actions: noActions,
-      editing: true,
-      onSubmitEdit: (_) {},
-      onCancelEdit: () {},
-    )));
+    await tester.pumpWidget(
+      harness(
+        MessageRow(
+          message: message(),
+          grouped: false,
+          showNewDivider: false,
+          knownUsernames: const {},
+          onRetry: () {},
+          onDiscard: () {},
+          onPickReaction: (_) {},
+          onReactionTap: (_) {},
+          onVote: (_) {},
+          actions: noActions,
+          editing: true,
+          onSubmitEdit: (_) {},
+          onCancelEdit: () {},
+        ),
+      ),
+    );
 
     expect(find.byType(MessageEditField), findsOneWidget);
     expect(find.widgetWithText(TextField, 'hello there'), findsOneWidget);
@@ -37,21 +41,25 @@ void main() {
 
   testWidgets('saving reports the edited text', (tester) async {
     String? submitted;
-    await tester.pumpWidget(harness(MessageRow(
-      message: message(),
-      grouped: false,
-      showNewDivider: false,
-      knownUsernames: const {},
-      onRetry: () {},
-      onDiscard: () {},
-      onPickReaction: (_) {},
-      onReactionTap: (_) {},
-      onVote: (_) {},
-      actions: noActions,
-      editing: true,
-      onSubmitEdit: (text) => submitted = text,
-      onCancelEdit: () {},
-    )));
+    await tester.pumpWidget(
+      harness(
+        MessageRow(
+          message: message(),
+          grouped: false,
+          showNewDivider: false,
+          knownUsernames: const {},
+          onRetry: () {},
+          onDiscard: () {},
+          onPickReaction: (_) {},
+          onReactionTap: (_) {},
+          onVote: (_) {},
+          actions: noActions,
+          editing: true,
+          onSubmitEdit: (text) => submitted = text,
+          onCancelEdit: () {},
+        ),
+      ),
+    );
 
     await tester.enterText(find.byType(TextField), 'edited content');
     await tester.tap(find.text('Save'));
@@ -61,21 +69,25 @@ void main() {
 
   testWidgets('cancel leaves the row rendered as unedited', (tester) async {
     var cancelled = false;
-    await tester.pumpWidget(harness(MessageRow(
-      message: message(),
-      grouped: false,
-      showNewDivider: false,
-      knownUsernames: const {},
-      onRetry: () {},
-      onDiscard: () {},
-      onPickReaction: (_) {},
-      onReactionTap: (_) {},
-      onVote: (_) {},
-      actions: noActions,
-      editing: true,
-      onSubmitEdit: (_) {},
-      onCancelEdit: () => cancelled = true,
-    )));
+    await tester.pumpWidget(
+      harness(
+        MessageRow(
+          message: message(),
+          grouped: false,
+          showNewDivider: false,
+          knownUsernames: const {},
+          onRetry: () {},
+          onDiscard: () {},
+          onPickReaction: (_) {},
+          onReactionTap: (_) {},
+          onVote: (_) {},
+          actions: noActions,
+          editing: true,
+          onSubmitEdit: (_) {},
+          onCancelEdit: () => cancelled = true,
+        ),
+      ),
+    );
 
     await tester.tap(find.text('Cancel'));
     expect(cancelled, isTrue);

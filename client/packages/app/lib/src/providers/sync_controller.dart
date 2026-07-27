@@ -127,18 +127,20 @@ class SyncController extends StateNotifier<SyncStatus> {
     final all = [...channels, ...dms.map(channelFromDm)];
     await store.upsertChannels(all);
 
-    // Per channel, not bundled with the listing above: the server does not
-    // hand back read state for a list of channels in one call. One channel's
-    // read state failing to fetch must not stop the rest from hydrating.
-    await Future.wait(all.map((channel) async {
-      try {
-        final read = await api.readState(channel.id);
-        await store.setReadMarker(channel.id, read.lastReadSeq);
-      } on ApiException {
-        // Best-effort: the next refresh (reconnect, or the next start())
-        // tries again, and until then the channel just reads as unread.
-      }
-    }));
+    /// Per channel, not bundled with the listing above: the server does not
+    /// hand back read state for a list of channels in one call. One channel's
+    /// read state failing to fetch must not stop the rest from hydrating.
+    await Future.wait(
+      all.map((channel) async {
+        try {
+          final read = await api.readState(channel.id);
+          await store.setReadMarker(channel.id, read.lastReadSeq);
+        } on ApiException {
+          // Best-effort: the next refresh (reconnect, or the next start())
+          // tries again, and until then the channel just reads as unread.
+        }
+      }),
+    );
   }
 
   /// [_refreshChannels], but a concurrent caller joins the one already
@@ -169,14 +171,15 @@ class SyncController extends StateNotifier<SyncStatus> {
       more = more || delta.hasMore;
     }
 
-    // At most one continuation per round, however many scopes are behind.
-    // Scheduling inside the loop meant every backlogged channel started its own
-    // full-cursor resync, so ten of them fanned out into ten overlapping /sync
-    // calls that each re-requested all ten scopes. Next tick rather than
-    // straight through, so a long backlog does not block the first paint.
+    /// At most one continuation per round, however many scopes are behind.
+    /// Scheduling inside the loop meant every backlogged channel started its own
+    /// full-cursor resync, so ten of them fanned out into ten overlapping /sync
+    /// calls that each re-requested all ten scopes. Next tick rather than
+    /// straight through, so a long backlog does not block the first paint.
     if (more) {
       unawaited(
-          Future<void>.delayed(Duration.zero, () => _catchUp(api, store)));
+        Future<void>.delayed(Duration.zero, () => _catchUp(api, store)),
+      );
     }
   }
 
@@ -192,9 +195,9 @@ class SyncController extends StateNotifier<SyncStatus> {
 
     _events = connection.events.listen(
       (event) async {
-        // Broadcast first and unconditionally: a listener that only cares
-        // about, say, ReactionsChanged must not depend on this switch ever
-        // learning about that event type.
+        /// Broadcast first and unconditionally: a listener that only cares
+        /// about, say, ReactionsChanged must not depend on this switch ever
+        /// learning about that event type.
         _liveEvents.add(event);
         await _applyServerEvent(api, store, event);
       },
@@ -206,7 +209,10 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// How one frame from the socket changes local state. A method of its own
   /// so [applyServerEventForTest] can drive it without a real socket.
   Future<void> _applyServerEvent(
-      SlimmApi api, MessageStore store, ServerEvent event) async {
+    SlimmApi api,
+    MessageStore store,
+    ServerEvent event,
+  ) async {
     switch (event) {
       case MessageCreated(:final message):
       case MessageEdited(:final message):
@@ -217,10 +223,11 @@ class SyncController extends StateNotifier<SyncStatus> {
         }
         await store.applyMessage(message);
       case MessageDeleted(:final messageId):
-        // Closes a real gap: this switch previously had no case for a
-        // delete at all, so a message removed by another user (or this
-        // account's own delete looping back) never left the local store
-        // and stayed visible until the next full resync.
+
+        /// Closes a real gap: this switch previously had no case for a
+        /// delete at all, so a message removed by another user (or this
+        /// account's own delete looping back) never left the local store
+        /// and stayed visible until the next full resync.
         await store.discard(messageId);
       case ErrorEvent(:final needsResync) when needsResync:
         // The connection fell behind and the server closed it; a restart
@@ -313,4 +320,5 @@ class SyncController extends StateNotifier<SyncStatus> {
 
 final syncControllerProvider =
     StateNotifierProvider<SyncController, SyncStatus>(
-        (ref) => SyncController(ref));
+      (ref) => SyncController(ref),
+    );

@@ -67,9 +67,7 @@ async fn connect(ws: WebSocketUpgrade, State(state): State<AppState>) -> Respons
         .on_upgrade(move |socket| serve(socket, state, permit))
 }
 
-// ---------------------------------------------------------------------------
-// Envelope
-// ---------------------------------------------------------------------------
+// --- Envelope ---
 
 #[derive(Serialize)]
 #[serde(tag = "type")]
@@ -159,9 +157,7 @@ enum ClientFrame {
     Typing { channel_id: String },
 }
 
-// ---------------------------------------------------------------------------
-// Connection
-// ---------------------------------------------------------------------------
+// --- Connection ---
 
 async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit) {
     let (mut sink, mut stream) = socket.split();
@@ -175,9 +171,8 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
     // handshake is buffered rather than missed.
     let mut events = state.hub.subscribe();
 
-    // Records this connection with the presence tracker and guarantees the
-    // matching disconnect is recorded and published no matter which branch of
-    // the loop below causes this function to return; see `signals::PresenceGuard`.
+    // Guarantees the matching disconnect however this function returns; see
+    // `signals::PresenceGuard`.
     let _presence_guard = signals::PresenceGuard::connect(state.hub.clone(), ctx.user_id);
 
     if send_frame(
@@ -284,16 +279,18 @@ async fn authenticate(
 
 /// Filters an event down to a wire frame, or `None` if this user may not see it.
 /// A permission-check error fails closed (no delivery).
+///
+/// Presence is handled up front rather than folded into the channel-scoped
+/// match: it has no channel to check view permission against (it is
+/// deployment-wide, like the member list) and needs the receiving connection's
+/// own user id to resolve the right answer for it.
 async fn authorize(
     store: &Store,
     hub: &Hub,
     ctx: &SessionContext,
     event: Event,
 ) -> Option<ServerFrame> {
-    // Presence has no channel to check view permission against (it is
-    // deployment-wide, like the member list) and needs the receiving
-    // connection's own user id to resolve the right answer for it, so it is
-    // handled up front rather than folded into the channel-scoped match below.
+    // Ahead of the channel-scoped match below; see the note on this function.
     if let Event::PresenceChanged(target_id) = event {
         let status = signals::presence_status(store, hub, ctx.user_id, target_id).await?;
         return Some(ServerFrame::PresenceChanged {

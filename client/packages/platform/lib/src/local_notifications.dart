@@ -78,9 +78,10 @@ class LocalNotifications {
 
   final FlutterLocalNotificationsPlugin _plugin;
   final bool _isAndroid;
-  // Nullable rather than defaulted in the initializer list: the default
-  // wraps `_plugin`, and an initializer list cannot read a field it is still
-  // in the middle of assigning. Built lazily in requestPermission instead.
+
+  /// Nullable rather than defaulted in the initializer list: the default wraps
+  /// `_plugin`, and an initializer list cannot read a field it is still in the
+  /// middle of assigning. Built lazily in requestPermission instead.
   final AndroidPermissionRequester? _permissionRequester;
   bool _ready = false;
 

@@ -32,52 +32,58 @@ const _signedIn = TokenPair(
 /// states that would change the layout under test. Every request lands in
 /// [requests].
 ProviderContainer _signedInContainer(List<Uri> requests) {
-  return ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-    sessionProvider.overrideWithValue(SessionStore(tokens: _signedIn)),
-    apiProvider.overrideWith((ref) {
-      final api = SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: ref.watch(sessionProvider),
-        httpClient: MockClient((request) async {
-          requests.add(request.url);
-          if (request.url.path == '/devices' || request.url.path == '/blocks') {
-            return http.Response('[]', 200,
-                headers: {'content-type': 'application/json'});
-          }
-          if (request.url.path == '/me') {
+  return ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(SessionStore(tokens: _signedIn)),
+      apiProvider.overrideWith((ref) {
+        final api = SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: MockClient((request) async {
+            requests.add(request.url);
+            if (request.url.path == '/devices' ||
+                request.url.path == '/blocks') {
+              return http.Response(
+                '[]',
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            if (request.url.path == '/me') {
+              return http.Response(
+                jsonEncode({
+                  'id': 'self',
+                  'username': 'self',
+                  'display_name': 'Self',
+                  'created_at': 0,
+                  'permissions': 0,
+                }),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
             return http.Response(
-              jsonEncode({
-                'id': 'self',
-                'username': 'self',
-                'display_name': 'Self',
-                'created_at': 0,
-                'permissions': 0,
-              }),
+              jsonEncode({'visibility': 'away'}),
               200,
               headers: {'content-type': 'application/json'},
             );
-          }
-          return http.Response(
-            jsonEncode({'visibility': 'away'}),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
-        }),
-      );
-      ref.onDispose(api.close);
-      return api;
-    }),
-  ]);
+          }),
+        );
+        ref.onDispose(api.close);
+        return api;
+      }),
+    ],
+  );
 }
 
 Widget _screen(ProviderContainer container) => UncontrolledProviderScope(
-      container: container,
-      child: MaterialApp(
-        theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const SettingsScreen(),
-      ),
-    );
+  container: container,
+  child: MaterialApp(
+    theme: buildTheme(Brightness.light, AppTokens.light),
+    home: const SettingsScreen(),
+  ),
+);
 
 void main() {
   setUpAll(() {
@@ -90,27 +96,30 @@ void main() {
     );
   });
 
-  testWidgets(
-      'a failed account deletion is shown on screen, not silently left '
-      'signed in with sync already stopped and the push key already gone',
-      (tester) async {
-    // Signed out, so deleteAccount() (like every other authenticated call
-    // this screen makes) fails fast with UnauthorizedException before any
-    // request is sent; the point under test is that the failure reaches the
-    // screen instead of disappearing into an unhandled Future.
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient:
-              MockClient((_) async => throw StateError('unexpected call')),
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-    ]);
+  testWidgets('a failed account deletion is shown on screen, not silently left '
+      'signed in with sync already stopped and the push key already gone', (
+    tester,
+  ) async {
+    /// Signed out, so deleteAccount() (like every other authenticated call
+    /// this screen makes) fails fast with UnauthorizedException before any
+    /// request is sent; the point under test is that the failure reaches the
+    /// screen instead of disappearing into an unhandled Future.
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient(
+              (_) async => throw StateError('unexpected call'),
+            ),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+      ],
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -124,14 +133,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Below the fold on the default test viewport; the account section is
-    // last in the list. ListView builds every child eagerly, so the finder
-    // already resolves before any scrolling; drag directly rather than via
-    // scrollUntilVisible, which only scrolls until the finder resolves at
-    // all, not until the target is actually within the viewport. The drag
-    // is deliberately larger than the list's content: Flutter clamps to
-    // `maxScrollExtent` rather than erroring, so this reaches the bottom
-    // regardless of exactly how tall the sections above it are.
+    /// Below the fold on the default test viewport; the account section is
+    /// last in the list. ListView builds every child eagerly, so the finder
+    /// already resolves before any scrolling; drag directly rather than via
+    /// scrollUntilVisible, which only scrolls until the finder resolves at
+    /// all, not until the target is actually within the viewport. The drag
+    /// is deliberately larger than the list's content: Flutter clamps to
+    /// `maxScrollExtent` rather than erroring, so this reaches the bottom
+    /// regardless of exactly how tall the sections above it are.
     await tester.drag(find.byType(ListView), const Offset(0, -2000));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete account'));
@@ -140,10 +149,7 @@ void main() {
     await tester.tap(find.text('Delete permanently'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.textContaining('Could not delete the account'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Could not delete the account'), findsOneWidget);
   });
 
   testWidgets('the whole screen lays out at phone width', (tester) async {
@@ -151,19 +157,22 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     addTearDown(tester.view.reset);
 
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient:
-              MockClient((_) async => throw StateError('unexpected call')),
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient(
+              (_) async => throw StateError('unexpected call'),
+            ),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+      ],
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -184,8 +193,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('picking a presence option sends it and updates the display',
-      (tester) async {
+  testWidgets('picking a presence option sends it and updates the display', (
+    tester,
+  ) async {
     final requests = <Uri>[];
     final container = _signedInContainer(requests);
     addTearDown(container.dispose);
@@ -193,9 +203,9 @@ void main() {
     await tester.pumpWidget(_screen(container));
     await tester.pumpAndSettle();
 
-    // Null, not Online: no endpoint reports a caller's own visibility back,
-    // and the preference is durable server-side, so claiming online here
-    // would tell someone still hidden that they are visible.
+    /// Null, not Online: no endpoint reports a caller's own visibility back,
+    /// and the preference is durable server-side, so claiming online here
+    /// would tell someone still hidden that they are visible.
     expect(container.read(presenceVisibilityDisplayProvider), isNull);
 
     // Presence now sits past the viewport's cache extent, so the option is
@@ -211,14 +221,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(requests.where((u) => u.path == '/presence'), hasLength(1));
-    expect(container.read(presenceVisibilityDisplayProvider),
-        PresenceVisibility.away);
+    expect(
+      container.read(presenceVisibilityDisplayProvider),
+      PresenceVisibility.away,
+    );
   });
 
   // The regression: the overflow was fixed by scrolling the four options
   // horizontally, hiding two of them (one the privacy control) off the edge.
-  testWidgets('every presence option is on screen and tappable at 390pt',
-      (tester) async {
+  testWidgets('every presence option is on screen and tappable at 390pt', (
+    tester,
+  ) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
     addTearDown(tester.view.reset);
@@ -244,16 +257,21 @@ void main() {
     ]) {
       final rect = tester.getRect(find.text(label));
       expect(rect.left, greaterThanOrEqualTo(0.0), reason: '$label is cut off');
-      expect(rect.right, lessThanOrEqualTo(390.0),
-          reason: '$label runs past the right edge of the screen');
+      expect(
+        rect.right,
+        lessThanOrEqualTo(390.0),
+        reason: '$label runs past the right edge of the screen',
+      );
     }
 
     // Reachable, not merely painted: an option outside the viewport takes no
     // tap, so this is what a horizontal scroll view could not satisfy.
     await tester.tap(find.text('Appear offline'));
     await tester.pumpAndSettle();
-    expect(container.read(presenceVisibilityDisplayProvider),
-        PresenceVisibility.hidden);
+    expect(
+      container.read(presenceVisibilityDisplayProvider),
+      PresenceVisibility.hidden,
+    );
     expect(requests.where((u) => u.path == '/presence'), hasLength(1));
   });
 }

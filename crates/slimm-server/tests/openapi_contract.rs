@@ -25,9 +25,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-// ---------------------------------------------------------------------------
-// HTTP methods
-// ---------------------------------------------------------------------------
+// --- HTTP methods ---
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Method {
@@ -82,9 +80,7 @@ fn is_ident_char(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_'
 }
 
-// ---------------------------------------------------------------------------
-// Router-side extraction
-// ---------------------------------------------------------------------------
+// --- Router-side extraction ---
 
 #[derive(Debug, Clone)]
 struct RouterRoute {
@@ -236,10 +232,8 @@ fn extract_router_routes() -> Vec<RouterRoute> {
             }
         }
 
-        // The self-check: every `.route(` this file textually contains must
-        // have been parsed. A mismatch means the scanner regressed on this
-        // file's syntax, which would otherwise show up only as routes
-        // quietly missing from the comparison below.
+        // Self-check: the found-versus-parsed count must match, or the scanner
+        // regressed on this file's syntax (see this file's module doc).
         assert_eq!(
             parsed_call_sites,
             raw_call_sites,
@@ -266,9 +260,7 @@ fn extract_router_routes() -> Vec<RouterRoute> {
     routes
 }
 
-// ---------------------------------------------------------------------------
-// Schema-side extraction
-// ---------------------------------------------------------------------------
+// --- Schema-side extraction ---
 
 #[derive(Debug, Clone)]
 struct SchemaRoute {
@@ -349,9 +341,7 @@ fn extract_schema_routes(repo_root: &Path) -> Vec<SchemaRoute> {
     routes
 }
 
-// ---------------------------------------------------------------------------
-// Comparison
-// ---------------------------------------------------------------------------
+// --- Comparison ---
 
 /// Normalizes a path template so axum's `{channel_id}` and the schema's
 /// `{channelId}` compare equal: both spell "one path parameter here", just

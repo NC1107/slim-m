@@ -246,9 +246,8 @@ impl Store {
         let Some(poll) = poll else {
             return Err(VoteError::UnknownPoll);
         };
-        // Checked inside the transaction against the server's own clock, not
-        // the client's: a claim that "it wasn't closed yet" from the caller
-        // is not something this can trust.
+        // Inside the transaction and against the server's clock: a caller's
+        // "it wasn't closed yet" is not something this can trust.
         if let Some(close_at) = poll.close_at
             && now >= close_at
         {

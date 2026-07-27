@@ -82,14 +82,14 @@ class MessageBody extends StatelessWidget {
           if (i > 0) const SizedBox(height: AppSpacing.s4),
           switch (blocks[i]) {
             TextBlock(:final text) => _MessageTextRun(
-                text: text,
-                knownUsernames: knownUsernames,
-                color: baseColor,
-              ),
+              text: text,
+              knownUsernames: knownUsernames,
+              color: baseColor,
+            ),
             CodeBlock(:final language, :final code) => AppCodeBlock(
-                language: language,
-                lines: lexCodeBlock(code, language),
-              ),
+              language: language,
+              lines: lexCodeBlock(code, language),
+            ),
           },
         ],
       ],
@@ -120,13 +120,13 @@ class _MessageTextRun extends StatelessWidget {
             switch (token.kind) {
               _SpanKind.text => TextSpan(text: token.text),
               _SpanKind.code => WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: AppInlineCode(token.text),
-                ),
+                alignment: PlaceholderAlignment.middle,
+                child: AppInlineCode(token.text),
+              ),
               _SpanKind.mention => WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: _MentionChip(token.text),
-                ),
+                alignment: PlaceholderAlignment.middle,
+                child: _MentionChip(token.text),
+              ),
             },
         ],
       ),

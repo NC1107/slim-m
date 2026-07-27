@@ -13,52 +13,62 @@ import 'package:slimm_app/src/providers/recent_emoji.dart';
 import 'package:slimm_app/src/widgets/emoji_picker.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-// The catalog's own first entries, escaped rather than literal: the hygiene
-// gate forbids an emoji codepoint in client source, and these are user
-// content standing in for a reaction, not interface chrome.
+/// The catalog's own first entries, escaped rather than literal: the hygiene
+/// gate forbids an emoji codepoint in client source, and these are user
+/// content standing in for a reaction, not interface chrome.
 const _grinningFace = '\u{1F600}'; // First catalog entry (smileys, default).
 const _grinningFaceBigEyes = '\u{1F603}'; // Second catalog entry.
 const _rofl = '\u{1F923}'; // Unique shortName "rofl"; a safe search probe.
 const _grapes = '\u{1F347}'; // First "Food and drink" category entry.
 
 Widget _harness(Widget child) => ProviderScope(
-      child: MaterialApp(
-        theme: buildTheme(Brightness.light, AppTokens.light),
-        home: Scaffold(body: Align(alignment: Alignment.topLeft, child: child)),
-      ),
-    );
+  child: MaterialApp(
+    theme: buildTheme(Brightness.light, AppTokens.light),
+    home: Scaffold(
+      body: Align(alignment: Alignment.topLeft, child: child),
+    ),
+  ),
+);
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets(
-      'defaults to the smileys category, and picking a tile reports its '
-      'emoji and records it as recently used', (tester) async {
-    String? picked;
-    late ProviderContainer container;
+    'defaults to the smileys category, and picking a tile reports its '
+    'emoji and records it as recently used',
+    (tester) async {
+      String? picked;
+      late ProviderContainer container;
 
-    await tester.pumpWidget(_harness(Builder(builder: (context) {
-      container = ProviderScope.containerOf(context);
-      return EmojiPickerPanel(
-        onSelect: (emoji) => picked = emoji,
-        onClose: () {},
+      await tester.pumpWidget(
+        _harness(
+          Builder(
+            builder: (context) {
+              container = ProviderScope.containerOf(context);
+              return EmojiPickerPanel(
+                onSelect: (emoji) => picked = emoji,
+                onClose: () {},
+              );
+            },
+          ),
+        ),
       );
-    })));
 
-    expect(find.text(_grinningFace), findsOneWidget);
-    await tester.tap(find.text(_grinningFace));
-    await tester.pump();
+      expect(find.text(_grinningFace), findsOneWidget);
+      await tester.tap(find.text(_grinningFace));
+      await tester.pump();
 
-    expect(picked, _grinningFace);
-    expect(container.read(recentEmojiProvider), contains(_grinningFace));
-  });
+      expect(picked, _grinningFace);
+      expect(container.read(recentEmojiProvider), contains(_grinningFace));
+    },
+  );
 
-  testWidgets('a search query filters the whole catalog and hides the tabs',
-      (tester) async {
-    await tester.pumpWidget(_harness(EmojiPickerPanel(
-      onSelect: (_) {},
-      onClose: () {},
-    )));
+  testWidgets('a search query filters the whole catalog and hides the tabs', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(EmojiPickerPanel(onSelect: (_) {}, onClose: () {})),
+    );
 
     expect(find.byTooltip('Food and drink'), findsOneWidget);
 
@@ -70,12 +80,12 @@ void main() {
     expect(find.byTooltip('Food and drink'), findsNothing);
   });
 
-  testWidgets('a category tab switches which group the grid shows',
-      (tester) async {
-    await tester.pumpWidget(_harness(EmojiPickerPanel(
-      onSelect: (_) {},
-      onClose: () {},
-    )));
+  testWidgets('a category tab switches which group the grid shows', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(EmojiPickerPanel(onSelect: (_) {}, onClose: () {})),
+    );
 
     expect(find.text(_grinningFace), findsOneWidget);
 
@@ -86,13 +96,15 @@ void main() {
     expect(find.text(_grinningFace), findsNothing);
   });
 
-  testWidgets('arrow-down moves the highlight and Enter picks it',
-      (tester) async {
+  testWidgets('arrow-down moves the highlight and Enter picks it', (
+    tester,
+  ) async {
     String? picked;
-    await tester.pumpWidget(_harness(EmojiPickerPanel(
-      onSelect: (emoji) => picked = emoji,
-      onClose: () {},
-    )));
+    await tester.pumpWidget(
+      _harness(
+        EmojiPickerPanel(onSelect: (emoji) => picked = emoji, onClose: () {}),
+      ),
+    );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
@@ -106,10 +118,11 @@ void main() {
 
   testWidgets('Escape calls onClose', (tester) async {
     var closed = false;
-    await tester.pumpWidget(_harness(EmojiPickerPanel(
-      onSelect: (_) {},
-      onClose: () => closed = true,
-    )));
+    await tester.pumpWidget(
+      _harness(
+        EmojiPickerPanel(onSelect: (_) {}, onClose: () => closed = true),
+      ),
+    );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pump();
@@ -118,42 +131,49 @@ void main() {
   });
 
   testWidgets(
-      'the recent tab only appears once there is a history, and shows it',
-      (tester) async {
-    await tester.pumpWidget(_harness(EmojiPickerPanel(
-      onSelect: (_) {},
-      onClose: () {},
-    )));
-    expect(find.byTooltip('Recently used'), findsNothing);
+    'the recent tab only appears once there is a history, and shows it',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(EmojiPickerPanel(onSelect: (_) {}, onClose: () {})),
+      );
+      expect(find.byTooltip('Recently used'), findsNothing);
 
-    await tester.tap(find.text(_grinningFace));
-    await tester.pump();
+      await tester.tap(find.text(_grinningFace));
+      await tester.pump();
 
-    expect(find.byTooltip('Recently used'), findsOneWidget);
-  });
+      expect(find.byTooltip('Recently used'), findsOneWidget);
+    },
+  );
 
   // The regression: this sheet ran to the physical bottom edge while its
   // sibling sheet did not, so the last emoji row sat under the home indicator.
-  testWidgets('the sheet keeps its last row clear of the home indicator',
-      (tester) async {
+  testWidgets('the sheet keeps its last row clear of the home indicator', (
+    tester,
+  ) async {
     const bottomInset = 34.0;
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
     tester.view.padding = const FakeViewPadding(bottom: bottomInset);
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(_harness(Builder(
-      builder: (context) => TextButton(
-        onPressed: () => showEmojiPickerSheet(context, onSelect: (_) {}),
-        child: const Text('open'),
+    await tester.pumpWidget(
+      _harness(
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showEmojiPickerSheet(context, onSelect: (_) {}),
+            child: const Text('open'),
+          ),
+        ),
       ),
-    )));
+    );
 
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(tester.getRect(find.byType(EmojiPickerPanel)).bottom,
-        lessThanOrEqualTo(844.0 - bottomInset),
-        reason: 'the panel must end above the home indicator, not under it');
+    expect(
+      tester.getRect(find.byType(EmojiPickerPanel)).bottom,
+      lessThanOrEqualTo(844.0 - bottomInset),
+      reason: 'the panel must end above the home indicator, not under it',
+    );
   });
 }

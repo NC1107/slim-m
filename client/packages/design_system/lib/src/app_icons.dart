@@ -35,9 +35,9 @@ abstract final class AppIcons {
   static const IconData code = LucideIcons.code;
   static const IconData smile = LucideIcons.smile;
 
-  // The emoji picker's category tabs. `smileysEmotion` reuses [smile] above
-  // and `recent` reuses [clock] below; these eight cover the rest of the
-  // `emojis` package's [EmojiGroup] set.
+  /// The emoji picker's category tabs. `smileysEmotion` reuses [smile] above
+  /// and `recent` reuses [clock] below; these eight cover the rest of the
+  /// `emojis` package's [EmojiGroup] set.
   static const IconData peopleBody = LucideIcons.footprints;
   static const IconData animalsNature = LucideIcons.pawPrint;
   static const IconData foodDrink = LucideIcons.utensils;
@@ -69,9 +69,9 @@ abstract final class AppIcons {
   static const IconData notificationsOn = LucideIcons.bell;
   static const IconData notificationsOff = LucideIcons.bellOff;
 
-  // Severity and surfaces (callouts, menus, code blocks). Distinct shapes
-  // (circle, triangle, sparkle, octagon) so a tone survives greyscale rather
-  // than resting on colour alone.
+  /// Severity and surfaces (callouts, menus, code blocks). Distinct shapes
+  /// (circle, triangle, sparkle, octagon) so a tone survives greyscale rather
+  /// than resting on colour alone.
   static const IconData warning = LucideIcons.triangleAlert;
   static const IconData highlight = LucideIcons.sparkles;
   static const IconData danger = LucideIcons.octagonAlert;

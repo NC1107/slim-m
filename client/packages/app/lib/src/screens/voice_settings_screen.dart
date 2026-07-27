@@ -41,12 +41,11 @@ class VoiceSettingsState {
   VoiceSettingsState copyWith({
     bool? joinLeaveSoundsEnabled,
     ScreenShareQuality? screenShareQuality,
-  }) =>
-      VoiceSettingsState(
-        joinLeaveSoundsEnabled:
-            joinLeaveSoundsEnabled ?? this.joinLeaveSoundsEnabled,
-        screenShareQuality: screenShareQuality ?? this.screenShareQuality,
-      );
+  }) => VoiceSettingsState(
+    joinLeaveSoundsEnabled:
+        joinLeaveSoundsEnabled ?? this.joinLeaveSoundsEnabled,
+    screenShareQuality: screenShareQuality ?? this.screenShareQuality,
+  );
 }
 
 class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
@@ -86,7 +85,8 @@ extension _FirstOrDefault<T> on Iterable<T> {
 
 final voiceSettingsControllerProvider =
     StateNotifierProvider<VoiceSettingsController, VoiceSettingsState>(
-        (ref) => VoiceSettingsController(ref));
+      (ref) => VoiceSettingsController(ref),
+    );
 
 class VoiceSettingsScreen extends ConsumerWidget {
   const VoiceSettingsScreen({super.key});
@@ -96,9 +96,8 @@ class VoiceSettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Voice settings'),
-        // Same reasoning as SettingsScreen's own back button: this route can
-        // be reached directly (a deep link, a restored tab), so there is not
-        // always a Navigator stack to pop.
+        // Same reasoning as SettingsScreen's back button: this route can be
+        // reached directly, so there is not always a stack to pop.
         leading: IconButton(
           icon: const Icon(AppIcons.back),
           tooltip: 'Back to settings',
@@ -144,13 +143,19 @@ class _SectionHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: AppText.ui.copyWith(
-                  color: tokens.textPrimary, fontWeight: AppWeights.semi)),
+          Text(
+            title,
+            style: AppText.ui.copyWith(
+              color: tokens.textPrimary,
+              fontWeight: AppWeights.semi,
+            ),
+          ),
           if (description != null) ...[
             const SizedBox(height: AppSpacing.s4),
-            Text(description!,
-                style: AppText.caption.copyWith(color: tokens.textSecondary)),
+            Text(
+              description!,
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
           ],
         ],
       ),
@@ -268,15 +273,17 @@ class _ScreenShareSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(voiceSettingsControllerProvider);
-    final index =
-        ScreenShareQuality.values.indexOf(settings.screenShareQuality);
+    final index = ScreenShareQuality.values.indexOf(
+      settings.screenShareQuality,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionHeader(
           'Screen share quality',
-          description: 'A ceiling on resolution and frame rate, not a '
+          description:
+              'A ceiling on resolution and frame rate, not a '
               'preference: it keeps a share from starving the audio '
               'alongside it.',
         ),
@@ -300,10 +307,10 @@ class _ScreenShareSection extends ConsumerWidget {
   }
 
   static String _label(ScreenShareQuality q) => switch (q) {
-        ScreenShareQuality.smooth => 'Smooth',
-        ScreenShareQuality.balanced => 'Balanced',
-        ScreenShareQuality.crisp => 'Crisp',
-      };
+    ScreenShareQuality.smooth => 'Smooth',
+    ScreenShareQuality.balanced => 'Balanced',
+    ScreenShareQuality.crisp => 'Crisp',
+  };
 }
 
 class _SoundsSection extends ConsumerWidget {

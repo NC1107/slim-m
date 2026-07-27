@@ -6,11 +6,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
+import '../routing/routes.dart';
 
 /// Sign in or create an account on a chosen server.
 ///
@@ -25,9 +27,9 @@ class SignInScreen extends ConsumerStatefulWidget {
 }
 
 class _SignInScreenState extends ConsumerState<SignInScreen> {
-  // Prefilled from the server chosen during onboarding, which every entry
-  // path has already written; a hardcoded default here silently overrode
-  // that choice on submit.
+  /// Prefilled from the server chosen during onboarding, which every entry path
+  /// has already written; a hardcoded default here silently overrode that
+  /// choice on submit.
   late final TextEditingController _server = TextEditingController(
     text: ref.read(serverUrlProvider).toString(),
   );
@@ -82,6 +84,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   /// Asks the server in the field whether it can deliver push at all, so
   /// someone joining a LAN-only deployment learns their phone will stay
   /// silent while they are still choosing, not after a week of wondering.
+  ///
+  /// Every failure resolves to "unknown". A host that answers 200 with
+  /// something that is not a slim-m `/version` body is as unknown as one that
+  /// refuses to connect, so the bare `catch` is deliberate: a foreign or
+  /// hostile server must not crash sign-in with a shaped reply.
+  ///
+  /// The result is applied only if the field still holds the address that was
+  /// probed, on every path including failures, so a slow answer about a
+  /// previously typed address cannot relabel the current one either way.
   Future<void> _probePush() async {
     final target = _probeTarget(_server.text);
     if (target == null) {
@@ -97,18 +108,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       // "could not reach that server" with more authority than a probe.
       answer = null;
     } catch (_) {
-      // A host that answers 200 with something that is not a slim-m
-      // /version body is just as unknown as one that refuses to connect. A
-      // foreign or hostile server must not crash sign-in with a shaped
-      // reply, so this deliberately catches everything the parse can throw.
+      // A shaped reply from a foreign host is as unknown as a refusal.
       answer = null;
     } finally {
       client.close();
     }
     if (!mounted) return;
-    // Guarded on every path, failures included: a slow answer about a
-    // previously typed address must not relabel the current one, whether
-    // it would set the notice or clear it.
     if (_probeTarget(_server.text) == target) {
       setState(() => _pushEnabled = answer);
     }
@@ -121,6 +126,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     _probeDebounce = Timer(const Duration(milliseconds: 600), _probePush);
   }
 
+  /// Signs in or registers, then starts push.
+  ///
+  /// On registration the invite code goes in with the signup rather than being
+  /// redeemed after it: a claimed deployment refuses an uninvited registration
+  /// outright, so there is no account to redeem against until that call
+  /// succeeds.
+  ///
+  /// Sync is deliberately not started here. `SyncController` is session-driven
+  /// (see its class doc) and its own listener already reacts to the
+  /// `session.set()` that register or login just performed. Starting it again
+  /// explicitly raced that listener and opened a second socket, which went on
+  /// to kick the first, healthy one offline.
+  ///
+  /// Push registration is fire-and-forget: a denied permission or unreachable
+  /// server must never hold up a sign-in that is already complete.
   Future<void> _submit() async {
     final address = Uri.tryParse(_server.text.trim());
     if (address == null || !address.hasScheme || address.host.isEmpty) {
@@ -133,15 +153,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       _error = null;
     });
 
-    ref.read(serverUrlProvider.notifier).state = address;
+    ref.read(chosenServerProvider.notifier).choose(address);
     final api = ref.read(apiProvider);
 
     final invite = ref.read(pendingInviteProvider);
     try {
       if (_creatingAccount) {
-        // The code goes in with the signup rather than being redeemed after
-        // it: a claimed deployment refuses an uninvited registration outright,
-        // so there is no account to redeem against until this call succeeds.
         await api.register(
           username: _username.text.trim(),
           displayName: _displayName.text.trim().isEmpty
@@ -170,30 +187,24 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       if (invite != null) {
         ref.read(pendingInviteProvider.notifier).state = null;
       }
-      // Sync is not started here: SyncController is session-driven (see its
-      // class doc) and its own listener already reacts to the session.set()
-      // that api.register()/api.login() just performed. Starting it again
-      // explicitly raced that listener's own start() and opened a second
-      // socket that went on to kick the first, healthy one offline.
-      //
-      // Fire-and-forget: a denied permission or unreachable server here must
-      // never hold up sign-in, which is already complete at this point.
       unawaited(ref.read(pushControllerProvider.notifier).register());
     } on ApiException catch (e) {
       // Say what actually happened. "Something went wrong" tells the user
       // nothing about whether to fix their password or wait.
-      setState(() => _error = switch (e) {
-            UnauthorizedException() =>
-              'That username and password did not match.',
-            ConflictException() => 'That username is already taken.',
-            BadRequestException(:final message) => message,
-            RateLimitedException() =>
-              'Too many attempts just now. Wait a moment and try again.',
-            UnavailableException() => 'The server is busy. Try again shortly.',
-            TransportException() =>
-              'Could not reach that server. Check the address and your connection.',
-            _ => 'The server refused that. ${e.message}',
-          });
+      setState(
+        () => _error = switch (e) {
+          UnauthorizedException() =>
+            'That username and password did not match.',
+          ConflictException() => 'That username is already taken.',
+          BadRequestException(:final message) => message,
+          RateLimitedException() =>
+            'Too many attempts just now. Wait a moment and try again.',
+          UnavailableException() => 'The server is busy. Try again shortly.',
+          TransportException() =>
+            'Could not reach that server. Check the address and your connection.',
+          _ => 'The server refused that. ${e.message}',
+        },
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -204,8 +215,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     return Scaffold(
-      // Both edges: this screen has no AppBar, so nothing else clears the
-      // notch, and its form runs the full height of the view.
+      // Both edges: this screen has no AppBar, so nothing else clears
+      // the notch, and its form runs the full height of the view.
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -219,9 +230,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   Text(
                     'slim-m',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: tokens.textPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      color: tokens.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.s8),
@@ -302,7 +313,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       child: Text(
                         _error!,
                         style: TextStyle(
-                            color: Theme.of(context).colorScheme.error),
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ),
                   ],
@@ -322,14 +334,22 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     onPressed: _busy
                         ? null
                         : () => setState(() {
-                              _creatingAccount = !_creatingAccount;
-                              _error = null;
-                            }),
+                            _creatingAccount = !_creatingAccount;
+                            _error = null;
+                          }),
                     child: Text(
                       _creatingAccount
                           ? 'I already have an account'
                           : 'Create an account instead',
                     ),
+                  ),
+                  // Once a server is remembered, sign-in is where a signed-out
+                  // user lands, so this is the only way back to invite redemption.
+                  TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () => context.go(Routes.onboarding),
+                    child: const Text('Use a different server'),
                   ),
                 ],
               ),

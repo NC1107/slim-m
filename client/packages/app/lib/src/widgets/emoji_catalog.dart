@@ -48,44 +48,44 @@ const List<EmojiCategory> emojiCategoriesInOrder = [
 
 extension EmojiCategoryInfo on EmojiCategory {
   String get label => switch (this) {
-        EmojiCategory.recent => 'Recently used',
-        EmojiCategory.smileysEmotion => 'Smileys and emotion',
-        EmojiCategory.peopleBody => 'People',
-        EmojiCategory.animalsNature => 'Animals and nature',
-        EmojiCategory.foodDrink => 'Food and drink',
-        EmojiCategory.activities => 'Activities',
-        EmojiCategory.travelPlaces => 'Travel and places',
-        EmojiCategory.objects => 'Objects',
-        EmojiCategory.symbols => 'Symbols',
-        EmojiCategory.flags => 'Flags',
-      };
+    EmojiCategory.recent => 'Recently used',
+    EmojiCategory.smileysEmotion => 'Smileys and emotion',
+    EmojiCategory.peopleBody => 'People',
+    EmojiCategory.animalsNature => 'Animals and nature',
+    EmojiCategory.foodDrink => 'Food and drink',
+    EmojiCategory.activities => 'Activities',
+    EmojiCategory.travelPlaces => 'Travel and places',
+    EmojiCategory.objects => 'Objects',
+    EmojiCategory.symbols => 'Symbols',
+    EmojiCategory.flags => 'Flags',
+  };
 
   IconData get icon => switch (this) {
-        EmojiCategory.recent => AppIcons.clock,
-        EmojiCategory.smileysEmotion => AppIcons.smile,
-        EmojiCategory.peopleBody => AppIcons.peopleBody,
-        EmojiCategory.animalsNature => AppIcons.animalsNature,
-        EmojiCategory.foodDrink => AppIcons.foodDrink,
-        EmojiCategory.activities => AppIcons.activities,
-        EmojiCategory.travelPlaces => AppIcons.travelPlaces,
-        EmojiCategory.objects => AppIcons.objects,
-        EmojiCategory.symbols => AppIcons.symbols,
-        EmojiCategory.flags => AppIcons.flags,
-      };
+    EmojiCategory.recent => AppIcons.clock,
+    EmojiCategory.smileysEmotion => AppIcons.smile,
+    EmojiCategory.peopleBody => AppIcons.peopleBody,
+    EmojiCategory.animalsNature => AppIcons.animalsNature,
+    EmojiCategory.foodDrink => AppIcons.foodDrink,
+    EmojiCategory.activities => AppIcons.activities,
+    EmojiCategory.travelPlaces => AppIcons.travelPlaces,
+    EmojiCategory.objects => AppIcons.objects,
+    EmojiCategory.symbols => AppIcons.symbols,
+    EmojiCategory.flags => AppIcons.flags,
+  };
 
   /// The catalog group this tab draws from, or null for [recent].
   EmojiGroup? get group => switch (this) {
-        EmojiCategory.recent => null,
-        EmojiCategory.smileysEmotion => EmojiGroup.smileysEmotion,
-        EmojiCategory.peopleBody => EmojiGroup.peopleBody,
-        EmojiCategory.animalsNature => EmojiGroup.animalsNature,
-        EmojiCategory.foodDrink => EmojiGroup.foodDrink,
-        EmojiCategory.activities => EmojiGroup.activities,
-        EmojiCategory.travelPlaces => EmojiGroup.travelPlaces,
-        EmojiCategory.objects => EmojiGroup.objects,
-        EmojiCategory.symbols => EmojiGroup.symbols,
-        EmojiCategory.flags => EmojiGroup.flags,
-      };
+    EmojiCategory.recent => null,
+    EmojiCategory.smileysEmotion => EmojiGroup.smileysEmotion,
+    EmojiCategory.peopleBody => EmojiGroup.peopleBody,
+    EmojiCategory.animalsNature => EmojiGroup.animalsNature,
+    EmojiCategory.foodDrink => EmojiGroup.foodDrink,
+    EmojiCategory.activities => EmojiGroup.activities,
+    EmojiCategory.travelPlaces => EmojiGroup.travelPlaces,
+    EmojiCategory.objects => EmojiGroup.objects,
+    EmojiCategory.symbols => EmojiGroup.symbols,
+    EmojiCategory.flags => EmojiGroup.flags,
+  };
 }
 
 /// The full catalog once, with [EmojiGroup.component] dropped. A top-level
@@ -105,10 +105,12 @@ List<Emoji> searchEmoji(String query) {
   final q = query.trim().toLowerCase();
   if (q.isEmpty) return const [];
   return _catalog
-      .where((emoji) =>
-          emoji.name.contains(q) ||
-          emoji.shortName.contains(q) ||
-          emoji.keywords.any((keyword) => keyword.contains(q)))
+      .where(
+        (emoji) =>
+            emoji.name.contains(q) ||
+            emoji.shortName.contains(q) ||
+            emoji.keywords.any((keyword) => keyword.contains(q)),
+      )
       .toList();
 }
 
@@ -117,6 +119,6 @@ List<Emoji> searchEmoji(String query) {
 /// character the catalog no longer recognises rather than showing a blank
 /// tile for it.
 List<Emoji> recentEmojiEntries(List<String> chars) => [
-      for (final char in chars)
-        if (Emoji.byChar(char) case final emoji?) emoji,
-    ];
+  for (final char in chars)
+    if (Emoji.byChar(char) case final emoji?) emoji,
+];

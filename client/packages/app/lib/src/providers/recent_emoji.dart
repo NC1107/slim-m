@@ -35,9 +35,10 @@ class RecentEmojiController extends StateNotifier<List<String>> {
 
   /// Moves [emoji] to the front of the shelf, adding it if it is new.
   Future<void> use(String emoji) async {
-    state = [emoji, ...state.where((e) => e != emoji)]
-        .take(_maxRecentEmoji)
-        .toList();
+    state = [
+      emoji,
+      ...state.where((e) => e != emoji),
+    ].take(_maxRecentEmoji).toList();
     try {
       final prefs = await _ref.read(preferencesProvider.future);
       await prefs.setStringList(_recentEmojiKey, state);
@@ -50,4 +51,5 @@ class RecentEmojiController extends StateNotifier<List<String>> {
 
 final recentEmojiProvider =
     StateNotifierProvider<RecentEmojiController, List<String>>(
-        (ref) => RecentEmojiController(ref));
+      (ref) => RecentEmojiController(ref),
+    );

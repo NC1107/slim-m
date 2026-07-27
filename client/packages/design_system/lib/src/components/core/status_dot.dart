@@ -138,9 +138,8 @@ class AppStatusDotPainter extends CustomPainter {
         canvas.drawPath(path, fill);
 
       case AppStatusShape.notchedSquare:
-        // A fixed 3px corner: the source hardcodes this regardless of dot
-        // size, and no [AppRadii] step is this small (the smallest, 6, reads
-        // as a full pill at status-dot sizes).
+        // A fixed 3px corner, hardcoded in the source regardless of dot size; no
+        // [AppRadii] step is this small (6, the smallest, reads as a pill here).
         canvas.drawRRect(
             RRect.fromRectAndRadius(
                 Offset.zero & size, const Radius.circular(3)),
@@ -158,9 +157,8 @@ class AppStatusDotPainter extends CustomPainter {
 
       case AppStatusShape.slashedRing:
         _drawRing(canvas, center, w, h, color);
-        // A flat, non-scaling 2px bar, matching the source exactly; the ring
-        // it crosses does scale, since it alone is what has to stay visible
-        // at very small sizes.
+        // A flat, non-scaling 2px bar, matching the source exactly; the ring it
+        // crosses does scale, since it alone must stay visible at small sizes.
         canvas.save();
         canvas.translate(center.dx, center.dy);
         canvas.rotate(-math.pi / 4);
@@ -175,8 +173,7 @@ class AppStatusDotPainter extends CustomPainter {
   void _drawRing(
       Canvas canvas, Offset center, double w, double h, Color ringColor) {
     // Border-box sizing: the ring's outer edge sits on the box edge and the
-    // stroke eats inward, so the stroked path radius is the outer radius
-    // minus half the stroke.
+    // stroke eats inward, so path radius = outer radius minus half the stroke.
     final strokeWidth = math.max(2.0, w * 0.26);
     canvas.drawCircle(
       center,

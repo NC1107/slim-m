@@ -26,10 +26,10 @@ enum LayoutClass {
   /// targets to touch size at the same width: one pane and a finger are the
   /// same situation, and two thresholds for it would drift.
   static LayoutClass fromWidth(double width) => switch (width) {
-        < kCompactWidth => LayoutClass.compact,
-        < 1000 => LayoutClass.medium,
-        _ => LayoutClass.expanded,
-      };
+    < kCompactWidth => LayoutClass.compact,
+    < 1000 => LayoutClass.medium,
+    _ => LayoutClass.expanded,
+  };
 
   /// Whether the list and the conversation are visible at the same time.
   bool get showsBothPanes => this != LayoutClass.compact;

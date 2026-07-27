@@ -13,7 +13,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart';
 import '../routing/routes.dart';
-import 'channel_rail.dart' show selectedChannelId;
+import 'channel_rail.dart' show channelIdInPath;
 
 /// Matches the server's own ceiling (`CHANNEL_TOPIC_MAX_CHARS` in
 /// `crates/slimm-server/src/http/channels.rs`), so the counter here never
@@ -73,7 +73,9 @@ class _ManageChannelSheetState extends ConsumerState<_ManageChannelSheet> {
       _error = null;
     });
     try {
-      final updated = await ref.read(apiProvider).updateChannel(
+      final updated = await ref
+          .read(apiProvider)
+          .updateChannel(
             channelId: widget.channel.id,
             name: _name.text.trim(),
             topic: _topic.text,
@@ -122,25 +124,27 @@ class _ManageChannelSheetState extends ConsumerState<_ManageChannelSheet> {
       _deleting = true;
       _error = null;
     });
+    // This sheet is a modal route on the root navigator, so GoRouterState.of
+    // would throw here; GoRouter.of resolves through an InheritedWidget.
+    final router = GoRouter.of(context);
+    final wasOpen = channelIdInPath(router.state.uri.path) == widget.channel.id;
     try {
       await ref.read(apiProvider).deleteChannel(widget.channel.id);
       final store = await ref.read(storeProvider.future);
       await store.removeChannel(widget.channel.id);
       if (!mounted) return;
-      final router = GoRouter.of(context);
-      final wasOpen = selectedChannelId(context) == widget.channel.id;
       Navigator.of(context).pop();
       // Otherwise the pane behind this sheet keeps showing a channel that no
       // longer exists in the local store.
       if (wasOpen) router.go(Routes.channels);
     } on api.ConflictException {
-      // The server's own wording ("cannot delete the deployment's last
-      // channel") is accurate but terse; say why in a full sentence instead
-      // of surfacing a bare error, per this feature's own requirement.
+      // The server's wording is accurate but terse, and this feature's own
+      // requirement is a full sentence rather than a bare error.
       if (!mounted) return;
       setState(() {
         _deleting = false;
-        _error = 'This is the last channel here. Create another channel '
+        _error =
+            'This is the last channel here. Create another channel '
             'before deleting this one.';
       });
     } on api.ApiException catch (e) {
@@ -204,8 +208,10 @@ class _ManageChannelSheetState extends ConsumerState<_ManageChannelSheet> {
             ),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.s8),
-              Text(_error!,
-                  style: AppText.caption.copyWith(color: tokens.dangerText)),
+              Text(
+                _error!,
+                style: AppText.caption.copyWith(color: tokens.dangerText),
+              ),
             ],
             const SizedBox(height: AppSpacing.s12),
             AppButton(

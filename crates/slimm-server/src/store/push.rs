@@ -58,6 +58,11 @@ impl Store {
     /// transaction, before writing the caller's own row. Without that, the
     /// token's previous holder would keep receiving pushes meant for its new
     /// owner until something else happened to notice.
+    ///
+    /// A device id that matches no row of the caller's rolls the whole
+    /// transaction back, that steal included. Otherwise a caller could wipe a
+    /// stranger's registration by guessing their token and any device id at
+    /// all, live or not.
     pub async fn register_push(
         &self,
         user_id: UserId,
@@ -95,10 +100,8 @@ impl Store {
         .await?
         .rows_affected();
         if affected == 0 {
-            // Rolling back (the transaction drops here) matters: a forged
-            // device id must leave the token-reassignment attempt above
-            // undone too, or a caller could wipe a stranger's registration by
-            // guessing their token and any device id, live or not.
+            // Dropping the transaction rolls back the token reassignment
+            // above; see the note on this function.
             return Err(PushError::NotFound);
         }
         tx.commit().await?;

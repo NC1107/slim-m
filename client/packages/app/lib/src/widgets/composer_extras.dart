@@ -27,8 +27,7 @@ bool usesSoftKeyboard(BuildContext context) =>
     switch (Theme.of(context).platform) {
       TargetPlatform.iOS ||
       TargetPlatform.android ||
-      TargetPlatform.fuchsia =>
-        true,
+      TargetPlatform.fuchsia => true,
       _ => false,
     };
 
@@ -127,8 +126,11 @@ class ComposerField extends StatelessWidget {
 /// non-interactive and there is no dedicated "remove" glyph in
 /// [AppIcons] to reach for instead.
 class StagedAttachmentChip extends StatelessWidget {
-  const StagedAttachmentChip(
-      {super.key, required this.filename, required this.onRemove});
+  const StagedAttachmentChip({
+    super.key,
+    required this.filename,
+    required this.onRemove,
+  });
 
   final String filename;
   final VoidCallback onRemove;
@@ -152,11 +154,15 @@ class StagedAttachmentChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(filename,
-                  style: AppText.caption.copyWith(color: tokens.textPrimary)),
+              Text(
+                filename,
+                style: AppText.caption.copyWith(color: tokens.textPrimary),
+              ),
               const SizedBox(width: AppSpacing.s4),
-              Text('x',
-                  style: AppText.caption.copyWith(color: tokens.textSecondary)),
+              Text(
+                'x',
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
             ],
           ),
         ),
@@ -192,15 +198,22 @@ Future<void> showComposerActionsSheet(
     builder: (sheetContext) => SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s12, 0, AppSpacing.s12, AppSpacing.s12),
+          AppSpacing.s12,
+          0,
+          AppSpacing.s12,
+          AppSpacing.s12,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             for (final (icon, label, action) in actions)
               AppListRow(
                 label: label,
-                leading: Icon(icon,
-                    size: AppSizes.icon16, color: tokens.textSecondary),
+                leading: Icon(
+                  icon,
+                  size: AppSizes.icon16,
+                  color: tokens.textSecondary,
+                ),
                 onTap: () {
                   Navigator.of(sheetContext).pop();
                   action();
@@ -264,7 +277,11 @@ class TypingIndicator extends ConsumerWidget {
         .firstWhere(
           (m) => m.id == id,
           orElse: () => api.UserProfile(
-              id: id, username: id, displayName: 'Someone', createdAt: 0),
+            id: id,
+            username: id,
+            displayName: 'Someone',
+            createdAt: 0,
+          ),
         )
         .displayName;
 
@@ -273,7 +290,9 @@ class TypingIndicator extends ConsumerWidget {
         ? '${names.first} is typing…'
         : '${names.join(', ')} are typing…';
 
-    return Text(label,
-        style: AppText.code.copyWith(color: tokens.textSecondary));
+    return Text(
+      label,
+      style: AppText.code.copyWith(color: tokens.textSecondary),
+    );
   }
 }

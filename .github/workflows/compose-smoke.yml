@@ -1,15 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 name: compose-smoke
 
-# The self-host stack is the product for most people, and nothing was checking
-# that it boots. Every other gate here tests the server, the client or the
-# schema in isolation; this one asks whether `docker compose up` on a fresh box
-# actually produces a working deployment, which is the thing a self-hoster does
-# first and the thing most likely to rot silently when a service is added.
-#
-# Runs on changes to the stack itself, and on a schedule, because the failure
-# mode this catches is usually an upstream image moving rather than a commit
-# here.
+# Every other gate tests one piece in isolation; this one asks whether
+# `docker compose up` gives a self-hoster a working deployment. See docs/ci.md.
 on:
   push:
     branches: [main]
@@ -43,10 +36,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # The published image is only correct for main. On a PR that changes the
-      # Dockerfile the whole point is to boot what this branch would produce, so
-      # it is built locally under the tag SLIMM_VERSION=smoke resolves to, so
-      # compose uses it instead of pulling.
+      # The published image is only correct for main, so this branch's image is
+      # built under the tag SLIMM_VERSION=smoke resolves to and compose uses it.
       - name: build the server image from this branch
         run: docker build -f docker/server.Dockerfile -t ghcr.io/nc1107/slim-m-server:smoke .
         env:
@@ -56,16 +47,14 @@ jobs:
         run: |
           set -euo pipefail
           cp deploy/.env.example .env
-          # .env.example ships these empty on purpose. Compose must refuse and
-          # name the missing one rather than starting an SFU anybody can mint
-          # tokens for, and that refusal is worth a test of its own because it
-          # is a security property, not a convenience.
+          # Refusing to start without credentials is a security property, not a
+          # convenience, so it gets a test of its own; see docs/ci.md.
           if docker compose config >/dev/null 2>err.txt; then
             echo "::error::compose started with no LiveKit credentials set"
             exit 1
           fi
-          # Either name is a correct refusal: compose stops at the first
-          # variable it interpolates, and that order is not ours to fix.
+          # Either name is a correct refusal: compose stops at the first variable
+          # it interpolates, and that order is not ours to fix.
           grep -qE "LIVEKIT_API_(KEY|SECRET)" err.txt || {
             echo "::error::compose refused but did not name the missing variable"
             cat err.txt
@@ -83,9 +72,8 @@ jobs:
           sed -i "s|^SLIMM_API_DOMAIN=.*|SLIMM_API_DOMAIN=localhost|" .env
           sed -i "s|^LIVEKIT_DOMAIN=.*|LIVEKIT_DOMAIN=localhost|" .env
           echo "SLIMM_VERSION=smoke" >> .env
-          # Caddy wants port 80/443 and a real domain to get a certificate, and
-          # neither is available here, so the smoke test covers the two services
-          # that carry the product: the server and the SFU.
+          # Caddy needs a real domain and 80/443 to get a certificate, so this
+          # covers the two services that carry the product; see docs/ci.md.
           docker compose up -d server livekit
           docker compose ps
 
@@ -112,9 +100,8 @@ jobs:
       - name: voice is configured, not silently disabled
         run: |
           set -euo pipefail
-          # The regression this exists for: the compose file ran an SFU for
-          # months without ever telling the server about it, so every voice
-          # request would have answered 501 on a stack that looked complete.
+          # The regression this exists for: the stack ran an SFU for months
+          # without telling the server, so voice would 501. See docs/ci.md.
           docker compose logs server | grep -q "voice enabled" || {
             echo "::error::server did not report voice enabled; check SLIMM_LIVEKIT_* reach it"
             docker compose logs server
@@ -125,11 +112,8 @@ jobs:
       - name: the SFU actually starts
         run: |
           set -euo pipefail
-          # "voice enabled" above is the server's opinion of its own config; it
-          # says nothing about whether the SFU came up. The first real
-          # deployment of this stack hit exactly that gap: the server reported
-          # voice enabled while LiveKit crashlooped on DNS behind it, and
-          # nothing in CI would have noticed.
+          # "voice enabled" above is only the server's opinion of its own config,
+          # and a real deployment crashlooped behind it; see docs/ci.md.
           for i in $(seq 1 45); do
             docker compose logs livekit 2>/dev/null | grep -q "starting LiveKit server" && break
             sleep 2
@@ -153,10 +137,8 @@ jobs:
       - name: the SFU accepts a token signed with the configured key
         run: |
           set -euo pipefail
-          # The end-to-end property that matters: a token signed the way the
-          # server signs one is a token this SFU honours. A key/secret that
-          # reached only one of the two services would pass every check above
-          # and fail on the first call.
+          # A key/secret that reached only one of the two services passes every
+          # check above and fails on the first real call; see docs/ci.md.
           set -a; . ./.env; set +a
           token=$(python3 - <<'PY'
           import base64, hashlib, hmac, json, os, time
@@ -174,11 +156,8 @@ jobs:
           print((body + b"." + base64.urlsafe_b64encode(sig).rstrip(b"=")).decode())
           PY
           )
-          # Plain HTTP on purpose, and the only correct choice here: this is a
-          # container-to-container call on a private compose network, to the
-          # port LiveKit serves unencrypted by design. TLS is Caddy's job one
-          # hop further out, and Caddy is not running on the runner because it
-          # has neither a domain nor a certificate to serve.
+          # Plain HTTP on purpose: a container-to-container call on a private
+          # network, to the port LiveKit serves unencrypted. See docs/ci.md.
           net=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q livekit)")
           curl_in() { docker run --rm --network "$net" curlimages/curl:8.11.1 "$@"; }
           curl_in -fsS "http://livekit:7880/rtc/validate?access_token=$token" | grep -q success || {

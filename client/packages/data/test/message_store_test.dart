@@ -208,10 +208,8 @@ void main() {
   });
 
   test('clear leaves nothing at all for whoever signs in next', () async {
-    // The database is one file for the whole app, not one per account or
-    // server, so anything surviving a sign-out is read by the next person to
-    // use the device. Unlike resetChannel, that has to include pending sends:
-    // an unsent message belongs to the account that was signing out.
+    // One database file for the whole app, so anything surviving a sign-out is
+    // read by the next person; unlike resetChannel that includes pending sends.
     await store.applyMessages([
       _message(id: 'm1', seq: 1),
       _message(id: 'm2', channelId: 'chan-2', seq: 1),

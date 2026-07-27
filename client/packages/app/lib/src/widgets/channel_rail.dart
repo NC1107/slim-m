@@ -17,15 +17,23 @@ import 'channel_rail_frame.dart';
 import 'channel_rail_sections.dart';
 import 'command_palette.dart';
 
-/// The route the router puts a channel id into; read here to highlight the
-/// selected row, and by [HomeShell] to decide which pane to show.
-String? selectedChannelId(BuildContext context) {
-  final path = GoRouterState.of(context).uri.path;
+/// The channel id in [path], or null when [path] is not a channel route.
+String? channelIdInPath(String path) {
   const prefix = '${Routes.channels}/';
   if (!path.startsWith(prefix)) return null;
   final id = path.substring(prefix.length);
   return id.isEmpty ? null : id;
 }
+
+/// The route the router puts a channel id into; read here to highlight the
+/// selected row, and by [HomeShell] to decide which pane to show.
+///
+/// Only valid under a `RouteBase.builder` subtree. A dialog, sheet or overlay
+/// pushed on the root navigator must read [channelIdInPath] off
+/// `GoRouter.of(context).state` instead, or [GoRouterState.of] throws a
+/// [GoError], which is an `Error` and so escapes every `on ...Exception` catch.
+String? selectedChannelId(BuildContext context) =>
+    channelIdInPath(GoRouterState.of(context).uri.path);
 
 class ChannelRail extends ConsumerStatefulWidget {
   const ChannelRail({super.key});
@@ -58,9 +66,8 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
           const RailHeader(),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-            // A real field would gain focus and a keyboard on tap; this one
-            // exists only to open the palette, so pointer events stop at the
-            // AbsorbPointer and the tap reaches the trigger below it instead.
+            // A real field would take focus and a keyboard; this only opens the
+            // palette, so AbsorbPointer stops events and the trigger gets them.
             child: GestureDetector(
               key: const Key('rail-search-trigger'),
               onTap: () => openCommandPalette(context),
@@ -72,8 +79,11 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                       ? AppInputSize.lg
                       : AppInputSize.sm,
                   placeholder: 'Search',
-                  icon: Icon(AppIcons.search,
-                      size: AppSizes.icon16, color: tokens.textSecondary),
+                  icon: Icon(
+                    AppIcons.search,
+                    size: AppSizes.icon16,
+                    color: tokens.textSecondary,
+                  ),
                   // AppKbd draws one keycap; a chained shortcut is composed
                   // by the caller, per that widget's own doc comment.
                   trailing: Row(
@@ -82,9 +92,12 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                       const AppKbd('Ctrl'),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: Text('+',
-                            style: AppText.micro
-                                .copyWith(color: tokens.textDisabled)),
+                        child: Text(
+                          '+',
+                          style: AppText.micro.copyWith(
+                            color: tokens.textDisabled,
+                          ),
+                        ),
                       ),
                       const AppKbd('K'),
                     ],
@@ -112,14 +125,16 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                         selectedId: selected,
                       ),
                       TextChannelsSection(
-                        channels:
-                            channels.where((c) => c.kind == 'text').toList(),
+                        channels: channels
+                            .where((c) => c.kind == 'text')
+                            .toList(),
                         selectedId: selected,
                         canManage: canManageChannels,
                       ),
                       VoiceChannelsSection(
-                        channels:
-                            channels.where((c) => c.kind == 'voice').toList(),
+                        channels: channels
+                            .where((c) => c.kind == 'voice')
+                            .toList(),
                         selectedId: selected,
                         canManage: canManageChannels,
                       ),

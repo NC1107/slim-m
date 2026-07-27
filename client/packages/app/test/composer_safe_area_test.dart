@@ -39,13 +39,19 @@ Finder _composerContent() => find
     .first;
 
 Future<void> _pumpComposer(
-    WidgetTester tester, TextEditingController controller) async {
+  WidgetTester tester,
+  TextEditingController controller,
+) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(_viewWidth, _viewHeight);
-  tester.view.padding =
-      const FakeViewPadding(top: _topInset, bottom: _bottomInset);
-  tester.view.viewPadding =
-      const FakeViewPadding(top: _topInset, bottom: _bottomInset);
+  tester.view.padding = const FakeViewPadding(
+    top: _topInset,
+    bottom: _bottomInset,
+  );
+  tester.view.viewPadding = const FakeViewPadding(
+    top: _topInset,
+    bottom: _bottomInset,
+  );
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(
@@ -54,8 +60,10 @@ Future<void> _pumpComposer(
         typingControllerProvider.overrideWith((ref, _) => _NoopTyping()),
       ],
       child: MaterialApp(
-        theme: buildTheme(Brightness.light, AppTokens.light)
-            .copyWith(platform: TargetPlatform.iOS),
+        theme: buildTheme(
+          Brightness.light,
+          AppTokens.light,
+        ).copyWith(platform: TargetPlatform.iOS),
         home: Scaffold(
           body: Column(
             children: [
@@ -85,8 +93,9 @@ void main() {
 
   tearDown(() => controller.dispose());
 
-  testWidgets('the composer keeps its content clear of the home indicator',
-      (tester) async {
+  testWidgets('the composer keeps its content clear of the home indicator', (
+    tester,
+  ) async {
     await _pumpComposer(tester, controller);
 
     expect(
@@ -97,16 +106,18 @@ void main() {
   });
 
   testWidgets(
-      'the composer reserves the inset rather than merely fitting in it',
-      (tester) async {
-    await _pumpComposer(tester, controller);
+    'the composer reserves the inset rather than merely fitting in it',
+    (tester) async {
+      await _pumpComposer(tester, controller);
 
-    final composer = tester.getRect(find.byType(Composer));
-    expect(
-      composer.bottom - tester.getRect(_composerContent()).bottom,
-      greaterThanOrEqualTo(_bottomInset),
-      reason: 'the gap below the content is what the inset buys; without it '
-          'the composer would only be as clear as its own 12pt padding',
-    );
-  });
+      final composer = tester.getRect(find.byType(Composer));
+      expect(
+        composer.bottom - tester.getRect(_composerContent()).bottom,
+        greaterThanOrEqualTo(_bottomInset),
+        reason:
+            'the gap below the content is what the inset buys; without it '
+            'the composer would only be as clear as its own 12pt padding',
+      );
+    },
+  );
 }

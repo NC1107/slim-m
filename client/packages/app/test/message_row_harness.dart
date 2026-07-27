@@ -22,19 +22,18 @@ Message message({
   int? editedAt,
   bool pending = false,
   bool failed = false,
-}) =>
-    Message(
-      id: id,
-      channelId: 'c1',
-      authorId: authorId,
-      authorDisplayName: authorDisplayName,
-      seq: 5,
-      content: 'hello there',
-      createdAt: createdAt,
-      editedAt: editedAt,
-      pending: pending,
-      failed: failed,
-    );
+}) => Message(
+  id: id,
+  channelId: 'c1',
+  authorId: authorId,
+  authorDisplayName: authorDisplayName,
+  seq: 5,
+  content: 'hello there',
+  createdAt: createdAt,
+  editedAt: editedAt,
+  pending: pending,
+  failed: failed,
+);
 
 void noop() {}
 
@@ -61,8 +60,8 @@ const noActions = MessageActions(
 /// fast on that lookup and the row falls back to initials, same as a real
 /// signed-out state would.
 Widget harness(Widget child) => ProviderScope(
-      child: MaterialApp(
-        theme: buildTheme(Brightness.light, AppTokens.light),
-        home: Scaffold(body: child),
-      ),
-    );
+  child: MaterialApp(
+    theme: buildTheme(Brightness.light, AppTokens.light),
+    home: Scaffold(body: child),
+  ),
+);

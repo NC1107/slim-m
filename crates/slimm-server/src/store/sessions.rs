@@ -182,15 +182,17 @@ impl Store {
     /// Each grace window is chosen so nothing that still means something is
     /// removed; see the constants for why, particularly
     /// [`REFRESH_SWEEP_GRACE_MS`], which reuse detection depends on.
+    ///
+    /// The three deletes are separate statements rather than one transaction:
+    /// the tables are independent, and holding the write lock across all three
+    /// buys nothing while making the pause longer.
     pub async fn sweep_expired_tokens(&self) -> anyhow::Result<SweptTokens> {
         let now = now_ms();
         let access_cutoff = now - ACCESS_SWEEP_GRACE_MS;
         let refresh_cutoff = now - REFRESH_SWEEP_GRACE_MS;
         let ticket_cutoff = now - TICKET_SWEEP_GRACE_MS;
 
-        // Separate statements rather than one transaction: these tables are
-        // independent, and holding the write lock across all three buys nothing
-        // while making the pause longer.
+        // Three statements, not one transaction; see the note on this function.
         let access_tokens = sqlx::query!(
             "DELETE FROM access_tokens WHERE rowid IN
              (SELECT rowid FROM access_tokens WHERE expires_at < ? LIMIT ?)",
@@ -474,18 +476,21 @@ impl Store {
     }
 
     /// Exchanges a refresh token for a new pair, detecting replay of a spent one.
+    ///
+    /// The token is spent atomically as the transaction's first statement.
+    /// Making the first statement a write takes the write lock up front, so a
+    /// concurrent rotation of the same token waits on the lock and then finds
+    /// `used_at` already set, rather than both reading a NULL snapshot and one
+    /// failing to promote its stale snapshot to a writer. A matched row means
+    /// this call won the claim; no row means the token was unknown, revoked,
+    /// expired, or already spent, which [`classify_failed_refresh`] sorts out.
     pub async fn rotate_refresh(&self, refresh_token: &str) -> anyhow::Result<RefreshOutcome> {
         let presented = hash_secret(refresh_token);
         let now = now_ms();
         let mut tx = self.pool.begin().await?;
 
-        // Atomically spend the token as the transaction's first statement. Making
-        // the first statement a write takes the write lock up front, so a
-        // concurrent rotation of the same token waits on the lock and then finds
-        // used_at already set, rather than both reading a NULL snapshot and one
-        // failing to promote its stale snapshot to a writer. A matched row means
-        // we won the claim; no row means it was unknown, revoked, expired, or
-        // already spent, which `classify_failed_refresh` sorts out.
+        // Claim-first, so this transaction opens on a write; see the note on
+        // this function.
         let claimed = sqlx::query!(
             r#"UPDATE refresh_tokens SET used_at = ?
                WHERE token_hash = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?
@@ -502,9 +507,8 @@ impl Store {
             return classify_failed_refresh(tx, &presented, now, self.reuse_grace_ms).await;
         };
 
-        // The session cannot be revoked here (revocation marks the token revoked,
-        // which the claim guard excludes), but read it back for the new tokens and
-        // keep the check as a belt-and-braces guard.
+        // Revocation marks the token revoked, which the claim guard excludes,
+        // so this read is for the new tokens; the check is belt and braces.
         let session = sqlx::query!(
             r#"SELECT user_id AS "user_id!: UserId",
                       device_id AS "device_id!: DeviceId",
@@ -597,9 +601,8 @@ impl Store {
         let now = now_ms();
         let mut tx = self.pool.begin().await?;
 
-        // Claim the ticket atomically as the first statement, so a double
-        // redemption cannot both pass the used_at check: exactly one caller
-        // matches the row and marks it used.
+        // Claimed atomically as the first statement, so a double redemption
+        // cannot have both callers pass the `used_at` check.
         let claimed = sqlx::query!(
             r#"UPDATE ws_tickets SET used_at = ?
                WHERE ticket_hash = ? AND used_at IS NULL AND expires_at > ?
@@ -706,6 +709,17 @@ impl Store {
     ///
     /// Group-ownership transfer is a no-op until an ownership model exists; the
     /// current schema has no owner column, so nothing can be orphaned.
+    ///
+    /// Refuses to delete the last administrator, because that leaves a
+    /// deployment nobody can administer and no recovery path: roles, invites
+    /// and moderation all need a bit no live account would hold any more.
+    /// Every other path that can remove an administrator already checked this;
+    /// account deletion was the one that did not.
+    ///
+    /// That refusal only applies while somebody would actually be stranded.
+    /// The last user of a deployment deleting themselves leaves nobody to
+    /// administer, but also nobody to care, and refusing there would trap the
+    /// one person who most clearly has the right to leave.
     pub async fn delete_account(
         &self,
         user_id: UserId,
@@ -713,9 +727,8 @@ impl Store {
         let now = now_ms();
         let mut tx = self.pool.begin().await?;
 
-        // Write-first: this UPDATE takes the write lock up front (matching the
-        // rest of this module) and captures the sessions to close in one shot.
-        // Deleting devices below cascades the session rows away.
+        // Write-first, taking the lock up front and capturing the sessions to
+        // close in one shot; deleting devices below cascades those rows away.
         let revoked: Vec<SessionId> = sqlx::query!(
             r#"UPDATE sessions SET revoked_at = ? WHERE user_id = ?
                RETURNING id AS "id!: SessionId""#,
@@ -801,16 +814,8 @@ impl Store {
         .execute(&mut *tx)
         .await?;
 
-        // Deleting the last administrator leaves a deployment nobody can
-        // administer, with no recovery path: roles, invites, and moderation all
-        // need a bit no live account would hold any more. Every other path that
-        // can remove an administrator already checks this; account deletion was
-        // the one that did not.
-        //
-        // Only refused while somebody would actually be stranded. The last user
-        // of a deployment deleting themselves leaves nobody to administer, but
-        // also nobody to care, and refusing there would trap the one person who
-        // most clearly has the right to leave.
+        // Refused only while somebody else would be stranded; see the note on
+        // this function.
         if super::roles::administrator_count(&mut tx).await? == 0 {
             let others = sqlx::query_scalar!(
                 r#"SELECT COUNT(*) AS "n!: i64" FROM users

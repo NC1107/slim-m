@@ -24,6 +24,9 @@ async fn store() -> Store {
 const KEY_A: [u8; 32] = [0xAA; 32];
 const KEY_B: [u8; 32] = [0xBB; 32];
 
+/// Bob presenting alice's device id (spoofed into the store call directly,
+/// since the HTTP layer never even accepts a body-supplied device id) is
+/// refused: the (device_id, user_id) pair does not match.
 #[tokio::test]
 async fn register_is_scoped_to_the_callers_own_device() {
     let s = store().await;
@@ -31,9 +34,6 @@ async fn register_is_scoped_to_the_callers_own_device() {
     let bob = s.create_user("bob", "Bob").await.unwrap();
     let alice_session = s.open_session(alice.id, "phone").await.unwrap();
 
-    // Bob presenting alice's device id (spoofing it into the store call
-    // directly, since the HTTP layer never even accepts a body-supplied
-    // device id) is refused: the (device_id, user_id) pair does not match.
     let forged = s
         .register_push(
             bob.id,
@@ -223,9 +223,8 @@ async fn clear_push_registration_is_scoped_to_the_owning_device_not_the_bare_tok
     .await
     .unwrap();
 
-    // A clear resolved against bob's own device and user id, but naming
-    // alice's token string, must never be able to reach alice's row: nothing
-    // about a bare token string identifies whose registration it is.
+    // A clear resolved against bob's own device and user id but naming alice's
+    // token must not reach her row: a bare token identifies no owner at all.
     s.clear_push_registration(bob.id, bob_session.device_id, "alices-token")
         .await
         .unwrap();
@@ -265,6 +264,9 @@ async fn a_logged_out_device_receives_nothing() {
     );
 }
 
+/// Each login mints a brand new device row, so without the session-liveness
+/// filter and the token hand-off, one physical phone that logged out and back
+/// in with the same provider token would leave two live-looking push targets.
 #[tokio::test]
 async fn repeated_logins_do_not_produce_duplicate_targets_for_one_physical_device() {
     let s = store().await;
@@ -285,9 +287,7 @@ async fn repeated_logins_do_not_produce_duplicate_targets_for_one_physical_devic
     s.revoke_session(first_login.session_id).await.unwrap();
 
     // She logs back in on the same physical phone and registers the same
-    // underlying provider token again. Each login mints a brand new device
-    // row, so without the session-liveness filter and the token hand-off
-    // this would leave two live-looking targets for one physical device.
+    // underlying provider token again.
     let second_login = s.open_session(alice.id, "phone").await.unwrap();
     s.register_push(
         alice.id,
@@ -309,13 +309,13 @@ async fn repeated_logins_do_not_produce_duplicate_targets_for_one_physical_devic
     assert_eq!(targets[0].device_id, second_login.device_id);
 }
 
+/// If a physical device's token is re-registered from a brand new login that
+/// never explicitly logged the previous one out (a session simply left live),
+/// the fresh registration must still be the only thing that token can wake:
+/// `register_push` itself hands the token off, rather than relying solely on
+/// the eventual logout to clean up the old row.
 #[tokio::test]
 async fn registering_a_token_on_a_new_login_reclaims_it_even_without_logging_out() {
-    // If a physical device's token is re-registered from a brand new login
-    // that never explicitly logged the previous one out (a session simply
-    // left live), the fresh registration must still be the only thing that
-    // token can wake: register_push itself hands the token off, rather than
-    // relying solely on the eventual logout to clean up the old row.
     let s = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let first_login = s.open_session(alice.id, "phone").await.unwrap();
@@ -347,12 +347,12 @@ async fn registering_a_token_on_a_new_login_reclaims_it_even_without_logging_out
     assert_eq!(targets[0].device_id, second_login.device_id);
 }
 
+/// A provider push token is a handle to one physical device, not a stable
+/// identity: a reinstall on a shared handset can legitimately hand it to a
+/// different account. Whoever registers it now is its owner, and the previous
+/// owner must stop receiving push to it.
 #[tokio::test]
 async fn a_token_reassigned_to_a_different_account_stops_reaching_the_old_one() {
-    // A provider push token is a handle to one physical device, not a stable
-    // identity: a reinstall on a shared handset can legitimately hand it to a
-    // different account. Whoever registers it now is its owner, and the
-    // previous owner must stop receiving push to it.
     let s = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let bob = s.create_user("bob", "Bob").await.unwrap();

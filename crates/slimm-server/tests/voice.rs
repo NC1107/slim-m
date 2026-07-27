@@ -202,11 +202,11 @@ async fn speak_rights_carry_into_the_token() {
     );
 }
 
+/// The evaluator already covers precedence; this pins that the voice route
+/// reads the per-channel answer rather than the base one, which is the mistake
+/// that would let somebody muted in one room join it anyway.
 #[tokio::test]
 async fn a_channel_denying_connect_beats_the_role_that_grants_it() {
-    // The evaluator already covers precedence; this pins that the voice route
-    // reads the per-channel answer rather than the base one, which is the
-    // mistake that would let somebody muted in one room join it anyway.
     let store = new_store().await;
     let everyone = store
         .create_role(

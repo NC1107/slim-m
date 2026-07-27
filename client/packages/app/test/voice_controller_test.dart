@@ -93,8 +93,7 @@ class _FakeSession implements VoiceSession {
   Future<bool> setScreenShareEnabled(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
-  }) async =>
-      enabled ? screenShareGranted : false;
+  }) async => enabled ? screenShareGranted : false;
 
   @override
   Future<bool> setDeafened(bool value) async {
@@ -121,7 +120,7 @@ http.Client _api({int status = 200, bool canPublish = true}) {
     if (status != 200) {
       return http.Response(
         jsonEncode({
-          'error': {'code': 'nope', 'message': 'refused'}
+          'error': {'code': 'nope', 'message': 'refused'},
         }),
         status,
         headers: {'content-type': 'application/json'},
@@ -149,21 +148,24 @@ void main() {
   /// The controller as the app builds it, with only the network and the SFU
   /// swapped: a real session, a real [SlimmApi], and the same provider wiring.
   VoiceController controllerWith(_FakeSession session, http.Client client) {
-    container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-      apiProvider.overrideWith((ref) {
-        final api = SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient: client,
-        );
-        ref.onDispose(api.close);
-        return api;
-      }),
-      voiceControllerProvider
-          .overrideWith((ref) => VoiceController(ref, session: session)),
-    ]);
+    container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: client,
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+        voiceControllerProvider.overrideWith(
+          (ref) => VoiceController(ref, session: session),
+        ),
+      ],
+    );
     return container.read(voiceControllerProvider.notifier);
   }
 
@@ -189,48 +191,63 @@ void main() {
     expect(controller.state.error, isNull);
   });
 
-  test('a server with no voice says so, and is not a retryable failure',
-      () async {
-    final session = _FakeSession();
-    final controller = controllerWith(session, _api(status: 501));
+  test(
+    'a server with no voice says so, and is not a retryable failure',
+    () async {
+      final session = _FakeSession();
+      final controller = controllerWith(session, _api(status: 501));
 
-    await controller.join('channel-1');
+      await controller.join('channel-1');
 
-    expect(controller.state.state, VoiceSessionState.failed);
-    expect(controller.state.error, contains('no voice configured'));
-    expect(controller.state.retryable, isFalse,
-        reason: 'the server config will not change from clicking Join again');
-  });
+      expect(controller.state.state, VoiceSessionState.failed);
+      expect(controller.state.error, contains('no voice configured'));
+      expect(
+        controller.state.retryable,
+        isFalse,
+        reason: 'the server config will not change from clicking Join again',
+      );
+    },
+  );
 
-  test('being refused the channel reads as permission, not as a fault',
-      () async {
-    final session = _FakeSession();
-    final controller = controllerWith(session, _api(status: 403));
+  test(
+    'being refused the channel reads as permission, not as a fault',
+    () async {
+      final session = _FakeSession();
+      final controller = controllerWith(session, _api(status: 403));
 
-    await controller.join('channel-1');
+      await controller.join('channel-1');
 
-    expect(controller.state.state, VoiceSessionState.failed);
-    expect(controller.state.error, contains('permission'));
-    expect(controller.state.retryable, isFalse,
-        reason: 'a permission denial will not change from clicking Join again');
-  });
+      expect(controller.state.state, VoiceSessionState.failed);
+      expect(controller.state.error, contains('permission'));
+      expect(
+        controller.state.retryable,
+        isFalse,
+        reason: 'a permission denial will not change from clicking Join again',
+      );
+    },
+  );
 
-  test('a failed connection surfaces why, not just that, and stays retryable',
-      () async {
-    final session = _FakeSession(joinOutcome: VoiceSessionState.failed);
-    final controller = controllerWith(session, _api());
+  test(
+    'a failed connection surfaces why, not just that, and stays retryable',
+    () async {
+      final session = _FakeSession(joinOutcome: VoiceSessionState.failed);
+      final controller = controllerWith(session, _api());
 
-    await controller.join('channel-1');
+      await controller.join('channel-1');
 
-    expect(controller.state.error, contains('the SFU refused'));
-    expect(controller.state.retryable, isTrue,
-        reason: 'a dropped connection might really succeed next time');
-  });
+      expect(controller.state.error, contains('the SFU refused'));
+      expect(
+        controller.state.retryable,
+        isTrue,
+        reason: 'a dropped connection might really succeed next time',
+      );
+    },
+  );
 
+  /// Uses the same controller throughout. An earlier version of this test
+  /// built a second one, whose retryable defaults to true, so it passed even
+  /// with the reset deleted.
   test('a retry after a non-retryable failure resets once it starts', () async {
-    // The same controller throughout. An earlier version of this test built a
-    // second one, whose retryable defaults to true, so it passed even with the
-    // reset deleted.
     var status = 501;
     final client = MockClient((request) async {
       if (!request.url.path.endsWith('/voice/token')) {
@@ -239,7 +256,7 @@ void main() {
       if (status != 200) {
         return http.Response(
           jsonEncode({
-            'error': {'code': 'nope', 'message': 'refused'}
+            'error': {'code': 'nope', 'message': 'refused'},
           }),
           status,
           headers: {'content-type': 'application/json'},
@@ -260,15 +277,21 @@ void main() {
 
     final controller = controllerWith(_FakeSession(), client);
     await controller.join('channel-1');
-    expect(controller.state.retryable, isFalse,
-        reason: 'a server with no voice is not worth retrying');
+    expect(
+      controller.state.retryable,
+      isFalse,
+      reason: 'a server with no voice is not worth retrying',
+    );
 
     // The admin configures an SFU and the user tries again.
     status = 200;
     await controller.join('channel-1');
 
-    expect(controller.state.retryable, isTrue,
-        reason: 'the previous failure must not lock this controller out');
+    expect(
+      controller.state.retryable,
+      isTrue,
+      reason: 'the previous failure must not lock this controller out',
+    );
     expect(controller.state.error, isNull);
   });
 
@@ -298,17 +321,19 @@ void main() {
     expect(controller.state.error, isNull);
   });
 
-  test('a desktop that refuses the capture is reported, not shown as sharing',
-      () async {
-    final session = _FakeSession(screenShareGranted: false);
-    final controller = controllerWith(session, _api());
+  test(
+    'a desktop that refuses the capture is reported, not shown as sharing',
+    () async {
+      final session = _FakeSession(screenShareGranted: false);
+      final controller = controllerWith(session, _api());
 
-    await controller.join('channel-1');
-    await controller.setScreenShare(true);
+      await controller.join('channel-1');
+      await controller.setScreenShare(true);
 
-    expect(controller.state.screenSharing, isFalse);
-    expect(controller.state.error, contains('refused the capture'));
-  });
+      expect(controller.state.screenSharing, isFalse);
+      expect(controller.state.error, contains('refused the capture'));
+    },
+  );
 
   test('the session decides who is sharing, not the local toggle', () async {
     final session = _FakeSession();

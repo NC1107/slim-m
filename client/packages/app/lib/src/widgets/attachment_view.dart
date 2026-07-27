@@ -42,7 +42,9 @@ class AttachmentView extends ConsumerWidget {
     if (!_isImage) {
       return Container(
         padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s12, vertical: AppSpacing.s8),
+          horizontal: AppSpacing.s12,
+          vertical: AppSpacing.s8,
+        ),
         decoration: BoxDecoration(
           color: tokens.surfaceRaised,
           border: Border.all(color: tokens.borderSubtle),
@@ -51,8 +53,10 @@ class AttachmentView extends ConsumerWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(attachment.filename,
-                style: AppText.ui.copyWith(color: tokens.textPrimary)),
+            Text(
+              attachment.filename,
+              style: AppText.ui.copyWith(color: tokens.textPrimary),
+            ),
             const SizedBox(width: AppSpacing.s8),
             Text(
               formatByteSize(attachment.size),
@@ -75,8 +79,10 @@ class AttachmentView extends ConsumerWidget {
           border: Border.all(color: tokens.borderSubtle),
           borderRadius: BorderRadius.circular(AppRadii.control),
         ),
-        child: Text('Could not load ${attachment.filename}.',
-            style: TextStyle(color: tokens.textSecondary)),
+        child: Text(
+          'Could not load ${attachment.filename}.',
+          style: TextStyle(color: tokens.textSecondary),
+        ),
       ),
       data: (bytes) => ClipRRect(
         borderRadius: BorderRadius.circular(AppRadii.control),

@@ -42,9 +42,7 @@ pub fn routes() -> Router<AppState> {
     Router::new().route("/channels/{channel_id}/canvas/objects", get(viewport))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 #[derive(Deserialize)]
 struct ViewportParams {
@@ -107,9 +105,7 @@ struct ViewportDto {
     latest_seq: i64,
 }
 
-// ---------------------------------------------------------------------------
-// Handler
-// ---------------------------------------------------------------------------
+// --- Handler ---
 
 async fn viewport(
     Authed(ctx): Authed,

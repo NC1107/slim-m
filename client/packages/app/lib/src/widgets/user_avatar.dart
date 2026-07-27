@@ -89,8 +89,9 @@ class AuthorAvatar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final id = userId;
-    final profile =
-        id == null ? null : ref.watch(userProfileProvider(id)).valueOrNull;
+    final profile = id == null
+        ? null
+        : ref.watch(userProfileProvider(id)).valueOrNull;
     return UserAvatar(
       name: name,
       userId: id,

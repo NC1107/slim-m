@@ -70,12 +70,14 @@ Future<ProviderContainer> _pumpOnboarding(
     return http.Response('{}', 200);
   });
 
-  final container = ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(keyStore ?? InMemoryKeyStore()),
-    probeApiProvider.overrideWithValue(
-      (baseUrl) => SlimmApi(baseUrl: baseUrl, httpClient: httpClient),
-    ),
-  ]);
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(keyStore ?? InMemoryKeyStore()),
+      probeApiProvider.overrideWithValue(
+        (baseUrl) => SlimmApi(baseUrl: baseUrl, httpClient: httpClient),
+      ),
+    ],
+  );
   addTearDown(container.dispose);
 
   await tester.pumpWidget(
@@ -114,16 +116,13 @@ Future<void> _tapButton(WidgetTester tester, String label) async {
 }
 
 void main() {
-  testWidgets('a server too old to report an identity is not blocked on one',
-      (tester) async {
+  testWidgets('a server too old to report an identity is not blocked on one', (
+    tester,
+  ) async {
     Uri? chosen;
     await _pumpOnboarding(
       tester,
-      versionBody: const {
-        'name': 'slim-m',
-        'version': '0.6.0',
-        'protocol': 1,
-      },
+      versionBody: const {'name': 'slim-m', 'version': '0.6.0', 'protocol': 1},
       onServerChosen: (server, invite) => chosen = server,
     );
 
@@ -133,8 +132,7 @@ void main() {
     expect(find.text('Confirm this server'), findsNothing);
   });
 
-  testWidgets(
-      'the first connection to a server shows its fingerprint, and '
+  testWidgets('the first connection to a server shows its fingerprint, and '
       'confirming it pins the key and proceeds', (tester) async {
     Uri? chosen;
     final keyStore = InMemoryKeyStore();
@@ -160,14 +158,12 @@ void main() {
     await _tapButton(tester, 'It matches - continue');
 
     expect(chosen, Uri.parse(_server));
-    expect(
-      await keyStore.read(_handleFor(_server)),
-      _identityA['public_key'],
-    );
+    expect(await keyStore.read(_handleFor(_server)), _identityA['public_key']);
   });
 
-  testWidgets('cancelling the first-connect fingerprint step pins nothing',
-      (tester) async {
+  testWidgets('cancelling the first-connect fingerprint step pins nothing', (
+    tester,
+  ) async {
     Uri? chosen;
     final keyStore = InMemoryKeyStore();
     await _pumpOnboarding(
@@ -189,8 +185,7 @@ void main() {
     expect(await keyStore.read(_handleFor(_server)), isNull);
   });
 
-  testWidgets(
-      'a later connection matching the pinned key never shows the step '
+  testWidgets('a later connection matching the pinned key never shows the step '
       'again', (tester) async {
     Uri? chosen;
     final keyStore = InMemoryKeyStore();
@@ -216,55 +211,62 @@ void main() {
 
   group('a pinned key that no longer matches', () {
     testWidgets(
-        'is shown as a distinct warning that blocks the risky action until '
-        'it is explicitly acknowledged', (tester) async {
+      'is shown as a distinct warning that blocks the risky action until '
+      'it is explicitly acknowledged',
+      (tester) async {
+        Uri? chosen;
+        final keyStore = InMemoryKeyStore();
+        await keyStore.put(
+          _handleFor(_server),
+          _identityA['public_key'] as String,
+        );
+
+        await _pumpOnboarding(
+          tester,
+          versionBody: const {
+            'name': 'slim-m',
+            'version': '0.10.0',
+            'protocol': 1,
+            'identity': _identityB,
+          },
+          keyStore: keyStore,
+          onServerChosen: (server, invite) => chosen = server,
+        );
+
+        await _enterManualServer(tester);
+
+        expect(find.text("This server's identity changed"), findsOneWidget);
+        expect(find.text('Confirm this server'), findsNothing);
+
+        // Tapping the risky action before acknowledging must do nothing: this
+        // is the one screen a plain tap-through is not allowed to work.
+        await _tapButton(tester, 'Trust the new identity');
+        expect(chosen, isNull);
+        expect(find.text("This server's identity changed"), findsOneWidget);
+
+        await tester.ensureVisible(find.byType(Checkbox));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(Checkbox));
+        await tester.pump();
+        await _tapButton(tester, 'Trust the new identity');
+
+        expect(chosen, Uri.parse(_server));
+        expect(
+          await keyStore.read(_handleFor(_server)),
+          _identityB['public_key'],
+        );
+      },
+    );
+
+    testWidgets('cancelling leaves the old pinned key untouched', (
+      tester,
+    ) async {
       Uri? chosen;
       final keyStore = InMemoryKeyStore();
       await keyStore.put(
-          _handleFor(_server), _identityA['public_key'] as String);
-
-      await _pumpOnboarding(
-        tester,
-        versionBody: const {
-          'name': 'slim-m',
-          'version': '0.10.0',
-          'protocol': 1,
-          'identity': _identityB,
-        },
-        keyStore: keyStore,
-        onServerChosen: (server, invite) => chosen = server,
+        _handleFor(_server),
+        _identityA['public_key'] as String,
       );
-
-      await _enterManualServer(tester);
-
-      expect(find.text("This server's identity changed"), findsOneWidget);
-      expect(find.text('Confirm this server'), findsNothing);
-
-      // Tapping the risky action before acknowledging must do nothing: this
-      // is the one screen a plain tap-through is not allowed to work.
-      await _tapButton(tester, 'Trust the new identity');
-      expect(chosen, isNull);
-      expect(find.text("This server's identity changed"), findsOneWidget);
-
-      await tester.ensureVisible(find.byType(Checkbox));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byType(Checkbox));
-      await tester.pump();
-      await _tapButton(tester, 'Trust the new identity');
-
-      expect(chosen, Uri.parse(_server));
-      expect(
-        await keyStore.read(_handleFor(_server)),
-        _identityB['public_key'],
-      );
-    });
-
-    testWidgets('cancelling leaves the old pinned key untouched',
-        (tester) async {
-      Uri? chosen;
-      final keyStore = InMemoryKeyStore();
-      await keyStore.put(
-          _handleFor(_server), _identityA['public_key'] as String);
 
       await _pumpOnboarding(
         tester,

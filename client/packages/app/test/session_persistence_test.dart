@@ -125,12 +125,13 @@ class _FlakyKeyStore implements KeyStore {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // Every restoreSession() call reads the first-launch flag from
-  // SharedPreferences; marking the app as "already launched" is what makes
-  // these tests the ordinary "restart", not a fresh install, unless a test
-  // is specifically about that first-launch behaviour.
-  setUp(() =>
-      SharedPreferences.setMockInitialValues({hasLaunchedBeforeKey: true}));
+  /// Every restoreSession() call reads the first-launch flag from
+  /// SharedPreferences; marking the app as "already launched" is what makes
+  /// these tests the ordinary "restart", not a fresh install, unless a test
+  /// is specifically about that first-launch behaviour.
+  setUp(
+    () => SharedPreferences.setMockInitialValues({hasLaunchedBeforeKey: true}),
+  );
 
   group('restoreSession', () {
     test('a persisted session is restored on a fresh launch', () async {
@@ -138,9 +139,9 @@ void main() {
       await keyStore.put(sessionTokenHandle, jsonEncode(_tokens.toJson()));
       await keyStore.put(serverUrlHandle, _serverUrl);
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-      ]);
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+      );
       addTearDown(container.dispose);
 
       await restoreSession(container);
@@ -151,16 +152,15 @@ void main() {
       expect(session.tokens!.userId, 'user-1');
     });
 
-    test(
-        'a restored session restores the server it was signed into, not '
+    test('a restored session restores the server it was signed into, not '
         'serverUrlProvider\'s localhost default', () async {
       final keyStore = InMemoryKeyStore();
       await keyStore.put(sessionTokenHandle, jsonEncode(_tokens.toJson()));
       await keyStore.put(serverUrlHandle, _serverUrl);
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-      ]);
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+      );
       addTearDown(container.dispose);
 
       await restoreSession(container);
@@ -168,18 +168,18 @@ void main() {
       expect(container.read(serverUrlProvider), Uri.parse(_serverUrl));
     });
 
-    test(
-        'a session with no persisted server address is dropped rather than '
+    test('a session with no persisted server address is dropped rather than '
         'restored against the useless default', () async {
       final keyStore = InMemoryKeyStore();
-      // A session persisted with no matching server address: the exact shape
-      // of the bug this guards, reproduced directly rather than only through
-      // the write path.
+
+      /// A session persisted with no matching server address: the exact shape
+      /// of the bug this guards, reproduced directly rather than only through
+      /// the write path.
       await keyStore.put(sessionTokenHandle, jsonEncode(_tokens.toJson()));
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-      ]);
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+      );
       addTearDown(container.dispose);
 
       await restoreSession(container);
@@ -192,39 +192,63 @@ void main() {
       );
     });
 
-    test('nothing persisted leaves a fresh launch signed out', () async {
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      ]);
+    test('a remembered server survives a sign-out and is restored on the next '
+        'launch, so recovery never means retyping the address', () async {
+      // Exactly what sign-out leaves on disk: the session token is deleted,
+      // the address of the server it was signed into is not.
+      final keyStore = InMemoryKeyStore();
+      await keyStore.put(serverUrlHandle, _serverUrl);
+
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+      );
       addTearDown(container.dispose);
 
       await restoreSession(container);
 
       expect(container.read(sessionProvider).isSignedIn, isFalse);
+      expect(
+        container.read(chosenServerProvider),
+        Uri.parse(_serverUrl),
+        reason: 'the server is remembered independently of any session',
+      );
+      expect(container.read(serverUrlProvider), Uri.parse(_serverUrl));
     });
 
-    test('a corrupt persisted session is dropped rather than crashing launch',
-        () async {
-      final keyStore = InMemoryKeyStore();
-      await keyStore.put(sessionTokenHandle, 'not valid json');
-
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-      ]);
+    test('nothing persisted leaves a fresh launch signed out', () async {
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(InMemoryKeyStore())],
+      );
       addTearDown(container.dispose);
 
       await restoreSession(container);
 
       expect(container.read(sessionProvider).isSignedIn, isFalse);
-      expect(await keyStore.read(sessionTokenHandle), isNull);
     });
 
     test(
-        'a key store that throws on read degrades to signed out, not a '
+      'a corrupt persisted session is dropped rather than crashing launch',
+      () async {
+        final keyStore = InMemoryKeyStore();
+        await keyStore.put(sessionTokenHandle, 'not valid json');
+
+        final container = ProviderContainer(
+          overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+        );
+        addTearDown(container.dispose);
+
+        await restoreSession(container);
+
+        expect(container.read(sessionProvider).isSignedIn, isFalse);
+        expect(await keyStore.read(sessionTokenHandle), isNull);
+      },
+    );
+
+    test('a key store that throws on read degrades to signed out, not a '
         'crashed launch', () async {
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(_ThrowingKeyStore()),
-      ]);
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(_ThrowingKeyStore())],
+      );
       addTearDown(container.dispose);
 
       // main() awaits this before runApp; if this completed with an error
@@ -233,38 +257,40 @@ void main() {
       expect(container.read(sessionProvider).isSignedIn, isFalse);
     });
 
-    test(
-        'the first launch after an install clears a leftover keychain '
+    test('the first launch after an install clears a leftover keychain '
         'session rather than restoring it', () async {
       SharedPreferences.setMockInitialValues({});
       final keyStore = InMemoryKeyStore();
       await keyStore.put(sessionTokenHandle, jsonEncode(_tokens.toJson()));
       await keyStore.put(serverUrlHandle, _serverUrl);
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-      ]);
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+      );
       addTearDown(container.dispose);
 
       await restoreSession(container);
 
       expect(container.read(sessionProvider).isSignedIn, isFalse);
-      expect(await keyStore.read(sessionTokenHandle), isNull,
-          reason: 'a keychain item that survived a supposed uninstall must '
-              'not come back as this install\'s session');
+      expect(
+        await keyStore.read(sessionTokenHandle),
+        isNull,
+        reason:
+            'a keychain item that survived a supposed uninstall must '
+            'not come back as this install\'s session',
+      );
     });
 
-    test(
-        'a later, ordinary launch does not re-clear a session that was '
+    test('a later, ordinary launch does not re-clear a session that was '
         'genuinely restored', () async {
       SharedPreferences.setMockInitialValues({});
       final keyStore = InMemoryKeyStore();
       await keyStore.put(sessionTokenHandle, jsonEncode(_tokens.toJson()));
       await keyStore.put(serverUrlHandle, _serverUrl);
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-      ]);
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+      );
       addTearDown(container.dispose);
 
       // First launch: clears the pre-existing keychain leftovers.
@@ -276,17 +302,16 @@ void main() {
       await pumpEventQueue();
 
       // A later relaunch of the same install must restore it normally.
-      final relaunch = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-      ]);
+      final relaunch = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+      );
       addTearDown(relaunch.dispose);
       await restoreSession(relaunch);
 
       expect(relaunch.read(sessionProvider).isSignedIn, isTrue);
     });
 
-    test(
-        'a restored session whose refresh token is rejected ends up signed '
+    test('a restored session whose refresh token is rejected ends up signed '
         'out, and only once, not in a loop', () async {
       final keyStore = InMemoryKeyStore();
       await keyStore.put(sessionTokenHandle, jsonEncode(_tokens.toJson()));
@@ -298,24 +323,32 @@ void main() {
         baseUrl: Uri.parse('http://localhost:8080'),
         session: session,
         httpClient: MockClient((request) async {
-          expect(request.url.path, '/auth/refresh',
-              reason: 'the only authenticated call this test makes');
+          expect(
+            request.url.path,
+            '/auth/refresh',
+            reason: 'the only authenticated call this test makes',
+          );
           refreshAttempts++;
           return http.Response('{"error":"revoked"}', 401);
         }),
       );
       addTearDown(api.close);
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-        sessionProvider.overrideWithValue(session),
-        apiProvider.overrideWithValue(api),
-      ]);
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(keyStore),
+          sessionProvider.overrideWithValue(session),
+          apiProvider.overrideWithValue(api),
+        ],
+      );
       addTearDown(container.dispose);
 
       await restoreSession(container);
-      expect(session.isSignedIn, isTrue,
-          reason: 'restored optimistically, before any network round trip');
+      expect(
+        session.isSignedIn,
+        isTrue,
+        reason: 'restored optimistically, before any network round trip',
+      );
 
       await expectLater(api.refresh, throwsA(isA<UnauthorizedException>()));
 
@@ -327,26 +360,44 @@ void main() {
   group('session persistence writes', () {
     test('the server address is persisted alongside a fresh session', () async {
       final keyStore = InMemoryKeyStore();
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-      ]);
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+      );
       addTearDown(container.dispose);
 
-      container.read(serverUrlProvider.notifier).state = Uri.parse(_serverUrl);
+      container
+          .read(chosenServerProvider.notifier)
+          .choose(Uri.parse(_serverUrl));
       container.read(sessionProvider).set(_tokens);
       await pumpEventQueue();
 
       expect(await keyStore.read(serverUrlHandle), _serverUrl);
     });
 
-    test(
-        'a burst of rapid session changes is written to disk in the order '
+    test('choosing a server persists it before any session exists', () async {
+      // Picking a server and closing the app before signing in still says
+      // where the user was going; forgetting it means onboarding again.
+      final keyStore = InMemoryKeyStore();
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+      );
+      addTearDown(container.dispose);
+
+      container
+          .read(chosenServerProvider.notifier)
+          .choose(Uri.parse(_serverUrl));
+      await pumpEventQueue();
+
+      expect(await keyStore.read(serverUrlHandle), _serverUrl);
+    });
+
+    test('a burst of rapid session changes is written to disk in the order '
         'they happened, not whichever write finishes first', () async {
       final inner = InMemoryKeyStore();
       final keyStore = _GatedKeyStore(inner);
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-      ]);
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+      );
       addTearDown(container.dispose);
 
       final session = container.read(sessionProvider);
@@ -362,10 +413,11 @@ void main() {
         refreshToken: 'refresh-second',
         accessExpiresAt: 0,
       );
-      // Two changes back to back, neither awaited individually: exactly the
-      // shape of a restore immediately followed by a refresh. The first
-      // write is held open by the gate; an unchained implementation lets the
-      // second race ahead of it regardless.
+
+      /// Two changes back to back, neither awaited individually: exactly the
+      /// shape of a restore immediately followed by a refresh. The first
+      /// write is held open by the gate; an unchained implementation lets the
+      /// second race ahead of it regardless.
       session.set(first);
       session.set(second);
       await pumpEventQueue();
@@ -373,37 +425,49 @@ void main() {
       await pumpEventQueue();
 
       final stored = await keyStore.read(sessionTokenHandle);
-      final persisted =
-          TokenPair.fromJson(jsonDecode(stored!) as Map<String, dynamic>);
-      expect(persisted.accessToken, 'access-second',
-          reason: 'the later change must win on disk, not whichever write '
-              'happened to finish first');
+      final persisted = TokenPair.fromJson(
+        jsonDecode(stored!) as Map<String, dynamic>,
+      );
+      expect(
+        persisted.accessToken,
+        'access-second',
+        reason:
+            'the later change must win on disk, not whichever write '
+            'happened to finish first',
+      );
     });
 
-    test(
-        'a write that fails drops the stored session rather than leaving a '
+    test('a write that fails drops the stored session rather than leaving a '
         'stale, already-spent token behind', () async {
       final inner = InMemoryKeyStore();
       await inner.put(sessionTokenHandle, jsonEncode(_tokens.toJson()));
       final keyStore = _FlakyKeyStore(inner)..failNextPut = true;
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-      ]);
+      final container = ProviderContainer(
+        overrides: [keyStoreProvider.overrideWithValue(keyStore)],
+      );
       addTearDown(container.dispose);
 
       // A rotation whose persistence write fails.
-      container.read(sessionProvider).set(const TokenPair(
-            userId: 'user-1',
-            accessToken: 'access-rotated',
-            refreshToken: 'refresh-rotated',
-            accessExpiresAt: 0,
-          ));
+      container
+          .read(sessionProvider)
+          .set(
+            const TokenPair(
+              userId: 'user-1',
+              accessToken: 'access-rotated',
+              refreshToken: 'refresh-rotated',
+              accessExpiresAt: 0,
+            ),
+          );
       await pumpEventQueue();
 
-      expect(await inner.read(sessionTokenHandle), isNull,
-          reason: 'the old, now-spent refresh token must not survive on '
-              'disk for the next launch to replay');
+      expect(
+        await inner.read(sessionTokenHandle),
+        isNull,
+        reason:
+            'the old, now-spent refresh token must not survive on '
+            'disk for the next launch to replay',
+      );
     });
   });
 
@@ -411,18 +475,20 @@ void main() {
     test('clears both the persisted session and the device push key', () async {
       final keyStore = InMemoryKeyStore();
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(keyStore),
-        apiProvider.overrideWith((ref) {
-          final api = SlimmApi(
-            baseUrl: ref.watch(serverUrlProvider),
-            session: ref.watch(sessionProvider),
-            httpClient: MockClient((_) async => http.Response('', 204)),
-          );
-          ref.onDispose(api.close);
-          return api;
-        }),
-      ]);
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(keyStore),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: ref.watch(serverUrlProvider),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((_) async => http.Response('', 204)),
+            );
+            ref.onDispose(api.close);
+            return api;
+          }),
+        ],
+      );
       addTearDown(container.dispose);
 
       // Sign in the way login() does: setting the session is what the
@@ -446,61 +512,77 @@ void main() {
       expect(container.read(sessionProvider).isSignedIn, isFalse);
     });
 
-    test('drops the cached channels and messages the session was reading',
-        () async {
-      // The local database is one file for the whole app, not one per account
-      // or per server. Without this, the next person to sign in on the device
-      // opens straight onto the previous account's channel list and message
-      // text, before any sync could correct it.
-      final db = SlimmDatabase(NativeDatabase.memory());
-      addTearDown(db.close);
-      final store = MessageStore(db);
+    test(
+      'drops the cached channels and messages the session was reading',
+      () async {
+        /// The local database is one file for the whole app, not one per account
+        /// or per server. Without this, the next person to sign in on the device
+        /// opens straight onto the previous account's channel list and message
+        /// text, before any sync could correct it.
+        final db = SlimmDatabase(NativeDatabase.memory());
+        addTearDown(db.close);
+        final store = MessageStore(db);
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        storeProvider.overrideWith((ref) async => store),
-        apiProvider.overrideWith((ref) {
-          final api = SlimmApi(
-            baseUrl: ref.watch(serverUrlProvider),
-            session: ref.watch(sessionProvider),
-            httpClient: MockClient((_) async => http.Response('', 204)),
-          );
-          ref.onDispose(api.close);
-          return api;
-        }),
-      ]);
-      addTearDown(container.dispose);
+        final container = ProviderContainer(
+          overrides: [
+            keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+            storeProvider.overrideWith((ref) async => store),
+            apiProvider.overrideWith((ref) {
+              final api = SlimmApi(
+                baseUrl: ref.watch(serverUrlProvider),
+                session: ref.watch(sessionProvider),
+                httpClient: MockClient((_) async => http.Response('', 204)),
+              );
+              ref.onDispose(api.close);
+              return api;
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
 
-      await store.upsertChannels([
-        const Channel(
-            id: 'chan-1', name: 'general', kind: 'text', createdAt: 1),
-      ]);
-      await store.applyMessage(const Message(
-        id: 'm1',
-        channelId: 'chan-1',
-        authorId: 'user-1',
-        authorDisplayName: 'User One',
-        seq: 1,
-        content: 'private to the account signing out',
-        createdAt: 1000,
-        editedAt: null,
-      ));
+        await store.upsertChannels([
+          const Channel(
+            id: 'chan-1',
+            name: 'general',
+            kind: 'text',
+            createdAt: 1,
+          ),
+        ]);
+        await store.applyMessage(
+          const Message(
+            id: 'm1',
+            channelId: 'chan-1',
+            authorId: 'user-1',
+            authorDisplayName: 'User One',
+            seq: 1,
+            content: 'private to the account signing out',
+            createdAt: 1000,
+            editedAt: null,
+          ),
+        );
 
-      // Bring the sync controller up so it is listening to the session, the
-      // way the app shell does.
-      container.read(syncControllerProvider.notifier);
-      container.read(sessionProvider).set(_tokens);
-      await pumpEventQueue();
-      expect(await store.watchChannel('chan-1').first, hasLength(1));
+        // Bring the sync controller up so it is listening to the session, the
+        // way the app shell does.
+        container.read(syncControllerProvider.notifier);
+        container.read(sessionProvider).set(_tokens);
+        await pumpEventQueue();
+        expect(await store.watchChannel('chan-1').first, hasLength(1));
 
-      await container.read(apiProvider).logout();
-      await pumpEventQueue();
+        await container.read(apiProvider).logout();
+        await pumpEventQueue();
 
-      expect(container.read(sessionProvider).isSignedIn, isFalse);
-      expect(await store.watchChannel('chan-1').first, isEmpty,
-          reason: 'the previous account\'s messages must not survive');
-      expect(await store.watchChannels().first, isEmpty,
-          reason: 'nor the channel list, which names the server they were on');
-    });
+        expect(container.read(sessionProvider).isSignedIn, isFalse);
+        expect(
+          await store.watchChannel('chan-1').first,
+          isEmpty,
+          reason: 'the previous account\'s messages must not survive',
+        );
+        expect(
+          await store.watchChannels().first,
+          isEmpty,
+          reason: 'nor the channel list, which names the server they were on',
+        );
+      },
+    );
   });
 }

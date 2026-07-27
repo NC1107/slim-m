@@ -44,9 +44,7 @@ pub fn routes() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(POLL_BODY_LIMIT))
 }
 
-// ---------------------------------------------------------------------------
-// Wire types
-// ---------------------------------------------------------------------------
+// --- Wire types ---
 
 /// A poll, as rendered inline in a message: the question, its ordered options
 /// with their public tallies, and this viewer's own pick.
@@ -141,9 +139,7 @@ struct VoteRequest {
     option: i64,
 }
 
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
+// --- Handlers ---
 
 async fn create(
     Authed(ctx): Authed,
@@ -228,6 +224,9 @@ async fn create(
 /// send there, mirroring `reactions::authorize` exactly: viewing is checked
 /// first so an unreadable message and a missing one answer identically,
 /// rather than voting being usable to probe for one.
+///
+/// SEND_MESSAGES is evaluated in this channel specifically: holding it in some
+/// other channel must not let a caller vote here.
 async fn authorize(
     state: &AppState,
     user_id: UserId,
@@ -243,9 +242,7 @@ async fn authorize(
     if !permissions.contains(Permissions::VIEW_CHANNEL) {
         return Err(ApiError::NotFound("no such message"));
     }
-    // Voting requires the same permission sending a message does, evaluated
-    // in this channel specifically: holding SEND_MESSAGES in some other
-    // channel must not let a caller vote here.
+    // Voting costs the same permission sending does; see the note above.
     if !permissions.contains(Permissions::SEND_MESSAGES) {
         return Err(ApiError::Forbidden);
     }

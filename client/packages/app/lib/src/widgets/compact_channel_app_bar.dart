@@ -109,8 +109,11 @@ class _Title extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(isVoice ? AppIcons.voice : AppIcons.hash,
-                size: AppSizes.icon16, color: tokens.textSecondary),
+            Icon(
+              isVoice ? AppIcons.voice : AppIcons.hash,
+              size: AppSizes.icon16,
+              color: tokens.textSecondary,
+            ),
             const SizedBox(width: AppSpacing.s8),
             Flexible(
               child: Text(
@@ -143,8 +146,9 @@ class _SearchAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final open =
-        ref.watch(channelSearchProvider(channelId).select((s) => s.open));
+    final open = ref.watch(
+      channelSearchProvider(channelId).select((s) => s.open),
+    );
     return AppIconButton(
       icon: AppIcons.search,
       semanticLabel: 'Search messages',
@@ -184,10 +188,10 @@ class _MembersAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AppIconButton(
-        icon: AppIcons.members,
-        semanticLabel: 'Show members',
-        tooltip: 'Members',
-        touch: true,
-        onPressed: () => Scaffold.of(context).openEndDrawer(),
-      );
+    icon: AppIcons.members,
+    semanticLabel: 'Show members',
+    tooltip: 'Members',
+    touch: true,
+    onPressed: () => Scaffold.of(context).openEndDrawer(),
+  );
 }

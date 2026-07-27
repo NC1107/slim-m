@@ -158,7 +158,8 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
         child: CustomSingleChildLayout(
           delegate: _MenuLayout(
             anchor: _anchor,
-            padding: MediaQuery.paddingOf(context) +
+            padding:
+                MediaQuery.paddingOf(context) +
                 const EdgeInsets.all(_screenMargin),
           ),
           child: TapRegion(
@@ -178,8 +179,11 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
                   AppMenuItem(
                     label: 'Copy text',
                     leading: AppIcons.copy,
-                    onTap: () => _run(() =>
-                        Clipboard.setData(ClipboardData(text: widget.content))),
+                    onTap: () => _run(
+                      () => Clipboard.setData(
+                        ClipboardData(text: widget.content),
+                      ),
+                    ),
                   ),
                   if (actions.canEdit)
                     AppMenuItem(

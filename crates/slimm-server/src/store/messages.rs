@@ -123,6 +123,14 @@ impl Store {
     /// linked inside this same transaction, so a message is never visible
     /// with only some of its attachments recorded: either every id resolves
     /// and the whole send commits, or none of it does.
+    ///
+    /// Uses [`Store::begin_write`] (`BEGIN IMMEDIATE`) rather than a deferred
+    /// transaction, because this reads the id before it writes. A deferred
+    /// transaction that has already taken a read snapshot cannot promote
+    /// itself to a writer once another connection holds the write lock;
+    /// SQLite answers that with SQLITE_BUSY straight away, ignoring
+    /// `busy_timeout`, because waiting could deadlock. Taking the write lock
+    /// up front makes concurrent sends queue instead.
     pub async fn send_message(
         &self,
         channel_id: ChannelId,
@@ -131,12 +139,7 @@ impl Store {
         content: &str,
         attachment_ids: &[Vec<u8>],
     ) -> Result<Sent, SendError> {
-        // BEGIN IMMEDIATE rather than a deferred transaction: this reads the
-        // id before it writes, and a deferred transaction that has already
-        // taken a read snapshot cannot promote itself to a writer once another
-        // connection holds the write lock. SQLite answers that with SQLITE_BUSY
-        // straight away, ignoring busy_timeout, because waiting could deadlock.
-        // Taking the write lock up front makes concurrent sends queue instead.
+        // BEGIN IMMEDIATE, never deferred; see the note on this function.
         let mut tx = self.begin_write().await?;
 
         if let Some(existing) = fetch_message(&mut *tx, id).await? {
@@ -310,6 +313,16 @@ impl Store {
     /// soft delete, and that trigger does not itself drop a deleted row (only
     /// an encrypted one is excluded); this filters `deleted_at IS NULL`
     /// explicitly rather than relying on the index to have dropped it.
+    ///
+    /// A malformed `query` must fail rather than come back empty, which is why
+    /// the body opens with a join-free probe against the index. The real query
+    /// joins to `messages` and filters by channel, and when that join has no
+    /// candidate rows (an empty or brand-new channel) SQLite's planner can
+    /// prove the whole result is empty without ever calling into FTS5's query
+    /// parser - so a bad query would slip through as a silent empty result.
+    /// The probe has nothing to join against, so FTS5 must parse `query` to
+    /// answer it at all, and a bad one fails there every time regardless of
+    /// how many rows exist.
     pub async fn search_messages(
         &self,
         channel_id: ChannelId,
@@ -317,15 +330,8 @@ impl Store {
         before_seq: Option<i64>,
         limit: i64,
     ) -> Result<Vec<Message>, SearchError> {
-        // A join-free probe against the index first. The real query below
-        // joins to `messages` and filters by channel, and when that join has
-        // no candidate rows (an empty or brand-new channel), SQLite's planner
-        // can prove the whole result is empty without ever calling into
-        // FTS5's own query parser - which would let a malformed `query` slip
-        // through as a silent empty result instead of failing. This probe has
-        // nothing else to join against, so FTS5 must parse `query` to answer
-        // it at all, and a bad query fails right here every time, regardless
-        // of how many rows exist.
+        // Join-free probe so FTS5 must parse `query`; see the note on this
+        // function. Not removable as dead work.
         sqlx::query_scalar!(
             r#"SELECT 1 AS "one!: i64" FROM messages_fts WHERE messages_fts MATCH ? LIMIT 1"#,
             query

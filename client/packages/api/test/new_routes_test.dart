@@ -143,8 +143,7 @@ void main() {
     test('reactions are parsed with the viewer-specific reacted flag', () {
       final message = Message.fromJson(_messageJson(reactions: [
         // Escaped rather than literal: the hygiene gate forbids emoji
-        // codepoints in client source, and these are user content standing in
-        // for a reaction, not interface chrome.
+        // codepoints in client source. These are user content, not chrome.
         {'emoji': '\u{1F44D}', 'count': 3, 'reacted': true},
         {'emoji': '\u{1F389}', 'count': 1, 'reacted': false},
       ]));

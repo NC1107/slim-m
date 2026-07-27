@@ -40,61 +40,65 @@ void main() {
     expect(channel.createdAt, 1000);
   });
 
-  test('openDirectMessage upserts the opened channel into the local store',
-      () async {
-    final db = SlimmDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
+  test(
+    'openDirectMessage upserts the opened channel into the local store',
+    () async {
+      final db = SlimmDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
 
-    const tokens = api.TokenPair(
-      userId: 'self',
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      accessExpiresAt: 0,
-    );
+      const tokens = api.TokenPair(
+        userId: 'self',
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        accessExpiresAt: 0,
+      );
 
-    final container = ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(api.SessionStore(tokens: tokens)),
-      databaseProvider.overrideWith((ref) async => db),
-      apiProvider.overrideWith((ref) {
-        final client = api.SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient: MockClient((request) async {
-            expect(request.method, 'POST');
-            expect(request.url.path, '/dms/user-2');
-            return http.Response(
-              jsonEncode({
-                'channel_id': 'dm-1',
-                'user': {
-                  'id': 'user-2',
-                  'username': 'priya',
-                  'display_name': 'Priya',
-                  'created_at': 0,
-                },
-                'unread': 0,
-                'created_at': 500,
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(api.SessionStore(tokens: tokens)),
+          databaseProvider.overrideWith((ref) async => db),
+          apiProvider.overrideWith((ref) {
+            final client = api.SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((request) async {
+                expect(request.method, 'POST');
+                expect(request.url.path, '/dms/user-2');
+                return http.Response(
+                  jsonEncode({
+                    'channel_id': 'dm-1',
+                    'user': {
+                      'id': 'user-2',
+                      'username': 'priya',
+                      'display_name': 'Priya',
+                      'created_at': 0,
+                    },
+                    'unread': 0,
+                    'created_at': 500,
+                  }),
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
               }),
-              200,
-              headers: {'content-type': 'application/json'},
             );
+            ref.onDispose(client.close);
+            return client;
           }),
-        );
-        ref.onDispose(client.close);
-        return client;
-      }),
-    ]);
-    addTearDown(container.dispose);
+        ],
+      );
+      addTearDown(container.dispose);
 
-    final channelId = await openDirectMessage(_FakeRef(container), 'user-2');
-    expect(channelId, 'dm-1');
+      final channelId = await openDirectMessage(_FakeRef(container), 'user-2');
+      expect(channelId, 'dm-1');
 
-    final store = await container.read(storeProvider.future);
-    final channels = await store.watchChannels().first;
-    expect(channels.single.id, 'dm-1');
-    expect(channels.single.name, 'Priya');
-    expect(channels.single.kind, dmChannelKind);
-  });
+      final store = await container.read(storeProvider.future);
+      final channels = await store.watchChannels().first;
+      expect(channels.single.id, 'dm-1');
+      expect(channels.single.name, 'Priya');
+      expect(channels.single.kind, dmChannelKind);
+    },
+  );
 }
 
 /// [openDirectMessage] takes a [WidgetRef], which only a widget tree can
@@ -110,5 +114,6 @@ class _FakeRef implements WidgetRef {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError(
-      '${invocation.memberName} is not used by this test');
+    '${invocation.memberName} is not used by this test',
+  );
 }

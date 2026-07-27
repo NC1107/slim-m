@@ -37,10 +37,13 @@ const _notificationsPluginChannelName =
     'dexterous.com/flutter/local_notifications';
 
 void _mockLocalNotificationsPlugin(
-    Future<Object?> Function(MethodCall call)? handler) {
+  Future<Object?> Function(MethodCall call)? handler,
+) {
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(
-          const MethodChannel(_notificationsPluginChannelName), handler);
+        const MethodChannel(_notificationsPluginChannelName),
+        handler,
+      );
 }
 
 const _tokens = TokenPair(
@@ -64,24 +67,26 @@ ProviderContainer _container({
   FcmTokenChannel? fcmChannel,
   LocalNotifications? localNotifications,
 }) {
-  return ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-    if (session != null) sessionProvider.overrideWithValue(session),
-    apiProvider.overrideWith((ref) {
-      final api = SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: ref.watch(sessionProvider),
-        httpClient: httpClient,
-      );
-      ref.onDispose(api.close);
-      return api;
-    }),
-    if (channel != null) apnsTokenChannelProvider.overrideWithValue(channel),
-    if (fcmChannel != null)
-      fcmTokenChannelProvider.overrideWithValue(fcmChannel),
-    if (localNotifications != null)
-      localNotificationsProvider.overrideWithValue(localNotifications),
-  ]);
+  return ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      if (session != null) sessionProvider.overrideWithValue(session),
+      apiProvider.overrideWith((ref) {
+        final api = SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: httpClient,
+        );
+        ref.onDispose(api.close);
+        return api;
+      }),
+      if (channel != null) apnsTokenChannelProvider.overrideWithValue(channel),
+      if (fcmChannel != null)
+        fcmTokenChannelProvider.overrideWithValue(fcmChannel),
+      if (localNotifications != null)
+        localNotificationsProvider.overrideWithValue(localNotifications),
+    ],
+  );
 }
 
 /// A [FcmTokenSource] a test fully controls: either a fixed token or a
@@ -135,19 +140,20 @@ void main() {
   setUpAll(registerAndroidLocalNotificationsPluginForTest);
 
   group('PushController construction', () {
-    test(
-        'a token source whose rotation stream throws synchronously cannot '
+    test('a token source whose rotation stream throws synchronously cannot '
         'break constructing the controller', () async {
-      // Signed in at construction, so the constructor also fires its own
-      // already-signed-in registration attempt over the iOS channel below -
-      // the point under test is that reading fcmTokenChannelProvider's
-      // onTokenRefresh getter, which throws here the way FirebaseMessaging
-      // does with no default Firebase app, never gets the chance to take
-      // that down with it.
-      _mock((call) async => switch (call.method) {
-            'getToken' => 'abcd1234',
-            _ => null,
-          });
+      /// Signed in at construction, so the constructor also fires its own
+      /// already-signed-in registration attempt over the iOS channel below -
+      /// the point under test is that reading fcmTokenChannelProvider's
+      /// onTokenRefresh getter, which throws here the way FirebaseMessaging
+      /// does with no default Firebase app, never gets the chance to take
+      /// that down with it.
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => 'abcd1234',
+          _ => null,
+        },
+      );
       addTearDown(() => _mock(null));
 
       final session = SessionStore(tokens: _tokens);
@@ -167,9 +173,9 @@ void main() {
         returnsNormally,
       );
 
-      // Construction surviving is the headline assertion, but the rest of
-      // the controller must still work normally afterwards too: nothing
-      // about the guard should leave it half-built.
+      /// Construction surviving is the headline assertion, but the rest of
+      /// the controller must still work normally afterwards too: nothing
+      /// about the guard should leave it half-built.
       await pumpEventQueue();
       expect(container.read(pushControllerProvider), PushStatus.registered);
     });
@@ -177,9 +183,9 @@ void main() {
 
   group('PushController.register', () {
     test('without a session, nothing is attempted', () async {
-      // The default sessionProvider starts signed out; nothing is overridden,
-      // so a real network call or a real MethodChannel round-trip would both
-      // be surfaced failures, proving the session check runs before either.
+      /// The default sessionProvider starts signed out; nothing is overridden,
+      /// so a real network call or a real MethodChannel round-trip would both
+      /// be surfaced failures, proving the session check runs before either.
       final container = _container(
         httpClient: MockClient((_) async => http.Response('unused', 500)),
       );
@@ -190,10 +196,12 @@ void main() {
     });
 
     test('a server failure never propagates out of register()', () async {
-      _mock((call) async => switch (call.method) {
-            'getToken' => 'abcd1234',
-            _ => null,
-          });
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => 'abcd1234',
+          _ => null,
+        },
+      );
       addTearDown(() => _mock(null));
 
       final session = SessionStore(tokens: _tokens);
@@ -228,29 +236,33 @@ void main() {
       );
     });
 
-    test('no answer at all is reported as still waiting, not a silent no-op',
-        () async {
-      // No mock handler is installed, so the channel throws
-      // MissingPluginException exactly as a genuine timeout would eventually
-      // resolve, without this test having to wait one out.
-      _mock(null);
-      final session = SessionStore(tokens: _tokens);
-      final container = _container(
-        session: session,
-        httpClient: MockClient((_) async => http.Response('unused', 500)),
-        channel: ApnsTokenChannel(isIOS: true),
-      );
-      addTearDown(container.dispose);
+    test(
+      'no answer at all is reported as still waiting, not a silent no-op',
+      () async {
+        /// No mock handler is installed, so the channel throws
+        /// MissingPluginException exactly as a genuine timeout would eventually
+        /// resolve, without this test having to wait one out.
+        _mock(null);
+        final session = SessionStore(tokens: _tokens);
+        final container = _container(
+          session: session,
+          httpClient: MockClient((_) async => http.Response('unused', 500)),
+          channel: ApnsTokenChannel(isIOS: true),
+        );
+        addTearDown(container.dispose);
 
-      await container.read(pushControllerProvider.notifier).register();
-      expect(container.read(pushControllerProvider), PushStatus.noTokenYet);
-    });
+        await container.read(pushControllerProvider.notifier).register();
+        expect(container.read(pushControllerProvider), PushStatus.noTokenYet);
+      },
+    );
 
     test('a native registration failure is reported, not swallowed', () async {
-      _mock((call) async => switch (call.method) {
-            'getRegistrationError' => 'denied',
-            _ => null,
-          });
+      _mock(
+        (call) async => switch (call.method) {
+          'getRegistrationError' => 'denied',
+          _ => null,
+        },
+      );
       addTearDown(() => _mock(null));
 
       final session = SessionStore(tokens: _tokens);
@@ -269,10 +281,12 @@ void main() {
     });
 
     test('a token accepted by the server ends up registered', () async {
-      _mock((call) async => switch (call.method) {
-            'getToken' => 'abcd1234',
-            _ => null,
-          });
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => 'abcd1234',
+          _ => null,
+        },
+      );
       addTearDown(() => _mock(null));
 
       final session = SessionStore(tokens: _tokens);
@@ -287,16 +301,17 @@ void main() {
       expect(container.read(pushControllerProvider), PushStatus.registered);
     });
 
-    test(
-        'a session already signed in when the controller is created '
+    test('a session already signed in when the controller is created '
         'registers without an explicit call', () async {
-      // Stands in for a session restored on launch: nothing on the sign-in
-      // screen ever ran, so the only thing that can start registration is the
-      // controller noticing it was constructed already signed in.
-      _mock((call) async => switch (call.method) {
-            'getToken' => 'abcd1234',
-            _ => null,
-          });
+      /// Stands in for a session restored on launch: nothing on the sign-in
+      /// screen ever ran, so the only thing that can start registration is the
+      /// controller noticing it was constructed already signed in.
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => 'abcd1234',
+          _ => null,
+        },
+      );
       addTearDown(() => _mock(null));
 
       final session = SessionStore(tokens: _tokens);
@@ -332,10 +347,12 @@ void main() {
 
       // The token arrives before the next attempt, the way a slow permission
       // prompt resolves while the app sits backgrounded.
-      _mock((call) async => switch (call.method) {
-            'getToken' => 'abcd1234',
-            _ => null,
-          });
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => 'abcd1234',
+          _ => null,
+        },
+      );
       addTearDown(() => _mock(null));
 
       controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
@@ -346,16 +363,18 @@ void main() {
 
     test('resuming does not retry once already registered', () async {
       var registerPushCalls = 0;
-      _mock((call) async => switch (call.method) {
-            'getToken' => 'abcd1234',
-            _ => null,
-          });
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => 'abcd1234',
+          _ => null,
+        },
+      );
       addTearDown(() => _mock(null));
 
-      // Starts signed out, so touching the notifier below does not also fire
-      // the constructor's own already-signed-in registration attempt
-      // alongside this test's: signing in afterwards is the single, clean
-      // trigger this test counts against.
+      /// Starts signed out, so touching the notifier below does not also fire
+      /// the constructor's own already-signed-in registration attempt
+      /// alongside this test's: signing in afterwards is the single, clean
+      /// trigger this test counts against.
       final session = SessionStore();
       final container = _container(
         session: session,
@@ -383,10 +402,12 @@ void main() {
     });
 
     test('signing out resets status to notSignedIn', () async {
-      _mock((call) async => switch (call.method) {
-            'getToken' => 'abcd1234',
-            _ => null,
-          });
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => 'abcd1234',
+          _ => null,
+        },
+      );
       addTearDown(() => _mock(null));
 
       final session = SessionStore(tokens: _tokens);
@@ -406,17 +427,18 @@ void main() {
       expect(container.read(pushControllerProvider), PushStatus.notSignedIn);
     });
 
-    test(
-        'a routine token rotation does not re-run registration: only the '
+    test('a routine token rotation does not re-run registration: only the '
         'signed-out/signed-in edge does', () async {
       var getTokenCalls = 0;
-      _mock((call) async => switch (call.method) {
-            'getToken' => () {
-                getTokenCalls++;
-                return 'abcd1234';
-              }(),
-            _ => null,
-          });
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => () {
+            getTokenCalls++;
+            return 'abcd1234';
+          }(),
+          _ => null,
+        },
+      );
       addTearDown(() => _mock(null));
 
       final session = SessionStore(tokens: _tokens);
@@ -431,35 +453,42 @@ void main() {
       expect(container.read(pushControllerProvider), PushStatus.registered);
       expect(getTokenCalls, 1);
 
-      // The server rotates access tokens well inside a live session, not
-      // just at sign-in and sign-out; a non-null token pair replacing another
-      // non-null one is that same rotation, not a new sign-in.
-      session.set(const TokenPair(
-        userId: 'user-1',
-        accessToken: 'access-2',
-        refreshToken: 'refresh-2',
-        accessExpiresAt: 0,
-      ));
+      /// The server rotates access tokens well inside a live session, not
+      /// just at sign-in and sign-out; a non-null token pair replacing another
+      /// non-null one is that same rotation, not a new sign-in.
+      session.set(
+        const TokenPair(
+          userId: 'user-1',
+          accessToken: 'access-2',
+          refreshToken: 'refresh-2',
+          accessExpiresAt: 0,
+        ),
+      );
       await pumpEventQueue();
 
-      expect(getTokenCalls, 1,
-          reason: 'a token rotation is not a sign-in edge; it must not '
-              'restart APNs registration');
+      expect(
+        getTokenCalls,
+        1,
+        reason:
+            'a token rotation is not a sign-in edge; it must not '
+            'restart APNs registration',
+      );
     });
 
-    test(
-        'two concurrent register() calls share one attempt, not two racing '
+    test('two concurrent register() calls share one attempt, not two racing '
         'to register a keypair', () async {
       var registerPushCalls = 0;
-      _mock((call) async => switch (call.method) {
-            'getToken' => 'abcd1234',
-            _ => null,
-          });
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => 'abcd1234',
+          _ => null,
+        },
+      );
       addTearDown(() => _mock(null));
 
-      // Already signed in at construction, so touching the notifier below
-      // also fires the constructor's own already-signed-in attempt: a third,
-      // uncoordinated caller alongside the two explicit ones.
+      /// Already signed in at construction, so touching the notifier below
+      /// also fires the constructor's own already-signed-in attempt: a third,
+      /// uncoordinated caller alongside the two explicit ones.
       final session = SessionStore(tokens: _tokens);
       final container = _container(
         session: session,
@@ -479,41 +508,48 @@ void main() {
       await Future.wait([first, second]);
       await pumpEventQueue();
 
-      expect(registerPushCalls, 1,
-          reason: 'two concurrent first registrations can each mint their '
-              'own device keypair and race to tell the server which is '
-              'current, leaving the loser\'s private half discarded locally '
-              'while the server still holds its public half');
+      expect(
+        registerPushCalls,
+        1,
+        reason:
+            'two concurrent first registrations can each mint their '
+            'own device keypair and race to tell the server which is '
+            'current, leaving the loser\'s private half discarded locally '
+            'while the server still holds its public half',
+      );
     });
   });
 
   group('PushController.unregister', () {
     test(
-        'a key-store failure while dropping the push key still completes '
-        'and reaches notSignedIn, rather than aborting sign-out mid-way',
-        () async {
-      final session = SessionStore(tokens: _tokens);
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(_DeleteFailingKeyStore()),
-        sessionProvider.overrideWithValue(session),
-        apiProvider.overrideWith((ref) {
-          final api = SlimmApi(
-            baseUrl: Uri.parse('http://localhost:8080'),
-            session: ref.watch(sessionProvider),
-            httpClient: MockClient((_) async => http.Response('', 204)),
-          );
-          ref.onDispose(api.close);
-          return api;
-        }),
-      ]);
-      addTearDown(container.dispose);
+      'a key-store failure while dropping the push key still completes '
+      'and reaches notSignedIn, rather than aborting sign-out mid-way',
+      () async {
+        final session = SessionStore(tokens: _tokens);
+        final container = ProviderContainer(
+          overrides: [
+            keyStoreProvider.overrideWithValue(_DeleteFailingKeyStore()),
+            sessionProvider.overrideWithValue(session),
+            apiProvider.overrideWith((ref) {
+              final api = SlimmApi(
+                baseUrl: Uri.parse('http://localhost:8080'),
+                session: ref.watch(sessionProvider),
+                httpClient: MockClient((_) async => http.Response('', 204)),
+              );
+              ref.onDispose(api.close);
+              return api;
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
 
-      final controller = container.read(pushControllerProvider.notifier);
-      // main.dart's sign-out sequence has no try/catch around this call:
-      // unregister() itself must never throw.
-      await expectLater(controller.unregister(), completes);
-      expect(container.read(pushControllerProvider), PushStatus.notSignedIn);
-    });
+        final controller = container.read(pushControllerProvider.notifier);
+        // main.dart's sign-out sequence has no try/catch around this call:
+        // unregister() itself must never throw.
+        await expectLater(controller.unregister(), completes);
+        expect(container.read(pushControllerProvider), PushStatus.notSignedIn);
+      },
+    );
   });
 
   group('Android push', () {
@@ -543,29 +579,30 @@ void main() {
       expect(sentBody!['push_token'], 'fcm-token-1');
     });
 
-    test('FCM producing no token is reported as a registration failure',
-        () async {
-      final session = SessionStore(tokens: _tokens);
-      final container = _container(
-        session: session,
-        httpClient: MockClient((_) async => http.Response('unused', 500)),
-        fcmChannel: FcmTokenChannel(
-          source: _FakeFcmTokenSource(error: StateError('no Play Services')),
-          isAndroid: true,
-        ),
-      );
-      addTearDown(container.dispose);
-
-      await container.read(pushControllerProvider.notifier).register();
-
-      expect(
-        container.read(pushControllerProvider),
-        PushStatus.registrationFailed,
-      );
-    });
-
     test(
-        'a rotated FCM token re-registers even though already registered - '
+      'FCM producing no token is reported as a registration failure',
+      () async {
+        final session = SessionStore(tokens: _tokens);
+        final container = _container(
+          session: session,
+          httpClient: MockClient((_) async => http.Response('unused', 500)),
+          fcmChannel: FcmTokenChannel(
+            source: _FakeFcmTokenSource(error: StateError('no Play Services')),
+            isAndroid: true,
+          ),
+        );
+        addTearDown(container.dispose);
+
+        await container.read(pushControllerProvider.notifier).register();
+
+        expect(
+          container.read(pushControllerProvider),
+          PushStatus.registrationFailed,
+        );
+      },
+    );
+
+    test('a rotated FCM token re-registers even though already registered - '
         'unlike an iOS resume, which skips work once registered', () async {
       var registerPushCalls = 0;
       final requests = <Map<String, dynamic>>[];
@@ -591,95 +628,109 @@ void main() {
       source.rotate('fcm-token-2');
       await pumpEventQueue();
 
-      expect(registerPushCalls, 2,
-          reason: 'a rotated token left unregistered is a device that '
-              'silently stops receiving push');
+      expect(
+        registerPushCalls,
+        2,
+        reason:
+            'a rotated token left unregistered is a device that '
+            'silently stops receiving push',
+      );
       expect(requests[1]['push_token'], 'fcm-token-2');
       expect(requests[1]['platform'], 'android');
       expect(container.read(pushControllerProvider), PushStatus.registered);
     });
 
-    test('a token rotation while signed out never reaches the server',
-        () async {
-      var registerPushCalls = 0;
-      final source = _FakeFcmTokenSource(token: 'fcm-token-1');
-      // Starts signed out; nothing here ever calls register() explicitly.
-      final container = _container(
-        httpClient: MockClient((request) async {
-          if (request.method == 'PUT' && request.url.path == '/push') {
-            registerPushCalls++;
-          }
-          return http.Response('', 204);
-        }),
-        fcmChannel: FcmTokenChannel(source: source, isAndroid: true),
-      );
-      addTearDown(container.dispose);
-
-      // Touching the notifier is what starts the refresh subscription.
-      container.read(pushControllerProvider.notifier);
-      source.rotate('fcm-token-2');
-      await pumpEventQueue();
-
-      expect(registerPushCalls, 0);
-      expect(container.read(pushControllerProvider), PushStatus.notSignedIn);
-    });
-
     test(
-        'a rotation that lands while a registration is already in flight is '
-        'not dropped: the server ends up with the rotated token instead of '
-        'this device going dead until something unrelated re-registers it',
-        () async {
-      final firstRequestReceived = Completer<void>();
-      final releaseFirstResponse = Completer<void>();
-      final requests = <Map<String, dynamic>>[];
-      var putCalls = 0;
-      final source = _FakeFcmTokenSource(token: 'fcm-token-1');
-
-      final container = _container(
-        session: SessionStore(tokens: _tokens),
-        httpClient: MockClient((request) async {
-          if (request.method != 'PUT' || request.url.path != '/push') {
+      'a token rotation while signed out never reaches the server',
+      () async {
+        var registerPushCalls = 0;
+        final source = _FakeFcmTokenSource(token: 'fcm-token-1');
+        // Starts signed out; nothing here ever calls register() explicitly.
+        final container = _container(
+          httpClient: MockClient((request) async {
+            if (request.method == 'PUT' && request.url.path == '/push') {
+              registerPushCalls++;
+            }
             return http.Response('', 204);
-          }
-          putCalls++;
-          requests.add(jsonDecode(request.body) as Map<String, dynamic>);
-          if (putCalls == 1) {
-            firstRequestReceived.complete();
-            await releaseFirstResponse.future;
-          }
-          return http.Response('', 204);
-        }),
-        fcmChannel: FcmTokenChannel(source: source, isAndroid: true),
-      );
-      addTearDown(container.dispose);
+          }),
+          fcmChannel: FcmTokenChannel(source: source, isAndroid: true),
+        );
+        addTearDown(container.dispose);
 
-      // Already signed in, so constructing the controller starts the first
-      // registration on its own.
-      container.read(pushControllerProvider.notifier);
-      await firstRequestReceived.future;
+        // Touching the notifier is what starts the refresh subscription.
+        container.read(pushControllerProvider.notifier);
+        source.rotate('fcm-token-2');
+        await pumpEventQueue();
 
-      // The token rotates while that first PUT is still in flight, and
-      // unresolved.
-      source.rotate('fcm-token-2');
-      await pumpEventQueue();
-      expect(putCalls, 1,
-          reason: 'a rotation landing mid-registration must queue behind '
-              'it, not race it with a second concurrent PUT');
-
-      releaseFirstResponse.complete();
-      await pumpEventQueue();
-      await pumpEventQueue();
-
-      expect(putCalls, 2,
-          reason: 'the rotated token must still reach the server as its '
-              'own follow-up request once the in-flight one clears');
-      expect(requests[1]['push_token'], 'fcm-token-2');
-      expect(requests[1]['platform'], 'android');
-      expect(container.read(pushControllerProvider), PushStatus.registered);
-    });
+        expect(registerPushCalls, 0);
+        expect(container.read(pushControllerProvider), PushStatus.notSignedIn);
+      },
+    );
 
     test(
-        'Android notification permission denied is reported honestly, not '
+      'a rotation that lands while a registration is already in flight is '
+      'not dropped: the server ends up with the rotated token instead of '
+      'this device going dead until something unrelated re-registers it',
+      () async {
+        final firstRequestReceived = Completer<void>();
+        final releaseFirstResponse = Completer<void>();
+        final requests = <Map<String, dynamic>>[];
+        var putCalls = 0;
+        final source = _FakeFcmTokenSource(token: 'fcm-token-1');
+
+        final container = _container(
+          session: SessionStore(tokens: _tokens),
+          httpClient: MockClient((request) async {
+            if (request.method != 'PUT' || request.url.path != '/push') {
+              return http.Response('', 204);
+            }
+            putCalls++;
+            requests.add(jsonDecode(request.body) as Map<String, dynamic>);
+            if (putCalls == 1) {
+              firstRequestReceived.complete();
+              await releaseFirstResponse.future;
+            }
+            return http.Response('', 204);
+          }),
+          fcmChannel: FcmTokenChannel(source: source, isAndroid: true),
+        );
+        addTearDown(container.dispose);
+
+        // Already signed in, so constructing the controller starts the first
+        // registration on its own.
+        container.read(pushControllerProvider.notifier);
+        await firstRequestReceived.future;
+
+        // The token rotates while that first PUT is still in flight, and
+        // unresolved.
+        source.rotate('fcm-token-2');
+        await pumpEventQueue();
+        expect(
+          putCalls,
+          1,
+          reason:
+              'a rotation landing mid-registration must queue behind '
+              'it, not race it with a second concurrent PUT',
+        );
+
+        releaseFirstResponse.complete();
+        await pumpEventQueue();
+        await pumpEventQueue();
+
+        expect(
+          putCalls,
+          2,
+          reason:
+              'the rotated token must still reach the server as its '
+              'own follow-up request once the in-flight one clears',
+        );
+        expect(requests[1]['push_token'], 'fcm-token-2');
+        expect(requests[1]['platform'], 'android');
+        expect(container.read(pushControllerProvider), PushStatus.registered);
+      },
+    );
+
+    test('Android notification permission denied is reported honestly, not '
         'as a plain "registered" the settings screen would have to take on '
         'faith', () async {
       _mockLocalNotificationsPlugin((call) async => true);
@@ -708,8 +759,7 @@ void main() {
       );
     });
 
-    test(
-        'Android notification permission granted registers normally, not '
+    test('Android notification permission granted registers normally, not '
         'downgraded just because the question was asked', () async {
       _mockLocalNotificationsPlugin((call) async => true);
       addTearDown(() => _mockLocalNotificationsPlugin(null));
@@ -736,17 +786,18 @@ void main() {
   });
 
   group('foreground lifecycle heartbeat', () {
-    test(
-        'a foregrounded app keeps re-reporting on its own, so staying on '
+    test('a foregrounded app keeps re-reporting on its own, so staying on '
         'one screen for minutes never crosses the server\'s one-minute '
         'staleness window and starts a notification for the exact screen '
         'already in front of the user', () {
       fakeAsync((async) {
         final lifecycleReports = <String>[];
-        _mock((call) async => switch (call.method) {
-              'getToken' => 'abcd1234',
-              _ => null,
-            });
+        _mock(
+          (call) async => switch (call.method) {
+            'getToken' => 'abcd1234',
+            _ => null,
+          },
+        );
 
         final session = SessionStore(tokens: _tokens);
         final container = _container(
@@ -764,40 +815,49 @@ void main() {
           channel: ApnsTokenChannel(isIOS: true),
         );
 
-        // Already signed in, so construction registers and reports the
-        // current (foreground) lifecycle once on its own, exactly as it
-        // does today on a fresh registration.
+        /// Already signed in, so construction registers and reports the
+        /// current (foreground) lifecycle once on its own, exactly as it
+        /// does today on a fresh registration.
         container.read(pushControllerProvider.notifier);
         async.flushMicrotasks();
         expect(lifecycleReports, ['foreground']);
 
-        // Stay right where it is for well past a minute, with no lifecycle
-        // transition of any kind - the exact shape of someone reading a
-        // channel for a few minutes.
+        /// Stay right where it is for well past a minute, with no lifecycle
+        /// transition of any kind - the exact shape of someone reading a
+        /// channel for a few minutes.
         async.elapse(const Duration(minutes: 3));
 
-        expect(lifecycleReports.length, greaterThan(1),
-            reason: 'without a heartbeat, the server\'s foreground report '
-                'goes stale after a minute and starts sending push for a '
-                'screen the user never left');
-        expect(lifecycleReports.toSet(), {'foreground'},
-            reason: 'every one of these is a re-report of the same '
-                'unchanged state, not a spurious transition');
+        expect(
+          lifecycleReports.length,
+          greaterThan(1),
+          reason:
+              'without a heartbeat, the server\'s foreground report '
+              'goes stale after a minute and starts sending push for a '
+              'screen the user never left',
+        );
+        expect(
+          lifecycleReports.toSet(),
+          {'foreground'},
+          reason:
+              'every one of these is a re-report of the same '
+              'unchanged state, not a spurious transition',
+        );
 
         container.dispose();
         async.flushMicrotasks();
       });
     });
 
-    test(
-        'backgrounding stops the heartbeat: it does not go on re-reporting '
+    test('backgrounding stops the heartbeat: it does not go on re-reporting '
         '"foreground" for a screen nobody is looking at', () {
       fakeAsync((async) {
         final lifecycleReports = <String>[];
-        _mock((call) async => switch (call.method) {
-              'getToken' => 'abcd1234',
-              _ => null,
-            });
+        _mock(
+          (call) async => switch (call.method) {
+            'getToken' => 'abcd1234',
+            _ => null,
+          },
+        );
 
         final session = SessionStore(tokens: _tokens);
         final container = _container(
@@ -826,9 +886,13 @@ void main() {
 
         async.elapse(const Duration(minutes: 3));
 
-        expect(lifecycleReports, ['foreground', 'background'],
-            reason: 'the heartbeat must stop with the app, not keep '
-                'claiming "foreground" from a paused isolate');
+        expect(
+          lifecycleReports,
+          ['foreground', 'background'],
+          reason:
+              'the heartbeat must stop with the app, not keep '
+              'claiming "foreground" from a paused isolate',
+        );
 
         container.dispose();
         async.flushMicrotasks();

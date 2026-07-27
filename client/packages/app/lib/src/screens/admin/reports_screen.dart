@@ -40,13 +40,17 @@ class ReportsScreen extends ConsumerWidget {
         child: reports.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(
-            child: Text('Could not load reports. $e',
-                style: TextStyle(color: tokens.textSecondary)),
+            child: Text(
+              'Could not load reports. $e',
+              style: TextStyle(color: tokens.textSecondary),
+            ),
           ),
           data: (list) => list.isEmpty
               ? Center(
-                  child: Text('The queue is empty.',
-                      style: TextStyle(color: tokens.textSecondary)),
+                  child: Text(
+                    'The queue is empty.',
+                    style: TextStyle(color: tokens.textSecondary),
+                  ),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.all(AppSpacing.s16),
@@ -74,26 +78,26 @@ class _ReportCardState extends ConsumerState<_ReportCard> {
   bool _busy = false;
 
   Future<void> _resolve(api.ReportResolution resolution) async {
-    final verb =
-        resolution == api.ReportResolution.resolved ? 'Resolve' : 'Dismiss';
+    final verb = resolution == api.ReportResolution.resolved
+        ? 'Resolve'
+        : 'Dismiss';
     final confirmed = await confirmDangerousAction(
       context,
       title: '$verb this report?',
       message: resolution == api.ReportResolution.resolved
           ? 'This marks it handled and removes it from the queue. It cannot '
-              'be reopened from here.'
+                'be reopened from here.'
           : 'This closes it with no action taken and removes it from the '
-              'queue. It cannot be reopened from here.',
+                'queue. It cannot be reopened from here.',
       confirmLabel: verb,
     );
     if (!confirmed || !mounted) return;
 
     setState(() => _busy = true);
     try {
-      await ref.read(apiProvider).resolveReport(
-            reportId: widget.report.id,
-            resolution: resolution,
-          );
+      await ref
+          .read(apiProvider)
+          .resolveReport(reportId: widget.report.id, resolution: resolution);
       if (context.mounted) ref.invalidate(openReportsProvider);
     } on api.ApiException catch (e) {
       if (!mounted) return;

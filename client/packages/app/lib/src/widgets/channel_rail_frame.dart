@@ -171,8 +171,10 @@ class RailConnectionBar extends ConsumerWidget {
       ),
       child: Semantics(
         liveRegion: true,
-        child: Text(label,
-            style: AppText.caption.copyWith(color: tokens.textSecondary)),
+        child: Text(
+          label,
+          style: AppText.caption.copyWith(color: tokens.textSecondary),
+        ),
       ),
     );
   }
@@ -233,15 +235,17 @@ class RailUserFooter extends ConsumerWidget {
                       Text(
                         statusLabel,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            AppText.micro.copyWith(color: tokens.textSecondary),
+                        style: AppText.micro.copyWith(
+                          color: tokens.textSecondary,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 AppIconButton(
-                  icon:
-                      voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
+                  icon: voice.microphoneEnabled
+                      ? AppIcons.mic
+                      : AppIcons.micOff,
                   semanticLabel: voice.microphoneEnabled ? 'Mute' : 'Unmute',
                   tooltip: inCall ? null : 'Not in a call',
                   onPressed: inCall ? voiceController.toggleMicrophone : null,

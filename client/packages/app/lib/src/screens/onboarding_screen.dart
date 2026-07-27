@@ -68,9 +68,9 @@ class OnboardingScreen extends ConsumerWidget {
                     'slim-m',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: tokens.textPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      color: tokens.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.s8),
                   Text(
@@ -232,21 +232,26 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
     try {
       final check = await client.checkInvite(_code.text.trim());
       if (check is api.InviteUnusable) {
-        // Deliberately vague, and it has to stay that way: the server answers
-        // expired, spent, revoked and never-issued identically so codes cannot
-        // be mined, and naming a reason here would undo that from the client
-        // side by telling an attacker which of the four they hit.
-        setState(() => _error = 'That code is not usable. It may have expired '
-            'or already been used.');
+        /// Deliberately vague, and it has to stay that way: the server answers
+        /// expired, spent, revoked and never-issued identically so codes cannot
+        /// be mined, and naming a reason here would undo that from the client
+        /// side by telling an attacker which of the four they hit.
+        setState(
+          () => _error =
+              'That code is not usable. It may have expired '
+              'or already been used.',
+        );
         return;
       }
       if (mounted) {
         Navigator.of(context).pop((address, _code.text.trim()));
       }
     } on api.ApiException catch (e) {
-      setState(() => _error = e is api.TransportException
-          ? 'Could not reach that server.'
-          : 'The server refused that. ${e.message}');
+      setState(
+        () => _error = e is api.TransportException
+            ? 'Could not reach that server.'
+            : 'The server refused that. ${e.message}',
+      );
     } finally {
       client.close();
       if (mounted) setState(() => _busy = false);
@@ -335,17 +340,21 @@ class _ManualServerDialogState extends State<_ManualServerDialog> {
       setState(() => _error = 'That does not look like a server address.');
       return;
     }
-    // Typing a server address by hand is a trust decision, so it is stated
-    // rather than implied: whoever runs it can read everything sent there.
-    //
-    // https is required over the internet, but not on a local network. A box on
-    // your own LAN has no public hostname to get a certificate for, and
-    // refusing http there would make self-hosting, the normal case for this
-    // app, impossible without a pile of certificate work.
+
+    /// Typing a server address by hand is a trust decision, so it is stated
+    /// rather than implied: whoever runs it can read everything sent there.
+    ///
+    /// https is required over the internet, but not on a local network. A box on
+    /// your own LAN has no public hostname to get a certificate for, and
+    /// refusing http there would make self-hosting, the normal case for this
+    /// app, impossible without a pile of certificate work.
     if (address.scheme != 'https' && !isLocalAddress(address)) {
-      setState(() => _error = 'Use https for a server on the internet, so '
-          'traffic cannot be read in transit. Plain http is only accepted for '
-          'an address on your own network.');
+      setState(
+        () => _error =
+            'Use https for a server on the internet, so '
+            'traffic cannot be read in transit. Plain http is only accepted for '
+            'an address on your own network.',
+      );
       return;
     }
     Navigator.of(context).pop(address);

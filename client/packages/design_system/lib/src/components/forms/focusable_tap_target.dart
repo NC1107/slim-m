@@ -8,6 +8,11 @@
 /// reusing the accent border a selected or active state already draws.
 /// Building that once here is what keeps several sibling widgets from
 /// drifting into slightly different versions of the same behaviour.
+///
+/// The ring hugs the visible control tightly; the hit-target floor grows the
+/// invisible tappable margin around it instead, so a small chip on a touch
+/// layout gets a bigger tap area without a ring that floats away from what it is
+/// meant to outline.
 library;
 
 import 'package:flutter/material.dart';
@@ -94,10 +99,8 @@ class _FocusableTapTargetState extends State<FocusableTapTarget> {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final content = widget.builder(context, _focused, _hovered);
 
-    // The ring hugs the visible control tightly; the hit-target floor below
-    // grows the invisible tappable margin around it instead, so a small chip
-    // on a touch layout gets a bigger tap area without a ring that floats
-    // away from what it is meant to outline.
+    // The ring hugs the control tightly; the hit-target floor below grows the
+    // invisible margin instead. See the library doc at the top of the file.
     final ring = Container(
       padding: const EdgeInsets.all(focusRingGap),
       decoration: BoxDecoration(

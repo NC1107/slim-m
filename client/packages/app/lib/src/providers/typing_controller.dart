@@ -70,4 +70,5 @@ class TypingController extends StateNotifier<Set<String>> {
 /// nothing is watching that channel's composer any more.
 final typingControllerProvider = StateNotifierProvider.autoDispose
     .family<TypingController, Set<String>, String>(
-        (ref, channelId) => TypingController(ref, channelId));
+      (ref, channelId) => TypingController(ref, channelId),
+    );

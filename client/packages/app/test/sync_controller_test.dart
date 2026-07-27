@@ -27,35 +27,37 @@ const _tokens = TokenPair(
 );
 
 Map<String, dynamic> _dmJson(String channelId) => {
-      'channel_id': channelId,
-      'user': {
-        'id': 'alice',
-        'username': 'alice',
-        'display_name': 'Alice',
-        'created_at': 0,
-      },
-      'unread': 1,
-      'created_at': 1000,
-    };
+  'channel_id': channelId,
+  'user': {
+    'id': 'alice',
+    'username': 'alice',
+    'display_name': 'Alice',
+    'created_at': 0,
+  },
+  'unread': 1,
+  'created_at': 1000,
+};
 
 Map<String, dynamic> _messageJson({
   required String id,
   required String channelId,
   required int seq,
-}) =>
-    {
-      'id': id,
-      'channel_id': channelId,
-      'author_id': 'alice',
-      'author_display_name': 'Alice',
-      'seq': seq,
-      'content': 'hey',
-      'created_at': 1000,
-      'edited_at': null,
-    };
+}) => {
+  'id': id,
+  'channel_id': channelId,
+  'author_id': 'alice',
+  'author_display_name': 'Alice',
+  'seq': seq,
+  'content': 'hey',
+  'created_at': 1000,
+  'edited_at': null,
+};
 
-http.Response _json(Object body) => http.Response(jsonEncode(body), 200,
-    headers: {'content-type': 'application/json'});
+http.Response _json(Object body) => http.Response(
+  jsonEncode(body),
+  200,
+  headers: {'content-type': 'application/json'},
+);
 
 /// Builds a container whose SyncController never auto-starts (its own
 /// session stays signed out), while its api client carries a separately
@@ -67,42 +69,45 @@ http.Response _json(Object body) => http.Response(jsonEncode(body), 200,
   final db = SlimmDatabase(NativeDatabase.memory());
   final store = MessageStore(db);
 
-  final container = ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-    sessionProvider.overrideWithValue(SessionStore()),
-    storeProvider.overrideWith((ref) async => store),
-    apiProvider.overrideWith((ref) {
-      final api = SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: SessionStore(tokens: _tokens),
-        httpClient: MockClient(handle),
-      );
-      ref.onDispose(api.close);
-      return api;
-    }),
-  ]);
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(SessionStore()),
+      storeProvider.overrideWith((ref) async => store),
+      apiProvider.overrideWith((ref) {
+        final api = SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: SessionStore(tokens: _tokens),
+          httpClient: MockClient(handle),
+        );
+        ref.onDispose(api.close);
+        return api;
+      }),
+    ],
+  );
 
   return (container: container, store: store);
 }
 
 void main() {
-  test(
-      'a MessageCreated for a channel this client has never fetched '
+  test('a MessageCreated for a channel this client has never fetched '
       'materialises the channel before applying the message', () async {
     var dmsResponse = <Map<String, dynamic>>[];
 
-    final harness = _harness(handle: (request) async {
-      if (request.method == 'GET' && request.url.path == '/channels') {
-        return _json(<Object>[]);
-      }
-      if (request.method == 'GET' && request.url.path == '/dms') {
-        return _json(dmsResponse);
-      }
-      if (request.url.path.endsWith('/read')) {
-        return _json({'last_read_seq': 0, 'unread': 1});
-      }
-      return http.Response('not found', 404);
-    });
+    final harness = _harness(
+      handle: (request) async {
+        if (request.method == 'GET' && request.url.path == '/channels') {
+          return _json(<Object>[]);
+        }
+        if (request.method == 'GET' && request.url.path == '/dms') {
+          return _json(dmsResponse);
+        }
+        if (request.url.path.endsWith('/read')) {
+          return _json({'last_read_seq': 0, 'unread': 1});
+        }
+        return http.Response('not found', 404);
+      },
+    );
     addTearDown(harness.container.dispose);
     final store = harness.store;
     addTearDown(store.db.close);
@@ -123,57 +128,82 @@ void main() {
       ),
     );
 
-    expect(await store.hasChannel('dm-1'), isTrue,
-        reason: 'the channel row must be materialised, not just the message');
+    expect(
+      await store.hasChannel('dm-1'),
+      isTrue,
+      reason: 'the channel row must be materialised, not just the message',
+    );
     final rows = await store.watchChannel('dm-1').first;
     expect(rows.single.id, 'm1');
-    expect(await store.cursorFor('dm-1'), 1,
-        reason: 'the cursor must advance so unread state comes out right');
-    expect(await store.unreadCount('dm-1'), 1,
-        reason: 'this is what puts the unread badge on the new DM');
+    expect(
+      await store.cursorFor('dm-1'),
+      1,
+      reason: 'the cursor must advance so unread state comes out right',
+    );
+    expect(
+      await store.unreadCount('dm-1'),
+      1,
+      reason: 'this is what puts the unread badge on the new DM',
+    );
   });
 
-  test('a burst of frames for the same unknown channel shares one refresh',
-      () async {
-    var refreshes = 0;
-    final gate = Completer<void>();
-    final dmsResponse = [_dmJson('dm-1')];
+  test(
+    'a burst of frames for the same unknown channel shares one refresh',
+    () async {
+      var refreshes = 0;
+      final gate = Completer<void>();
+      final dmsResponse = [_dmJson('dm-1')];
 
-    final harness = _harness(handle: (request) async {
-      if (request.method == 'GET' && request.url.path == '/channels') {
-        return _json(<Object>[]);
-      }
-      if (request.method == 'GET' && request.url.path == '/dms') {
-        refreshes++;
-        // Held open so both frames below are guaranteed to see the channel
-        // as still unknown before either refresh can possibly have landed.
-        await gate.future;
-        return _json(dmsResponse);
-      }
-      if (request.url.path.endsWith('/read')) {
-        return _json({'last_read_seq': 0, 'unread': 0});
-      }
-      return http.Response('not found', 404);
-    });
-    addTearDown(harness.container.dispose);
-    final store = harness.store;
-    addTearDown(store.db.close);
+      final harness = _harness(
+        handle: (request) async {
+          if (request.method == 'GET' && request.url.path == '/channels') {
+            return _json(<Object>[]);
+          }
+          if (request.method == 'GET' && request.url.path == '/dms') {
+            refreshes++;
+            // Held open so both frames below are guaranteed to see the channel
+            // as still unknown before either refresh can possibly have landed.
+            await gate.future;
+            return _json(dmsResponse);
+          }
+          if (request.url.path.endsWith('/read')) {
+            return _json({'last_read_seq': 0, 'unread': 0});
+          }
+          return http.Response('not found', 404);
+        },
+      );
+      addTearDown(harness.container.dispose);
+      final store = harness.store;
+      addTearDown(store.db.close);
 
-    final controller = harness.container.read(syncControllerProvider.notifier);
+      final controller = harness.container.read(
+        syncControllerProvider.notifier,
+      );
 
-    final first = controller.applyServerEventForTest(MessageCreated(
-        Message.fromJson(_messageJson(id: 'm1', channelId: 'dm-1', seq: 1))));
-    final second = controller.applyServerEventForTest(MessageEdited(
-        Message.fromJson(_messageJson(id: 'm1', channelId: 'dm-1', seq: 1))));
+      final first = controller.applyServerEventForTest(
+        MessageCreated(
+          Message.fromJson(_messageJson(id: 'm1', channelId: 'dm-1', seq: 1)),
+        ),
+      );
+      final second = controller.applyServerEventForTest(
+        MessageEdited(
+          Message.fromJson(_messageJson(id: 'm1', channelId: 'dm-1', seq: 1)),
+        ),
+      );
 
-    // Both frames have reached (and are blocked inside) the GET /dms mock by
-    // now, so releasing the gate exercises the dedupe rather than a race.
-    await Future<void>.delayed(Duration.zero);
-    gate.complete();
-    await Future.wait([first, second]);
+      // Both frames have reached (and are blocked inside) the GET /dms mock by
+      // now, so releasing the gate exercises the dedupe rather than a race.
+      await Future<void>.delayed(Duration.zero);
+      gate.complete();
+      await Future.wait([first, second]);
 
-    expect(refreshes, 1,
-        reason: 'a burst of frames for one unknown channel must not fan out '
-            'into a GET /channels + GET /dms pair per frame');
-  });
+      expect(
+        refreshes,
+        1,
+        reason:
+            'a burst of frames for one unknown channel must not fan out '
+            'into a GET /channels + GET /dms pair per frame',
+      );
+    },
+  );
 }

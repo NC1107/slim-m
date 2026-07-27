@@ -6,16 +6,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// key.properties is gitignored (public repo, CI writes it from secrets).
-// Without it, release builds fall back to debug signing so a contributor's
-// `flutter run --release` still works.
+// key.properties is gitignored (public repo, CI writes it from secrets). Without
+// it, release builds debug-sign so a contributor's `flutter run --release` works.
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
-    // Present but incomplete means CI wrote an empty or malformed secret. Left
-    // alone that silently debug-signs a release, which only a later step
-    // catches and only if someone added one.
+    // Present but incomplete means CI wrote a malformed secret; unchecked, that
+    // silently debug-signs a release and nothing downstream reliably catches it.
     val required = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
     val absent = required.filter { keystoreProperties[it]?.toString().isNullOrBlank() }
     require(absent.isEmpty()) {
@@ -24,15 +22,8 @@ if (keystorePropertiesFile.exists()) {
     }
 }
 
-// The Google Services plugin processes google-services.json into the string
-// resources FirebaseApp reads to auto-initialize on Android. That file is
-// gitignored (see the repo root .gitignore): this repo is public and the
-// file carries an API key, so applying the plugin unconditionally would fail
-// every contributor's Gradle configuration until they downloaded their own
-// copy. Skipping it instead leaves Firebase with no default options to
-// auto-init from, which FcmTokenChannel (packages/platform) already treats
-// as an ordinary registration failure rather than a build break - see its
-// FirebaseFcmTokenSource doc.
+// Conditional because google-services.json is gitignored (public repo, API
+// key); applying it always breaks contributors. See FirebaseFcmTokenSource.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
@@ -45,9 +36,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        // flutter_local_notifications' Android implementation uses java.time
-        // APIs that only exist natively on API 26+; desugaring is what lets
-        // it keep working down to this app's actual minSdk.
+        // flutter_local_notifications uses java.time APIs native only to API
+        // 26+; desugaring is what keeps it working down to this app's minSdk.
         isCoreLibraryDesugaringEnabled = true
     }
 
@@ -78,9 +68,8 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
-            // A release build ships the class and method names of a messaging
-            // client otherwise, which hands an attacker a free map of the auth
-            // and push paths.
+            // Otherwise a release ships the class and method names of a
+            // messaging client: a free map of the auth and push paths.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

@@ -65,24 +65,23 @@ class VoiceState {
     String? error,
     bool clearError = false,
     bool? retryable,
-  }) =>
-      VoiceState(
-        channelId: channelId ?? this.channelId,
-        state: state ?? this.state,
-        participants: participants ?? this.participants,
-        microphoneEnabled: microphoneEnabled ?? this.microphoneEnabled,
-        screenSharing: screenSharing ?? this.screenSharing,
-        canPublish: canPublish ?? this.canPublish,
-        deafened: deafened ?? this.deafened,
-        error: clearError ? null : (error ?? this.error),
-        retryable: clearError ? true : (retryable ?? this.retryable),
-      );
+  }) => VoiceState(
+    channelId: channelId ?? this.channelId,
+    state: state ?? this.state,
+    participants: participants ?? this.participants,
+    microphoneEnabled: microphoneEnabled ?? this.microphoneEnabled,
+    screenSharing: screenSharing ?? this.screenSharing,
+    canPublish: canPublish ?? this.canPublish,
+    deafened: deafened ?? this.deafened,
+    error: clearError ? null : (error ?? this.error),
+    retryable: clearError ? true : (retryable ?? this.retryable),
+  );
 }
 
 class VoiceController extends StateNotifier<VoiceState> {
   VoiceController(this._ref, {VoiceSession? session})
-      : _session = session ?? VoiceSession(),
-        super(const VoiceState()) {
+    : _session = session ?? VoiceSession(),
+      super(const VoiceState()) {
     _states = _session.states.listen((s) {
       state = state.copyWith(state: s);
     });
@@ -158,8 +157,9 @@ class VoiceController extends StateNotifier<VoiceState> {
     // never claims a microphone is open when the SFU refused the track.
     state = state.copyWith(
       microphoneEnabled: got ? want : state.microphoneEnabled,
-      error:
-          got ? null : 'Could not ${want ? 'unmute' : 'mute'} the microphone.',
+      error: got
+          ? null
+          : 'Could not ${want ? 'unmute' : 'mute'} the microphone.',
       clearError: got,
     );
   }
@@ -202,4 +202,5 @@ class VoiceController extends StateNotifier<VoiceState> {
 
 final voiceControllerProvider =
     StateNotifierProvider<VoiceController, VoiceState>(
-        (ref) => VoiceController(ref));
+      (ref) => VoiceController(ref),
+    );

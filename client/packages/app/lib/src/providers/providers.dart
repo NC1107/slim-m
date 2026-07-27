@@ -16,10 +16,52 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
 
-/// Where the app points. Overridden at startup from saved settings, and by
-/// tests to aim at a throwaway server.
-final serverUrlProvider = StateProvider<Uri>(
-  (ref) => Uri.parse('http://localhost:8080'),
+/// The server the user picked, with null meaning one has never been picked on
+/// this install.
+///
+/// Split from [serverUrlProvider] because the two answer different questions.
+/// "Where does the app point" always has an answer, and a localhost default is
+/// a reasonable one. "Has a server ever been chosen" has to be able to say no,
+/// and it is the only thing that can tell a first run apart from a returning
+/// user who is merely signed out.
+class ChosenServer extends Notifier<Uri?> {
+  @override
+  Uri? build() => null;
+
+  /// The user picked this server. Persisted straight away rather than waiting
+  /// for a session to carry it, so an install that chooses a server and never
+  /// signs in still knows where it was going on the next launch.
+  void choose(Uri server) {
+    state = server;
+    unawaited(_persist(server));
+  }
+
+  /// Read back from storage at launch, so nothing is written: it is already
+  /// on disk, and that is where it came from.
+  void restore(Uri server) {
+    state = server;
+  }
+
+  Future<void> _persist(Uri server) async {
+    try {
+      await ref.read(keyStoreProvider).put(serverUrlHandle, server.toString());
+    } catch (_) {
+      // Best effort: a key store that refuses to write must not stand between
+      // someone and the server they just typed.
+    }
+  }
+}
+
+final chosenServerProvider = NotifierProvider<ChosenServer, Uri?>(
+  ChosenServer.new,
+);
+
+/// Where the app points. Follows [chosenServerProvider] once a server has been
+/// chosen, and falls back to a local default before that. Tests override this
+/// directly to aim at a throwaway server.
+final serverUrlProvider = Provider<Uri>(
+  (ref) =>
+      ref.watch(chosenServerProvider) ?? Uri.parse('http://localhost:8080'),
 );
 
 /// An invite code chosen during onboarding, redeemed once an account exists.
@@ -28,11 +70,13 @@ final pendingInviteProvider = StateProvider<String?>((ref) => null);
 /// The handle the persisted session is stored under, in [keyStoreProvider].
 const sessionTokenHandle = 'session_token_pair';
 
-/// The handle the server address that session belongs to is stored under.
-/// Written and read alongside [sessionTokenHandle], never independently:
-/// a session is only meaningful together with the server that issued it, and
-/// [serverUrlProvider]'s own default (localhost) is useless against a real
-/// deployment.
+/// The handle the chosen server address is stored under.
+///
+/// It outlives [sessionTokenHandle] deliberately. A session is only meaningful
+/// together with the server that issued it, but the reverse is not true: the
+/// server someone chose is still the right answer after they sign out, and
+/// tying the two together is what used to send a signed-out user back to
+/// onboarding to retype an address the app had on disk the whole time.
 const serverUrlHandle = 'server_url';
 
 /// The handle for the flag that says this install has launched before. Lives
@@ -63,15 +107,15 @@ final sessionProvider = Provider<SessionStore>((ref) {
     pending = pending
         .then((_) => _persistSession(keyStore, tokens, serverUrl))
         .catchError((Object _, StackTrace __) {
-      // The server rotates refresh tokens with reuse detection: a write that
-      // failed here may have left a stale, already-spent token on disk, and
-      // replaying that on the next launch reads as reuse and revokes the
-      // whole family. Dropping the stored session outright degrades to a
-      // fresh sign-in instead of that false replay.
-      if (tokens != null) {
-        return keyStore.delete(sessionTokenHandle).catchError((_) {});
-      }
-    });
+          /// The server rotates refresh tokens with reuse detection: a write that
+          /// failed here may have left a stale, already-spent token on disk, and
+          /// replaying that on the next launch reads as reuse and revokes the
+          /// whole family. Dropping the stored session outright degrades to a
+          /// fresh sign-in instead of that false replay.
+          if (tokens != null) {
+            return keyStore.delete(sessionTokenHandle).catchError((_) {});
+          }
+        });
   });
   ref.onDispose(subscription.cancel);
   ref.onDispose(store.dispose);
@@ -113,11 +157,11 @@ Future<void> _persistSession(
 Future<void> restoreSession(ProviderContainer container) async {
   final keyStore = container.read(keyStoreProvider);
   try {
-    // The iOS/Android keychain outlives app deletion; this flag does not, so
-    // its absence means this is the first launch since an install (fresh, or
-    // a reinstall over one that was supposedly wiped). Whatever is already in
-    // the keychain at that point belongs to the account signed in before,
-    // not to this install, and must not come back as if nothing happened.
+    /// The iOS/Android keychain outlives app deletion; this flag does not, so
+    /// its absence means this is the first launch since an install (fresh, or
+    /// a reinstall over one that was supposedly wiped). Whatever is already in
+    /// the keychain at that point belongs to the account signed in before,
+    /// not to this install, and must not come back as if nothing happened.
     final prefs = await container.read(preferencesProvider.future);
     if (prefs.getBool(hasLaunchedBeforeKey) != true) {
       await keyStore.clear();
@@ -125,23 +169,32 @@ Future<void> restoreSession(ProviderContainer container) async {
       return;
     }
 
+    // Read before the session and restored whether or not there is one: a
+    // remembered server is what tells sign-in apart from onboarding.
+    final storedServerUrl = await keyStore.read(serverUrlHandle);
+    final parsed = storedServerUrl == null
+        ? null
+        : Uri.tryParse(storedServerUrl);
+    final serverUrl =
+        parsed != null && parsed.hasScheme && parsed.host.isNotEmpty
+        ? parsed
+        : null;
+    if (serverUrl != null) {
+      container.read(chosenServerProvider.notifier).restore(serverUrl);
+    }
+
     final stored = await keyStore.read(sessionTokenHandle);
     if (stored == null) return;
 
-    final tokens =
-        TokenPair.fromJson(jsonDecode(stored) as Map<String, dynamic>);
+    final tokens = TokenPair.fromJson(
+      jsonDecode(stored) as Map<String, dynamic>,
+    );
 
-    final storedServerUrl = await keyStore.read(serverUrlHandle);
-    final serverUrl =
-        storedServerUrl == null ? null : Uri.tryParse(storedServerUrl);
-    if (serverUrl == null || !serverUrl.hasScheme || serverUrl.host.isEmpty) {
-      // A session with no usable server address restores to a connection
-      // that can never work; that is the exact failure this exists to
-      // prevent, so treat it the same as a corrupt session rather than
-      // silently falling back to the localhost default.
+    if (serverUrl == null) {
+      // A session with no usable address restores to a connection that can
+      // never work, so it is dropped rather than aimed at the default.
       throw const FormatException('missing or invalid persisted server url');
     }
-    container.read(serverUrlProvider.notifier).state = serverUrl;
 
     container.read(sessionProvider).set(tokens);
   } catch (_) {
@@ -173,7 +226,8 @@ final apiProvider = Provider<SlimmApi>((ref) {
 /// sign-in. A provider rather than a bare constructor call so tests can
 /// substitute a fake transport; the caller owns close().
 final probeApiProvider = Provider<SlimmApi Function(Uri)>(
-  (ref) => (baseUrl) => SlimmApi(baseUrl: baseUrl),
+  (ref) =>
+      (baseUrl) => SlimmApi(baseUrl: baseUrl),
 );
 
 /// Whether there is a signed-in session, as a stream so routing can react.
@@ -260,25 +314,22 @@ class ThemeController extends StateNotifier<AppThemeChoice> {
 }
 
 final themeControllerProvider =
-    StateNotifierProvider<ThemeController, AppThemeChoice>(
-  ThemeController.new,
-);
+    StateNotifierProvider<ThemeController, AppThemeChoice>(ThemeController.new);
 
 /// Where device secrets live: the session token pair and the push private key
 /// today, later signing and agreement keys for E2EE. The platform keychain on
 /// iOS and Android, an owner-only-permissioned file on desktop; see
 /// `createPersistentKeyStore` for why desktop does not also use the keychain
 /// backend.
-final keyStoreProvider =
-    Provider<KeyStore>((ref) => createPersistentKeyStore());
+final keyStoreProvider = Provider<KeyStore>(
+  (ref) => createPersistentKeyStore(),
+);
 
 /// Prepends a current value to a stream, so a listener attaching late still
 /// sees the present state rather than waiting for the next change.
 StreamTransformer<T, T> _startWith<T>(T initial) {
-  return StreamTransformer<T, T>.fromBind(
-    (source) async* {
-      yield initial;
-      yield* source;
-    },
-  );
+  return StreamTransformer<T, T>.fromBind((source) async* {
+    yield initial;
+    yield* source;
+  });
 }

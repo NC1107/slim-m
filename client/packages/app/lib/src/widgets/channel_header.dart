@@ -44,17 +44,18 @@ class ChannelHeader extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(isVoice ? AppIcons.voice : AppIcons.hash,
-              size: AppSizes.icon16, color: tokens.textSecondary),
+          Icon(
+            isVoice ? AppIcons.voice : AppIcons.hash,
+            size: AppSizes.icon16,
+            color: tokens.textSecondary,
+          ),
           const SizedBox(width: AppSpacing.s8),
           Flexible(
             child: Text(
               name,
               overflow: TextOverflow.ellipsis,
-              // The design's 17px header size was deliberately dropped from
-              // the six-step type scale (see app_typography.dart): it never
-              // differed from body except in weight, so weight alone carries
-              // the same hierarchy here.
+              // The design's 17px header left the scale (app_typography.dart):
+              // it differed from body only in weight, so weight alone carries.
               style: AppText.body.copyWith(
                 color: tokens.textPrimary,
                 fontWeight: AppWeights.medium,
@@ -63,11 +64,7 @@ class ChannelHeader extends ConsumerWidget {
           ),
           if (topic != null && topic!.isNotEmpty) ...[
             const SizedBox(width: AppSpacing.s12),
-            Container(
-              width: 1,
-              height: 20,
-              color: tokens.borderSubtle,
-            ),
+            Container(width: 1, height: 20, color: tokens.borderSubtle),
             const SizedBox(width: AppSpacing.s12),
             Flexible(
               flex: 2,
@@ -92,9 +89,9 @@ class ChannelHeader extends ConsumerWidget {
             icon: AppIcons.members,
             semanticLabel: 'Toggle member list',
             active: membersVisible,
-            onPressed: () => ref
-                .read(memberPaneVisibleProvider.notifier)
-                .state = !membersVisible,
+            onPressed: () =>
+                ref.read(memberPaneVisibleProvider.notifier).state =
+                    !membersVisible,
           ),
         ],
       ),

@@ -57,47 +57,54 @@ class _StubSyncController extends SyncController {
 /// that answers the two endpoints the footer reaches (`/me` for the name and
 /// avatar, `/presence` for a status change) and 404s everything else.
 ({ProviderContainer container, List<http.Request> requests}) _setup(
-    SyncStatus status) {
+  SyncStatus status,
+) {
   final requests = <http.Request>[];
-  final container = ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-    sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-    syncControllerProvider
-        .overrideWith((ref) => _StubSyncController(ref, status)),
-    apiProvider.overrideWith((ref) {
-      final client = api.SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: ref.watch(sessionProvider),
-        httpClient: MockClient((request) async {
-          requests.add(request);
-          if (request.url.path == '/me') {
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+      syncControllerProvider.overrideWith(
+        (ref) => _StubSyncController(ref, status),
+      ),
+      apiProvider.overrideWith((ref) {
+        final client = api.SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: MockClient((request) async {
+            requests.add(request);
+            if (request.url.path == '/me') {
+              return http.Response(
+                jsonEncode({
+                  'id': 'self',
+                  'username': 'self',
+                  'display_name': 'Self',
+                  'created_at': 0,
+                  'permissions': 0,
+                }),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            if (request.url.path == '/presence') {
+              return http.Response(
+                jsonEncode({'visibility': 'hidden'}),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
             return http.Response(
-              jsonEncode({
-                'id': 'self',
-                'username': 'self',
-                'display_name': 'Self',
-                'created_at': 0,
-                'permissions': 0,
-              }),
-              200,
+              '{}',
+              404,
               headers: {'content-type': 'application/json'},
             );
-          }
-          if (request.url.path == '/presence') {
-            return http.Response(
-              jsonEncode({'visibility': 'hidden'}),
-              200,
-              headers: {'content-type': 'application/json'},
-            );
-          }
-          return http.Response('{}', 404,
-              headers: {'content-type': 'application/json'});
-        }),
-      );
-      ref.onDispose(client.close);
-      return client;
-    }),
-  ]);
+          }),
+        );
+        ref.onDispose(client.close);
+        return client;
+      }),
+    ],
+  );
   return (container: container, requests: requests);
 }
 
@@ -111,10 +118,14 @@ Future<void> _pumpFooter(
 }) async {
   tester.view.physicalSize = Size(width * _dpr, _viewHeight * _dpr);
   tester.view.devicePixelRatio = _dpr;
-  tester.view.padding =
-      FakeViewPadding(top: _topInset * _dpr, bottom: _bottomInset * _dpr);
-  tester.view.viewPadding =
-      FakeViewPadding(top: _topInset * _dpr, bottom: _bottomInset * _dpr);
+  tester.view.padding = FakeViewPadding(
+    top: _topInset * _dpr,
+    bottom: _bottomInset * _dpr,
+  );
+  tester.view.viewPadding = FakeViewPadding(
+    top: _topInset * _dpr,
+    bottom: _bottomInset * _dpr,
+  );
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(
@@ -151,8 +162,7 @@ Finder _footerBackground() => find
     .first;
 
 void main() {
-  testWidgets(
-      'tapping the footer avatar opens a status menu offering '
+  testWidgets('tapping the footer avatar opens a status menu offering '
       'every visibility, appear-offline included', (tester) async {
     final setup = _setup(SyncStatus.live);
     addTearDown(setup.container.dispose);
@@ -163,8 +173,11 @@ void main() {
     await tester.tap(find.byType(UserAvatar));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AppMenu), findsOneWidget,
-        reason: 'the avatar had no gesture wrapper at all before this');
+    expect(
+      find.byType(AppMenu),
+      findsOneWidget,
+      reason: 'the avatar had no gesture wrapper at all before this',
+    );
     for (final (_, label, _) in presenceOptions) {
       expect(
         find.descendant(of: find.byType(AppMenu), matching: find.text(label)),
@@ -174,15 +187,17 @@ void main() {
     }
     expect(
       find.descendant(
-          of: find.byType(AppMenu), matching: find.text('Appear offline')),
+        of: find.byType(AppMenu),
+        matching: find.text('Appear offline'),
+      ),
       findsOneWidget,
-      reason: 'appear-offline is the whole point of putting this on the '
+      reason:
+          'appear-offline is the whole point of putting this on the '
           'avatar; it must never be the one that is missing',
     );
   });
 
-  testWidgets(
-      'picking appear offline sends it and stops the footer '
+  testWidgets('picking appear offline sends it and stops the footer '
       'claiming online', (tester) async {
     final setup = _setup(SyncStatus.live);
     addTearDown(setup.container.dispose);
@@ -204,14 +219,15 @@ void main() {
     );
     expect(patches, hasLength(1));
     expect(jsonDecode(patches.first.body), {'visibility': 'hidden'});
-    expect(setup.container.read(presenceVisibilityDisplayProvider),
-        api.PresenceVisibility.hidden);
+    expect(
+      setup.container.read(presenceVisibilityDisplayProvider),
+      api.PresenceVisibility.hidden,
+    );
     expect(find.text('appear offline'), findsOneWidget);
     expect(find.text('online'), findsNothing);
   });
 
-  testWidgets(
-      'a device that is not live reports its connection, not the '
+  testWidgets('a device that is not live reports its connection, not the '
       'chosen status', (tester) async {
     final setup = _setup(SyncStatus.offline);
     addTearDown(setup.container.dispose);
@@ -219,13 +235,16 @@ void main() {
         api.PresenceVisibility.online;
     await _pumpFooter(tester, setup.container);
 
-    expect(find.text('offline'), findsOneWidget,
-        reason: 'claiming a chosen status while nothing is arriving would '
-            'be a lie about the connection');
+    expect(
+      find.text('offline'),
+      findsOneWidget,
+      reason:
+          'claiming a chosen status while nothing is arriving would '
+          'be a lie about the connection',
+    );
   });
 
-  testWidgets(
-      'the footer keeps its content clear of the home indicator '
+  testWidgets('the footer keeps its content clear of the home indicator '
       'while its background reaches the edge', (tester) async {
     final setup = _setup(SyncStatus.live);
     addTearDown(setup.container.dispose);
@@ -236,19 +255,23 @@ void main() {
       lessThanOrEqualTo(_viewHeight - _bottomInset),
       reason: 'the avatar sat under the home indicator before this',
     );
-    expect(tester.getRect(_footerBackground()).bottom, _viewHeight,
-        reason: 'insetting the bar itself would leave a scaffold-coloured '
-            'band below the rail');
+    expect(
+      tester.getRect(_footerBackground()).bottom,
+      _viewHeight,
+      reason:
+          'insetting the bar itself would leave a scaffold-coloured '
+          'band below the rail',
+    );
     expect(
       tester.getRect(_footerBackground()).bottom,
       greaterThan(tester.getRect(find.byType(UserAvatar)).bottom),
-      reason: 'the background has to extend below the content it insets, or '
+      reason:
+          'the background has to extend below the content it insets, or '
           'nothing is painted behind the home indicator',
     );
   });
 
-  testWidgets(
-      'the footer does not overflow with a 44pt avatar target at '
+  testWidgets('the footer does not overflow with a 44pt avatar target at '
       'phone width and larger text', (tester) async {
     for (final scale in [1.0, 1.3]) {
       final setup = _setup(SyncStatus.live);

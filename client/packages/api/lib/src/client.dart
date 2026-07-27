@@ -10,10 +10,8 @@ import 'package:http/http.dart' as http;
 import 'exceptions.dart';
 import 'models.dart';
 
-// Split into companion files purely to stay under this repo's line budget.
-// Each is a `part of` this library rather than its own, since every one of
-// them needs the private `_send` helper below and privacy in Dart is scoped
-// to the library, not the file.
+// Split for the line budget. `part`, not separate libraries: they all need
+// the private `_send` below, and Dart privacy is library-scoped, not file.
 part 'client_admin.dart';
 part 'client_attachments.dart';
 part 'client_channel_admin.dart';
@@ -83,9 +81,7 @@ class SlimmApi {
 
   void close() => _http.close();
 
-  // ---------------------------------------------------------------------------
-  // System
-  // ---------------------------------------------------------------------------
+  // --- System ---
 
   Future<Version> version() async {
     final json = await _send('GET', '/version', authenticated: false);
@@ -101,9 +97,7 @@ class SlimmApi {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Auth
-  // ---------------------------------------------------------------------------
+  // --- Auth ---
 
   /// Creates an account and signs in. On an unclaimed deployment the first
   /// account also becomes its administrator.
@@ -158,10 +152,11 @@ class SlimmApi {
 
   /// Rotates the session. Callers rarely need this directly; an unauthorized
   /// response triggers it automatically.
+  ///
+  /// Concurrent callers share one in-flight rotation: the refresh token is
+  /// single-use, so two rotations would spend it twice and the server would
+  /// treat the second as a leak and revoke the session.
   Future<TokenPair> refresh() {
-    // Share one in-flight rotation: the refresh token is single-use, so two
-    // concurrent rotations would spend it twice and the server would treat the
-    // second as a leak and revoke the session.
     return _refreshInFlight ??= _refreshOnce().whenComplete(() {
       _refreshInFlight = null;
     });
@@ -208,9 +203,7 @@ class SlimmApi {
     session.clear();
   }
 
-  // ---------------------------------------------------------------------------
-  // Channels
-  // ---------------------------------------------------------------------------
+  // --- Channels ---
 
   Future<List<Channel>> listChannels() async {
     final json = await _send('GET', '/channels');
@@ -230,9 +223,7 @@ class SlimmApi {
     return Channel.fromJson(json as Map<String, dynamic>);
   }
 
-  // ---------------------------------------------------------------------------
-  // Messages
-  // ---------------------------------------------------------------------------
+  // --- Messages ---
 
   /// History, newest first. Pass the smallest `seq` already held as [before] to
   /// page backwards.
@@ -291,9 +282,7 @@ class SlimmApi {
     return Message.fromJson(json as Map<String, dynamic>);
   }
 
-  // ---------------------------------------------------------------------------
-  // Read state and sync
-  // ---------------------------------------------------------------------------
+  // --- Read state and sync ---
 
   Future<ReadState> readState(String channelId) async {
     final json = await _send('GET', '/channels/$channelId/read');
@@ -325,9 +314,7 @@ class SlimmApi {
         .toList(growable: false);
   }
 
-  // ---------------------------------------------------------------------------
-  // Devices, blocking, and reporting
-  // ---------------------------------------------------------------------------
+  // --- Devices, blocking, and reporting ---
 
   /// The account's own devices, with the current one flagged.
   Future<List<Device>> listDevices() async {
@@ -411,9 +398,7 @@ class SlimmApi {
     return (json as Map<String, dynamic>)['id'] as String;
   }
 
-  // ---------------------------------------------------------------------------
-  // Push
-  // ---------------------------------------------------------------------------
+  // --- Push ---
 
   /// Registers, or replaces, this device's push registration. The server seals
   /// a content-free envelope to [pushPublicKey]; only this device holds the
@@ -450,9 +435,7 @@ class SlimmApi {
         expectNoContent: true,
       );
 
-  // ---------------------------------------------------------------------------
-  // Transport
-  // ---------------------------------------------------------------------------
+  // --- Transport ---
 
   Future<Object?> _send(
     String method,

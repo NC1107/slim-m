@@ -113,9 +113,8 @@ class _AppListRowState extends State<AppListRow> {
       widget.height ?? 0,
     );
 
-    // The source lifts colour and weight together for `selected || unread`;
-    // the dot below is what keeps unread legible once it is combined with
-    // selected, since the two would otherwise share colour and weight.
+    // The source lifts colour and weight together for `selected || unread`, so
+    // the dot below is what keeps unread legible when both are set at once.
     final emphasised = widget.selected || widget.unread;
     final labelStyle = AppText.ui.copyWith(
       color: emphasised ? tokens.textPrimary : tokens.textSecondary,
@@ -142,8 +141,7 @@ class _AppListRowState extends State<AppListRow> {
           if (widget.leading != null) widget.leading!,
           Expanded(
             // Excluded because the Semantics wrapper below already names this
-            // row. Without this the two merge and a screen reader announces
-            // "general, general".
+            // row; without it a screen reader announces "general, general".
             child: ExcludeSemantics(
               child: Text(widget.label,
                   overflow: TextOverflow.ellipsis, style: labelStyle),

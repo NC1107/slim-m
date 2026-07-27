@@ -259,12 +259,12 @@ async fn an_unusable_code_is_refused_and_leaves_the_username_free() {
     assert!(store.find_credentials("hopeful").await.unwrap().is_some());
 }
 
+/// The HTTP create-invite route does not expose `role_grant` yet, so the
+/// role-carrying invite is built through the store the way an admin console
+/// eventually will.
 #[tokio::test]
 async fn an_invite_that_grants_a_role_applies_it_at_signup() {
     let (store, app, _admin) = claimed().await;
-    // The HTTP create-invite route does not expose role_grant yet, so this
-    // builds the role-carrying invite through the store the way an admin
-    // console eventually will.
     let role = store
         .create_role("moderator", Permissions::MANAGE_MESSAGES, false)
         .await

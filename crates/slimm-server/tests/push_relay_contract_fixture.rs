@@ -354,9 +354,8 @@ async fn push_relay_contract_fixture() {
     let ios_entry = find_entry(messages, REAL_CASE_TOKEN_IOS);
     let android_entry = find_entry(messages, REAL_CASE_TOKEN_ANDROID);
 
-    // Self-check: this is the part of the contract slim-m alone can verify.
-    // A field rename, a dropped field, or a changed kind/platform value
-    // fails right here, in server CI, before it ever reaches the relay.
+    // Self-check: the part of the contract slim-m alone can verify. A rename, a
+    // dropped field or a changed kind/platform fails here, in server CI.
     assert_real_entry_shape(&ios_entry, "ios", REAL_CASE_TOKEN_IOS, &bob_secret);
     assert_real_entry_shape(
         &android_entry,
@@ -365,15 +364,8 @@ async fn push_relay_contract_fixture() {
         &carol_secret,
     );
 
-    // Synthetic edge cases: built by cloning one of the two real entries
-    // above and overriding only the field(s) each case is actually about,
-    // so every other field - "platform" and "kind" for the payload-boundary
-    // cases, "kind" for the unknown-platform case, "platform" for the
-    // unknown-kind case - is a value the server genuinely produced this run
-    // rather than a literal retyped from scratch that could quietly stop
-    // matching what envelope.rs/relay.rs actually emit. The relay must
-    // reject each of these outright (see TestPushRelayContract), not accept
-    // or silently misroute it.
+    // Synthetic edge cases, cloned from a real entry and overridden only where
+    // each case is about it (module doc); `TestPushRelayContract` rejects each.
     let at_limit_payload = "x".repeat(RELAY_MAX_PAYLOAD_BYTES);
     let over_limit_payload = "x".repeat(RELAY_MAX_PAYLOAD_BYTES + 1);
     let synthetic_entries = [

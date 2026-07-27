@@ -18,17 +18,17 @@ const Size _phone = Size(390, 844);
 const Size _desktop = Size(1400, 900);
 
 Channel _channel(String id, String name) => Channel(
-      id: id,
-      name: name,
-      kind: 'text',
-      createdAt: 0,
-      cursor: 0,
-      lastReadSeq: 0,
-    );
+  id: id,
+  name: name,
+  kind: 'text',
+  createdAt: 0,
+  cursor: 0,
+  lastReadSeq: 0,
+);
 
 Finder _createButton() => find.byWidgetPredicate(
-      (w) => w is AppIconButton && w.semanticLabel == 'Create a text channel',
-    );
+  (w) => w is AppIconButton && w.semanticLabel == 'Create a text channel',
+);
 
 Future<void> _pumpRail(WidgetTester tester, Size size) async {
   tester.view.devicePixelRatio = 1;
@@ -53,17 +53,21 @@ Iterable<Size> _sizesOf(WidgetTester tester, Finder finder) =>
     finder.evaluate().map((e) => tester.getSize(find.byWidget(e.widget)));
 
 void main() {
-  testWidgets('the create-channel button meets 44pt at compact width',
-      (tester) async {
+  testWidgets('the create-channel button meets 44pt at compact width', (
+    tester,
+  ) async {
     await _pumpRail(tester, _phone);
 
     expect(_createButton(), findsOneWidget);
-    expect(tester.getSize(_createButton()).shortestSide,
-        greaterThanOrEqualTo(AppSizes.rowTouch));
+    expect(
+      tester.getSize(_createButton()).shortestSide,
+      greaterThanOrEqualTo(AppSizes.rowTouch),
+    );
   });
 
-  testWidgets('the create-channel button stays pointer-sized when expanded',
-      (tester) async {
+  testWidgets('the create-channel button stays pointer-sized when expanded', (
+    tester,
+  ) async {
     await _pumpRail(tester, _desktop);
 
     expect(_createButton(), findsOneWidget);

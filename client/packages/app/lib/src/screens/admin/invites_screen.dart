@@ -110,10 +110,9 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
         ? null
         : DateTime.now().add(duration).millisecondsSinceEpoch;
     try {
-      final invite = await ref.read(apiProvider).createInvite(
-            maxUses: maxUses,
-            expiresAt: expiresAt,
-          );
+      final invite = await ref
+          .read(apiProvider)
+          .createInvite(maxUses: maxUses, expiresAt: expiresAt);
       if (context.mounted) ref.invalidate(invitesProvider);
       if (!mounted) return;
       setState(() {
@@ -188,8 +187,10 @@ class _CreatedInviteCallout extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(invite.code,
-                style: const TextStyle(fontFamily: AppFonts.mono)),
+            child: Text(
+              invite.code,
+              style: const TextStyle(fontFamily: AppFonts.mono),
+            ),
           ),
           AppIconButton(
             icon: AppIcons.copy,
@@ -230,7 +231,8 @@ class _InviteRowState extends ConsumerState<_InviteRow> {
     final confirmed = await confirmDangerousAction(
       context,
       title: 'Revoke this invite?',
-      message: 'Anyone holding "${widget.invite.code}" will no longer be '
+      message:
+          'Anyone holding "${widget.invite.code}" will no longer be '
           'able to redeem it. This cannot be undone.',
       confirmLabel: 'Revoke',
     );
@@ -269,21 +271,28 @@ class _InviteRowState extends ConsumerState<_InviteRow> {
               children: [
                 Row(
                   children: [
-                    Text(invite.code,
-                        style: const TextStyle(fontFamily: AppFonts.mono)),
+                    Text(
+                      invite.code,
+                      style: const TextStyle(fontFamily: AppFonts.mono),
+                    ),
                     const SizedBox(width: AppSpacing.s8),
                     if (invite.revoked)
                       const AppBadge(
-                          variant: AppBadgeVariant.warn, label: 'Revoked')
+                        variant: AppBadgeVariant.warn,
+                        label: 'Revoked',
+                      )
                     else if (!invite.usable)
                       const AppBadge(
-                          variant: AppBadgeVariant.tag, label: 'Expired'),
+                        variant: AppBadgeVariant.tag,
+                        label: 'Expired',
+                      ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.s4),
-                Text('$usesLabel · $expiryLabel',
-                    style:
-                        AppText.caption.copyWith(color: tokens.textSecondary)),
+                Text(
+                  '$usesLabel · $expiryLabel',
+                  style: AppText.caption.copyWith(color: tokens.textSecondary),
+                ),
               ],
             ),
           ),

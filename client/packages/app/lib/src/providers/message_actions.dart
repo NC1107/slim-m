@@ -53,15 +53,17 @@ bool hasReacted(WidgetRef ref, String messageId, String emoji) => ref
 /// reactions are: `poll.voted` never reports back who voted, only the
 /// refreshed tally, so the voter's own [api.Poll.votedOption] would
 /// otherwise never update on their own screen.
+///
+/// A failed request is swallowed rather than reverted. There is no clean revert
+/// for a vote the way there is for a reaction, since the previous choice is
+/// already folded into the locally merged tally, so this leans on the next
+/// `poll.voted` broadcast or re-fetch to correct the screen.
 Future<void> castVote(WidgetRef ref, String messageId, int option) async {
   ref.read(messageExtrasProvider.notifier).applyLocalVote(messageId, option);
   try {
     await ref.read(apiProvider).votePoll(messageId: messageId, option: option);
   } on api.ApiException {
-    // Best-effort: the next poll.voted broadcast or a re-fetch corrects
-    // this. There is no clean revert for a vote the way there is for a
-    // reaction, since the previous choice is already folded into the
-    // locally merged tally.
+    // Best-effort: the next tally corrects this, and a vote has no clean revert.
   }
 }
 
@@ -107,8 +109,13 @@ bool canBlockMessageAuthor(Message message, String? myUserId) =>
 /// a live `message.edited` event would, so the row's own edited marker
 /// updates without waiting for that broadcast to loop back.
 Future<void> editMessageAction(
-    WidgetRef ref, Message message, String content) async {
-  final updated = await ref.read(apiProvider).editMessage(
+  WidgetRef ref,
+  Message message,
+  String content,
+) async {
+  final updated = await ref
+      .read(apiProvider)
+      .editMessage(
         channelId: message.channelId,
         messageId: message.id,
         content: content,
@@ -122,10 +129,9 @@ Future<void> editMessageAction(
 /// from this device immediately rather than waiting for the `message.deleted`
 /// broadcast [SyncController] applies the same way.
 Future<void> deleteMessageAction(WidgetRef ref, Message message) async {
-  await ref.read(apiProvider).deleteMessage(
-        channelId: message.channelId,
-        messageId: message.id,
-      );
+  await ref
+      .read(apiProvider)
+      .deleteMessage(channelId: message.channelId, messageId: message.id);
   final store = await ref.read(storeProvider.future);
   await store.discard(message.id);
 }

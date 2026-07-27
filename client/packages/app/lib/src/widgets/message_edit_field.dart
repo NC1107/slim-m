@@ -58,7 +58,9 @@ class _MessageEditFieldState extends State<MessageEditField> {
       },
       child: Container(
         padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
+          horizontal: AppSpacing.s8,
+          vertical: AppSpacing.s4,
+        ),
         decoration: BoxDecoration(
           color: tokens.surfaceRaised,
           border: Border.all(color: tokens.accentFill),
@@ -91,7 +93,9 @@ class _MessageEditFieldState extends State<MessageEditField> {
                 ),
                 const Spacer(),
                 TextButton(
-                    onPressed: widget.onCancel, child: const Text('Cancel')),
+                  onPressed: widget.onCancel,
+                  child: const Text('Cancel'),
+                ),
                 TextButton(onPressed: _submit, child: const Text('Save')),
               ],
             ),

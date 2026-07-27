@@ -56,12 +56,12 @@ class ReactionsRow extends StatelessWidget {
   /// existing reactions without it.
   final bool showAddButton;
 
+  /// The design shows a reactions row only on a message that has one. A
+  /// permanent add-button under every message costs a row of vertical space
+  /// each and turns a quiet list into a grid of identical glyphs, so the
+  /// affordance belongs on hover with the row absent until then.
   @override
   Widget build(BuildContext context) {
-    // The design shows a reactions row only on a message that has one. A
-    // permanent add-button under every message costs a row of vertical space
-    // each and turns a quiet list into a grid of identical glyphs; the
-    // affordance belongs on hover, with the row absent until then.
     if (reactions.isEmpty && !showAddButton) return const SizedBox.shrink();
 
     return Padding(
@@ -123,11 +123,16 @@ class FailedRow extends StatelessWidget {
       padding: const EdgeInsets.only(top: AppSpacing.s4),
       child: Row(
         children: [
-          Icon(AppIcons.failed,
-              size: AppSizes.icon16, color: tokens.dangerText),
+          Icon(
+            AppIcons.failed,
+            size: AppSizes.icon16,
+            color: tokens.dangerText,
+          ),
           const SizedBox(width: AppSpacing.s8),
-          Text('Not sent.',
-              style: AppText.caption.copyWith(color: tokens.dangerText)),
+          Text(
+            'Not sent.',
+            style: AppText.caption.copyWith(color: tokens.dangerText),
+          ),
           TextButton(onPressed: onRetry, child: const Text('Retry')),
           TextButton(onPressed: onDiscard, child: const Text('Discard')),
         ],

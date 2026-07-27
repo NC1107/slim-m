@@ -128,82 +128,83 @@ class MessageRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _HoverReveal(
-        builder: (context, hovered) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (showNewDivider) const NewMessagesDivider(),
-                MessageContextMenuRegion(
-                  content: message.content,
-                  actions: actions,
-                  onAddReaction: () =>
-                      showEmojiPickerSheet(context, onSelect: onPickReaction),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _Leading(
-                            grouped: grouped,
-                            isWebhook: isWebhook,
-                            message: message),
-                        const SizedBox(width: AppSpacing.s12),
-                        Expanded(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(
-                                maxWidth: kMessageColumnMax),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (!grouped)
-                                  _Header(
-                                      message: message, isWebhook: isWebhook),
-                                editing
-                                    ? MessageEditField(
-                                        initialContent: message.content,
-                                        onSubmit: onSubmitEdit,
-                                        onCancel: onCancelEdit,
-                                      )
-                                    : MessageBody(
-                                        content: message.content,
-                                        knownUsernames: knownUsernames,
-                                        dim: _unsent,
-                                      ),
-                                if (message.editedAt != null && !editing)
-                                  const EditedMarker(),
-                                if (poll != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                        top: AppSpacing.s4),
-                                    child:
-                                        PollView(poll: poll!, onVote: onVote),
-                                  ),
-                                for (final attachment in attachments)
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                        top: AppSpacing.s4),
-                                    child:
-                                        AttachmentView(attachment: attachment),
-                                  ),
-                                if (!_unsent)
-                                  ReactionsRow(
-                                    reactions: reactions,
-                                    onReactionTap: onReactionTap,
-                                    onPickReaction: onPickReaction,
-                                    showAddButton: hovered,
-                                  ),
-                                if (message.failed)
-                                  FailedRow(
-                                      onRetry: onRetry, onDiscard: onDiscard),
-                              ],
+      builder: (context, hovered) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (showNewDivider) const NewMessagesDivider(),
+          MessageContextMenuRegion(
+            content: message.content,
+            actions: actions,
+            onAddReaction: () =>
+                showEmojiPickerSheet(context, onSelect: onPickReaction),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Leading(
+                    grouped: grouped,
+                    isWebhook: isWebhook,
+                    message: message,
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  Expanded(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: kMessageColumnMax,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (!grouped)
+                            _Header(message: message, isWebhook: isWebhook),
+                          editing
+                              ? MessageEditField(
+                                  initialContent: message.content,
+                                  onSubmit: onSubmitEdit,
+                                  onCancel: onCancelEdit,
+                                )
+                              : MessageBody(
+                                  content: message.content,
+                                  knownUsernames: knownUsernames,
+                                  dim: _unsent,
+                                ),
+                          if (message.editedAt != null && !editing)
+                            const EditedMarker(),
+                          if (poll != null)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                top: AppSpacing.s4,
+                              ),
+                              child: PollView(poll: poll!, onVote: onVote),
                             ),
-                          ),
-                        ),
-                      ],
+                          for (final attachment in attachments)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                top: AppSpacing.s4,
+                              ),
+                              child: AttachmentView(attachment: attachment),
+                            ),
+                          if (!_unsent)
+                            ReactionsRow(
+                              reactions: reactions,
+                              onReactionTap: onReactionTap,
+                              onPickReaction: onPickReaction,
+                              showAddButton: hovered,
+                            ),
+                          if (message.failed)
+                            FailedRow(onRetry: onRetry, onDiscard: onDiscard),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ));
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -248,11 +249,7 @@ class _HoverRevealState extends State<_HoverReveal> {
 /// which unmounts the control and the popup with it - so the thing can be opened
 /// and never clicked.
 class HoverRevealScope extends InheritedWidget {
-  const HoverRevealScope({
-    super.key,
-    required this.pin,
-    required super.child,
-  });
+  const HoverRevealScope({super.key, required this.pin, required super.child});
 
   final ValueChanged<bool> pin;
 
@@ -265,8 +262,11 @@ class HoverRevealScope extends InheritedWidget {
 }
 
 class _Leading extends StatelessWidget {
-  const _Leading(
-      {required this.grouped, required this.isWebhook, required this.message});
+  const _Leading({
+    required this.grouped,
+    required this.isWebhook,
+    required this.message,
+  });
 
   final bool grouped;
   final bool isWebhook;
@@ -305,8 +305,11 @@ class _Leading extends StatelessWidget {
           border: Border.all(color: tokens.borderSubtle),
           borderRadius: BorderRadius.circular(AppRadii.control),
         ),
-        child: Icon(AppIcons.code,
-            size: AppSizes.icon20, color: tokens.textSecondary),
+        child: Icon(
+          AppIcons.code,
+          size: AppSizes.icon20,
+          color: tokens.textSecondary,
+        ),
       );
     }
 

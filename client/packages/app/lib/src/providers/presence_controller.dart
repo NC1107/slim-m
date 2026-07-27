@@ -57,7 +57,8 @@ class PresenceController extends StateNotifier<Map<String, api.PresenceState>> {
 /// so there is no reason to lose it and refetch every time the pane toggles.
 final presenceControllerProvider =
     StateNotifierProvider<PresenceController, Map<String, api.PresenceState>>(
-        (ref) => PresenceController(ref));
+      (ref) => PresenceController(ref),
+    );
 
 /// The caller's own visibility choice as far as this client knows it, or null
 /// for "not known", which is the state every launch starts in.

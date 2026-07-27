@@ -29,7 +29,8 @@ class AppearanceSettingsSection extends ConsumerWidget {
       children: [
         const SettingsSectionHeader(
           'Appearance',
-          description: 'Following the system picks light or dark, never true '
+          description:
+              'Following the system picks light or dark, never true '
               'black: that one is a choice for an OLED screen.',
         ),
         Padding(
@@ -58,9 +59,9 @@ class AppearanceSettingsSection extends ConsumerWidget {
   }
 
   String _labelFor(AppThemeChoice choice) => switch (choice) {
-        AppThemeChoice.system => 'System',
-        AppThemeChoice.light => 'Light',
-        AppThemeChoice.dark => 'Dark',
-        AppThemeChoice.trueBlack => 'True black',
-      };
+    AppThemeChoice.system => 'System',
+    AppThemeChoice.light => 'Light',
+    AppThemeChoice.dark => 'Dark',
+    AppThemeChoice.trueBlack => 'True black',
+  };
 }

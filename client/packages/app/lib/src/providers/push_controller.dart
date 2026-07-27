@@ -15,22 +15,25 @@ import 'providers.dart';
 /// The native bridge for this device's APNs token. A provider, rather than a
 /// field [PushController] constructs itself, so a test can substitute one
 /// that does not depend on the test runner actually being iOS.
-final apnsTokenChannelProvider =
-    Provider<ApnsTokenChannel>((ref) => ApnsTokenChannel());
+final apnsTokenChannelProvider = Provider<ApnsTokenChannel>(
+  (ref) => ApnsTokenChannel(),
+);
 
 /// The bridge for this device's FCM registration token, Android's
 /// counterpart to [apnsTokenChannelProvider]. A provider for the same
 /// reason: a test can substitute one that does not depend on the test
 /// runner actually being Android.
-final fcmTokenChannelProvider =
-    Provider<FcmTokenChannel>((ref) => FcmTokenChannel());
+final fcmTokenChannelProvider = Provider<FcmTokenChannel>(
+  (ref) => FcmTokenChannel(),
+);
 
 /// The seam onto Android's local-notification channel: creating it, and
 /// asking for runtime permission to use it. A provider, for the same reason
 /// as the two above - a test can substitute one that reports "denied"
 /// without a real Android device or plugin channel behind it.
-final localNotificationsProvider =
-    Provider<LocalNotifications>((ref) => LocalNotifications());
+final localNotificationsProvider = Provider<LocalNotifications>(
+  (ref) => LocalNotifications(),
+);
 
 /// This device's push registration state, plain enough to read at a glance
 /// off the settings screen rather than guessing from server logs, which is
@@ -69,15 +72,15 @@ enum PushStatus {
 /// A plain-English label for [PushStatus], for the settings screen.
 extension PushStatusLabel on PushStatus {
   String get label => switch (this) {
-        PushStatus.notSignedIn => 'Not signed in',
-        PushStatus.unsupportedPlatform => 'Not available on this device',
-        PushStatus.noTokenYet => 'Waiting on the notification permission',
-        PushStatus.registrationFailed => 'The device could not register',
-        PushStatus.serverError => 'Could not reach the server',
-        PushStatus.registered => 'Registered for notifications',
-        PushStatus.registeredNotificationsBlocked =>
-          'Registered, but notifications are blocked in system settings',
-      };
+    PushStatus.notSignedIn => 'Not signed in',
+    PushStatus.unsupportedPlatform => 'Not available on this device',
+    PushStatus.noTokenYet => 'Waiting on the notification permission',
+    PushStatus.registrationFailed => 'The device could not register',
+    PushStatus.serverError => 'Could not reach the server',
+    PushStatus.registered => 'Registered for notifications',
+    PushStatus.registeredNotificationsBlocked =>
+      'Registered, but notifications are blocked in system settings',
+  };
 }
 
 /// Registers this device's push token and encryption public key, and reports
@@ -122,16 +125,13 @@ class PushController extends StateNotifier<PushStatus>
       }
     });
     // Kept for this controller's whole life, not just while registered: a
-    // failed attempt (denied permission, a slow token, a server that was down)
-    // still needs to hear about the next resume to retry.
+    // failed attempt still needs the next resume to retry on.
     WidgetsBinding.instance.addObserver(this);
     _lastSignedIn = session.isSignedIn;
     if (_lastSignedIn) unawaited(register());
 
-    // FCM only ever rotates a token on Android; [FcmTokenChannel.onTokenRefresh]
-    // is a permanently empty stream everywhere else, so subscribing
-    // unconditionally here costs nothing on iOS or desktop and needs no
-    // platform check of its own.
+    // FcmTokenChannel.onTokenRefresh is permanently empty off Android, so this
+    // costs nothing on iOS or desktop and needs no platform check of its own.
     _fcmRefreshSubscription = _fcmTokenRefreshStream().listen((token) {
       if (_ref.read(sessionProvider).isSignedIn) {
         unawaited(_reregisterAndroid(token));
@@ -144,15 +144,17 @@ class PushController extends StateNotifier<PushStatus>
   late final StreamSubscription<String> _fcmRefreshSubscription;
   bool _lastSignedIn = false;
   Future<void>? _registering;
-  // Android's most recently rotated token, when it landed while a
-  // registration was already in flight and so could not be part of it: set
-  // the moment that happens, and consumed by that in-flight attempt's own
-  // completion handler, which starts a follow-up for it. See
-  // _reregisterAndroid and _runRegistering.
+
+  /// Android's most recently rotated token, when it landed while a
+  /// registration was already in flight and so could not be part of it: set
+  /// the moment that happens, and consumed by that in-flight attempt's own
+  /// completion handler, which starts a follow-up for it. See
+  /// [_reregisterAndroid] and [_runRegistering].
   String? _pendingAndroidToken;
-  // Keeps the server's foreground guess from ever crossing its own one-
-  // minute staleness window during a single long-lived foreground session;
-  // see _reportLifecycle.
+
+  /// Keeps the server's foreground guess from ever crossing its own one-minute
+  /// staleness window during a single long-lived foreground session; see
+  /// [_reportLifecycle].
   Timer? _foregroundHeartbeat;
 
   /// [fcmTokenChannelProvider]'s rotation stream, guarded against the getter
@@ -214,26 +216,29 @@ class PushController extends StateNotifier<PushStatus>
       final pendingToken = _pendingAndroidToken;
       if (pendingToken != null) {
         _pendingAndroidToken = null;
-        unawaited(_runRegistering(() =>
-            _registerWithServer(platform: 'android', token: pendingToken)));
+        unawaited(
+          _runRegistering(
+            () => _registerWithServer(platform: 'android', token: pendingToken),
+          ),
+        );
       }
     });
     _registering = future;
     return future;
   }
 
+  /// Asks the iOS channel first. On a real device exactly one of the two ever
+  /// reports anything other than "unsupported" (a device is never both iOS and
+  /// Android), so an iOS answer that is not a bare "unsupported" is this
+  /// device's whole story and the Android channel is never consulted. Only when
+  /// iOS is definitively not it - including on Linux desktop, where nothing is
+  /// - does the Android channel get to decide the state.
   Future<void> _registerOnce() async {
     if (!_ref.read(sessionProvider).isSignedIn) {
       state = PushStatus.notSignedIn;
       return;
     }
 
-    // Ask the iOS channel first; on a real device exactly one of these two
-    // ever reports anything other than "unsupported" (a device is never both
-    // iOS and Android), so an iOS answer that is not a bare "unsupported" is
-    // this device's whole story and the Android channel is never consulted.
-    // Only when iOS is definitively not it - including on Linux desktop,
-    // where nothing is - does the Android channel get to decide the state.
     final iosResult = await _ref.read(apnsTokenChannelProvider).fetch();
     if (iosResult is! ApnsUnsupported) {
       await _applyIosResult(iosResult);
@@ -257,6 +262,16 @@ class PushController extends StateNotifier<PushStatus>
     }
   }
 
+  /// Notification permission is requested here, in the foreground app that is
+  /// about to register this token, never from `LocalNotifications.show`: that
+  /// also runs in FCM's Activity-less background isolate, where asking throws
+  /// instead of prompting anyone.
+  ///
+  /// Registration happens regardless of the answer - a permission granted later
+  /// needs a token already on file to do any good - but the answer decides
+  /// which of [PushStatus.registered] or
+  /// [PushStatus.registeredNotificationsBlocked] this reports, so the settings
+  /// screen tells the truth about whether anything will actually show.
   Future<void> _applyAndroidResult(FcmTokenResult result) async {
     switch (result) {
       case FcmUnsupported():
@@ -264,15 +279,6 @@ class PushController extends StateNotifier<PushStatus>
       case FcmRegistrationFailed():
         state = PushStatus.registrationFailed;
       case FcmTokenReady(:final token):
-        // Requested here, in the foreground app that is about to register
-        // this token, never from LocalNotifications.show: that runs in
-        // FCM's Activity-less background isolate too, where asking throws
-        // instead of prompting anyone. Still registers regardless of the
-        // answer - a permission granted later needs a token already on
-        // file to do any good - but the answer decides which of
-        // [PushStatus.registered] or [PushStatus.registeredNotificationsBlocked]
-        // this ends up reporting, so the settings screen tells the truth
-        // about whether anything will actually show.
         final permitted = await _requestAndroidPermission();
         await _registerWithServer(platform: 'android', token: token);
         if (!permitted && state == PushStatus.registered) {
@@ -318,9 +324,16 @@ class PushController extends StateNotifier<PushStatus>
       return inFlight;
     }
     return _runRegistering(
-        () => _registerWithServer(platform: 'android', token: token));
+      () => _registerWithServer(platform: 'android', token: token),
+    );
   }
 
+  /// Reports the current lifecycle state immediately after a successful
+  /// registration, because Flutter does not replay it to an observer added
+  /// earlier and the server treats a foreground report as stale after a minute.
+  /// Without that the app can sit freshly registered but never known to be
+  /// foreground, so every message pushes a notification to the screen the user
+  /// is already looking at.
   Future<void> _registerWithServer({
     required String platform,
     required String token,
@@ -329,17 +342,14 @@ class PushController extends StateNotifier<PushStatus>
       final keyStore = _ref.read(keyStoreProvider);
       final publicKey = await DevicePushKeys(keyStore).publicKeyBase64();
 
-      await _ref.read(apiProvider).registerPush(
+      await _ref
+          .read(apiProvider)
+          .registerPush(
             platform: platform,
             pushToken: token,
             pushPublicKey: publicKey,
           );
       state = PushStatus.registered;
-      // Flutter does not replay the current lifecycle state to an observer
-      // added earlier, and the server treats a foreground report as stale
-      // after a minute. Without this the app can sit freshly registered but
-      // never known to be foreground, so every message pushes a notification
-      // to the screen the user is already looking at.
       final current =
           WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed;
       unawaited(_reportLifecycle(_stateLabel(current)));
@@ -353,17 +363,20 @@ class PushController extends StateNotifier<PushStatus>
   /// background would notify someone who is looking straight at the screen, so
   /// only a genuinely hidden app counts as background.
   static String _stateLabel(AppLifecycleState state) => switch (state) {
-        AppLifecycleState.resumed || AppLifecycleState.inactive => 'foreground',
-        _ => 'background',
-      };
+    AppLifecycleState.resumed || AppLifecycleState.inactive => 'foreground',
+    _ => 'background',
+  };
 
+  /// A resume retries registration when this device is not registered yet. A
+  /// denied permission, a token that had not arrived, or a server that was
+  /// briefly unreachable all self-heal the same way: try again the next time
+  /// the user opens the app, rather than staying silent until the next full
+  /// sign-in.
+  ///
+  /// Note `this.state` is the push status while the bare `state` parameter is
+  /// the lifecycle transition being reported.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // A denied permission, a token that had not arrived yet, or a server that
-    // was briefly unreachable all self-heal the same way: try again next time
-    // the user opens the app, rather than staying silent until the next full
-    // sign-in. `this.state` is the push status; the bare `state` parameter is
-    // the lifecycle transition being reported.
     if (state == AppLifecycleState.resumed &&
         this.state != PushStatus.registered) {
       unawaited(register());
@@ -377,20 +390,21 @@ class PushController extends StateNotifier<PushStatus>
   /// Called on sign-out, while the owning session is still valid, and clears
   /// the local key too so the next account signed into this device gets a
   /// fresh one rather than inheriting this account's.
+  ///
+  /// Neither step is allowed to throw. An unreachable server or a failing key
+  /// store must not abort sign-out mid-way and strand the user on the settings
+  /// screen with sync already stopped; the server-side registration is cleared
+  /// on session revocation anyway.
   Future<void> unregister() async {
     try {
       await _ref.read(apiProvider).unregisterPush();
     } catch (_) {
-      // A server that cannot be reached still must not strand the user on the
-      // settings screen; the registration is cleared server-side on session
-      // revocation anyway.
+      // Must not strand the user mid-sign-out; see the doc above.
     }
     try {
       await _ref.read(keyStoreProvider).delete(devicePushKeyHandle);
     } catch (_) {
-      // Same reasoning as above: a key-store failure here must not abort
-      // sign-out mid-way and leave sync already stopped but the session, and
-      // the user, still stuck on the settings screen.
+      // Same reasoning as above.
     }
     _stopForegroundHeartbeat();
     state = PushStatus.notSignedIn;
@@ -443,4 +457,5 @@ class PushController extends StateNotifier<PushStatus>
 
 final pushControllerProvider =
     StateNotifierProvider<PushController, PushStatus>(
-        (ref) => PushController(ref));
+      (ref) => PushController(ref),
+    );

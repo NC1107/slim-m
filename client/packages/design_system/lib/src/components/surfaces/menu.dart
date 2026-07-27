@@ -161,8 +161,7 @@ class _AppMenuItemState extends State<AppMenuItem> {
     final touch = widget.touch ?? AppTouchTargets.of(context);
     final ink = _toneColor(tokens);
     // The source dims the icon to text-secondary for the normal tone even
-    // though the label itself is text-primary; warn/danger keep the icon in
-    // step with the label colour.
+    // though the label is text-primary; warn/danger keep icon and label in step.
     final iconInk =
         widget.tone == AppMenuItemTone.normal ? tokens.textSecondary : ink;
 

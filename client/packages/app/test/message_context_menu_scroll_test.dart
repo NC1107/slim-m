@@ -34,51 +34,50 @@ const _noActions = MessageActions(
 );
 
 Message _message(int index) => Message(
-      id: 'm$index',
-      channelId: 'c1',
-      authorId: 'author-$index',
-      authorDisplayName: 'Priya',
-      seq: index,
-      content: 'message $index',
-      createdAt: 1700000000000 + index,
-      pending: false,
-      failed: false,
-    );
+  id: 'm$index',
+  channelId: 'c1',
+  authorId: 'author-$index',
+  authorDisplayName: 'Priya',
+  seq: index,
+  content: 'message $index',
+  createdAt: 1700000000000 + index,
+  pending: false,
+  failed: false,
+);
 
 /// A list long enough to scroll, with each row keyed so the finder still
 /// resolves to the same one after the viewport has moved.
 Widget _harness() => ProviderScope(
-      child: MaterialApp(
-        theme: buildTheme(Brightness.light, AppTokens.light),
-        home: Scaffold(
-          body: ListView(
-            children: [
-              for (var i = 0; i < 40; i++)
-                MessageRow(
-                  key: ValueKey('row-$i'),
-                  message: _message(i),
-                  grouped: false,
-                  showNewDivider: false,
-                  knownUsernames: const {},
-                  onRetry: _noop,
-                  onDiscard: _noop,
-                  onPickReaction: (_) {},
-                  onReactionTap: (_) {},
-                  onVote: (_) {},
-                  actions: _noActions,
-                  editing: false,
-                  onSubmitEdit: (_) {},
-                  onCancelEdit: _noop,
-                ),
-            ],
-          ),
-        ),
+  child: MaterialApp(
+    theme: buildTheme(Brightness.light, AppTokens.light),
+    home: Scaffold(
+      body: ListView(
+        children: [
+          for (var i = 0; i < 40; i++)
+            MessageRow(
+              key: ValueKey('row-$i'),
+              message: _message(i),
+              grouped: false,
+              showNewDivider: false,
+              knownUsernames: const {},
+              onRetry: _noop,
+              onDiscard: _noop,
+              onPickReaction: (_) {},
+              onReactionTap: (_) {},
+              onVote: (_) {},
+              actions: _noActions,
+              editing: false,
+              onSubmitEdit: (_) {},
+              onCancelEdit: _noop,
+            ),
+        ],
       ),
-    );
+    ),
+  ),
+);
 
 void main() {
-  testWidgets(
-      'a wheel scroll closes the menu instead of stranding it over '
+  testWidgets('a wheel scroll closes the menu instead of stranding it over '
       'another message', (tester) async {
     await tester.pumpWidget(_harness());
 
@@ -88,12 +87,19 @@ void main() {
     );
     final anchor = tester.getTopLeft(region) + const Offset(30, 30);
 
-    await tester.tapAt(anchor,
-        buttons: kSecondaryButton, kind: PointerDeviceKind.mouse);
+    await tester.tapAt(
+      anchor,
+      buttons: kSecondaryButton,
+      kind: PointerDeviceKind.mouse,
+    );
     await tester.pumpAndSettle();
-    expect(find.byType(AppMenu), findsOneWidget,
-        reason: 'the right-click has to open a menu for the rest to mean '
-            'anything');
+    expect(
+      find.byType(AppMenu),
+      findsOneWidget,
+      reason:
+          'the right-click has to open a menu for the rest to mean '
+          'anything',
+    );
     final rowBefore = tester.getRect(region);
 
     // Well clear of the menu's own 200pt-wide column, which has a scroll view
@@ -103,12 +109,20 @@ void main() {
     await tester.sendEventToBinding(pointer.scroll(const Offset(0, 150)));
     await tester.pumpAndSettle();
 
-    expect(tester.getRect(region).top, lessThan(rowBefore.top),
-        reason: 'the wheel must actually move the list, or this test proves '
-            'nothing about what the menu did while it moved');
-    expect(find.byType(AppMenu), findsNothing,
-        reason: 'a menu left open after its row has moved is anchored to '
-            'whatever message now sits where that row was');
+    expect(
+      tester.getRect(region).top,
+      lessThan(rowBefore.top),
+      reason:
+          'the wheel must actually move the list, or this test proves '
+          'nothing about what the menu did while it moved',
+    );
+    expect(
+      find.byType(AppMenu),
+      findsNothing,
+      reason:
+          'a menu left open after its row has moved is anchored to '
+          'whatever message now sits where that row was',
+    );
   });
 
   testWidgets('a menu that was never open survives a scroll', (tester) async {

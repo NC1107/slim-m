@@ -45,39 +45,46 @@ class _StubSyncController extends SyncController {
   Future<void> start() async {}
 }
 
-ProviderContainer _container() => ProviderContainer(overrides: [
-      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-      syncControllerProvider.overrideWith(_StubSyncController.new),
-      apiProvider.overrideWith((ref) {
-        final client = api.SlimmApi(
-          baseUrl: Uri.parse('http://localhost:8080'),
-          session: ref.watch(sessionProvider),
-          httpClient: MockClient((request) async {
-            if (request.url.path == '/me') {
-              return http.Response(
-                jsonEncode({
-                  'id': 'self',
-                  'username': 'self',
-                  'display_name': 'Self',
-                  'created_at': 0,
-                  'permissions': 0,
-                }),
-                200,
-                headers: {'content-type': 'application/json'},
-              );
-            }
-            return http.Response('{}', 404,
-                headers: {'content-type': 'application/json'});
-          }),
-        );
-        ref.onDispose(client.close);
-        return client;
-      }),
-    ]);
+ProviderContainer _container() => ProviderContainer(
+  overrides: [
+    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+    sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+    syncControllerProvider.overrideWith(_StubSyncController.new),
+    apiProvider.overrideWith((ref) {
+      final client = api.SlimmApi(
+        baseUrl: Uri.parse('http://localhost:8080'),
+        session: ref.watch(sessionProvider),
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/me') {
+            return http.Response(
+              jsonEncode({
+                'id': 'self',
+                'username': 'self',
+                'display_name': 'Self',
+                'created_at': 0,
+                'permissions': 0,
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response(
+            '{}',
+            404,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      ref.onDispose(client.close);
+      return client;
+    }),
+  ],
+);
 
 Future<void> _pumpFooter(
-    WidgetTester tester, ProviderContainer container) async {
+  WidgetTester tester,
+  ProviderContainer container,
+) async {
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -97,26 +104,34 @@ void main() {
     final container = _container();
     addTearDown(container.dispose);
 
-    expect(container.read(presenceVisibilityDisplayProvider), isNull,
-        reason: 'defaulting to online asserts a stored choice this client has '
-            'no endpoint to read back');
+    expect(
+      container.read(presenceVisibilityDisplayProvider),
+      isNull,
+      reason:
+          'defaulting to online asserts a stored choice this client has '
+          'no endpoint to read back',
+    );
   });
 
-  testWidgets(
-      'the footer reports the connection rather than claiming online '
+  testWidgets('the footer reports the connection rather than claiming online '
       'before any choice is made', (tester) async {
     final container = _container();
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(find.text('online'), findsNothing,
-        reason: 'a user who chose appear-offline last week is still hidden '
-            'server-side; telling them they are online is the privacy lie');
+    expect(
+      find.text('online'),
+      findsNothing,
+      reason:
+          'a user who chose appear-offline last week is still hidden '
+          'server-side; telling them they are online is the privacy lie',
+    );
     expect(find.text('connected'), findsOneWidget);
   });
 
-  testWidgets('the status menu marks nothing current until a choice is made',
-      (tester) async {
+  testWidgets('the status menu marks nothing current until a choice is made', (
+    tester,
+  ) async {
     final container = _container();
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
@@ -124,18 +139,25 @@ void main() {
     await tester.tap(find.byType(UserAvatar));
     await tester.pumpAndSettle();
 
-    final items = tester.widgetList<AppMenuItem>(find.descendant(
-      of: find.byType(AppMenu),
-      matching: find.byType(AppMenuItem),
-    ));
+    final items = tester.widgetList<AppMenuItem>(
+      find.descendant(
+        of: find.byType(AppMenu),
+        matching: find.byType(AppMenuItem),
+      ),
+    );
     expect(items, hasLength(presenceOptions.length));
-    expect(items.where((item) => item.selected), isEmpty,
-        reason: 'a tick here reads as "this is your current setting", which '
-            'is exactly what this client cannot know');
+    expect(
+      items.where((item) => item.selected),
+      isEmpty,
+      reason:
+          'a tick here reads as "this is your current setting", which '
+          'is exactly what this client cannot know',
+    );
   });
 
-  testWidgets('a choice made in this session is shown as current',
-      (tester) async {
+  testWidgets('a choice made in this session is shown as current', (
+    tester,
+  ) async {
     final container = _container();
     addTearDown(container.dispose);
     container.read(presenceVisibilityDisplayProvider.notifier).state =
@@ -148,10 +170,12 @@ void main() {
     await tester.pumpAndSettle();
 
     final selected = tester
-        .widgetList<AppMenuItem>(find.descendant(
-          of: find.byType(AppMenu),
-          matching: find.byType(AppMenuItem),
-        ))
+        .widgetList<AppMenuItem>(
+          find.descendant(
+            of: find.byType(AppMenu),
+            matching: find.byType(AppMenuItem),
+          ),
+        )
         .where((item) => item.selected);
     expect(selected.map((item) => item.label), ['Appear offline']);
   });

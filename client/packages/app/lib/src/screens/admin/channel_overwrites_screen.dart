@@ -122,7 +122,9 @@ class _ChannelOverwritesScreenState
     }
     setState(() => _busy = true);
     try {
-      await ref.read(apiProvider).setChannelOverwrite(
+      await ref
+          .read(apiProvider)
+          .setChannelOverwrite(
             channelId: _channel!.id,
             kind: _kind,
             id: _targetId!,
@@ -147,7 +149,8 @@ class _ChannelOverwritesScreenState
     final confirmed = await confirmDangerousAction(
       context,
       title: 'Clear this overwrite?',
-      message: 'Every permission for $_targetLabel in "${_channel!.name}" '
+      message:
+          'Every permission for $_targetLabel in "${_channel!.name}" '
           'goes back to inheriting from their roles. This cannot be undone.',
       confirmLabel: 'Clear',
     );
@@ -155,7 +158,9 @@ class _ChannelOverwritesScreenState
 
     setState(() => _busy = true);
     try {
-      await ref.read(apiProvider).deleteChannelOverwrite(
+      await ref
+          .read(apiProvider)
+          .deleteChannelOverwrite(
             channelId: _channel!.id,
             kind: _kind,
             id: _targetId!,
@@ -175,14 +180,14 @@ class _ChannelOverwritesScreenState
     }
   }
 
+  /// [myPermissionsProvider] is a floor here, not the exact figure. The server
+  /// checks "allow" against the caller's effective permissions in this specific
+  /// channel, which a per-channel overwrite of the caller's own can raise above
+  /// their base set. There is no endpoint to read that per-channel figure, so
+  /// this uses the base (deployment-level) set from `/me` as a safe, possibly
+  /// stricter, stand-in.
   @override
   Widget build(BuildContext context) {
-    // A floor, not the exact figure: the server checks "allow" against the
-    // caller's effective permissions in this specific channel, which a
-    // per-channel overwrite of the caller's own can raise above their base
-    // set. There is no endpoint to read that per-channel figure, so this
-    // uses the base (deployment-level) set from `/me` as a safe, possibly
-    // stricter, stand-in.
     final myPermissions = ref.watch(myPermissionsProvider);
 
     return Scaffold(
@@ -211,9 +216,10 @@ class _ChannelOverwritesScreenState
             const SizedBox(height: AppSpacing.s16),
             AppCard(
               title: 'Channel',
-              // The card's own background sits between a bare ListTile and the
-              // Scaffold's Material, which swallows its ink splash; a
-              // transparent Material here gives the splash somewhere to paint.
+
+              /// The card's own background sits between a bare ListTile and the
+              /// Scaffold's Material, which swallows its ink splash; a
+              /// transparent Material here gives the splash somewhere to paint.
               child: Material(
                 type: MaterialType.transparency,
                 child: ListTile(
@@ -247,8 +253,10 @@ class _ChannelOverwritesScreenState
                   type: MaterialType.transparency,
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(_targetLabel ??
-                        'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}'),
+                    title: Text(
+                      _targetLabel ??
+                          'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}',
+                    ),
                     trailing: const Icon(AppIcons.chevronRight),
                     onTap: _pickTarget,
                   ),

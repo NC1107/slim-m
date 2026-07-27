@@ -76,9 +76,8 @@ void main() {
 
     final rows = await db.select(db.messages).get();
 
-    // Not "the name is filled in": the client has no way to fill it in
-    // locally. The row goes, so the next sync fetches the server's copy, which
-    // has carried the name all along.
+    // Not "the name is filled in": the client cannot fill it in locally. The
+    // row goes, so the next sync refetches the copy that has the name.
     expect(rows, isEmpty);
   });
 

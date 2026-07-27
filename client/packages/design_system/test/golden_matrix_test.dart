@@ -202,9 +202,9 @@ void main() {
           );
           await tester.pumpAndSettle();
 
-          // No overflow at any scale. This is the assertion that matters most:
-          // clipped text at 200% is an accessibility failure, and it is
-          // invisible in a 100% screenshot.
+          /// No overflow at any scale. This is the assertion that matters most:
+          /// clipped text at 200% is an accessibility failure, and it is
+          /// invisible in a 100% screenshot.
           expect(tester.takeException(), isNull);
 
           // The width axis is only worth its runtime if it actually lands on

@@ -58,18 +58,21 @@ const _me = Me(
 /// question here is the same whether a list has rows in it or not. The voice
 /// token is the one object body, since a call has to connect to have controls.
 http.Client _emptyApi() => MockClient((request) async {
-      final body = request.url.path.endsWith('/voice/token')
-          ? jsonEncode({
-              'url': 'wss://sfu.example.com',
-              'room': 'channel-1',
-              'token': 'jwt',
-              'expires_at': 0,
-              'can_publish': true,
-            })
-          : '[]';
-      return http.Response(body, 200,
-          headers: const {'content-type': 'application/json'});
-    });
+  final body = request.url.path.endsWith('/voice/token')
+      ? jsonEncode({
+          'url': 'wss://sfu.example.com',
+          'room': 'channel-1',
+          'token': 'jwt',
+          'expires_at': 0,
+          'can_publish': true,
+        })
+      : '[]';
+  return http.Response(
+    body,
+    200,
+    headers: const {'content-type': 'application/json'},
+  );
+});
 
 /// The minimum [VoiceSession] the controller needs, connecting on join so the
 /// in-call surface (and its bottom control bar) actually renders.
@@ -120,8 +123,7 @@ class _FakeSession implements VoiceSession {
   Future<bool> setScreenShareEnabled(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
-  }) async =>
-      enabled;
+  }) async => enabled;
 
   @override
   Future<bool> setDeafened(bool value) async => true;
@@ -142,27 +144,33 @@ Future<ProviderContainer> _pump(
 }) async {
   tester.view.physicalSize = size * _dpr;
   tester.view.devicePixelRatio = _dpr;
-  tester.view.padding =
-      FakeViewPadding(top: _topInset * _dpr, bottom: _bottomInset * _dpr);
-  tester.view.viewPadding =
-      FakeViewPadding(top: _topInset * _dpr, bottom: _bottomInset * _dpr);
+  tester.view.padding = FakeViewPadding(
+    top: _topInset * _dpr,
+    bottom: _bottomInset * _dpr,
+  );
+  tester.view.viewPadding = FakeViewPadding(
+    top: _topInset * _dpr,
+    bottom: _bottomInset * _dpr,
+  );
   addTearDown(tester.view.reset);
 
-  final container = ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-    sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-    meProvider.overrideWith((ref) async => _me),
-    apiProvider.overrideWith((ref) {
-      final api = SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: ref.watch(sessionProvider),
-        httpClient: _emptyApi(),
-      );
-      ref.onDispose(api.close);
-      return api;
-    }),
-    ...overrides,
-  ]);
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+      meProvider.overrideWith((ref) async => _me),
+      apiProvider.overrideWith((ref) {
+        final api = SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: _emptyApi(),
+        );
+        ref.onDispose(api.close);
+        return api;
+      }),
+      ...overrides,
+    ],
+  );
   addTearDown(container.dispose);
 
   await tester.pumpWidget(
@@ -190,15 +198,24 @@ void _expectClearOfIndicator(WidgetTester tester, Finder finder, String what) {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('voice settings insets its list above the home indicator',
-      (tester) async {
-    await _pump(tester, const VoiceSettingsScreen(), overrides: [
-      voiceControllerProvider
-          .overrideWith((ref) => VoiceController(ref, session: _FakeSession())),
-    ]);
+  testWidgets('voice settings insets its list above the home indicator', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      const VoiceSettingsScreen(),
+      overrides: [
+        voiceControllerProvider.overrideWith(
+          (ref) => VoiceController(ref, session: _FakeSession()),
+        ),
+      ],
+    );
 
     _expectClearOfIndicator(
-        tester, find.byType(ListView), "voice settings' list");
+      tester,
+      find.byType(ListView),
+      "voice settings' list",
+    );
   });
 
   testWidgets('the invites list is inset', (tester) async {
@@ -215,8 +232,9 @@ void main() {
     _expectClearOfIndicator(tester, find.byType(ListView), 'the role list');
   });
 
-  testWidgets('the reports body is inset even when the queue is empty',
-      (tester) async {
+  testWidgets('the reports body is inset even when the queue is empty', (
+    tester,
+  ) async {
     await _pump(tester, const ReportsScreen());
 
     // The Center fills the body, so its box reports the inset; the text
@@ -225,8 +243,9 @@ void main() {
       tester,
       find
           .ancestor(
-              of: find.text('The queue is empty.'),
-              matching: find.byType(Center))
+            of: find.text('The queue is empty.'),
+            matching: find.byType(Center),
+          )
           .first,
       "the reports queue's empty state",
     );
@@ -236,54 +255,72 @@ void main() {
     await _pump(tester, const ChannelOverwritesScreen());
 
     _expectClearOfIndicator(
-        tester, find.byType(ListView), 'the overwrites form');
+      tester,
+      find.byType(ListView),
+      'the overwrites form',
+    );
   });
 
-  testWidgets('sign-in clears both the notch and the home indicator',
-      (tester) async {
+  testWidgets('sign-in clears both the notch and the home indicator', (
+    tester,
+  ) async {
     await _pump(tester, const SignInScreen());
 
     final form = find.byType(SingleChildScrollView);
-    expect(tester.getRect(form).top, greaterThanOrEqualTo(_topInset),
-        reason: 'sign-in has no AppBar, so nothing else clears the notch');
+    expect(
+      tester.getRect(form).top,
+      greaterThanOrEqualTo(_topInset),
+      reason: 'sign-in has no AppBar, so nothing else clears the notch',
+    );
     _expectClearOfIndicator(tester, form, "sign-in's form");
   });
 
-  testWidgets('onboarding clears both the notch and the home indicator',
-      (tester) async {
+  testWidgets('onboarding clears both the notch and the home indicator', (
+    tester,
+  ) async {
     await _pump(tester, OnboardingScreen(onServerChosen: (_, __) {}));
 
     final body = find.byType(SingleChildScrollView);
-    expect(tester.getRect(body).top, greaterThanOrEqualTo(_topInset),
-        reason: 'onboarding has no AppBar, so nothing else clears the notch');
+    expect(
+      tester.getRect(body).top,
+      greaterThanOrEqualTo(_topInset),
+      reason: 'onboarding has no AppBar, so nothing else clears the notch',
+    );
     _expectClearOfIndicator(tester, body, "onboarding's entry list");
   });
 
-  testWidgets(
-      'the in-call controls sit above the home indicator while their '
+  testWidgets('the in-call controls sit above the home indicator while their '
       'bar still paints to the edge', (tester) async {
     final container = await _pump(
       tester,
       const Scaffold(body: VoiceScreen(channelId: 'channel-1')),
       overrides: [
         voiceControllerProvider.overrideWith(
-            (ref) => VoiceController(ref, session: _FakeSession())),
+          (ref) => VoiceController(ref, session: _FakeSession()),
+        ),
       ],
     );
     await container.read(voiceControllerProvider.notifier).join('channel-1');
     await tester.pumpAndSettle();
 
     _expectClearOfIndicator(
-        tester, find.byIcon(AppIcons.leaveCall), 'the leave-call button');
+      tester,
+      find.byIcon(AppIcons.leaveCall),
+      'the leave-call button',
+    );
 
     // The other half: inset the bar itself and a base-coloured band appears
     // below it, so the decoration has to keep reaching the screen edge.
     final bar = find
         .ancestor(
-            of: find.byIcon(AppIcons.leaveCall),
-            matching: find.byType(DecoratedBox))
+          of: find.byIcon(AppIcons.leaveCall),
+          matching: find.byType(DecoratedBox),
+        )
         .last;
-    expect(tester.getRect(bar).bottom, _view.height,
-        reason: 'the control bar background must still reach the edge');
+    expect(
+      tester.getRect(bar).bottom,
+      _view.height,
+      reason: 'the control bar background must still reach the edge',
+    );
   });
 }

@@ -63,9 +63,8 @@ impl Contract {
                 hub: Hub::new(),
                 limiter: RateLimiter::new(),
                 push: PushSender::disabled(),
-                // Voice is configured rather than disabled so `mintVoiceToken`
-                // reaches its documented 200 instead of the 501 a text-only
-                // deployment answers, which would leave its body unchecked.
+                // Configured rather than disabled so `mintVoiceToken` reaches
+                // its documented 200, and its body gets checked, not a 501.
                 voice: VoiceService::for_test("wss://sfu.invalid", "devkey", "devsecret"),
                 media: Media::for_tests(),
             },

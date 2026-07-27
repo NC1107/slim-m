@@ -28,8 +28,9 @@ class VoiceScreen extends ConsumerWidget {
     return Container(
       color: tokens.surfaceBase,
       child: switch (voice.state) {
-        VoiceSessionState.connected when inThisChannel =>
-          _InCall(channelId: channelId),
+        VoiceSessionState.connected when inThisChannel => _InCall(
+          channelId: channelId,
+        ),
         VoiceSessionState.connecting when inThisChannel => const _Connecting(),
         _ => _JoinPreview(channelId: channelId),
       },
@@ -133,15 +134,17 @@ class _JoinPreview extends ConsumerWidget {
               // than one that only invites the same failure a second time.
               if (canRetry)
                 FilledButton(
-                  onPressed: showingLastAttempt &&
+                  onPressed:
+                      showingLastAttempt &&
                           voice.state == VoiceSessionState.connecting
                       ? null
                       : () => controller.join(channelId),
                   style: FilledButton.styleFrom(
                     backgroundColor: tokens.accentFill,
                     foregroundColor: tokens.accentOn,
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.s16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.s16,
+                    ),
                   ),
                   child: const Text('Join call'),
                 ),

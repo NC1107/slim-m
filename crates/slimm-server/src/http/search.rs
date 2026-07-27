@@ -44,6 +44,11 @@ struct SearchParams {
     limit: Option<i64>,
 }
 
+/// Full-text search within one channel.
+///
+/// A nonexistent channel grants no permissions, so this refuses both "you
+/// cannot search here" and "no such channel" identically, revealing neither,
+/// exactly like listing.
 async fn search(
     Authed(ctx): Authed,
     Path(channel_id): Path<String>,
@@ -51,9 +56,7 @@ async fn search(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<MessageDto>>, ApiError> {
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
-    // A nonexistent channel grants no permissions, so this refuses both "you
-    // cannot search here" and "no such channel" identically, revealing
-    // neither, exactly like listing.
+    // A missing channel and a denied one answer alike; see the note above.
     if !state
         .store
         .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)

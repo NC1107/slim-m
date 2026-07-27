@@ -33,9 +33,7 @@ use slimm_server::store::Store;
 use tokio::net::TcpListener;
 use tower::ServiceExt;
 
-// ---------------------------------------------------------------------------
-// Shared fixtures (mirrors the style of tests/message_endpoints.rs)
-// ---------------------------------------------------------------------------
+// --- Shared fixtures (mirrors the style of tests/message_endpoints.rs) ---
 
 async fn new_store() -> Store {
     let path = std::env::temp_dir()
@@ -170,9 +168,7 @@ where
     }
 }
 
-// ---------------------------------------------------------------------------
-// Mock relay: a real HTTP server implementing just `POST /v1/send`.
-// ---------------------------------------------------------------------------
+// --- Mock relay: a real HTTP server implementing just `POST /v1/send` ---
 
 #[derive(Default)]
 struct RelayState {
@@ -323,16 +319,14 @@ async fn seeded_store() -> (Store, slimm_server::ids::ChannelId) {
 const SHORT_DEBOUNCE_MS: i64 = 150;
 const WAIT_TIMEOUT: Duration = Duration::from_secs(5);
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+// --- Tests ---
 
+/// A mock relay is running, but the sender under test is disabled and was never
+/// told its address: if `PushSender::disabled()` were not a genuine no-op, that
+/// mock is what would catch a stray call.
 #[tokio::test]
 async fn a_disabled_sender_never_reaches_a_relay() {
     let (store, channel_id) = seeded_store().await;
-    // A mock relay is running, but the sender under test is disabled and was
-    // never told its address: if `PushSender::disabled()` were not a genuine
-    // no-op, this is what would catch a stray call.
     let (mock, _addr) = spawn_mock_relay().await;
 
     let app = app(store.clone(), PushSender::disabled());
@@ -572,12 +566,12 @@ async fn a_burst_of_messages_in_one_channel_debounces_to_one_push() {
     );
 }
 
+/// Regression: the debounce used to record its window at decision time, before
+/// delivery was even attempted, so a leading trigger that failed at the
+/// transport level still spent the window and the next message's push was
+/// dropped rather than merely collapsed into it.
 #[tokio::test]
 async fn a_relay_failure_does_not_swallow_the_next_messages_wake() {
-    // Regression: the debounce used to record its window at decision time,
-    // before delivery was even attempted, so a leading trigger that failed at
-    // the transport level still spent the window and the next message's push
-    // was dropped rather than merely collapsed into it.
     let (store, channel_id) = seeded_store().await;
     let (mock, relay_url) = spawn_mock_relay().await;
     let push = PushSender::with_debounce_window_ms(&push_config(&relay_url), SHORT_DEBOUNCE_MS)
@@ -624,20 +618,19 @@ async fn a_relay_failure_does_not_swallow_the_next_messages_wake() {
     assert_eq!(messages[0]["token"], "bobs-token");
 }
 
+/// Regression: the debounce used to be keyed on channel id alone, so one
+/// recipient's open window silenced every other recipient's first wake in the
+/// same channel too.
+///
+/// Both accounts are fully registered for push up front, so nothing here
+/// depends on exactly when either background delivery task happens to run its
+/// own database reads. Carol's first message is awaited all the way through
+/// delivery before bob's state changes and the second message is sent, so which
+/// task's debounce check would happen to run first is never in question; the
+/// debounce window is generously larger than the one cheap, hash-free lifecycle
+/// call in between, so it cannot elapse on its own by coincidence either.
 #[tokio::test]
 async fn one_recipients_open_debounce_window_does_not_suppress_another_recipient() {
-    // Regression: the debounce used to be keyed on channel id alone, so one
-    // recipient's open window silenced every other recipient's first wake in
-    // the same channel too.
-    //
-    // Both accounts are fully registered for push up front, so nothing here
-    // depends on exactly when either background delivery task happens to run
-    // its own database reads. Carol's first message is awaited all the way
-    // through delivery before bob's state changes and the second message is
-    // sent, so which task's debounce check would happen to run first is never
-    // in question; the debounce window is generously larger than the one
-    // cheap, hash-free lifecycle call in between, so it cannot elapse on its
-    // own by coincidence either.
     const ISOLATION_DEBOUNCE_MS: i64 = 3_000;
 
     let (store, channel_id) = seeded_store().await;
@@ -669,10 +662,8 @@ async fn one_recipients_open_debounce_window_does_not_suppress_another_recipient
         )
     };
 
-    // Bob is currently foreground, so the first message reaches only carol;
-    // her debounce window opens. Waited out fully before anything else
-    // happens, so there is no ambiguity about which recipient's trigger ran
-    // first.
+    // Bob is foreground, so the first message reaches only carol; her debounce
+    // window opens, and is waited out fully before anything else happens.
     let reported = app.clone().oneshot(report_bob("foreground")).await.unwrap();
     assert_eq!(reported.status(), axum::http::StatusCode::NO_CONTENT);
     app.clone().oneshot(send("m1")).await.unwrap();
@@ -689,9 +680,8 @@ async fn one_recipients_open_debounce_window_does_not_suppress_another_recipient
     assert_eq!(reported.status(), axum::http::StatusCode::NO_CONTENT);
     app.clone().oneshot(send("m2")).await.unwrap();
 
-    // Bob's very first wake must not be swallowed by carol's already-open,
-    // unrelated window: debouncing collapses a burst for one recipient, it
-    // does not silence a different recipient entirely.
+    // Bob's first wake must not be swallowed by carol's open, unrelated window:
+    // debouncing collapses one recipient's burst, it does not silence another.
     assert!(
         wait_until(
             || mock

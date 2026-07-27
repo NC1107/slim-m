@@ -85,15 +85,19 @@ impl PushSender {
 
     /// [`Self::new`] with an explicit debounce window, so tests can exercise
     /// collapsing (and its expiry) without waiting out the real window.
+    ///
+    /// Redirects are refused rather than followed. reqwest strips sensitive
+    /// headers across a redirect only when the host or port changes, comparing
+    /// neither the scheme, so an https to http downgrade back to the same host
+    /// would carry the relay bearer key and every device push token in it. The
+    /// relay is a known endpoint we configure, so it has no business
+    /// redirecting.
     pub fn with_debounce_window_ms(config: &Config, window_ms: i64) -> anyhow::Result<Self> {
         let inner = match (&config.push_relay_url, &config.push_relay_key) {
             (Some(url), Some(key)) => {
                 validate_relay_url(url)?;
-                // Redirects are refused rather than followed. reqwest strips sensitive
-                // headers across a redirect only when the host or port changes, comparing
-                // neither the scheme, so an https to http downgrade back to the same host
-                // would carry the relay bearer key and every device push token in it. The
-                // relay is a known endpoint we configure, so it has no business redirecting.
+                // Redirects refused, not followed; see the note on this
+                // function.
                 let http = reqwest::Client::builder()
                     .timeout(relay::RELAY_TIMEOUT)
                     .redirect(reqwest::redirect::Policy::none())
@@ -168,6 +172,35 @@ impl PushSender {
 /// The background half of [`PushSender::notify_message`]. Every error path
 /// logs and returns rather than propagating: there is no caller left to
 /// report to, only the process log.
+///
+/// The recipient set is built from who could receive a push at all, then
+/// filtered by view permission, rather than evaluating permissions for every
+/// live user and then asking which of them have a device. Both orders give the
+/// same recipients, but this one costs a single indexed query on a deployment
+/// where nobody has registered for push, instead of a full permission
+/// evaluation per user on every message sent. The view check itself is not an
+/// optimization to skip: a recipient who cannot see the channel must never be
+/// told a message landed in it.
+///
+/// The debounce is decided once per recipient, even when they have several
+/// registered devices, so a second device is never mistaken for a second burst
+/// trigger and dropped. A recipient filtered out for being foreground never
+/// reaches that decision, so their state can never cost a different recipient
+/// (or their own next genuine message) a wake; see the module docs and
+/// [`Debounce`].
+///
+/// A window only stays shut when a recipient was really woken, which means at
+/// least one of their devices took the push. Everything else releases it: a
+/// batch that failed at the transport level, a recipient whose devices all
+/// failed to seal (most likely a corrupt stored key), and the relay's
+/// forbidden, error and not_attempted statuses. Treating any of those as
+/// success would suppress that recipient's next genuine message, turning a
+/// dropped wake into a silently missing notification.
+///
+/// A status this server does not recognize means the two repos have drifted on
+/// the status vocabulary. It is handled as any other inactionable status rather
+/// than crashing or misrouting, but logged, since it should never happen
+/// against a relay built from the documented contract.
 async fn deliver(
     enabled: Arc<Enabled>,
     debounce: Arc<Debounce>,
@@ -177,12 +210,8 @@ async fn deliver(
     message_id: MessageId,
     seq: Seq,
 ) {
-    // Start from who could receive a push at all, then filter that set by view
-    // permission, rather than evaluating permissions for every live user and
-    // then asking which of them have a device. Both orders give the same
-    // recipients, but this one costs a single indexed query on a deployment
-    // where nobody has registered for push, instead of a full permission
-    // evaluation per user on every message sent.
+    // Push registrations first, permissions second; see the note on this
+    // function for why that order.
     let candidates = match store.users_with_push_devices().await {
         Ok(candidates) => candidates,
         Err(err) => {
@@ -196,9 +225,7 @@ async fn deliver(
         if user_id == author_id {
             continue;
         }
-        // A recipient who cannot see the channel must never be told a message
-        // landed in it; that is the whole reason this check is here and not
-        // skipped as an optimization.
+        // Not an optimization to skip; see the note on this function.
         match store
             .has_permission(user_id, channel_id, Permissions::VIEW_CHANNEL)
             .await
@@ -232,12 +259,7 @@ async fn deliver(
         return;
     }
 
-    // Decide the debounce once per recipient, even if they have several
-    // registered devices, so a second device is never mistaken for a second
-    // burst trigger and dropped. A recipient filtered out just above for
-    // being foreground never reaches this decision at all, so their state can
-    // never cost a different recipient (or their own next genuine message) a
-    // wake; see the module docs and `Debounce`.
+    // Once per recipient, not once per device; see the note on this function.
     let mut decisions: HashMap<UserId, Option<i64>> = HashMap::new();
     for target in &targets {
         decisions
@@ -258,10 +280,8 @@ async fn deliver(
 
     let messages = envelope::seal_for_message(channel_id, message_id, seq, &targets);
 
-    // A recipient with no message in the batch (every one of their devices
-    // failed to seal, most likely a corrupt stored key) got no delivery
-    // attempt at all; their debounce window must not stick either, or a
-    // burst's failed leading edge would silently eat their next genuine wake.
+    // Nothing sealed means nothing was attempted, so release; see the note on
+    // this function.
     for (&user_id, &fired_at) in &opened {
         if !messages.iter().any(|m| m.user_id == user_id) {
             debounce.release_if_undelivered(channel_id, user_id, fired_at);
@@ -273,17 +293,12 @@ async fn deliver(
 
     match relay::send(&enabled.http, &enabled.send_url, &enabled.key, &messages).await {
         Ok(results) => {
-            // A recipient counts as woken only if one of their devices actually
-            // took the push. The relay also reports forbidden, error and
-            // not_attempted, and treating those as success would leave the
-            // window open and suppress the recipient's next genuine message,
-            // turning a dropped wake into a silently missing notification.
+            // Only a Delivered device counts as a wake; see the note on this
+            // function.
             let mut delivered: HashSet<UserId> = HashSet::new();
             for result in results {
-                // The relay only ever echoes back a bare token; resolve it to
-                // the exact device this batch actually sent it to, rather
-                // than trusting the string alone to identify whose
-                // registration to clear.
+                // The relay echoes back a bare token, so resolve it to the
+                // device this batch really sent it to before acting on it.
                 let Some(target) = messages.iter().find(|m| m.token == result.token) else {
                     continue;
                 };
@@ -309,13 +324,8 @@ async fn deliver(
                         | relay::RelayStatus::NotAttempted,
                     ) => {}
                     None => {
-                        // The relay returned a status this server does not
-                        // recognize: the two repos have drifted apart on the
-                        // status vocabulary. Treated the same as any other
-                        // inactionable status rather than crashing or
-                        // misrouting, but worth a log line since it should
-                        // never happen against a relay built from the
-                        // documented contract.
+                        // Inactionable, never misrouted, and logged because it
+                        // should never happen; see the note on this function.
                         tracing::warn!(
                             status = %result.status,
                             "push: relay reported a status this server does not recognize"
@@ -331,9 +341,8 @@ async fn deliver(
         }
         Err(err) => {
             tracing::warn!(error = %err, %channel_id, "push: relay send failed");
-            // The whole batch failed at the transport level, so nobody in it
-            // was actually notified; none of their debounce windows should
-            // stick either.
+            // Transport failure notified nobody, so no window may stick; see
+            // the note on this function.
             for (&user_id, &fired_at) in &opened {
                 debounce.release_if_undelivered(channel_id, user_id, fired_at);
             }
@@ -504,11 +513,11 @@ mod tests {
         assert!(debounce.try_fire_at(a, bob, 100).is_none());
     }
 
+    /// Regression: the debounce used to be keyed on channel alone, so a window
+    /// opened by one recipient's message silenced every other recipient in the
+    /// same channel for the rest of that window.
     #[test]
     fn debounce_is_independent_per_recipient() {
-        // Regression: the debounce used to be keyed on channel alone, so a
-        // window opened by one recipient's message silenced every other
-        // recipient in the same channel for the rest of the window.
         let debounce = Debounce::new(1_000);
         let channel = ChannelId::generate();
         let bob = user();
@@ -524,12 +533,12 @@ mod tests {
         );
     }
 
+    /// Regression: a leading trigger that ends up delivering nobody anything
+    /// (a relay error, or every device filtered out) used to spend the window
+    /// regardless, dropping the next message's wake outright instead of merely
+    /// collapsing it.
     #[test]
     fn release_if_undelivered_reopens_the_window_immediately() {
-        // Regression: a leading trigger that ends up delivering nobody
-        // anything (a relay error, or every device filtered out) used to
-        // spend the window regardless, dropping the next message's wake
-        // outright instead of merely collapsing it.
         let debounce = Debounce::new(1_000);
         let channel = ChannelId::generate();
         let bob = user();

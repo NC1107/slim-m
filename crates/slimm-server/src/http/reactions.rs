@@ -141,9 +141,8 @@ async fn publish(state: &AppState, channel_id: crate::ids::ChannelId, message_id
             });
         }
         Err(err) => {
-            // The write already succeeded; a failed fan-out means live clients
-            // are briefly stale until their next fetch, which is not worth
-            // failing the request over.
+            // The write already succeeded, so a failed fan-out only leaves
+            // live clients stale until their next fetch.
             tracing::warn!(error = %err, "reactions: could not load summaries to publish");
         }
     }

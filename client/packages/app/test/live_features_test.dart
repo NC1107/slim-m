@@ -44,125 +44,149 @@ const _tokens = TokenPair(
 );
 
 Map<String, dynamic> _pinJson(String messageId) => {
-      'id': messageId,
-      'channel_id': 'c1',
-      'author_id': 'author-1',
-      'author_display_name': 'Priya',
-      'seq': 1,
-      'content': 'hello',
-      'created_at': 0,
-      'edited_at': null,
-      'pinned_at': 0,
-      'pinned_by': 'author-1',
-    };
+  'id': messageId,
+  'channel_id': 'c1',
+  'author_id': 'author-1',
+  'author_display_name': 'Priya',
+  'seq': 1,
+  'content': 'hello',
+  'created_at': 0,
+  'edited_at': null,
+  'pinned_at': 0,
+  'pinned_by': 'author-1',
+};
 
 void main() {
   group('pins', () {
-    test('the count reflects the server, and a live pin refreshes it',
-        () async {
-      final events = StreamController<ServerEvent>.broadcast();
-      addTearDown(events.close);
-      var pinned = <Map<String, dynamic>>[];
+    test(
+      'the count reflects the server, and a live pin refreshes it',
+      () async {
+        final events = StreamController<ServerEvent>.broadcast();
+        addTearDown(events.close);
+        var pinned = <Map<String, dynamic>>[];
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-        apiProvider.overrideWith((ref) {
-          final api = SlimmApi(
-            baseUrl: Uri.parse('http://localhost:8080'),
-            session: ref.watch(sessionProvider),
-            httpClient: MockClient((request) async {
-              return http.Response(jsonEncode(pinned), 200,
-                  headers: {'content-type': 'application/json'});
+        final container = ProviderContainer(
+          overrides: [
+            keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+            sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+            apiProvider.overrideWith((ref) {
+              final api = SlimmApi(
+                baseUrl: Uri.parse('http://localhost:8080'),
+                session: ref.watch(sessionProvider),
+                httpClient: MockClient((request) async {
+                  return http.Response(
+                    jsonEncode(pinned),
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }),
+              );
+              ref.onDispose(api.close);
+              return api;
             }),
-          );
-          ref.onDispose(api.close);
-          return api;
-        }),
-        liveEventsProvider.overrideWithValue(events.stream),
-      ]);
-      addTearDown(container.dispose);
+            liveEventsProvider.overrideWithValue(events.stream),
+          ],
+        );
+        addTearDown(container.dispose);
 
-      final sub = container.listen(pinsControllerProvider('c1'), (_, __) {});
-      addTearDown(sub.close);
+        final sub = container.listen(pinsControllerProvider('c1'), (_, __) {});
+        addTearDown(sub.close);
 
-      await container.read(pinsControllerProvider('c1').notifier).refresh();
-      expect(sub.read().pinned, isEmpty);
-      expect(sub.read().failed, isFalse);
+        await container.read(pinsControllerProvider('c1').notifier).refresh();
+        expect(sub.read().pinned, isEmpty);
+        expect(sub.read().failed, isFalse);
 
-      // The server now has one pin; a live event is what should notice.
-      pinned = [_pinJson('m1')];
-      events.add(const MessagePinned(
-        channelId: 'c1',
-        messageId: 'm1',
-        pinnedBy: 'author-1',
-        pinnedAt: 0,
-      ));
-      await _settle();
+        // The server now has one pin; a live event is what should notice.
+        pinned = [_pinJson('m1')];
+        events.add(
+          const MessagePinned(
+            channelId: 'c1',
+            messageId: 'm1',
+            pinnedBy: 'author-1',
+            pinnedAt: 0,
+          ),
+        );
+        await _settle();
 
-      final state = sub.read().pinned;
-      expect(state, isNotNull);
-      expect(state!.single.message.id, 'm1');
-    });
+        final state = sub.read().pinned;
+        expect(state, isNotNull);
+        expect(state!.single.message.id, 'm1');
+      },
+    );
 
-    test('a failed refresh keeps the last known list and flags the failure',
-        () async {
-      final events = StreamController<ServerEvent>.broadcast();
-      addTearDown(events.close);
-      var fail = false;
+    test(
+      'a failed refresh keeps the last known list and flags the failure',
+      () async {
+        final events = StreamController<ServerEvent>.broadcast();
+        addTearDown(events.close);
+        var fail = false;
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-        apiProvider.overrideWith((ref) {
-          final api = SlimmApi(
-            baseUrl: Uri.parse('http://localhost:8080'),
-            session: ref.watch(sessionProvider),
-            httpClient: MockClient((request) async {
-              if (fail) return http.Response('server error', 500);
-              return http.Response(jsonEncode([_pinJson('m1')]), 200,
-                  headers: {'content-type': 'application/json'});
+        final container = ProviderContainer(
+          overrides: [
+            keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+            sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+            apiProvider.overrideWith((ref) {
+              final api = SlimmApi(
+                baseUrl: Uri.parse('http://localhost:8080'),
+                session: ref.watch(sessionProvider),
+                httpClient: MockClient((request) async {
+                  if (fail) return http.Response('server error', 500);
+                  return http.Response(
+                    jsonEncode([_pinJson('m1')]),
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }),
+              );
+              ref.onDispose(api.close);
+              return api;
             }),
-          );
-          ref.onDispose(api.close);
-          return api;
-        }),
-        liveEventsProvider.overrideWithValue(events.stream),
-      ]);
-      addTearDown(container.dispose);
+            liveEventsProvider.overrideWithValue(events.stream),
+          ],
+        );
+        addTearDown(container.dispose);
 
-      final sub = container.listen(pinsControllerProvider('c1'), (_, __) {});
-      addTearDown(sub.close);
-      await _settle();
-      expect(sub.read().pinned, hasLength(1));
-      expect(sub.read().failed, isFalse);
+        final sub = container.listen(pinsControllerProvider('c1'), (_, __) {});
+        addTearDown(sub.close);
+        await _settle();
+        expect(sub.read().pinned, hasLength(1));
+        expect(sub.read().failed, isFalse);
 
-      fail = true;
-      await container.read(pinsControllerProvider('c1').notifier).refresh();
+        fail = true;
+        await container.read(pinsControllerProvider('c1').notifier).refresh();
 
-      expect(sub.read().failed, isTrue,
-          reason: 'a failed refresh must be visible to the sheet');
-      expect(sub.read().pinned, hasLength(1),
-          reason: 'the last known list must survive a failed refresh');
-    });
+        expect(
+          sub.read().failed,
+          isTrue,
+          reason: 'a failed refresh must be visible to the sheet',
+        );
+        expect(
+          sub.read().pinned,
+          hasLength(1),
+          reason: 'the last known list must survive a failed refresh',
+        );
+      },
+    );
 
     test('a fresh 403 never gets a retry that could not succeed', () async {
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-        apiProvider.overrideWith((ref) {
-          final api = SlimmApi(
-            baseUrl: Uri.parse('http://localhost:8080'),
-            session: ref.watch(sessionProvider),
-            httpClient: MockClient((request) async {
-              return http.Response('forbidden', 403);
-            }),
-          );
-          ref.onDispose(api.close);
-          return api;
-        }),
-        liveEventsProvider.overrideWithValue(const Stream.empty()),
-      ]);
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((request) async {
+                return http.Response('forbidden', 403);
+              }),
+            );
+            ref.onDispose(api.close);
+            return api;
+          }),
+          liveEventsProvider.overrideWithValue(const Stream.empty()),
+        ],
+      );
       addTearDown(container.dispose);
 
       final sub = container.listen(pinsControllerProvider('c1'), (_, __) {});
@@ -179,24 +203,29 @@ void main() {
       addTearDown(events.close);
       var fetchCount = 0;
 
-      final container = ProviderContainer(overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-        apiProvider.overrideWith((ref) {
-          final api = SlimmApi(
-            baseUrl: Uri.parse('http://localhost:8080'),
-            session: ref.watch(sessionProvider),
-            httpClient: MockClient((request) async {
-              fetchCount++;
-              return http.Response('[]', 200,
-                  headers: {'content-type': 'application/json'});
-            }),
-          );
-          ref.onDispose(api.close);
-          return api;
-        }),
-        liveEventsProvider.overrideWithValue(events.stream),
-      ]);
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((request) async {
+                fetchCount++;
+                return http.Response(
+                  '[]',
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }),
+            );
+            ref.onDispose(api.close);
+            return api;
+          }),
+          liveEventsProvider.overrideWithValue(events.stream),
+        ],
+      );
       addTearDown(container.dispose);
 
       // Listening is what starts (and keeps alive) the controller; its
@@ -206,12 +235,14 @@ void main() {
       await _settle();
       expect(fetchCount, 1);
 
-      events.add(const MessagePinned(
-        channelId: 'some-other-channel',
-        messageId: 'm2',
-        pinnedBy: null,
-        pinnedAt: 0,
-      ));
+      events.add(
+        const MessagePinned(
+          channelId: 'some-other-channel',
+          messageId: 'm2',
+          pinnedBy: null,
+          pinnedAt: 0,
+        ),
+      );
       await _settle();
 
       expect(fetchCount, 1, reason: 'a different channel must not refetch');
@@ -223,9 +254,9 @@ void main() {
       final events = StreamController<ServerEvent>.broadcast();
       addTearDown(events.close);
 
-      final container = ProviderContainer(overrides: [
-        liveEventsProvider.overrideWithValue(events.stream),
-      ]);
+      final container = ProviderContainer(
+        overrides: [liveEventsProvider.overrideWithValue(events.stream)],
+      );
       addTearDown(container.dispose);
 
       final sub = container.listen(typingControllerProvider('c1'), (_, __) {});
@@ -245,9 +276,9 @@ void main() {
       final events = StreamController<ServerEvent>.broadcast();
       addTearDown(events.close);
 
-      final container = ProviderContainer(overrides: [
-        liveEventsProvider.overrideWithValue(events.stream),
-      ]);
+      final container = ProviderContainer(
+        overrides: [liveEventsProvider.overrideWithValue(events.stream)],
+      );
       addTearDown(container.dispose);
 
       final sub = container.listen(typingControllerProvider('c1'), (_, __) {});

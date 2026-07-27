@@ -34,7 +34,9 @@ class PollView extends StatelessWidget {
           Text(
             poll.question,
             style: AppText.body.copyWith(
-                color: tokens.textPrimary, fontWeight: AppWeights.semi),
+              color: tokens.textPrimary,
+              fontWeight: AppWeights.semi,
+            ),
           ),
           const SizedBox(height: AppSpacing.s8),
           for (final option in poll.options) ...[
@@ -79,7 +81,8 @@ class _PollOptionRow extends StatelessWidget {
     return Semantics(
       button: onTap != null,
       selected: selected,
-      label: '${option.label}, $percent percent, ${option.votes} votes'
+      label:
+          '${option.label}, $percent percent, ${option.votes} votes'
           '${selected ? ', your vote' : ''}',
       child: GestureDetector(
         onTap: onTap,
@@ -88,7 +91,8 @@ class _PollOptionRow extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             border: Border.all(
-                color: selected ? tokens.accentFill : tokens.borderSubtle),
+              color: selected ? tokens.accentFill : tokens.borderSubtle,
+            ),
             borderRadius: BorderRadius.circular(AppRadii.control),
           ),
           child: Stack(
@@ -109,8 +113,9 @@ class _PollOptionRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppText.ui.copyWith(
                           color: tokens.textPrimary,
-                          fontWeight:
-                              selected ? AppWeights.semi : AppWeights.regular,
+                          fontWeight: selected
+                              ? AppWeights.semi
+                              : AppWeights.regular,
                         ),
                       ),
                     ),

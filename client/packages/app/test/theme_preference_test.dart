@@ -17,9 +17,9 @@ import 'package:slimm_platform/platform.dart';
 /// A container built the way `main()` builds one, so a second call to this
 /// after a `select` is the same thing as relaunching the app.
 ProviderContainer _restartedContainer() {
-  final container = ProviderContainer(overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-  ]);
+  final container = ProviderContainer(
+    overrides: [keyStoreProvider.overrideWithValue(InMemoryKeyStore())],
+  );
   addTearDown(container.dispose);
   return container;
 }
@@ -31,7 +31,9 @@ ThemeData _paintedTheme(WidgetTester tester) =>
 
 /// The section on its own, in the list that settings puts it in.
 Future<void> _pumpSection(
-    WidgetTester tester, ProviderContainer container) async {
+  WidgetTester tester,
+  ProviderContainer container,
+) async {
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -47,11 +49,11 @@ Future<void> _pumpSection(
 /// The labels the section draws, spelled out here rather than imported: they
 /// are the user-facing contract, so a rename should fail a test.
 String _labelOf(AppThemeChoice choice) => switch (choice) {
-      AppThemeChoice.system => 'System',
-      AppThemeChoice.light => 'Light',
-      AppThemeChoice.dark => 'Dark',
-      AppThemeChoice.trueBlack => 'True black',
-    };
+  AppThemeChoice.system => 'System',
+  AppThemeChoice.light => 'Light',
+  AppThemeChoice.dark => 'Dark',
+  AppThemeChoice.trueBlack => 'True black',
+};
 
 Future<void> _pumpApp(WidgetTester tester, ProviderContainer container) async {
   await tester.pumpWidget(
@@ -70,14 +72,16 @@ void main() {
     expect(container.read(themeControllerProvider), AppThemeChoice.system);
   });
 
-  test('a stored value this build does not know falls back to the system',
-      () async {
-    SharedPreferences.setMockInitialValues({themeChoiceKey: 'solarized'});
-    final container = _restartedContainer();
-    await container.read(themeControllerProvider.notifier).restore();
+  test(
+    'a stored value this build does not know falls back to the system',
+    () async {
+      SharedPreferences.setMockInitialValues({themeChoiceKey: 'solarized'});
+      final container = _restartedContainer();
+      await container.read(themeControllerProvider.notifier).restore();
 
-    expect(container.read(themeControllerProvider), AppThemeChoice.system);
-  });
+      expect(container.read(themeControllerProvider), AppThemeChoice.system);
+    },
+  );
 
   test('the choice survives a restart', () async {
     final first = _restartedContainer();
@@ -95,8 +99,9 @@ void main() {
     expect(second.read(themeControllerProvider), AppThemeChoice.trueBlack);
   });
 
-  testWidgets('the picker survives a list and a phone at a large text scale',
-      (tester) async {
+  testWidgets('the picker survives a list and a phone at a large text scale', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -111,9 +116,7 @@ void main() {
             data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
             // A list is what settings is, and it gives its children no height
             // bound, which is the constraint the card variant needs one for.
-            child: ListView(
-              children: const [AppearanceSettingsSection()],
-            ),
+            child: ListView(children: const [AppearanceSettingsSection()]),
           ),
         ),
       ),
@@ -124,8 +127,9 @@ void main() {
     expect(find.text('True black'), findsOneWidget);
   });
 
-  testWidgets('tapping a segment is what actually changes the theme',
-      (tester) async {
+  testWidgets('tapping a segment is what actually changes the theme', (
+    tester,
+  ) async {
     final container = _restartedContainer();
     await container.read(themeControllerProvider.notifier).restore();
     await _pumpSection(tester, container);
@@ -135,10 +139,14 @@ void main() {
     await tester.tap(find.text('True black'));
     await tester.pumpAndSettle();
 
-    expect(container.read(themeControllerProvider), AppThemeChoice.trueBlack,
-        reason: 'the segment is the only control the user has for the whole '
-            'theme feature; driving the controller directly proves nothing '
-            'about whether it is wired to anything');
+    expect(
+      container.read(themeControllerProvider),
+      AppThemeChoice.trueBlack,
+      reason:
+          'the segment is the only control the user has for the whole '
+          'theme feature; driving the controller directly proves nothing '
+          'about whether it is wired to anything',
+    );
     expect(
       tester
           .widget<AppSegmentedControl>(find.byType(AppSegmentedControl))
@@ -154,8 +162,9 @@ void main() {
     expect(relaunched.read(themeControllerProvider), AppThemeChoice.trueBlack);
   });
 
-  testWidgets('every appearance option is reachable by tapping it',
-      (tester) async {
+  testWidgets('every appearance option is reachable by tapping it', (
+    tester,
+  ) async {
     for (final choice in AppThemeChoice.values) {
       SharedPreferences.setMockInitialValues({});
       final container = _restartedContainer();
@@ -167,13 +176,17 @@ void main() {
       await tester.tap(find.text(_labelOf(choice)));
       await tester.pumpAndSettle();
 
-      expect(container.read(themeControllerProvider), choice,
-          reason: 'tapping ${_labelOf(choice)} must select it');
+      expect(
+        container.read(themeControllerProvider),
+        choice,
+        reason: 'tapping ${_labelOf(choice)} must select it',
+      );
     }
   });
 
-  testWidgets('a chosen light theme wins over a dark operating system',
-      (tester) async {
+  testWidgets('a chosen light theme wins over a dark operating system', (
+    tester,
+  ) async {
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
     addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
 
@@ -185,8 +198,9 @@ void main() {
     expect(_paintedTheme(tester).brightness, Brightness.light);
   });
 
-  testWidgets('a chosen dark theme wins over a light operating system',
-      (tester) async {
+  testWidgets('a chosen dark theme wins over a light operating system', (
+    tester,
+  ) async {
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
     addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
 
@@ -200,8 +214,9 @@ void main() {
     expect(theme.extension<AppTokens>(), AppTokens.dark);
   });
 
-  testWidgets('true black is reachable, and following the system never is',
-      (tester) async {
+  testWidgets('true black is reachable, and following the system never is', (
+    tester,
+  ) async {
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
     addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
 
