@@ -608,4 +608,68 @@ mod role_grant {
             .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
+
+    /// `InviteDto` (the authenticated create/list shape) carries `role_grant`,
+    /// but the unauthenticated check endpoint is built from its own
+    /// `CheckResponse`/`InviteCommunity` types and must stay that way: an
+    /// invite's role is who redeeming it becomes, which is not something
+    /// proving you hold the code should disclose before you have used it.
+    #[tokio::test]
+    async fn the_check_endpoint_never_discloses_a_role_grant() {
+        let (store, app, admin, _member) = fixture().await;
+        let role = store
+            .create_role("greeter", Permissions::MANAGE_MESSAGES, false)
+            .await
+            .unwrap();
+
+        let created = json_body(
+            app.clone()
+                .oneshot(request(
+                    "POST",
+                    "/invites",
+                    Some(&admin),
+                    Some(json!({"role_grant": role.to_string()})),
+                ))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let code = created["code"].as_str().unwrap().to_owned();
+
+        let check = json_body(
+            app.oneshot(request(
+                "GET",
+                &format!("/invites/{code}/check"),
+                None,
+                None,
+            ))
+            .await
+            .unwrap(),
+        )
+        .await;
+
+        assert_eq!(check["usable"], true);
+        let mut top_level: Vec<_> = check.as_object().unwrap().keys().cloned().collect();
+        top_level.sort();
+        assert_eq!(top_level, ["community", "usable"]);
+
+        let mut community_keys: Vec<_> = check["community"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        community_keys.sort();
+        assert_eq!(
+            community_keys,
+            [
+                "expires_at",
+                "invited_by",
+                "member_count",
+                "name",
+                "uses_remaining"
+            ],
+            "a role_grant must never reach this response, even for a code that carries one"
+        );
+    }
 }

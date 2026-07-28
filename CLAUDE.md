@@ -41,7 +41,7 @@ Known gaps, deliberately left:
 
 - ~~**Live WebSocket frames omit poll, reaction and attachment data.**~~ Fixed 2026-07-28, and the note above it was wrong about the cost. It claimed the fix needed "a database read inside the hot fan-out path or reshaping a widely shared struct"; it needed neither. The send handler already read the attachment summaries for its own response, just *after* publishing, so reading them once before it and handing them to both costs nothing. `Event::MessageCreated` carries them beside the row rather than the row growing a field, so nothing else holding a `Message` changed. Reactions stay absent and that is correct: a message that has just been created cannot have any.
 - **Webhook and bot authorship is not built.** The design shows a CI message; an integrations system is well past beta scope, and the UI marker stays rather than being faked.
-- **Emoji picking is a single placeholder reaction.** The reaction chip, its count and the "did you react" state are all real.
+- ~~**Emoji picking is a single placeholder reaction.**~~ Already stale by the time this was checked, 2026-07-28: PR #76 (2026-07-27) built a real one. `emoji_picker_panel.dart` is a searchable, grouped, keyboard-navigable grid over the `emojis` package's catalog, with the deployment's own custom emoji and a recent shelf both feeding the same `PickerEmoji` grid; see `emoji_catalog.dart` and `emoji_picker_test.dart`.
 
 ### Seeing the UI, and the font trap it exposed
 
