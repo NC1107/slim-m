@@ -39,7 +39,7 @@ After this push every table in 0002 is wired except the canvas pair. `canvas_obj
 
 Known gaps, deliberately left:
 
-- **Live WebSocket frames for a freshly created message omit poll, reaction and attachment data.** Those frames are built from a bare DTO rather than the enrichment path that list, search, sync and the pin list all share. It is pre-existing (reactions always had it) and affects three features identically. Fixing it means a database read inside the hot fan-out path or reshaping a widely shared struct. The client recovers on the next sync.
+- ~~**Live WebSocket frames omit poll, reaction and attachment data.**~~ Fixed 2026-07-28, and the note above it was wrong about the cost. It claimed the fix needed "a database read inside the hot fan-out path or reshaping a widely shared struct"; it needed neither. The send handler already read the attachment summaries for its own response, just *after* publishing, so reading them once before it and handing them to both costs nothing. `Event::MessageCreated` carries them beside the row rather than the row growing a field, so nothing else holding a `Message` changed. Reactions stay absent and that is correct: a message that has just been created cannot have any.
 - **Webhook and bot authorship is not built.** The design shows a CI message; an integrations system is well past beta scope, and the UI marker stays rather than being faked.
 - **Emoji picking is a single placeholder reaction.** The reaction chip, its count and the "did you react" state are all real.
 
@@ -115,6 +115,22 @@ That flag also fixed a real cross-channel leak: `VoiceController` is one instanc
 **This section's "not yet fixed" list is closed, 2026-07-28.** All six entries were re-checked against main by a fan-out that had to cite file and line for every claim; four had already been fixed and the notes had outlived them, and the last two were fixed then. Recording that because the cost was real: a stale backlog sends work at problems that no longer exist, and two of these had been quoted forward into later documents as though still live.
 
 What had already been fixed, and where to look if it recurs: the `ref.invalidate`-after-dispose sites all carry a `mounted` guard now; the `OverlayPortal` children are wrapped in `Positioned`; `manage_channel_sheet.dart`'s delete reads the router before the async gap; the revoked-session redirect lands on sign-in with the server address intact; and `voice_controller_test.dart`'s retry test already drives one controller twice (its doc comment says why, and is what stops somebody "simplifying" it back).
+
+## Driving the Apple Developer portal (2026-07-28)
+
+The App Group, the extension App ID, and the broadcast profile were all created by driving `developer.apple.com` over the Chrome DevTools Protocol, on an isolated profile with its own `--user-data-dir` and `--remote-debugging-port`.
+Worth knowing before doing it again, because three things cost real time:
+
+- **Synthetic JS clicks do not work.** `element.click()` and a dispatched `MouseEvent` both leave the portal's Save doing nothing, silently. Use `Input.dispatchMouseEvent` through CDP, which produces trusted events, and click by an element's bounding-box centre.
+- **Save raises a "Modify App Capabilities" confirmation modal**, and nothing on the page says so. Two apparently successful saves had saved nothing; only reloading and re-reading the row caught it. Verify every write by reloading, never by the absence of an error.
+- **The App Group description rejects hyphens** (`@ & * ' " - .` are all refused), so it is "slimm Shared" rather than "slim-m Shared". The identifier itself takes dots fine.
+
+**The thing to know before touching a capability at all: adding or removing one invalidates every provisioning profile containing that App ID.**
+Enabling App Groups on `top.npcserver.slimm` turned `slim-m App Store Distribution` Invalid immediately, and the next iOS release would have failed to sign.
+It has to be regenerated and its GitHub secret updated in the same sitting.
+Match the certificate by sha1 fingerprint against `~/.secrets/slim-m/slimm_distribution.p12` rather than by the expiry shown in the list, which renders in local time and reads a day earlier than the certificate says.
+
+There is an App Store Connect API key (`asc-api-key-A94NDY63N8.p8`) that can create App IDs and profiles without a browser, but the issuer id lives only in a write-only GitHub secret, and the public API has no App Groups endpoint at all. The portal is the only route for the group.
 
 ## Running the Fedora build, and what it found (2026-07-28)
 
@@ -289,7 +305,7 @@ What landed:
 - Push reachability in onboarding (PR #39): `/version` reports `push_enabled`, and the sign-in screen (where all onboarding paths land) probes it and shows a non-blocking notice when a server explicitly cannot push. Also fixed the sign-in field hardcoding a LAN address over the onboarding choice.
 
 Still open in Phase 3:
-- The iOS Notification Service Extension, which is what would replace "New message" with the decrypted content. It needs a new Xcode target, which cannot be created or tested on this machine.
+- The iOS Notification Service Extension, which is what would replace "New message" with the decrypted content. It needs a new Xcode target. **That is no longer the blocker it reads as**: the broadcast upload extension landed on 2026-07-28 as a second target created by editing `project.pbxproj` as text, and CI compiles and links it, so the same route is open here.
 - The Android half of the exit criterion: a real backgrounded Android device receiving a content-free wake. No Android hardware has been available; the pipeline, registration path, and contract test are done.
 
 Known residuals, deliberately shipped:
