@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.16.0](https://github.com/NC1107/slim-m/compare/server-v0.15.0...server-v0.16.0) (2026-07-28)
+
+
+### Features
+
+* add a per-channel voice roster so the rail shows who is already there ([#98](https://github.com/NC1107/slim-m/issues/98)) ([06d13d7](https://github.com/NC1107/slim-m/commit/06d13d7b3c96cc5b137a8131fd1da870cc4785b6))
+
+
+### Bug Fixes
+
+* **server:** map malformed-body and query rejections to the JSON error contract ([#102](https://github.com/NC1107/slim-m/issues/102)) ([0d06318](https://github.com/NC1107/slim-m/commit/0d063189845c7f20ca48b5857cc911d847b01c36))
+
 ## [0.15.0](https://github.com/NC1107/slim-m/compare/server-v0.14.3...server-v0.15.0) (2026-07-28)
 
 
