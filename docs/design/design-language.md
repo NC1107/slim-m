@@ -49,7 +49,11 @@ The accent is a muted teal, far in hue from Discord's blurple, Slack's aubergine
 | border.subtle | #E1E4E8 | #2B2F34 | #232427 |
 | text.primary | #1B1E22 | #ECEDEF | #ECEDEF |
 | text.secondary | #5B6169 | #A7AEB6 | #A7AEB6 |
-| accent.default | #2B8A83 | #4FBDB4 | #4FBDB4 |
+| accent.default | #1B6F91 | #58B4D8 | #40B6D9 |
+
+The accent moved from the teal this table originally carried (#2B8A83 / #4FBDB4) to glacier cyan on 2026-07-27.
+The reasoning, including that the review's own stated argument for the move turned out to be wrong when measured, is in [decisions/0004-visual-identity-review.md](../decisions/0004-visual-identity-review.md).
+The Design Brief Prompt further down still quotes the teal, deliberately: it is a verbatim record of what was asked for, not a statement of what is.
 
 Status dots keep the conventional traffic-light palette (green online, amber away, red do-not-disturb, gray offline), since that convention is load-bearing for recognition; each also carries a distinct shape so state never depends on color alone.
 Canvas participant cursors get their own categorical set, spaced away from the accent and status hues.

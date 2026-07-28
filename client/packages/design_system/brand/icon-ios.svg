@@ -1,0 +1,16 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- iOS app icon: identical to icon-master.svg but square and full-bleed.
+     iOS applies its own superellipse mask, so a pre-rounded tile would show a
+     gap inside the system corner; the spec's 114/512 radius describes that
+     mask rather than something the asset should bake in. -->
+<!-- The background is opaque and reaches every edge on purpose: an App Store
+     icon carrying an alpha channel is rejected at upload. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="slim-m">
+  <rect width="512" height="512" fill="#17191C"/>
+  <g fill="#58B4D8" transform="translate(256,256) scale(15.2079208) translate(-15.9,-15.9)">
+    <circle cx="9" cy="9" r="3.2"/>
+    <circle cx="21" cy="9" r="3.2"/>
+    <circle cx="9" cy="21" r="3.2"/>
+    <rect x="15" y="15" width="11" height="11" rx="3.5"/>
+  </g>
+</svg>

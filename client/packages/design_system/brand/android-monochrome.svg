@@ -1,0 +1,15 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Android themed-icon (API 33+) monochrome layer. Same 108dp canvas and same
+     placement as android-foreground.svg, painted flat white: the launcher
+     recolours it from the user's wallpaper palette and keeps only the alpha,
+     the way drawable/ic_stat_notify.xml is treated in the status bar. -->
+<!-- White rather than accentFill so nothing here suggests the mark has a
+     second colour treatment; the tint discards the value either way. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108" role="img" aria-label="slim-m">
+  <g fill="#FFFFFF" transform="translate(54,54) scale(2.1386139) translate(-15.9,-15.9)">
+    <circle cx="9" cy="9" r="3.2"/>
+    <circle cx="21" cy="9" r="3.2"/>
+    <circle cx="9" cy="21" r="3.2"/>
+    <rect x="15" y="15" width="11" height="11" rx="3.5"/>
+  </g>
+</svg>

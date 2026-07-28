@@ -1,0 +1,11 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- The below-16px fallback the spec calls for: the square alone, no lattice.
+     Below 16px the three dots collapse into noise and reading them costs more
+     than they add, so the object that left the grid carries the mark by itself. -->
+<!-- Scaled for equal ink weight with the full mark rather than an equal
+     bounding box, so a swap between the two does not change how heavy the
+     icon looks. The mark inks 206.99 square units against this square's
+     110.48 at 1:1, so the side is 11*sqrt(206.99/110.48) = 15.056. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="currentColor" role="img" aria-label="slim-m">
+  <rect x="8.472" y="8.472" width="15.056" height="15.056" rx="4.791"/>
+</svg>
