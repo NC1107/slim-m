@@ -13,7 +13,7 @@ use crate::fixtures::*;
 /// than being descended into or silently dropped.
 #[tokio::test]
 async fn a_non_image_is_refused_and_the_rest_of_the_directory_carries_on() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let media = media_for_test();
     let dir = pack_dir();
     write(&dir, "notes.txt", b"read me first");
@@ -54,7 +54,7 @@ async fn a_non_image_is_refused_and_the_rest_of_the_directory_carries_on() {
 /// nothing about the filename gets a say.
 #[tokio::test]
 async fn an_extension_that_lies_about_the_content_is_refused() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let media = media_for_test();
     let dir = pack_dir();
     write(&dir, "sneaky.png", b"PK\x03\x04\x14\x00\x00\x00zip payload");
@@ -84,7 +84,7 @@ async fn an_extension_that_lies_about_the_content_is_refused() {
 /// accepted as a message attachment.
 #[tokio::test]
 async fn an_allowlisted_type_that_is_not_an_image_is_refused() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let (media, blob_dir) = media_with_blobs();
     let dir = pack_dir();
     let pdf = b"%PDF-1.7\n1 0 obj\n<< >>\nendobj\n";
@@ -124,7 +124,7 @@ async fn an_allowlisted_type_that_is_not_an_image_is_refused() {
 /// reads it hunting for an illegal character that is not there.
 #[tokio::test]
 async fn a_long_filename_is_refused_for_its_length_not_its_characters() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let media = media_for_test();
     let dir = pack_dir();
 

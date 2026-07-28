@@ -18,11 +18,10 @@ use slimm_server::store::Store;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-reactions-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-reactions");
     let config = Config {
         port: 0,
         database_path: path,
@@ -30,7 +29,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -91,7 +90,7 @@ async fn register(store: &Store, username: &str) -> String {
 /// tap on a slow connection is the normal case rather than an edge case.
 #[tokio::test]
 async fn reacting_twice_is_idempotent() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -159,7 +158,7 @@ async fn reacting_twice_is_idempotent() {
 /// cannot see: an unreadable message and a missing one answer identically.
 #[tokio::test]
 async fn reacting_cannot_probe_for_messages_you_cannot_see() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     // @everyone can send and react but NOT view, so the author can post
     // through a role of their own while a stranger sees nothing.
     store

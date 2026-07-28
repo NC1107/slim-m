@@ -21,7 +21,8 @@ use slimm_server::db;
 use slimm_server::ids::ChannelId;
 use slimm_server::store::{Rect, Store, ViewportQuery};
 use sqlx::SqlitePool;
-use uuid::Uuid;
+
+mod support;
 
 /// Objects a 1920x1080 viewport should hold, which is what the seeded world's
 /// size is solved backwards from so density stays fixed as the count grows.
@@ -31,18 +32,18 @@ const SCREEN_H: f64 = 1080.0;
 const OBJECT_W: f64 = 180.0;
 const OBJECT_H: f64 = 140.0;
 
-async fn new_pool(name: &str) -> SqlitePool {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-{name}-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+async fn new_pool(name: &str) -> (SqlitePool, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new(&format!("slimm-{name}"));
     let config = Config {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
         ..Config::default()
     };
-    db::connect(&config).await.expect("connect + migrate")
+    (
+        db::connect(&config).await.expect("connect + migrate"),
+        guard,
+    )
 }
 
 /// The world side length that puts `PER_SCREEN` objects in one screenful.
@@ -188,15 +189,15 @@ fn row(label: &str, names: (&str, &str), fast: (Duration, usize), slow: (Duratio
 }
 
 /// A fresh database holding one seeded canvas.
-async fn world(name: &str, count: usize) -> (SqlitePool, ChannelId) {
-    let pool = new_pool(name).await;
+async fn world(name: &str, count: usize) -> (SqlitePool, ChannelId, support::TestDbGuard) {
+    let (pool, guard) = new_pool(name).await;
     let channel = Store::new(pool.clone())
         .create_channel("canvas", "voice")
         .await
         .unwrap()
         .id;
     seed(&pool, channel, count).await;
-    (pool, channel)
+    (pool, channel, guard)
 }
 
 /// How the two read strategies scale as a single channel's canvas grows, with
@@ -206,7 +207,7 @@ async fn world(name: &str, count: usize) -> (SqlitePool, ChannelId) {
 async fn viewport_cost_against_object_count() {
     println!("\nOne channel, density fixed at ~{PER_SCREEN} objects per screen.\n");
     for count in [1_000usize, 5_000, 20_000, 100_000] {
-        let (pool, channel) = world("spike-count", count).await;
+        let (pool, channel, _guard) = world("spike-count", count).await;
         let viewport = centred(count, 1.0);
         let indexed = measure(&pool, &rtree_sql(true), channel, &viewport).await;
         let naive = measure(&pool, NAIVE_SQL, channel, &viewport).await;
@@ -225,7 +226,7 @@ async fn viewport_cost_against_object_count() {
 #[ignore = "Phase 5 measurement; run with --ignored --nocapture"]
 async fn viewport_cost_against_zoom() {
     let count = 20_000usize;
-    let (pool, channel) = world("spike-zoom", count).await;
+    let (pool, channel, _guard) = world("spike-zoom", count).await;
     println!("\n{count} objects in one channel, zooming out.\n");
 
     for zoom in [1.0f64, 2.0, 4.0, 8.0, 100.0] {
@@ -248,7 +249,7 @@ async fn viewport_cost_against_zoom() {
 #[ignore = "Phase 5 measurement; run with --ignored --nocapture"]
 async fn viewport_cost_against_neighbouring_canvases() {
     let count = 20_000usize;
-    let (pool, mine) = world("spike-channels", count).await;
+    let (pool, mine, _guard) = world("spike-channels", count).await;
     let store = Store::new(pool.clone());
     println!("\n{count} objects each, one read in the first channel.\n");
 
@@ -280,7 +281,7 @@ async fn viewport_cost_against_neighbouring_canvases() {
 #[ignore = "Phase 5 measurement; run with --ignored --nocapture"]
 async fn viewport_cost_of_leaving_the_join_order_open() {
     let count = 20_000usize;
-    let (pool, channel) = world("spike-join", count).await;
+    let (pool, channel, _guard) = world("spike-join", count).await;
     let viewport = centred(count, 1.0);
     println!("\n{count} objects in one channel, one screen.\n");
 
@@ -302,7 +303,7 @@ async fn viewport_cost_of_leaving_the_join_order_open() {
 #[ignore = "Phase 5 measurement; run with --ignored --nocapture"]
 async fn pan_delta_against_a_cold_fetch() {
     let count = 20_000usize;
-    let (pool, channel) = world("spike-delta", count).await;
+    let (pool, channel, _guard) = world("spike-delta", count).await;
     let store = Store::new(pool);
     let cursor = store.latest_canvas_seq(channel).await.unwrap();
 

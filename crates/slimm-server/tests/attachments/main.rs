@@ -17,3 +17,6 @@ mod filenames;
 mod fixtures;
 mod serving;
 mod uploading;
+
+#[path = "../support/mod.rs"]
+mod support;

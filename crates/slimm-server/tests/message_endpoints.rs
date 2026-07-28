@@ -19,11 +19,10 @@ use slimm_server::store::Store;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-msg-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-msg-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -31,7 +30,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 /// Builds a router sharing `store`, so roles and channels created directly on the
@@ -90,7 +89,7 @@ async fn register(store: &Store, username: &str) -> (String, String) {
 
 #[tokio::test]
 async fn send_list_and_edit_happy_path() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -153,7 +152,7 @@ async fn send_list_and_edit_happy_path() {
 
 #[tokio::test]
 async fn send_is_idempotent_over_http() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -195,7 +194,7 @@ async fn send_is_idempotent_over_http() {
 
 #[tokio::test]
 async fn send_id_is_scoped_to_channel_and_author() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -256,7 +255,7 @@ async fn send_id_is_scoped_to_channel_and_author() {
 #[tokio::test]
 async fn permissions_are_enforced() {
     // @everyone can view but not send.
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -291,7 +290,7 @@ async fn permissions_are_enforced() {
 
 #[tokio::test]
 async fn no_view_permission_hides_the_channel() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::NONE, true)
         .await
@@ -315,7 +314,7 @@ async fn no_view_permission_hides_the_channel() {
 
 #[tokio::test]
 async fn editing_another_users_message_needs_manage() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -372,7 +371,7 @@ async fn editing_another_users_message_needs_manage() {
 
 #[tokio::test]
 async fn validation_and_missing_resources() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -432,7 +431,7 @@ async fn validation_and_missing_resources() {
 /// been fixed until the app restarted.
 #[tokio::test]
 async fn a_message_carries_its_author_display_name() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -482,7 +481,7 @@ async fn a_message_carries_its_author_display_name() {
 /// refused.
 #[tokio::test]
 async fn editing_is_rate_limited_like_the_other_writes() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",

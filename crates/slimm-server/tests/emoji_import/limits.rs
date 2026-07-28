@@ -16,7 +16,7 @@ use crate::fixtures::*;
 /// on how much an arbitrary directory can be made to read.
 #[tokio::test]
 async fn a_file_over_the_size_ceiling_is_refused() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let (media, blob_dir) = media_with_blobs();
     let dir = pack_dir();
 
@@ -61,7 +61,7 @@ async fn a_file_over_the_size_ceiling_is_refused() {
 /// import would reach first, and it would say so.
 #[tokio::test]
 async fn the_size_is_read_from_disk_rather_than_from_the_bytes() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let media = media_for_test();
     let dir = pack_dir();
 
@@ -89,7 +89,7 @@ async fn the_size_is_read_from_disk_rather_than_from_the_bytes() {
 /// going through the import at all, which is the HTTP upload.
 #[tokio::test]
 async fn add_emoji_refuses_bytes_over_the_ceiling_on_its_own() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let (media, blob_dir) = media_with_blobs();
 
     let oversized = png(&vec![0u8; MAX_IMAGE_BYTES as usize]);
@@ -114,7 +114,7 @@ async fn add_emoji_refuses_bytes_over_the_ceiling_on_its_own() {
 /// wasted reads and a report that blames the wrong thing.
 #[tokio::test]
 async fn hitting_the_cap_reports_what_was_left_out_and_keeps_the_rest() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let (media, blob_dir) = media_with_blobs();
 
     // One attachment row, many names: the cap counts emoji, and the bytes

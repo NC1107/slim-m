@@ -17,7 +17,7 @@ use crate::fixtures::*;
 /// sanitizer in isolation.
 #[tokio::test]
 async fn a_hostile_filename_cannot_escape_into_the_header_or_the_storage_path() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",

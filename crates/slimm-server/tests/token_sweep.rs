@@ -16,18 +16,20 @@ use slimm_server::db;
 use slimm_server::store::{RefreshOutcome, Store};
 use sqlx::SqlitePool;
 
-async fn pool() -> SqlitePool {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-sweep-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn pool() -> (SqlitePool, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-sweep-test");
     let config = Config {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
         ..Config::default()
     };
-    db::connect(&config).await.expect("connect + migrate")
+    (
+        db::connect(&config).await.expect("connect + migrate"),
+        guard,
+    )
 }
 
 /// Drags a table's `expires_at` back by `age_ms`, standing in for rows written
@@ -53,7 +55,7 @@ const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
 #[tokio::test]
 async fn a_fresh_deployment_has_nothing_to_sweep() {
-    let pool = pool().await;
+    let (pool, _guard) = pool().await;
     let store = Store::new(pool.clone());
     let user = store.create_user("alice", "Alice").await.unwrap();
     let tokens = store.open_session(user.id, "laptop").await.unwrap();
@@ -77,7 +79,7 @@ async fn a_fresh_deployment_has_nothing_to_sweep() {
 
 #[tokio::test]
 async fn long_dead_rows_are_removed_from_all_three_tables() {
-    let pool = pool().await;
+    let (pool, _guard) = pool().await;
     let store = Store::new(pool.clone());
     let user = store.create_user("alice", "Alice").await.unwrap();
     let tokens = store.open_session(user.id, "laptop").await.unwrap();
@@ -108,7 +110,7 @@ async fn long_dead_rows_are_removed_from_all_three_tables() {
 /// the row to still be there.
 #[tokio::test]
 async fn a_spent_refresh_token_survives_long_enough_to_still_catch_reuse() {
-    let pool = pool().await;
+    let (pool, _guard) = pool().await;
     let store = Store::with_reuse_grace_ms(pool.clone(), 0);
     let user = store.create_user("alice", "Alice").await.unwrap();
     let original = store.open_session(user.id, "laptop").await.unwrap();
@@ -140,7 +142,7 @@ async fn a_spent_refresh_token_survives_long_enough_to_still_catch_reuse() {
 
 #[tokio::test]
 async fn sweeping_does_not_disturb_a_live_session_alongside_dead_rows() {
-    let pool = pool().await;
+    let (pool, _guard) = pool().await;
     let store = Store::new(pool.clone());
     let user = store.create_user("alice", "Alice").await.unwrap();
 

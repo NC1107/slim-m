@@ -23,14 +23,13 @@ use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tower::ServiceExt;
 
+mod support;
+
 type Client =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-presence-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-presence-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -38,7 +37,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn state_for(store: &Store) -> AppState {
@@ -155,7 +154,7 @@ async fn presence_status(state: &AppState, token: &str, target_id: &str) -> Stri
 /// only because the viewer differs.
 #[tokio::test]
 async fn hidden_user_reads_offline_to_others_but_true_to_self() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let state = state_for(&store);
     let (alice_access, alice_ticket, alice_id) = user_ticket(&store, "alice").await;
     let (_bob_access, bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
@@ -222,7 +221,7 @@ async fn hidden_user_reads_offline_to_others_but_true_to_self() {
 /// peer and the REST surface observe the transition.
 #[tokio::test]
 async fn presence_flips_to_offline_when_the_last_socket_closes() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let state = state_for(&store);
     let (_alice_access, alice_ticket, alice_id) = user_ticket(&store, "alice").await;
     let (bob_access, bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
@@ -261,7 +260,7 @@ async fn presence_flips_to_offline_when_the_last_socket_closes() {
 /// "offline" entry.
 #[tokio::test]
 async fn unknown_id_is_simply_absent() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let state = state_for(&store);
     let (access, _ticket, _id) = user_ticket(&store, "alice").await;
 

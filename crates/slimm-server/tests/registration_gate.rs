@@ -23,11 +23,10 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-register-gate-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-register-gate");
     let config = Config {
         port: 0,
         database_path: path,
@@ -35,7 +34,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -85,8 +84,8 @@ fn signup(username: &str, invite_code: Option<&str>) -> Value {
 }
 
 /// Claims a fresh deployment with an admin account and returns its token.
-async fn claimed() -> (Store, Router, String) {
-    let store = new_store().await;
+async fn claimed() -> (Store, Router, String, support::TestDbGuard) {
+    let (store, guard) = new_store().await;
     let app = app(store.clone());
     let first = app
         .clone()
@@ -107,7 +106,7 @@ async fn claimed() -> (Store, Router, String) {
         .as_str()
         .unwrap()
         .to_owned();
-    (store, app, token)
+    (store, app, token, guard)
 }
 
 async fn mint_invite(app: &Router, admin: &str, body: Value) -> String {
@@ -125,7 +124,7 @@ async fn mint_invite(app: &Router, admin: &str, body: Value) -> String {
 
 #[tokio::test]
 async fn a_claimed_deployment_refuses_a_registration_with_no_invite() {
-    let (_store, app, _admin) = claimed().await;
+    let (_store, app, _admin, _guard) = claimed().await;
 
     let refused = app
         .clone()
@@ -166,7 +165,7 @@ async fn a_claimed_deployment_refuses_a_registration_with_no_invite() {
 
 #[tokio::test]
 async fn a_usable_invite_lets_someone_in_and_is_spent_by_the_signup() {
-    let (store, app, admin) = claimed().await;
+    let (store, app, admin, _guard) = claimed().await;
     let code = mint_invite(&app, &admin, json!({ "max_uses": 1 })).await;
 
     let joined = app
@@ -204,7 +203,7 @@ async fn a_usable_invite_lets_someone_in_and_is_spent_by_the_signup() {
 
 #[tokio::test]
 async fn an_unusable_code_is_refused_and_leaves_the_username_free() {
-    let (store, app, admin) = claimed().await;
+    let (store, app, admin, _guard) = claimed().await;
     let revoked = mint_invite(&app, &admin, json!({})).await;
     let gone = app
         .clone()
@@ -264,7 +263,7 @@ async fn an_unusable_code_is_refused_and_leaves_the_username_free() {
 /// eventually will.
 #[tokio::test]
 async fn an_invite_that_grants_a_role_applies_it_at_signup() {
-    let (store, app, _admin) = claimed().await;
+    let (store, app, _admin, _guard) = claimed().await;
     let role = store
         .create_role("moderator", Permissions::MANAGE_MESSAGES, false)
         .await
@@ -301,7 +300,7 @@ async fn an_invite_that_grants_a_role_applies_it_at_signup() {
 
 #[tokio::test]
 async fn a_failed_signup_does_not_spend_the_invite() {
-    let (store, app, admin) = claimed().await;
+    let (store, app, admin, _guard) = claimed().await;
     let code = mint_invite(&app, &admin, json!({ "max_uses": 1 })).await;
 
     // Taking a username that already exists fails after the code has been

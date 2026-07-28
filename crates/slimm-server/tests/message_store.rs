@@ -6,11 +6,10 @@ use slimm_server::db;
 use slimm_server::ids::{MessageId, Seq};
 use slimm_server::store::Store;
 
-async fn store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -18,12 +17,12 @@ async fn store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 #[tokio::test]
 async fn seq_is_monotonic_and_independent_per_channel() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let author = s.create_user("mara", "Mara").await.unwrap();
     let a = s.create_channel("general", "text").await.unwrap();
     let b = s.create_channel("gaming", "text").await.unwrap();
@@ -52,7 +51,7 @@ async fn seq_is_monotonic_and_independent_per_channel() {
 
 #[tokio::test]
 async fn send_is_idempotent_by_id() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let author = s.create_user("theo", "Theo").await.unwrap();
     let c = s.create_channel("general", "text").await.unwrap();
 
@@ -90,7 +89,7 @@ async fn send_is_idempotent_by_id() {
 
 #[tokio::test]
 async fn edit_and_keyset_pagination() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let author = s.create_user("priya", "Priya").await.unwrap();
     let c = s.create_channel("general", "text").await.unwrap();
     for i in 0..5 {
@@ -133,7 +132,7 @@ async fn edit_and_keyset_pagination() {
 
 #[tokio::test]
 async fn a_retry_reports_itself_as_a_retry() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let author = s.create_user("rae", "Rae").await.unwrap();
     let c = s.create_channel("general", "text").await.unwrap();
     let id = MessageId::generate();
@@ -164,7 +163,7 @@ async fn a_retry_reports_itself_as_a_retry() {
 async fn concurrent_sends_each_take_a_distinct_sequence_number() {
     const SENDERS: usize = 24;
 
-    let s = store().await;
+    let (s, _guard) = store().await;
     let author = s.create_user("nils", "Nils").await.unwrap();
     let c = s.create_channel("general", "text").await.unwrap();
 

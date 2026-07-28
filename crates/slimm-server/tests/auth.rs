@@ -16,11 +16,10 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::{RefreshOutcome, RegisterError, Store};
 use tower::ServiceExt;
 
-async fn store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-auth-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-auth-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -28,15 +27,15 @@ async fn store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 const PASSWORD: &str = "correct horse battery staple";
 
 /// Registers `alice` with a real Argon2id hash and returns the store, the auth
-/// service, and the new user id.
-async fn with_alice() -> (Store, Auth, slimm_server::ids::UserId) {
-    let store = store().await;
+/// service, the new user id, and the store's db-cleanup guard.
+async fn with_alice() -> (Store, Auth, slimm_server::ids::UserId, support::TestDbGuard) {
+    let (store, guard) = store().await;
     let auth = Auth::new(2).expect("auth service");
     let hash = auth
         .hash_password(PASSWORD.to_owned())
@@ -46,12 +45,12 @@ async fn with_alice() -> (Store, Auth, slimm_server::ids::UserId) {
         .create_account("alice", "Alice", &hash)
         .await
         .expect("register alice");
-    (store, auth, account.id)
+    (store, auth, account.id, guard)
 }
 
 #[tokio::test]
 async fn access_token_resolves_to_its_session() {
-    let (store, _auth, user_id) = with_alice().await;
+    let (store, _auth, user_id, _guard) = with_alice().await;
     let tokens = store.open_session(user_id, "laptop").await.unwrap();
 
     let ctx = store
@@ -75,7 +74,7 @@ async fn access_token_resolves_to_its_session() {
 
 #[tokio::test]
 async fn password_verification_and_username_uniqueness() {
-    let (store, auth, user_id) = with_alice().await;
+    let (store, auth, user_id, _guard) = with_alice().await;
 
     let (found_id, hash) = store
         .find_credentials("alice")
@@ -105,7 +104,7 @@ async fn password_verification_and_username_uniqueness() {
 
 #[tokio::test]
 async fn refresh_rotates_and_drops_the_old_access_token() {
-    let (store, _auth, user_id) = with_alice().await;
+    let (store, _auth, user_id, _guard) = with_alice().await;
     let original = store.open_session(user_id, "laptop").await.unwrap();
 
     let rotated = match store.rotate_refresh(&original.refresh_token).await.unwrap() {
@@ -139,7 +138,7 @@ async fn refresh_rotates_and_drops_the_old_access_token() {
 async fn concurrent_double_refresh_within_grace_denies_softly() {
     // With the default grace window, replaying the just-spent token immediately
     // is treated as the client racing itself, not as theft.
-    let (store, _auth, user_id) = with_alice().await;
+    let (store, _auth, user_id, _guard) = with_alice().await;
     let original = store.open_session(user_id, "laptop").await.unwrap();
 
     let rotated = match store.rotate_refresh(&original.refresh_token).await.unwrap() {
@@ -169,10 +168,7 @@ async fn concurrent_double_refresh_within_grace_denies_softly() {
 #[tokio::test]
 async fn stale_refresh_reuse_revokes_the_family() {
     // A zero grace window makes any replay of a spent token count as reuse.
-    let path = std::env::temp_dir()
-        .join(format!("slimm-auth-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+    let (path, _guard) = support::TestDbGuard::new("slimm-auth-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -219,7 +215,7 @@ async fn stale_refresh_reuse_revokes_the_family() {
 
 #[tokio::test]
 async fn revoke_session_is_instant() {
-    let (store, _auth, user_id) = with_alice().await;
+    let (store, _auth, user_id, _guard) = with_alice().await;
     let tokens = store.open_session(user_id, "phone").await.unwrap();
     assert!(
         store
@@ -247,7 +243,7 @@ async fn revoke_session_is_instant() {
 
 #[tokio::test]
 async fn revoke_device_kills_its_sessions() {
-    let (store, _auth, user_id) = with_alice().await;
+    let (store, _auth, user_id, _guard) = with_alice().await;
     let tokens = store.open_session(user_id, "desktop").await.unwrap();
 
     store.revoke_device(tokens.device_id).await.unwrap();
@@ -262,7 +258,7 @@ async fn revoke_device_kills_its_sessions() {
 
 #[tokio::test]
 async fn ws_ticket_is_single_use_and_session_bound() {
-    let (store, _auth, user_id) = with_alice().await;
+    let (store, _auth, user_id, _guard) = with_alice().await;
     let tokens = store.open_session(user_id, "tablet").await.unwrap();
     let ctx = store
         .authenticate(&tokens.access_token)
@@ -298,7 +294,7 @@ async fn ws_ticket_is_single_use_and_session_bound() {
 /// log out, and confirm the same token is then rejected.
 #[tokio::test]
 async fn http_register_ticket_and_logout() {
-    let store = store().await;
+    let (store, _guard) = store().await;
     let auth = Auth::new(2).expect("auth service");
     let app = http::router(AppState {
         store,
@@ -385,7 +381,7 @@ async fn http_register_ticket_and_logout() {
 /// Wrong password and unknown user are both a plain 401.
 #[tokio::test]
 async fn http_login_rejects_bad_credentials() {
-    let (store, auth, _user_id) = with_alice().await;
+    let (store, auth, _user_id, _guard) = with_alice().await;
     let app = http::router(AppState {
         store,
         auth,
@@ -442,7 +438,7 @@ async fn http_login_rejects_bad_credentials() {
 /// one rotates, the other is a soft deny, neither errors, and the session lives.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn concurrent_refresh_of_same_token_never_errors() {
-    let (store, _auth, user_id) = with_alice().await;
+    let (store, _auth, user_id, _guard) = with_alice().await;
     let original = store.open_session(user_id, "laptop").await.unwrap();
     let token = original.refresh_token.clone();
 
@@ -481,7 +477,7 @@ async fn concurrent_refresh_of_same_token_never_errors() {
 /// A display name carrying a bidi-override character is rejected at registration.
 #[tokio::test]
 async fn http_register_rejects_spoofing_display_name() {
-    let store = store().await;
+    let (store, _guard) = store().await;
     let auth = Auth::new(2).expect("auth service");
     let app = http::router(AppState {
         store,
@@ -521,7 +517,7 @@ async fn http_register_rejects_spoofing_display_name() {
 /// happens to work when nothing races it.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn concurrent_redemptions_of_one_ticket_admit_exactly_one() {
-    let (store, _auth, user_id) = with_alice().await;
+    let (store, _auth, user_id, _guard) = with_alice().await;
     let tokens = store.open_session(user_id, "laptop").await.unwrap();
     let ctx = store
         .authenticate(&tokens.access_token)

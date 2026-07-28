@@ -18,11 +18,10 @@ use slimm_server::store::Store;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-users-test-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-users-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -30,7 +29,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -86,7 +85,7 @@ async fn register(store: &Store, username: &str) -> (String, String) {
 
 #[tokio::test]
 async fn a_profile_carries_only_the_public_shape() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (token, alice_id) = register(&store, "alice").await;
 
@@ -117,7 +116,7 @@ async fn a_profile_carries_only_the_public_shape() {
 /// account.
 #[tokio::test]
 async fn a_deleted_account_looks_like_one_that_never_existed() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (token, _my_id) = register(&store, "alice").await;
     let (_bob_token, bob_id) = register(&store, "bob").await;
@@ -157,7 +156,7 @@ async fn a_deleted_account_looks_like_one_that_never_existed() {
 
 #[tokio::test]
 async fn batch_lookup_skips_ids_with_nothing_to_report() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (token, alice_id) = register(&store, "alice").await;
     let (_, bob_id) = register(&store, "bob").await;
@@ -188,7 +187,7 @@ async fn batch_lookup_skips_ids_with_nothing_to_report() {
 
 #[tokio::test]
 async fn an_empty_batch_returns_an_empty_list() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (token, _id) = register(&store, "alice").await;
 
@@ -204,7 +203,7 @@ async fn an_empty_batch_returns_an_empty_list() {
 
 #[tokio::test]
 async fn a_batch_over_the_cap_is_rejected() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (token, _id) = register(&store, "alice").await;
 
@@ -224,7 +223,7 @@ async fn a_batch_over_the_cap_is_rejected() {
 
 #[tokio::test]
 async fn an_unparseable_id_in_the_batch_is_a_bad_request() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (token, _id) = register(&store, "alice").await;
 
@@ -238,7 +237,7 @@ async fn an_unparseable_id_in_the_batch_is_a_bad_request() {
 
 #[tokio::test]
 async fn the_member_list_is_paginated_and_bounded() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (token, first_id) = register(&store, "alice").await;
     let (_, second_id) = register(&store, "bob").await;
@@ -276,7 +275,7 @@ async fn the_member_list_is_paginated_and_bounded() {
 
 #[tokio::test]
 async fn the_member_list_requires_authentication() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
 
     let response = app

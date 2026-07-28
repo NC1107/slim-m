@@ -20,11 +20,10 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::{JoinPolicy, Store};
 use tower::ServiceExt;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-join-policy-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-join-policy");
     let config = Config {
         port: 0,
         database_path: path,
@@ -32,7 +31,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -96,7 +95,7 @@ async fn claim(app: &Router) -> String {
 
 #[tokio::test]
 async fn a_fresh_deployment_is_invite_only() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     assert_eq!(store.join_policy().await.unwrap(), JoinPolicy::Invite);
 
     let app = app(store);
@@ -109,7 +108,7 @@ async fn a_fresh_deployment_is_invite_only() {
 
 #[tokio::test]
 async fn an_open_deployment_takes_an_account_with_no_code() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let admin = claim(&app).await;
 
@@ -131,7 +130,7 @@ async fn an_open_deployment_takes_an_account_with_no_code() {
 
 #[tokio::test]
 async fn an_open_deployment_still_applies_a_codes_role_grant() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let admin = claim(&app).await;
     store.set_join_policy(JoinPolicy::Open).await.unwrap();
@@ -175,7 +174,7 @@ async fn an_open_deployment_still_applies_a_codes_role_grant() {
 
 #[tokio::test]
 async fn an_open_deployment_still_refuses_a_bad_code() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     claim(&app).await;
     store.set_join_policy(JoinPolicy::Open).await.unwrap();
@@ -186,7 +185,7 @@ async fn an_open_deployment_still_refuses_a_bad_code() {
 
 #[tokio::test]
 async fn changing_the_policy_needs_manage_server() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let admin = claim(&app).await;
     store.set_join_policy(JoinPolicy::Open).await.unwrap();
@@ -221,7 +220,7 @@ async fn changing_the_policy_needs_manage_server() {
 
 #[tokio::test]
 async fn an_unknown_policy_is_refused_rather_than_coerced() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let admin = claim(&app).await;
 
@@ -243,7 +242,7 @@ async fn an_unknown_policy_is_refused_rather_than_coerced() {
 
 #[tokio::test]
 async fn version_reports_whether_a_code_is_needed() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
 
     let before = json_body(
