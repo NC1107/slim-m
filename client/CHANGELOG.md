@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.7.0](https://github.com/NC1107/slim-m/compare/client-v0.6.0...client-v0.7.0) (2026-07-28)
+
+
+### Features
+
+* add a per-channel voice roster so the rail shows who is already there ([#98](https://github.com/NC1107/slim-m/issues/98)) ([06d13d7](https://github.com/NC1107/slim-m/commit/06d13d7b3c96cc5b137a8131fd1da870cc4785b6))
+* **android:** give an incoming call a real notification ([#95](https://github.com/NC1107/slim-m/issues/95)) ([e096f12](https://github.com/NC1107/slim-m/commit/e096f129a23b2ac683ff5420a620cd4cbf0a6e7c))
+* **client:** surface the device media capability probe in voice settings ([#93](https://github.com/NC1107/slim-m/issues/93)) ([da84b30](https://github.com/NC1107/slim-m/commit/da84b3002f2f2fc6262bd344f29f24bca4d94fb4))
+
+
+### Bug Fixes
+
+* **ios:** the broadcast extension must embed no frameworks ([#92](https://github.com/NC1107/slim-m/issues/92)) ([949af6b](https://github.com/NC1107/slim-m/commit/949af6be9245aa6cada04dc9e444705625ec9317))
+* **ui:** centre every list row's content, and give the pane one gutter ([#99](https://github.com/NC1107/slim-m/issues/99)) ([663d56d](https://github.com/NC1107/slim-m/commit/663d56d361057d24a20f5a7ea6d07d308bfaa0fb))
+
 ## [0.6.0](https://github.com/NC1107/slim-m/compare/client-v0.5.1...client-v0.6.0) (2026-07-28)
 
 
