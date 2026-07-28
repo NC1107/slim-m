@@ -50,6 +50,14 @@ const UNCOVERED: &[(&str, &str)] = &[
          permission gate is covered in tests/voice.rs.",
     ),
     (
+        "listVoiceRoster",
+        "its 200 also goes through a reachable LiveKit room service, which this \
+         harness has none of; the fixture's SFU url is undialable by design (see \
+         world.rs). Its shape, the room-not-found-is-empty case, and the \
+         appear-offline filter are covered by tests/voice_roster.rs against a real \
+         mock room service; its permission gate is covered there too.",
+    ),
+    (
         "connectWebSocket",
         "an upgrade, not a request/response: the only statuses it documents are 101 and \
      503 and neither carries a body. The frames that flow afterwards are exercised by \

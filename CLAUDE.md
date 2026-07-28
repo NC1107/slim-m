@@ -12,6 +12,30 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## A per-channel voice roster (2026-07-28)
+
+The rail could only show who was in the one call already joined; every other voice channel looked empty even with people talking in it.
+`GET /channels/{channelId}/voice/roster` (`crates/slimm-server/src/http/voice.rs`) closes that, backed by a new `VoiceService::list_participants` (`crates/slimm-server/src/voice/roster.rs`, a sibling of `voice/mod.rs` split out for the line budget) that calls LiveKit's `ListParticipants` the same way `remove_participant` already called `RemoveParticipant`.
+
+Three things worth knowing before touching it again.
+
+**Appear-offline is enforced here too, not just in `presence.rs`.**
+Being in a LiveKit room already reveals your identity to everyone else already in that room - that half cannot be hidden, the SFU has to tell participants about each other to let them hear one another - but this route is the *preview* a caller who has not joined yet can query, and it must not become a second way to learn a hidden user is online.
+A participant whose `presence_visibility` is `Hidden` is dropped from the response for every viewer but themselves, checked per participant against the store, the same structural treatment `status_for` gives every other surface.
+
+**Unknown, empty, and not-configured are three different answers, not one.**
+A 501 means this deployment has no SFU at all (hide the roster).
+A 503 means one is configured but could not be reached just now (show nothing, but do not clear what was already known).
+A 200 with an empty list means the room was actually checked and nobody is in it.
+`tests/voice_roster.rs` drives all three against a real (or deliberately unreachable) room service; the response contract test cannot exercise the 200 case at all, because the fixture's SFU is `wss://sfu.invalid`-shaped on purpose (see `world.rs`), so `listVoiceRoster` sits in `UNCOVERED` for the same reason `kickVoiceParticipant` already did.
+
+**Cost is handled client-side, not server-side.**
+There is no cache in front of LiveKit; the answer instead is that `voiceRosterProvider` (`client/packages/app/lib/src/providers/voice_roster.dart`) is a `StreamProvider.autoDispose` keyed per channel, polling on a 15-second `Timer.periodic` that only exists while a rail row for that channel is actually on screen, and `VoiceChannelRow` never watches it at all for the one channel already joined, since that one already has live participant data for free.
+`Timer.periodic` rather than a bare `Future.delayed` loop, deliberately: it is the only shape `ref.onDispose` can actually `.cancel()`, and a widget test proved the difference - the `Future.delayed` version left an uncancellable timer pending after every test that ever got a successful fetch.
+
+Found and fixed along the way: `ui_snapshot_test.dart`'s fake HTTP client had a catch-all fallback of `<Object>[]` for any unmatched path, the right empty answer for a list endpoint and the wrong shape entirely for this one, so the full-shell snapshot test crashed with a type-cast error the moment this route existed.
+It now answers the roster path with `{"participants": []}` explicitly.
+
 ## The design-alignment push (2026-07-26)
 
 The UI was aligned to the Claude Design visual identity review, and the features the design assumed were built to back it.
@@ -225,7 +249,7 @@ A channel with kind `voice` rendered as a text channel, so there was no way to s
 `client/packages/app/test/route_reachability_test.dart` now fails if any registered route has nothing navigating to it, ignoring the route's own `path:` registration (the evidence that was present for settings the whole time) and comments (its own first draft passed on a comment that merely named the route).
 
 Still open in Phase 4:
-- Voice UX polish: camera pre-toggle and a roster shown before joining rather than after. The join preview, mic pre-toggle, in-call controls and collapse-to-strip indicator are built.
+- Voice UX polish: camera pre-toggle. The rail shows a real roster for a channel not yet joined now (see "A per-channel voice roster" above), but the join preview screen itself (`voice_screen.dart`) still does not show who is already in the room before you tap Join; it could reuse `voiceRosterProvider` to close that. The join preview, mic pre-toggle, in-call controls and collapse-to-strip indicator are built.
 - Android ConnectionService with a CallStyle notification.
 - The runtime half of the RTC spike. `MediaCapabilities.probeAll()` exists but nothing calls it, and the Wayland portal shows a picker, so it needs a human at the screen.
 - A real call on an iPhone through TestFlight, and an Android device for the heads-up path.

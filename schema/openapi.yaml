@@ -2054,6 +2054,53 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /channels/{channelId}/voice/roster:
+    get:
+      operationId: listVoiceRoster
+      tags: [voice]
+      summary: Who is currently in a channel's voice room.
+      description: >
+        Requires `VIEW_CHANNEL` alone, the same bit `listMessages` reads
+        under: seeing who is talking is exactly as sensitive as seeing what
+        they typed, and no more, so this does not also require `CONNECT`.
+
+
+        A participant who has chosen to appear offline is omitted from every
+        viewer's roster but their own, the same treatment presence gives
+        everywhere else. This is a real round trip to the SFU's room
+        service, unlike minting a token, so a client should poll it on an
+        interval rather than on every render.
+
+
+        A 501 means this deployment has no SFU configured. A 503 means one is
+        configured but could not be reached right now; both are distinct from
+        a 200 with an empty list, which means the room is genuinely empty.
+      parameters:
+        - $ref: "#/components/parameters/ChannelId"
+      responses:
+        "200":
+          description: Who the SFU reports as connected, visible to this caller.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceRoster"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "501":
+          description: This deployment has no voice configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
   /channels/{channelId}/voice/participants/{userId}/kick:
     parameters:
       - name: channelId
@@ -3246,6 +3293,27 @@ components:
             Whether this token grants publishing audio, mirroring the SPEAK
             grant inside it, so the UI can show a listen-only state up front
             instead of after the SFU refuses a track.
+
+    VoiceRoster:
+      type: object
+      required: [participants]
+      properties:
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/VoiceRosterParticipant"
+
+    VoiceRosterParticipant:
+      type: object
+      required: [user_id, display_name]
+      properties:
+        user_id:
+          type: string
+        display_name:
+          type: string
+          description: >-
+            As it was when this participant joined the room, not necessarily
+            their current profile name.
 
     ReactionSummary:
       type: object

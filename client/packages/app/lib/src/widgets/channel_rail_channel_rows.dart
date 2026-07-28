@@ -8,12 +8,15 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
+import '../providers/voice_roster.dart';
 import '../routing/routes.dart';
 import 'manage_channel_sheet.dart';
 import 'user_avatar.dart';
@@ -57,7 +60,7 @@ class ManagedChannelRow extends StatelessWidget {
   }
 }
 
-class VoiceChannelRow extends StatelessWidget {
+class VoiceChannelRow extends ConsumerWidget {
   const VoiceChannelRow({
     super.key,
     required this.channel,
@@ -74,11 +77,21 @@ class VoiceChannelRow extends StatelessWidget {
       voice.channelId == channel.id;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final iconColor = _inCall
         ? tokens.accent
         : tokens.textSecondary.withValues(alpha: 0.7);
+
+    // A joined call already has this live; an unjoined one polls for it below.
+    final participants = _inCall
+        ? voice.participants
+        : ref
+                  .watch(voiceRosterProvider(channel.id))
+                  .valueOrNull
+                  ?.map(_asVoiceParticipant)
+                  .toList(growable: false) ??
+              const <VoiceParticipant>[];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,31 +105,38 @@ class VoiceChannelRow extends StatelessWidget {
             size: AppSizes.icon16,
             color: iconColor,
           ),
-          trailing: _inCall
-              ? Text(
-                  '${voice.participants.length}',
+          trailing: participants.isEmpty
+              ? null
+              : Text(
+                  '${participants.length}',
                   style: AppText.micro.copyWith(
                     color: tokens.textSecondary,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
-                )
-              : null,
+                ),
           onTap: () => context.go(Routes.channel(channel.id)),
         ),
-        if (_inCall) _ParticipantStrip(participants: voice.participants),
+        if (participants.isNotEmpty)
+          _ParticipantStrip(participants: participants),
       ],
     );
   }
 }
 
-/// Who is in a voice channel, rendered only for the one the caller has
-/// actually joined.
-///
-/// TODO(ui-backend): for any other voice channel there is no way to know who
-/// (if anyone) is in it, because the server exposes no per-channel voice
-/// roster, only the participants of a room already joined. So this strip is
-/// sourced from real participant data for that one channel, and shows
-/// nothing at all otherwise.
+/// A roster snapshot carries no live speaking or screen-share signal, only
+/// who is connected, so every derived flag here is false rather than guessed.
+VoiceParticipant _asVoiceParticipant(api.VoiceRosterParticipant p) =>
+    VoiceParticipant(
+      identity: p.userId,
+      name: p.displayName,
+      isSpeaking: false,
+      isMuted: false,
+      isLocal: false,
+      isScreenSharing: false,
+    );
+
+/// Who is in a voice channel: real-time for the one the caller has joined,
+/// a periodic snapshot ([voiceRosterProvider]) for every other one.
 class _ParticipantStrip extends StatelessWidget {
   const _ParticipantStrip({required this.participants});
 
