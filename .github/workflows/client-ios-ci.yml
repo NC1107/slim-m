@@ -60,8 +60,10 @@ jobs:
           path: |
             client/packages/app/ios/Pods
             ~/Library/Caches/CocoaPods
+          # Keyed on the lockfiles alone, with no prefix fallback: restoring
+          # pods resolved from a different lockfile is how a build stops
+          # matching the dependencies it claims to have.
           key: pods-${{ runner.os }}-${{ hashFiles('client/packages/app/ios/Podfile.lock', 'client/pubspec.lock') }}
-          restore-keys: pods-${{ runner.os }}-
 
       # xcodebuild will not open the project until a Flutter build has generated
       # its config and plugin registrant. --no-codesign keeps it to compiling.
