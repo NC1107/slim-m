@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- surfaceBase from design_system/lib/src/app_tokens.dart. The launcher icon
+     keeps the dark tile in both system themes, so there is no -night variant. -->
+<resources>
+    <color name="ic_launcher_background">#17191C</color>
+</resources>

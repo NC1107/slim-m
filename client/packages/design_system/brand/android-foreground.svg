@@ -1,0 +1,16 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Android adaptive icon foreground layer. The canvas is the full 108dp; the
+     launcher masks the outer 18dp on every side away, leaving 72dp visible,
+     of which only a 66dp circle is guaranteed. Transparent by design: the
+     background layer is a flat surfaceBase supplied as a colour resource. -->
+<!-- The mark is 60% of the 72dp visible area (43.2 units, 43.2/20.2 =
+     2.1386139) so it reads at the same weight as the iOS and web tiles. Its
+     circumscribed circle is 55.4dp, inside the 66dp guarantee. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108" role="img" aria-label="slim-m">
+  <g fill="#58B4D8" transform="translate(54,54) scale(2.1386139) translate(-15.9,-15.9)">
+    <circle cx="9" cy="9" r="3.2"/>
+    <circle cx="21" cy="9" r="3.2"/>
+    <circle cx="9" cy="21" r="3.2"/>
+    <rect x="15" y="15" width="11" height="11" rx="3.5"/>
+  </g>
+</svg>

@@ -36,8 +36,11 @@ By hand, when that job has skipped or failed:
 sudo dnf install copr-cli rpm-build rpmdevtools
 rpmdev-setuptree
 cp packaging/rpm/slim-m-client.spec ~/rpmbuild/SPECS/
-# spectool fetches remote sources only, so Source1 has to be placed by hand.
+# spectool fetches remote sources only, so the local ones go by hand: the
+# desktop entry and the hicolor icons it names.
 cp packaging/rpm/top.npcserver.slimm.desktop ~/rpmbuild/SOURCES/
+cp packaging/linux/icons/top.npcserver.slimm*.png \
+   packaging/linux/icons/top.npcserver.slimm.svg ~/rpmbuild/SOURCES/
 spectool -g -R ~/rpmbuild/SPECS/slim-m-client.spec
 rpmbuild -bs ~/rpmbuild/SPECS/slim-m-client.spec
 copr-cli build nc1107/slim-m ~/rpmbuild/SRPMS/slim-m-client-*.src.rpm

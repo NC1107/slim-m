@@ -1,0 +1,17 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Maskable web icon. A maskable icon is cropped to an arbitrary shape by the
+     installing platform, and only the centre 80% circle is guaranteed to
+     survive, so the mark is smaller here than in icon-master.svg. -->
+<!-- Sized as 60% of that 80% safe box: 512*0.8*0.6 = 245.76 units of bounding
+     box, 245.76/20.2 = 12.1663366. The mark's furthest ink from centre is
+     12.958 units, so its circumscribed circle lands at 62% of the tile, well
+     inside the 80% the mask promises. Full-bleed, since the crop needs bleed. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="slim-m">
+  <rect width="512" height="512" fill="#17191C"/>
+  <g fill="#58B4D8" transform="translate(256,256) scale(12.1663366) translate(-15.9,-15.9)">
+    <circle cx="9" cy="9" r="3.2"/>
+    <circle cx="21" cy="9" r="3.2"/>
+    <circle cx="9" cy="21" r="3.2"/>
+    <rect x="15" y="15" width="11" height="11" rx="3.5"/>
+  </g>
+</svg>

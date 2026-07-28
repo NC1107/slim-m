@@ -382,7 +382,9 @@ jobs:
             dnf -y install rpm-build patchelf desktop-file-utils tar gzip >/dev/null
             mkdir -p rpmbuild/SOURCES
             cp dist/slim-m-client-*-linux-amd64.tar.gz \
-              packaging/rpm/top.npcserver.slimm.desktop rpmbuild/SOURCES/
+              packaging/rpm/top.npcserver.slimm.desktop \
+              packaging/linux/icons/top.npcserver.slimm*.png \
+              packaging/linux/icons/top.npcserver.slimm.svg rpmbuild/SOURCES/
             # The same stamp the copr job applies, so the .rpm on the release and
             # the one COPR builds carry the same version as the tag.
             sed "s/^Version:.*/Version:        ${VER}/" \
@@ -480,7 +482,9 @@ jobs:
           cp "$spec" ~/rpmbuild/SPECS/slim-m-client.spec
           # spectool below fetches remote sources only, so the local ones have
           # to be placed by hand or rpmbuild -bs fails on a missing Source.
-          cp packaging/rpm/top.npcserver.slimm.desktop ~/rpmbuild/SOURCES/
+          cp packaging/rpm/top.npcserver.slimm.desktop \
+            packaging/linux/icons/top.npcserver.slimm*.png \
+            packaging/linux/icons/top.npcserver.slimm.svg ~/rpmbuild/SOURCES/
           # Stamp the version only when the spec hardcodes it. A spec that
           # expands a macro there already has the value and must not be edited.
           if ! grep -q '^Version:.*%{' ~/rpmbuild/SPECS/slim-m-client.spec; then

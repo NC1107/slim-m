@@ -1,0 +1,16 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Primary app icon: accentFill on surfaceBase, 512 tile, 114 corner radius,
+     mark at 60% of the tile. Colours are the dark theme's accentFill (#58B4D8)
+     and surfaceBase (#17191C) from design_system/lib/src/app_tokens.dart. -->
+<!-- The mark's bounding box is 20.2 units on the 32 grid (5.8..26 both axes),
+     centred on (15.9, 15.9). 512*0.6/20.2 = 15.2079208 maps it to 60% here,
+     which leaves 6.73 units of clear space, above the 6.4 the spec asks for. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="slim-m">
+  <rect width="512" height="512" rx="114" fill="#17191C"/>
+  <g fill="#58B4D8" transform="translate(256,256) scale(15.2079208) translate(-15.9,-15.9)">
+    <circle cx="9" cy="9" r="3.2"/>
+    <circle cx="21" cy="9" r="3.2"/>
+    <circle cx="9" cy="21" r="3.2"/>
+    <rect x="15" y="15" width="11" height="11" rx="3.5"/>
+  </g>
+</svg>

@@ -6,6 +6,10 @@
 %global appid     top.npcserver.slimm
 %global bundledir %{_libdir}/%{name}
 
+# The hicolor sizes a Linux desktop actually looks in, chosen by counting what
+# is installed under /usr/share/icons/hicolor/*/apps on a Fedora KDE box.
+%global iconsizes 16 22 24 32 48 64 128 256 512
+
 # The Flutter engine and its plugin .so files are private to this app, not distro
 # libraries: rpm must neither advertise them nor try to resolve them elsewhere.
 %global __provides_exclude_from ^%{bundledir}/.*\\.so$
@@ -24,6 +28,20 @@ URL:            https://github.com/NC1107/slim-m
 # Flutter build needs network for pub, which a COPR/mock buildroot has not.
 Source0:        https://github.com/NC1107/slim-m/releases/download/client-v%{version}/slim-m-client-%{version}-linux-amd64.tar.gz
 Source1:        top.npcserver.slimm.desktop
+# The hicolor icons, from client/packages/design_system/brand. Every Source
+# lands in one flat directory, which is why the sizes are in the basenames.
+# Declared one by one, rather than globbed, so they travel inside the SRPM that
+# the COPR job builds: rpmbuild only carries sources the spec names.
+Source2:        top.npcserver.slimm-16.png
+Source3:        top.npcserver.slimm-22.png
+Source4:        top.npcserver.slimm-24.png
+Source5:        top.npcserver.slimm-32.png
+Source6:        top.npcserver.slimm-48.png
+Source7:        top.npcserver.slimm-64.png
+Source8:        top.npcserver.slimm-128.png
+Source9:        top.npcserver.slimm-256.png
+Source10:       top.npcserver.slimm-512.png
+Source11:       top.npcserver.slimm.svg
 
 # The upstream Flutter engine and the bundled libwebrtc are x86_64-only builds.
 ExclusiveArch:  x86_64
@@ -83,12 +101,29 @@ ln -s ../%{_lib}/%{name}/slimm_app %{buildroot}%{_bindir}/slim-m
 
 desktop-file-install --dir=%{buildroot}%{_datadir}/applications %{SOURCE1}
 
+# Installed under the name the .desktop's Icon= line asks for. A mismatch here
+# shows as a generic placeholder in the launcher and nothing warns about it.
+for px in %{iconsizes}; do
+    install -Dpm0644 %{_sourcedir}/%{appid}-${px}.png \
+        %{buildroot}%{_datadir}/icons/hicolor/${px}x${px}/apps/%{appid}.png
+done
+# Scalable covers the sizes above plus every HiDPI scale of them, and is the
+# most populated apps directory in hicolor on a real desktop.
+install -Dpm0644 %{SOURCE11} \
+    %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/%{appid}.svg
+
 %check
 desktop-file-validate %{buildroot}%{_datadir}/applications/%{appid}.desktop
 # The runner is useless without these two, and a bundle that lost them would
 # otherwise package cleanly and fail at launch on the user's machine.
 test -x %{buildroot}%{bundledir}/slimm_app
 test -f %{buildroot}%{bundledir}/data/icudtl.dat
+# The %%files globs below would pass on a partial set, and a missing size falls
+# back to a scaled neighbour silently, so assert every one landed.
+for px in %{iconsizes}; do
+    test -f %{buildroot}%{_datadir}/icons/hicolor/${px}x${px}/apps/%{appid}.png
+done
+test -f %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/%{appid}.svg
 
 %files
 %license LICENSE
@@ -96,6 +131,10 @@ test -f %{buildroot}%{bundledir}/data/icudtl.dat
 %{_bindir}/slim-m
 %{bundledir}/
 %{_datadir}/applications/%{appid}.desktop
+# No gtk-update-icon-cache scriptlet: Fedora's filesystem package carries a file
+# trigger on this directory that rebuilds the cache for us.
+%{_datadir}/icons/hicolor/*/apps/%{appid}.png
+%{_datadir}/icons/hicolor/scalable/apps/%{appid}.svg
 
 %changelog
 * Mon Jul 27 2026 NC1107 <nickpconn@gmail.com> - 0.4.0-1

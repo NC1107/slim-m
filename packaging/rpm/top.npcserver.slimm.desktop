@@ -7,8 +7,8 @@ Name=slim-m
 GenericName=Messaging
 Comment=Chat, voice, and screen share on a slim-m server
 Exec=slim-m
-# No icon file is shipped; the repo has no slim-m artwork yet. The key is here so
-# dropping top.npcserver.slimm.png into hicolor is all it takes to light it up.
+# Names the hicolor icons the spec installs, which are keyed on the application
+# id rather than a filename. Renaming this without renaming those breaks both.
 Icon=top.npcserver.slimm
 Terminal=false
 StartupNotify=true

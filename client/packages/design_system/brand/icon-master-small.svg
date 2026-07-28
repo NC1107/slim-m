@@ -1,0 +1,16 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- The app icon below the mark's own minimum: the square alone, no lattice.
+     The spec sets a 16px floor on the full mark and calls for the glyph under
+     it, and the mark is 62% of its tile, so a 16, 22 or 24px tile draws it at
+     9.9, 13.6 and 14.9px - all under the floor, with the dots landing near
+     2px. Rendered from this instead, those three stay legible. -->
+<!-- Same tile, same colours and the same 60% ink target as icon-master.svg,
+     so the two are interchangeable at a glance. The glyph's side is 15.056 on
+     the 32 grid (see glyph.svg for why that number and not 11), which makes
+     512*0.6/15.056 = 20.4038 the scale that puts its ink at 60% here. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="slim-m">
+  <rect width="512" height="512" rx="114" fill="#17191C"/>
+  <g fill="#58B4D8" transform="translate(256,256) scale(20.4038) translate(-16,-16)">
+    <rect x="8.472" y="8.472" width="15.056" height="15.056" rx="4.791"/>
+  </g>
+</svg>

@@ -41,13 +41,26 @@ They are services rather than libraries, each backs one feature rather than the 
 
 The private `.so` files are kept out of rpm's dependency namespace in both directions, through `__provides_exclude_from` and `__requires_exclude`, so the package neither advertises `libwebrtc.so` to the distribution nor tries to resolve it there.
 
-## No icon
+## Icons
 
-There is no slim-m icon in this repository.
-Every icon under `client/packages/app`, on all three platforms, is still the stock Flutter logo, so none is shipped and none is invented.
+The package installs the "Off-grid" mark into the hicolor theme at nine sizes, plus the SVG at `scalable/apps`.
+The sizes are 16, 22, 24, 32, 48, 64, 128, 256 and 512, chosen by counting what is actually installed under `/usr/share/icons/hicolor/*/apps` on a Fedora KDE desktop rather than from a default list.
 
-The `.desktop` file names `Icon=top.npcserver.slimm` anyway, so the day real artwork exists, installing it into `hicolor` is the whole change.
-Until then the launcher entry appears with the desktop's fallback icon.
+Every file is named `top.npcserver.slimm`, matching the `.desktop` file's `Icon=` line exactly.
+That match is the whole thing: a mismatch shows as a generic placeholder in the launcher, and nothing warns about it.
+
+The PNGs are not drawn by hand or checked in from a designer.
+`client/packages/design_system/brand/generate.sh` rasterises them from `icon-master.svg`, the same master the iOS, Android and web icons come from, into `packaging/linux/icons/`.
+Rerun it after changing a master or an accent token.
+
+Each size is rendered natively from the vector at that size rather than downsampled from the 512.
+Downsampling a tile this simple with Lanczos rings visibly: dark halos around the dots and a bright core in the square, worst exactly where it matters, at 16 and 22.
+
+They are declared as individual `SourceN` lines with the size in the basename.
+Both are forced: rpm flattens every source into one directory, so the basenames have to differ, and only sources the spec names travel inside the SRPM that the COPR job builds.
+
+There is no `gtk-update-icon-cache` scriptlet.
+Fedora's `filesystem` package carries a file trigger on that directory and rebuilds the cache itself.
 
 The `.desktop` file is itself named for the GTK application id in `client/packages/app/linux/CMakeLists.txt`.
 Wayland matches a window to its launcher entry by that id, so the two names have to agree.
