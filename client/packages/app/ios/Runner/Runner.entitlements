@@ -4,5 +4,13 @@
 <dict>
 	<key>aps-environment</key>
 	<string>production</string>
+	<!-- The broadcast upload extension is a separate process; this shared
+	     container is the only place the two can meet. flutter_webrtc opens
+	     the capture socket in it, the extension connects to it. Must match
+	     BroadcastExtension/BroadcastExtension.entitlements exactly. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.top.npcserver.slimm</string>
+	</array>
 </dict>
 </plist>

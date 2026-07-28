@@ -9,6 +9,7 @@ import UserNotifications
   private static let pushChannelName = "top.npcserver.slimm/push"
 
   private var pushChannel: FlutterMethodChannel?
+  private var broadcastChannel: FlutterMethodChannel?
 
   // The token or a registration failure can each arrive before Dart has asked
   // for it (a fast relaunch) or long after (the user takes a while to decide
@@ -35,6 +36,12 @@ import UserNotifications
       self?.handlePushCall(call, result: result)
     }
     pushChannel = channel
+
+    let broadcast = FlutterMethodChannel(name: BroadcastChannel.name, binaryMessenger: messenger)
+    broadcast.setMethodCallHandler { call, result in
+      BroadcastChannel.handle(call, result: result)
+    }
+    broadcastChannel = broadcast
   }
 
   private func handlePushCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
