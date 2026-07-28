@@ -2441,7 +2441,7 @@ components:
           description: >
             Whether creating an account here needs an invite code. Follows
             the deployment's `join_policy`. Absent on servers older than
-            0.15.0, which a client must treat as unknown rather than false.
+            0.14.2, which a client must treat as unknown rather than false.
             Unauthenticated for the same reason `push_enabled` is: the
             sign-up screen has to say so before an account exists.
         identity:
