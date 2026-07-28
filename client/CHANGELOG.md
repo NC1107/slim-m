@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/NC1107/slim-m/compare/client-v0.4.0...client-v0.5.0) (2026-07-28)
+
+
+### Features
+
+* **brand:** the off-grid mark, everywhere an icon lives ([#80](https://github.com/NC1107/slim-m/issues/80)) ([40f68ba](https://github.com/NC1107/slim-m/commit/40f68ba6627d4b3d6e0d9027bda59751be713b23))
+
+
+### Bug Fixes
+
+* **mobile:** image-only sends, fullscreen media, Fedora packaging, and Space naming ([#77](https://github.com/NC1107/slim-m/issues/77)) ([cbf89d4](https://github.com/NC1107/slim-m/commit/cbf89d494fb80e7f14a01677237358eda5c9bbe2))
+
 ## [0.4.0](https://github.com/NC1107/slim-m/compare/client-v0.3.0...client-v0.4.0) (2026-07-27)
 
 
