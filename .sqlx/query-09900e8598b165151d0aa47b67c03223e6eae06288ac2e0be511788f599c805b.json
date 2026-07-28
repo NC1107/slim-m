@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 AS \"one!: i64\"\n               WHERE EXISTS (SELECT 1 FROM message_attachments WHERE sha256 = ?)\n                  OR EXISTS (SELECT 1 FROM custom_emoji WHERE sha256 = ?)",
+  "describe": {
+    "columns": [
+      {
+        "name": "one!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "09900e8598b165151d0aa47b67c03223e6eae06288ac2e0be511788f599c805b"
+}

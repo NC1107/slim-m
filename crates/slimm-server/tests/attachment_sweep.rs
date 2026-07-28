@@ -155,3 +155,74 @@ async fn removing_the_emoji_releases_its_bytes_to_the_next_sweep() {
     assert_eq!(freed, vec![hex(&emoji_bytes)]);
     assert_eq!(attachment_count(&pool).await, 0);
 }
+
+/// Deleting a message whose image is ALSO a custom emoji must not fail.
+///
+/// Content addressing makes this collision the normal case rather than an
+/// exotic one: `add_emoji` deliberately reuses an `attachments` row someone
+/// already attached to a message, and the import path advertises that as the
+/// reason an image costs one copy. `release_message_attachments` then deletes
+/// the row once no *message* references the hash, which is the same blind spot
+/// the sweep had - RESTRICT aborts the delete and takes the whole
+/// message-deletion transaction with it.
+#[tokio::test]
+async fn deleting_a_message_whose_image_is_also_an_emoji_still_works() {
+    use slimm_server::ids::MessageId;
+
+    let pool = pool().await;
+    let store = Store::new(pool.clone());
+
+    let shared = [0x33u8; 32];
+    store
+        .store_attachment(&shared, 8, "image/png", "shared.png")
+        .await
+        .unwrap();
+
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let author = store
+        .create_account("alice", "Alice", "hash")
+        .await
+        .expect("an author")
+        .id;
+    let message = MessageId::generate();
+    store
+        .send_message(
+            channel.id,
+            author,
+            message,
+            "look at this",
+            &[shared.to_vec()],
+        )
+        .await
+        .expect("the message is sent with its attachment");
+
+    store
+        .create_custom_emoji(EmojiId::generate(), "shared", &shared, None)
+        .await
+        .unwrap()
+        .expect("the emoji reuses the message's bytes");
+
+    let deletion = store
+        .delete_message(message)
+        .await
+        .expect("an emoji sharing the bytes must not fail the delete");
+
+    assert!(
+        deletion.freed_attachments.is_empty(),
+        "the bytes are still an emoji's, so nothing may be freed: {:?}",
+        deletion.freed_attachments
+    );
+    assert_eq!(
+        attachment_count(&pool).await,
+        1,
+        "the emoji's row must survive the message that shared it"
+    );
+    assert!(
+        store
+            .custom_emoji_sha256_by_name("shared")
+            .await
+            .unwrap()
+            .is_some(),
+        "the emoji must still resolve to its bytes"
+    );
+}
