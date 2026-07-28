@@ -27,7 +27,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, broadcast};
 
 use crate::ids::{ChannelId, MessageId, SessionId, UserId};
 use crate::presence::PresenceTracker;
-use crate::store::Message;
+use crate::store::{AttachmentSummary, Message};
 use crate::typing::TypingTracker;
 
 /// How many events the channel buffers per subscriber before the slowest one
@@ -42,7 +42,15 @@ const MAX_CONNECTIONS: usize = 1024;
 pub enum Event {
     /// A message was created; carries the full row so a connection can render
     /// the wire frame without another query.
-    MessageCreated(Message),
+    ///
+    /// Attachments ride along because a brand new message can already have
+    /// them and the row cannot express them. The sender reads them once for
+    /// its own response, so this costs no extra query; leaving them out sent
+    /// an image that only appeared on the next sync.
+    MessageCreated {
+        message: Message,
+        attachments: Vec<AttachmentSummary>,
+    },
     /// A message was edited.
     MessageEdited(Message),
     /// A poll's votes changed. Carries the whole per-option tally rather than

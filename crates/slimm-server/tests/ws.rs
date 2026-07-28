@@ -302,3 +302,69 @@ async fn deleting_the_account_closes_its_live_socket() {
         "the socket must close when the account behind it is deleted"
     );
 }
+
+/// A brand new message can already carry an attachment, and the live frame is
+/// the only thing a connected client sees until its next sync.
+///
+/// The frame used to be built from a bare row, which cannot express one, so an
+/// image arrived as an empty message and only gained its picture on reconnect.
+#[tokio::test]
+async fn a_live_frame_carries_the_attachment_the_message_was_sent_with() {
+    let store = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL
+                .union(Permissions::SEND_MESSAGES)
+                .union(Permissions::ATTACH_FILES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let state = state_for(&store);
+
+    let (alice_access, _alice_ticket, _alice) = user_ticket(&store, "alice").await;
+    let (_bob_access, bob_ticket, _bob) = user_ticket(&store, "bob").await;
+
+    // Stored directly: this test is about the fan-out, not the upload route.
+    // The id on the wire is the lowercase hex of the content hash.
+    // 32 bytes: the id is a sha256, and a short one is refused as malformed.
+    let bytes = [0x11u8; 32];
+    store
+        .store_attachment(&bytes, bytes.len() as i64, "image/png", "shot.png")
+        .await
+        .unwrap();
+    let attachment_id: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+
+    let addr = serve(state.clone()).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    let uri = format!("/channels/{}/messages", channel.id);
+    let response = http::router(state.clone())
+        .oneshot(send_request(
+            &uri,
+            &alice_access,
+            json!({
+                "id": Uuid::now_v7().to_string(),
+                "content": "look at this",
+                "attachment_ids": [attachment_id],
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let frame = read_frame(&mut bob_ws).await;
+    assert_eq!(frame["type"], "message.created");
+    let attachments = frame["message"]["attachments"]
+        .as_array()
+        .expect("the frame carries an attachments array");
+    assert_eq!(
+        attachments.len(),
+        1,
+        "the live frame must carry the attachment, not leave it for the next sync: {frame}"
+    );
+    assert_eq!(attachments[0]["filename"], "shot.png");
+    assert_eq!(attachments[0]["content_type"], "image/png");
+}
