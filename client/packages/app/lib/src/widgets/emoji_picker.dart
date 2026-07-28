@@ -23,7 +23,7 @@ import '../providers/recent_emoji.dart';
 import 'emoji_catalog.dart';
 import 'emoji_picker_grid.dart';
 import 'emoji_picker_panel.dart';
-import 'message_row.dart';
+import 'hover_reveal.dart';
 
 export 'emoji_picker_panel.dart' show EmojiPickerPanel;
 

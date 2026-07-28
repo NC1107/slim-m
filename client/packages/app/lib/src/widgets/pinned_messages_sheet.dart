@@ -22,9 +22,9 @@ Future<void> showPinnedMessagesSheet(BuildContext context, String channelId) {
   );
 }
 
-/// Never the raw id: see message_row.dart's `_authorLabel` for the same
-/// rule applied to the local store's own `Message`. Duplicated rather than
-/// shared because [PinnedMessage.message] is the wire `api.Message`, a
+/// Never the raw id: see message_row_identity.dart's `_authorLabel` for the
+/// same rule applied to the local store's own `Message`. Duplicated rather
+/// than shared because [PinnedMessage.message] is the wire `api.Message`, a
 /// different type from the local one that helper reads.
 String _authorLabel(api.Message message) =>
     message.authorDisplayName ??

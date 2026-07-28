@@ -12,8 +12,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/member_presence.dart';
 import '../providers/typing_controller.dart';
-import 'member_pane.dart';
 
 /// Whether this platform's primary text input is a soft keyboard, which has
 /// no shift key and turns the return key into whatever `textInputAction`

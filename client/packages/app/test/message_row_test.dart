@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/widgets/emoji_picker.dart';
 import 'package:slimm_app/src/widgets/message_row.dart';
+import 'package:slimm_app/src/widgets/message_row_identity.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'message_row_harness.dart';

@@ -11,10 +11,10 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import 'channel_rail.dart' show selectedChannelId;
 import 'command_palette_items.dart';
-import 'member_pane.dart' show membersProvider;
 
 /// The design's floating card width; not on the spacing grid because it is
 /// the palette's own measured size, like the rail widths beside it.

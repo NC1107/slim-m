@@ -9,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_data/data.dart';
 
-import 'dms.dart';
+import 'channel_refresher.dart';
 import 'providers.dart';
 
 /// How the connection is doing, for the UI to show honestly rather than
@@ -36,8 +36,7 @@ enum SyncStatus { offline, connecting, live }
 class SyncController extends StateNotifier<SyncStatus> {
   SyncController(this._ref) : super(SyncStatus.offline) {
     final session = _ref.read(sessionProvider);
-    // Subscribe before reading the current value, so a change landing between
-    // the two is never missed.
+    // Subscribe before reading the current value, so a change landing between the two is never missed.
     _sessionSubscription = session.changes.listen((tokens) {
       final signedIn = tokens != null;
       if (signedIn == _lastSignedIn) return;
@@ -60,10 +59,7 @@ class SyncController extends StateNotifier<SyncStatus> {
   Timer? _retry;
   bool _disposed = false;
   int _attempt = 0;
-
-  /// The in-flight refresh from a live event naming an unknown channel, so a
-  /// burst of such frames shares one round trip rather than firing one each.
-  Future<void>? _channelRefresh;
+  final _channelRefresher = ChannelRefresher();
 
   /// Every event this session receives, broadcast to whoever else wants one
   /// (presence, typing, reactions, pins, polls): a second, independent
@@ -95,60 +91,17 @@ class SyncController extends StateNotifier<SyncStatus> {
       final api = _ref.read(apiProvider);
       final store = await _ref.read(storeProvider.future);
 
-      await _refreshChannels(api, store);
+      await _channelRefresher.refresh(api, store);
       await _catchUp(api, store);
       await _attach(api, store);
 
       _attempt = 0;
       state = SyncStatus.live;
     } catch (_) {
-      // Any failure here is a connectivity or auth problem, and both are
-      // handled the same way: show offline and try again with backoff.
+      // A connectivity or auth problem here: both mean show offline and retry with backoff.
       state = SyncStatus.offline;
       _scheduleRetry();
     }
-  }
-
-  /// Refreshes both channel listings the server keeps apart: the
-  /// deployment's own channels, and the caller's DM conversations (which
-  /// `GET /channels` deliberately excludes). Both land in the same local
-  /// channel table under the same shape, so everything downstream (the
-  /// rail, sync cursors, read state) treats a DM exactly like any other
-  /// channel once it is here.
-  ///
-  /// Also hydrates each channel's read marker from the server. `ScopeDelta`
-  /// carries no read state, so `/sync` can never do this, and
-  /// `MessageStore.clear()` wipes the local marker on every sign-out; without
-  /// this, a reinstall or a second device shows every channel unread
-  /// forever, however recently it was actually read elsewhere.
-  Future<void> _refreshChannels(SlimmApi api, MessageStore store) async {
-    final channels = await api.listChannels();
-    final dms = await api.listDirectMessages();
-    final all = [...channels, ...dms.map(channelFromDm)];
-    await store.upsertChannels(all);
-
-    /// Per channel, not bundled with the listing above: the server does not
-    /// hand back read state for a list of channels in one call. One channel's
-    /// read state failing to fetch must not stop the rest from hydrating.
-    await Future.wait(
-      all.map((channel) async {
-        try {
-          final read = await api.readState(channel.id);
-          await store.setReadMarker(channel.id, read.lastReadSeq);
-        } on ApiException {
-          // Best-effort: the next refresh (reconnect, or the next start())
-          // tries again, and until then the channel just reads as unread.
-        }
-      }),
-    );
-  }
-
-  /// [_refreshChannels], but a concurrent caller joins the one already
-  /// running instead of starting a second. See [_channelRefresh].
-  Future<void> _refreshChannelsOnce(SlimmApi api, MessageStore store) {
-    return _channelRefresh ??= _refreshChannels(api, store).whenComplete(() {
-      _channelRefresh = null;
-    });
   }
 
   /// Catches every known scope up in one request, applying deltas in order.
@@ -160,8 +113,7 @@ class SyncController extends StateNotifier<SyncStatus> {
     var more = false;
     for (final delta in deltas) {
       if (delta.reset) {
-        // The server says the gap is too large to stream: local state for this
-        // scope cannot be trusted, so drop it and refetch from the start.
+        // The gap is too large to stream: local state is untrusted, so drop and refetch.
         await store.resetChannel(delta.channelId);
         final fresh = await api.listMessages(delta.channelId, limit: 50);
         await store.applyMessages(fresh);
@@ -216,10 +168,9 @@ class SyncController extends StateNotifier<SyncStatus> {
     switch (event) {
       case MessageCreated(:final message):
       case MessageEdited(:final message):
-        // A DM's first message is a channel this client has never
-        // fetched; materialise it first or applyMessage lands silently.
+        // A DM's first message is a channel never fetched; materialise it first or this no-ops.
         if (!await store.hasChannel(message.channelId)) {
-          await _refreshChannelsOnce(api, store);
+          await _channelRefresher.refreshOnce(api, store);
         }
         await store.applyMessage(message);
       case MessageDeleted(:final messageId):
@@ -230,8 +181,7 @@ class SyncController extends StateNotifier<SyncStatus> {
         /// and stayed visible until the next full resync.
         await store.discard(messageId);
       case ErrorEvent(:final needsResync) when needsResync:
-        // The connection fell behind and the server closed it; a restart
-        // re-runs catch-up, which is exactly the recovery.
+        // The server closed a connection that fell behind; a restart re-runs catch-up.
         unawaited(start());
       case _:
         break;
