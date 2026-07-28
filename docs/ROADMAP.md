@@ -16,6 +16,9 @@ Two identity terms recur throughout.
 Dependency legend: a phase lists the earlier phases whose output it consumes.
 Nothing points forward.
 
+**Status annotations, dated 2026-07-28,** were added under each phase's exit criteria in a reconciliation pass, verified against the repository itself rather than against any other document, `CLAUDE.md` included, since it is itself a source of drift.
+Where a status corrects an earlier claim in this file rather than adding a first one, the earlier claim is struck through and dated, following the convention `CLAUDE.md` already uses for its own known-gaps list.
+
 ## Phase 0 - Foundations
 
 Size: M.
@@ -40,6 +43,18 @@ Dependencies: none.
 
 Exit criteria: CI is green on the empty skeleton; a tagged 0.0.x release automatically produces signed multi-arch server and relay images, a Linux Flatpak and rpm, and an internal TestFlight build; the JSON performance baseline exists; the size-regression gate and the token contrast gate run, and the contrast gate's current failures are triaged into the design track.
 
+Status (2026-07-28): mostly met, with two open gaps.
+CI is green on main across `server-ci`, `client-ci`, `schema-ci`, `hygiene`, `perf`, and `release`.
+`release.yml` builds the server natively per architecture and cosign-signs the merged manifest, verified live on the server 0.15.0 release; the relay's own image signing lives in the separate `slim-m-relay` repository and cannot be checked from here.
+The rpm is real: `packaging/rpm/slim-m-client.spec` builds in the `linux-client` job, and the `copr` job actually submitted client 0.6.0 to Fedora COPR (`nc1107/slim-m`) on 2026-07-28, not just wired inertly.
+The Flatpak is not: no `packaging/flatpak/org.slimm.Client.yaml` exists, so `release.yml`'s flatpak step no-ops with a warning on every run, most recently on that same 0.6.0 release.
+The TestFlight leg is presently broken: that 0.6.0 release failed at `ios-testflight` with altool error 90206, "the bundle at Runner.app/PlugIns/BroadcastExtension.appex contains disallowed file 'Frameworks'", a regression from the broadcast upload extension work merged the same day.
+A fix (`949af6b`, "the broadcast extension must embed no frameworks") landed on main afterward, but no client release has been cut since to confirm the upload goes through now, so "a tagged release automatically produces... an internal TestFlight build" does not currently hold, though it held for earlier releases (a real iPhone received a push from a 2026-07-25 build).
+The JSON performance baseline exists (`perf/baselines/0.8.0.json`, both RSS figures under the 30MB budget) but is stale: it was taken at server 0.8.0, the server is now at 0.15.0 across seven releases, and nothing re-measures or re-baselines it automatically.
+The size-regression gate is real (`server-ci.yml` fails the build past 20MiB) and the contrast gate is real and currently green (`client/packages/design_system/test/contrast_test.dart`, 22 tests against the live tokens).
+The contrast gate's original failures were genuinely resolved, not just triaged into a backlog: `docs/decisions/0004-visual-identity-review.md` documents the failing values found and the token fixes applied, and states the result clears the gate.
+Two deliverables named earlier in this phase never got the CI automation promised for them, worth flagging even though the exit criteria above don't name them directly: no workflow checks the 300-line file budget, and no workflow runs a license-allowlist check (the `LICENSES/` directory and per-file SPDX headers exist, but nothing gates on them beyond `hygiene.yml`'s SPDX-presence check).
+
 ## Phase 1 - Server and Protocol Core
 
 Size: L.
@@ -62,6 +77,13 @@ Risks: the RBAC evaluator's override precedence is escalation-prone if untested;
 Dependencies: Phase 0.
 
 Exit criteria: a two-client integration test passes per-scope ordering, per-device fan-out, and instant token and device revocation; the permission evaluator passes exhaustive precedence tests with deny winning across roles; account deletion (including group ownership transfer) works end-to-end; measured server idle RSS is inside the under-30MB budget.
+
+Status (2026-07-28): mostly met; one clause is stale rather than unmet.
+Per-scope ordering, per-device fan-out, and instant revocation each have a passing test: `crates/slimm-server/tests/ws.rs::two_clients_receive_fan_out_in_order`, `tests/message_store.rs::seq_is_monotonic_and_independent_per_channel` and `::concurrent_sends_each_take_a_distinct_sequence_number`, `tests/ws.rs::removing_a_device_closes_its_live_socket` (proves only the targeted device's socket closes, not every device on the account), and `tests/auth.rs::revoke_session_is_instant`.
+The permission evaluator's precedence tests are real, if not literally combinatorially exhaustive: `crates/slimm-server/src/permissions.rs`'s own test module covers default-deny, role union, ADMINISTRATOR bypass, the @everyone overwrite, role-tier deny-wins, and member-overwrite-absolute in both directions, eight tests in total.
+Account deletion works end-to-end (anonymize, tombstone, free the username, revoke sessions), but "including group ownership transfer" describes a concept the shipped architecture never grew: `store/sessions.rs` says outright that "group-ownership transfer is a no-op until an ownership model exists; the current schema has no owner column, so nothing can be orphaned."
+What actually guards against an orphaned deployment instead is that the last administrator cannot delete their own account while other members remain (409), tested in `tests/account.rs::the_last_administrator_cannot_strand_a_populated_deployment`.
+Idle RSS was measured once, inside budget (7,296 kB steady, 25,760 kB peak against a 30MB ceiling, `perf/baselines/0.8.0.json`), and has not been re-measured against any of the seven server releases since.
 
 ## Phase 2 - Client Shell and Text Messaging
 
@@ -86,6 +108,12 @@ Dependencies: Phase 0, Phase 1.
 
 Exit criteria: full text chat works end-to-end on Fedora KDE Wayland and iOS against a self-hosted server; account deletion, report, and block work from the client; the golden matrix is green; client cold-start and idle-memory budgets are met on both targets.
 
+Status (2026-07-28): partially met, and one clause reads as met but is not doing what it implies.
+Account deletion, report, and block all work from the client: `settings_screen.dart` for deletion, `message_context_menu.dart` plus `channel_message_actions.dart` plus `report_dialog.dart` for report and block on a message, `member_pane.dart` plus `context_menu_region.dart` for the same on a member, with a regression test in `message_context_menu_test.dart`.
+"The golden matrix is green" is true of what actually runs, but that is narrower than it sounds: `client/packages/design_system/test/golden_matrix_test.dart` gates the real pixel comparison behind `SLIMM_GOLDENS`, `client-ci.yml` never sets it, and no reference images are committed, so CI only ever asserts no overflow at 200% scale, never a true golden diff; the newer real-shell snapshot test (`ui_snapshot_test.dart`) has the identical gap behind `SLIMM_UI_SNAPSHOTS`.
+Client cold-start and idle-memory budgets are not met because they are not measured: `perf/README.md` scopes the whole `perf/` directory to the server, and nothing in `client/` times startup or bounds memory.
+"Full text chat works end-to-end on Fedora KDE Wayland and iOS" cannot be determined from the repository alone: there is no `integration_test` or device-automation harness anywhere in `client/`, so this rests on prose narration of manual passes rather than on anything CI asserts or that can be re-run here.
+
 ## Phase 3 - Push Relay and Notifications
 
 Size: M.
@@ -107,6 +135,13 @@ Risks: the encrypt-to-device-key pipeline adds crypto burden to every self-host,
 Dependencies: Phase 0, Phase 1, Phase 2.
 
 Exit criteria: a backgrounded iOS device and an Android device each receive a content-free encrypted wake and fetch the message; the relay logs show only ciphertext and a coarse kind; a NAT-unreachable server cleanly uses the disable path; the contract test passes.
+
+Status (2026-07-28): the server-side half is solid; the two device-wake criteria are open for different reasons, and one deliverable is easy to mis-read as done.
+A NAT-unreachable server cleanly uses the disable path: `crates/slimm-server/src/push.rs`'s `PushSender` is a no-op `Option` unless both `SLIMM_PUSH_RELAY_URL` and `SLIMM_PUSH_RELAY_KEY` are set, and the contract test passes (`.github/workflows/push-relay-contract.yml` drives a server-generated fixture through the real relay handler; recent runs on main are green).
+Android device wake is not met, and is explicitly a hardware gap: no Android device test exists anywhere, and no Android hardware has been available to run one.
+iOS device wake and "the relay logs show only ciphertext and a coarse kind" cannot be determined from this repository: the relay itself lives in the separate `slim-m-relay` repository, and the iOS claim rests on a prose account of a single past hardware pass rather than anything reproducible here.
+Worth correcting explicitly: the iOS Notification Service Extension, the actual Phase 3 deliverable that would replace "New message" with real content, still does not exist; `client/packages/app/ios/` has exactly one extension target, `BroadcastExtension`, which is a ReplayKit screen-share capture extension for Phase 4 and has nothing to do with push decryption.
+A recently-added join policy (`crates/slimm-server/migrations/0018_space_settings.sql`, `crates/slimm-server/src/store/space.rs`) lets an admin open registration without reopening the invite-gate hole an earlier audit closed: an unrecognized or absent value still reads as invite-only, and `open` is a deliberate admin opt-in, documented in `schema/openapi.yaml`.
 
 ## Phase 4 - Voice and Screen Share
 
@@ -131,6 +166,15 @@ Dependencies: Phase 0, Phase 1 (auth and permissions), Phase 3 (VoIP push path).
 
 Exit criteria: 1:1 and group voice and screen share work on Fedora and iOS; a kick force-evicts the participant immediately; the CallKit synchronous-report invariant test is green; the egress budget is measured; active-call memory budgets are met.
 
+Status (2026-07-28): a lot of real, tested pieces; several core criteria are unverifiable from the repo, and two nearly-finished deliverables are still on open PRs rather than merged.
+Linux screen-share source selection is real and wired (`client/packages/rtc/lib/src/desktop_sources.dart`, `voice_session.dart`'s `setScreenShareEnabled(sourceId:)`), and the iOS Broadcast Upload Extension target is merged and CI-checked (`hygiene.yml`'s "ios broadcast extension is wired up" step).
+Whether voice and screen share actually work in a live multi-participant call on real Fedora or iOS hardware cannot be determined here; nothing in the repo exercises that.
+The kick-evicts-immediately criterion cannot be confirmed either: `crates/slimm-server/src/http/voice.rs` calls LiveKit's `RemoveParticipant`, but its tests cover only the permission gate and the SFU-unavailable path, not a successful eviction.
+The CallKit synchronous-report invariant test is green: `client/packages/app/ios/RunnerTests/VoipCallHandlerTests.swift` runs under `client-ci.yml`'s `ios-unit-tests` job on `macos-latest`.
+The egress budget and active-call memory budgets are not met, because neither has ever been measured; `perf/baselines/0.8.0.json` carries no such figures, and every mention of them elsewhere is a planning target, not a result.
+The device media-capability probe is now genuinely wired into the UI (`media_capability_section.dart` calling `probeAll()`, surfaced from `voice_settings_screen.dart`), closing a gap this roadmap's own notes previously carried as open.
+Two deliverables are close but not landed as of this writing: an Android incoming-call notification (open PR #95, `feat/android-call-notification`) ships `NotificationCompat.CallStyle` with an optional full-screen intent, by its own commit message explicitly *not* `android.telecom.ConnectionService` integration; and a per-channel voice roster (open PR #98, `feat/voice-channel-roster`) adds a server roster endpoint and a client provider, neither yet merged to `dev`.
+
 ## Phase 5 - Voice Canvas De-risking Spike
 
 Size: M.
@@ -150,6 +194,11 @@ Risks: the spike may reveal that a target object count or the streaming protocol
 Dependencies: Phase 0, Phase 1 (per-scope ordering and schema shape), Phase 4 (LiveKit and the rtc package).
 
 Exit criteria: the spike demonstrates 60fps at target counts, a working viewport-delta fetch backed by the R-Tree, and flicker-free media culling on Fedora and iOS, or it produces a documented redesign that the full-build phase adopts before any production canvas code is written.
+
+Status (2026-07-28): two of three exit-criteria clauses are met with measured numbers; the third has no spike evidence yet, so calling the phase closed would overstate it.
+`docs/research/canvas-spike-server.md` and `docs/research/canvas-spike-client.md` (2026-07-26/27) demonstrate 60fps at the soft-cap object counts and a working R-Tree-backed viewport-delta fetch, each producing a real documented redesign rather than a clean pass: the query needs `CROSS JOIN` to pin its plan or the R-Tree prunes nothing, and the client needs an adaptive grid with a linear-scan fallback rather than a flat 2048px grid.
+Flicker-free LiveKit media culling near the viewport boundary, the third clause, is not covered by either document; both list it explicitly as still open, alongside the world-coordinate camera-bubble and screen-share placement deliverable.
+So this phase is two of its five stated spike deliverables short, not fully closed, even though the parts that were tested came back with real numbers.
 
 ## Phase 6 - Voice Canvas Full Build
 
@@ -174,6 +223,12 @@ Dependencies: Phase 0, Phase 1, Phase 4, Phase 5.
 
 Exit criteria: a two-client canvas session converges under concurrent edits (property test on convergence) with no clear-resurrection; a client panning a large world reaches all objects; 60fps and the memory-cache budgets hold at the soft-cap object counts on Fedora and iOS.
 
+Status (2026-07-28): not started.
+The server has exactly one canvas HTTP route, a read-only viewport query (`GET /channels/{channel_id}/canvas/objects` in `crates/slimm-server/src/http/canvas.rs`); `Store::place_canvas_object`, `move_canvas_object`, and `remove_canvas_object` exist in `store/canvas.rs` but are called only by tests, never by any handler.
+`canvas_ops`, the append-only op log this phase is meant to build on, is touched nowhere in `src/` except the account-deletion anonymization pass, and `canvas_audit_log`, named directly in this phase's own deliverable text, does not exist in any migration.
+`client/packages/voice_canvas` exists, but its own library doc comment says plainly it is "Phase 5 spike surface only... No rendering, persistence, or wire protocol," and it is not yet a dependency of `packages/app` at all.
+None of this phase's exit criteria (convergence, panning reaching all objects, frame budget at soft-cap counts) can be evaluated, because none of the subject matter they describe exists yet.
+
 ## Phase 7 - Administration, Moderation, and Metrics
 
 Size: M.
@@ -192,6 +247,13 @@ Risks: the metrics store taxes the same process the idle budget covers and must 
 Dependencies: Phase 0, Phase 1, Phase 2.
 
 Exit criteria: an admin can manage users, invites, and roles, action reports from the queue, and view performance graphs over time; the metrics store stays within its budget; the content and legal-reporting policy is documented and the capability handshake is enforced client-side.
+
+Status (2026-07-28): further along than this roadmap's own phase ordering (and CLAUDE.md's phase narrative, which does not mention this phase by name) would suggest, but the metrics half named in this phase's title has not been started.
+Real, wired admin screens exist for reports, invites, roles, and per-channel permission overwrites (`reports_screen.dart`, `invites_screen.dart`, `roles_screen.dart`, `role_editor_sheet.dart`, `role_assign_sheet.dart`, `channel_overwrites_screen.dart`), each gated per-permission-bit off a settings section.
+User management is partial: `client_admin.dart` exposes only admin-issued password reset codes, with no user list, ban, or admin-initiated account deletion.
+The `/metrics` Prometheus endpoint and the SQLite time-series store do not exist: there is no metrics module anywhere in `crates/slimm-server/src` and no `/metrics` path in `schema/openapi.yaml`.
+The capability handshake (a client checking a server exposes report and block before connecting) does not exist either; nothing in the client checks for this before connecting.
+The content and legal-reporting policy is documented in prose (`STRATEGY.md`, `decisions/0001-owner-decisions.md`) but has no implementation artifact beyond that prose.
 
 ## Phase 8 - Audio Design and Interaction Polish
 
@@ -212,6 +274,12 @@ Dependencies: Phase 0, Phase 2 (client shell), Phase 3 (NSE), Phase 4 (CallKit a
 
 Exit criteria: seven distinguishable, consistently normalized sounds play correctly on Fedora, iOS, and Android; in-app chimes never glitch a live call; reduce-motion collapses non-essential motion; the polish pass has no known visible defects in the primary flows; and a golden proves every presence state stays distinguishable desaturated, since the shape-first cue only matters if it survives the greyscale screenshot a bug report arrives as.
 
+Status (2026-07-28): not started.
+No `assets/audio/`, `synth.py`, or numpy/pyloudnorm pipeline exists anywhere; the whole audio deliverable is still only the description in `STRATEGY.md`.
+Nothing in the client handles reduced motion; a repo-wide search for it turns up nothing.
+The one test that touches presence-state distinguishability (`core_test.dart`, asserting `AppStatusDot.shapeOf` values are pairwise distinct) is a logic assertion, not the golden, pixel, desaturated proof this exit criterion actually asks for.
+Whether the polish pass has any known visible defects cannot be assessed from the repo alone; it needs a human at a screen, and no pass has been logged specifically as this phase's dedicated polish pass, as distinct from the several ad hoc UI fixes that have landed as incidental cleanup during other work.
+
 ## Phase 9 - Release Readiness and Store Submission
 
 Size: M.
@@ -231,6 +299,12 @@ Dependencies: Phases 0 through 8.
 
 Exit criteria: the store-readiness checklist passes; a one-command self-host works on a fresh Fedora host and an arm64 board; a signed 1.0 is tagged and produces all platform artifacts automatically.
 
+Status (2026-07-28): not met, as expected this early, but worth recording precisely rather than leaving unstated.
+Current versions are nowhere near 1.0: server 0.15.0 (`crates/slimm-server/Cargo.toml`), client 0.6.0 (`client/pubspec.yaml`).
+`deploy/` has a working `docker-compose.yml` (at the repo root, documented at `deploy/README.md`), a `Caddyfile`, and `.env.example`, but the backup story this phase asks for (a `VACUUM INTO` hot copy, restore-and-checksum drills) is not built; only Litestream exists, which replicates the SQLite file only and explicitly does not cover attachments.
+The product still carries its placeholder name; both `decisions/0001-owner-decisions.md` and `STRATEGY.md` still defer the rename to this phase's closeout, as planned.
+The Flatpak remains absent (see the Phase 0 status above), which alone blocks "produces all platform artifacts automatically."
+
 ## Phase Dependency Summary
 
 - Phase 0: no dependencies.
@@ -248,5 +322,7 @@ Every dependency points backward; no phase requires work scheduled later.
 The design track (validating the palette against the CI contrast gate and the designer review) runs in parallel from Phase 0, since the token pipeline and gate exist from the start and the visual identity is decoupled from widget code by design.
 **The designer review happened on 2026-07-26** ([decision 0004](decisions/0004-visual-identity-review.md)).
 It confirmed the neutrals, type, spacing and border-first elevation, corrected several token values, and added three token families that were missing.
-One thing remains open: the accent hue, because the shipped teal collides with the online-status green.
-That is a single primitive value plus regenerated goldens whenever it is decided, and it does not block any phase.
+~~One thing remains open: the accent hue, because the shipped teal collides with the online-status green.~~
+~~That is a single primitive value plus regenerated goldens whenever it is decided, and it does not block any phase.~~
+Resolved 2026-07-27, and the reason given above for reopening it did not survive measurement: decision 0004 found the shipped teal was not actually confusable with the online-status green under normal vision (their CIEDE2000 distance is 20.2 to 29.3), but it did lose most of its chroma under a deuteranopia simulation, which was the real problem.
+The accent is now glacier cyan (`#1B6F91` light, `#58B4D8` dark), applied in `client/packages/design_system/lib/src/app_tokens.dart`, and nothing here blocks a phase.
