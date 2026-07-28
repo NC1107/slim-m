@@ -33,9 +33,12 @@ jobs:
           channel: stable
           cache: true
 
+      # --enforce-lockfile, for the same reason the Rust side builds --locked:
+      # without it the committed lockfile is advisory and CI can silently
+      # resolve versions nobody committed.
       - name: resolve workspace dependencies
         working-directory: client
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: analyze (workspace-wide)
         working-directory: client
