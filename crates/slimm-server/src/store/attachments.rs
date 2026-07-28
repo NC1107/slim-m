@@ -291,8 +291,13 @@ pub(super) async fn release_message_attachments(
 
     let mut freed = Vec::new();
     for row in linked {
+        // A custom emoji counts as a reference, not just a message. Content
+        // addressing makes an emoji sharing a message's bytes the normal case.
         let still_referenced = sqlx::query_scalar!(
-            r#"SELECT 1 AS "one!: i64" FROM message_attachments WHERE sha256 = ? LIMIT 1"#,
+            r#"SELECT 1 AS "one!: i64"
+               WHERE EXISTS (SELECT 1 FROM message_attachments WHERE sha256 = ?)
+                  OR EXISTS (SELECT 1 FROM custom_emoji WHERE sha256 = ?)"#,
+            row.sha256,
             row.sha256
         )
         .fetch_optional(&mut **tx)
