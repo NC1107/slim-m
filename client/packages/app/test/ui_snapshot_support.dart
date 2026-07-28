@@ -133,6 +133,7 @@ MockClient fixtureClient() => MockClient((request) async {
     // A list is the right empty answer for the collection reads; the
     // read marker decodes a shape and type-errors on one.
     _ when path.endsWith('/read') => const {'last_read_seq': 3, 'unread': 0},
+    _ when path.endsWith('/voice/roster') => const {'participants': <Object>[]},
     _ => const <Object>[],
   };
   return http.Response(
