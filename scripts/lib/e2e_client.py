@@ -16,7 +16,10 @@ import tempfile
 import time
 import urllib.request
 
+import e2e_js
+
 TIMEOUT = 90
+_MOUSE = "Input.dispatchMouseEvent"
 # A private directory when unset, rather than a guessable shared one.
 SHOTS = os.environ.get("E2E_SHOTS") or tempfile.mkdtemp(prefix="e2e-")
 
@@ -71,30 +74,7 @@ class Client:
         it, not on the wrapping semantics node, so both have to be collected or
         every field on every screen looks unlabelled.
         """
-        raw = self.ev("""
-        (function(){
-          var out=[];
-          document.querySelectorAll('flt-semantics').forEach(function(e){
-            // A row that names itself (a channel, a member) keeps its label on
-            // the node wrapping its icon and text, so leaves alone miss it.
-            var named=e.getAttribute('aria-label');
-            if (!named && e.querySelector('flt-semantics')) return;
-            var t=(named||e.textContent||'').trim();
-            if(!t) return;
-            var r=e.getBoundingClientRect();
-            if(r.width<1||r.height<1) return;
-            out.push({t:t,x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),
-                      field:false});
-          });
-          document.querySelectorAll('input,textarea').forEach(function(e){
-            var t=(e.getAttribute('aria-label')||e.getAttribute('placeholder')||'').trim();
-            if(!t) return;
-            var r=e.getBoundingClientRect();
-            out.push({t:t,x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),
-                      field:true});
-          });
-          return JSON.stringify(out);
-        })()""")
+        raw = self.ev(e2e_js.NODES)
         return json.loads(raw or "[]")
 
     def find(self, label, field=None):
@@ -117,7 +97,7 @@ class Client:
 
     def tap(self, x, y):
         for kind in ("mousePressed", "mouseReleased"):
-            self.send("Input.dispatchMouseEvent",
+            self.send(_MOUSE,
                       {"type": kind, "x": x, "y": y, "button": "left",
                        "clickCount": 1})
             time.sleep(0.06)
@@ -131,44 +111,7 @@ class Client:
         framework listens for.
         """
         self.wait_for(label)
-        hit = self.ev(f"""
-        (function(){{
-          var want={json.dumps(label.lower())};
-          var hits=[];
-          document.querySelectorAll('flt-semantics').forEach(function(e){{
-            var t=((e.getAttribute('aria-label')||'')+' '+
-                   (e.textContent||'')).toLowerCase();
-            if (t.indexOf(want)>=0) hits.push(e);
-          }});
-          // Flutter paints the same label onto a plain node and onto the
-          // tappable one beside it; only the tappable one answers a click.
-          var tappable=hits.filter(function(e){{
-            return e.hasAttribute('flt-tappable') ||
-                   e.getAttribute('role')==='button';
-          }});
-          // Closest name wins, not the last one found: a channel row and its
-          // "Manage <name>" button both match the channel's own name, and
-          // taking the last opened the manage sheet every time.
-          function name(e){{
-            return (e.getAttribute('aria-label')||e.textContent||'').trim();
-          }}
-          tappable.sort(function(x,y){{
-            var nx=name(x), ny=name(y);
-            if ((nx.toLowerCase()===want)!==(ny.toLowerCase()===want)) {{
-              return nx.toLowerCase()===want ? -1 : 1;
-            }}
-            return nx.length-ny.length;
-          }});
-          var target=tappable[0];
-          if (!target) {{
-            target=hits.filter(function(e){{
-              return !e.querySelector('flt-semantics');
-            }}).pop();
-          }}
-          if (!target) return false;
-          target.click();
-          return true;
-        }})()""")
+        hit = self.ev(e2e_js.click(json.dumps(label.lower())))
         if not hit:
             n = self.wait_for(label)
             self.tap(n["x"], n["y"])
@@ -185,18 +128,8 @@ class Client:
         if not self.find(label, field=True):
             self.click(label, settle=1.0)
         self.wait_for(label, field=True)
-        focused = self.ev(f"""
-        (function(){{
-          var els=document.querySelectorAll('input,textarea');
-          for (var i=0;i<els.length;i++) {{
-            var t=(els[i].getAttribute('aria-label')||
-                   els[i].getAttribute('placeholder')||'');
-            if (t.toLowerCase().indexOf({json.dumps(label.lower())})>=0) {{
-              els[i].focus(); return true;
-            }}
-          }}
-          return false;
-        }})()""")
+        focused = self.ev(
+            e2e_js.focus_field(json.dumps(label.lower())))
         if not focused:
             n = self.wait_for(label, field=True)
             self.tap(n["x"], n["y"])
@@ -214,19 +147,17 @@ class Client:
         the ones a mouse is the only way to reach.
         """
         value = "none" if on else ""
-        self.ev(
-            "(function(){var h=document.querySelector('flt-semantics-host');"
-            f"if(h) h.style.pointerEvents={json.dumps(value)};}})()")
+        self.ev(e2e_js.set_gestures(json.dumps(value)))
         time.sleep(0.2)
 
     def hover(self, x, y, settle=1.2):
-        self.send("Input.dispatchMouseEvent",
+        self.send(_MOUSE,
                   {"type": "mouseMoved", "x": x, "y": y})
         time.sleep(settle)
 
     def mouse_click(self, x, y, button="left", hold=0.06):
         for kind in ("mousePressed", "mouseReleased"):
-            self.send("Input.dispatchMouseEvent",
+            self.send(_MOUSE,
                       {"type": kind, "x": x, "y": y, "button": button,
                        "clickCount": 1})
             time.sleep(hold)
@@ -240,21 +171,7 @@ class Client:
         `DOM.setFileInputFiles` to find and nothing to query for afterwards.
         Wrapping `createElement` is what gets a handle on it.
         """
-        self.ev("""
-        (function(){
-          window.__e2eFiles = [];
-          if (window.__e2eHooked) return;
-          var make = document.createElement.bind(document);
-          document.createElement = function(tag){
-            var el = make(tag);
-            if (String(tag).toLowerCase() === 'input') {
-              // The type is set after construction, so it is read later.
-              window.__e2eFiles.push(el);
-            }
-            return el;
-          };
-          window.__e2eHooked = 1;
-        })()""")
+        self.ev(e2e_js.WATCH_FILES)
 
     def give_file(self, path, mime="image/png"):
         """Hand the caught input a real file, as a person's picker would.
@@ -266,28 +183,8 @@ class Client:
         with open(path, "rb") as fh:
             payload = base64.b64encode(fh.read()).decode()
         name = os.path.basename(path)
-        ok = self.ev(f"""
-        (function(){{
-          var inputs=(window.__e2eFiles||[]).filter(function(e){{
-            return e.type === 'file';
-          }});
-          if (!inputs.length) return 'no file input was created';
-          var raw = atob({json.dumps(payload)});
-          var bytes = new Uint8Array(raw.length);
-          for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-          // Every input caught since the picker opened, not just the last:
-          // more than one is sometimes made and only one is listened to.
-          inputs.forEach(function(el){{
-            var file = new File([bytes], {json.dumps(name)},
-                                {{type: {json.dumps(mime)}}});
-            var dt = new DataTransfer();
-            dt.items.add(file);
-            el.files = dt.files;
-            el.dispatchEvent(new Event('change', {{bubbles: true}}));
-            el.dispatchEvent(new Event('input', {{bubbles: true}}));
-          }});
-          return 'ok';
-        }})()""")
+        ok = self.ev(e2e_js.give_file(
+            json.dumps(payload), json.dumps(name), json.dumps(mime)))
         if ok != "ok":
             raise AssertionError(f"{self.name}: {ok}")
         time.sleep(3)

@@ -184,7 +184,7 @@ def devices_and_read_state(api, channel_id):
     print(f"  {len(rows)} device(s) listed, read state and sync answered")
 
 
-def run_all(api, member_api, channel_id, other_id):
+def run_all(api, channel_id, other_id):
     TOUCHED.clear()
     messages_can_be_edited_and_deleted(api, channel_id)
     search_finds_what_was_said(api, channel_id)

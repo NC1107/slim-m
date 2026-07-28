@@ -13,6 +13,8 @@ import os
 import time
 import urllib.request
 
+import e2e_labels as L
+
 
 def sfu_participants(room):
     """Ask the SFU itself who is connected, rather than trusting either UI."""
@@ -44,7 +46,7 @@ def tracks_of(participant, source):
             if t.get("source") == source]
 
 
-def join_call(a, b, room_id, channel="lounge"):
+def join_call(a, b, room_id, channel=L.VOICE_CHANNEL):
     """Both clients into the same room, each publishing and subscribed."""
     # Reached through the rail rather than by URL, which is also the only
     # end-to-end check that the rail is reachable at all: it published no
@@ -52,8 +54,8 @@ def join_call(a, b, room_id, channel="lounge"):
     # block them, and nothing but a real run would have noticed.
     for c in (a, b):
         c.click(channel)
-        c.click("Join call", settle=8)
-        c.wait_for("in call")
+        c.click(L.JOIN_CALL, settle=8)
+        c.wait_for(L.IN_CALL)
 
     for c in (a, b):
         c.wait_for("2 in call")
@@ -79,10 +81,10 @@ def share_screen(client, other, room_id):
     the operating system would raise never appears; everything after that is
     the app's own path.
     """
-    client.click("Share a screen", settle=3)
+    client.click(L.SHARE_SCREEN, settle=3)
     # A quality is chosen before capture starts; picking one is what calls
     # getDisplayMedia, and the browser answers it with a pre-selected source.
-    client.click("Balanced", settle=10)
+    client.click(L.SHARE_QUALITY, settle=10)
 
     deadline = time.time() + 45
     shared = None
@@ -97,12 +99,12 @@ def share_screen(client, other, room_id):
     assert shared, "no screen-share track ever reached the SFU"
     print(f'  {shared["identity"][:13]} is publishing a screen track')
 
-    client.wait_for("You are sharing your screen")
+    client.wait_for(L.SHARING_NOTICE)
     client.shot("sharing-screen")
     other.shot("peer-sharing-screen")
     print("  the sharing client says so on screen")
 
-    client.click("Stop sharing", settle=8)
+    client.click(L.STOP_SHARING, settle=8)
     deadline = time.time() + 30
     while time.time() < deadline:
         live = [p for p in sfu_participants(room_id)
@@ -116,7 +118,7 @@ def share_screen(client, other, room_id):
 
 
 def mute_propagates(a, b, room_id):
-    a.click("Mute")
+    a.click(L.MUTE)
     time.sleep(4)
     muted = {p["identity"][:13]: p["tracks"][0].get("muted", False)
              for p in sfu_participants(room_id) if p.get("tracks")}
@@ -127,7 +129,7 @@ def mute_propagates(a, b, room_id):
 
 
 def leave_call(a, b):
-    a.click("Leave call", settle=8)
+    a.click(L.LEAVE_CALL, settle=8)
     b.wait_for("1 in call")
     b.shot("peer-left")
     print("  the remaining client dropped to 1 in call")

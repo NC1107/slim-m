@@ -60,6 +60,23 @@ kicking someone from a call, revoking one device, custom emoji, redeeming a
 second invite). The last group is the honest backlog; the run prints it every
 time so it cannot quietly grow.
 
+## Layout
+
+| File | What it owns |
+| --- | --- |
+| `scripts/e2e.sh` | the stack: SFU, server, web build, two browsers, teardown |
+| `lib/e2e_run.py` | the running order, and the coverage report at the end |
+| `lib/e2e_client.py` | one browser, over the Chrome DevTools Protocol |
+| `lib/e2e_js.py` | the browser-side half: reading and driving the semantics tree |
+| `lib/e2e_labels.py` | every accessible name the app is driven by, in one place |
+| `lib/e2e_api.py` | the server's own answer, for checking against |
+| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py` | the scenarios |
+| `lib/e2e_sweep.py` | the API-level routes the scenarios do not reach |
+| `lib/e2e_seed.py`, `e2e_fixtures.py` | the accounts and the two PNGs a run uploads |
+
+Labels live in one module because they are a contract with the UI rather than
+incidental strings: when one changes, exactly one line changes with it.
+
 ## Driving a canvas app
 
 Flutter paints to a canvas and exposes nothing to a script until its

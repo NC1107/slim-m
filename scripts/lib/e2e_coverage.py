@@ -35,7 +35,7 @@ def documented(schema_path):
             continue
         if inside and line and not line[0].isspace():
             break
-        if inside and re.match(r"^  /", line):
+        if inside and re.match(r"^ {2}/", line):
             paths.append(line.strip().rstrip(":"))
     return paths
 

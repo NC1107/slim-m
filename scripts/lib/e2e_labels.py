@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: Apache-2.0
+"""The accessible names this harness drives the app by.
+
+Kept in one place because they are a contract with the UI, not incidental
+strings: when a label changes, exactly one line here changes with it, and a
+scenario that no longer matches says so rather than timing out on a name
+nobody remembered was duplicated across three files.
+"""
+
+# Composer
+COMPOSER = "Message #"
+SEND = "Send message"
+ATTACH = "Attach a file"
+ADD_REACTION = "Add a reaction"
+REMOVE_ATTACHMENT = "Remove attachment"
+
+# Rail and navigation
+SPACE_MENU = "Space menu"
+SPACE_SETTINGS = "Space settings"
+PERSONAL_SETTINGS = "Personal settings"
+
+# Personal settings
+UPLOAD_PHOTO = "Upload photo"
+CROP_TITLE = "Crop your picture"
+USE_PICTURE = "Use picture"
+THEME = "Theme"
+STATUS = "Status"
+
+# Space settings
+WHO_CAN_JOIN = "Who can join"
+JOIN_OPEN = "Anyone with the address"
+JOIN_INVITE = "People with an invite"
+ROLES = "Roles"
+NEW_ROLE = "New role"
+ROLE_NAME = "Role name"
+CREATE_ROLE = "Create role"
+
+# Voice
+JOIN_CALL = "Join call"
+IN_CALL = "in call"
+SHARE_SCREEN = "Share a screen"
+SHARE_QUALITY = "Balanced"
+SHARING_NOTICE = "You are sharing your screen"
+STOP_SHARING = "Stop sharing"
+MUTE = "Mute"
+LEAVE_CALL = "Leave call"
+
+# The fixture channels the seed creates
+TEXT_CHANNEL = "general"
+VOICE_CHANNEL = "lounge"
+
+# Messages the run sends, referred to again when reacting to or reporting them
+FIRST_MESSAGE = "first message from alice"
+REPLY_MESSAGE = "and a reply from bob"

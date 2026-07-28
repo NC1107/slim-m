@@ -6,6 +6,8 @@ whether it happened, because a chip that renders is not a row that was stored.
 """
 import time
 
+import e2e_labels as L
+
 
 def send_and_receive(sender, receiver, channel, text, api):
     """One message, typed by one client and waited for on the other.
@@ -16,9 +18,9 @@ def send_and_receive(sender, receiver, channel, text, api):
     """
     for c in (sender, receiver):
         c.click(channel)
-        c.wait_for('Message #')
-    sender.type_into('Message #', text)
-    sender.click('Send message', settle=2)
+        c.wait_for(L.COMPOSER)
+    sender.type_into(L.COMPOSER, text)
+    sender.click(L.SEND, settle=2)
 
     sender.wait_for(text)
     receiver.wait_for(text)
@@ -43,7 +45,7 @@ def react(client, other, message_text, emoji_name, api, channel):
         client.hover(row['x'], row['y'])
     finally:
         client.gestures(False)
-    client.click('Add a reaction', settle=2)
+    client.click(L.ADD_REACTION, settle=2)
     client.wait_for(emoji_name)
     client.click(emoji_name, settle=2)
 
@@ -66,8 +68,8 @@ def mention(sender, receiver, channel, who, api):
     """A mention is ordinary message text the server has to keep verbatim."""
     text = f'@{who} take a look at this'
     sender.click(channel)
-    sender.type_into('Message #', text)
-    sender.click('Send message', settle=2)
+    sender.type_into(L.COMPOSER, text)
+    sender.click(L.SEND, settle=2)
     receiver.wait_for(who)
     stored = api.message_with(api.channel_named(channel)['id'], f'@{who}')
     assert f'@{who}' in stored['content'], stored['content']
@@ -77,9 +79,9 @@ def mention(sender, receiver, channel, who, api):
 def attach(client, other, channel, path, api):
     """Upload a file and check the server kept it, not just that a chip drew."""
     client.click(channel)
-    client.attach_file('Attach a file', path)
-    client.wait_for('Remove attachment')
-    client.click('Send message', settle=4)
+    client.attach_file(L.ATTACH, path)
+    client.wait_for(L.REMOVE_ATTACHMENT)
+    client.click(L.SEND, settle=4)
 
     channel_id = api.channel_named(channel)['id']
     deadline = time.time() + 40

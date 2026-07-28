@@ -7,26 +7,28 @@ two are reachable independently, and that what they change actually changes.
 """
 import time
 
+import e2e_labels as L
+
 
 def _open_personal(client):
     """Each scenario starts from the channel list, so each finds its own way."""
     if '#/settings' not in (client.ev('location.href') or '') or \
-            client.find('Who can join'):
-        client.click('Personal settings', settle=3)
+            client.find(L.WHO_CAN_JOIN):
+        client.click(L.PERSONAL_SETTINGS, settle=3)
 
 
 def _open_space(client):
     if '#/settings/space' not in (client.ev('location.href') or ''):
-        client.click('Space menu', settle=2)
-        client.click('Space settings', settle=3)
+        client.click(L.SPACE_MENU, settle=2)
+        client.click(L.SPACE_SETTINGS, settle=3)
 
 
 def personal_settings_reachable(client):
     """The footer control opens personal settings, never Space settings."""
-    client.click('Personal settings', settle=3)
+    client.click(L.PERSONAL_SETTINGS, settle=3)
     client.wait_url('#/settings')
-    client.wait_for('Upload photo')
-    assert not client.find('Who can join'), \
+    client.wait_for(L.UPLOAD_PHOTO)
+    assert not client.find(L.WHO_CAN_JOIN), \
         'personal settings is showing Space settings'
     client.shot('personal-settings')
     print('  personal settings opens on its own, with no Space section in it')
@@ -35,17 +37,17 @@ def personal_settings_reachable(client):
 def change_theme(client):
     """A preference that persists is a preference that was actually stored."""
     _open_personal(client)
-    client.click('Theme', settle=2)
+    client.click(L.THEME, settle=2)
     client.wait_for('Dark')
     client.click('Dark', settle=2)
     client.wait_for('Theme, currently Dark')
     print('  theme changed to Dark and the control says so')
 
 
-def change_status(client, api):
+def change_status(client):
     """Presence is a real server-side state, not a local badge."""
     _open_personal(client)
-    client.click('Status', settle=2)
+    client.click(L.STATUS, settle=2)
     client.wait_for('Do not disturb')
     client.click('Do not disturb', settle=3)
     client.wait_for('Status, currently Do not disturb')
@@ -55,11 +57,11 @@ def change_status(client, api):
 def upload_avatar(client, api, path):
     """Upload a picture and check the server serves it back."""
     _open_personal(client)
-    client.attach_file('Upload photo', path)
+    client.attach_file(L.UPLOAD_PHOTO, path)
     # A picked picture is cropped before it is uploaded, so the sheet has to be
     # answered; nothing reaches the server until it is.
-    client.wait_for('Crop your picture')
-    client.click('Use picture', settle=4)
+    client.wait_for(L.CROP_TITLE)
+    client.click(L.USE_PICTURE, settle=4)
     deadline = time.time() + 40
     served = None
     while time.time() < deadline:
@@ -79,9 +81,9 @@ def space_settings_reachable(client):
     """The Space menu opens Space settings, which personal settings is not."""
     _open_space(client)
     client.wait_url('#/settings/space')
-    for label in ('Reports', 'Invites', 'Roles', 'Who can join'):
+    for label in ('Reports', 'Invites', L.ROLES, L.WHO_CAN_JOIN):
         client.wait_for(label)
-    assert not client.find('Upload photo'), \
+    assert not client.find(L.UPLOAD_PHOTO), \
         'Space settings is showing personal settings'
     client.shot('space-settings')
     print('  Space settings opens on its own, with all four sections')
@@ -91,9 +93,9 @@ def change_join_policy(client, api):
     """Who can join is one row in the database and the whole security model."""
     _open_space(client)
     before = api.space_settings()['join_policy']
-    client.click('Who can join', settle=2)
-    client.wait_for('Anyone with the address')
-    client.click('Anyone with the address', settle=3)
+    client.click(L.WHO_CAN_JOIN, settle=2)
+    client.wait_for(L.JOIN_OPEN)
+    client.click(L.JOIN_OPEN, settle=3)
 
     deadline = time.time() + 30
     while time.time() < deadline:
@@ -109,8 +111,8 @@ def change_join_policy(client, api):
         '/version still says an invite is required'
     print(f'  join policy {before} -> {after}, and /version agrees')
 
-    client.click('Who can join', settle=2)
-    client.click('People with an invite', settle=3)
+    client.click(L.WHO_CAN_JOIN, settle=2)
+    client.click(L.JOIN_INVITE, settle=3)
     deadline = time.time() + 30
     while time.time() < deadline:
         if api.space_settings()['join_policy'] == 'invite':

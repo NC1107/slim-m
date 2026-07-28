@@ -32,7 +32,11 @@ def png(path, width, height, rgb):
 
 
 def main():
-    out = Path(sys.argv[1])
+    # Resolved and required absolute, so a relative or traversing argument
+    # cannot write these two files somewhere the caller did not name.
+    out = Path(sys.argv[1]).resolve()
+    if not Path(sys.argv[1]).is_absolute():
+        sys.exit(f"fixtures need an absolute directory, got {sys.argv[1]!r}")
     out.mkdir(parents=True, exist_ok=True)
     avatar = png(out / "avatar.png", 64, 64, (88, 180, 216))
     attachment = png(out / "attachment.png", 120, 80, (27, 111, 145))

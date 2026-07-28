@@ -10,10 +10,12 @@ Called by scripts/e2e.sh, which owns the stack this talks to.
 """
 import os
 import sys
+import tempfile
 import time
 import traceback
 
 import e2e_admin
+import e2e_labels as L
 import e2e_messaging
 import e2e_settings
 import e2e_coverage
@@ -23,7 +25,9 @@ import e2e_api
 from e2e_api import Api
 from e2e_client import Client
 
-FIXTURES = os.environ.get("E2E_FIXTURES", "/tmp/e2e-fixtures")
+# A private directory when unset, rather than a guessable shared one; e2e.sh
+# always sets it to a directory inside the run's own work area.
+FIXTURES = os.environ.get("E2E_FIXTURES") or tempfile.mkdtemp(prefix="e2e-")
 
 
 def sign_in(client, server, username, password):
@@ -45,26 +49,26 @@ def go_home(client):
         time.sleep(2)
 
 
-def scenarios(a, b, admin, member, server, room_id, secret):
+def scenarios(a, b, admin, member, room_id):
     """Every scenario, as (name, callable). Named so a failure says which."""
     picture = os.path.join(FIXTURES, "avatar.png")
     upload = os.path.join(FIXTURES, "attachment.png")
     return [
         ("messaging: a message each way", lambda: (
             e2e_messaging.send_and_receive(
-                a, b, "general", "first message from alice", admin),
+                a, b, L.TEXT_CHANNEL, L.FIRST_MESSAGE, admin),
             e2e_messaging.send_and_receive(
-                b, a, "general", "and a reply from bob", admin))),
+                b, a, L.TEXT_CHANNEL, L.REPLY_MESSAGE, admin))),
         ("messaging: a mention", lambda: e2e_messaging.mention(
-            a, b, "general", "Bob", admin)),
+            a, b, L.TEXT_CHANNEL, "Bob", admin)),
         ("messaging: a reaction", lambda: e2e_messaging.react(
-            a, b, "first message from alice", "grinning face", admin,
-            "general")),
+            a, b, L.FIRST_MESSAGE, "grinning face", admin,
+            L.TEXT_CHANNEL)),
         ("messaging: an attachment", lambda: e2e_messaging.attach(
-            a, b, "general", upload, admin)),
+            a, b, L.TEXT_CHANNEL, upload, admin)),
         ("moderation: reporting a message", lambda: e2e_admin.report_a_message(
-            member, admin, admin.channel_named("general")["id"],
-            "first message from alice")),
+            member, admin, admin.channel_named(L.TEXT_CHANNEL)["id"],
+            L.FIRST_MESSAGE)),
         ("moderation: blocking a member", lambda: e2e_admin.block_and_unblock(
             member, admin.me()["id"])),
         ("permissions: the server refuses what the UI hides",
@@ -75,7 +79,7 @@ def scenarios(a, b, admin, member, server, room_id, secret):
             a, admin, picture)),
         ("settings: theme and status", lambda: (
             e2e_settings.change_theme(a),
-            e2e_settings.change_status(a, admin))),
+            e2e_settings.change_status(a))),
         ("settings: Space settings stand alone",
          lambda: e2e_settings.space_settings_reachable(a)),
         ("settings: who can join", lambda: e2e_settings.change_join_policy(
@@ -83,7 +87,7 @@ def scenarios(a, b, admin, member, server, room_id, secret):
         ("admin: creating a role", lambda: e2e_admin.create_role(a, admin)),
         ("api: the routes the UI scenarios do not reach",
          lambda: e2e_sweep.run_all(
-             admin, member, admin.channel_named("general")["id"],
+             admin, admin.channel_named(L.TEXT_CHANNEL)["id"],
              member.me()["id"])),
         ("voice: two clients in one call", lambda: e2e_voice.join_call(
             a, b, room_id)),
@@ -111,7 +115,7 @@ def main():
     sign_in(b, server, "bob", secret)
 
     failures = []
-    for name, run in scenarios(a, b, admin, member, server, room_id, secret):
+    for name, run in scenarios(a, b, admin, member, room_id):
         if only and only not in name:
             continue
         print(f"\n== {name} ==")

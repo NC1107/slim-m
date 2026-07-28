@@ -14,17 +14,19 @@ access control; refusing the request is, and that is the half worth testing.
 """
 import time
 
+import e2e_labels as L
+
 
 def create_role(client, api):
     """A role is created through the UI and read back from the server."""
-    client.click('Space menu', settle=2)
-    client.click('Space settings', settle=3)
-    client.click('Roles', settle=4)
+    client.click(L.SPACE_MENU, settle=2)
+    client.click(L.SPACE_SETTINGS, settle=3)
+    client.click(L.ROLES, settle=4)
     before = {r['name'] for r in api.roles()}
 
-    client.click('New role', settle=2)
-    client.type_into('Role name', 'moderator')
-    client.click('Create role', settle=4)
+    client.click(L.NEW_ROLE, settle=2)
+    client.type_into(L.ROLE_NAME, 'moderator')
+    client.click(L.CREATE_ROLE, settle=4)
 
     deadline = time.time() + 30
     while time.time() < deadline:
@@ -83,10 +85,11 @@ def permissions_are_enforced(member_api, admin_api):
     body, and would have passed just as happily against a server with no
     permission checks in it at all.
     """
+    queue = '/reports'
     refusals = [
         ('POST', '/roles', {'name': 'should-not-exist', 'permissions': 0}),
         ('PATCH', '/space/settings', {'join_policy': 'open'}),
-        ('GET', '/reports', None),
+        ('GET', queue, None),
     ]
     for method, path, body in refusals:
         code = member_api.status(method, path, body)
@@ -94,7 +97,7 @@ def permissions_are_enforced(member_api, admin_api):
             f'{method} {path} answered {code} for an ordinary member'
         print(f'  {method} {path} refused an ordinary member with {code}')
 
-    assert admin_api.status('GET', '/reports') == 200, \
+    assert admin_api.status('GET', queue) == 200, \
         'the administrator cannot read the report queue'
     assert 'should-not-exist' not in {r['name'] for r in admin_api.roles()}, \
         'the refused role was created anyway'
