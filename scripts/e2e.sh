@@ -26,7 +26,10 @@ KEEP=0
 export E2E_SHOTS="$SHOTS"
 export E2E_FIXTURES="$WORK/fixtures"
 export E2E_SCHEMA="$ROOT/schema/openapi.yaml"
-export LIVEKIT_API_KEY=devkey LIVEKIT_API_SECRET=secret
+# LiveKit's own dev-mode pair, for a throwaway container on this machine that
+# is torn down with the run. Overridable, so nothing here assumes them.
+export LIVEKIT_API_KEY="${LIVEKIT_API_KEY:-devkey}"
+export LIVEKIT_API_SECRET="${LIVEKIT_API_SECRET:-secret}"
 
 cleanup() {
   local code=$?

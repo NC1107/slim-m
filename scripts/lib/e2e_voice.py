@@ -19,8 +19,10 @@ def sfu_participants(room):
     def b64(b):
         return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
 
-    key = os.environ.get("LIVEKIT_API_KEY", "devkey")
-    secret = os.environ.get("LIVEKIT_API_SECRET", "secret").encode()
+    # Required rather than defaulted: e2e.sh always exports both, and a
+    # guessable fallback would quietly sign tokens for whatever SFU answered.
+    key = os.environ["LIVEKIT_API_KEY"]
+    secret = os.environ["LIVEKIT_API_SECRET"].encode()
     now = int(time.time())
     header = b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
     payload = b64(json.dumps({
