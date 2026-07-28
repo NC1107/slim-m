@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.2](https://github.com/NC1107/slim-m/compare/server-v0.14.1...server-v0.14.2) (2026-07-28)
+
+
+### Bug Fixes
+
+* desktop screen share, colour emoji, rail alignment, and who can join ([#81](https://github.com/NC1107/slim-m/issues/81)) ([4dd1bb1](https://github.com/NC1107/slim-m/commit/4dd1bb13090f2056952743ea397073df4bdb5ba3))
+
 ## [0.14.1](https://github.com/NC1107/slim-m/compare/server-v0.14.0...server-v0.14.1) (2026-07-28)
 
 
