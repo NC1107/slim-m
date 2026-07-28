@@ -11,7 +11,7 @@ use crate::fixtures::*;
 
 #[tokio::test]
 async fn an_oversized_upload_is_refused() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -43,7 +43,7 @@ async fn an_oversized_upload_is_refused() {
 /// would be.
 #[tokio::test]
 async fn a_disallowed_content_type_is_refused_even_when_the_filename_lies() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -65,7 +65,7 @@ async fn a_disallowed_content_type_is_refused_even_when_the_filename_lies() {
 
 #[tokio::test]
 async fn uploads_are_rate_limited() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await

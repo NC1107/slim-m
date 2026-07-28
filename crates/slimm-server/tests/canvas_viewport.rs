@@ -20,20 +20,21 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use slimm_server::voice::VoiceService;
 use tower::ServiceExt;
-use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-canvas-http-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-canvas-http");
     let config = Config {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
         ..Config::default()
     };
-    Store::new(db::connect(&config).await.expect("connect + migrate"))
+    (
+        Store::new(db::connect(&config).await.expect("connect + migrate")),
+        guard,
+    )
 }
 
 fn app(store: Store) -> Router {
@@ -106,7 +107,7 @@ async fn place(store: &Store, channel: ChannelId, author: UserId, x: f64) {
 /// room's shared work lives and a listen-only guest is a real role.
 #[tokio::test]
 async fn reading_a_canvas_needs_the_canvas_bit_as_well_as_the_view_bit() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -135,7 +136,7 @@ async fn reading_a_canvas_needs_the_canvas_bit_as_well_as_the_view_bit() {
 /// shipped once, in report resolution.
 #[tokio::test]
 async fn the_canvas_gate_is_evaluated_per_channel() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -166,7 +167,7 @@ async fn the_canvas_gate_is_evaluated_per_channel() {
 /// part of the world with no sign anything went wrong.
 #[tokio::test]
 async fn a_rectangle_the_server_cannot_honour_is_refused() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -194,7 +195,7 @@ async fn a_rectangle_the_server_cannot_honour_is_refused() {
 /// silently truncating the canvas it draws.
 #[tokio::test]
 async fn a_crowded_region_reports_that_it_held_something_back() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",

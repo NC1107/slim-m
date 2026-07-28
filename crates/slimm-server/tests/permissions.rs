@@ -7,11 +7,10 @@ use slimm_server::db;
 use slimm_server::permissions::Permissions;
 use slimm_server::store::Store;
 
-async fn store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-perm-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-perm-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -19,7 +18,7 @@ async fn store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 const VIEW: Permissions = Permissions::VIEW_CHANNEL;
@@ -28,7 +27,7 @@ const NONE: Permissions = Permissions::NONE;
 
 #[tokio::test]
 async fn deny_by_default_with_no_roles() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let user = s.create_user("nia", "Nia").await.unwrap();
     let channel = s.create_channel("general", "text").await.unwrap();
 
@@ -39,7 +38,7 @@ async fn deny_by_default_with_no_roles() {
 
 #[tokio::test]
 async fn everyone_base_applies_without_explicit_assignment() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let user = s.create_user("omar", "Omar").await.unwrap();
     let channel = s.create_channel("general", "text").await.unwrap();
     s.create_role("everyone", VIEW.union(SEND), true)
@@ -54,7 +53,7 @@ async fn everyone_base_applies_without_explicit_assignment() {
 
 #[tokio::test]
 async fn explicit_role_unions_onto_the_base() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let user = s.create_user("pia", "Pia").await.unwrap();
     let channel = s.create_channel("general", "text").await.unwrap();
     s.create_role("everyone", VIEW.union(SEND), true)
@@ -76,7 +75,7 @@ async fn explicit_role_unions_onto_the_base() {
 
 #[tokio::test]
 async fn administrator_bypasses_channel_denies() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let user = s.create_user("quinn", "Quinn").await.unwrap();
     let channel = s.create_channel("general", "text").await.unwrap();
     let everyone = s.create_role("everyone", NONE, true).await.unwrap();
@@ -101,7 +100,7 @@ async fn administrator_bypasses_channel_denies() {
 
 #[tokio::test]
 async fn everyone_channel_overwrite_removes_a_base_permission() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let user = s.create_user("rae", "Rae").await.unwrap();
     let channel = s.create_channel("general", "text").await.unwrap();
     let everyone = s
@@ -121,7 +120,7 @@ async fn everyone_channel_overwrite_removes_a_base_permission() {
 
 #[tokio::test]
 async fn role_overwrite_deny_wins_then_member_overwrite_regrants() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let user = s.create_user("sol", "Sol").await.unwrap();
     let channel = s.create_channel("general", "text").await.unwrap();
     s.create_role("everyone", VIEW, true).await.unwrap();
@@ -148,7 +147,7 @@ async fn role_overwrite_deny_wins_then_member_overwrite_regrants() {
 
 #[tokio::test]
 async fn only_one_everyone_role_is_allowed() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     s.create_role("everyone", VIEW, true).await.unwrap();
     // A second @everyone role is rejected by the database constraint.
     assert!(
@@ -161,7 +160,7 @@ async fn only_one_everyone_role_is_allowed() {
 
 #[tokio::test]
 async fn overwrites_for_other_targets_are_ignored() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let user = s.create_user("tam", "Tam").await.unwrap();
     let other = s.create_user("uma", "Uma").await.unwrap();
     let channel = s.create_channel("general", "text").await.unwrap();

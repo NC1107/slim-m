@@ -13,7 +13,7 @@ use crate::fixtures::*;
 
 #[tokio::test]
 async fn deleting_a_message_releases_its_attachment() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -85,7 +85,7 @@ async fn deleting_a_message_releases_its_attachment() {
 /// not.
 #[tokio::test]
 async fn a_send_carrying_an_attachment_needs_no_text() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",

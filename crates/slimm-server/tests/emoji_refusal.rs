@@ -19,20 +19,22 @@ use slimm_server::store::{MAX_CUSTOM_EMOJI, Store};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
+mod support;
+
 // --- Fixtures ---
 
-async fn pool() -> SqlitePool {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-emoji-refusal-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+async fn pool() -> (SqlitePool, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-emoji-refusal");
     let config = Config {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
         ..Config::default()
     };
-    db::connect(&config).await.expect("connect + migrate")
+    (
+        db::connect(&config).await.expect("connect + migrate"),
+        guard,
+    )
 }
 
 /// A media handle plus the directory its blobs land in, so a test can count
@@ -77,7 +79,7 @@ fn blob_count(dir: &std::path::Path) -> usize {
 /// nothing, and only the emoji count looked right.
 #[tokio::test]
 async fn an_emoji_refused_at_the_cap_leaves_no_bytes_and_no_row() {
-    let pool = pool().await;
+    let (pool, _guard) = pool().await;
     let store = Store::new(pool.clone());
     let (media, blobs) = media_for_test();
 
@@ -140,7 +142,7 @@ async fn an_emoji_refused_at_the_cap_leaves_no_bytes_and_no_row() {
 /// second copy of the same image.
 #[tokio::test]
 async fn an_emoji_refused_for_its_name_leaves_no_bytes_and_no_row() {
-    let pool = pool().await;
+    let (pool, _guard) = pool().await;
     let store = Store::new(pool.clone());
     let (media, blobs) = media_for_test();
 

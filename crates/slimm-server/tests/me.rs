@@ -16,13 +16,11 @@ use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
-use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-me-test-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-me-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -30,7 +28,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -93,7 +91,7 @@ async fn register(app: &Router, username: &str) -> (String, String) {
 /// permissions, so a client can decide which actions to show.
 #[tokio::test]
 async fn get_me_returns_profile_and_base_permissions() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store);
     // No role pre-created: the first account to register claims the
     // unclaimed deployment and is granted an administrator role.
@@ -122,7 +120,7 @@ async fn get_me_returns_profile_and_base_permissions() {
 
 #[tokio::test]
 async fn get_me_requires_authentication() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store);
 
     let response = app
@@ -135,7 +133,7 @@ async fn get_me_requires_authentication() {
 
 #[tokio::test]
 async fn patch_me_updates_the_display_name() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store);
     let (token, _user_id) = register(&app, "alice").await;
 
@@ -170,7 +168,7 @@ async fn patch_me_updates_the_display_name() {
 /// field, so it cannot be used to rename the account.
 #[tokio::test]
 async fn patch_me_cannot_change_the_username() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store);
     let (token, _user_id) = register(&app, "alice").await;
 
@@ -191,7 +189,7 @@ async fn patch_me_cannot_change_the_username() {
 
 #[tokio::test]
 async fn patch_me_rejects_a_whitespace_only_name() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store);
     let (token, _user_id) = register(&app, "alice").await;
 
@@ -210,7 +208,7 @@ async fn patch_me_rejects_a_whitespace_only_name() {
 
 #[tokio::test]
 async fn patch_me_rejects_a_name_that_is_too_long() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store);
     let (token, _user_id) = register(&app, "alice").await;
 

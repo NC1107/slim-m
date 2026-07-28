@@ -481,7 +481,16 @@ cargo sqlx prepare --workspace                         # writes .sqlx/, commit i
 
 Test databases are temp SQLite files (`Config { port, database_path }` then `db::connect`); do not use `:memory:` with the multi-connection pool.
 
-**They leak, and on this box that is not cosmetic.** 96 sites across 46 test files build a path under `std::env::temp_dir()` and nothing ever deletes it, so a full `cargo test --all` leaves roughly a thousand `slimm-*.db` files behind, plus their `-wal` and `-shm` companions. `/tmp` here is a 16GB tmpfs shared with every other tool, and on 2026-07-28 the accumulation reached 20,000 files and filled it, which surfaces as the shell failing every command that writes to stdout with `disk quota exceeded` rather than as anything mentioning tests. Clear them with `find /tmp -maxdepth 1 -name 'slimm-*' -delete`. The real fix is a shared RAII guard that removes the file on drop, which is a wide, shallow change across all 46 files and wants a moment when nothing else is in flight.
+**They used to leak, and on this box that was not cosmetic.**
+96 sites across 46 test files built a path under `std::env::temp_dir()` and nothing ever deleted it, so a full `cargo test --all` left roughly a thousand `slimm-*.db` files behind, plus their `-wal` and `-shm` companions.
+`/tmp` here is a 16GB tmpfs shared with every other tool, and on 2026-07-28 the accumulation reached 20,000 files and filled it, which surfaces as the shell failing every command that writes to stdout with `disk quota exceeded` rather than as anything mentioning tests.
+Clear a pre-fix mess with `find /tmp -maxdepth 1 -name 'slimm-*' -delete` (non-empty leftover media directories need `-exec rm -rf {} +` instead).
+
+**Fixed, 2026-07-28.**
+`tests/support/mod.rs` is a `TestDbGuard`, included per test binary with `mod support;` (a plain top-level file) or `#[path = "../support/mod.rs"] mod support;` (a `tests/<name>/main.rs` subdirectory binary), since integration tests are separate crates and a `mod.rs` with no `main.rs` is never auto-discovered as its own target.
+It deletes its `.db`, `-wal` and `-shm` siblings on drop, panic or not, and every one of the 46 files now threads it through: a helper returns `(Store, TestDbGuard)` (or `(SqlitePool, TestDbGuard)`), and every wrapper around that helper has to carry the guard onward too, or it drops (and deletes the database) the moment the wrapper returns, before the test body ever runs.
+That exact bug hit three wrappers first (`invites.rs`'s `fixture`, `registration_gate.rs`'s `claimed`, `read_state_sync.rs`'s `setup`) and surfaced as "no such table", not as a leak.
+Left unconverted: `tests/response_contract/**` (a concurrent change owned it) and four sites that create a temp media directory rather than a database (`emoji_refusal.rs`, `attachments/fixtures.rs`, `emoji_import/fixtures.rs` twice) - a different leak shape, no `-wal`/`-shm`, and out of scope for this guard.
 
 ## Contribution conventions
 

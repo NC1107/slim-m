@@ -16,7 +16,7 @@ use crate::fixtures::*;
 /// must be refused even though he has the exact, correct attachment id.
 #[tokio::test]
 async fn fetching_requires_view_channel_permission() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     // @everyone gets nothing; alice is separately granted what she needs so
     // bob (plain @everyone) genuinely cannot view the channel.
     store
@@ -90,7 +90,7 @@ async fn fetching_requires_view_channel_permission() {
 
 #[tokio::test]
 async fn the_served_response_carries_nosniff_and_a_safe_disposition() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -148,7 +148,7 @@ async fn the_served_response_carries_nosniff_and_a_safe_disposition() {
 
 #[tokio::test]
 async fn a_non_image_attachment_is_served_as_a_forced_download() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",

@@ -21,11 +21,10 @@ use slimm_server::store::Store;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-overwrites-test-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-overwrites-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -33,7 +32,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -132,7 +131,7 @@ async fn send_message(app: &Router, channel_id: &str, token: &str) -> StatusCode
 /// id and a real channel the caller cannot manage must answer identically.
 #[tokio::test]
 async fn nonexistent_channel_refuses_identically_for_everyone() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
     let everyone = everyone_role_id(&store).await;
@@ -161,7 +160,7 @@ async fn nonexistent_channel_refuses_identically_for_everyone() {
 /// not themselves hold there, even for themselves.
 #[tokio::test]
 async fn allow_cannot_grant_a_permission_the_caller_lacks() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
     let (member_token, member_id) = register(&store, "bob").await;
@@ -210,7 +209,7 @@ async fn allow_cannot_grant_a_permission_the_caller_lacks() {
 
 #[tokio::test]
 async fn kind_must_be_role_or_member() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
     let channel_id = general_channel_id(&store).await;
@@ -230,7 +229,7 @@ async fn kind_must_be_role_or_member() {
 
 #[tokio::test]
 async fn setting_an_overwrite_for_a_nonexistent_target_is_not_found() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
     let channel_id = general_channel_id(&store).await;
@@ -270,7 +269,7 @@ async fn setting_an_overwrite_for_a_nonexistent_target_is_not_found() {
 /// the `@everyone` overwrite restores the default for everyone else.
 #[tokio::test]
 async fn set_and_clear_actually_change_what_the_evaluator_returns() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
     let (carol_token, carol_id) = register(&store, "carol").await;
@@ -340,7 +339,7 @@ async fn set_and_clear_actually_change_what_the_evaluator_returns() {
 /// Clearing an overwrite that was never set is not an error.
 #[tokio::test]
 async fn clearing_an_unset_overwrite_is_idempotent() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
     let channel_id = general_channel_id(&store).await;
@@ -364,7 +363,7 @@ async fn clearing_an_unset_overwrite_is_idempotent() {
 /// themselves a bit they could never have granted directly.
 #[tokio::test]
 async fn clearing_a_deny_you_do_not_hold_is_refused() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
 
     // First account claims the deployment and is its administrator.

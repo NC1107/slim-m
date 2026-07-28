@@ -17,11 +17,10 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-sync-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-sync-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -29,7 +28,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 /// A user, their access token, and a router sharing the store.
@@ -38,10 +37,11 @@ struct Fixture {
     app: Router,
     user_id: UserId,
     token: String,
+    _guard: support::TestDbGuard,
 }
 
 async fn setup(everyone: Permissions) -> Fixture {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store.create_role("everyone", everyone, true).await.unwrap();
     let app = http::router(AppState {
         store: store.clone(),
@@ -59,6 +59,7 @@ async fn setup(everyone: Permissions) -> Fixture {
         app,
         user_id: user.id,
         token: tokens.access_token,
+        _guard,
     }
 }
 

@@ -17,11 +17,10 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-safety-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-safety-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -29,7 +28,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -67,7 +66,7 @@ async fn json_body(response: axum::response::Response) -> Value {
 
 #[tokio::test]
 async fn devices_list_and_sign_out_only_your_own() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let auth = Auth::new(2).unwrap();
     let hash = auth
         .hash_password("hunter2hunter2".to_owned())
@@ -142,7 +141,7 @@ async fn devices_list_and_sign_out_only_your_own() {
 
 #[tokio::test]
 async fn blocking_is_private_idempotent_and_one_directional() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let auth = Auth::new(2).unwrap();
     let hash = auth
         .hash_password("hunter2hunter2".to_owned())
@@ -222,7 +221,7 @@ async fn blocking_is_private_idempotent_and_one_directional() {
 
 #[tokio::test]
 async fn reporting_a_message_keeps_a_snapshot_and_resists_flooding() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -321,7 +320,7 @@ async fn reporting_a_message_keeps_a_snapshot_and_resists_flooding() {
 
 #[tokio::test]
 async fn a_message_you_cannot_see_cannot_be_reported() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",

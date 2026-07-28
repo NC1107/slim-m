@@ -24,14 +24,13 @@ use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tower::ServiceExt;
 use uuid::Uuid;
 
+mod support;
+
 type WsClient =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-polls-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-polls");
     let config = Config {
         port: 0,
         database_path: path,
@@ -39,7 +38,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn state_for(store: &Store) -> AppState {
@@ -149,7 +148,7 @@ async fn vote(app: &Router, message_id: &str, token: &str, option: i64) -> Statu
 /// that was abandoned.
 #[tokio::test]
 async fn voting_twice_replaces_rather_than_doubles() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -219,7 +218,7 @@ async fn voting_twice_replaces_rather_than_doubles() {
 /// merely hidden by the client: the check is against the server's own clock.
 #[tokio::test]
 async fn vote_after_close_is_refused() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -259,7 +258,7 @@ async fn vote_after_close_is_refused() {
 /// project (see CLAUDE.md).
 #[tokio::test]
 async fn voting_needs_send_permission_evaluated_per_channel() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -326,7 +325,7 @@ async fn voting_needs_send_permission_evaluated_per_channel() {
 /// same trigger-on-`deleted_at` mechanism pinned messages already rely on.
 #[tokio::test]
 async fn deleting_the_message_removes_the_poll() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -390,7 +389,7 @@ async fn deleting_the_message_removes_the_poll() {
 /// must too.
 #[tokio::test]
 async fn voting_is_rate_limited() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -432,7 +431,7 @@ async fn voting_is_rate_limited() {
 /// Poll creation is a message send and must be rate limited the same way.
 #[tokio::test]
 async fn poll_creation_is_rate_limited() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -539,7 +538,7 @@ async fn read_frame_of_type(ws: &mut WsClient, frame_type: &str) -> Value {
 /// which user cast which vote.
 #[tokio::test]
 async fn poll_vote_event_never_reveals_the_voter() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",

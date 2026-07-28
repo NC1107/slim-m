@@ -18,11 +18,8 @@ use uuid::Uuid;
 
 // --- Fixtures ---
 
-pub async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-emoji-import-test-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+pub async fn new_store() -> (Store, crate::support::TestDbGuard) {
+    let (path, guard) = crate::support::TestDbGuard::new("slimm-emoji-import-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -30,7 +27,7 @@ pub async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 pub fn media_for_test() -> Media {

@@ -20,14 +20,13 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
 
+mod support;
+
 const WEB_CLIENT: &str = "http://localhost:8099";
 const SOMEBODY_ELSE: &str = "https://evil.example.com";
 
-async fn app(policy: CorsPolicy) -> Router {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-cors-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+async fn app(policy: CorsPolicy) -> (Router, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-cors-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -35,7 +34,7 @@ async fn app(policy: CorsPolicy) -> Router {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    policy.apply(http::router(AppState {
+    let router = policy.apply(http::router(AppState {
         store: Store::new(pool),
         auth: Auth::new(2).unwrap(),
         hub: Hub::new(),
@@ -43,10 +42,11 @@ async fn app(policy: CorsPolicy) -> Router {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
-    }))
+    }));
+    (router, guard)
 }
 
-async fn configured() -> Router {
+async fn configured() -> (Router, support::TestDbGuard) {
     app(CorsPolicy::for_test(WEB_CLIENT).expect("a valid origin")).await
 }
 
@@ -85,20 +85,21 @@ fn header<'a>(headers: &'a axum::http::HeaderMap, name: &str) -> Option<&'a str>
 /// refuses the real request, not that the server pretends to allow it.
 #[tokio::test]
 async fn an_unconfigured_deployment_sends_no_cors_headers() {
-    let (status, headers) =
-        headers_of(app(CorsPolicy::disabled()).await, simple_get(WEB_CLIENT)).await;
+    let (router, _guard) = app(CorsPolicy::disabled()).await;
+    let (status, headers) = headers_of(router, simple_get(WEB_CLIENT)).await;
     assert_eq!(status, StatusCode::OK, "the request itself still succeeds");
     assert_eq!(header(&headers, "access-control-allow-origin"), None);
 
-    let (status, headers) =
-        headers_of(app(CorsPolicy::disabled()).await, preflight(WEB_CLIENT)).await;
+    let (router, _guard) = app(CorsPolicy::disabled()).await;
+    let (status, headers) = headers_of(router, preflight(WEB_CLIENT)).await;
     assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
     assert_eq!(header(&headers, "access-control-allow-origin"), None);
 }
 
 #[tokio::test]
 async fn a_configured_origin_is_echoed_back() {
-    let (status, headers) = headers_of(configured().await, simple_get(WEB_CLIENT)).await;
+    let (router, _guard) = configured().await;
+    let (status, headers) = headers_of(router, simple_get(WEB_CLIENT)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         header(&headers, "access-control-allow-origin"),
@@ -111,7 +112,8 @@ async fn a_configured_origin_is_echoed_back() {
 
 #[tokio::test]
 async fn another_origin_is_refused() {
-    let (status, headers) = headers_of(configured().await, simple_get(SOMEBODY_ELSE)).await;
+    let (router, _guard) = configured().await;
+    let (status, headers) = headers_of(router, simple_get(SOMEBODY_ELSE)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         header(&headers, "access-control-allow-origin"),
@@ -119,13 +121,15 @@ async fn another_origin_is_refused() {
         "an origin that is not on the list must never be echoed"
     );
 
-    let (_, headers) = headers_of(configured().await, preflight(SOMEBODY_ELSE)).await;
+    let (router, _guard) = configured().await;
+    let (_, headers) = headers_of(router, preflight(SOMEBODY_ELSE)).await;
     assert_eq!(header(&headers, "access-control-allow-origin"), None);
 }
 
 #[tokio::test]
 async fn a_preflight_is_answered_rather_than_405() {
-    let (status, headers) = headers_of(configured().await, preflight(WEB_CLIENT)).await;
+    let (router, _guard) = configured().await;
+    let (status, headers) = headers_of(router, preflight(WEB_CLIENT)).await;
     assert!(
         status.is_success(),
         "a preflight must be answered by the layer, not reach the method router: {status}"
@@ -154,7 +158,8 @@ async fn credentials_are_never_allowed() {
     // This API's bearer token is attached explicitly by the client and is
     // never ambient, so allowing credentials would add only cookie authority.
     for request in [preflight(WEB_CLIENT), simple_get(WEB_CLIENT)] {
-        let (_, headers) = headers_of(configured().await, request).await;
+        let (router, _guard) = configured().await;
+        let (_, headers) = headers_of(router, request).await;
         assert_eq!(
             header(&headers, "access-control-allow-credentials"),
             None,
@@ -176,7 +181,8 @@ async fn a_post_from_an_allowed_origin_reaches_the_handler() {
             r#"{"username":"nobody","password":"wrong-password","device_name":"web"}"#,
         ))
         .unwrap();
-    let (status, headers) = headers_of(configured().await, request).await;
+    let (router, _guard) = configured().await;
+    let (status, headers) = headers_of(router, request).await;
     assert_eq!(
         status,
         StatusCode::UNAUTHORIZED,
