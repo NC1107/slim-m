@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: Apache-2.0
+/// Shows Android's incoming-call notification for a content-free `call`
+/// push - the Android counterpart to iOS reporting a call to CallKit (see
+/// `VoipCallHandler.swift`).
+///
+/// A `MethodChannel` rather than a call into `LocalNotifications`: that
+/// class's plugin has no `Notification.CallStyle` support, so the native
+/// side here is this app's own `CallNotificationPlugin`, registered as a
+/// real Flutter plugin (see this package's `pubspec.yaml` and
+/// `android/src/main/kotlin/.../CallNotificationPlugin.kt`) rather than a
+/// bare channel wired up in `MainActivity` - the latter would be invisible
+/// to the headless `FlutterEngine` `firebase_messaging` runs its background
+/// isolate in, which is exactly where an Android call push arrives.
+library;
+
+import 'package:flutter/services.dart';
+
+import 'host_platform.dart';
+
+const _channelName = 'top.npcserver.slimm/calls';
+
+/// Displays this app's incoming-call notification on Android.
+///
+/// A clean no-op everywhere else: iOS reports the call to CallKit instead,
+/// and neither Linux nor a browser has a call-notification surface at all.
+class CallNotifications {
+  CallNotifications({MethodChannel? channel, bool? isAndroid})
+      : _channel = channel ?? const MethodChannel(_channelName),
+        _isAndroid = isAndroid ?? isAndroidHost;
+
+  final MethodChannel _channel;
+  final bool _isAndroid;
+
+  /// Shows, or replaces, the incoming-call notification for [callId], naming
+  /// [callerName]. A repeat call sharing one [callId] updates the
+  /// notification already on screen instead of stacking a second one.
+  Future<void> showIncomingCall({
+    required String callId,
+    required String callerName,
+  }) async {
+    if (!_isAndroid) return;
+    await _channel.invokeMethod<void>('showIncomingCall', {
+      'callId': callId,
+      'callerName': callerName,
+    });
+  }
+}
