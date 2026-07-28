@@ -254,6 +254,66 @@ async fn logout_closes_the_live_socket() {
     assert!(closed.is_ok(), "the socket should close after logout");
 }
 
+/// Removing a device is the third way a session dies, alongside logout and
+/// account deletion, and the only one with no test until now.
+///
+/// `Store::revoke_device` deliberately does not publish anything itself: the
+/// handler does, because it is the layer that holds the hub. That split is
+/// easy to undo by accident while refactoring, and nothing would fail.
+#[tokio::test]
+async fn removing_a_device_closes_its_live_socket() {
+    let store = new_store().await;
+    let state = state_for(&store);
+    let (alice_access, alice_ticket, alice) = user_ticket(&store, "alice").await;
+
+    // A second device on the same account, whose socket must survive: the
+    // revocation has to reach one session, not every session the user has.
+    let other = store.open_session(alice, "phone").await.unwrap();
+    let other_ctx = store
+        .authenticate(&other.access_token)
+        .await
+        .unwrap()
+        .unwrap();
+    let (other_ticket, _) = store.mint_ws_ticket(&other_ctx).await.unwrap();
+
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut other_ws = connect(addr, &other_ticket).await;
+
+    let device = store
+        .authenticate(&alice_access)
+        .await
+        .unwrap()
+        .unwrap()
+        .device_id;
+    let response = http::router(state.clone())
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/devices/{device}"))
+                .header("authorization", format!("Bearer {}", other.access_token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    let closed = tokio::time::timeout(Duration::from_secs(2), wait_closed(&mut alice_ws)).await;
+    assert!(
+        closed.is_ok(),
+        "the removed device's socket must close, not linger with fan-out access"
+    );
+
+    // The surviving device keeps its socket, so the revocation was targeted.
+    let still_open =
+        tokio::time::timeout(Duration::from_millis(400), wait_closed(&mut other_ws)).await;
+    assert!(
+        still_open.is_err(),
+        "removing one device must not close another device's socket"
+    );
+}
+
 #[tokio::test]
 async fn a_bad_ticket_is_rejected() {
     let store = new_store().await;

@@ -67,3 +67,6 @@ client/packages/app/web/sqlite3.wasm
 
 # Rendered by scripts/ui-snapshots.sh for looking at, never committed.
 client/packages/app/build/ui-snapshots/
+
+# Agent worktrees, created by the Agent tool under isolation: worktree.
+.claude/worktrees/

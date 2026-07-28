@@ -312,7 +312,7 @@ Known residuals, deliberately shipped:
 - The session write lands just after the in-memory token becomes authoritative, so a process death in that window replays a spent refresh token into reuse detection and forces a sign-out. Recoverable, but closing it means reordering `SlimmApi`'s refresh path.
 - The delete-account error path reports its failure but still strands the user.
 - Malformed query strings and JSON bodies still return axum's default error rather than the uniform JSON error contract.
-- `revoke_device` does not itself publish `SessionRevoked`; the logout and deletion paths do, and both are now covered by socket-closes tests.
+- `revoke_device` does not itself publish `SessionRevoked`, and that is the layering rather than a gap: the handler holds the hub, so `DELETE /devices/{id}` publishes for every session the removal revoked. Read twice as an open bug before somebody checked. Covered by a test since 2026-07-28 that also asserts a *second* device's socket survives, so a revocation that fanned out to the whole account would fail rather than look correct.
 - `packaging/flatpak/*.yaml` and `packaging/rpm/*.spec` still do not exist, so a tagged release warns and skips both Linux artifacts. Phase 0's exit criterion names them and Phase 9 owns them properly. Deliberately not guessed at here: an untested manifest that merely looks right is worse than an honest skip, because it produces a broken artifact instead of a visible gap.
 
 ## Push credentials and identifiers
@@ -344,7 +344,7 @@ Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 
 - The shared message context menu (edit, delete, pin/unpin) is now built; see "Cross-origin access, moderation UI, and channel administration" above. Reactions UI, the quick switcher, and haptics are not. The server side of reactions exists (PUT/DELETE on `/messages/{id}/reactions/{emoji}`, summaries on list, a ReactionsChanged event). History pagination is not built either.
 - The shortcut table exists but is not yet bound into the widget tree.
 
-Open follow-ups noted during reviews: malformed query/JSON bodies still return axum's default error rather than the uniform JSON error contract (low); `revoke_device` does not itself publish `SessionRevoked` (the logout and deletion paths do).
+Open follow-up noted during reviews: malformed query and JSON bodies still return axum's default plain-text error rather than the uniform JSON error contract (low). Fixing it means our own `Json`/`Query` extractors mapping their rejections to `ApiError`, which is a one-line import change in every `http/*.rs` module; worth doing when nothing else is in flight across that directory, because the diff is wide and shallow.
 
 ## Running deployment (LAN test instance)
 
