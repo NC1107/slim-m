@@ -481,6 +481,8 @@ cargo sqlx prepare --workspace                         # writes .sqlx/, commit i
 
 Test databases are temp SQLite files (`Config { port, database_path }` then `db::connect`); do not use `:memory:` with the multi-connection pool.
 
+**They leak, and on this box that is not cosmetic.** 96 sites across 46 test files build a path under `std::env::temp_dir()` and nothing ever deletes it, so a full `cargo test --all` leaves roughly a thousand `slimm-*.db` files behind, plus their `-wal` and `-shm` companions. `/tmp` here is a 16GB tmpfs shared with every other tool, and on 2026-07-28 the accumulation reached 20,000 files and filled it, which surfaces as the shell failing every command that writes to stdout with `disk quota exceeded` rather than as anything mentioning tests. Clear them with `find /tmp -maxdepth 1 -name 'slimm-*' -delete`. The real fix is a shared RAII guard that removes the file on drop, which is a wide, shallow change across all 46 files and wants a moment when nothing else is in flight.
+
 ## Contribution conventions
 
 - Branch, then PR, then squash-merge to main. release-please plus conventional-commit PR titles.
