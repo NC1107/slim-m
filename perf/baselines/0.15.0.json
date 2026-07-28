@@ -1,0 +1,35 @@
+{
+  "version": "0.15.0",
+  "metrics": [
+    {
+      "name": "uuid_now_v7",
+      "value": 118.96,
+      "unit": "ns"
+    },
+    {
+      "name": "version_json_serialize",
+      "value": 138.71,
+      "unit": "ns"
+    },
+    {
+      "name": "idle_rss_glibc",
+      "value": 8748,
+      "unit": "kB"
+    },
+    {
+      "name": "peak_rss_glibc",
+      "value": 26916,
+      "unit": "kB"
+    },
+    {
+      "name": "idle_rss_musl",
+      "value": 5924,
+      "unit": "kB"
+    },
+    {
+      "name": "peak_rss_musl",
+      "value": 24080,
+      "unit": "kB"
+    }
+  ]
+}

@@ -192,7 +192,14 @@ class _ComposerState extends ConsumerState<Composer> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+        // The same gutter the message rows and the header use; a composer
+        // inset differently from the messages above it is visibly crooked.
+        padding: EdgeInsets.fromLTRB(
+          touch ? AppSizes.paneGutterCompact : AppSizes.paneGutter,
+          0,
+          touch ? AppSizes.paneGutterCompact : AppSizes.paneGutter,
+          8,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

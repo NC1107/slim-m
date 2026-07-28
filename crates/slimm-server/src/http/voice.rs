@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Joining a channel's voice room.
+//! Joining a channel's voice room, and seeing who else already has.
 //!
-//! Two routes, and almost all of each is the check in front: the token this
+//! Three routes, and almost all of each is the check in front: the token this
 //! hands back is a bearer credential the SFU trusts, so what a caller may do in
 //! a room is decided here, once, from their permissions in that channel.
 //!
@@ -9,11 +9,18 @@
 //! TTL bounds how long a removed participant could walk back in; removing them
 //! from the room is what makes a kick take effect now rather than in two
 //! minutes.
+//!
+//! The roster is the read-only third: `VIEW_CHANNEL` is the gate, the same bit
+//! that lets a member read a text channel's messages without also being able
+//! to send into it. A participant who chose to appear offline is dropped from
+//! every viewer's roster but their own, the same treatment [`crate::presence`]
+//! gives every other surface; see [`roster`]'s doc comment for why that is a
+//! deliberate call rather than an oversight.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Serialize;
 
@@ -23,12 +30,14 @@ use super::extract::{Authed, enforce};
 use super::messages::parse_uuid;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
+use crate::presence::Visibility;
 use crate::ratelimit::Class;
 use crate::voice::{RoomToken, VoiceError};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/channels/{channel_id}/voice/token", post(token))
+        .route("/channels/{channel_id}/voice/roster", get(roster))
         .route(
             "/channels/{channel_id}/voice/participants/{user_id}/kick",
             post(kick),
@@ -83,8 +92,7 @@ async fn token(
         return Err(ApiError::Forbidden);
     }
 
-    // The name on the token is what other participants see, so it comes from
-    // the account rather than from anything the caller sends with the request.
+    // The token's name comes from the account, never from what the caller sends.
     let profile = state.store.user_profile(ctx.user_id).await?;
     let display_name = profile
         .as_ref()
@@ -96,13 +104,90 @@ async fn token(
         .mint(channel_id, ctx.user_id, permissions, display_name)
     {
         Ok(token) => Ok(Json(token.into())),
-        // A deployment with no SFU is a supported configuration, not a fault,
-        // so it says so plainly enough for a client to hide voice entirely.
+        // No SFU is a supported configuration, not a fault; say so plainly.
         Err(VoiceError::Unavailable) => Err(ApiError::NotConfigured(
             "this server has no voice configured",
         )),
         Err(VoiceError::Internal(err)) => Err(err.into()),
     }
+}
+
+#[derive(Serialize)]
+struct RosterParticipantDto {
+    user_id: String,
+    display_name: String,
+}
+
+#[derive(Serialize)]
+struct RosterResponse {
+    participants: Vec<RosterParticipantDto>,
+}
+
+/// Who is currently connected to a channel's voice room, whether or not the
+/// caller has joined it.
+///
+/// Gated on `VIEW_CHANNEL` alone, the same bit `listMessages` reads under:
+/// seeing who is talking is exactly as sensitive as seeing what they typed,
+/// and no more, so this does not also require `CONNECT`.
+///
+/// Appear-offline still applies here even though a room's own realtime
+/// protocol has no such preference: a participant with [`Visibility::Hidden`]
+/// is dropped from the roster of every viewer but themselves, structurally,
+/// the same way [`crate::presence::status_for`] never lets a hidden user's
+/// true state reach another viewer's payload. Joining a call with somebody
+/// already still shows that person live once you are both in the room - the
+/// SFU has to tell participants about each other to let them hear one
+/// another - but this route is the *preview* shown before joining, and that
+/// preview must not become a second way to learn a hidden user is online.
+///
+/// A configured SFU that cannot be reached answers 503, not 500 or an empty
+/// list: an empty room and an unreachable one are different claims, and only
+/// the former means nobody is there.
+async fn roster(
+    Authed(ctx): Authed,
+    parts: Parts,
+    Path(channel_id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<RosterResponse>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    let channel_id = ChannelId(parse_uuid(&channel_id)?);
+
+    let permissions = state
+        .store
+        .permissions_in_channel(ctx.user_id, channel_id)
+        .await?;
+    if !permissions.contains(Permissions::VIEW_CHANNEL) {
+        return Err(ApiError::Forbidden);
+    }
+
+    let connected = match state.voice.list_participants(channel_id).await {
+        Ok(list) => list,
+        Err(VoiceError::Unavailable) => {
+            return Err(ApiError::NotConfigured(
+                "this server has no voice configured",
+            ));
+        }
+        Err(VoiceError::Internal(err)) => {
+            tracing::warn!(%err, "could not list a channel's voice participants");
+            return Err(ApiError::Unavailable);
+        }
+    };
+
+    let mut participants = Vec::with_capacity(connected.len());
+    for participant in connected {
+        if participant.user_id != ctx.user_id {
+            let visibility = state.store.presence_visibility(participant.user_id).await?;
+            if visibility == Some(Visibility::Hidden) {
+                continue;
+            }
+        }
+        participants.push(RosterParticipantDto {
+            user_id: participant.user_id.to_string(),
+            display_name: participant.display_name,
+        });
+    }
+
+    Ok(Json(RosterResponse { participants }))
 }
 
 /// Evicts a participant from a channel's voice room.

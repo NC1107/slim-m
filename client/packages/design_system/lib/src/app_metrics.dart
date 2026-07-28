@@ -53,6 +53,15 @@ abstract final class AppSizes {
   static const double rowPointer = 30;
   static const double rowTouch = 44;
 
+  /// The conversation pane's side gutter: the header, every message row and
+  /// the composer share it, or their left and right edges visibly disagree.
+  ///
+  /// Tighter at touch density because the avatar column already eats a narrow
+  /// measure on a phone. Three files each hardcoded their own number before
+  /// this existed, and had drifted to 16, 20 and 20.
+  static const double paneGutter = 20;
+  static const double paneGutterCompact = 10;
+
   static const double controlSm = 26;
   static const double controlMd = 34;
   static const double controlLg = 38;

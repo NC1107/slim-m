@@ -26,6 +26,7 @@ part 'client_roles.dart';
 part 'client_space.dart';
 part 'client_transport.dart';
 part 'client_users.dart';
+part 'client_voice.dart';
 
 /// Holds the current session and hands out the access token.
 ///
@@ -196,28 +197,6 @@ class SlimmApi {
   /// Spends an invite for the signed-in account.
   Future<void> redeemInvite(String code) =>
       _send('POST', '/invites/$code/redeem', expectNoContent: true);
-
-  /// Mints a join token for a channel's voice room.
-  ///
-  /// Throws [NotImplementedException] when the deployment has no SFU, which is
-  /// a supported way to run text-only rather than a fault, so a caller should
-  /// hide voice rather than retry.
-  Future<VoiceToken> voiceToken(String channelId) async {
-    final json = await _send('POST', '/channels/$channelId/voice/token');
-    return VoiceToken.fromJson(json as Map<String, dynamic>);
-  }
-
-  /// Evicts a participant from a channel's voice room.
-  ///
-  /// Idempotent: removing somebody who is not connected succeeds, so a retry
-  /// after a timeout is safe. This does not bar them from rejoining - taking
-  /// away CONNECT is what does that - it makes the removal take effect now
-  /// rather than when their current token lapses.
-  Future<void> kickVoiceParticipant(String channelId, String userId) => _send(
-        'POST',
-        '/channels/$channelId/voice/participants/$userId/kick',
-        expectNoContent: true,
-      );
 
   /// Files a report for a human to review.
   Future<String> report({
