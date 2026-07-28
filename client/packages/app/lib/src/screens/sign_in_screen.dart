@@ -47,6 +47,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   /// because warning someone off a server that has push is worse than
   /// staying quiet.
   bool? _pushEnabled;
+  bool? _inviteRequired;
   Timer? _probeDebounce;
 
   @override
@@ -101,8 +102,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
     final client = ref.read(probeApiProvider)(target);
     bool? answer;
+    bool? needsInvite;
     try {
-      answer = (await client.version()).pushEnabled;
+      final version = await client.version();
+      answer = version.pushEnabled;
+      needsInvite = version.inviteRequired;
     } on ApiException {
       // Unreachable or refusing means unknown, and sign-in itself will say
       // "could not reach that server" with more authority than a probe.
@@ -115,13 +119,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
     if (!mounted) return;
     if (_probeTarget(_server.text) == target) {
-      setState(() => _pushEnabled = answer);
+      setState(() {
+        _pushEnabled = answer;
+        _inviteRequired = needsInvite;
+      });
     }
   }
 
   void _onServerEdited(String _) {
     // The old answer is about the old address the moment the field changes.
-    if (_pushEnabled != null) setState(() => _pushEnabled = null);
+    if (_pushEnabled != null || _inviteRequired != null) {
+      setState(() {
+        _pushEnabled = null;
+        _inviteRequired = null;
+      });
+    }
     _probeDebounce?.cancel();
     _probeDebounce = Timer(const Duration(milliseconds: 600), _probePush);
   }
@@ -252,6 +264,37 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     autocorrect: false,
                     onChanged: _onServerEdited,
                   ),
+                  // Only while creating an account: it is not a fact a
+                  // returning member has any use for.
+                  if (_creatingAccount && _inviteRequired == true) ...[
+                    const SizedBox(height: AppSpacing.s8),
+                    Semantics(
+                      liveRegion: true,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            AppIcons.invite,
+                            size: 16,
+                            color: tokens.textSecondary,
+                          ),
+                          const SizedBox(width: AppSpacing.s8),
+                          Expanded(
+                            child: Text(
+                              'This Space is invite only. Ask a member for a '
+                              'code, then use "Join a different Space" below '
+                              'to redeem it. An admin can open joining to '
+                              'anyone in Settings, under Space.',
+                              style: TextStyle(
+                                color: tokens.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (_pushEnabled == false) ...[
                     const SizedBox(height: AppSpacing.s8),
                     Semantics(

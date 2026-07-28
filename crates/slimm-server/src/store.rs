@@ -33,6 +33,7 @@ mod recovery;
 mod roles;
 mod safety;
 mod sessions;
+mod space;
 mod users;
 
 pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
@@ -58,6 +59,7 @@ pub use sessions::{
     Account, DeleteAccountError, IssuedTokens, OpenError, RefreshOutcome, RegisterError,
     SessionContext, SweptTokens,
 };
+pub use space::JoinPolicy;
 
 /// Unix milliseconds, `pub(crate)` so the push trigger path (outside this
 /// module) can compare a lifecycle report's age against the same clock

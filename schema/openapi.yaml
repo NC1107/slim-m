@@ -2100,6 +2100,60 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /space/settings:
+    get:
+      operationId: getSpaceSettings
+      tags: [space]
+      summary: Read the deployment's settings.
+      description: >
+        Gated on MANAGE_SERVER, the same bit that changes them. Whether the
+        Space is open to join is already public through `/version`, which
+        onboarding needs before an account exists; this route exists so the
+        screen that changes it can show the current value, and gating reads
+        keeps a later setting from becoming member-readable by default.
+      responses:
+        "200":
+          description: The current settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpaceSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    patch:
+      operationId: updateSpaceSettings
+      tags: [space]
+      summary: Change the deployment's settings.
+      description: >
+        `join_policy` is `invite` (a code is required to register) or `open`
+        (anyone who can reach the server may). An open Space still accepts a
+        code, so an invite that grants a role keeps working. Any other value
+        is refused rather than coerced.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpaceSettings"
+      responses:
+        "200":
+          description: The settings as stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpaceSettings"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /sync:
     post:
       operationId: sync
@@ -2382,6 +2436,14 @@ components:
             account exists, so someone choosing a LAN-only server learns
             their phone will stay silent while they can still choose
             differently.
+        invite_required:
+          type: boolean
+          description: >
+            Whether creating an account here needs an invite code. Follows
+            the deployment's `join_policy`. Absent on servers older than
+            0.15.0, which a client must treat as unknown rather than false.
+            Unauthenticated for the same reason `push_enabled` is: the
+            sign-up screen has to say so before an account exists.
         identity:
           type: object
           required:
@@ -2618,6 +2680,18 @@ components:
             Must not contain control characters or text-direction overrides,
             the same rule registration enforces.
 
+    SpaceSettings:
+      type: object
+      required: [join_policy]
+      properties:
+        join_policy:
+          type: string
+          enum: [invite, open]
+          description: >
+            `invite` means registration requires a valid code, and is the
+            default every deployment keeps on upgrade. `open` means anyone
+            who can reach the server may register; a code is still accepted,
+            so an invite granting a role keeps working.
     PresenceStatus:
       type: object
       required: [user_id, status]

@@ -120,6 +120,19 @@ pub async fn run(c: &mut Contract) {
     c.bare("createWsTicket", "POST", "/auth/ws-ticket", root)
         .await;
 
+    c.bare("getSpaceSettings", "GET", "/space/settings", root)
+        .await;
+    // Set back to what it already is, so the rest of the pass still runs
+    // against an invite-only deployment.
+    c.json(
+        "updateSpaceSettings",
+        "PATCH",
+        "/space/settings",
+        root,
+        json!({"join_policy": "invite"}),
+    )
+    .await;
+
     profile_calls(c, root, &admin_id, &bob_id).await;
     safety_calls(c, root, bob_token, &bob_id).await;
 

@@ -28,7 +28,9 @@ export 'src/client.dart'
         SlimmApiModeration,
         SlimmApiPresence,
         SlimmApiRoles,
-        SlimmApiUsers;
+        SlimmApiSpace,
+        SlimmApiUsers,
+        JoinPolicy;
 export 'src/events.dart'
     show
         EventConnection,
