@@ -166,7 +166,8 @@ class AppSegmentedControl extends StatelessWidget {
     final option = options[index];
 
     return FocusableTapTarget(
-      onTap: () => onSegmentSelected(index),
+      onTap: option.disabled ? null : () => onSegmentSelected(index),
+      enabled: !option.disabled,
       selected: selected,
       semanticLabel: option.hint == null
           ? option.label
@@ -196,9 +197,11 @@ class AppSegmentedControl extends StatelessWidget {
                     child: Text(
                       option.label,
                       style: AppText.ui.copyWith(
-                        color: selected
-                            ? tokens.textPrimary
-                            : tokens.textSecondary,
+                        color: switch ((option.disabled, selected)) {
+                          (true, _) => tokens.textDisabled,
+                          (false, true) => tokens.textPrimary,
+                          (false, false) => tokens.textSecondary,
+                        },
                         fontWeight:
                             selected ? AppWeights.semi : AppWeights.medium,
                         fontFamily: AppFonts.sans,
@@ -212,7 +215,9 @@ class AppSegmentedControl extends StatelessWidget {
                 Text(
                   option.hint!,
                   style: AppText.micro.copyWith(
-                    color: selected ? tokens.accent : tokens.textSecondary,
+                    color: option.disabled
+                        ? tokens.textDisabled
+                        : (selected ? tokens.accent : tokens.textSecondary),
                     fontFamily: AppFonts.mono,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),

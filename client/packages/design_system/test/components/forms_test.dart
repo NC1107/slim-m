@@ -229,6 +229,40 @@ void main() {
       expect(reported, 2);
     });
 
+    testWidgets('a disabled card is dimmed and wires no tap handler either', (
+      tester,
+    ) async {
+      var reported = -1;
+      await tester.pumpWidget(
+        _wrap(
+          AppSegmentedControl.cards(
+            options: const [
+              AppSegmentedOption(
+                  label: 'Official', hint: 'slim.npc-server.top'),
+              AppSegmentedOption(
+                label: 'Self-hosted',
+                hint: '10.0.0.100:8095',
+                disabled: true,
+              ),
+            ],
+            selectedIndex: 0,
+            onSegmentSelected: (i) => reported = i,
+          ),
+        ),
+      );
+
+      // The same flag on the same option class must mean the same thing in
+      // both variants, or a caller setting it on a card gets a silent no-op.
+      final label = tester.widget<Text>(find.text('Self-hosted'));
+      final hint = tester.widget<Text>(find.text('10.0.0.100:8095'));
+      expect(label.style?.color, AppTokens.light.textDisabled);
+      expect(hint.style?.color, AppTokens.light.textDisabled);
+
+      await tester.tap(find.text('Self-hosted'));
+      await tester.pump();
+      expect(reported, -1);
+    });
+
     testWidgets('cards variant shows a check glyph only on the selected option',
         (tester) async {
       await tester.pumpWidget(
