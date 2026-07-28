@@ -38,45 +38,57 @@ class ChannelHeader extends ConsumerWidget {
 
     return Container(
       height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+      // Matches the message rows and composer below it.
+      padding: const EdgeInsets.symmetric(horizontal: AppSizes.paneGutter),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
       ),
       child: Row(
         children: [
-          Icon(
-            isVoice ? AppIcons.voice : AppIcons.hash,
-            size: AppSizes.icon16,
-            color: tokens.textSecondary,
-          ),
-          const SizedBox(width: AppSpacing.s8),
-          Flexible(
-            child: Text(
-              name,
-              overflow: TextOverflow.ellipsis,
-              // The design's 17px header left the scale (app_typography.dart):
-              // it differed from body only in weight, so weight alone carries.
-              style: AppText.body.copyWith(
-                color: tokens.textPrimary,
-                fontWeight: AppWeights.medium,
-              ),
+          // One Expanded around the whole title block, not a Flexible name
+          // beside a Spacer: two flex children split the free space evenly,
+          // which left the actions mid-pane with dead air to their right.
+          Expanded(
+            child: Row(
+              children: [
+                Icon(
+                  isVoice ? AppIcons.voice : AppIcons.hash,
+                  size: AppSizes.icon16,
+                  color: tokens.textSecondary,
+                ),
+                const SizedBox(width: AppSpacing.s8),
+                Flexible(
+                  child: Text(
+                    name,
+                    overflow: TextOverflow.ellipsis,
+                    // The design's 17px header left the scale
+                    // (app_typography.dart): it differed from body only in
+                    // weight, so weight alone carries it.
+                    style: AppText.body.copyWith(
+                      color: tokens.textPrimary,
+                      fontWeight: AppWeights.medium,
+                    ),
+                  ),
+                ),
+                if (topic != null && topic!.isNotEmpty) ...[
+                  const SizedBox(width: AppSpacing.s12),
+                  Container(width: 1, height: 20, color: tokens.borderSubtle),
+                  const SizedBox(width: AppSpacing.s12),
+                  Flexible(
+                    flex: 2,
+                    child: Text(
+                      topic!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.caption.copyWith(
+                        color: tokens.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (topic != null && topic!.isNotEmpty) ...[
-            const SizedBox(width: AppSpacing.s12),
-            Container(width: 1, height: 20, color: tokens.borderSubtle),
-            const SizedBox(width: AppSpacing.s12),
-            Flexible(
-              flex: 2,
-              child: Text(
-                topic!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.caption.copyWith(color: tokens.textSecondary),
-              ),
-            ),
-          ],
-          const Spacer(),
           _PinPill(channelId: channelId),
           const SizedBox(width: AppSpacing.s8),
           AppIconButton(
@@ -85,6 +97,7 @@ class ChannelHeader extends ConsumerWidget {
             active: searchOpen,
             onPressed: onToggleSearch,
           ),
+          const SizedBox(width: AppSpacing.s4),
           AppIconButton(
             icon: AppIcons.members,
             semanticLabel: 'Toggle member list',
