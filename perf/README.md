@@ -27,10 +27,16 @@ Each baseline file has:
   - `value`, the measured point estimate
   - `unit`, the unit the value is expressed in (for example `ns`)
 
-Two entries are not criterion benchmarks: `idle_rss` and `peak_rss`, in kB.
+Four entries are not criterion benchmarks: `idle_rss_glibc`, `peak_rss_glibc`,
+`idle_rss_musl` and `peak_rss_musl`, all in kB.
 They exist because the Phase 1 exit criterion is stated in terms of resident
 memory rather than throughput, and a number nobody records is a number nobody
 can hold a release to.
+The libc is part of the metric name, not a side note, because glibc and musl
+genuinely measure different things here (musl's allocator fragments
+differently under Tokio) and a bare `idle_rss` name has already caused one
+baseline (0.8.0) to record a glibc number with no way to tell that from the
+name alone.
 See "Measuring idle RSS" below for how to take them.
 
 Keeping the shape flat and per-metric means a new baseline can be diffed
@@ -76,36 +82,62 @@ Automating that extraction is a later phase, not part of this scaffolding.
 
 STRATEGY.md budgets the server at under 30MB resident at true zero load, and
 the Phase 1 exit criterion is that the figure has actually been measured.
-Take it against a release build, not a debug one, with nothing connected:
+Take it against a release build, not a debug one, with nothing connected, on
+both libcs: the host's glibc, and the musl build every release actually ships
+(built the same way CI builds it, from the committed
+`docker/server.Dockerfile`, so it needs Docker but not a musl toolchain
+locally).
+
+`perf/measure-idle-rss.sh` automates both, after you build the glibc binary:
 
 ```sh
 cargo build --locked --release --bin slimm-server
-SLIMM_PORT=8099 SLIMM_DATABASE_PATH=/tmp/rss-probe.db \
-  ./target/release/slimm-server &
-SRV=$!
-sleep 5                              # let startup and migrations settle
-curl -s localhost:8099/healthz       # confirm it is actually serving
-grep -E '^VmRSS|^VmHWM' /proc/$SRV/status
-kill $SRV
+perf/measure-idle-rss.sh
 ```
 
-`VmRSS` is the steady idle figure the budget refers to.
-`VmHWM` is the high-water mark, which peaks during migrations at startup and
-then never recurs, so it is worth recording separately rather than mistaking it
-for the idle cost.
+It starts each build with nothing connected, confirms it over `/healthz`,
+reads `VmRSS` (the steady idle figure the budget refers to) and `VmHWM` (the
+high-water mark, which peaks during startup migrations and never recurs, so
+it is worth recording separately rather than mistaking it for the idle cost)
+out of `/proc/<pid>/status`, then tears the process or container down.
+Run it with `--skip-musl` if Docker is not available, or `--skip-glibc` /
+`--skip-musl` to isolate one side while debugging the other; the full flag
+list is in its own header comment.
 
-The 0.8.0 baseline was taken this way on Fedora with glibc, measuring 7,296 kB
-idle and 25,760 kB peak.
-Note that releases ship a musl binary built in CI, and musl's allocator
-fragments differently under Tokio, so a musl-built figure is the one that
-finally settles the budget; this local glibc number is indicative and both
-figures sit inside it with room to spare.
+Take several readings rather than trusting a single run.
+RSS is noisy enough (page-cache timing, what else the host is doing) that one
+sample can read 2-3% high or low; the 0.15.0 baseline below is the median of
+five runs of the script, and each individual run printed within about 2% of
+that median on this machine.
+
+The 0.8.0 baseline was taken this way on Fedora with glibc only, measuring
+7,296 kB idle and 25,760 kB peak, and flagged that releases ship musl instead
+without being able to measure it.
+0.15.0 is the first baseline with both figures: see
+`perf/baselines/0.15.0.json` and the release notes for the comparison, and do
+not compare a `_glibc` figure against a `_musl` one, or either against the
+unqualified `idle_rss`/`peak_rss` names 0.8.0 used before this split existed.
+
+**This is deliberately not wired into CI.**
+The criterion benchmarks above are fine to run on a shared GitHub Actions
+runner because they measure relative cost, not an absolute budget.
+RSS is the opposite: the whole reason 0.8.0's number carries a glibc-versus-musl
+caveat is that the exact host matters, and a virtualized CI runner is a third
+environment, not a stand-in for either the release binary's real deployment
+target or a contributor's own machine.
+A number captured there would look exactly as authoritative as this one while
+measuring something different, which is a worse failure mode than the manual
+step it would replace.
+Take this measurement by hand, on real hardware, at each release.
 
 ## Adding a new baseline
 
 1. Let the release workflow run and download its `criterion-report` artifact.
 2. Open the `estimates.json` file under each benchmark's directory (or read
    the numbers straight off the HTML report).
-3. Copy `perf/baseline.example.json` to `perf/baselines/<version>.json`.
-4. Fill in the `version` field and one `metrics` entry per benchmark.
-5. Commit the new baseline file alongside the release.
+3. Separately, on real hardware, build the release binary and run
+   `perf/measure-idle-rss.sh` (see "Measuring idle RSS" above).
+4. Copy `perf/baseline.example.json` to `perf/baselines/<version>.json`.
+5. Fill in the `version` field, one `metrics` entry per criterion benchmark,
+   and the four RSS entries the script printed.
+6. Commit the new baseline file alongside the release.
