@@ -55,6 +55,46 @@ void main() {
     handle.dispose();
   });
 
+  // The case above passes a row with no leading widget, which is why it went on
+  // passing while every member row announced "Ada Lovelace Ada Lovelace": an
+  // avatar names itself, and a row that already names itself then says it twice.
+  testWidgets('AppListRow does not repeat a leading avatar\'s name', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _host(
+        const AppListRow(
+          label: 'Ada Lovelace',
+          leading: AppAvatar(name: 'Ada Lovelace', size: 26),
+        ),
+      ),
+    );
+    _announcedOnce(tester, 'Ada Lovelace');
+    handle.dispose();
+  });
+
+  testWidgets('AppListRow announces state it is given, not a guess at it', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _host(
+        const AppListRow(
+          label: 'Ada Lovelace',
+          muted: true,
+          stateDescription: 'offline',
+        ),
+      ),
+    );
+
+    _announcedOnce(tester, 'Ada Lovelace, offline');
+    // `muted` is a visual de-emphasis with no single meaning, and announcing it
+    // told anyone offline they had been muted.
+    expect(find.bySemanticsLabel(RegExp('muted')), findsNothing);
+    handle.dispose();
+  });
+
   testWidgets('AppMenuItem announces its label once', (tester) async {
     final handle = tester.ensureSemantics();
     await tester.pumpWidget(

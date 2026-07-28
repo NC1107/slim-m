@@ -54,7 +54,12 @@ class HomeShell extends ConsumerWidget {
               child: const ChannelRail(),
             ),
             const VerticalDivider(width: 1),
-            Expanded(child: child),
+            // Its own semantics node, or the modal barrier inside this pane's
+            // navigator blocks everything painted before it, which is the
+            // whole rail: no channel row, section or search field reached a
+            // screen reader at all. The member pane paints after it and so
+            // was never affected, which is what made this look like a rail bug.
+            Expanded(child: Semantics(container: true, child: child)),
             if (showMembers) const AppMemberPane(),
           ],
         ),

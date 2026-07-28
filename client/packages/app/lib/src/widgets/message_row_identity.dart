@@ -79,10 +79,14 @@ class MessageRowLeading extends StatelessWidget {
       );
     }
 
-    return AuthorAvatar(
-      userId: message.authorId,
-      name: _authorLabel(message),
-      size: _avatarSize,
+    // Decorative here: the header beside it already names the author, and
+    // without this every message was announced "Ada Lovelace Ada Lovelace".
+    return ExcludeSemantics(
+      child: AuthorAvatar(
+        userId: message.authorId,
+        name: _authorLabel(message),
+        size: _avatarSize,
+      ),
     );
   }
 }

@@ -176,13 +176,35 @@ class _GroupLabel extends StatelessWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
-      child: Text(
-        text.toUpperCase(),
-        style: AppText.label.copyWith(color: tokens.textSecondary),
+      // A heading in its natural case, for the same reason the rail's are.
+      child: Semantics(
+        container: true,
+        header: true,
+        label: text,
+        child: ExcludeSemantics(
+          child: Text(
+            text.toUpperCase(),
+            style: AppText.label.copyWith(color: tokens.textSecondary),
+          ),
+        ),
       ),
     );
   }
 }
+
+/// How a presence state is spoken, since on screen it is only a dot's colour
+/// and silhouette.
+///
+/// Hidden is deliberately absent: it renders for the one person appearing
+/// offline, and naming it aloud beside their own name tells them nothing they
+/// did not choose.
+String? _presenceDescription(AppPresence status) => switch (status) {
+  AppPresence.online => 'online',
+  AppPresence.away => 'away',
+  AppPresence.dnd => 'do not disturb',
+  AppPresence.offline => 'offline',
+  AppPresence.hidden => null,
+};
 
 /// A row is muted (dimmed, per [AppListRow.muted]) only once fully offline;
 /// away and do-not-disturb still read as present, matching the grouping
@@ -212,6 +234,9 @@ class _MemberRow extends ConsumerWidget {
       height: 36,
       label: profile.displayName,
       muted: status == AppPresence.offline,
+      // Presence is a dot and an opacity on screen, and was reaching a screen
+      // reader as the word "muted" or as nothing at all.
+      stateDescription: _presenceDescription(status),
       trailing: badge == null
           ? null
           : AppBadge(variant: AppBadgeVariant.role, label: badge),

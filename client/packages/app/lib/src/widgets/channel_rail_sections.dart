@@ -35,9 +35,18 @@ class _SectionLabel extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              text.toUpperCase(),
-              style: AppText.label.copyWith(color: tokens.textSecondary),
+            // Announced in its natural case and as a heading: the uppercase is
+            // a visual treatment, and some screen readers spell such a word out.
+            child: Semantics(
+              container: true,
+              header: true,
+              label: text,
+              child: ExcludeSemantics(
+                child: Text(
+                  text.toUpperCase(),
+                  style: AppText.label.copyWith(color: tokens.textSecondary),
+                ),
+              ),
             ),
           ),
           if (onAdd != null)
