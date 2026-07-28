@@ -256,6 +256,7 @@ A channel with kind `voice` rendered as a text channel, so there was no way to s
 **A voice call has been held, and it is a script now (2026-07-28).**
 `scripts/e2e.sh` stands the whole stack up (a real LiveKit SFU, the release server binary, the web build), drives two isolated headless browsers through onboarding, sign-in and a call in one channel, then tears it down.
 It covers far more than voice now - messages, mentions, reactions, attachments, avatars, settings, roles, moderation and screen share - and every scenario is checked against the server or the SFU as well as the screen; see [docs/e2e.md](docs/e2e.md).
+A full run reaches 36 of the 59 documented API paths and prints the ones it missed, counted from what was really requested rather than from a list kept by hand.
 It passes: both participants ACTIVE with an unmuted microphone track published, each subscribed to the other's track, a mute on one side reaching the SFU, and leaving dropping the other side's count.
 Mutation-tested by pointing the server at a dead SFU, which fails it at "2 in call" rather than passing quietly.
 
