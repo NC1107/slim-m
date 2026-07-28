@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  package="top.npcserver.slimm.platform">
+    <!-- Gated at use by NotificationManagerCompat.canUseFullScreenIntent() on API 34+. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <application>
+        <receiver
+            android:name=".CallActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="top.npcserver.slimm.action.DECLINE_CALL"/>
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
