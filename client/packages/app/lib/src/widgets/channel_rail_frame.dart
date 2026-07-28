@@ -10,12 +10,12 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../providers/member_presence.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
-import 'member_pane.dart';
 import 'presence_menu.dart';
 
 /// The server's own identity, for the header's name line. Real endpoint;

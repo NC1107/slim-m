@@ -1,27 +1,53 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The role and member picker sheets [ChannelOverwritesScreen] opens for
-/// `_pickTarget`, split out purely to keep that file under the line budget.
+/// The channel, role and member picker sheets [ChannelOverwritesScreen]
+/// opens, split out purely to keep that file under the line budget.
 ///
-/// Both watch their provider from inside the sheet rather than being handed
-/// a pre-read list: an autoDispose `FutureProvider` read once with
-/// `ref.read` outside a listener registers no subscriber, so it can be
-/// (and reliably is) torn down mid-fetch, leaving the sheet permanently
-/// empty with no spinner and no error. Watching keeps the provider alive
-/// for exactly as long as the sheet is open, the same shape
+/// The role and member sheets watch their provider from inside the sheet
+/// rather than being handed a pre-read list: an autoDispose `FutureProvider`
+/// read once with `ref.read` outside a listener registers no subscriber, so
+/// it can be (and reliably is) torn down mid-fetch, leaving the sheet
+/// permanently empty with no spinner and no error. Watching keeps the
+/// provider alive for exactly as long as the sheet is open, the same shape
 /// `role_assign_sheet.dart` already uses for its member list.
+///
+/// The channel sheet takes an already-resolved list instead: its caller
+/// awaits a one-shot `store.watchChannels().first` rather than a live
+/// provider, so there is nothing here for it to watch.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/admin_providers.dart';
-import '../../widgets/member_pane.dart' show membersProvider;
+import '../../providers/member_presence.dart' show membersProvider;
 
 /// Bounded height so a loading spinner or an error has somewhere to center;
 /// a `ListView(shrinkWrap: true)` has no intrinsic height before data
 /// arrives.
 const _pickerSheetHeightFraction = 0.6;
+
+class ChannelPickerSheet extends StatelessWidget {
+  const ChannelPickerSheet({super.key, required this.channels});
+
+  final List<Channel> channels;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      shrinkWrap: true,
+      children: [
+        for (final c in channels)
+          ListTile(
+            leading: Icon(c.kind == 'voice' ? AppIcons.voice : AppIcons.hash),
+            title: Text(c.name),
+            onTap: () => Navigator.of(context).pop(c),
+          ),
+      ],
+    );
+  }
+}
 
 class RolePickerSheet extends ConsumerWidget {
   const RolePickerSheet({super.key});

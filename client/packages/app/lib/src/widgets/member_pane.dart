@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The right-hand member pane: the deployment's roster.
 ///
-/// Presence is real now: [_presenceSeedProvider] batch-fetches status for the
-/// resolved member list and [presenceControllerProvider] keeps it current
-/// from live `presence.changed` events, so [groupMembersByPresence] (a real,
-/// tested grouping function; see member_pane_test.dart) is finally called
+/// Presence is real now: `presenceSeedProvider` (in `member_presence.dart`,
+/// where the roster and presence data this pane renders all live now)
+/// batch-fetches status for the resolved member list and
+/// [presenceControllerProvider] keeps it current from live
+/// `presence.changed` events, so `groupMembersByPresence` is finally called
 /// with a real status map instead of an empty one.
 ///
 /// A member's first role becomes a badge. `@everyone` is excluded server-side,
@@ -21,171 +22,19 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/dms.dart';
-import '../providers/live_events.dart';
+import '../providers/member_presence.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
 import 'context_menu_region.dart';
-import 'report_dialog.dart';
+import 'member_actions.dart';
 import 'user_avatar.dart';
-
-/// Files a report against a member, from the row's context menu.
-Future<void> _reportUser(
-  BuildContext context,
-  WidgetRef ref,
-  api.UserProfile profile,
-) async {
-  final reason = await promptReportReason(context, subjectLabel: 'this member');
-  if (reason == null || !context.mounted) return;
-  try {
-    await ref
-        .read(apiProvider)
-        .report(
-          subject: api.ReportSubject.user,
-          subjectId: profile.id,
-          reason: reason,
-        );
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Report filed. A moderator will review it.'),
-      ),
-    );
-  } on api.ApiException catch (e) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Could not file the report. ${e.message}')),
-    );
-  }
-}
-
-/// Blocks a member from the row's context menu; see `SlimmApi.blockUser`
-/// for why the blocked member is never told.
-Future<void> _blockUser(
-  BuildContext context,
-  WidgetRef ref,
-  api.UserProfile profile,
-) async {
-  try {
-    await ref.read(apiProvider).blockUser(profile.id);
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Blocked. Their messages are hidden for you.'),
-      ),
-    );
-  } on api.ApiException catch (e) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Could not block that user. ${e.message}')),
-    );
-  }
-}
-
-/// The deployment's members. Real endpoint, real data.
-final membersProvider = FutureProvider.autoDispose<List<api.UserProfile>>(
-  (ref) => ref.watch(apiProvider).listMembers(),
-);
-
-/// Seeds live presence for the resolved member list. A trigger, not a data
-/// source in its own right: [AppMemberPane] watches this purely to start it,
-/// and reads the actual statuses back from [presenceControllerProvider].
-/// `autoDispose` and depending on the (also `autoDispose`) [membersProvider]
-/// keeps this from outliving the pane, unlike [presenceControllerProvider]
-/// itself, which is worth keeping warm for the rest of the session.
-final _presenceSeedProvider = FutureProvider.autoDispose<void>((ref) async {
-  final members = await ref.watch(membersProvider.future);
-  await ref
-      .read(presenceControllerProvider.notifier)
-      .refresh(members.map((m) => m.id));
-});
-
-/// Mirrors `MEMBERS_MAX_LIMIT` in `crates/slimm-server/src/http/users.rs`.
-/// Below it, an unknown id means a stale cache; at or above it, an unknown
-/// id is normal (a member off this page), so it must not force a refetch.
-const _memberPageCeiling = 200;
-
-/// Coalesces a burst of joins (or one join's presence-then-message pair)
-/// into a single refetch rather than one per event.
-const _rosterKeepAliveDebounce = Duration(milliseconds: 500);
-
-/// There is no `MemberJoined` event (`hub.rs` has no such [Event] variant),
-/// so [membersProvider] never notices a new member on its own. This infers
-/// a join from what one already produces on the live socket - a presence
-/// frame, or, failing that, the author id on a first message - and
-/// invalidates the cached roster so the pane catches up without a reload.
-final _memberRosterKeepAliveProvider = Provider.autoDispose<void>((ref) {
-  Timer? debounce;
-  final sub = ref.read(liveEventsProvider).listen((event) {
-    final candidateId = switch (event) {
-      api.PresenceChanged(:final userId) => userId,
-      api.MessageCreated(:final message) => message.authorId,
-      _ => null,
-    };
-    if (candidateId == null) return;
-
-    final members = ref.read(membersProvider).valueOrNull;
-    // No cached roster yet, or a full page: neither case says the id is a
-    // stale gap, so leave any pending refetch as it was.
-    if (members == null || members.length >= _memberPageCeiling) return;
-    if (members.any((m) => m.id == candidateId)) return;
-
-    debounce?.cancel();
-    debounce = Timer(_rosterKeepAliveDebounce, () {
-      ref.invalidate(membersProvider);
-    });
-  });
-  ref.onDispose(() {
-    debounce?.cancel();
-    unawaited(sub.cancel());
-  });
-});
 
 /// Whether the member pane is shown at expanded width. Defaults open; the
 /// channel header's members toggle flips it. [HomeShell] also gates this on
 /// layout, since the toggle can only hide the pane, not summon room for it
 /// that is not there.
 final memberPaneVisibleProvider = StateProvider<bool>((ref) => true);
-
-/// The design-system status a server [api.PresenceState] renders as. Both
-/// [PresenceState.away] and [PresenceState.dnd] still group under "online"
-/// below (see [groupMembersByPresence]): each is reachable in some capacity,
-/// which is the distinction that bucket exists to draw, and the row itself
-/// still shows the more specific dot shape/colour.
-AppPresence _presenceOf(api.PresenceState? state) => switch (state) {
-  api.PresenceState.online => AppPresence.online,
-  api.PresenceState.away => AppPresence.away,
-  api.PresenceState.dnd => AppPresence.dnd,
-  api.PresenceState.offline || null => AppPresence.offline,
-};
-
-/// Splits and sorts [members] by presence. A member absent from [statusOf]
-/// counts as offline, which is the only honest default when presence is
-/// unknown rather than assumed online. Away and do-not-disturb both count as
-/// "online" for grouping purposes: both are a live, connected session, just
-/// with a status layered on top, and grouping either under "Offline" would
-/// read as a lie the row's own presence dot then has to contradict.
-({List<api.UserProfile> online, List<api.UserProfile> offline})
-groupMembersByPresence(
-  List<api.UserProfile> members,
-  Map<String, AppPresence> statusOf,
-) {
-  final online = <api.UserProfile>[];
-  final offline = <api.UserProfile>[];
-  for (final member in members) {
-    final status = statusOf[member.id];
-    final isOnlineGroup =
-        status == AppPresence.online ||
-        status == AppPresence.away ||
-        status == AppPresence.dnd;
-    (isOnlineGroup ? online : offline).add(member);
-  }
-  int byName(api.UserProfile a, api.UserProfile b) =>
-      a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
-  online.sort(byName);
-  offline.sort(byName);
-  return (online: online, offline: offline);
-}
 
 /// 236px, `--surface-sunken`, a left hairline: the design's right member pane.
 class AppMemberPane extends ConsumerWidget {
@@ -197,12 +46,10 @@ class AppMemberPane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final membersAsync = ref.watch(membersProvider);
-    // Purely to start the seed fetch; the actual statuses come back through
-    // presenceControllerProvider below, watched per row.
-    ref.watch(_presenceSeedProvider);
-    // Purely a side-effect subscription; it never itself has a value the
-    // pane renders, only an invalidate it may trigger on membersProvider.
-    ref.watch(_memberRosterKeepAliveProvider);
+    // Purely to start the seed fetch; statuses come back through presenceControllerProvider below.
+    ref.watch(presenceSeedProvider);
+    // Purely a side-effect subscription: no value of its own, only a possible invalidate on membersProvider.
+    ref.watch(memberRosterKeepAliveProvider);
     final presence = ref.watch(presenceControllerProvider);
     final myId = ref.watch(meProvider).valueOrNull?.id;
 
@@ -236,8 +83,7 @@ class AppMemberPane extends ConsumerWidget {
                         style: TextStyle(color: tokens.textSecondary),
                         textAlign: TextAlign.center,
                       ),
-                      // A 403 means a lost permission, not a fault: the
-                      // same request would only fail again.
+                      // A 403 means a lost permission, not a fault: retrying would only fail the same way.
                       if (error is! api.ForbiddenException) ...[
                         const SizedBox(height: AppSpacing.s12),
                         TextButton(
@@ -255,7 +101,7 @@ class AppMemberPane extends ConsumerWidget {
         data: (members) {
           final statusOf = {
             for (final entry in presence.entries)
-              entry.key: _presenceOf(entry.value),
+              entry.key: presenceOf(entry.value),
           };
           final grouped = groupMembersByPresence(members, statusOf);
           return Column(
@@ -358,13 +204,11 @@ class _MemberRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Only the first: the design gives a member one badge, and a row that
-    // grows with role count would push the name out of a 236px pane.
+    // Only the first: a row that grew with role count would push the name out of a 236px pane.
     final badge = profile.roles.isEmpty ? null : profile.roles.first;
 
     final row = AppListRow(
-      // Taller than a channel row: the design pairs a 26px avatar with a
-      // status dot hanging off its corner, which crops at the default height.
+      // Taller than a channel row: a 26px avatar's corner status dot crops at the default height.
       height: 36,
       label: profile.displayName,
       muted: status == AppPresence.offline,
@@ -386,8 +230,7 @@ class _MemberRow extends ConsumerWidget {
             },
     );
 
-    // No report/block affordance on your own row: reporting yourself has
-    // nothing to investigate, and there is no concept of blocking yourself.
+    // No report/block on your own row: nothing to investigate, and no concept of blocking yourself.
     if (isSelf) return row;
 
     return ContextMenuRegion(
@@ -397,7 +240,7 @@ class _MemberRow extends ConsumerWidget {
           leading: AppIcons.report,
           onTap: () {
             close();
-            unawaited(_reportUser(context, ref, profile));
+            unawaited(reportMember(context, ref, profile));
           },
         ),
         const AppMenuDivider(),
@@ -407,7 +250,7 @@ class _MemberRow extends ConsumerWidget {
           tone: AppMenuItemTone.danger,
           onTap: () {
             close();
-            unawaited(_blockUser(context, ref, profile));
+            unawaited(blockMember(context, ref, profile));
           },
         ),
       ],
