@@ -39,6 +39,7 @@ class Version {
     required this.version,
     required this.protocol,
     this.pushEnabled,
+    this.inviteRequired,
     this.identity,
   });
 
@@ -52,6 +53,11 @@ class Version {
   /// staying quiet.
   final bool? pushEnabled;
 
+  /// Whether creating an account here needs an invite code. Null on servers
+  /// older than 0.15.0, which is "unknown": the sign-up screen stays quiet
+  /// rather than promising either way.
+  final bool? inviteRequired;
+
   /// The server's trust-on-first-use identity. Null on servers too old to
   /// report it, the same "unknown" treatment [pushEnabled] gets.
   final ServerIdentity? identity;
@@ -61,6 +67,7 @@ class Version {
         version: json['version'] as String,
         protocol: json['protocol'] as int,
         pushEnabled: json['push_enabled'] as bool?,
+        inviteRequired: json['invite_required'] as bool?,
         identity: json['identity'] == null
             ? null
             : ServerIdentity.fromJson(json['identity'] as Map<String, dynamic>),

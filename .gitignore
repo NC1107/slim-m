@@ -64,3 +64,6 @@ ios-broadcast-extension.patch
 # The web build is a test surface, so these are not vendored into git.
 client/packages/app/web/drift_worker.js
 client/packages/app/web/sqlite3.wasm
+
+# Rendered by scripts/ui-snapshots.sh for looking at, never committed.
+client/packages/app/build/ui-snapshots/

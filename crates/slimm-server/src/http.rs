@@ -13,7 +13,7 @@ use crate::hub::Hub;
 use crate::media::Media;
 use crate::push::PushSender;
 use crate::ratelimit::RateLimiter;
-use crate::store::Store;
+use crate::store::{JoinPolicy, Store};
 use crate::voice::VoiceService;
 use error::ApiError;
 
@@ -38,6 +38,7 @@ mod reports;
 mod roles;
 mod safety;
 mod search;
+mod space;
 mod sync;
 mod users;
 mod voice;
@@ -82,6 +83,7 @@ pub fn router(state: AppState) -> Router {
         .merge(safety::routes())
         .merge(dms::routes())
         .merge(search::routes())
+        .merge(space::routes())
         .merge(sync::routes())
         .merge(voice::routes())
         .merge(polls::routes())
@@ -104,6 +106,9 @@ struct Version {
     version: &'static str,
     protocol: u32,
     push_enabled: bool,
+    /// Whether creating an account here needs an invite code. Onboarding
+    /// needs this before an account exists, so it rides on /version.
+    invite_required: bool,
     identity: ServerIdentityDto,
 }
 
@@ -145,6 +150,7 @@ async fn version(State(state): State<AppState>) -> Result<Json<Version>, ApiErro
         version: env!("CARGO_PKG_VERSION"),
         protocol: PROTOCOL_VERSION,
         push_enabled: state.push.is_enabled(),
+        invite_required: state.store.join_policy().await? == JoinPolicy::Invite,
         identity: ServerIdentityDto {
             public_key: BASE64.encode(identity.public_key()),
             fingerprint: identity.fingerprint_hex(),

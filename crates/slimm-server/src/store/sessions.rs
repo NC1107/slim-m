@@ -23,7 +23,7 @@
 use sqlx::{Sqlite, SqliteConnection, Transaction};
 
 use super::invites::spend_invite;
-use super::{Store, now_ms};
+use super::{JoinPolicy, Store, now_ms};
 use crate::auth::{generate_secret, hash_secret};
 use crate::ids::{DeviceId, FamilyId, SessionId, UserId};
 
@@ -116,6 +116,12 @@ pub enum RegisterError {
 impl From<sqlx::Error> for RegisterError {
     fn from(err: sqlx::Error) -> Self {
         RegisterError::Internal(err.into())
+    }
+}
+
+impl From<anyhow::Error> for RegisterError {
+    fn from(err: anyhow::Error) -> Self {
+        RegisterError::Internal(err)
     }
 }
 
@@ -282,23 +288,33 @@ impl Store {
                 .await?
                 .is_some();
 
+        // Read in the same transaction, for the same reason `claimed` is: a
+        // policy change landing concurrently must not be missed here.
+        let policy = super::space::read_join_policy(&mut *tx).await?;
+
         if claimed {
             // Dropping `tx` without committing rolls the account insert back, so
             // every early return below leaves the username free.
-            let Some(code) = invite_code else {
-                return Err(RegisterError::InviteRequired);
+            let code = match (invite_code, policy) {
+                (Some(code), _) => Some(code),
+                // An open Space still accepts a code, so an invite that grants
+                // a role keeps working; it just no longer demands one.
+                (None, JoinPolicy::Open) => None,
+                (None, JoinPolicy::Invite) => return Err(RegisterError::InviteRequired),
             };
-            let Some(spent) = spend_invite(&mut tx, code, now).await? else {
-                return Err(RegisterError::InviteUnusable);
-            };
-            if let Some(role_id) = spent {
-                sqlx::query!(
-                    "INSERT OR IGNORE INTO member_roles (user_id, role_id) VALUES (?, ?)",
-                    id,
-                    role_id
-                )
-                .execute(&mut *tx)
-                .await?;
+            if let Some(code) = code {
+                let Some(spent) = spend_invite(&mut tx, code, now).await? else {
+                    return Err(RegisterError::InviteUnusable);
+                };
+                if let Some(role_id) = spent {
+                    sqlx::query!(
+                        "INSERT OR IGNORE INTO member_roles (user_id, role_id) VALUES (?, ?)",
+                        id,
+                        role_id
+                    )
+                    .execute(&mut *tx)
+                    .await?;
+                }
             }
         }
 

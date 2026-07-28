@@ -96,6 +96,16 @@ class AppListRow extends StatefulWidget {
   /// Exposed so a test can find the unread dot without depending on colour.
   static const Key unreadDotKey = Key('app_list_row_unread_dot');
 
+  /// The height a row built here takes, for a sibling that must line up with
+  /// one rather than centre against the taller column it sits in.
+  static double heightFor(BuildContext context, {bool? touch, double? min}) {
+    final density = touch ?? AppTouchTargets.of(context);
+    return math.max(
+      density ? AppSizes.rowTouch : AppSizes.rowPointer,
+      min ?? 0,
+    );
+  }
+
   @override
   State<AppListRow> createState() => _AppListRowState();
 }
@@ -108,10 +118,8 @@ class _AppListRowState extends State<AppListRow> {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final touch = widget.touch ?? AppTouchTargets.of(context);
-    final rowHeight = math.max(
-      touch ? AppSizes.rowTouch : AppSizes.rowPointer,
-      widget.height ?? 0,
-    );
+    final rowHeight =
+        AppListRow.heightFor(context, touch: touch, min: widget.height);
 
     // The source lifts colour and weight together for `selected || unread`, so
     // the dot below is what keeps unread legible when both are set at once.

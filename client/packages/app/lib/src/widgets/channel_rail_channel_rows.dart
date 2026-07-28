@@ -16,6 +16,7 @@ import 'package:slimm_rtc/rtc.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'manage_channel_sheet.dart';
+import 'user_avatar.dart';
 
 /// Pairs a channel row with its manage-sheet trigger, kept as a sibling
 /// rather than [AppListRow.trailing] so it never displaces that slot's own
@@ -36,13 +37,20 @@ class ManagedChannelRow extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!canManage) return row;
     return Row(
+      // Centring floats the button between a voice row and its strip below.
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: row),
-        AppIconButton(
-          icon: AppIcons.moreVertical,
-          semanticLabel: 'Manage ${channel.name}',
-          size: AppIconButtonSize.sm,
-          onPressed: () => showManageChannelSheet(context, channel),
+        SizedBox(
+          height: AppListRow.heightFor(context),
+          child: Center(
+            child: AppIconButton(
+              icon: AppIcons.moreVertical,
+              semanticLabel: 'Manage ${channel.name}',
+              size: AppIconButtonSize.sm,
+              onPressed: () => showManageChannelSheet(context, channel),
+            ),
+          ),
         ),
       ],
     );
@@ -124,15 +132,12 @@ class _ParticipantStrip extends StatelessWidget {
           for (final participant in participants.take(8))
             Padding(
               padding: const EdgeInsets.only(right: AppSpacing.s4),
-              child: participant.isSpeaking
-                  ? Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: tokens.accentFill, width: 2),
-                      ),
-                      child: AppAvatar(name: participant.name, size: 20),
-                    )
-                  : AppAvatar(name: participant.name, size: 20),
+              child: AuthorAvatar(
+                name: participant.name,
+                userId: participant.identity,
+                size: 20,
+                speaking: participant.isSpeaking,
+              ),
             ),
           if (participants.any((p) => p.isScreenSharing))
             Icon(AppIcons.screenShare, size: 13, color: tokens.textSecondary),

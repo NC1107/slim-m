@@ -18,7 +18,7 @@ use super::extract::{Authed, PASSWORD, REFRESH, RateLimited, enforce};
 use crate::hub::Event;
 use crate::ratelimit::Class;
 use crate::store::DeleteAccountError;
-use crate::store::{Bootstrap, IssuedTokens, RefreshOutcome, RegisterError};
+use crate::store::{Bootstrap, IssuedTokens, JoinPolicy, RefreshOutcome, RegisterError};
 
 /// Auth payloads are a handful of short fields; cap the body well below any
 /// realistic request so an oversized body is rejected before it is buffered.
@@ -118,7 +118,13 @@ async fn register(
         .as_deref()
         .map(str::trim)
         .filter(|c| !c.is_empty());
-    if invite_code.is_none() && state.store.is_bootstrapped().await? {
+    // Answered before hashing so a doomed request costs no Argon2id run. The
+    // store re-checks both inside its transaction, which is what settles a
+    // claim or a policy change racing this.
+    if invite_code.is_none()
+        && state.store.is_bootstrapped().await?
+        && state.store.join_policy().await? == JoinPolicy::Invite
+    {
         return Err(ApiError::BadRequest(INVITE_REQUIRED));
     }
 

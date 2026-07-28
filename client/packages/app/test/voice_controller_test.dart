@@ -190,7 +190,7 @@ void main() {
       await controller.setScreenShare(true);
 
       expect(controller.state.screenSharing, isFalse);
-      expect(controller.state.error, contains('refused the capture'));
+      expect(controller.state.error, contains('Could not start sharing'));
     },
   );
 
@@ -255,5 +255,50 @@ void main() {
     expect(session.leaveCalls, 1);
     expect(controller.state.channelId, isNull);
     expect(controller.state.state, VoiceSessionState.idle);
+  });
+
+  test('a drop the SFU decided on is reported, not silently idle', () async {
+    final session = FakeSession();
+    final controller = harness.controllerWith(session, voiceApi());
+    await controller.join('channel-1');
+
+    session.dropWith(VoiceDisconnect.replacedByOtherDevice);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state.state, VoiceSessionState.failed);
+    expect(
+      controller.state.error,
+      VoiceDisconnect.replacedByOtherDevice.message,
+    );
+  });
+
+  test('a screen share failure carries the cause, not just a shrug', () async {
+    final session = FakeSession(screenShareOutcome: ScreenShareOutcome.failed);
+    final controller = harness.controllerWith(session, voiceApi());
+    await controller.join('channel-1');
+
+    await controller.setScreenShare(true);
+
+    // Dropping this is what left the real Linux failure invisible.
+    expect(controller.state.error, contains('source not found!'));
+    expect(
+      harness.log(controller).map((e) => e.message),
+      contains(contains('Screen share start failed')),
+    );
+  });
+
+  test('a chosen screen reaches the session', () async {
+    final session = FakeSession(
+      needsSource: true,
+      sources: const [ScreenShareSource(id: 'screen-2', name: 'Screen 2')],
+    );
+    final controller = harness.controllerWith(session, voiceApi());
+    await controller.join('channel-1');
+
+    expect(controller.screenShareNeedsSource, isTrue);
+    final sources = await controller.screenShareSources();
+    await controller.setScreenShare(true, sourceId: sources.first.id);
+
+    expect(session.lastSourceId, 'screen-2');
   });
 }

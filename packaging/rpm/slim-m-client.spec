@@ -62,7 +62,8 @@ Requires:       libpipewire-0.3.so.0()(64bit)
 # Services rather than libraries, and each backs one feature rather than the app:
 # no portal means no screen share, no secret service means no remembered sign-in.
 Recommends:     xdg-desktop-portal
-Recommends:     gnome-keyring
+# kf6-kwallet's ksecretd serves the same org.freedesktop.secrets libsecret wants.
+Recommends:     (gnome-keyring or kf6-kwallet)
 
 %description
 The slim-m desktop client: text channels, voice, screen share and direct

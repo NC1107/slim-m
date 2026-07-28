@@ -23,6 +23,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../diagnostics/debug_log.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
@@ -419,6 +420,7 @@ class _AppSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final info = ref.watch(appInfoProvider);
+    final errors = ref.watch(debugLogProvider);
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     return Column(
@@ -438,6 +440,18 @@ class _AppSection extends ConsumerWidget {
             ),
             style: TextStyle(color: tokens.textSecondary),
           ),
+        ),
+        ListTile(
+          leading: const Icon(AppIcons.info),
+          title: const Text('Debug log'),
+          subtitle: Text(
+            errors.isEmpty
+                ? 'Nothing caught this session'
+                : '${errors.length} caught this session',
+            style: TextStyle(color: tokens.textSecondary),
+          ),
+          trailing: const Icon(AppIcons.chevronRight),
+          onTap: () => context.push(Routes.debugLog),
         ),
       ],
     );

@@ -118,6 +118,51 @@ Known issues surfaced by review, not yet fixed:
 - **`voice_controller_test.dart`'s "resets once it starts" retry test is vacuous.** It joins a *fresh* `VoiceController` rather than retrying the same one, so it passes even with the reset logic it claims to guard deleted entirely. `VoiceState.retryable` defaults to `true` on a new controller regardless. Fix is calling `join` again on the same controller, which the fake session already supports.
 - **`manage_channel_sheet.dart` duplicates `confirmDangerousAction` almost verbatim** because the shared helper hardcodes `Text('Cancel')` with no `cancelLabel` parameter, and this sheet wants "Keep channel". Add the parameter rather than the duplicate.
 
+## Running the Fedora build, and what it found (2026-07-28)
+
+The rpm was installed and used, and it found nine defects in one sitting.
+Read this before touching desktop voice, emoji rendering, or the icons.
+
+**Screen share on Linux could never have worked, and the reason is not in our code.**
+`flutter_webrtc`'s `GetDisplayMedia` matches its `source_id` against a `sources_` vector that is only ever populated by `GetSources`, so a share that names no source fails with `Bad Arguments: source not found!` no matter what else is right.
+Proved with a probe against the real plugin on this box: enumerating screens returns one source (`id="1"`), capture with that id publishes a track, and capture without one throws exactly that string.
+`VoiceSession.setScreenShareEnabled` takes a `sourceId` now, and `DesktopSources` is the seam that lists them.
+**Never enumerate windows on Linux**: `getSources(types: [SourceType.Window])` segfaults the process on Wayland (SIGSEGV, exit 139), and a native crash cannot be caught from Dart.
+
+**Emoji resolve to the monochrome face unless the colour one is named.**
+Fedora ships both `Noto Emoji` and `Noto Color Emoji`, and fontconfig hands back the monochrome one, so every reaction chip drew as a hollow outline.
+`AppFonts.emoji` is now in `fontFamilyFallback` on the theme and on `AppText.code`.
+Verified by rendering the same string three ways through the real engine, not by reasoning about it.
+
+**A `RenderRepaintBoundary.toImage()` in a widget test must be wrapped in `tester.runAsync`.**
+Rasterising is engine work the test's fake clock never completes, so the PNG is written and the test then hangs forever holding a finished image. That is the "does not shut down cleanly" problem the earlier throwaway harness hit, and it is why `scripts/ui-snapshots.sh` is committable where that one was not.
+
+`scripts/ui-snapshots.sh` renders the **real shell** at five resolutions in both themes.
+`design_system`'s golden matrix renders a synthetic sample of chrome, which is why neither of that pass's two layout bugs was visible to it: the rail's manage button centring against a whole column, and the voice roster never fetching a picture.
+The snapshot test also asserts no overflow, and that half runs in CI.
+Three things it needs and each fails silently without: real fonts through `FontLoader`, Lucide registered as `packages/lucide_icons_flutter/Lucide` (package-qualified, or every icon is an empty square), and a seeded session.
+
+**Mutation testing a Rust fix needs `touch` after restoring the file.**
+`shutil.move` puts the original mtime back, cargo's fingerprint is mtime-based, and it keeps the mutated object file. That cost half an hour chasing a "failure" that was a stale build.
+
+**`/tmp` here is a 16GB tmpfs**, and two Flutter Linux release builds fill it. When it fills, the Bash tool's shell wedges: commands that write to stdout fail with exit 1 while ones that write nothing succeed. Free space and it recovers. Put probe builds under `~/.cache`, not the scratchpad.
+
+Also settled: the rpm's `Recommends` named `gnome-keyring`, which pulled a second unused keyring daemon onto every KDE install. `kf6-kwallet` ships `ksecretd` and `org.kde.secretservicecompat.service`, the same `org.freedesktop.secrets` API libsecret wants, so it is `(gnome-keyring or kf6-kwallet)` now. There is no virtual provide for the capability in Fedora, which is why this has to be a boolean dependency naming both.
+
+And the launcher icon: below 32px the ladder rendered `icon-master-small.svg`, which was the lone square from `glyph.svg`'s reasoning, so a launcher entry had no lattice in it and did not read as this app. Small sizes draw the same mark at 78% of the tile instead of 60%.
+
+### Who can join (2026-07-28)
+
+`space_settings` is one row holding a `join_policy` of `invite` or `open`, read inside the same transaction as the account insert so a concurrent change is not missed.
+`invite` is the default and what every deployment keeps on upgrade.
+**Unrecognised text reads as `invite` on both sides**, deliberately: a row holding junk, or a value a newer server grows, must not be the reason a Space is open to the internet.
+An open Space still accepts a code and still applies the role it grants.
+`/version` reports `invite_required` unauthenticated, the same treatment `push_enabled` gets, because the sign-up screen has to say so before an account exists.
+
+Two things the response contract test caught that nothing else would have: a `$ref` to `#/components/responses/RateLimited`, which does not exist (it is `TooManyRequests`), and both new operations having no case in `tests/response_contract/script.rs`. Adding a documented route means adding a case there as well as to `schema/openapi.yaml`.
+
+Found and left alone: **`POST /invites` exposes `max_uses` and `expires_at` only**, so a role-granting invite has no HTTP surface at all despite `Store::create_invite` taking one.
+
 ## Driving the client in a real browser (2026-07-27)
 
 A web build plus a local server is now the fastest way to exercise the client end to end, faster than a Linux desktop build and scriptable in a way a real device is not.
@@ -431,13 +476,16 @@ Test databases are temp SQLite files (`Config { port, database_path }` then `db:
   Clippy's `too_many_arguments` fires at 8 and SonarQube's equivalent rule is also 7, so both linters already in this stack enforce it for free.
   Dart **named** parameters on a widget or data-class constructor are exempt: a Flutter widget legitimately takes many, and a named argument is self-describing at the call site in a way a positional one is not.
   Past 7 positional parameters, the fix is a struct or a parameter object, not a longer signature.
-- **No comment may exceed two lines.** Code explains how; a comment explains why, and two lines is enough for a why. If the reason genuinely needs more room it belongs in a doc comment on the item, in `docs/`, or in the decision record - not in a block above a statement. A long comment above a confusing function is a sign the function should be refactored, which is the rule this one exists to enforce.
-  **Scope, settled 2026-07-27:** the two-line cap is on plain comments (`//`, `#`) only.
+- **No comment may exceed one line.** Owner decision, 2026-07-27, tightened from two: the code was carrying more comment than code.
+  Code explains how; a comment explains why, and one line is enough for a why.
+  If the reason genuinely needs more room it belongs in a doc comment on the item, in `docs/`, or in the decision record - not in a block above a statement.
+  A long comment above a confusing function is a sign the function should be refactored, which is the rule this one exists to enforce.
+  **Scope:** the cap is on plain comments (`//`, `#`) only.
   Doc comments (`///`, `//!`, `/**`) are exempt, because they carry an item's contract to its callers and to `cargo doc` / `dart doc`, which is a different job from explaining a line.
-  A doc comment that has grown past roughly ten lines is still a signal: that is reference material, and it belongs in `docs/` with the doc comment linking to it.
+  They are not a loophole: a doc comment is for the contract, and one that has grown past roughly ten lines is reference material that belongs in `docs/` with the doc comment linking to it.
   Test files are in scope. A long comment there is usually a why worth keeping, so shorten it or move it to a doc comment on the test rather than deleting the reasoning.
   **One exemption, for languages with no doc-comment syntax.** In YAML, TOML and shell, a `#` block at the very top of the file is that file's only documentation mechanism, so a file header there is treated as a doc comment and is exempt.
-  A `#` block anywhere else in those files is an ordinary comment and capped at two lines like everything else.
+  A `#` block anywhere else in those files is an ordinary comment and capped at one line like everything else.
   The point of the rule is that reasoning should live somewhere durable and findable, not that reasoning should be deleted: when shortening, move the why to a doc comment or to `docs/`, never drop it.
 - Anything published under the owner's name (PR titles and bodies, issues, review comments, releases) is written in Nick's voice: read `~/.claude/Voice.md`. It is plain, hedged, anti-hype, lowercase product names, no emoji or exclamation points, and it walks through how a thing works. Commit messages, code, and working conversation stay in the normal clear register.
 - Subagent model selection (from the owner's global instructions): haiku for trivial ops, sonnet for default coding and analysis, opus only for orchestration or hard reasoning; never use fable for engineering. Prefer sonnet-4-6 over sonnet-5. Workflow/Agent tooling only accepts tier aliases (haiku/sonnet/opus/fable), so full model ids cannot be passed there.

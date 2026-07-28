@@ -9,6 +9,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -75,6 +76,21 @@ void main() {
       final inactiveCount = tester.widget<Text>(find.text('5'));
       expect(activeCount.style?.fontWeight, AppWeights.semi);
       expect(inactiveCount.style?.fontWeight, AppWeights.regular);
+    });
+
+    testWidgets('reaction glyph resolves a colour emoji fallback',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(AppChip.reaction(
+            emoji: '\u{1F44D}', count: 1, active: false, onTap: () {})),
+      );
+
+      // Unnamed, fontconfig hands back monochrome Noto Emoji on Fedora.
+      final resolved = tester
+          .renderObject<RenderParagraph>(find.text('\u{1F44D}'))
+          .text
+          .style;
+      expect(resolved?.fontFamilyFallback, contains('Noto Color Emoji'));
     });
 
     testWidgets('operator variant renders as a non-interactive span',

@@ -28,6 +28,15 @@ abstract final class AppFonts {
   /// as a proportional face.
   static const String sans = 'packages/slimm_design_system/IBM Plex Sans';
   static const String mono = 'packages/slimm_design_system/IBM Plex Mono';
+
+  /// Colour emoji, per platform. Unnamed, fontconfig picks monochrome
+  /// `Noto Emoji` over the colour face sitting beside it and every reaction
+  /// renders as a hollow outline. A family absent from a machine is skipped.
+  static const List<String> emoji = [
+    'Noto Color Emoji',
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+  ];
 }
 
 /// The three weights this system has. Named rather than raw [FontWeight] so
@@ -99,5 +108,6 @@ abstract final class AppText {
     fontSize: 13.5,
     height: 1.5,
     letterSpacing: 13.5 * AppTracking.mono,
+    fontFamilyFallback: AppFonts.emoji,
   );
 }

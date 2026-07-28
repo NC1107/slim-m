@@ -76,6 +76,7 @@ class AuthorAvatar extends ConsumerWidget {
     required this.userId,
     this.size = 36,
     this.shape = AppAvatarShape.circle,
+    this.speaking = false,
   });
 
   final String name;
@@ -85,6 +86,10 @@ class AuthorAvatar extends ConsumerWidget {
   final String? userId;
   final double size;
   final AppAvatarShape shape;
+
+  /// Draws [AppAvatar]'s speaking ring, for the voice surfaces that identify
+  /// a participant by author id the same way a message row does.
+  final bool speaking;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -98,6 +103,7 @@ class AuthorAvatar extends ConsumerWidget {
       avatarUpdatedAt: profile?.avatarUpdatedAt,
       size: size,
       shape: shape,
+      speaking: speaking,
     );
   }
 }

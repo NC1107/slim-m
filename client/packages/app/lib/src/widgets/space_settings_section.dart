@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../permissions.dart';
 import '../providers/admin_providers.dart';
 import '../routing/routes.dart';
+import 'join_policy_row.dart';
 import 'settings_section_header.dart';
 
 /// Each row is gated on the server bit its screen requires, per `GET /me`'s
@@ -73,6 +74,7 @@ class SpaceSettingsSection extends ConsumerWidget {
             onTap: () => context.push(Routes.adminOverwrites),
           ),
         ],
+        if (canManageServer) const JoinPolicyRow(),
         if (canManageServer)
           ListTile(
             leading: const Icon(AppIcons.smile),

@@ -16,6 +16,7 @@ abstract final class Routes {
   static const adminRoles = '/settings/roles';
   static const adminOverwrites = '/settings/permissions';
   static const adminEmoji = '/settings/emoji';
+  static const debugLog = '/settings/debug-log';
 
   /// The messages of one channel.
   static String channel(String id) => '/channels/$id';

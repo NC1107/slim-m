@@ -290,4 +290,50 @@ void main() {
       expect(quiet, isNot(equals(talking)));
     });
   });
+
+  group('screen share source', () {
+    test('the chosen screen reaches LiveKit as its device id', () {
+      final options = VoiceSession.captureOptionsFor(
+        ScreenShareQuality.balanced,
+        'screen-2',
+      );
+
+      // LiveKit carries sourceId as deviceId, and it is the only field
+      // getDisplayMedia matches on: dropped, a desktop share cannot start.
+      expect(options.deviceId, 'screen-2');
+    });
+
+    test('no source named is left unset rather than defaulted', () {
+      final options =
+          VoiceSession.captureOptionsFor(ScreenShareQuality.balanced, null);
+
+      expect(options.deviceId, isNull);
+    });
+
+    test('sources are listed through the injected seam, never a global',
+        () async {
+      final session = VoiceSession(
+        roomFactory: _EmptyRoom.new,
+        desktopSources: _FakeSources(const [
+          ScreenShareSource(id: '1', name: 'Screen 1'),
+        ]),
+      );
+      addTearDown(session.dispose);
+
+      expect(session.screenShareNeedsSource, isTrue);
+      expect((await session.screenShareSources()).single.id, '1');
+    });
+  });
+}
+
+class _FakeSources implements DesktopSources {
+  const _FakeSources(this._sources);
+
+  final List<ScreenShareSource> _sources;
+
+  @override
+  bool get required => true;
+
+  @override
+  Future<List<ScreenShareSource>> list() async => _sources;
 }
