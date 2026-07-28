@@ -193,8 +193,12 @@ final fixtureMessages = [
 ];
 
 /// A container wired like the app's, with the network and database swapped.
-Future<({ProviderContainer container, SlimmDatabase db})>
-fixtureContainer() async {
+///
+/// [extraOverrides] layers on top for a test that needs one more provider
+/// swapped (a fake voice call, say) without duplicating this whole setup.
+Future<({ProviderContainer container, SlimmDatabase db})> fixtureContainer({
+  List<Override> extraOverrides = const [],
+}) async {
   final db = SlimmDatabase(NativeDatabase.memory());
   final container = ProviderContainer(
     overrides: [
@@ -213,6 +217,7 @@ fixtureContainer() async {
         return client;
       }),
       databaseProvider.overrideWith((ref) => db),
+      ...extraOverrides,
     ],
   );
   final store = await container.read(storeProvider.future);

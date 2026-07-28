@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
+import '../widgets/local_screen_share_banner.dart';
 import '../widgets/user_avatar.dart';
 import 'voice_call_controls.dart';
 
@@ -217,6 +218,17 @@ class _InCall extends ConsumerWidget {
 
     return Column(
       children: [
+        // Pinned above the roster: a per-row glyph is too easy to scroll past.
+        if (voice.screenSharing)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.s16,
+              AppSpacing.s16,
+              AppSpacing.s16,
+              0,
+            ),
+            child: LocalScreenShareBanner(),
+          ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.all(AppSpacing.s16),
@@ -285,48 +297,6 @@ class _ParticipantRow extends StatelessWidget {
             participant.isMuted ? AppIcons.micOff : AppIcons.mic,
             size: 16,
             color: participant.isMuted ? tokens.textSecondary : tokens.accent,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Shown in the channel list for a voice channel the user is in.
-class VoiceStripIndicator extends ConsumerWidget {
-  const VoiceStripIndicator({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final voice = ref.watch(voiceControllerProvider);
-    if (voice.state != VoiceSessionState.connected) {
-      return const SizedBox.shrink();
-    }
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s12,
-        vertical: AppSpacing.s8,
-      ),
-      decoration: BoxDecoration(
-        color: tokens.surfaceSunken,
-        border: Border(top: BorderSide(color: tokens.borderSubtle)),
-      ),
-      child: Row(
-        children: [
-          Icon(AppIcons.voice, size: 16, color: tokens.accent),
-          const SizedBox(width: AppSpacing.s8),
-          Expanded(
-            child: Text(
-              '${voice.participants.length} in call',
-              style: TextStyle(color: tokens.textPrimary, fontSize: 12),
-            ),
-          ),
-          IconButton(
-            iconSize: 16,
-            tooltip: 'Leave call',
-            icon: const Icon(AppIcons.leaveCall),
-            onPressed: ref.read(voiceControllerProvider.notifier).leave,
           ),
         ],
       ),
