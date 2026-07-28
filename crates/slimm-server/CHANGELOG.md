@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.0](https://github.com/NC1107/slim-m/compare/server-v0.14.3...server-v0.15.0) (2026-07-28)
+
+
+### Features
+
+* role-granting invites, a disabled segmented option, and a backlog that was mostly stale ([#87](https://github.com/NC1107/slim-m/issues/87)) ([25b10fb](https://github.com/NC1107/slim-m/commit/25b10fb671e26ecfe5e8d62daa5f1aeafae832a3))
+
+
+### Bug Fixes
+
+* **server:** carry a message's attachments on its live frame ([#91](https://github.com/NC1107/slim-m/issues/91)) ([7c1a626](https://github.com/NC1107/slim-m/commit/7c1a626638e047cac7f1bdfd19aa81701fb2d319))
+
 ## [0.14.3](https://github.com/NC1107/slim-m/compare/server-v0.14.2...server-v0.14.3) (2026-07-28)
 
 
