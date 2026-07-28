@@ -40,3 +40,25 @@ fn sibling(path: &Path, suffix: &str) -> PathBuf {
 fn remove(path: &Path) {
     let _ = std::fs::remove_file(path);
 }
+
+/// Deletes a temp *directory tree* on drop, for the fixtures that build a
+/// media root or an import pack rather than a database.
+///
+/// Allowed dead: this module is included by every test binary, and most of
+/// them have no directory fixture to guard.
+#[allow(dead_code)]
+pub struct TestDirGuard(PathBuf);
+
+#[allow(dead_code)]
+impl TestDirGuard {
+    pub fn new(prefix: &str) -> (PathBuf, Self) {
+        let path = std::env::temp_dir().join(format!("{prefix}-{}", uuid::Uuid::now_v7()));
+        (path.clone(), Self(path))
+    }
+}
+
+impl Drop for TestDirGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
