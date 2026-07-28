@@ -139,11 +139,10 @@ class MessageRow extends StatelessWidget {
             onAddReaction: () =>
                 showEmojiPickerSheet(context, onSelect: onPickReaction),
             child: Padding(
-              // Tighter side gutters on a phone: the avatar column leaves a narrow measure at 430pt.
               padding: EdgeInsets.fromLTRB(
-                compact ? 10 : 20,
+                compact ? AppSizes.paneGutterCompact : AppSizes.paneGutter,
                 8,
-                compact ? 10 : 20,
+                compact ? AppSizes.paneGutterCompact : AppSizes.paneGutter,
                 4,
               ),
               child: Row(

@@ -39,23 +39,29 @@ class ManagedChannelRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!canManage) return row;
-    return Row(
-      // Centring floats the button between a voice row and its strip below.
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: row),
-        SizedBox(
-          height: AppListRow.heightFor(context),
-          child: Center(
-            child: AppIconButton(
-              icon: AppIcons.moreVertical,
-              semanticLabel: 'Manage ${channel.name}',
-              size: AppIconButtonSize.sm,
-              onPressed: () => showManageChannelSheet(context, channel),
+    // Mirrors _SectionLabel's own trailing inset so this glyph and the
+    // section's add glyph share a right edge; both are AppIconButtonSize.sm.
+    final trailingPad = AppTouchTargets.of(context) ? 0.0 : 4.0;
+    return Padding(
+      padding: EdgeInsets.only(right: trailingPad),
+      child: Row(
+        // Centring floats the button between a voice row and its strip below.
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: row),
+          SizedBox(
+            height: AppListRow.heightFor(context),
+            child: Center(
+              child: AppIconButton(
+                icon: AppIcons.moreVertical,
+                semanticLabel: 'Manage ${channel.name}',
+                size: AppIconButtonSize.sm,
+                onPressed: () => showManageChannelSheet(context, channel),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

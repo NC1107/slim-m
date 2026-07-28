@@ -185,6 +185,10 @@ class _AppListRowState extends State<AppListRow> {
             )
           : null,
       child: Stack(
+        // Expand, or the row's content takes its intrinsic height and a Stack
+        // aligns it top-start: the icon, label and unread dot all sat above
+        // the centre of a 30pt row, and higher still on a 44pt touch one.
+        fit: StackFit.expand,
         children: [
           content,
           if (widget.selected)

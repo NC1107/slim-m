@@ -19,6 +19,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/providers/message_extras.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/screens/home_shell.dart';
@@ -217,6 +218,9 @@ fixtureContainer() async {
   final store = await container.read(storeProvider.future);
   await store.upsertChannels(fixtureChannels);
   await store.applyMessages(fixtureMessages);
+  // Reactions, attachments and polls live in an in-memory controller rather
+  // than the store, so seeding the store alone renders none of them.
+  container.read(messageExtrasProvider.notifier).applyMessages(fixtureMessages);
   return (container: container, db: db);
 }
 
