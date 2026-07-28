@@ -5,16 +5,16 @@
 //! module is the thin REST skin over them, plus input validation, the bearer
 //! extractor, and the error-to-status mapping.
 
+use axum::Router;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::{delete, post};
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, PASSWORD, REFRESH, RateLimited, enforce};
+use super::extract::{Authed, Json, PASSWORD, REFRESH, RateLimited, enforce};
 use crate::hub::Event;
 use crate::ratelimit::Class;
 use crate::store::DeleteAccountError;

@@ -8,16 +8,16 @@
 //! checks it before touching the store, the same as the rest of this file's
 //! sibling admin surfaces do.
 
+use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::{get, patch};
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
+use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
 use crate::ids::UserId;
 use crate::permissions::Permissions;

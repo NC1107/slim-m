@@ -6,15 +6,15 @@
 //! because they are the safety model the owner chose: human review of manual
 //! reports, no automated scanning of anything.
 
+use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::routing::{delete, get, post};
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::Authed;
+use super::extract::{Authed, Json};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{DeviceId, MessageId, UserId};

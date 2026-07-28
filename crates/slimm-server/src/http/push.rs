@@ -7,18 +7,18 @@
 //! device's registration; [`crate::store::Store::register_push`] and its
 //! siblings re-check `user_id` too, so this holds even if that ever changes.
 
+use axum::Router;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::put;
-use axum::{Json, Router};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::Deserialize;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
+use super::extract::{Authed, Json, enforce};
 use crate::ratelimit::Class;
 
 const BODY_LIMIT: usize = 4 * 1024;
