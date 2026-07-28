@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
+import 'package:slimm_rtc/rtc.dart';
 
 /// The server the user picked, with null meaning one has never been picked on
 /// this install.
@@ -315,6 +316,13 @@ class ThemeController extends StateNotifier<AppThemeChoice> {
 
 final themeControllerProvider =
     StateNotifierProvider<ThemeController, AppThemeChoice>(ThemeController.new);
+
+/// The runtime probe for what this device can actually do with media. A
+/// provider rather than a bare construction, so a test can substitute one
+/// backed by a fake seam instead of the real platform.
+final mediaCapabilitiesProvider = Provider<MediaCapabilities>(
+  (ref) => const MediaCapabilities(),
+);
 
 /// Where device secrets live: the session token pair and the push private key
 /// today, later signing and agreement keys for E2EE. The platform keychain on

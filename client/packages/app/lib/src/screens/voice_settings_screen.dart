@@ -21,6 +21,7 @@ import 'package:slimm_rtc/rtc.dart';
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
+import '../widgets/media_capability_section.dart';
 
 const _soundsKey = 'slimm.voice.join_leave_sounds_enabled';
 const _qualityKey = 'slimm.voice.screen_share_quality';
@@ -111,6 +112,8 @@ class VoiceSettingsScreen extends ConsumerWidget {
         child: ListView(
           children: const [
             _MicrophoneSection(),
+            Divider(height: 1),
+            MediaCapabilitySection(),
             Divider(height: 1),
             _DeviceSection(),
             Divider(height: 1),
