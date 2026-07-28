@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.3](https://github.com/NC1107/slim-m/compare/server-v0.14.2...server-v0.14.3) (2026-07-28)
+
+
+### Bug Fixes
+
+* **server:** deleting a message whose image is also an emoji ([#85](https://github.com/NC1107/slim-m/issues/85)) ([2d2644b](https://github.com/NC1107/slim-m/commit/2d2644ba4ea902f0752ba40b06995e4f248e97cf))
+
 ## [0.14.2](https://github.com/NC1107/slim-m/compare/server-v0.14.1...server-v0.14.2) (2026-07-28)
 
 
