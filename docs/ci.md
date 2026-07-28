@@ -11,7 +11,8 @@ Each section below is named for its workflow file.
 | Workflow | Runs on | What it gates |
 | --- | --- | --- |
 | `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, tests, release build, binary size budget |
-| `client-ci` | changes under `client/` | dart analyze, format, every package's tests, and the iOS CallKit XCTest on macOS |
+| `client-ci` | changes under `client/` | dart analyze, format, every package's tests |
+| `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | the iOS CallKit XCTest on macOS, and the extension-embeds-no-frameworks check |
 | `schema-ci` | changes under `schema/`, `redocly.yaml` | redocly lint, and the additive-only oasdiff gate on pull requests |
 | `hygiene` | every push and pull request | iOS purpose strings, no emoji in UI source, SPDX headers on Rust source |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
@@ -40,7 +41,7 @@ Golden-file assertions (`matchesGoldenFile`) live inside each package's ordinary
 Golden PNGs are sensitive to the exact Flutter engine and Skia build and to font rendering, so goldens are generated and verified on the same `stable` channel on `ubuntu-latest`.
 If goldens start flaking across runs, pin an exact Flutter version in the workflow instead of floating on `stable`, and regenerate the goldens with `flutter test --update-goldens` on that same pinned version so both sides render identically.
 
-### The iOS unit-test job
+### The iOS unit-test job, and why it is its own workflow
 
 The CallKit synchronous-report invariant is a real termination risk, not a style rule.
 iOS kills an app that takes a VoIP push without reporting a call before the handler returns, and repeat offences cost it VoIP push entirely.
@@ -48,6 +49,11 @@ That makes it worth a macOS runner of its own, because the ubuntu job runs Dart 
 
 It is simulator only, so it needs no signing identity and no secrets: it compiles the Swift and runs XCTest, it does not produce a shippable build.
 The signed device build stays in the release workflow.
+
+It lives in `client-ios-ci.yml` rather than beside the Dart job because it is the expensive one by an order of magnitude: 14 minutes against 5, measured across recent runs, which made `client-ci` a median of 11 minutes when the Dart half finishes in a third of that.
+A GitHub workflow cannot path-filter one job, so the split is what lets it be gated on the paths that can actually change its answer: the iOS project, the plugins carrying CallKit and WebRTC, and the dependency set, which is how a Dart-side change reaches an Xcode build.
+Every push to `main` runs it whatever changed, so `main` is never trusted on a path filter alone.
+CocoaPods is cached on the lockfiles, since rebuilding those pods is most of what the project-generation step spends its five minutes on.
 
 `flutter build ios --simulator --no-codesign` runs first because xcodebuild needs the generated Flutter config and the plugin registrant to exist before the project will open, and only a Flutter build makes them.
 `--no-codesign` keeps it to compiling, with no identity involved.
