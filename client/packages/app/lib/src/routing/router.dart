@@ -17,6 +17,7 @@ import '../screens/admin/invites_screen.dart';
 import '../screens/admin/reports_screen.dart';
 import '../screens/admin/roles_screen.dart';
 import '../screens/home_shell.dart';
+import '../screens/debug_log_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/sign_in_screen.dart';
@@ -98,6 +99,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.adminEmoji,
         builder: (context, state) => const EmojiScreen(),
+      ),
+      GoRoute(
+        path: Routes.debugLog,
+        builder: (context, state) => const DebugLogScreen(),
       ),
       // The shell keeps the channel list alive across conversation changes.
       ShellRoute(

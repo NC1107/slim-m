@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
+import '../widgets/user_avatar.dart';
 import 'voice_call_controls.dart';
 
 class VoiceScreen extends ConsumerWidget {
@@ -259,28 +260,12 @@ class _ParticipantRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
       child: Row(
         children: [
-          // Speaking is a ring, and it is never the only cue: the muted icon
-          // carries the same information for anyone who cannot see the colour.
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: tokens.surfaceRaised,
-              border: Border.all(
-                color: participant.isSpeaking
-                    ? tokens.accentFill
-                    : tokens.borderSubtle,
-                width: participant.isSpeaking ? 2 : 1,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              participant.name.isEmpty
-                  ? '?'
-                  : participant.name.characters.first.toUpperCase(),
-              style: TextStyle(color: tokens.textSecondary, fontSize: 12),
-            ),
+          // Speaking is a ring, and never the only cue: the muted icon repeats it.
+          AuthorAvatar(
+            name: participant.name,
+            userId: participant.identity,
+            size: 32,
+            speaking: participant.isSpeaking,
           ),
           const SizedBox(width: AppSpacing.s12),
           Expanded(

@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
+import 'package:slimm_app/src/diagnostics/debug_log.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_platform/platform.dart';
@@ -36,6 +37,8 @@ class FakeSession implements VoiceSession {
     this.microphoneGranted = true,
     this.screenShareOutcome = ScreenShareOutcome.started,
     this.deafenGranted = true,
+    this.needsSource = false,
+    this.sources = const [],
   });
 
   final VoiceSessionState joinOutcome;
@@ -45,6 +48,15 @@ class FakeSession implements VoiceSession {
   /// controller has to tell apart is one of these.
   final ScreenShareOutcome screenShareOutcome;
   final bool deafenGranted;
+
+  /// Whether this platform makes a share name a screen first.
+  final bool needsSource;
+  final List<ScreenShareSource> sources;
+
+  /// What the controller actually passed through, so a test can assert the
+  /// chosen screen reached the session rather than being dropped.
+  String? lastSourceId;
+  int sourceListings = 0;
 
   final _states = StreamController<VoiceSessionState>.broadcast();
   final _participants = StreamController<List<VoiceParticipant>>.broadcast();
@@ -68,9 +80,31 @@ class FakeSession implements VoiceSession {
   @override
   Stream<List<VoiceParticipant>> get participantChanges => _participants.stream;
 
+  Object? _lastError;
+
   @override
   Object? get lastError =>
-      _state == VoiceSessionState.failed ? 'the SFU refused' : null;
+      _lastError ??
+      (_state == VoiceSessionState.failed ? 'the SFU refused' : null);
+
+  @override
+  VoiceDisconnect? lastDisconnect;
+
+  @override
+  bool get screenShareNeedsSource => needsSource;
+
+  @override
+  Future<List<ScreenShareSource>> screenShareSources() async {
+    sourceListings++;
+    return sources;
+  }
+
+  /// Drives a drop the SFU decided on, the way a real room event would.
+  void dropWith(VoiceDisconnect reason) {
+    lastDisconnect = reason;
+    _state = VoiceSessionState.failed;
+    _states.add(_state);
+  }
 
   @override
   Future<void> join({
@@ -95,7 +129,17 @@ class FakeSession implements VoiceSession {
   Future<ScreenShareOutcome> setScreenShareEnabled(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
-  }) async => enabled ? screenShareOutcome : ScreenShareOutcome.stopped;
+    String? sourceId,
+  }) async {
+    lastSourceId = sourceId;
+    if (!enabled) return ScreenShareOutcome.stopped;
+    // The real session records why before reporting failure; a fake that does
+    // not cannot catch a controller that drops the cause.
+    if (screenShareOutcome == ScreenShareOutcome.failed) {
+      _lastError = 'source not found!';
+    }
+    return screenShareOutcome;
+  }
 
   @override
   Future<bool> setDeafened(bool value) async {
@@ -147,6 +191,10 @@ class VoiceHarness {
   ProviderContainer? _container;
 
   void dispose() => _container?.dispose();
+
+  /// What the controller recorded for the user to read back in settings.
+  List<DiagnosticEvent> log(VoiceController _) =>
+      _container!.read(debugLogProvider);
 
   /// The controller as the app builds it, with only the network and the SFU
   /// swapped: a real session, a real [SlimmApi], and the same provider wiring.

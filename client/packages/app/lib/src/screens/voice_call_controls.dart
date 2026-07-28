@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
+import '../widgets/screen_source_sheet.dart';
 
 class CallControls extends StatelessWidget {
   const CallControls({
@@ -76,7 +77,7 @@ class CallControls extends StatelessWidget {
     if (voice.awaitingBroadcast) {
       return 'Waiting for you to start the broadcast. Tap to cancel.';
     }
-    return 'Share a screen or window';
+    return 'Share a screen';
   }
 
   Future<void> _share(
@@ -95,7 +96,22 @@ class CallControls extends StatelessWidget {
       builder: (context) => const _ShareQualityDialog(),
     );
     if (quality == null) return;
-    await controller.setScreenShare(true, quality: quality);
+
+    String? sourceId;
+    if (controller.screenShareNeedsSource) {
+      // Mandatory: capture cannot find a source nothing asked to list.
+      final sources = await controller.screenShareSources();
+      if (sources.isEmpty) return;
+      if (sources.length == 1) {
+        sourceId = sources.first.id;
+      } else {
+        if (!context.mounted) return;
+        final chosen = await showScreenSourceSheet(context, sources);
+        if (chosen == null) return;
+        sourceId = chosen.id;
+      }
+    }
+    await controller.setScreenShare(true, quality: quality, sourceId: sourceId);
   }
 }
 
@@ -187,7 +203,7 @@ class _ShareQualityDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Your desktop will ask which screen or window to share.',
+            'You will be asked which screen to share next.',
             style: TextStyle(color: tokens.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: AppSpacing.s16),

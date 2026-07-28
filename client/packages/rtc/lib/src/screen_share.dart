@@ -35,6 +35,21 @@ enum ScreenShareQuality {
   final int maxBitrate;
 }
 
+/// A screen the OS will let this app capture.
+///
+/// Screens only, never windows. Enumerating windows through libwebrtc's
+/// desktop capturer segfaults the process on Fedora Wayland (SIGSEGV, exit
+/// 139, reproduced 2026-07-27), and a native crash is not catchable from Dart.
+class ScreenShareSource {
+  const ScreenShareSource({required this.id, required this.name});
+
+  /// Opaque to us, and the only thing `getDisplayMedia` matches on.
+  final String id;
+
+  /// The capturer's own label, 'Screen 1' and up on Linux.
+  final String name;
+}
+
 /// What asking to share a screen actually did.
 ///
 /// Deliberately not a bool. On iOS "the request went through" and "somebody

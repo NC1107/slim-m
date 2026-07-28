@@ -14,9 +14,11 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
 import 'broadcast_bridge.dart';
+import 'desktop_sources.dart';
 import 'screen_share.dart';
 
 /// Where a session is in its lifecycle.
@@ -33,6 +35,34 @@ enum VoiceSessionState {
   /// The last attempt failed, or the connection dropped and did not recover.
   /// [VoiceSession.lastError] says what happened.
   failed,
+}
+
+/// Why a call ended, when it was not this client that ended it.
+///
+/// The SFU reports a reason on every disconnect and nothing read it, so a call
+/// that was dropped looked exactly like a call that was left.
+enum VoiceDisconnect {
+  /// The same account joined from somewhere else and took this slot. The SFU
+  /// allows one connection per identity and evicts the older one.
+  replacedByOtherDevice,
+
+  /// A moderator removed this participant, or the room went away.
+  removed,
+
+  /// The connection dropped and reconnecting did not recover it.
+  connectionLost,
+
+  /// Ended for a reason this client cannot name.
+  unknown;
+
+  /// What to tell the user, in their terms rather than the SFU's.
+  String get message => switch (this) {
+        replacedByOtherDevice =>
+          'You joined this call from another device, so this one left it.',
+        removed => 'You were removed from the call.',
+        connectionLost => 'The call disconnected and could not reconnect.',
+        unknown => 'The call ended unexpectedly.',
+      };
 }
 
 /// Somebody in the call, including you.
@@ -86,9 +116,13 @@ typedef RoomFactory = lk.Room Function();
 /// disposing, because a user can leave and rejoin without the surrounding
 /// screen being torn down.
 class VoiceSession {
-  VoiceSession({RoomFactory? roomFactory, BroadcastBridge? broadcast})
-      : _roomFactory = roomFactory ?? _defaultRoomFactory,
-        _broadcast = broadcast ?? const MethodChannelBroadcastBridge();
+  VoiceSession({
+    RoomFactory? roomFactory,
+    BroadcastBridge? broadcast,
+    DesktopSources? desktopSources,
+  })  : _roomFactory = roomFactory ?? _defaultRoomFactory,
+        _broadcast = broadcast ?? const MethodChannelBroadcastBridge(),
+        _desktopSources = desktopSources ?? const WebrtcDesktopSources();
 
   static lk.Room _defaultRoomFactory() => lk.Room(
         roomOptions: const lk.RoomOptions(
@@ -101,6 +135,7 @@ class VoiceSession {
 
   final RoomFactory _roomFactory;
   final BroadcastBridge _broadcast;
+  final DesktopSources _desktopSources;
 
   lk.Room? _room;
   // room.events.listen returns a cancel function rather than a
@@ -114,6 +149,7 @@ class VoiceSession {
   VoiceSessionState _state = VoiceSessionState.idle;
   List<VoiceParticipant> _participants = const [];
   Object? _lastError;
+  VoiceDisconnect? _lastDisconnect;
   bool _disposed = false;
 
   /// Whether every remote participant's audio is locally silenced. Purely
@@ -133,6 +169,9 @@ class VoiceSession {
   /// Why the last attempt failed, when [state] is [VoiceSessionState.failed].
   Object? get lastError => _lastError;
 
+  /// Why the last call ended, when the SFU ended it rather than this client.
+  VoiceDisconnect? get lastDisconnect => _lastDisconnect;
+
   /// Joins a room with a token minted by the server.
   ///
   /// The token decides what this connection may do: a member without SPEAK gets
@@ -147,6 +186,7 @@ class VoiceSession {
     if (_disposed) return;
     if (_room != null) await leave();
 
+    _lastDisconnect = null;
     _setState(VoiceSessionState.connecting);
     try {
       final room = _roomFactory();
@@ -177,10 +217,27 @@ class VoiceSession {
     await _teardown();
     _participants = const [];
     _deafened = false;
+    _lastDisconnect = null;
     if (!_participantsController.isClosed) {
       _participantsController.add(_participants);
     }
     _setState(VoiceSessionState.idle);
+  }
+
+  /// Whether starting a share here must name a source first.
+  bool get screenShareNeedsSource => _desktopSources.required;
+
+  /// The screens this desktop will let the app capture.
+  ///
+  /// Calling this is what makes a later [setScreenShareEnabled] able to find
+  /// anything at all: see [DesktopSources].
+  Future<List<ScreenShareSource>> screenShareSources() async {
+    try {
+      return await _desktopSources.list();
+    } catch (e) {
+      _lastError = e;
+      return const [];
+    }
   }
 
   /// Mutes or unmutes the local microphone.
@@ -214,6 +271,7 @@ class VoiceSession {
   Future<ScreenShareOutcome> setScreenShareEnabled(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
+    String? sourceId,
   }) async {
     final room = _room;
     if (room == null) return ScreenShareOutcome.failed;
@@ -225,18 +283,8 @@ class VoiceSession {
     try {
       await room.localParticipant?.setScreenShareEnabled(
         enabled,
-        screenShareCaptureOptions: enabled
-            ? lk.ScreenShareCaptureOptions(
-                maxFrameRate: quality.fps.toDouble(),
-                params: lk.VideoParameters(
-                  dimensions: lk.VideoDimensions(quality.width, quality.height),
-                  encoding: lk.VideoEncoding(
-                    maxBitrate: quality.maxBitrate,
-                    maxFramerate: quality.fps,
-                  ),
-                ),
-              )
-            : null,
+        screenShareCaptureOptions:
+            enabled ? captureOptionsFor(quality, sourceId) : null,
       );
       if (!enabled) await _broadcast.requestStop();
       _refreshParticipants();
@@ -250,6 +298,28 @@ class VoiceSession {
       return ScreenShareOutcome.failed;
     }
   }
+
+  /// The capture options a share is published with.
+  ///
+  /// Extracted so the [sourceId] hand-off is assertable: it reaches LiveKit as
+  /// `deviceId`, and dropping it is what made a desktop share fail with
+  /// `source not found!` while every other setting looked right.
+  @visibleForTesting
+  static lk.ScreenShareCaptureOptions captureOptionsFor(
+    ScreenShareQuality quality,
+    String? sourceId,
+  ) =>
+      lk.ScreenShareCaptureOptions(
+        sourceId: sourceId,
+        maxFrameRate: quality.fps.toDouble(),
+        params: lk.VideoParameters(
+          dimensions: lk.VideoDimensions(quality.width, quality.height),
+          encoding: lk.VideoEncoding(
+            maxBitrate: quality.maxBitrate,
+            maxFramerate: quality.fps,
+          ),
+        ),
+      );
 
   /// A published screen track is the only thing that means anybody can see a
   /// screen, so it is what both the roster and the outcome above read.
@@ -303,7 +373,39 @@ class VoiceSession {
   /// up rather than silently ignored.
   void _listen(lk.Room room) {
     _cancelEvents?.call();
-    _cancelEvents = room.events.listen((_) => _refreshParticipants());
+    _cancelEvents = room.events.listen((event) {
+      if (event is lk.RoomDisconnectedEvent) {
+        _onDisconnected(event.reason);
+        return;
+      }
+      _refreshParticipants();
+    });
+  }
+
+  /// A disconnect this client did not ask for. [_teardown] cancels this
+  /// listener before it disconnects, so a `leave()` never lands here.
+  void _onDisconnected(lk.DisconnectReason? reason) {
+    if (_disposed) return;
+    if (reason == lk.DisconnectReason.clientInitiated) return;
+    _lastDisconnect = switch (reason) {
+      lk.DisconnectReason.duplicateIdentity =>
+        VoiceDisconnect.replacedByOtherDevice,
+      lk.DisconnectReason.participantRemoved ||
+      lk.DisconnectReason.roomDeleted ||
+      lk.DisconnectReason.serverShutdown =>
+        VoiceDisconnect.removed,
+      lk.DisconnectReason.signalingConnectionFailure ||
+      lk.DisconnectReason.reconnectAttemptsExceeded ||
+      lk.DisconnectReason.joinFailure ||
+      lk.DisconnectReason.disconnected =>
+        VoiceDisconnect.connectionLost,
+      _ => VoiceDisconnect.unknown,
+    };
+    _participants = const [];
+    if (!_participantsController.isClosed) {
+      _participantsController.add(_participants);
+    }
+    _setState(VoiceSessionState.failed);
   }
 
   void _refreshParticipants() {

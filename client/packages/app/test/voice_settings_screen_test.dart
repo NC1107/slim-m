@@ -79,6 +79,15 @@ class _FakeSession implements VoiceSession {
   Object? get lastError => null;
 
   @override
+  VoiceDisconnect? get lastDisconnect => null;
+
+  @override
+  bool get screenShareNeedsSource => false;
+
+  @override
+  Future<List<ScreenShareSource>> screenShareSources() async => const [];
+
+  @override
   Future<void> join({
     required String url,
     required String token,
@@ -101,6 +110,7 @@ class _FakeSession implements VoiceSession {
   Future<ScreenShareOutcome> setScreenShareEnabled(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
+    String? sourceId,
   }) async => enabled ? ScreenShareOutcome.started : ScreenShareOutcome.stopped;
 
   @override

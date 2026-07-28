@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_rtc/rtc.dart';
 
+import '../diagnostics/debug_log.dart';
 import 'providers.dart';
 
 /// Everything a voice surface needs to render, in one value.
@@ -95,6 +96,14 @@ class VoiceController extends StateNotifier<VoiceState> {
   }) : _session = session ?? VoiceSession(),
        super(const VoiceState()) {
     _states = _session.states.listen((s) {
+      // A drop the SFU decided on: the reason is the only thing that can tell
+      // "you joined elsewhere" from "your network went".
+      final dropped = _session.lastDisconnect;
+      if (s == VoiceSessionState.failed && dropped != null) {
+        _log('Call ended: ${dropped.name}', detail: dropped.message);
+        state = state.copyWith(state: s, error: dropped.message);
+        return;
+      }
       state = state.copyWith(state: s);
     });
     _participants = _session.participantChanges.listen((p) {
@@ -199,14 +208,24 @@ class VoiceController extends StateNotifier<VoiceState> {
     );
   }
 
+  /// Whether starting a share here needs a screen chosen first, and the
+  /// screens to choose from. Enumerating is also what makes the capture that
+  /// follows able to find anything, so it happens even for a single screen.
+  bool get screenShareNeedsSource => _session.screenShareNeedsSource;
+
+  Future<List<ScreenShareSource>> screenShareSources() =>
+      _session.screenShareSources();
+
   Future<void> setScreenShare(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
+    String? sourceId,
   }) async {
     _cancelBroadcastDeadline();
     final outcome = await _session.setScreenShareEnabled(
       enabled,
       quality: quality,
+      sourceId: sourceId,
     );
     switch (outcome) {
       case ScreenShareOutcome.started:
@@ -229,15 +248,26 @@ class VoiceController extends StateNotifier<VoiceState> {
           retryable: false,
         );
       case ScreenShareOutcome.failed:
+        final cause = _session.lastError;
+        _log(
+          'Screen share ${enabled ? 'start' : 'stop'} failed',
+          detail: cause,
+        );
         state = state.copyWith(
           screenSharing: false,
           awaitingBroadcast: false,
+          // The cause is included rather than dropped: "the system refused the
+          // capture" alone sent a real Linux failure to a log nobody reads.
           error: enabled
-              ? 'Could not start sharing. The system refused the capture.'
-              : 'Could not stop sharing.',
+              ? 'Could not start sharing. ${cause ?? 'The system refused the capture.'}'
+              : 'Could not stop sharing. ${cause ?? ''}'.trim(),
         );
     }
   }
+
+  void _log(String message, {Object? detail}) => _ref
+      .read(debugLogProvider.notifier)
+      .record('voice', message, detail: detail);
 
   /// The user was shown a broadcast picker and nothing came of it: they
   /// dismissed it, or there was nothing in it to pick. Either way the share

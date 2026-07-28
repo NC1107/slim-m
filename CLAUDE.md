@@ -431,13 +431,16 @@ Test databases are temp SQLite files (`Config { port, database_path }` then `db:
   Clippy's `too_many_arguments` fires at 8 and SonarQube's equivalent rule is also 7, so both linters already in this stack enforce it for free.
   Dart **named** parameters on a widget or data-class constructor are exempt: a Flutter widget legitimately takes many, and a named argument is self-describing at the call site in a way a positional one is not.
   Past 7 positional parameters, the fix is a struct or a parameter object, not a longer signature.
-- **No comment may exceed two lines.** Code explains how; a comment explains why, and two lines is enough for a why. If the reason genuinely needs more room it belongs in a doc comment on the item, in `docs/`, or in the decision record - not in a block above a statement. A long comment above a confusing function is a sign the function should be refactored, which is the rule this one exists to enforce.
-  **Scope, settled 2026-07-27:** the two-line cap is on plain comments (`//`, `#`) only.
+- **No comment may exceed one line.** Owner decision, 2026-07-27, tightened from two: the code was carrying more comment than code.
+  Code explains how; a comment explains why, and one line is enough for a why.
+  If the reason genuinely needs more room it belongs in a doc comment on the item, in `docs/`, or in the decision record - not in a block above a statement.
+  A long comment above a confusing function is a sign the function should be refactored, which is the rule this one exists to enforce.
+  **Scope:** the cap is on plain comments (`//`, `#`) only.
   Doc comments (`///`, `//!`, `/**`) are exempt, because they carry an item's contract to its callers and to `cargo doc` / `dart doc`, which is a different job from explaining a line.
-  A doc comment that has grown past roughly ten lines is still a signal: that is reference material, and it belongs in `docs/` with the doc comment linking to it.
+  They are not a loophole: a doc comment is for the contract, and one that has grown past roughly ten lines is reference material that belongs in `docs/` with the doc comment linking to it.
   Test files are in scope. A long comment there is usually a why worth keeping, so shorten it or move it to a doc comment on the test rather than deleting the reasoning.
   **One exemption, for languages with no doc-comment syntax.** In YAML, TOML and shell, a `#` block at the very top of the file is that file's only documentation mechanism, so a file header there is treated as a doc comment and is exempt.
-  A `#` block anywhere else in those files is an ordinary comment and capped at two lines like everything else.
+  A `#` block anywhere else in those files is an ordinary comment and capped at one line like everything else.
   The point of the rule is that reasoning should live somewhere durable and findable, not that reasoning should be deleted: when shortening, move the why to a doc comment or to `docs/`, never drop it.
 - Anything published under the owner's name (PR titles and bodies, issues, review comments, releases) is written in Nick's voice: read `~/.claude/Voice.md`. It is plain, hedged, anti-hype, lowercase product names, no emoji or exclamation points, and it walks through how a thing works. Commit messages, code, and working conversation stay in the normal clear register.
 - Subagent model selection (from the owner's global instructions): haiku for trivial ops, sonnet for default coding and analysis, opus only for orchestration or hard reasoning; never use fable for engineering. Prefer sonnet-4-6 over sonnet-5. Workflow/Agent tooling only accepts tier aliases (haiku/sonnet/opus/fable), so full model ids cannot be passed there.

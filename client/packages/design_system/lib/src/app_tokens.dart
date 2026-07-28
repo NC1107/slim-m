@@ -462,6 +462,7 @@ ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
     colorScheme: scheme,
     scaffoldBackgroundColor: tokens.surfaceBase,
     fontFamily: AppFonts.sans,
+    fontFamilyFallback: AppFonts.emoji,
     extensions: [tokens],
     dividerTheme: DividerThemeData(color: tokens.borderSubtle, space: 1),
   );

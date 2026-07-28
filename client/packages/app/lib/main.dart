@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'src/diagnostics/debug_log.dart';
 import 'src/providers/providers.dart';
 import 'src/providers/push_controller.dart';
 import 'src/providers/sync_controller.dart';
@@ -33,6 +34,8 @@ Future<void> main() async {
   await _initAndroidPush();
 
   final container = ProviderContainer();
+  // Before anything that can throw, so startup failures land in the log too.
+  installDiagnostics(container);
   // Before runApp so the router's first redirect knows the answer.
   await restoreSession(container);
   // Awaited for the same reason, and free: restoreSession has already
