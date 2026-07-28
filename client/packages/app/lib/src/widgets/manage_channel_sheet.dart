@@ -14,6 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
 import 'channel_rail.dart' show channelIdInPath;
+import 'confirm_dialog.dart';
 
 /// Matches the server's own ceiling (`CHANNEL_TOPIC_MAX_CHARS` in
 /// `crates/slimm-server/src/http/channels.rs`), so the counter here never
@@ -93,30 +94,16 @@ class _ManageChannelSheetState extends ConsumerState<_ManageChannelSheet> {
   }
 
   Future<void> _confirmDelete() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete "${widget.channel.name}"?'),
-        content: const Text(
+    final confirmed = await confirmDangerousAction(
+      context,
+      title: 'Delete "${widget.channel.name}"?',
+      message:
           'This deletes the channel and its message history for everyone '
           'in the Space. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep channel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete permanently'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete permanently',
+      cancelLabel: 'Keep channel',
     );
-    if (confirmed == true) await _delete();
+    if (confirmed) await _delete();
   }
 
   Future<void> _delete() async {

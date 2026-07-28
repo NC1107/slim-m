@@ -35,7 +35,9 @@ class PermissionOverwriteRow extends StatelessWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final options = [
       const AppSegmentedOption(label: 'Inherit'),
-      const AppSegmentedOption(label: 'Allow'),
+      // Dimmed rather than merely inert: the server refuses granting a bit
+      // the caller does not hold, so it must not look available.
+      AppSegmentedOption(label: 'Allow', disabled: !allowEnabled),
       const AppSegmentedOption(label: 'Deny'),
     ];
 
@@ -50,12 +52,9 @@ class PermissionOverwriteRow extends StatelessWidget {
             semanticLabel: label,
             options: options,
             selectedIndex: value.index,
-            onSegmentSelected: (i) {
-              // Ignored rather than redirected: substituting Deny meant a
-              // moderator reaching for "grant" silently selected its opposite.
-              if (i == OverwriteState.allow.index && !allowEnabled) return;
-              onChanged(OverwriteState.values[i]);
-            },
+            // The option itself wires no tap when disabled, so nothing to
+            // guard against here.
+            onSegmentSelected: (i) => onChanged(OverwriteState.values[i]),
           ),
         ],
       ),

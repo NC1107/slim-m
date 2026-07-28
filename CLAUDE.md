@@ -98,8 +98,8 @@ Full operator-facing writeup in `deploy/README.md`.
 Settings gained a "Community management" section (`_ModerationSection` in `settings_screen.dart`), hidden entirely, including its divider, when the caller holds none of the four gating permission bits.
 Four screens: a reports queue (MANAGE_MESSAGES), invites (CREATE_INVITE), roles (MANAGE_ROLES), and per-channel permission overwrites (MANAGE_ROLES).
 The overwrites screen cannot show an existing overwrite because the API has no `GET` for one, only set or clear, and it says so in a callout rather than faking current state.
-Its "Allow" option is meant to be unavailable when the caller lacks that bit themselves, the same restriction the server enforces, but `AppSegmentedOption` (`design_system/.../segmented_control.dart`) has no disabled concept, so the tap is silently redirected to "Deny" instead: the opposite of what was asked for.
-The wrong state is visible on screen before submit, which is why this shipped, but it is a real correctness gap and not yet fixed.
+Its "Allow" option is unavailable when the caller lacks that bit themselves, the same restriction the server enforces.
+`AppSegmentedOption` carries a `disabled` flag for it, which dims the label to `textDisabled` and wires no tap handler at all rather than accepting the tap and having the caller drop it: an option that merely does nothing still reads as available and still reports itself as a button to assistive tech.
 
 Channel management (create, rename or clear topic, delete) is gated on MANAGE_CHANNELS, read from `GET /me`.
 Delete refuses the deployment's last non-DM channel (409) and is idempotent on one already deleted.
@@ -112,11 +112,9 @@ An audit of empty/loading/error states fixed several places that rendered a fail
 The voice join preview gained a `VoiceState.retryable` flag: a 501 (no voice configured) or 403 (permission denied) hides the Join button instead of inviting a retry that is guaranteed to fail the same way again.
 That flag also fixed a real cross-channel leak: `VoiceController` is one instance for the whole app, so an error from channel A was being shown, and could block joining, in channel B's preview; both the displayed error and the button-hiding are now gated on the error belonging to the channel currently being previewed.
 
-Known issues surfaced by review, not yet fixed:
+**This section's "not yet fixed" list is closed, 2026-07-28.** All six entries were re-checked against main by a fan-out that had to cite file and line for every claim; four had already been fixed and the notes had outlived them, and the last two were fixed then. Recording that because the cost was real: a stale backlog sends work at problems that no longer exist, and two of these had been quoted forward into later documents as though still live.
 
-- **`ref.invalidate` after the widget is disposed can crash.** A confirm-then-await-then-invalidate sequence (revoke an invite, remove a device, upload or remove an avatar) throws `StateError` if the user navigates away before the request resolves, because Riverpod's `invalidate` asserts the element is still mounted and the surrounding `on api.ApiException catch` does not catch a `StateError`. Sites: `invites_screen.dart` (:113, :238), `reports_screen.dart` (:93), `roles_screen.dart` (:82), `role_editor_sheet.dart` (:77), `role_assign_sheet.dart` (:46), `avatar_settings_section.dart` (:46, :60), and two pre-existing ones in `settings_screen.dart` this work did not introduce. Fix is a `context.mounted`/`ref.mounted` guard before each `invalidate` call.
-- **`voice_controller_test.dart`'s "resets once it starts" retry test is vacuous.** It joins a *fresh* `VoiceController` rather than retrying the same one, so it passes even with the reset logic it claims to guard deleted entirely. `VoiceState.retryable` defaults to `true` on a new controller regardless. Fix is calling `join` again on the same controller, which the fake session already supports.
-- **`manage_channel_sheet.dart` duplicates `confirmDangerousAction` almost verbatim** because the shared helper hardcodes `Text('Cancel')` with no `cancelLabel` parameter, and this sheet wants "Keep channel". Add the parameter rather than the duplicate.
+What had already been fixed, and where to look if it recurs: the `ref.invalidate`-after-dispose sites all carry a `mounted` guard now; the `OverlayPortal` children are wrapped in `Positioned`; `manage_channel_sheet.dart`'s delete reads the router before the async gap; the revoked-session redirect lands on sign-in with the server address intact; and `voice_controller_test.dart`'s retry test already drives one controller twice (its doc comment says why, and is what stops somebody "simplifying" it back).
 
 ## Running the Fedora build, and what it found (2026-07-28)
 

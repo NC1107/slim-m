@@ -194,6 +194,41 @@ void main() {
       expect(weekText.style?.fontWeight, AppWeights.medium);
     });
 
+    testWidgets('a disabled option is dimmed and wires no tap handler', (
+      tester,
+    ) async {
+      var reported = -1;
+      await tester.pumpWidget(
+        _wrap(
+          AppSegmentedControl.inline(
+            options: const [
+              AppSegmentedOption(label: 'Inherit'),
+              AppSegmentedOption(label: 'Allow', disabled: true),
+              AppSegmentedOption(label: 'Deny'),
+            ],
+            selectedIndex: 0,
+            onSegmentSelected: (i) => reported = i,
+          ),
+        ),
+      );
+
+      // Dimmed, so an unavailable choice reads as unavailable rather than as
+      // an ordinary option that happens to do nothing.
+      final allow = tester.widget<Text>(find.text('Allow'));
+      final deny = tester.widget<Text>(find.text('Deny'));
+      expect(allow.style?.color, AppTokens.light.textDisabled);
+      expect(deny.style?.color, isNot(AppTokens.light.textDisabled));
+
+      await tester.tap(find.text('Allow'));
+      await tester.pump();
+      expect(reported, -1, reason: 'a disabled option reports nothing');
+
+      // The control still works, so the refusal is the option not the widget.
+      await tester.tap(find.text('Deny'));
+      await tester.pump();
+      expect(reported, 2);
+    });
+
     testWidgets('cards variant shows a check glyph only on the selected option',
         (tester) async {
       await tester.pumpWidget(
