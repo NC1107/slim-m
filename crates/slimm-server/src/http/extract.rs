@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! The bearer-token authentication extractor, shared by every authenticated
-//! route.
+//! route, plus the `Json`, `Query` and `Bytes` extractors every handler in
+//! this crate uses in their place: same wire behaviour as axum's own, but a
+//! malformed or oversized request rejects with [`ApiError`] instead of
+//! axum's default plain text.
 
 use std::net::SocketAddr;
 
-use axum::extract::{ConnectInfo, FromRequestParts};
+use axum::extract::{ConnectInfo, FromRequest, FromRequestParts, Request};
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
+use axum::response::{IntoResponse, Response};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use super::AppState;
 use super::error::ApiError;
@@ -101,5 +107,53 @@ impl<const C: u8> FromRequestParts<AppState> for RateLimited<C> {
     ) -> Result<Self, Self::Rejection> {
         enforce(state, parts, None, class_of(C))?;
         Ok(RateLimited)
+    }
+}
+
+/// A JSON request body, and a JSON response: a drop-in for [`axum::Json`]
+/// usable in both positions, so swapping the import is the whole migration.
+pub(crate) struct Json<T>(pub(crate) T);
+
+impl<T: DeserializeOwned> FromRequest<AppState> for Json<T> {
+    type Rejection = ApiError;
+
+    async fn from_request(req: Request, state: &AppState) -> Result<Self, Self::Rejection> {
+        let axum::Json(value) = axum::Json::<T>::from_request(req, state).await?;
+        Ok(Json(value))
+    }
+}
+
+impl<T: Serialize> IntoResponse for Json<T> {
+    fn into_response(self) -> Response {
+        axum::Json(self.0).into_response()
+    }
+}
+
+/// A query-string extractor: a drop-in for [`axum::extract::Query`].
+pub(crate) struct Query<T>(pub(crate) T);
+
+impl<T: DeserializeOwned> FromRequestParts<AppState> for Query<T> {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let axum::extract::Query(value) =
+            axum::extract::Query::<T>::from_request_parts(parts, state).await?;
+        Ok(Query(value))
+    }
+}
+
+/// The raw request body: a drop-in for [`axum::body::Bytes`], used by the
+/// three routes that accept a binary upload rather than JSON.
+pub(crate) struct Bytes(pub(crate) axum::body::Bytes);
+
+impl FromRequest<AppState> for Bytes {
+    type Rejection = ApiError;
+
+    async fn from_request(req: Request, state: &AppState) -> Result<Self, Self::Rejection> {
+        let bytes = axum::body::Bytes::from_request(req, state).await?;
+        Ok(Bytes(bytes))
     }
 }

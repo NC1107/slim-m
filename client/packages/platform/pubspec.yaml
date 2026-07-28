@@ -20,3 +20,10 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
+# Registers CallNotificationPlugin (android/); see call_notifications.dart.
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: top.npcserver.slimm.platform
+        pluginClass: CallNotificationPlugin

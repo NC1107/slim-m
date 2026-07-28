@@ -19,7 +19,6 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use slimm_server::voice::VoiceService;
 use tower::ServiceExt;
-use uuid::Uuid;
 
 use super::openapi::Api;
 use super::verdict::{self, Answer};
@@ -35,14 +34,13 @@ pub struct Contract {
     api: Api,
     covered: BTreeSet<String>,
     problems: Vec<String>,
+    /// Held, not read: its drop removes the temp database.
+    _db: crate::support::TestDbGuard,
 }
 
 impl Contract {
     pub async fn new() -> Contract {
-        let database_path = std::env::temp_dir()
-            .join(format!("slimm-response-contract-{}.db", Uuid::now_v7()))
-            .to_string_lossy()
-            .into_owned();
+        let (database_path, db_guard) = crate::support::TestDbGuard::new("slimm-response-contract");
         let config = Config {
             port: 0,
             database_path,
@@ -71,6 +69,7 @@ impl Contract {
             api: Api::load(repo_root),
             covered: BTreeSet::new(),
             problems: Vec::new(),
+            _db: db_guard,
         }
     }
 

@@ -6,11 +6,10 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::store::{PushError, Store};
 
-async fn store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-push-store-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-push-store-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -18,7 +17,7 @@ async fn store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 const KEY_A: [u8; 32] = [0xAA; 32];
@@ -29,7 +28,7 @@ const KEY_B: [u8; 32] = [0xBB; 32];
 /// refused: the (device_id, user_id) pair does not match.
 #[tokio::test]
 async fn register_is_scoped_to_the_callers_own_device() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let bob = s.create_user("bob", "Bob").await.unwrap();
     let alice_session = s.open_session(alice.id, "phone").await.unwrap();
@@ -86,7 +85,7 @@ async fn register_is_scoped_to_the_callers_own_device() {
 
 #[tokio::test]
 async fn deregister_is_scoped_to_the_callers_own_device() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let bob = s.create_user("bob", "Bob").await.unwrap();
     let alice_session = s.open_session(alice.id, "phone").await.unwrap();
@@ -115,7 +114,7 @@ async fn deregister_is_scoped_to_the_callers_own_device() {
 
 #[tokio::test]
 async fn report_lifecycle_is_scoped_to_the_callers_own_device() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let bob = s.create_user("bob", "Bob").await.unwrap();
     let alice_session = s.open_session(alice.id, "phone").await.unwrap();
@@ -149,7 +148,7 @@ async fn report_lifecycle_is_scoped_to_the_callers_own_device() {
 
 #[tokio::test]
 async fn a_device_that_never_registered_is_never_a_push_target() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let bob = s.create_user("bob", "Bob").await.unwrap();
     s.open_session(alice.id, "phone").await.unwrap();
@@ -174,7 +173,7 @@ async fn a_device_that_never_registered_is_never_a_push_target() {
 
 #[tokio::test]
 async fn clearing_a_dead_token_never_clobbers_a_fresher_registration() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let session = s.open_session(alice.id, "phone").await.unwrap();
     s.register_push(alice.id, session.device_id, "ios", "token-v1", None, &KEY_A)
@@ -207,7 +206,7 @@ async fn clearing_a_dead_token_never_clobbers_a_fresher_registration() {
 
 #[tokio::test]
 async fn clear_push_registration_is_scoped_to_the_owning_device_not_the_bare_token() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let bob = s.create_user("bob", "Bob").await.unwrap();
     let alice_session = s.open_session(alice.id, "phone").await.unwrap();
@@ -240,7 +239,7 @@ async fn clear_push_registration_is_scoped_to_the_owning_device_not_the_bare_tok
 
 #[tokio::test]
 async fn a_logged_out_device_receives_nothing() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let session = s.open_session(alice.id, "phone").await.unwrap();
     s.register_push(
@@ -269,7 +268,7 @@ async fn a_logged_out_device_receives_nothing() {
 /// in with the same provider token would leave two live-looking push targets.
 #[tokio::test]
 async fn repeated_logins_do_not_produce_duplicate_targets_for_one_physical_device() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
 
     // Alice logs in on her phone, registers it for push, then logs out.
@@ -316,7 +315,7 @@ async fn repeated_logins_do_not_produce_duplicate_targets_for_one_physical_devic
 /// the eventual logout to clean up the old row.
 #[tokio::test]
 async fn registering_a_token_on_a_new_login_reclaims_it_even_without_logging_out() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let first_login = s.open_session(alice.id, "phone").await.unwrap();
     s.register_push(
@@ -353,7 +352,7 @@ async fn registering_a_token_on_a_new_login_reclaims_it_even_without_logging_out
 /// owner must stop receiving push to it.
 #[tokio::test]
 async fn a_token_reassigned_to_a_different_account_stops_reaching_the_old_one() {
-    let s = store().await;
+    let (s, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let bob = s.create_user("bob", "Bob").await.unwrap();
     let alice_session = s.open_session(alice.id, "shared-phone").await.unwrap();

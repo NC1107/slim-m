@@ -15,20 +15,21 @@ use slimm_server::db;
 use slimm_server::ids::{CanvasObjectId, ChannelId, UserId};
 use slimm_server::store::{Rect, Store, ViewportQuery};
 use sqlx::{Row, SqlitePool};
-use uuid::Uuid;
 
-async fn new_pool(name: &str) -> SqlitePool {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-{name}-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_pool(name: &str) -> (SqlitePool, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new(&format!("slimm-{name}"));
     let config = Config {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
         ..Config::default()
     };
-    db::connect(&config).await.expect("connect + migrate")
+    (
+        db::connect(&config).await.expect("connect + migrate"),
+        guard,
+    )
 }
 
 fn view(min_x: f64, min_y: f64, max_x: f64, max_y: f64) -> Rect {
@@ -93,7 +94,7 @@ fn viewport_sql() -> String {
 /// still returns the right answer, so only the plan itself can catch it.
 #[tokio::test]
 async fn the_viewport_read_drives_from_the_rtree() {
-    let pool = new_pool("canvas-plan").await;
+    let (pool, _guard) = new_pool("canvas-plan").await;
     let sql = viewport_sql();
     let rows = sqlx::query(&format!("EXPLAIN QUERY PLAN {sql}"))
         .fetch_all(&pool)
@@ -129,7 +130,7 @@ async fn the_viewport_read_drives_from_the_rtree() {
 /// compaction all write this table without asking the application.
 #[tokio::test]
 async fn raw_sql_writes_still_maintain_the_index() {
-    let pool = new_pool("canvas-triggers").await;
+    let (pool, _guard) = new_pool("canvas-triggers").await;
     let store = Store::new(pool.clone());
     let channel = store.create_channel("canvas", "voice").await.unwrap().id;
     let author = store.create_user("ann", "Ann").await.unwrap().id;
@@ -164,7 +165,8 @@ async fn raw_sql_writes_still_maintain_the_index() {
 /// Moving an object moves it in the index, and removing it takes it out.
 #[tokio::test]
 async fn the_index_follows_a_move_and_a_removal() {
-    let store = Store::new(new_pool("canvas-move").await);
+    let (pool, _guard) = new_pool("canvas-move").await;
+    let store = Store::new(pool);
     let channel = store.create_channel("canvas", "voice").await.unwrap().id;
     let author = store.create_user("ann", "Ann").await.unwrap().id;
     let id = place(&store, channel, author, (0.0, 0.0, 10.0, 10.0)).await;
@@ -199,7 +201,7 @@ async fn the_index_follows_a_move_and_a_removal() {
 /// and must never under-report.
 #[tokio::test]
 async fn the_index_over_reports_and_the_exact_test_cleans_up() {
-    let pool = new_pool("canvas-precision").await;
+    let (pool, _guard) = new_pool("canvas-precision").await;
     let store = Store::new(pool.clone());
     let channel = store.create_channel("canvas", "voice").await.unwrap().id;
     let author = store.create_user("ann", "Ann").await.unwrap().id;
@@ -235,7 +237,8 @@ async fn the_index_over_reports_and_the_exact_test_cleans_up() {
 /// overlap. Every canvas starts at the same origin, so they always overlap.
 #[tokio::test]
 async fn a_viewport_never_reaches_another_channels_canvas() {
-    let store = Store::new(new_pool("canvas-scope").await);
+    let (pool, _guard) = new_pool("canvas-scope").await;
+    let store = Store::new(pool);
     let author = store.create_user("ann", "Ann").await.unwrap().id;
     let mine = store.create_channel("mine", "voice").await.unwrap().id;
     let theirs = store.create_channel("theirs", "voice").await.unwrap().id;
@@ -252,7 +255,8 @@ async fn a_viewport_never_reaches_another_channels_canvas() {
 /// and one that arrived in the overlap since its cursor is not.
 #[tokio::test]
 async fn a_pan_returns_only_what_the_new_region_adds() {
-    let store = Store::new(new_pool("canvas-delta").await);
+    let (pool, _guard) = new_pool("canvas-delta").await;
+    let store = Store::new(pool);
     let channel = store.create_channel("canvas", "voice").await.unwrap().id;
     let author = store.create_user("ann", "Ann").await.unwrap().id;
 

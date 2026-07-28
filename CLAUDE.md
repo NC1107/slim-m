@@ -12,6 +12,30 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## A per-channel voice roster (2026-07-28)
+
+The rail could only show who was in the one call already joined; every other voice channel looked empty even with people talking in it.
+`GET /channels/{channelId}/voice/roster` (`crates/slimm-server/src/http/voice.rs`) closes that, backed by a new `VoiceService::list_participants` (`crates/slimm-server/src/voice/roster.rs`, a sibling of `voice/mod.rs` split out for the line budget) that calls LiveKit's `ListParticipants` the same way `remove_participant` already called `RemoveParticipant`.
+
+Three things worth knowing before touching it again.
+
+**Appear-offline is enforced here too, not just in `presence.rs`.**
+Being in a LiveKit room already reveals your identity to everyone else already in that room - that half cannot be hidden, the SFU has to tell participants about each other to let them hear one another - but this route is the *preview* a caller who has not joined yet can query, and it must not become a second way to learn a hidden user is online.
+A participant whose `presence_visibility` is `Hidden` is dropped from the response for every viewer but themselves, checked per participant against the store, the same structural treatment `status_for` gives every other surface.
+
+**Unknown, empty, and not-configured are three different answers, not one.**
+A 501 means this deployment has no SFU at all (hide the roster).
+A 503 means one is configured but could not be reached just now (show nothing, but do not clear what was already known).
+A 200 with an empty list means the room was actually checked and nobody is in it.
+`tests/voice_roster.rs` drives all three against a real (or deliberately unreachable) room service; the response contract test cannot exercise the 200 case at all, because the fixture's SFU is `wss://sfu.invalid`-shaped on purpose (see `world.rs`), so `listVoiceRoster` sits in `UNCOVERED` for the same reason `kickVoiceParticipant` already did.
+
+**Cost is handled client-side, not server-side.**
+There is no cache in front of LiveKit; the answer instead is that `voiceRosterProvider` (`client/packages/app/lib/src/providers/voice_roster.dart`) is a `StreamProvider.autoDispose` keyed per channel, polling on a 15-second `Timer.periodic` that only exists while a rail row for that channel is actually on screen, and `VoiceChannelRow` never watches it at all for the one channel already joined, since that one already has live participant data for free.
+`Timer.periodic` rather than a bare `Future.delayed` loop, deliberately: it is the only shape `ref.onDispose` can actually `.cancel()`, and a widget test proved the difference - the `Future.delayed` version left an uncancellable timer pending after every test that ever got a successful fetch.
+
+Found and fixed along the way: `ui_snapshot_test.dart`'s fake HTTP client had a catch-all fallback of `<Object>[]` for any unmatched path, the right empty answer for a list endpoint and the wrong shape entirely for this one, so the full-shell snapshot test crashed with a type-cast error the moment this route existed.
+It now answers the roster path with `{"participants": []}` explicitly.
+
 ## The design-alignment push (2026-07-26)
 
 The UI was aligned to the Claude Design visual identity review, and the features the design assumed were built to back it.
@@ -37,11 +61,15 @@ Things worth knowing before changing any of it:
 
 After this push every table in 0002 is wired except the canvas pair. `canvas_objects` and `canvas_ops` are referenced in exactly one place, `store/sessions.rs`, which anonymises their `author_id` on account deletion. That is correct and deliberate: account deletion has to cover a table the moment it exists, not the moment it is used. The canvas itself is Phase 5 and 6 work.
 
-Known gaps, deliberately left:
+Known gaps, deliberately left.
+**Date every entry in a list like this one, and strike it through rather than deleting it when it closes.**
+Five notes in this file went stale inside two days (2026-07-28): four recorded bugs that were already fixed, the claim that the overwrites screen "silently redirects to Deny", and the emoji picker below.
+A stale gap costs more than a missing one, because it sends work at a problem that no longer exists and gets quoted forward into later documents as though still live.
+A struck-through entry with the date it closed is what stops the next reader trusting it:
 
 - ~~**Live WebSocket frames omit poll, reaction and attachment data.**~~ Fixed 2026-07-28, and the note above it was wrong about the cost. It claimed the fix needed "a database read inside the hot fan-out path or reshaping a widely shared struct"; it needed neither. The send handler already read the attachment summaries for its own response, just *after* publishing, so reading them once before it and handing them to both costs nothing. `Event::MessageCreated` carries them beside the row rather than the row growing a field, so nothing else holding a `Message` changed. Reactions stay absent and that is correct: a message that has just been created cannot have any.
 - **Webhook and bot authorship is not built.** The design shows a CI message; an integrations system is well past beta scope, and the UI marker stays rather than being faked.
-- **Emoji picking is a single placeholder reaction.** The reaction chip, its count and the "did you react" state are all real.
+- ~~**Emoji picking is a single placeholder reaction.**~~ Already stale by the time this was checked, 2026-07-28: PR #76 (2026-07-27) built a real one. `emoji_picker_panel.dart` is a searchable, grouped, keyboard-navigable grid over the `emojis` package's catalog, with the deployment's own custom emoji and a recent shelf both feeding the same `PickerEmoji` grid; see `emoji_catalog.dart` and `emoji_picker_test.dart`.
 
 ### Seeing the UI, and the font trap it exposed
 
@@ -225,7 +253,7 @@ A channel with kind `voice` rendered as a text channel, so there was no way to s
 `client/packages/app/test/route_reachability_test.dart` now fails if any registered route has nothing navigating to it, ignoring the route's own `path:` registration (the evidence that was present for settings the whole time) and comments (its own first draft passed on a comment that merely named the route).
 
 Still open in Phase 4:
-- Voice UX polish: camera pre-toggle and a roster shown before joining rather than after. The join preview, mic pre-toggle, in-call controls and collapse-to-strip indicator are built.
+- Voice UX polish: camera pre-toggle. The rail shows a real roster for a channel not yet joined now (see "A per-channel voice roster" above), but the join preview screen itself (`voice_screen.dart`) still does not show who is already in the room before you tap Join; it could reuse `voiceRosterProvider` to close that. The join preview, mic pre-toggle, in-call controls and collapse-to-strip indicator are built.
 - Android ConnectionService with a CallStyle notification.
 - The runtime half of the RTC spike. `MediaCapabilities.probeAll()` exists but nothing calls it, and the Wayland portal shows a picker, so it needs a human at the screen.
 - A real call on an iPhone through TestFlight, and an Android device for the heads-up path.
@@ -311,8 +339,8 @@ Still open in Phase 3:
 Known residuals, deliberately shipped:
 - The session write lands just after the in-memory token becomes authoritative, so a process death in that window replays a spent refresh token into reuse detection and forces a sign-out. Recoverable, but closing it means reordering `SlimmApi`'s refresh path.
 - The delete-account error path reports its failure but still strands the user.
-- Malformed query strings and JSON bodies still return axum's default error rather than the uniform JSON error contract.
-- `revoke_device` does not itself publish `SessionRevoked`; the logout and deletion paths do, and both are now covered by socket-closes tests.
+- ~~Malformed query strings and JSON bodies still return axum's default error rather than the uniform JSON error contract.~~ Fixed 2026-07-28: `http::extract::{Json, Query, Bytes}` now wrap axum's own extractors and map their rejections to `ApiError`.
+- `revoke_device` does not itself publish `SessionRevoked`, and that is the layering rather than a gap: the handler holds the hub, so `DELETE /devices/{id}` publishes for every session the removal revoked. Read twice as an open bug before somebody checked. Covered by a test since 2026-07-28 that also asserts a *second* device's socket survives, so a revocation that fanned out to the whole account would fail rather than look correct.
 - `packaging/flatpak/*.yaml` and `packaging/rpm/*.spec` still do not exist, so a tagged release warns and skips both Linux artifacts. Phase 0's exit criterion names them and Phase 9 owns them properly. Deliberately not guessed at here: an untested manifest that merely looks right is worse than an honest skip, because it produces a broken artifact instead of a visible gap.
 
 ## Push credentials and identifiers
@@ -344,7 +372,10 @@ Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 
 - The shared message context menu (edit, delete, pin/unpin) is now built; see "Cross-origin access, moderation UI, and channel administration" above. Reactions UI, the quick switcher, and haptics are not. The server side of reactions exists (PUT/DELETE on `/messages/{id}/reactions/{emoji}`, summaries on list, a ReactionsChanged event). History pagination is not built either.
 - The shortcut table exists but is not yet bound into the widget tree.
 
-Open follow-ups noted during reviews: malformed query/JSON bodies still return axum's default error rather than the uniform JSON error contract (low); `revoke_device` does not itself publish `SessionRevoked` (the logout and deletion paths do).
+~~Open follow-up noted during reviews: malformed query and JSON bodies still return axum's default plain-text error rather than the uniform JSON error contract (low).~~ Fixed 2026-07-28.
+`http::extract` now defines `Json`, `Query` and `Bytes` wrappers that behave exactly like axum's own (including as a response type, for `Json`) but map a rejection to `ApiError` instead: a syntax error or a missing field is a 400 naming what was wrong, an oversized body is a 413, and both keep the `{"error": ...}` shape and `application/json` content type every other response already had.
+The message for a bad body is the parser's own explanation one `source()` layer in, which names a missing field or a syntax position without the request body or a Rust type path; everywhere else keeps a static string.
+The three raw-`Bytes` upload routes (attachments, custom emoji, avatars) got the same fix, since an oversized upload hit the identical axum-default-plain-text problem one layer earlier than the JSON body case did.
 
 ## Running deployment (LAN test instance)
 
@@ -476,6 +507,17 @@ cargo sqlx prepare --workspace                         # writes .sqlx/, commit i
 ```
 
 Test databases are temp SQLite files (`Config { port, database_path }` then `db::connect`); do not use `:memory:` with the multi-connection pool.
+
+**They used to leak, and on this box that was not cosmetic.**
+96 sites across 46 test files built a path under `std::env::temp_dir()` and nothing ever deleted it, so a full `cargo test --all` left roughly a thousand `slimm-*.db` files behind, plus their `-wal` and `-shm` companions.
+`/tmp` here is a 16GB tmpfs shared with every other tool, and on 2026-07-28 the accumulation reached 20,000 files and filled it, which surfaces as the shell failing every command that writes to stdout with `disk quota exceeded` rather than as anything mentioning tests.
+Clear a pre-fix mess with `find /tmp -maxdepth 1 -name 'slimm-*' -delete` (non-empty leftover media directories need `-exec rm -rf {} +` instead).
+
+**Fixed, 2026-07-28.**
+`tests/support/mod.rs` is a `TestDbGuard`, included per test binary with `mod support;` (a plain top-level file) or `#[path = "../support/mod.rs"] mod support;` (a `tests/<name>/main.rs` subdirectory binary), since integration tests are separate crates and a `mod.rs` with no `main.rs` is never auto-discovered as its own target.
+It deletes its `.db`, `-wal` and `-shm` siblings on drop, panic or not, and every one of the 46 files now threads it through: a helper returns `(Store, TestDbGuard)` (or `(SqlitePool, TestDbGuard)`), and every wrapper around that helper has to carry the guard onward too, or it drops (and deletes the database) the moment the wrapper returns, before the test body ever runs.
+That exact bug hit three wrappers first (`invites.rs`'s `fixture`, `registration_gate.rs`'s `claimed`, `read_state_sync.rs`'s `setup`) and surfaced as "no such table", not as a leak.
+Left unconverted: `tests/response_contract/**` (a concurrent change owned it) and four sites that create a temp media directory rather than a database (`emoji_refusal.rs`, `attachments/fixtures.rs`, `emoji_import/fixtures.rs` twice) - a different leak shape, no `-wal`/`-shm`, and out of scope for this guard.
 
 ## Contribution conventions
 

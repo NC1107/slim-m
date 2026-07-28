@@ -33,16 +33,12 @@ use slimm_server::store::Store;
 use tokio::net::TcpListener;
 use tower::ServiceExt;
 
+mod support;
+
 // --- Shared fixtures (mirrors the style of tests/message_endpoints.rs) ---
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!(
-            "slimm-push-endpoints-test-{}.db",
-            uuid::Uuid::now_v7()
-        ))
-        .to_string_lossy()
-        .into_owned();
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-push-endpoints-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -50,7 +46,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store, push: PushSender) -> Router {
@@ -302,8 +298,8 @@ fn push_config(relay_url: &str) -> Config {
 
 /// Seeds `@everyone` with view+send so every registered user can see and post
 /// to the general channel, matching the message-endpoint tests' setup.
-async fn seeded_store() -> (Store, slimm_server::ids::ChannelId) {
-    let store = new_store().await;
+async fn seeded_store() -> (Store, slimm_server::ids::ChannelId, support::TestDbGuard) {
+    let (store, guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -313,7 +309,7 @@ async fn seeded_store() -> (Store, slimm_server::ids::ChannelId) {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    (store, channel.id)
+    (store, channel.id, guard)
 }
 
 const SHORT_DEBOUNCE_MS: i64 = 150;
@@ -326,7 +322,7 @@ const WAIT_TIMEOUT: Duration = Duration::from_secs(5);
 /// mock is what would catch a stray call.
 #[tokio::test]
 async fn a_disabled_sender_never_reaches_a_relay() {
-    let (store, channel_id) = seeded_store().await;
+    let (store, channel_id, _guard) = seeded_store().await;
     let (mock, _addr) = spawn_mock_relay().await;
 
     let app = app(store.clone(), PushSender::disabled());
@@ -359,7 +355,7 @@ async fn a_disabled_sender_never_reaches_a_relay() {
 
 #[tokio::test]
 async fn a_recipient_gets_a_push_and_the_envelope_carries_no_message_content() {
-    let (store, channel_id) = seeded_store().await;
+    let (store, channel_id, _guard) = seeded_store().await;
     let (mock, relay_url) = spawn_mock_relay().await;
     let push = PushSender::with_debounce_window_ms(&push_config(&relay_url), SHORT_DEBOUNCE_MS)
         .expect("push sender");
@@ -434,7 +430,7 @@ async fn a_recipient_gets_a_push_and_the_envelope_carries_no_message_content() {
 
 #[tokio::test]
 async fn an_unregistered_result_clears_the_registration() {
-    let (store, channel_id) = seeded_store().await;
+    let (store, channel_id, _guard) = seeded_store().await;
     let (mock, relay_url) = spawn_mock_relay().await;
     let push = PushSender::with_debounce_window_ms(&push_config(&relay_url), SHORT_DEBOUNCE_MS)
         .expect("push sender");
@@ -470,7 +466,7 @@ async fn an_unregistered_result_clears_the_registration() {
 
 #[tokio::test]
 async fn a_foreground_device_is_not_pushed() {
-    let (store, channel_id) = seeded_store().await;
+    let (store, channel_id, _guard) = seeded_store().await;
     let (mock, relay_url) = spawn_mock_relay().await;
     let push = PushSender::with_debounce_window_ms(&push_config(&relay_url), SHORT_DEBOUNCE_MS)
         .expect("push sender");
@@ -524,7 +520,7 @@ async fn a_foreground_device_is_not_pushed() {
 
 #[tokio::test]
 async fn a_burst_of_messages_in_one_channel_debounces_to_one_push() {
-    let (store, channel_id) = seeded_store().await;
+    let (store, channel_id, _guard) = seeded_store().await;
     let (mock, relay_url) = spawn_mock_relay().await;
     let push = PushSender::with_debounce_window_ms(&push_config(&relay_url), SHORT_DEBOUNCE_MS)
         .expect("push sender");
@@ -572,7 +568,7 @@ async fn a_burst_of_messages_in_one_channel_debounces_to_one_push() {
 /// dropped rather than merely collapsed into it.
 #[tokio::test]
 async fn a_relay_failure_does_not_swallow_the_next_messages_wake() {
-    let (store, channel_id) = seeded_store().await;
+    let (store, channel_id, _guard) = seeded_store().await;
     let (mock, relay_url) = spawn_mock_relay().await;
     let push = PushSender::with_debounce_window_ms(&push_config(&relay_url), SHORT_DEBOUNCE_MS)
         .expect("push sender");
@@ -633,7 +629,7 @@ async fn a_relay_failure_does_not_swallow_the_next_messages_wake() {
 async fn one_recipients_open_debounce_window_does_not_suppress_another_recipient() {
     const ISOLATION_DEBOUNCE_MS: i64 = 3_000;
 
-    let (store, channel_id) = seeded_store().await;
+    let (store, channel_id, _guard) = seeded_store().await;
     let (mock, relay_url) = spawn_mock_relay().await;
     let push = PushSender::with_debounce_window_ms(&push_config(&relay_url), ISOLATION_DEBOUNCE_MS)
         .expect("push sender");

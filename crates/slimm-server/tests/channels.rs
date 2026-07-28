@@ -19,11 +19,10 @@ use slimm_server::store::Store;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-channels-test-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-channels-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -31,7 +30,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -90,7 +89,7 @@ async fn register(store: &Store, username: &str) -> String {
 
 #[tokio::test]
 async fn manager_can_rename_a_channel() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -123,7 +122,7 @@ async fn manager_can_rename_a_channel() {
 
 #[tokio::test]
 async fn renaming_without_manage_channels_is_forbidden() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -150,7 +149,7 @@ async fn renaming_without_manage_channels_is_forbidden() {
 /// Forbidden, never a distinguishing 404.
 #[tokio::test]
 async fn a_non_manager_cannot_distinguish_a_real_channel_from_a_fake_one_by_renaming() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -191,7 +190,7 @@ async fn a_non_manager_cannot_distinguish_a_real_channel_from_a_fake_one_by_rena
 /// can already manage every real channel.
 #[tokio::test]
 async fn renaming_a_nonexistent_channel_by_a_manager_is_not_found() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -219,7 +218,7 @@ async fn renaming_a_nonexistent_channel_by_a_manager_is_not_found() {
 
 #[tokio::test]
 async fn rename_validates_the_new_name() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -249,7 +248,7 @@ async fn rename_validates_the_new_name() {
 /// is not an error.
 #[tokio::test]
 async fn manager_can_delete_a_channel_idempotently() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -294,7 +293,7 @@ async fn manager_can_delete_a_channel_idempotently() {
 /// left nobody has anywhere to land.
 #[tokio::test]
 async fn the_last_channel_cannot_be_deleted() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -334,7 +333,7 @@ async fn the_last_channel_cannot_be_deleted() {
 /// from the 204 an already-deleted (but once real) channel gets.
 #[tokio::test]
 async fn deleting_a_channel_id_that_was_never_real_is_not_found() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -362,7 +361,7 @@ async fn deleting_a_channel_id_that_was_never_real_is_not_found() {
 
 #[tokio::test]
 async fn deleting_without_manage_channels_is_forbidden() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await

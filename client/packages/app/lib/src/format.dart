@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Small formatting helpers with no state and no dependency on `intl`,
-/// matching `formatMessageTime` in `widgets/message_row.dart`.
+/// matching `formatMessageTime` in `widgets/message_row_identity.dart`.
 library;
 
 /// `YYYY-MM-DD HH:mm`, local time. Used wherever a screen shows a Unix

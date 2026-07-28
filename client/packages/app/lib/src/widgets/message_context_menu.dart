@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import 'message_row.dart';
+import 'hover_reveal.dart';
 
 /// Where the menu's top-left sits relative to the row's own top-left, from
 /// the design.

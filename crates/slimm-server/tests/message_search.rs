@@ -18,11 +18,10 @@ use slimm_server::store::Store;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-message-search-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-message-search");
     let config = Config {
         port: 0,
         database_path: path,
@@ -30,7 +29,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -106,7 +105,7 @@ async fn send(app: &Router, channel_id: &str, token: &str, content: &str) -> Val
 /// in the channel.
 #[tokio::test]
 async fn search_returns_matching_messages_only() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -144,7 +143,7 @@ async fn search_returns_matching_messages_only() {
 /// still technically carries it until touched again.
 #[tokio::test]
 async fn search_excludes_deleted_messages() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -190,7 +189,7 @@ async fn search_excludes_deleted_messages() {
 /// listing it would be, so it cannot be used to probe for a hidden channel.
 #[tokio::test]
 async fn search_requires_view_permission() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::NONE, true)
         .await
@@ -215,7 +214,7 @@ async fn search_requires_view_permission() {
 /// Malformed FTS5 query syntax is a clean 400, never a 500.
 #[tokio::test]
 async fn a_malformed_query_is_a_bad_request_not_a_server_error() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -241,7 +240,7 @@ async fn a_malformed_query_is_a_bad_request_not_a_server_error() {
 /// An empty query is rejected before ever reaching FTS5.
 #[tokio::test]
 async fn an_empty_query_is_rejected() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -268,7 +267,7 @@ async fn an_empty_query_is_rejected() {
 /// reaches, so it stays scoped no matter what FTS5 syntax `q` uses.
 #[tokio::test]
 async fn search_stays_scoped_to_its_own_channel() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",

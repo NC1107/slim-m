@@ -17,15 +17,15 @@
 //! cursor over `canvas_objects` can observe one. That belongs to the
 //! `canvas_ops` stream, which Phase 6 materializes this table from.
 
-use axum::extract::{Path, Query, State};
+use axum::Router;
+use axum::extract::{Path, State};
 use axum::routing::get;
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::Authed;
+use super::extract::{Authed, Json, Query};
 use super::messages::parse_uuid;
 use crate::ids::ChannelId;
 use crate::permissions::Permissions;

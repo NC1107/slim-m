@@ -16,13 +16,12 @@
 //! so this module only turns one caller's request into that call and its
 //! result into a status code.
 
-use axum::body::Bytes;
+use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::response::Response;
 use axum::routing::{delete, get};
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
@@ -30,6 +29,7 @@ use super::attachments::serve;
 use super::error::ApiError;
 use super::extract::Authed;
 use super::extract::enforce;
+use super::extract::{Bytes, Json, Query};
 use crate::emoji::{self, AddError};
 use crate::ids::EmojiId;
 use crate::media;
@@ -89,9 +89,9 @@ async fn list(
 async fn upload(
     Authed(ctx): Authed,
     parts: Parts,
-    axum::extract::Query(params): axum::extract::Query<UploadParams>,
+    Query(params): Query<UploadParams>,
     State(state): State<AppState>,
-    body: Bytes,
+    Bytes(body): Bytes,
 ) -> Result<(StatusCode, Json<CustomEmojiDto>), ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Upload)?;
     require_manage_server(&state, &ctx).await?;

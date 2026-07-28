@@ -17,11 +17,10 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::{OpenError, RefreshOutcome, Store};
 use tower::ServiceExt;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-account-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-account-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -29,12 +28,12 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 #[tokio::test]
 async fn delete_account_anonymizes_content_and_revokes_access() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let auth = Auth::new(2).unwrap();
     let hash = auth
         .hash_password("correct horse battery".to_owned())
@@ -97,7 +96,7 @@ async fn delete_account_anonymizes_content_and_revokes_access() {
 
 #[tokio::test]
 async fn open_session_refuses_a_deleted_account() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let account = store
         .create_account("alice", "Alice", "hash")
         .await
@@ -112,7 +111,7 @@ async fn open_session_refuses_a_deleted_account() {
 
 #[tokio::test]
 async fn delete_account_purges_member_channel_overwrites() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -153,7 +152,7 @@ async fn delete_account_purges_member_channel_overwrites() {
 
 #[tokio::test]
 async fn http_delete_account_rejects_the_token_afterward() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = http::router(AppState {
         store,
         auth: Auth::new(2).unwrap(),
@@ -227,7 +226,7 @@ async fn http_delete_account_rejects_the_token_afterward() {
 /// would hold afterwards, and there is no recovery path from that state.
 #[tokio::test]
 async fn the_last_administrator_cannot_strand_a_populated_deployment() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = http::router(AppState {
         store,
         auth: Auth::new(2).unwrap(),

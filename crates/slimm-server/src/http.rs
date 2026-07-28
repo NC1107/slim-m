@@ -2,7 +2,7 @@
 //! HTTP surface: liveness, version, the auth routes, and the message routes. The
 //! WebSocket routes are added as the protocol is built.
 
-use axum::{Json, Router, extract::State, routing::get};
+use axum::{Router, extract::State, routing::get};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::Serialize;
@@ -16,6 +16,7 @@ use crate::ratelimit::RateLimiter;
 use crate::store::{JoinPolicy, Store};
 use crate::voice::VoiceService;
 use error::ApiError;
+use extract::Json;
 
 mod attachments;
 mod auth;

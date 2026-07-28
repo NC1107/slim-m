@@ -22,6 +22,7 @@
 
 use std::io;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use uuid::Uuid;
 
@@ -159,6 +160,23 @@ pub struct Media {
     attachments_dir: PathBuf,
     avatars_dir: PathBuf,
     max_attachment_bytes: u64,
+    /// Set only by [`Media::for_tests`]; always `None` in a real deployment,
+    /// whose media root outlives the process on purpose.
+    temp_root: Option<Arc<TempRoot>>,
+}
+
+/// Removes the tree it names once the last [`Media`] clone holding it drops.
+///
+/// Behind an `Arc` because `Media` is cloned into every `AppState` and axum
+/// clones that per request; deleting on the first drop would take the
+/// directory out from under a live test.
+#[derive(Debug)]
+struct TempRoot(PathBuf);
+
+impl Drop for TempRoot {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 impl Media {
@@ -176,6 +194,7 @@ impl Media {
             attachments_dir,
             avatars_dir,
             max_attachment_bytes,
+            temp_root: None,
         })
     }
 
@@ -185,7 +204,10 @@ impl Media {
     /// to think about storage unless it is actually exercising attachments.
     pub fn for_tests() -> Self {
         let root = std::env::temp_dir().join(format!("slimm-media-test-{}", Uuid::now_v7()));
-        Self::new(root, DEFAULT_ATTACHMENT_MAX_BYTES).expect("create temp media directories")
+        let mut media = Self::new(root.clone(), DEFAULT_ATTACHMENT_MAX_BYTES)
+            .expect("create temp media directories");
+        media.temp_root = Some(Arc::new(TempRoot(root)));
+        media
     }
 
     pub fn max_attachment_bytes(&self) -> u64 {
@@ -304,5 +326,24 @@ mod tests {
         assert_eq!(from_hex(&hex), Some(bytes));
         assert_eq!(from_hex("not-hex"), None);
         assert_eq!(from_hex("abc"), None, "odd length is rejected");
+    }
+}
+
+#[cfg(test)]
+mod temp_root_tests {
+    use super::*;
+
+    #[test]
+    fn a_test_media_root_is_removed_when_the_last_clone_drops() {
+        let media = Media::for_tests();
+        let root = media.attachments_dir.parent().unwrap().to_path_buf();
+        assert!(root.exists(), "the root exists while a handle is held");
+
+        let clone = media.clone();
+        drop(media);
+        assert!(root.exists(), "a surviving clone keeps the root alive");
+
+        drop(clone);
+        assert!(!root.exists(), "the last drop removes the root");
     }
 }

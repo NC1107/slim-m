@@ -18,13 +18,11 @@ use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
-use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-avatars-test-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-avatars-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -32,7 +30,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -93,7 +91,7 @@ fn png(padding: usize) -> Vec<u8> {
 
 #[tokio::test]
 async fn uploading_an_avatar_is_reflected_on_the_profile_and_is_fetchable() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -139,7 +137,7 @@ async fn uploading_an_avatar_is_reflected_on_the_profile_and_is_fetchable() {
 
 #[tokio::test]
 async fn a_user_with_no_avatar_answers_not_found() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -170,7 +168,7 @@ async fn a_user_with_no_avatar_answers_not_found() {
 
 #[tokio::test]
 async fn deleting_an_avatar_clears_it() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -202,7 +200,7 @@ async fn deleting_an_avatar_clears_it() {
 
 #[tokio::test]
 async fn a_non_image_avatar_is_refused() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await

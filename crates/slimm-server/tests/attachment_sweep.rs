@@ -14,22 +14,23 @@ use slimm_server::db;
 use slimm_server::ids::EmojiId;
 use slimm_server::store::Store;
 use sqlx::SqlitePool;
-use uuid::Uuid;
+
+mod support;
 
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
-async fn pool() -> SqlitePool {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-attachment-sweep-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+async fn pool() -> (SqlitePool, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-attachment-sweep");
     let config = Config {
         port: 0,
         database_path: path,
         hash_concurrency: 2,
         ..Config::default()
     };
-    db::connect(&config).await.expect("connect + migrate")
+    (
+        db::connect(&config).await.expect("connect + migrate"),
+        guard,
+    )
 }
 
 /// Drags every attachment's `created_at` back past the sweep's grace window,
@@ -57,7 +58,7 @@ fn hex(bytes: &[u8]) -> String {
 /// reclaimed. This is the behaviour the emoji case must not change.
 #[tokio::test]
 async fn an_aged_unattached_upload_is_swept() {
-    let pool = pool().await;
+    let (pool, _guard) = pool().await;
     let store = Store::new(pool.clone());
 
     let orphan = [0xAAu8; 32];
@@ -81,7 +82,7 @@ async fn an_aged_unattached_upload_is_swept() {
 /// the life of the deployment.
 #[tokio::test]
 async fn an_emoji_does_not_stop_the_sweep_and_its_bytes_survive() {
-    let pool = pool().await;
+    let (pool, _guard) = pool().await;
     let store = Store::new(pool.clone());
 
     let emoji_bytes = [0x11u8; 32];
@@ -132,7 +133,7 @@ async fn an_emoji_does_not_stop_the_sweep_and_its_bytes_survive() {
 /// is genuinely reclaimable rather than pinned forever by the exclusion.
 #[tokio::test]
 async fn removing_the_emoji_releases_its_bytes_to_the_next_sweep() {
-    let pool = pool().await;
+    let (pool, _guard) = pool().await;
     let store = Store::new(pool.clone());
 
     let emoji_bytes = [0x33u8; 32];
@@ -169,7 +170,7 @@ async fn removing_the_emoji_releases_its_bytes_to_the_next_sweep() {
 async fn deleting_a_message_whose_image_is_also_an_emoji_still_works() {
     use slimm_server::ids::MessageId;
 
-    let pool = pool().await;
+    let (pool, _guard) = pool().await;
     let store = Store::new(pool.clone());
 
     let shared = [0x33u8; 32];

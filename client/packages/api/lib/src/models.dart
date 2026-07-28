@@ -266,6 +266,27 @@ class VoiceToken {
       );
 }
 
+/// One participant the server reports as currently connected to a channel's
+/// voice room, from `GET /channels/{id}/voice/roster`.
+///
+/// [displayName] is as it was when this participant joined, not necessarily
+/// their current profile name; a participant who chose to appear offline is
+/// never sent to any viewer but themselves, so absence from the list is not
+/// distinguishable from never having joined.
+class VoiceRosterParticipant {
+  const VoiceRosterParticipant(
+      {required this.userId, required this.displayName});
+
+  final String userId;
+  final String displayName;
+
+  factory VoiceRosterParticipant.fromJson(Map<String, dynamic> json) =>
+      VoiceRosterParticipant(
+        userId: json['user_id'] as String,
+        displayName: json['display_name'] as String,
+      );
+}
+
 /// How far a user has read in a channel, and how much is left.
 class ReadState {
   const ReadState({required this.lastReadSeq, required this.unread});

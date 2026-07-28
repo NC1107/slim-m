@@ -17,11 +17,10 @@ use slimm_server::store::{Bootstrap, Store};
 use tower::ServiceExt;
 use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-boot-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-boot-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -29,7 +28,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -111,7 +110,7 @@ async fn signup(app: &Router, username: &str, invite_code: Option<&str>) -> Stri
 
 #[tokio::test]
 async fn first_account_claims_the_deployment_and_can_message() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     assert!(!store.is_bootstrapped().await.unwrap());
     let app = app(store.clone());
 
@@ -167,7 +166,7 @@ async fn first_account_claims_the_deployment_and_can_message() {
 
 #[tokio::test]
 async fn bootstrap_runs_only_once() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let first = store.create_user("alice", "Alice").await.unwrap();
     let second = store.create_user("bob", "Bob").await.unwrap();
 
@@ -186,7 +185,7 @@ async fn bootstrap_runs_only_once() {
 
 #[tokio::test]
 async fn only_a_manager_can_create_channels() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store);
     let admin = register(&app, "alice").await;
     let member = join(&app, &admin, "bob").await;
@@ -234,7 +233,7 @@ async fn only_a_manager_can_create_channels() {
 
 #[tokio::test]
 async fn channel_list_requires_authentication() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store);
     let response = app
         .oneshot(request("GET", "/channels", None, None))
@@ -247,7 +246,7 @@ async fn channel_list_requires_authentication() {
 /// the Argon2id permits saturated.
 #[tokio::test]
 async fn password_endpoints_are_rate_limited() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store);
 
     let mut statuses = Vec::new();

@@ -13,16 +13,16 @@
 //! [`crate::store::roles`] because it has to see every caller at once, not
 //! just this request's.
 
+use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::{get, patch, put};
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
+use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
 use crate::ids::{RoleId, UserId};
 use crate::permissions::Permissions;

@@ -19,11 +19,10 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-roles-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-roles-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -31,7 +30,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -103,7 +102,7 @@ async fn admin_role_id(store: &Store) -> String {
 /// or not the resource named in the path exists.
 #[tokio::test]
 async fn every_verb_requires_manage_roles() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (_admin_token, _admin_id) = register(&store, "alice").await;
     let (member_token, member_id) = register(&store, "bob").await;
@@ -139,7 +138,7 @@ async fn every_verb_requires_manage_roles() {
 /// a role carrying ADMINISTRATOR: MANAGE_ROLES is not a shortcut to it.
 #[tokio::test]
 async fn creating_a_role_cannot_grant_a_permission_the_caller_lacks() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
     let (member_token, member_id) = register(&store, "bob").await;
@@ -192,7 +191,7 @@ async fn creating_a_role_cannot_grant_a_permission_the_caller_lacks() {
 /// hold ADMINISTRATOR.
 #[tokio::test]
 async fn assigning_a_role_cannot_grant_a_permission_the_caller_lacks() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
     let (member_token, member_id) = register(&store, "bob").await;
@@ -238,7 +237,7 @@ async fn assigning_a_role_cannot_grant_a_permission_the_caller_lacks() {
 /// check even runs, so a stray high bit cannot smuggle in a future meaning.
 #[tokio::test]
 async fn unknown_permission_bits_are_rejected() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
 
@@ -261,7 +260,7 @@ async fn unknown_permission_bits_are_rejected() {
 /// leave the deployment with no administrator and no recovery path.
 #[tokio::test]
 async fn cannot_unassign_the_last_administrator() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, admin_id) = register(&store, "alice").await;
     let admin_role = admin_role_id(&store).await;
@@ -299,7 +298,7 @@ async fn cannot_unassign_the_last_administrator() {
 /// own access at all.
 #[tokio::test]
 async fn cannot_delete_the_only_administrator_role() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
     let (member_token, member_id) = register(&store, "bob").await;
@@ -345,7 +344,7 @@ async fn cannot_delete_the_only_administrator_role() {
 /// succeeds: the guard only refuses the transition to zero, not to one.
 #[tokio::test]
 async fn a_second_administrator_makes_removal_possible() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, admin_id) = register(&store, "alice").await;
     let (_member_token, member_id) = register(&store, "bob").await;
@@ -380,7 +379,7 @@ async fn a_second_administrator_makes_removal_possible() {
 /// every permission evaluation and the schema allows only one.
 #[tokio::test]
 async fn cannot_delete_everyone_role() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
 
@@ -411,7 +410,7 @@ async fn cannot_delete_everyone_role() {
 
 #[tokio::test]
 async fn admin_can_create_update_list_and_the_role_takes_effect() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
 

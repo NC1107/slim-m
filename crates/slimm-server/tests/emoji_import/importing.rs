@@ -15,9 +15,9 @@ use crate::fixtures::*;
 /// content-addressed blob an upload would have written.
 #[tokio::test]
 async fn a_clean_import_adds_every_image_under_its_normalised_name() {
-    let store = new_store().await;
-    let media = media_for_test();
-    let dir = pack_dir();
+    let (store, _guard) = new_store().await;
+    let (media, _mediadir) = media_for_test();
+    let (dir, _packdir) = pack_dir();
 
     let smile = png(b"smile");
     write(&dir, "Big Smile.png", &smile);
@@ -88,9 +88,9 @@ async fn a_clean_import_adds_every_image_under_its_normalised_name() {
 /// duplicates and not an error.
 #[tokio::test]
 async fn re_importing_the_same_directory_changes_nothing() {
-    let store = new_store().await;
-    let media = media_for_test();
-    let dir = pack_dir();
+    let (store, _guard) = new_store().await;
+    let (media, _mediadir) = media_for_test();
+    let (dir, _packdir) = pack_dir();
     write(&dir, "smile.png", &png(b"smile"));
     write(&dir, "wave.png", &png(b"wave"));
 
@@ -128,17 +128,17 @@ async fn re_importing_the_same_directory_changes_nothing() {
 /// members already know stays live.
 #[tokio::test]
 async fn a_name_collision_skips_rather_than_replacing_the_existing_image() {
-    let store = new_store().await;
-    let media = media_for_test();
+    let (store, _guard) = new_store().await;
+    let (media, _mediadir) = media_for_test();
 
     let original = png(b"the original");
-    let first_dir = pack_dir();
+    let (first_dir, _firstpack) = pack_dir();
     write(&first_dir, "smile.png", &original);
     import_directory(&store, &media, &first_dir)
         .await
         .expect("first import");
 
-    let second_dir = pack_dir();
+    let (second_dir, _secondpack) = pack_dir();
     write(
         &second_dir,
         "Smile.png",

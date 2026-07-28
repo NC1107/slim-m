@@ -32,6 +32,8 @@
 
 mod openapi;
 mod script;
+#[path = "../support/mod.rs"]
+mod support;
 mod verdict;
 mod world;
 
@@ -48,6 +50,14 @@ const UNCOVERED: &[(&str, &str)] = &[
          which this harness has none of. Nothing is lost by not driving it: the \
          success response is 204 with no body, so there is no shape to check. Its \
          permission gate is covered in tests/voice.rs.",
+    ),
+    (
+        "listVoiceRoster",
+        "its 200 also goes through a reachable LiveKit room service, which this \
+         harness has none of; the fixture's SFU url is undialable by design (see \
+         world.rs). Its shape, the room-not-found-is-empty case, and the \
+         appear-offline filter are covered by tests/voice_roster.rs against a real \
+         mock room service; its permission gate is covered there too.",
     ),
     (
         "connectWebSocket",

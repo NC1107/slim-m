@@ -10,3 +10,6 @@ mod fixtures;
 mod importing;
 mod limits;
 mod refusals;
+
+#[path = "../support/mod.rs"]
+mod support;

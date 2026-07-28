@@ -12,17 +12,17 @@
 //! code itself, since the person redeeming it is, by definition, someone who
 //! cannot sign in right now.
 
+use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::post;
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::auth::validate_password;
 use super::error::ApiError;
-use super::extract::{Authed, PASSWORD, RateLimited, enforce};
+use super::extract::{Authed, Json, PASSWORD, RateLimited, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::UserId;

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /// One row in the message list: the avatar or continuation gutter, the
 /// header line, the body, and everything that can follow it.
+///
+/// The avatar/gutter and header live in `message_row_identity.dart`, and the
+/// hover-reveal mechanism (shared with the emoji picker and the context
+/// menu) lives in `hover_reveal.dart`; both were split out to keep this file
+/// to the row's own composition.
 library;
 
 import 'package:flutter/material.dart';
@@ -12,26 +17,13 @@ import '../routing/breakpoints.dart';
 
 import 'attachment_view.dart';
 import 'emoji_picker.dart';
+import 'hover_reveal.dart';
 import 'message_context_menu.dart';
 import 'message_edit_field.dart';
+import 'message_row_identity.dart';
 import 'message_row_parts.dart';
 import 'message_text.dart';
 import 'poll_view.dart';
-import 'user_avatar.dart';
-
-/// The avatar column's width, and therefore also the continuation gutter's:
-/// the design's 36px message-row avatar, named once so both agree.
-const double _avatarSize = 36;
-
-/// `HH:mm`, as the design uses throughout. Fixed width matters here: a
-/// grouped message puts its time in a 36px gutter, and "12:05 PM" wraps to two
-/// lines in it while "12:05" does not.
-String formatMessageTime(int epochMs) {
-  final dt = DateTime.fromMillisecondsSinceEpoch(epochMs);
-  final hour = dt.hour.toString().padLeft(2, '0');
-  final minute = dt.minute.toString().padLeft(2, '0');
-  return '$hour:$minute';
-}
 
 /// One message, and optionally the "New" divider directly above it.
 ///
@@ -136,7 +128,7 @@ class MessageRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compact = LayoutClass.of(context) == LayoutClass.compact;
-    return _HoverReveal(
+    return HoverReveal(
       builder: (context, hovered) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -147,18 +139,16 @@ class MessageRow extends StatelessWidget {
             onAddReaction: () =>
                 showEmojiPickerSheet(context, onSelect: onPickReaction),
             child: Padding(
-              // Tighter side gutters on a phone: 20 each side plus the avatar
-              // column leaves a narrow measure at 430pt.
               padding: EdgeInsets.fromLTRB(
-                compact ? 10 : 20,
+                compact ? AppSizes.paneGutterCompact : AppSizes.paneGutter,
                 8,
-                compact ? 10 : 20,
+                compact ? AppSizes.paneGutterCompact : AppSizes.paneGutter,
                 4,
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Leading(
+                  MessageRowLeading(
                     grouped: grouped,
                     isWebhook: isWebhook,
                     message: message,
@@ -173,15 +163,17 @@ class MessageRow extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (!grouped)
-                            _Header(message: message, isWebhook: isWebhook),
+                            MessageRowHeader(
+                              message: message,
+                              isWebhook: isWebhook,
+                            ),
                           if (editing)
                             MessageEditField(
                               initialContent: message.content,
                               onSubmit: onSubmitEdit,
                               onCancel: onCancelEdit,
                             )
-                          // An attachment-only message has no body, and an
-                          // empty one still costs a blank line above the image.
+                          // An attachment-only message has no body; an empty one still adds a blank line above the image.
                           else if (message.content.isNotEmpty)
                             MessageBody(
                               content: message.content,
@@ -228,167 +220,3 @@ class MessageRow extends StatelessWidget {
     );
   }
 }
-
-/// Tracks pointer hover for one subtree.
-///
-/// Its own widget so [MessageRow] can stay stateless: the row has a dozen
-/// fields and converting it wholesale to carry one bool would touch every
-/// reference in the file.
-class _HoverReveal extends StatefulWidget {
-  const _HoverReveal({required this.builder});
-
-  final Widget Function(BuildContext context, bool hovered) builder;
-
-  @override
-  State<_HoverReveal> createState() => _HoverRevealState();
-}
-
-class _HoverRevealState extends State<_HoverReveal> {
-  bool _hovered = false;
-  bool _pinned = false;
-
-  void _pin(bool pinned) {
-    if (_pinned != pinned) setState(() => _pinned = pinned);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: HoverRevealScope(
-        pin: _pin,
-        child: widget.builder(context, _hovered || _pinned),
-      ),
-    );
-  }
-}
-
-/// Lets a hover-revealed control keep itself mounted while it has a popup open.
-///
-/// Without it, moving the pointer onto the popup leaves the row's [MouseRegion],
-/// which unmounts the control and the popup with it - so the thing can be opened
-/// and never clicked.
-class HoverRevealScope extends InheritedWidget {
-  const HoverRevealScope({super.key, required this.pin, required super.child});
-
-  final ValueChanged<bool> pin;
-
-  /// Null outside a hover-revealed subtree, where nothing needs pinning.
-  static HoverRevealScope? maybeOf(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<HoverRevealScope>();
-
-  @override
-  bool updateShouldNotify(HoverRevealScope oldWidget) => pin != oldWidget.pin;
-}
-
-class _Leading extends StatelessWidget {
-  const _Leading({
-    required this.grouped,
-    required this.isWebhook,
-    required this.message,
-  });
-
-  final bool grouped;
-  final bool isWebhook;
-  final Message message;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-
-    if (grouped) {
-      // The continuation gutter: no avatar, just the time, right-aligned so
-      // it lines up with the avatar it replaces.
-      return SizedBox(
-        width: _avatarSize,
-        child: Padding(
-          padding: const EdgeInsets.only(top: 3),
-          child: Text(
-            formatMessageTime(message.createdAt),
-            textAlign: TextAlign.right,
-            style: AppText.micro.copyWith(
-              color: tokens.textSecondary,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (isWebhook) {
-      return Container(
-        width: _avatarSize,
-        height: _avatarSize,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: tokens.surfaceRaised,
-          border: Border.all(color: tokens.borderSubtle),
-          borderRadius: BorderRadius.circular(AppRadii.control),
-        ),
-        child: Icon(
-          AppIcons.code,
-          size: AppSizes.icon20,
-          color: tokens.textSecondary,
-        ),
-      );
-    }
-
-    return AuthorAvatar(
-      userId: message.authorId,
-      name: _authorLabel(message),
-      size: _avatarSize,
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header({required this.message, required this.isWebhook});
-
-  final Message message;
-  final bool isWebhook;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.s4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              _authorLabel(message),
-              overflow: TextOverflow.ellipsis,
-              style: AppText.body.copyWith(
-                color: tokens.textPrimary,
-                fontWeight: AppWeights.semi,
-              ),
-            ),
-          ),
-          if (isWebhook) ...[
-            const SizedBox(width: AppSpacing.s8),
-            const AppBadge(variant: AppBadgeVariant.tag, label: 'webhook'),
-          ],
-          const SizedBox(width: AppSpacing.s8),
-          Text(
-            formatMessageTime(message.createdAt),
-            style: AppText.micro.copyWith(
-              color: tokens.textSecondary,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Never the raw id: a missing name means the row predates the server
-/// sending names, and a 36-character uuid where a person's name goes reads as
-/// corruption rather than staleness. A null author id is a deleted account,
-/// which is a different and knowable thing.
-String _authorLabel(Message message) =>
-    message.authorDisplayName ??
-    (message.authorId == null ? 'Deleted user' : 'Unknown');

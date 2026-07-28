@@ -16,11 +16,10 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-version-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-version-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -28,7 +27,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store, push: PushSender) -> Router {
@@ -63,7 +62,8 @@ async fn get_version(app: Router) -> Value {
 
 #[tokio::test]
 async fn version_reports_push_disabled_without_a_relay() {
-    let body = get_version(app(new_store().await, PushSender::disabled())).await;
+    let (store, _guard) = new_store().await;
+    let body = get_version(app(store, PushSender::disabled())).await;
 
     assert_eq!(body["name"], "slim-m");
     assert_eq!(body["protocol"], 1);
@@ -83,6 +83,7 @@ async fn version_reports_push_enabled_with_a_relay() {
     };
     let push = PushSender::new(&config).expect("relay config is valid");
 
-    let body = get_version(app(new_store().await, push)).await;
+    let (store, _guard) = new_store().await;
+    let body = get_version(app(store, push)).await;
     assert_eq!(body["push_enabled"], true);
 }

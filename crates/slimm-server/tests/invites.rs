@@ -17,11 +17,10 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-invite-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-invite-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -29,7 +28,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -66,8 +65,8 @@ async fn json_body(response: axum::response::Response) -> Value {
 }
 
 /// An admin (via the bootstrap claim) and an ordinary member.
-async fn fixture() -> (Store, Router, String, String) {
-    let store = new_store().await;
+async fn fixture() -> (Store, Router, String, String, support::TestDbGuard) {
+    let (store, guard) = new_store().await;
     let auth = Auth::new(2).unwrap();
     let hash = auth
         .hash_password("hunter2hunter2".to_owned())
@@ -88,12 +87,13 @@ async fn fixture() -> (Store, Router, String, String) {
         app,
         admin_session.access_token,
         member_session.access_token,
+        guard,
     )
 }
 
 #[tokio::test]
 async fn only_a_permitted_member_can_create_invites() {
-    let (_store, app, admin, member) = fixture().await;
+    let (_store, app, admin, member, _guard) = fixture().await;
 
     let created = app
         .clone()
@@ -124,7 +124,7 @@ async fn only_a_permitted_member_can_create_invites() {
 
 #[tokio::test]
 async fn the_use_limit_holds_and_a_spent_invite_stops_working() {
-    let (store, app, admin, member) = fixture().await;
+    let (store, app, admin, member, _guard) = fixture().await;
 
     let invite = json_body(
         app.clone()
@@ -184,7 +184,7 @@ async fn the_use_limit_holds_and_a_spent_invite_stops_working() {
 
 #[tokio::test]
 async fn concurrent_redemptions_cannot_exceed_the_limit() {
-    let (store, _app, _admin, _member) = fixture().await;
+    let (store, _app, _admin, _member, _guard) = fixture().await;
     let auth = Auth::new(2).unwrap();
     let hash = auth
         .hash_password("hunter2hunter2".to_owned())
@@ -231,7 +231,7 @@ async fn concurrent_redemptions_cannot_exceed_the_limit() {
 
 #[tokio::test]
 async fn expiry_and_revocation_both_stop_an_invite() {
-    let (store, app, admin, member) = fixture().await;
+    let (store, app, admin, member, _guard) = fixture().await;
     let auth = Auth::new(2).unwrap();
     let hash = auth
         .hash_password("hunter2hunter2".to_owned())
@@ -285,7 +285,7 @@ async fn expiry_and_revocation_both_stop_an_invite() {
 
 #[tokio::test]
 async fn checking_an_unknown_code_looks_the_same_as_a_spent_one() {
-    let (_store, app, _admin, _member) = fixture().await;
+    let (_store, app, _admin, _member, _guard) = fixture().await;
 
     // A code that was never issued reports exactly what a used-up or expired one
     // reports, so the endpoint cannot be used to mine for valid codes.
@@ -327,7 +327,7 @@ async fn check_bytes(app: &Router, code: &str) -> Vec<u8> {
 /// these branches must fail here rather than only at a future security review.
 #[tokio::test]
 async fn expired_spent_and_never_issued_invites_are_byte_for_byte_identical() {
-    let (store, app, admin, member) = fixture().await;
+    let (store, app, admin, member, _guard) = fixture().await;
     let auth = Auth::new(2).unwrap();
     let hash = auth
         .hash_password("hunter2hunter2".to_owned())
@@ -407,7 +407,7 @@ async fn expired_spent_and_never_issued_invites_are_byte_for_byte_identical() {
 
 #[tokio::test]
 async fn a_valid_code_discloses_community_metadata() {
-    let (_store, app, admin, _member) = fixture().await;
+    let (_store, app, admin, _member, _guard) = fixture().await;
 
     let invite = json_body(
         app.clone()
@@ -448,7 +448,7 @@ async fn a_valid_code_discloses_community_metadata() {
 
 #[tokio::test]
 async fn the_check_endpoint_is_rate_limited() {
-    let (_store, app, _admin, _member) = fixture().await;
+    let (_store, app, _admin, _member, _guard) = fixture().await;
 
     let mut statuses = Vec::new();
     for _ in 0..15 {
@@ -486,7 +486,7 @@ mod role_grant {
 
     #[tokio::test]
     async fn an_admin_can_attach_a_role_and_it_is_applied_on_redemption() {
-        let (store, app, admin, _member) = fixture().await;
+        let (store, app, admin, _member, _guard) = fixture().await;
         let role = store
             .create_role("moderator", Permissions::MANAGE_MESSAGES, false)
             .await
@@ -538,7 +538,7 @@ mod role_grant {
     #[tokio::test]
     async fn create_invite_alone_cannot_attach_a_role() {
         // May invite, may not decide what the invitee becomes.
-        let (store, app, _admin, member) = fixture().await;
+        let (store, app, _admin, member, _guard) = fixture().await;
         grant_member(&store, Permissions::CREATE_INVITE).await;
         let role = store
             .create_role("target", Permissions::from_bits(0), false)
@@ -570,7 +570,7 @@ mod role_grant {
     async fn a_role_carrying_more_than_the_caller_holds_is_refused() {
         // Both bits, but the role carries ADMINISTRATOR: without this check
         // the pair mints an admin account for somebody who is not one.
-        let (store, app, _admin, member) = fixture().await;
+        let (store, app, _admin, member, _guard) = fixture().await;
         grant_member(
             &store,
             Permissions::CREATE_INVITE.union(Permissions::MANAGE_ROLES),
@@ -595,7 +595,7 @@ mod role_grant {
 
     #[tokio::test]
     async fn a_role_that_does_not_exist_is_not_found_rather_than_a_silent_none() {
-        let (_store, app, admin, _member) = fixture().await;
+        let (_store, app, admin, _member, _guard) = fixture().await;
 
         let response = app
             .oneshot(request(
@@ -607,5 +607,69 @@ mod role_grant {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    /// `InviteDto` (the authenticated create/list shape) carries `role_grant`,
+    /// but the unauthenticated check endpoint is built from its own
+    /// `CheckResponse`/`InviteCommunity` types and must stay that way: an
+    /// invite's role is who redeeming it becomes, which is not something
+    /// proving you hold the code should disclose before you have used it.
+    #[tokio::test]
+    async fn the_check_endpoint_never_discloses_a_role_grant() {
+        let (store, app, admin, _member, _guard) = fixture().await;
+        let role = store
+            .create_role("greeter", Permissions::MANAGE_MESSAGES, false)
+            .await
+            .unwrap();
+
+        let created = json_body(
+            app.clone()
+                .oneshot(request(
+                    "POST",
+                    "/invites",
+                    Some(&admin),
+                    Some(json!({"role_grant": role.to_string()})),
+                ))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let code = created["code"].as_str().unwrap().to_owned();
+
+        let check = json_body(
+            app.oneshot(request(
+                "GET",
+                &format!("/invites/{code}/check"),
+                None,
+                None,
+            ))
+            .await
+            .unwrap(),
+        )
+        .await;
+
+        assert_eq!(check["usable"], true);
+        let mut top_level: Vec<_> = check.as_object().unwrap().keys().cloned().collect();
+        top_level.sort();
+        assert_eq!(top_level, ["community", "usable"]);
+
+        let mut community_keys: Vec<_> = check["community"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        community_keys.sort();
+        assert_eq!(
+            community_keys,
+            [
+                "expires_at",
+                "invited_by",
+                "member_count",
+                "name",
+                "uses_remaining"
+            ],
+            "a role_grant must never reach this response, even for a code that carries one"
+        );
     }
 }

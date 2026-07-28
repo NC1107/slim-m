@@ -8,15 +8,15 @@
 //! the same bit means nothing else about a deployment's configuration becomes
 //! member-readable when a second setting lands here.
 
+use axum::Router;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::request::Parts;
 use axum::routing::get;
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
+use super::extract::{Authed, Json, enforce};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::JoinPolicy;

@@ -4,6 +4,7 @@
 library;
 
 export 'src/apns_token_channel.dart';
+export 'src/call_notifications.dart';
 export 'src/device_push_keys.dart';
 export 'src/fcm_token_channel.dart';
 export 'src/host_platform.dart';

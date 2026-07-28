@@ -17,14 +17,13 @@ use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
 
+mod support;
+
 /// A fresh database file, never `:memory:`: the pool hands out multiple
 /// connections, and an in-memory database is private to whichever connection
 /// created it, so a second connection would see an empty database.
-fn temp_db_path() -> String {
-    std::env::temp_dir()
-        .join(format!("slimm-identity-test-{}.db", uuid::Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned()
+fn temp_db_path() -> (String, support::TestDbGuard) {
+    support::TestDbGuard::new("slimm-identity-test")
 }
 
 fn config(database_path: String) -> Config {
@@ -68,7 +67,7 @@ async fn version_body(store: Store) -> Value {
 
 #[tokio::test]
 async fn the_identity_keypair_is_stable_across_a_restart() {
-    let path = temp_db_path();
+    let (path, _guard) = temp_db_path();
 
     // "First boot": nothing exists yet, so this call generates the keypair.
     let first_pool = db::connect(&config(path.clone()))
@@ -99,7 +98,7 @@ async fn the_identity_keypair_is_stable_across_a_restart() {
 
 #[tokio::test]
 async fn the_fingerprint_is_deterministic_from_the_same_public_key() {
-    let path = temp_db_path();
+    let (path, _guard) = temp_db_path();
     let pool = db::connect(&config(path)).await.expect("connect + migrate");
     let store = Store::new(pool);
 
@@ -111,7 +110,7 @@ async fn the_fingerprint_is_deterministic_from_the_same_public_key() {
 
 #[tokio::test]
 async fn version_exposes_the_public_key_fingerprint_and_color_strip() {
-    let path = temp_db_path();
+    let (path, _guard) = temp_db_path();
     let pool = db::connect(&config(path)).await.expect("connect + migrate");
     let store = Store::new(pool);
     let identity = store.server_identity().await.unwrap();
@@ -148,13 +147,15 @@ async fn version_exposes_the_public_key_fingerprint_and_color_strip() {
 
 #[tokio::test]
 async fn two_deployments_get_different_identities() {
+    let (path_a, _guard_a) = temp_db_path();
+    let (path_b, _guard_b) = temp_db_path();
     let store_a = Store::new(
-        db::connect(&config(temp_db_path()))
+        db::connect(&config(path_a))
             .await
             .expect("connect + migrate"),
     );
     let store_b = Store::new(
-        db::connect(&config(temp_db_path()))
+        db::connect(&config(path_b))
             .await
             .expect("connect + migrate"),
     );

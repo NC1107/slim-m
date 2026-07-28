@@ -20,11 +20,10 @@ use slimm_server::store::Store;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-message-delete-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-message-delete");
     let config = Config {
         port: 0,
         database_path: path,
@@ -32,7 +31,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -106,7 +105,7 @@ async fn send(app: &Router, channel_id: &str, token: &str, content: &str) -> Val
 /// after a dropped response.
 #[tokio::test]
 async fn author_can_delete_their_own_message_and_it_is_idempotent() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -155,7 +154,7 @@ async fn author_can_delete_their_own_message_and_it_is_idempotent() {
 /// MANAGE_MESSAGES can.
 #[tokio::test]
 async fn deleting_anothers_message_needs_manage_messages() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -206,7 +205,7 @@ async fn deleting_anothers_message_needs_manage_messages() {
 /// probe for messages in a hidden channel.
 #[tokio::test]
 async fn deleting_in_a_hidden_channel_cannot_be_used_to_probe() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::NONE, true)
         .await
@@ -239,7 +238,7 @@ async fn deleting_in_a_hidden_channel_cannot_be_used_to_probe() {
 /// view, is a plain 404.
 #[tokio::test]
 async fn deleting_an_unknown_message_in_a_visible_channel_is_not_found() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await

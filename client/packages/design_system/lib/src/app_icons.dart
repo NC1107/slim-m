@@ -84,6 +84,10 @@ abstract final class AppIcons {
   static const IconData chevronRight = LucideIcons.chevronRight;
   static const IconData copy = LucideIcons.copy;
 
+  /// A fourth, distinct shape for "not known", never to be confused with
+  /// [danger]'s "known not to work".
+  static const IconData unknown = LucideIcons.circleHelp;
+
   // Moderation and administration: the reports queue, invite management,
   // roles, and channel permission overwrites.
   static const IconData report = LucideIcons.messageSquareWarning;

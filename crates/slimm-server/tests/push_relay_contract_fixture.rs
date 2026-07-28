@@ -63,6 +63,8 @@ use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tower::ServiceExt;
 
+mod support;
+
 /// The push tokens behind the fixture's two genuinely server-produced
 /// entries, one per platform this server can register a device for today. A
 /// token is otherwise opaque to the relay, so reusing it as each case's name
@@ -77,14 +79,8 @@ const REAL_CASE_TOKEN_ANDROID: &str = "contract-real-message-android";
 /// different, not to assume they agree.
 const RELAY_MAX_PAYLOAD_BYTES: usize = 4096;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!(
-            "slimm-push-contract-fixture-test-{}.db",
-            uuid::Uuid::now_v7()
-        ))
-        .to_string_lossy()
-        .into_owned();
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-push-contract-fixture-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -92,7 +88,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store, push: PushSender) -> Router {
@@ -174,8 +170,8 @@ async fn register_push(app: &Router, token: &str, platform: &str, push_token: &s
     secret
 }
 
-async fn seeded_store() -> (Store, slimm_server::ids::ChannelId) {
-    let store = new_store().await;
+async fn seeded_store() -> (Store, slimm_server::ids::ChannelId, support::TestDbGuard) {
+    let (store, guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -185,7 +181,7 @@ async fn seeded_store() -> (Store, slimm_server::ids::ChannelId) {
         .await
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    (store, channel.id)
+    (store, channel.id, guard)
 }
 
 /// A real HTTP server on an ephemeral loopback port standing in for the
@@ -308,7 +304,7 @@ fn fixture_out_path() -> PathBuf {
 
 #[tokio::test]
 async fn push_relay_contract_fixture() {
-    let (store, channel_id) = seeded_store().await;
+    let (store, channel_id, _guard) = seeded_store().await;
     let (captured, relay_url) = spawn_capturing_relay().await;
     let push = PushSender::with_debounce_window_ms(
         &Config {

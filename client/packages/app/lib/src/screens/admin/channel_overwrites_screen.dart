@@ -58,17 +58,7 @@ class _ChannelOverwritesScreenState
     final picked = await showModalBottomSheet<Channel>(
       context: context,
       showDragHandle: true,
-      builder: (context) => ListView(
-        shrinkWrap: true,
-        children: [
-          for (final c in channels)
-            ListTile(
-              leading: Icon(c.kind == 'voice' ? AppIcons.voice : AppIcons.hash),
-              title: Text(c.name),
-              onTap: () => Navigator.of(context).pop(c),
-            ),
-        ],
-      ),
+      builder: (context) => ChannelPickerSheet(channels: channels),
     );
     if (picked == null) return;
     setState(() {

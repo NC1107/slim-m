@@ -19,13 +19,11 @@ use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
-use uuid::Uuid;
 
-async fn new_store() -> Store {
-    let path = std::env::temp_dir()
-        .join(format!("slimm-channel-topic-test-{}.db", Uuid::now_v7()))
-        .to_string_lossy()
-        .into_owned();
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-channel-topic-test");
     let config = Config {
         port: 0,
         database_path: path,
@@ -33,7 +31,7 @@ async fn new_store() -> Store {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    Store::new(pool)
+    (Store::new(pool), guard)
 }
 
 fn app(store: Store) -> Router {
@@ -96,7 +94,7 @@ async fn register(store: &Store, username: &str) -> String {
 /// header uses.
 #[tokio::test]
 async fn manager_can_set_a_topic_and_it_round_trips_through_the_list() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -150,7 +148,7 @@ async fn manager_can_set_a_topic_and_it_round_trips_through_the_list() {
 /// empty string, matching [`Store::update_channel`]'s "no topic" state.
 #[tokio::test]
 async fn a_fresh_channel_has_no_topic() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -180,7 +178,7 @@ async fn a_fresh_channel_has_no_topic() {
 /// carry "clear it" without a separate tri-state signal.
 #[tokio::test]
 async fn a_blank_topic_clears_it() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -222,7 +220,7 @@ async fn a_blank_topic_clears_it() {
 /// already refuses them a rename.
 #[tokio::test]
 async fn setting_a_topic_without_manage_channels_is_forbidden() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role("everyone", Permissions::VIEW_CHANNEL, true)
         .await
@@ -248,7 +246,7 @@ async fn setting_a_topic_without_manage_channels_is_forbidden() {
 /// what any client-side limit would have allowed.
 #[tokio::test]
 async fn a_topic_over_the_length_ceiling_is_rejected() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
@@ -278,7 +276,7 @@ async fn a_topic_over_the_length_ceiling_is_rejected() {
 /// rather than silently succeeding as a no-op.
 #[tokio::test]
 async fn an_update_with_neither_field_is_rejected() {
-    let store = new_store().await;
+    let (store, _guard) = new_store().await;
     store
         .create_role(
             "everyone",
