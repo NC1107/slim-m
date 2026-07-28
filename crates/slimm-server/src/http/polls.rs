@@ -205,9 +205,11 @@ async fn create(
     }
 
     if sent.fresh {
-        state
-            .hub
-            .publish(Event::MessageCreated(sent.message.clone()));
+        state.hub.publish(Event::MessageCreated {
+            message: sent.message.clone(),
+            // A poll message carries no attachment.
+            attachments: Vec::new(),
+        });
         state.push.notify_message(
             state.store.clone(),
             channel_id,
