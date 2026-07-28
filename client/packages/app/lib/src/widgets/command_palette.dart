@@ -11,6 +11,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import '../providers/admin_providers.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import 'channel_rail.dart' show selectedChannelId;
@@ -141,6 +142,7 @@ class _CommandPaletteContentState
     final storeAsync = ref.watch(storeProvider);
     final members = ref.watch(membersProvider).valueOrNull ?? const [];
     final selfId = ref.watch(meProvider).valueOrNull?.id;
+    final permissions = ref.watch(myPermissionsProvider);
 
     return Align(
       alignment: const Alignment(0, -0.5),
@@ -177,7 +179,13 @@ class _CommandPaletteContentState
                   stream: store.watchChannels(),
                   builder: (context, snapshot) {
                     final channels = snapshot.data ?? const <Channel>[];
-                    return _buildResults(tokens, channels, members, selfId);
+                    return _buildResults(
+                      tokens,
+                      channels,
+                      members,
+                      selfId,
+                      permissions,
+                    );
                   },
                 ),
               ),
@@ -193,13 +201,14 @@ class _CommandPaletteContentState
     List<Channel> channels,
     List<api.UserProfile> members,
     String? selfId,
+    int permissions,
   ) {
     final groups = <(String, List<PaletteResultItem>)>[
       ('Channels', buildChannelItems(channels, _query)),
       ('Members', buildMemberItems(members, _query, selfId)),
       if (widget.currentChannelId != null)
         ('Messages', buildMessageItems(_messageResults, tokens)),
-      ('Actions', buildActionItems(_query)),
+      ('Actions', buildActionItems(_query, permissions)),
     ].where((g) => g.$2.isNotEmpty).toList();
 
     final flat = [for (final group in groups) ...group.$2];

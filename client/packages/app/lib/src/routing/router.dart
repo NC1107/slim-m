@@ -18,7 +18,8 @@ import '../screens/admin/reports_screen.dart';
 import '../screens/admin/roles_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/debug_log_screen.dart';
-import '../screens/settings_screen.dart';
+import '../screens/personal_settings_screen.dart';
+import '../screens/space_settings_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/sign_in_screen.dart';
 import '../screens/voice_settings_screen.dart';
@@ -73,8 +74,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SignInScreen(),
       ),
       GoRoute(
-        path: Routes.settings,
-        builder: (context, state) => const SettingsScreen(),
+        path: Routes.personalSettings,
+        builder: (context, state) => const PersonalSettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.spaceSettings,
+        builder: (context, state) => const SpaceSettingsScreen(),
       ),
       GoRoute(
         path: Routes.voiceSettings,

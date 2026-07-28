@@ -10,6 +10,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../providers/admin_providers.dart';
 import '../providers/member_presence.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
@@ -17,6 +18,7 @@ import '../providers/sync_controller.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'presence_menu.dart';
+import 'space_settings_section.dart';
 
 /// The server's own identity, for the header's name line. Real endpoint;
 /// there is no separate per-deployment "workspace name" concept, so this is
@@ -86,19 +88,26 @@ class RailHeader extends ConsumerWidget {
   }
 }
 
-class _SpaceMenuButton extends StatefulWidget {
+/// Hidden entirely for a caller holding none of [spaceSettingsReachable]'s
+/// gating bits: its one item today is Space settings, and a member who
+/// cannot reach that screen must not be offered a menu that opens onto it
+/// empty. A future item unrelated to permission would need this reconsidered.
+class _SpaceMenuButton extends ConsumerStatefulWidget {
   const _SpaceMenuButton();
 
   @override
-  State<_SpaceMenuButton> createState() => _SpaceMenuButtonState();
+  ConsumerState<_SpaceMenuButton> createState() => _SpaceMenuButtonState();
 }
 
-class _SpaceMenuButtonState extends State<_SpaceMenuButton> {
+class _SpaceMenuButtonState extends ConsumerState<_SpaceMenuButton> {
   final _controller = OverlayPortalController();
   final _link = LayerLink();
 
   @override
   Widget build(BuildContext context) {
+    final permissions = ref.watch(myPermissionsProvider);
+    if (!spaceSettingsReachable(permissions)) return const SizedBox.shrink();
+
     return CompositedTransformTarget(
       link: _link,
       child: OverlayPortal(
@@ -120,11 +129,11 @@ class _SpaceMenuButtonState extends State<_SpaceMenuButton> {
                 width: 200,
                 children: [
                   AppMenuItem(
-                    label: 'Settings',
+                    label: 'Space settings',
                     leading: AppIcons.settings,
                     onTap: () {
                       _controller.hide();
-                      context.go(Routes.settings);
+                      context.go(Routes.spaceSettings);
                     },
                   ),
                 ],
@@ -261,8 +270,8 @@ class RailUserFooter extends ConsumerWidget {
                 ),
                 AppIconButton(
                   icon: AppIcons.settings,
-                  semanticLabel: 'Settings',
-                  onPressed: () => context.go(Routes.settings),
+                  semanticLabel: 'Personal settings',
+                  onPressed: () => context.go(Routes.personalSettings),
                 ),
               ],
             ),

@@ -39,8 +39,16 @@ class SettingsSelectRow<T> extends StatelessWidget {
       .firstWhere((c) => c.value == value, orElse: () => choices.first)
       .label;
 
-  Future<void> _open(BuildContext context) async {
-    final chosen = await showModalBottomSheet<T>(
+  /// Opens the choice sheet standalone, for a caller that wants this row's
+  /// picker without its [AppListRow] presentation: [JoinPolicyRow] renders
+  /// as a [ListTile] to match its neighbours but still needs this sheet.
+  static Future<T?> pick<T>(
+    BuildContext context, {
+    required String title,
+    required T value,
+    required List<SettingsChoice<T>> choices,
+  }) {
+    return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -48,7 +56,7 @@ class SettingsSelectRow<T> extends StatelessWidget {
         top: false,
         child: AppMenu(
           children: [
-            AppMenuLabel(sheetTitle ?? label),
+            AppMenuLabel(title),
             for (final choice in choices)
               AppMenuItem(
                 label: choice.label,
@@ -60,6 +68,15 @@ class SettingsSelectRow<T> extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _open(BuildContext context) async {
+    final chosen = await pick<T>(
+      context,
+      title: sheetTitle ?? label,
+      value: value,
+      choices: choices,
     );
     if (chosen != null && chosen != value) onChanged(chosen);
   }

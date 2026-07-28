@@ -29,8 +29,8 @@ class RolesScreen extends ConsumerWidget {
         title: const Text('Roles'),
         leading: IconButton(
           icon: const Icon(AppIcons.back),
-          tooltip: 'Back to settings',
-          onPressed: () => context.go(Routes.settings),
+          tooltip: 'Back to Space settings',
+          onPressed: () => context.go(Routes.spaceSettings),
         ),
         actions: [
           IconButton(

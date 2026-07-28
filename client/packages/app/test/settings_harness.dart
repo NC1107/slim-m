@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Shared fixtures for the two suites that pump the whole settings screen:
-/// the Space group's permission gating, and the taxonomy the three group
-/// headers impose on it.
+/// Shared fixtures for the suites that pump the personal and Space settings
+/// screens: the Space screen's permission gating, and the App group's fixed
+/// position on the personal screen regardless of who is looking.
 ///
 /// Not a `_test.dart` file, so `flutter test` does not try to run it. It
-/// exists because both suites need the same signed-in session, the same `/me`
-/// permission answer and the same stubbed device and block lists, none of
-/// which either suite is actually about.
+/// exists because every one of those suites needs the same signed-in session,
+/// the same `/me` permission answer and the same stubbed device and block
+/// lists, none of which any of them is actually about.
 library;
 
 import 'dart:convert';
@@ -19,7 +19,8 @@ import 'package:http/testing.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/permissions.dart';
-import 'package:slimm_app/src/screens/settings_screen.dart';
+import 'package:slimm_app/src/screens/personal_settings_screen.dart';
+import 'package:slimm_app/src/screens/space_settings_screen.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -29,7 +30,7 @@ import 'package:slimm_platform/platform.dart';
 /// resolved before `/me` answers, so the wire value already has them all.
 int get allPermissionBits => Perm.editable.fold(0, (acc, p) => acc | p.$1);
 
-/// The build identity `_AppSection` reads. Called from `setUpAll`, since
+/// The build identity `AppInfoSection` reads. Called from `setUpAll`, since
 /// `PackageInfo` otherwise throws on a test binding with no host platform.
 void mockAppVersion() {
   PackageInfo.setMockInitialValues(
@@ -41,32 +42,21 @@ void mockAppVersion() {
   );
 }
 
-/// Renders the settings screen with `/me` reporting [permissions], scrolled
-/// down to the section under test.
+/// A container with `/me` reporting [permissions] and empty device and block
+/// lists, wired the way the running app wires them.
 ///
-/// A token pair is seeded because every call this screen makes, including
+/// A token pair is seeded because every call either screen makes, including
 /// `/me`, goes through the signed session guard first: without one the client
 /// refuses fast with UnauthorizedException before the mock handler ever sees
 /// the request, which would make every case read as "no permissions".
-///
-/// The Space and App groups sit below the whole personal half (avatar,
-/// appearance, presence, notifications, voice, devices, blocked, account), so
-/// the default test viewport does not reach them without scrolling first. The
-/// drag is deliberately larger than the list's content, matching the
-/// account-deletion test's own reasoning: Flutter clamps to
-/// `maxScrollExtent` rather than erroring.
-Future<ProviderContainer> pumpSettings(
-  WidgetTester tester,
-  int permissions, {
-  bool scrollToBottom = true,
-}) async {
+ProviderContainer _container(int permissions) {
   const tokens = TokenPair(
     userId: 'self',
     accessToken: 'access',
     refreshToken: 'refresh',
     accessExpiresAt: 0,
   );
-  final container = ProviderContainer(
+  return ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       sessionProvider.overrideWithValue(SessionStore(tokens: tokens)),
@@ -108,6 +98,23 @@ Future<ProviderContainer> pumpSettings(
       }),
     ],
   );
+}
+
+/// Renders the personal settings screen with `/me` reporting [permissions],
+/// scrolled down to the section under test.
+///
+/// The App group sits below the whole rest of the list (avatar, appearance,
+/// presence, notifications, voice, devices, blocked, account), so the default
+/// test viewport does not reach it without scrolling first. The drag is
+/// deliberately larger than the list's content, matching the
+/// account-deletion test's own reasoning: Flutter clamps to
+/// `maxScrollExtent` rather than erroring.
+Future<ProviderContainer> pumpPersonalSettings(
+  WidgetTester tester,
+  int permissions, {
+  bool scrollToBottom = true,
+}) async {
+  final container = _container(permissions);
   addTearDown(container.dispose);
 
   await tester.pumpWidget(
@@ -115,7 +122,7 @@ Future<ProviderContainer> pumpSettings(
       container: container,
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const SettingsScreen(),
+        home: const PersonalSettingsScreen(),
       ),
     ),
   );
@@ -130,9 +137,31 @@ Future<ProviderContainer> pumpSettings(
   return container;
 }
 
-/// A viewport tall enough to hold the whole settings list at once, so every
-/// group header is built and their positions are comparable without scrolling
-/// any of them out of the tree.
+/// Renders the Space settings screen with `/me` reporting [permissions].
+Future<ProviderContainer> pumpSpaceSettings(
+  WidgetTester tester,
+  int permissions,
+) async {
+  final container = _container(permissions);
+  addTearDown(container.dispose);
+
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: const SpaceSettingsScreen(),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+
+  return container;
+}
+
+/// A viewport tall enough to hold the whole personal settings list at once,
+/// so every group header is built and their positions are comparable without
+/// scrolling any of them out of the tree.
 void useTallViewport(WidgetTester tester) {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(420, 2400);
