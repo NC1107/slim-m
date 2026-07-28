@@ -315,7 +315,7 @@ Still open in Phase 3:
 Known residuals, deliberately shipped:
 - The session write lands just after the in-memory token becomes authoritative, so a process death in that window replays a spent refresh token into reuse detection and forces a sign-out. Recoverable, but closing it means reordering `SlimmApi`'s refresh path.
 - The delete-account error path reports its failure but still strands the user.
-- Malformed query strings and JSON bodies still return axum's default error rather than the uniform JSON error contract.
+- ~~Malformed query strings and JSON bodies still return axum's default error rather than the uniform JSON error contract.~~ Fixed 2026-07-28: `http::extract::{Json, Query, Bytes}` now wrap axum's own extractors and map their rejections to `ApiError`.
 - `revoke_device` does not itself publish `SessionRevoked`, and that is the layering rather than a gap: the handler holds the hub, so `DELETE /devices/{id}` publishes for every session the removal revoked. Read twice as an open bug before somebody checked. Covered by a test since 2026-07-28 that also asserts a *second* device's socket survives, so a revocation that fanned out to the whole account would fail rather than look correct.
 - `packaging/flatpak/*.yaml` and `packaging/rpm/*.spec` still do not exist, so a tagged release warns and skips both Linux artifacts. Phase 0's exit criterion names them and Phase 9 owns them properly. Deliberately not guessed at here: an untested manifest that merely looks right is worse than an honest skip, because it produces a broken artifact instead of a visible gap.
 
@@ -348,7 +348,10 @@ Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 
 - The shared message context menu (edit, delete, pin/unpin) is now built; see "Cross-origin access, moderation UI, and channel administration" above. Reactions UI, the quick switcher, and haptics are not. The server side of reactions exists (PUT/DELETE on `/messages/{id}/reactions/{emoji}`, summaries on list, a ReactionsChanged event). History pagination is not built either.
 - The shortcut table exists but is not yet bound into the widget tree.
 
-Open follow-up noted during reviews: malformed query and JSON bodies still return axum's default plain-text error rather than the uniform JSON error contract (low). Fixing it means our own `Json`/`Query` extractors mapping their rejections to `ApiError`, which is a one-line import change in every `http/*.rs` module; worth doing when nothing else is in flight across that directory, because the diff is wide and shallow.
+~~Open follow-up noted during reviews: malformed query and JSON bodies still return axum's default plain-text error rather than the uniform JSON error contract (low).~~ Fixed 2026-07-28.
+`http::extract` now defines `Json`, `Query` and `Bytes` wrappers that behave exactly like axum's own (including as a response type, for `Json`) but map a rejection to `ApiError` instead: a syntax error or a missing field is a 400 naming what was wrong, an oversized body is a 413, and both keep the `{"error": ...}` shape and `application/json` content type every other response already had.
+The message for a bad body is the parser's own explanation one `source()` layer in, which names a missing field or a syntax position without the request body or a Rust type path; everywhere else keeps a static string.
+The three raw-`Bytes` upload routes (attachments, custom emoji, avatars) got the same fix, since an oversized upload hit the identical axum-default-plain-text problem one layer earlier than the JSON body case did.
 
 ## Running deployment (LAN test instance)
 

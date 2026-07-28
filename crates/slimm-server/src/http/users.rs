@@ -10,20 +10,19 @@
 
 use std::collections::HashMap;
 
-use axum::body::Bytes;
-use axum::extract::{DefaultBodyLimit, Path, Query, State};
+use axum::Router;
+use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::response::Response;
 use axum::routing::{get, post};
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::attachments::serve;
 use super::auth::validate_label;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
+use super::extract::{Authed, Bytes, Json, Query, enforce};
 use super::messages::parse_uuid;
 use crate::ids::UserId;
 use crate::media;
@@ -280,7 +279,7 @@ async fn upload_avatar(
     Authed(ctx): Authed,
     parts: Parts,
     State(state): State<AppState>,
-    body: Bytes,
+    Bytes(body): Bytes,
 ) -> Result<Json<UserDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Upload)?;
 

@@ -8,15 +8,15 @@
 //! same function the WebSocket broadcast in [`super::ws`] uses, so a user who
 //! chose to appear offline reads as offline through both surfaces or neither.
 
-use axum::extract::{DefaultBodyLimit, Query, State};
+use axum::Router;
+use axum::extract::{DefaultBodyLimit, State};
 use axum::http::request::Parts;
 use axum::routing::get;
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
+use super::extract::{Authed, Json, Query, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::UserId;

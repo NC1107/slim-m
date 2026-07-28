@@ -12,15 +12,15 @@
 //! demonstrated. See [`crate::store::InviteCheck`] for where that boundary is
 //! enforced.
 
+use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, INVITE_CHECK, RateLimited};
+use super::extract::{Authed, INVITE_CHECK, Json, RateLimited};
 use crate::permissions::Permissions;
 use crate::store::{Invite, InviteCheck, RedeemError};
 

@@ -13,14 +13,14 @@
 //! rather than a 500: SQLite only validates FTS5 syntax once the statement
 //! runs.
 
-use axum::extract::{Path, Query, State};
+use axum::Router;
+use axum::extract::{Path, State};
 use axum::routing::get;
-use axum::{Json, Router};
 use serde::Deserialize;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::Authed;
+use super::extract::{Authed, Json, Query};
 use super::messages::{MessageDto, parse_uuid, with_reactions};
 use crate::ids::ChannelId;
 use crate::permissions::Permissions;

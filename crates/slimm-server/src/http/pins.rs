@@ -9,16 +9,16 @@
 //! codebase, so it is deliberate here rather than assumed. Reading the pin
 //! list or its count needs only VIEW_CHANNEL, the same as reading messages.
 
+use axum::Router;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::{get, put};
-use axum::{Json, Router};
 use serde::Serialize;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
+use super::extract::{Authed, Json, enforce};
 use super::messages::{MessageDto, parse_uuid, with_reactions};
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};

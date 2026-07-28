@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! The shared HTTP error type and its status mapping. Every route returns this
-//! so error responses are uniform across the API.
+//! so error responses are uniform across the API, and so do axum's own
+//! extractor rejections (malformed JSON, a bad query string, an oversized
+//! body): [`super::extract::Json`], [`super::extract::Query`] and
+//! [`super::extract::Bytes`] map them here rather than leaving axum's default
+//! plain-text body.
+
+use std::borrow::Cow;
+use std::error::Error as StdError;
 
 use axum::Json;
+use axum::extract::rejection::{BytesRejection, JsonRejection, QueryRejection};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
@@ -12,6 +20,10 @@ use crate::store::{OpenError, PushError, SendError};
 
 pub(crate) enum ApiError {
     BadRequest(&'static str),
+    /// Like [`ApiError::BadRequest`], but the message names something only
+    /// known at request time (a missing field, an unparsable query key) and
+    /// so cannot be `&'static str`.
+    BadRequestDetail(String),
     Unauthorized,
     Forbidden,
     NotFound(&'static str),
@@ -23,31 +35,78 @@ pub(crate) enum ApiError {
     /// showing it and retrying forever.
     NotConfigured(&'static str),
     Unavailable,
+    PayloadTooLarge,
     Internal,
 }
 
 #[derive(Serialize)]
 struct ErrorBody {
-    error: &'static str,
+    error: Cow<'static, str>,
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        let (status, error) = match self {
-            ApiError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
-            ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "invalid credentials"),
-            ApiError::Forbidden => (StatusCode::FORBIDDEN, "insufficient permissions"),
-            ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message),
-            ApiError::Conflict(message) => (StatusCode::CONFLICT, message),
-            ApiError::TooManyRequests => (StatusCode::TOO_MANY_REQUESTS, "slow down and retry"),
-            ApiError::NotConfigured(message) => (StatusCode::NOT_IMPLEMENTED, message),
+        let (status, error): (StatusCode, Cow<'static, str>) = match self {
+            ApiError::BadRequest(message) => (StatusCode::BAD_REQUEST, message.into()),
+            ApiError::BadRequestDetail(message) => (StatusCode::BAD_REQUEST, message.into()),
+            ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "invalid credentials".into()),
+            ApiError::Forbidden => (StatusCode::FORBIDDEN, "insufficient permissions".into()),
+            ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message.into()),
+            ApiError::Conflict(message) => (StatusCode::CONFLICT, message.into()),
+            ApiError::TooManyRequests => {
+                (StatusCode::TOO_MANY_REQUESTS, "slow down and retry".into())
+            }
+            ApiError::NotConfigured(message) => (StatusCode::NOT_IMPLEMENTED, message.into()),
             ApiError::Unavailable => (
                 StatusCode::SERVICE_UNAVAILABLE,
-                "server busy, retry shortly",
+                "server busy, retry shortly".into(),
             ),
-            ApiError::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
+            ApiError::PayloadTooLarge => (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "request body exceeds the size limit".into(),
+            ),
+            ApiError::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal error".into()),
         };
         (status, Json(ErrorBody { error })).into_response()
+    }
+}
+
+/// The rejection's own explanation one layer in, skipping axum's added
+/// wrapper text (`"Failed to ... : "`) to reach what the parser itself named:
+/// a missing field or a syntax position, never the request body or a Rust
+/// type path.
+fn rejection_detail(err: &(dyn StdError + 'static)) -> String {
+    match err.source() {
+        Some(source) => source.to_string(),
+        None => err.to_string(),
+    }
+}
+
+/// Oversized-body rejections keep their distinct status; everything else
+/// about a malformed extractor is a 400 with the parser's own detail.
+fn from_rejection(status: StatusCode, detail: String) -> ApiError {
+    if status == StatusCode::PAYLOAD_TOO_LARGE {
+        ApiError::PayloadTooLarge
+    } else {
+        ApiError::BadRequestDetail(detail)
+    }
+}
+
+impl From<JsonRejection> for ApiError {
+    fn from(rejection: JsonRejection) -> Self {
+        from_rejection(rejection.status(), rejection_detail(&rejection))
+    }
+}
+
+impl From<QueryRejection> for ApiError {
+    fn from(rejection: QueryRejection) -> Self {
+        from_rejection(rejection.status(), rejection_detail(&rejection))
+    }
+}
+
+impl From<BytesRejection> for ApiError {
+    fn from(rejection: BytesRejection) -> Self {
+        from_rejection(rejection.status(), rejection_detail(&rejection))
     }
 }
 

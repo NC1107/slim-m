@@ -11,15 +11,15 @@
 //! covers what is specific to a DM rather than any channel: discovering the
 //! conversation list, and turning a target user id into a channel id.
 
+use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::request::Parts;
 use axum::routing::{get, post};
-use axum::{Json, Router};
 use serde::Serialize;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
+use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
 use crate::ids::UserId;
 use crate::ratelimit::Class;

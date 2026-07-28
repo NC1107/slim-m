@@ -14,19 +14,19 @@
 //! belongs to - an unguessable hex id is not access control on its own, and
 //! this never treats it as such.
 
-use axum::body::{Body, Bytes};
-use axum::extract::{DefaultBodyLimit, Path, Query, State};
+use axum::Router;
+use axum::body::Body;
+use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::request::Parts;
 use axum::http::{HeaderName, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
+use super::extract::{Authed, Bytes, Json, Query, enforce};
 use crate::media;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
@@ -75,7 +75,7 @@ async fn upload(
     parts: Parts,
     Query(params): Query<UploadParams>,
     State(state): State<AppState>,
-    body: Bytes,
+    Bytes(body): Bytes,
 ) -> Result<(StatusCode, Json<AttachmentUploadDto>), ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Upload)?;
 

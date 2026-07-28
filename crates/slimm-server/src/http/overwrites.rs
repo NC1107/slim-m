@@ -17,16 +17,16 @@
 //! a real vulnerability class. `deny` is a restriction, not a grant, and is
 //! never gated on top of already requiring MANAGE_ROLES here.
 
+use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::put;
-use axum::{Json, Router};
 use serde::Deserialize;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
+use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
 use crate::ids::{ChannelId, RoleId, UserId};
 use crate::permissions::Permissions;
