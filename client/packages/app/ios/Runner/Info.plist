@@ -49,6 +49,20 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Screen share on iOS is two processes. livekit_client reads
+	     RTCScreenSharingExtension to know which extension to preselect in
+	     RPSystemBroadcastPickerView, and flutter_webrtc reads
+	     RTCAppGroupIdentifier to find the capture socket the extension
+	     writes to. Both are read from this dictionary at runtime, and both
+	     fail silently when absent: livekit's BroadcastManager.requestActivation
+	     guards on the first and simply returns, which is exactly the "the
+	     button does nothing" report this pair fixes. The names are the
+	     packages' own; see BroadcastBundleInfo.swift and
+	     FlutterBroadcastScreenCapturer.m. -->
+	<key>RTCScreenSharingExtension</key>
+	<string>top.npcserver.slimm.BroadcastExtension</string>
+	<key>RTCAppGroupIdentifier</key>
+	<string>group.top.npcserver.slimm</string>
 	<!-- Declares that the app uses no encryption beyond what is exempt, which is
 	     what stops App Store Connect asking the export compliance question on
 	     every single build and holding it out of TestFlight until answered by
