@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/NC1107/slim-m/compare/client-v0.5.1...client-v0.6.0) (2026-07-28)
+
+
+### Features
+
+* **ios:** land the broadcast upload extension, now that its portal objects exist ([#90](https://github.com/NC1107/slim-m/issues/90)) ([eecf501](https://github.com/NC1107/slim-m/commit/eecf501fb4d08d04952b12f372f1530738792863))
+* role-granting invites, a disabled segmented option, and a backlog that was mostly stale ([#87](https://github.com/NC1107/slim-m/issues/87)) ([25b10fb](https://github.com/NC1107/slim-m/commit/25b10fb671e26ecfe5e8d62daa5f1aeafae832a3))
+
 ## [0.5.1](https://github.com/NC1107/slim-m/compare/client-v0.5.0...client-v0.5.1) (2026-07-28)
 
 
