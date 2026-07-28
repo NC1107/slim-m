@@ -1,0 +1,132 @@
+# SPDX-License-Identifier: Apache-2.0
+name: client-ios-ci
+
+# Split out of client-ci and gated harder than it was, because it is the
+# expensive job by an order of magnitude: 14 minutes on a macOS runner against
+# 5 for everything else, and it ran on every client change including the
+# Dart-only ones that cannot affect it.
+#
+# The paths are what can actually change the answer: the iOS project itself,
+# the plugins that pull in CallKit and WebRTC, and the dependency set, which is
+# how a Dart-side change reaches an Xcode build. Push to main runs it whatever
+# changed, so main is never trusted on a filter alone.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - ".github/workflows/client-ios-ci.yml"
+  pull_request:
+    paths:
+      - "client/packages/app/ios/**"
+      - "client/packages/rtc/**"
+      - "client/packages/platform/**"
+      - "client/pubspec.yaml"
+      - "client/pubspec.lock"
+      - "client/packages/app/pubspec.yaml"
+      - ".github/workflows/client-ios-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The CallKit synchronous-report invariant is a termination risk, not a style
+  # rule, so it gets a macOS runner. Simulator only; see docs/ci.md.
+  ios-unit-tests:
+    name: ios unit tests (callkit invariant)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          cache: true
+
+      # --enforce-lockfile, for the same reason the Rust side builds --locked:
+      # without it the committed lockfile is advisory and CI can silently
+      # resolve versions nobody committed.
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
+
+      # Rebuilding these from scratch is most of the five minutes the project
+      # generation step costs; the lockfile is what decides their contents.
+      - name: cache cocoapods
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            client/packages/app/ios/Pods
+            ~/Library/Caches/CocoaPods
+          # Keyed on the lockfiles alone, with no prefix fallback: restoring
+          # pods resolved from a different lockfile is how a build stops
+          # matching the dependencies it claims to have.
+          key: pods-${{ runner.os }}-${{ hashFiles('client/packages/app/ios/Podfile.lock', 'client/pubspec.lock') }}
+
+      # xcodebuild will not open the project until a Flutter build has generated
+      # its config and plugin registrant. --no-codesign keeps it to compiling.
+      - name: generate the ios project
+        working-directory: client/packages/app
+        run: flutter build ios --simulator --no-codesign
+
+      # An app extension carrying a Frameworks directory is refused by the
+      # store with error 90206, which only surfaces at upload - after a
+      # release has been tagged and an archive built. Caught here instead.
+      - name: the broadcast extension embeds no frameworks
+        working-directory: client/packages/app
+        run: |
+          set -euo pipefail
+          appex="$(find build/ios -name 'BroadcastExtension.appex' -maxdepth 6 | head -n1)"
+          if [ -z "$appex" ]; then
+            echo "::error::BroadcastExtension.appex was not built"
+            exit 1
+          fi
+          echo "found $appex"
+          if [ -d "$appex/Frameworks" ]; then
+            echo "::error::$appex embeds frameworks; the store refuses this (90206)"
+            ls -la "$appex/Frameworks"
+            exit 1
+          fi
+          echo "the extension embeds no frameworks"
+
+      # Chosen from what the runner actually has, not by name: a hardcoded
+      # 'iPhone 16' broke on day one and would break on every image roll.
+      - name: pick an available simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          udid=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          devices = json.load(sys.stdin)['devices']
+          for runtime, devs in sorted(devices.items()):
+              if 'iOS' not in runtime:
+                  continue
+              for dev in devs:
+                  if dev.get('isAvailable') and 'iPhone' in dev.get('name', ''):
+                      print(dev['udid'])
+                      raise SystemExit
+          ")
+          if [ -z "$udid" ]; then
+            echo "::error::no available iPhone simulator on this runner"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices available | grep "$udid" || true
+
+      - name: run xctest
+        working-directory: client/packages/app/ios
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -only-testing:RunnerTests \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || exit ${PIPESTATUS[0]}

@@ -1,0 +1,222 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Drive one Flutter web client over the Chrome DevTools Protocol.
+
+Flutter paints to a canvas, so the app is unreachable from a script until its
+accessibility tree is on; clicking the placeholder Flutter leaves in the DOM
+turns every widget into an <flt-semantics> element with a real bounding box.
+That is what makes this label-driven rather than pixel-driven, and so survives
+a layout change.
+
+Split out of the scenarios that use it, which live in e2e_*.py beside this.
+"""
+import base64
+import json
+import os
+import tempfile
+import time
+import urllib.request
+
+import e2e_js
+
+TIMEOUT = 90
+_MOUSE = "Input.dispatchMouseEvent"
+# A private directory when unset, rather than a guessable shared one.
+SHOTS = os.environ.get("E2E_SHOTS") or tempfile.mkdtemp(prefix="e2e-")
+
+
+class Client:
+    """One browser, addressed over the Chrome DevTools Protocol."""
+
+    def __init__(self, name, port):
+        self.name = name
+        self.port = port
+        self._ws = None
+        self._id = 0
+
+    def _connect(self):
+        from websocket import create_connection
+
+        targets = json.load(urllib.request.urlopen(
+            f"http://127.0.0.1:{self.port}/json/list"))
+        page = next(t for t in targets if t["type"] == "page")
+        self._ws = create_connection(page["webSocketDebuggerUrl"],
+                                     suppress_origin=True, timeout=30)
+
+    def send(self, method, params=None):
+        if self._ws is None:
+            self._connect()
+        self._id += 1
+        self._ws.send(json.dumps({"id": self._id, "method": method,
+                                  "params": params or {}}))
+        while True:
+            msg = json.loads(self._ws.recv())
+            if msg.get("id") == self._id:
+                return msg
+
+    def ev(self, expr):
+        r = self.send("Runtime.evaluate",
+                      {"expression": expr, "returnByValue": True})
+        return r.get("result", {}).get("result", {}).get("value")
+
+    def enable_semantics(self):
+        for _ in range(20):
+            if (self.ev("document.querySelectorAll('flt-semantics').length") or 0) > 0:
+                return
+            self.ev("(function(){var p=document.querySelector("
+                    "'flt-semantics-placeholder');if(p){p.click();}})()")
+            time.sleep(2)
+        raise AssertionError(f"{self.name}: accessibility tree never came up")
+
+    def nodes(self):
+        """Every leaf widget on screen, plus the fields.
+
+        A text field's accessible name lands on the <input> Flutter creates for
+        it, not on the wrapping semantics node, so both have to be collected or
+        every field on every screen looks unlabelled.
+        """
+        raw = self.ev(e2e_js.NODES)
+        return json.loads(raw or "[]")
+
+    def find(self, label, field=None):
+        for n in self.nodes():
+            if field is not None and n.get("field") != field:
+                continue
+            if label.lower() in n["t"].lower():
+                return n
+        return None
+
+    def wait_for(self, label, timeout=TIMEOUT, field=None):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            n = self.find(label, field=field)
+            if n:
+                return n
+            time.sleep(1)
+        self.shot(f"missing-{label[:20].replace(' ', '-')}")
+        raise AssertionError(f"{self.name}: never saw {label!r}")
+
+    def tap(self, x, y):
+        for kind in ("mousePressed", "mouseReleased"):
+            self.send(_MOUSE,
+                      {"type": kind, "x": x, "y": y, "button": "left",
+                       "clickCount": 1})
+            time.sleep(0.06)
+
+    def click(self, label, settle=1.5):
+        """Activate a widget the way a screen reader would.
+
+        Dispatching a mouse event at the widget's coordinates hits whatever
+        Flutter has layered over the canvas there and silently does nothing on
+        some screens; clicking the semantics element itself is what the
+        framework listens for.
+        """
+        self.wait_for(label)
+        hit = self.ev(e2e_js.click(json.dumps(label.lower())))
+        if not hit:
+            n = self.wait_for(label)
+            self.tap(n["x"], n["y"])
+        time.sleep(settle)
+
+    def type_into(self, label, text):
+        """Focus the field's own element rather than clicking where it looks.
+
+        A click lands on whatever is topmost at that point, which on a dialog is
+        sometimes the barrier; focusing the input Flutter already made cannot
+        miss. Flutter only builds that input for the field holding focus, so a
+        field that has never held it is clicked once to bring it into being.
+        """
+        if not self.find(label, field=True):
+            self.click(label, settle=1.0)
+        self.wait_for(label, field=True)
+        focused = self.ev(
+            e2e_js.focus_field(json.dumps(label.lower())))
+        if not focused:
+            n = self.wait_for(label, field=True)
+            self.tap(n["x"], n["y"])
+        time.sleep(0.4)
+        self.send("Input.insertText", {"text": text})
+        time.sleep(0.4)
+
+    def gestures(self, on):
+        """Let real pointer events through to the canvas, or take them back.
+
+        With the accessibility tree on, Flutter's semantics elements sit over
+        the canvas and swallow pointer events, so a hover or a right-click
+        reaches nothing. Labelled controls are still clicked through the tree;
+        this is only for the affordances that have no label to click, which are
+        the ones a mouse is the only way to reach.
+        """
+        value = "none" if on else ""
+        self.ev(e2e_js.set_gestures(json.dumps(value)))
+        time.sleep(0.2)
+
+    def hover(self, x, y, settle=1.2):
+        self.send(_MOUSE,
+                  {"type": "mouseMoved", "x": x, "y": y})
+        time.sleep(settle)
+
+    def mouse_click(self, x, y, button="left", hold=0.06):
+        for kind in ("mousePressed", "mouseReleased"):
+            self.send(_MOUSE,
+                      {"type": kind, "x": x, "y": y, "button": button,
+                       "clickCount": 1})
+            time.sleep(hold)
+        time.sleep(1.0)
+
+    def watch_for_file_input(self):
+        """Catch the picker's <input> at the moment it is made.
+
+        Flutter's web file picker builds the element, clicks it, and never puts
+        it in the document, so there is nothing for CDP's own
+        `DOM.setFileInputFiles` to find and nothing to query for afterwards.
+        Wrapping `createElement` is what gets a handle on it.
+        """
+        self.ev(e2e_js.WATCH_FILES)
+
+    def give_file(self, path, mime="image/png"):
+        """Hand the caught input a real file, as a person's picker would.
+
+        `files` cannot be assigned a plain list, but it will take a
+        `DataTransfer`'s, which is how a file arrives without a dialog nobody
+        is there to answer.
+        """
+        with open(path, "rb") as fh:
+            payload = base64.b64encode(fh.read()).decode()
+        name = os.path.basename(path)
+        ok = self.ev(e2e_js.give_file(
+            json.dumps(payload), json.dumps(name), json.dumps(mime)))
+        if ok != "ok":
+            raise AssertionError(f"{self.name}: {ok}")
+        time.sleep(3)
+
+    def attach_file(self, open_label, path, mime="image/png"):
+        """Open a picker and answer it, in the order those have to happen."""
+        self.watch_for_file_input()
+        self.click(open_label, settle=2)
+        self.give_file(path, mime)
+
+    def wait_url(self, fragment, timeout=TIMEOUT):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if fragment in (self.ev("location.href") or ""):
+                return
+            time.sleep(1)
+        self.shot(f"stuck-at{fragment.replace('/', '-')}")
+        raise AssertionError(
+            f"{self.name}: never reached {fragment!r}, still at "
+            f"{self.ev('location.href')}")
+
+    def shot(self, tag):
+        os.makedirs(SHOTS, mode=0o700, exist_ok=True)
+        r = self.send("Page.captureScreenshot", {"format": "png"})
+        data = (r.get("result", {}).get("result", {}).get("data")
+                or r.get("result", {}).get("data"))
+        if not data:
+            return
+        path = os.path.join(SHOTS, f"{self.name}-{tag}.png")
+        with open(path, "wb") as fh:
+            fh.write(base64.b64decode(data))
+        print(f"    shot {path}")
+
+
+

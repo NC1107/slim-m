@@ -55,6 +55,7 @@ class AppListRow extends StatefulWidget {
     this.onTap,
     this.focusNode,
     this.semanticLabel,
+    this.stateDescription,
   });
 
   final String label;
@@ -88,6 +89,14 @@ class AppListRow extends StatefulWidget {
   /// Overrides the accessible label entirely (state suffixes below are still
   /// appended). Falls back to [label].
   final String? semanticLabel;
+
+  /// Announced after the label, for state a sighted reader gets from the row's
+  /// appearance and nobody else gets at all.
+  ///
+  /// [muted] deliberately announces nothing on its own: it is a wholesale
+  /// visual de-emphasis with no single meaning, and its only caller uses it for
+  /// an offline member, who was being announced as "muted" as a result.
+  final String? stateDescription;
 
   /// Exposed so a test can find the left selection marker without depending
   /// on widget tree shape.
@@ -146,7 +155,9 @@ class _AppListRowState extends State<AppListRow> {
       child: Row(
         spacing: AppSpacing.s8,
         children: [
-          if (widget.leading != null) widget.leading!,
+          // Excluded for the same reason the label below is: an avatar names
+          // itself, so a member row announced its name twice.
+          if (widget.leading != null) ExcludeSemantics(child: widget.leading!),
           Expanded(
             // Excluded because the Semantics wrapper below already names this
             // row; without it a screen reader announces "general, general".
@@ -214,10 +225,14 @@ class _AppListRowState extends State<AppListRow> {
     final semanticParts = <String>[
       widget.semanticLabel ?? widget.label,
       if (widget.unread) 'unread',
-      if (widget.muted) 'muted',
+      if (widget.stateDescription != null) widget.stateDescription!,
     ];
 
     return Semantics(
+      // Its own node, not an annotation merged into whatever encloses it: the
+      // rail's rows were landing in a screen-sized ancestor and vanishing,
+      // which left the whole channel list unreachable to a screen reader.
+      container: true,
       label: semanticParts.join(', '),
       button: widget.onTap != null,
       selected: widget.selected,

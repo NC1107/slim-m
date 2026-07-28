@@ -30,12 +30,23 @@ final emojiImagePickerProvider = Provider<EmojiImagePicker>(
   (ref) => _pickImageBytes,
 );
 
+/// The extensions the server actually stores an emoji as: the inline subset
+/// of `media::ALLOWED_TYPES` in `crates/slimm-server/src/media.rs`.
+const acceptedEmojiExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+
+/// `FileType.custom`, not `FileType.image`: on iOS the latter opens only the
+/// Photos-backed `PHPickerViewController`, which cannot see a file that
+/// arrived by download, Files, or a messaging app rather than the camera
+/// roll. An extension filter opens `UIDocumentPickerViewController` instead,
+/// which can reach all of those (and is the Android SAF browser there too).
 Future<List<int>?> _pickImageBytes() async {
-  final result = await FilePicker.pickFiles(type: FileType.image);
+  final result = await FilePicker.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: acceptedEmojiExtensions,
+  );
   final files = result?.files ?? const <PlatformFile>[];
   if (files.isEmpty) return null;
-  // readAsBytes streams from disk; file_picker 12 deprecated withData and
-  // PlatformFile.bytes because eager loading OOMs on a large pick.
+  // readAsBytes streams from disk since eager loading OOMs on a large pick.
   return files.first.readAsBytes();
 }
 
@@ -113,6 +124,7 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     final normalized = normalizeEmojiName(_name.text);
     final usable = isUsableEmojiName(normalized);
     // Refusing a name the loaded list already holds saves a round trip whose
@@ -147,6 +159,11 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
             full: true,
             disabled: _submitting,
             onPressed: _pick,
+          ),
+          const SizedBox(height: AppSpacing.s4),
+          Text(
+            'PNG, JPEG, GIF or WEBP.',
+            style: AppText.caption.copyWith(color: tokens.textSecondary),
           ),
           const SizedBox(height: AppSpacing.s12),
           AppButton(

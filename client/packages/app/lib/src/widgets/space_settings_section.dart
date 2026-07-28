@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Everything in settings that changes the Space rather than the person: the
-/// reports queue, invites, roles, channel permission overwrites, and the
-/// Space's custom emoji.
+/// Everything that changes the Space rather than the person: the reports
+/// queue, invites, roles, channel permission overwrites, who can join, and
+/// the Space's custom emoji.
 ///
-/// It owns the "Space" group header itself, so a caller with none of the
-/// gating bits removes the whole group by returning nothing.
+/// This is [SpaceSettingsScreen]'s whole body, not a section sharing a screen
+/// with personal settings, so it owns no group header or divider of its own.
 library;
 
 import 'package:flutter/material.dart';
@@ -16,36 +16,42 @@ import '../permissions.dart';
 import '../providers/admin_providers.dart';
 import '../routing/routes.dart';
 import 'join_policy_row.dart';
-import 'settings_section_header.dart';
+
+/// Whether [permissions] carries any of the four bits that gate a row on
+/// [SpaceSettingsSection]. Shared with the rail's Space menu, which must hide
+/// its own entry point on exactly this condition rather than open onto a
+/// screen with nothing on it.
+bool spaceSettingsReachable(int permissions) =>
+    permissions.hasPermission(Perm.manageMessages) ||
+    permissions.hasPermission(Perm.createInvite) ||
+    permissions.hasPermission(Perm.manageRoles) ||
+    permissions.hasPermission(Perm.manageServer);
 
 /// Each row is gated on the server bit its screen requires, per `GET /me`'s
 /// base permissions, rather than shown and left to answer 403: a member
 /// without MANAGE_ROLES should not see role editing exists at all.
 ///
-/// Hidden entirely, group header and divider included, for a caller with none
-/// of the gating bits, so an ordinary member's settings screen holds nothing
-/// but their own settings.
+/// Hidden entirely for a caller with none of the gating bits, so this screen
+/// holds nothing at all rather than an empty list under a bare app bar; the
+/// rail's Space menu hides its own entry point on the same condition, so this
+/// case is reachable only by a direct navigation, not by anything in the UI.
 class SpaceSettingsSection extends ConsumerWidget {
   const SpaceSettingsSection({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = ref.watch(myPermissionsProvider);
+    if (!spaceSettingsReachable(permissions)) {
+      return const SizedBox.shrink();
+    }
     final canModerate = permissions.hasPermission(Perm.manageMessages);
     final canInvite = permissions.hasPermission(Perm.createInvite);
     final canManageRoles = permissions.hasPermission(Perm.manageRoles);
     final canManageServer = permissions.hasPermission(Perm.manageServer);
 
-    if (!canModerate && !canInvite && !canManageRoles && !canManageServer) {
-      return const SizedBox.shrink();
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Divider(height: 1),
-        const SettingsGroupHeader('Space'),
-        const SizedBox(height: AppSpacing.s8),
         if (canModerate)
           ListTile(
             leading: const Icon(AppIcons.report),

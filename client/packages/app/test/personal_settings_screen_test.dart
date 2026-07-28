@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Tests for the settings screen's account actions: a failure partway
-/// through sign-out or deletion must reach the screen, not vanish and leave
-/// the user stranded. Also the presence visibility control, which is a real
-/// endpoint now.
+/// Tests for the personal settings screen's account actions: a failure
+/// partway through sign-out or deletion must reach the screen, not vanish and
+/// leave the user stranded. Also the presence visibility control, which is a
+/// real endpoint now.
 library;
 
 import 'dart:convert';
@@ -16,7 +16,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/presence_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
-import 'package:slimm_app/src/screens/settings_screen.dart';
+import 'package:slimm_app/src/screens/personal_settings_screen.dart';
 import 'package:slimm_app/src/widgets/user_avatar.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -82,7 +82,7 @@ Widget _screen(ProviderContainer container) => UncontrolledProviderScope(
   container: container,
   child: MaterialApp(
     theme: buildTheme(Brightness.light, AppTokens.light),
-    home: const SettingsScreen(),
+    home: const PersonalSettingsScreen(),
   ),
 );
 
@@ -128,7 +128,7 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const SettingsScreen(),
+          home: const PersonalSettingsScreen(),
         ),
       ),
     );
@@ -181,13 +181,12 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const SettingsScreen(),
+          home: const PersonalSettingsScreen(),
         ),
       ),
     );
     await tester.pumpAndSettle();
-    // Every section, not just the ones above the fold: the presence control
-    // overflowed by 264pt here and no test viewport was ever this narrow.
+    // Every section: the presence control overflowed by 264pt here once.
     await tester.drag(find.byType(ListView), const Offset(0, -2000));
     await tester.pumpAndSettle();
 
@@ -212,8 +211,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final avatar = tester.getRect(find.byType(UserAvatar));
-    // The first divider whose top is at or below the avatar's own top: the
-    // one the avatar was overlapping, whatever else the list gains above it.
+    // The first divider at or below the avatar's top: the one it overlapped.
     final below =
         tester
             .widgetList<Divider>(find.byType(Divider))
@@ -247,8 +245,7 @@ void main() {
     /// would tell someone still hidden that they are visible.
     expect(container.read(presenceVisibilityDisplayProvider), isNull);
 
-    // Presence now sits past the viewport's cache extent, so the option is
-    // not merely off screen: it does not exist to be found until scrolled to.
+    // Past the cache extent: it does not exist to be found until scrolled to.
     await tester.scrollUntilVisible(
       find.text('Status'),
       200,
@@ -268,8 +265,7 @@ void main() {
     );
   });
 
-  // The overflow was once fixed by scrolling the four options horizontally,
-  // hiding two (one the privacy control); they live in a sheet now.
+  // Once fixed by scrolling the four options horizontally; a sheet now.
   testWidgets('every presence option is on screen and tappable at 390pt', (
     tester,
   ) async {
@@ -307,8 +303,7 @@ void main() {
       );
     }
 
-    // Reachable, not merely painted: an option outside the viewport takes no
-    // tap, so this is what a horizontal scroll view could not satisfy.
+    // Reachable, not merely painted: a horizontal scroll view could not do this.
     await tester.tap(find.text('Appear offline'));
     await tester.pumpAndSettle();
     expect(

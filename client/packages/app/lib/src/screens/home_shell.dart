@@ -8,16 +8,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+import 'package:slimm_rtc/rtc.dart';
 
 import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
+import '../providers/voice_controller.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import '../widgets/channel_rail.dart';
 import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/member_pane.dart';
+import '../widgets/voice_strip_indicator.dart';
 import 'channel_screen.dart';
 import 'voice_screen.dart';
 
@@ -51,12 +54,22 @@ class HomeShell extends ConsumerWidget {
               child: const ChannelRail(),
             ),
             const VerticalDivider(width: 1),
-            Expanded(child: child),
+            // Its own semantics node, or the modal barrier inside this pane's
+            // navigator blocks everything painted before it, which is the
+            // whole rail: no channel row, section or search field reached a
+            // screen reader at all. The member pane paints after it and so
+            // was never affected, which is what made this look like a rail bug.
+            Expanded(child: Semantics(container: true, child: child)),
             if (showMembers) const AppMemberPane(),
           ],
         ),
       );
     } else if (selected != null) {
+      // No rail here to carry the strip, so a call elsewhere gets its own row.
+      final voice = ref.watch(voiceControllerProvider);
+      final showVoiceStrip =
+          voice.state == VoiceSessionState.connected &&
+          voice.channelId != selected;
       // Compact: the conversation replaces the list, with a way back.
       scaffold = Scaffold(
         appBar: CompactChannelAppBar(
@@ -69,7 +82,14 @@ class HomeShell extends ConsumerWidget {
           width: AppMemberPane.width,
           child: SafeArea(child: AppMemberPane()),
         ),
-        body: child,
+        body: showVoiceStrip
+            ? Column(
+                children: [
+                  Expanded(child: child),
+                  const SafeArea(top: false, child: VoiceStripIndicator()),
+                ],
+              )
+            : child,
       );
     } else {
       scaffold = const Scaffold(body: ChannelRail());

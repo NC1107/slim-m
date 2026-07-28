@@ -228,8 +228,9 @@ Confirmed bugs from this pass, in the order found:
 Confirmed but not fixed, still real:
 
 - **No UI ever called `SlimmApi.report` or `blockUser`.** The endpoints, wire model, and an admin triage screen all existed with zero call sites in `packages/app`. A concurrent, unrelated change landed in this same working tree while this pass was running and closed it (`report_dialog.dart`, `context_menu_region.dart`, wired into both the message context menu and the member row); it was not this pass's work, so it is not itemised above, but a future contributor should know the gap this pass found is already closed. Its own regression test (`message_row_test.dart`) was missing a `pumpAndSettle` between closing the menu and reopening it for the second tap, which failed the gate deterministically rather than flakily; fixed in the same run, no app code changed.
-- **`ContextMenuRegion` (the report/block fix's new shared widget) repeats the same missing-`Positioned` mistake** as `message_context_menu.dart` and `emoji_picker.dart`: an `OverlayPortal` child that is a bare `CompositedTransformFollower` gets tight-constrained to the whole overlay by `_RenderTheaterMixin`, unless wrapped in `Positioned`. That is a fourth site with the server-menu chevron's exact bug (still open, see below); a shared `AnchoredOverlayMenu` that wraps `Positioned` once would fix all four together rather than patching each call site.
-- **The server-menu chevron opens a blank, full-viewport overlay** for the same missing-`Positioned` reason, first found on the server dropdown itself. Still open.
+- ~~**`ContextMenuRegion` repeats the same missing-`Positioned` mistake.**~~ Stale, checked 2026-07-28: the `overlayChildBuilder` in `context_menu_region.dart` wraps its follower in `Positioned` and carries a comment saying why.
+- ~~**The server-menu chevron opens a blank, full-viewport overlay.**~~ Stale, checked 2026-07-28 by opening it on a live web build: the Space menu opens correctly and its items are reachable.
+- **A context menu is unreachable without a pointer, which is most of the message and member actions.** `ContextMenuRegion` opens on `onSecondaryTapDown` or `onLongPress` and offers nothing else: no keyboard affordance, no semantic action. Everything inside it - report, block, edit, delete, pin - is therefore unreachable to a keyboard or screen-reader user. Found while trying to drive it: with the accessibility tree on, the semantics elements sit over the canvas and swallow pointer events, so neither a synthetic right-click nor a long press opens it either, which is the same wall a real assistive-technology user hits. `scripts/lib/e2e_admin.py` covers report and block at the API and says so in its docstring rather than pretending the UI path was exercised.
 - **A revoked session mid-app drops the user all the way to the bare onboarding root**, not sign-in, losing the remembered server address and showing no explanation, contradicting `router.dart`'s own doc comment. Still open.
 
 Three touched files now exceed the 300-line review budget: `sync_controller.dart` (316, crossed it this pass), `member_pane.dart` (396, crossed it this pass), `channel_screen.dart` (583, already over before this pass). Split before opening a PR from this work rather than adding to them further.
@@ -252,12 +253,33 @@ A channel with kind `voice` rendered as a text channel, so there was no way to s
 `Routes.settings` was registered, built and tested, and nothing in the app ever navigated to it, which left sign-out, the device list and account deletion unreachable through a whole release.
 `client/packages/app/test/route_reachability_test.dart` now fails if any registered route has nothing navigating to it, ignoring the route's own `path:` registration (the evidence that was present for settings the whole time) and comments (its own first draft passed on a comment that merely named the route).
 
+**A voice call has been held, and it is a script now (2026-07-28).**
+`scripts/e2e.sh` stands the whole stack up (a real LiveKit SFU, the release server binary, the web build), drives two isolated headless browsers through onboarding, sign-in and a call in one channel, then tears it down.
+It covers far more than voice now - messages, mentions, reactions, attachments, avatars, settings, roles, moderation and screen share - and every scenario is checked against the server or the SFU as well as the screen; see [docs/e2e.md](docs/e2e.md).
+A full run reaches 36 of the 59 documented API paths and prints the ones it missed, counted from what was really requested rather than from a list kept by hand.
+It passes: both participants ACTIVE with an unmuted microphone track published, each subscribed to the other's track, a mute on one side reaching the SFU, and leaving dropping the other side's count.
+Mutation-tested by pointing the server at a dead SFU, which fails it at "2 in call" rather than passing quietly.
+
+That closes the criterion that had been open longest, and it closed on the third attempt at the tooling rather than the first.
+Three things make driving a canvas app possible at all, each of which fails silently rather than loudly:
+
+- **The accessibility tree is the only handle.** Flutter paints to a canvas and exposes nothing until one click on the `flt-semantics-placeholder` it leaves in the DOM. That click works reliably headless and did not work at all in a headed window on this box, which is the opposite of what you would guess.
+- **Only the focused text field has an `<input>`.** Every other field on the screen is paint. So a field is found by its `aria-label` and focused directly, never clicked at coordinates.
+- **The same label is painted onto a plain node and a tappable one**, and only the node carrying `flt-tappable` or `role="button"` answers a click. Clicking the other one does nothing and reports success.
+
+**The channel rail publishes no accessibility nodes at all on web.** Not the channel rows, not the section headers, not the search field, not the footer; only the centre pane and the member pane appear in the tree. The harness routes to the channel by URL instead, and says so in a comment rather than hiding it. Nothing in `channel_rail*.dart` excludes semantics and `AppListRow` wraps every row in a `Semantics` with a label, so this is unexplained rather than understood, and it wants a widget-test check of whether the rail reaches the framework's own semantics tree before anyone concludes it is a Flutter web quirk.
+
+**Driving the whole product found two defects nothing else had.**
+The avatar crop sheet sized its square viewport from the window's width alone, so on any window wider than it is tall - which is every desktop - the circle was taller than the screen and pushed Cancel and Use picture off the bottom, leaving no way to finish or abandon a crop and so no way to set an avatar at all.
+`avatar_crop_sheet_test.dart` asserts both buttons sit inside the window at three sizes.
+And a context menu opens on right-click or long-press with no keyboard or assistive-technology affordance, so report, block, edit, delete and pin are unreachable without a mouse; that one is recorded rather than fixed, and `scripts/lib/e2e_admin.py` drives those two at the API and says why.
+
 Still open in Phase 4:
 - Voice UX polish: camera pre-toggle. The rail shows a real roster for a channel not yet joined now (see "A per-channel voice roster" above), but the join preview screen itself (`voice_screen.dart`) still does not show who is already in the room before you tap Join; it could reuse `voiceRosterProvider` to close that. The join preview, mic pre-toggle, in-call controls and collapse-to-strip indicator are built.
 - Android ConnectionService with a CallStyle notification.
 - The runtime half of the RTC spike. `MediaCapabilities.probeAll()` exists but nothing calls it, and the Wayland portal shows a picker, so it needs a human at the screen.
-- A real call on an iPhone through TestFlight, and an Android device for the heads-up path.
-- The aggregate egress budget, which needs several real clients at once.
+- A real call on an iPhone through TestFlight, and an Android device for the heads-up path. Two web clients is not a phone, and the mobile call path is still untaken.
+- The aggregate egress budget, which needs several real clients at once. `scripts/e2e.sh` is the obvious thing to grow into that, since adding clients to it is now a loop rather than a person.
 
 **iOS work does not need a local Mac.** `release.yml` builds the ipa on `macos-latest`, `client-ci` runs XCTest there, `project.pbxproj` is a text file that can be edited directly, and a device build reaches a real iPhone through TestFlight. An earlier note here claimed otherwise; that was wrong, and it is why the phase 3 NSE sat parked longer than it needed to.
 

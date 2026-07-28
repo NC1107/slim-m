@@ -13,6 +13,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/dms.dart';
 import '../routing/routes.dart';
+import 'space_settings_section.dart';
 
 /// A running palette result: a label and icon to render, and what selecting
 /// it does. [onSelect] receives the still-mounted palette's own context and
@@ -117,13 +118,22 @@ List<PaletteResultItem> buildMessageItems(
 ];
 
 /// The palette's static actions, filtered by [query] like everything else.
-List<PaletteResultItem> buildActionItems(String query) {
+/// The Space settings action is gated on [permissions] the same way the
+/// rail's Space menu is, so the palette never offers a path this caller
+/// could not also reach from the rail.
+List<PaletteResultItem> buildActionItems(String query, int permissions) {
   final actions = [
     PaletteResultItem(
-      label: 'Open settings',
+      label: 'Open personal settings',
       leading: AppIcons.settings,
-      onSelect: (context, ref) async => context.go(Routes.settings),
+      onSelect: (context, ref) async => context.go(Routes.personalSettings),
     ),
+    if (spaceSettingsReachable(permissions))
+      PaletteResultItem(
+        label: 'Open Space settings',
+        leading: AppIcons.settings,
+        onSelect: (context, ref) async => context.go(Routes.spaceSettings),
+      ),
   ];
   if (query.isEmpty) return actions;
   final q = query.toLowerCase();

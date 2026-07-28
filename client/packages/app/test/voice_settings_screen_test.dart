@@ -19,7 +19,7 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/routing/routes.dart';
-import 'package:slimm_app/src/screens/settings_screen.dart';
+import 'package:slimm_app/src/screens/personal_settings_screen.dart';
 import 'package:slimm_app/src/screens/voice_settings_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -270,11 +270,11 @@ void main() {
 
   testWidgets('the settings screen row reaches voice settings', (tester) async {
     final router = GoRouter(
-      initialLocation: Routes.settings,
+      initialLocation: Routes.personalSettings,
       routes: [
         GoRoute(
-          path: Routes.settings,
-          builder: (context, state) => const SettingsScreen(),
+          path: Routes.personalSettings,
+          builder: (context, state) => const PersonalSettingsScreen(),
         ),
         GoRoute(
           path: Routes.voiceSettings,

@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/presence_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
@@ -58,8 +59,9 @@ class _StubSyncController extends SyncController {
 /// that answers the two endpoints the footer reaches (`/me` for the name and
 /// avatar, `/presence` for a status change) and 404s everything else.
 ({ProviderContainer container, List<http.Request> requests}) _setup(
-  SyncStatus status,
-) {
+  SyncStatus status, {
+  int permissions = 0,
+}) {
   final requests = <http.Request>[];
   final container = ProviderContainer(
     overrides: [
@@ -81,7 +83,7 @@ class _StubSyncController extends SyncController {
                   'username': 'self',
                   'display_name': 'Self',
                   'created_at': 0,
-                  'permissions': 0,
+                  'permissions': permissions,
                 }),
                 200,
                 headers: {'content-type': 'application/json'},
@@ -302,9 +304,9 @@ void main() {
 
   // One deployment is a Space. The header's chevron opens what that Space is
   // and how it is run, so "Server menu" named the machine behind it instead.
-  testWidgets('the header menu is announced as the Space menu, and opens the '
-      "Space's settings", (tester) async {
-    final setup = _setup(SyncStatus.live);
+  testWidgets('the header menu is announced as the Space menu, and opens '
+      'Space settings, for a caller who can manage the Space', (tester) async {
+    final setup = _setup(SyncStatus.live, permissions: Perm.manageServer);
     addTearDown(setup.container.dispose);
     await _pumpHeader(tester, setup.container);
 
@@ -312,6 +314,16 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Space menu'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Space settings'), findsOneWidget);
+  });
+
+  // Its one item leads to Space settings, unreachable for this caller.
+  testWidgets('the header menu is hidden entirely for a member holding none '
+      'of the Space settings gating bits', (tester) async {
+    final setup = _setup(SyncStatus.live);
+    addTearDown(setup.container.dispose);
+    await _pumpHeader(tester, setup.container);
+
+    expect(find.bySemanticsLabel('Space menu'), findsNothing);
   });
 }

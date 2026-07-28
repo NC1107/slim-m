@@ -97,12 +97,11 @@ class VoiceSettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Voice settings'),
-        // Same reasoning as SettingsScreen's back button: this route can be
-        // reached directly, so there is not always a stack to pop.
+        // Reachable directly, as PersonalSettingsScreen is, so no stack to pop.
         leading: IconButton(
           icon: const Icon(AppIcons.back),
           tooltip: 'Back to settings',
-          onPressed: () => context.go(Routes.settings),
+          onPressed: () => context.go(Routes.personalSettings),
         ),
       ),
       // top: false because the AppBar already clears the status bar; without
