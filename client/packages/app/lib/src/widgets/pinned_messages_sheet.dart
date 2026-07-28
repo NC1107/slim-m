@@ -14,10 +14,10 @@ import '../providers/pins_controller.dart';
 import 'user_avatar.dart';
 
 Future<void> showPinnedMessagesSheet(BuildContext context, String channelId) {
-  return showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
+  return showAppSheet<void>(
+    context,
+    maxWidth: 560,
+    scrolls: true,
     builder: (context) => _PinnedMessagesSheet(channelId: channelId),
   );
 }

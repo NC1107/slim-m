@@ -27,9 +27,11 @@ class SpaceSettingsScreen extends StatelessWidget {
           onPressed: () => context.go(Routes.channels),
         ),
       ),
-      body: SafeArea(
-        top: false,
-        child: ListView(children: const [SpaceSettingsSection()]),
+      body: AppContentColumn(
+        child: SafeArea(
+          top: false,
+          child: ListView(children: const [SpaceSettingsSection()]),
+        ),
       ),
     );
   }

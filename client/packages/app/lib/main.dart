@@ -104,6 +104,14 @@ class SlimMApp extends ConsumerWidget {
       // and no choice the user makes can reach the theme; that is what shipped.
       themeMode: _themeModeFor(choice),
       routerConfig: ref.watch(routerProvider),
+      // Material's own list rows are sized for a thumb whatever the window,
+      // which is what made the settings and administration screens read as a
+      // phone blown up. Applied here rather than per screen so a new one
+      // cannot forget, and read from the window so nothing has to say which.
+      builder: (context, child) => ListTileTheme.merge(
+        dense: !AppTouchTargets.of(context),
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

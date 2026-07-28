@@ -39,28 +39,30 @@ class EmojiScreen extends ConsumerWidget {
         ),
       ),
       // top: false because the AppBar already clears the status bar.
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.s16),
-          children: [
-            const EmojiUploadCard(),
-            const SizedBox(height: AppSpacing.s16),
-            emoji.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => _Message('Could not load emoji. $e'),
-              data: (list) => list.isEmpty
-                  ? const _Message('No emoji yet.')
-                  : Column(
-                      children: [
-                        for (final item in list) ...[
-                          _EmojiRow(emoji: item),
-                          const SizedBox(height: AppSpacing.s8),
+      body: AppContentColumn(
+        child: SafeArea(
+          top: false,
+          child: ListView(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            children: [
+              const EmojiUploadCard(),
+              const SizedBox(height: AppSpacing.s16),
+              emoji.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => _Message('Could not load emoji. $e'),
+                data: (list) => list.isEmpty
+                    ? const _Message('No emoji yet.')
+                    : Column(
+                        children: [
+                          for (final item in list) ...[
+                            _EmojiRow(emoji: item),
+                            const SizedBox(height: AppSpacing.s8),
+                          ],
                         ],
-                      ],
-                    ),
-            ),
-          ],
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

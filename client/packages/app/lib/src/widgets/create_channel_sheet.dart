@@ -20,10 +20,8 @@ Future<void> showCreateChannelSheet(
   BuildContext context, {
   required String initialKind,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  return showAppSheet<void>(
+    context,
     builder: (context) => _CreateChannelSheet(initialKind: initialKind),
   );
 }

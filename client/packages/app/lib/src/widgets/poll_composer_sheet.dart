@@ -14,10 +14,8 @@ import '../providers/message_extras.dart';
 import '../providers/providers.dart';
 
 Future<void> showPollComposerSheet(BuildContext context, String channelId) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  return showAppSheet<void>(
+    context,
     builder: (context) => _PollComposerSheet(channelId: channelId),
   );
 }

@@ -191,10 +191,8 @@ Future<void> showComposerActionsSheet(
     (AppIcons.code, 'Insert code', onCode),
   ];
 
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  return showAppSheet<void>(
+    context,
     builder: (sheetContext) => SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(

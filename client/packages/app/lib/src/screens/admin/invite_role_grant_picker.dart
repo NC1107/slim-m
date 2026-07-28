@@ -63,9 +63,9 @@ class InviteRoleGrantPicker extends ConsumerWidget {
   }
 
   Future<void> _open(BuildContext context, List<api.Role> grantable) async {
-    final picked = await showModalBottomSheet<_Choice>(
-      context: context,
-      showDragHandle: true,
+    final picked = await showAppSheet<_Choice>(
+      context,
+      bare: true,
       builder: (sheetContext) => SafeArea(
         top: false,
         child: AppMenu(
@@ -73,7 +73,6 @@ class InviteRoleGrantPicker extends ConsumerWidget {
             const AppMenuLabel('Role granted on redemption'),
             AppMenuItem(
               label: 'None',
-              touch: true,
               selected: selected == null,
               leading: selected == null ? AppIcons.check : null,
               onTap: () => Navigator.of(sheetContext).pop(const _Choice(null)),
@@ -81,7 +80,6 @@ class InviteRoleGrantPicker extends ConsumerWidget {
             for (final role in grantable)
               AppMenuItem(
                 label: role.name,
-                touch: true,
                 selected: role.id == selected,
                 leading: role.id == selected ? AppIcons.check : null,
                 onTap: () => Navigator.of(sheetContext).pop(_Choice(role.id)),

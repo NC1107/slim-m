@@ -106,20 +106,22 @@ class VoiceSettingsScreen extends ConsumerWidget {
       ),
       // top: false because the AppBar already clears the status bar; without
       // the bottom edge the last section runs under the home indicator.
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          children: const [
-            _MicrophoneSection(),
-            Divider(height: 1),
-            MediaCapabilitySection(),
-            Divider(height: 1),
-            _DeviceSection(),
-            Divider(height: 1),
-            _ScreenShareSection(),
-            Divider(height: 1),
-            _SoundsSection(),
-          ],
+      body: AppContentColumn(
+        child: SafeArea(
+          top: false,
+          child: ListView(
+            children: const [
+              _MicrophoneSection(),
+              Divider(height: 1),
+              MediaCapabilitySection(),
+              Divider(height: 1),
+              _DeviceSection(),
+              Divider(height: 1),
+              _ScreenShareSection(),
+              Divider(height: 1),
+              _SoundsSection(),
+            ],
+          ),
         ),
       ),
     );

@@ -21,10 +21,9 @@ const int _outputEdge = 512;
 /// Shows [bytes] in a square viewport the user can pan and zoom, and returns
 /// the cropped PNG, or null if they backed out.
 Future<Uint8List?> showAvatarCropSheet(BuildContext context, Uint8List bytes) {
-  return showModalBottomSheet<Uint8List>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  return showAppSheet<Uint8List>(
+    context,
+    maxWidth: 520,
     builder: (_) => _AvatarCropSheet(bytes: bytes),
   );
 }

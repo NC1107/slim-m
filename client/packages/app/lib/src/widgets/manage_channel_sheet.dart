@@ -24,10 +24,8 @@ const int _topicMaxChars = 256;
 const int _nameMaxChars = 64;
 
 Future<void> showManageChannelSheet(BuildContext context, Channel channel) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  return showAppSheet<void>(
+    context,
     builder: (context) => _ManageChannelSheet(channel: channel),
   );
 }
