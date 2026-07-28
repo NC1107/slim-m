@@ -2,6 +2,7 @@
 /// Square-crops a picked image before it is uploaded as an avatar.
 library;
 
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -69,7 +70,11 @@ class _AvatarCropSheetState extends State<_AvatarCropSheet> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final edge = MediaQuery.sizeOf(context).width - AppSpacing.s32;
+    // The viewport is square, so it has to fit the shorter side as well.
+    // Sized on width alone it was 1248pt tall in a 900pt window, which pushed
+    // Cancel and Use picture off the bottom of the screen on every desktop.
+    final size = MediaQuery.sizeOf(context);
+    final edge = math.min(size.width - AppSpacing.s32, size.height * 0.5);
 
     return SafeArea(
       top: false,

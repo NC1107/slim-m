@@ -7,7 +7,7 @@ turns every widget into an <flt-semantics> element with a real bounding box.
 That is what makes this label-driven rather than pixel-driven, and so survives
 a layout change.
 
-Split out of voice_e2e.py, which owns the scenario these methods are used by.
+Split out of the scenarios that use it, which live in e2e_*.py beside this.
 """
 import base64
 import json
@@ -16,9 +16,12 @@ import tempfile
 import time
 import urllib.request
 
+import e2e_js
+
 TIMEOUT = 90
+_MOUSE = "Input.dispatchMouseEvent"
 # A private directory when unset, rather than a guessable shared one.
-SHOTS = os.environ.get("VOICE_E2E_SHOTS") or tempfile.mkdtemp(prefix="voice-e2e-")
+SHOTS = os.environ.get("E2E_SHOTS") or tempfile.mkdtemp(prefix="e2e-")
 
 
 class Client:
@@ -71,30 +74,7 @@ class Client:
         it, not on the wrapping semantics node, so both have to be collected or
         every field on every screen looks unlabelled.
         """
-        raw = self.ev("""
-        (function(){
-          var out=[];
-          document.querySelectorAll('flt-semantics').forEach(function(e){
-            // A row that names itself (a channel, a member) keeps its label on
-            // the node wrapping its icon and text, so leaves alone miss it.
-            var named=e.getAttribute('aria-label');
-            if (!named && e.querySelector('flt-semantics')) return;
-            var t=(named||e.textContent||'').trim();
-            if(!t) return;
-            var r=e.getBoundingClientRect();
-            if(r.width<1||r.height<1) return;
-            out.push({t:t,x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),
-                      field:false});
-          });
-          document.querySelectorAll('input,textarea').forEach(function(e){
-            var t=(e.getAttribute('aria-label')||e.getAttribute('placeholder')||'').trim();
-            if(!t) return;
-            var r=e.getBoundingClientRect();
-            out.push({t:t,x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),
-                      field:true});
-          });
-          return JSON.stringify(out);
-        })()""")
+        raw = self.ev(e2e_js.NODES)
         return json.loads(raw or "[]")
 
     def find(self, label, field=None):
@@ -117,7 +97,7 @@ class Client:
 
     def tap(self, x, y):
         for kind in ("mousePressed", "mouseReleased"):
-            self.send("Input.dispatchMouseEvent",
+            self.send(_MOUSE,
                       {"type": kind, "x": x, "y": y, "button": "left",
                        "clickCount": 1})
             time.sleep(0.06)
@@ -131,30 +111,7 @@ class Client:
         framework listens for.
         """
         self.wait_for(label)
-        hit = self.ev(f"""
-        (function(){{
-          var want={json.dumps(label.lower())};
-          var hits=[];
-          document.querySelectorAll('flt-semantics').forEach(function(e){{
-            var t=((e.getAttribute('aria-label')||'')+' '+
-                   (e.textContent||'')).toLowerCase();
-            if (t.indexOf(want)>=0) hits.push(e);
-          }});
-          // Flutter paints the same label onto a plain node and onto the
-          // tappable one beside it; only the tappable one answers a click.
-          var target=hits.filter(function(e){{
-            return e.hasAttribute('flt-tappable') ||
-                   e.getAttribute('role')==='button';
-          }}).pop();
-          if (!target) {{
-            target=hits.filter(function(e){{
-              return !e.querySelector('flt-semantics');
-            }}).pop();
-          }}
-          if (!target) return false;
-          target.click();
-          return true;
-        }})()""")
+        hit = self.ev(e2e_js.click(json.dumps(label.lower())))
         if not hit:
             n = self.wait_for(label)
             self.tap(n["x"], n["y"])
@@ -165,27 +122,78 @@ class Client:
 
         A click lands on whatever is topmost at that point, which on a dialog is
         sometimes the barrier; focusing the input Flutter already made cannot
-        miss.
+        miss. Flutter only builds that input for the field holding focus, so a
+        field that has never held it is clicked once to bring it into being.
         """
+        if not self.find(label, field=True):
+            self.click(label, settle=1.0)
         self.wait_for(label, field=True)
-        focused = self.ev(f"""
-        (function(){{
-          var els=document.querySelectorAll('input,textarea');
-          for (var i=0;i<els.length;i++) {{
-            var t=(els[i].getAttribute('aria-label')||
-                   els[i].getAttribute('placeholder')||'');
-            if (t.toLowerCase().indexOf({json.dumps(label.lower())})>=0) {{
-              els[i].focus(); return true;
-            }}
-          }}
-          return false;
-        }})()""")
+        focused = self.ev(
+            e2e_js.focus_field(json.dumps(label.lower())))
         if not focused:
             n = self.wait_for(label, field=True)
             self.tap(n["x"], n["y"])
         time.sleep(0.4)
         self.send("Input.insertText", {"text": text})
         time.sleep(0.4)
+
+    def gestures(self, on):
+        """Let real pointer events through to the canvas, or take them back.
+
+        With the accessibility tree on, Flutter's semantics elements sit over
+        the canvas and swallow pointer events, so a hover or a right-click
+        reaches nothing. Labelled controls are still clicked through the tree;
+        this is only for the affordances that have no label to click, which are
+        the ones a mouse is the only way to reach.
+        """
+        value = "none" if on else ""
+        self.ev(e2e_js.set_gestures(json.dumps(value)))
+        time.sleep(0.2)
+
+    def hover(self, x, y, settle=1.2):
+        self.send(_MOUSE,
+                  {"type": "mouseMoved", "x": x, "y": y})
+        time.sleep(settle)
+
+    def mouse_click(self, x, y, button="left", hold=0.06):
+        for kind in ("mousePressed", "mouseReleased"):
+            self.send(_MOUSE,
+                      {"type": kind, "x": x, "y": y, "button": button,
+                       "clickCount": 1})
+            time.sleep(hold)
+        time.sleep(1.0)
+
+    def watch_for_file_input(self):
+        """Catch the picker's <input> at the moment it is made.
+
+        Flutter's web file picker builds the element, clicks it, and never puts
+        it in the document, so there is nothing for CDP's own
+        `DOM.setFileInputFiles` to find and nothing to query for afterwards.
+        Wrapping `createElement` is what gets a handle on it.
+        """
+        self.ev(e2e_js.WATCH_FILES)
+
+    def give_file(self, path, mime="image/png"):
+        """Hand the caught input a real file, as a person's picker would.
+
+        `files` cannot be assigned a plain list, but it will take a
+        `DataTransfer`'s, which is how a file arrives without a dialog nobody
+        is there to answer.
+        """
+        with open(path, "rb") as fh:
+            payload = base64.b64encode(fh.read()).decode()
+        name = os.path.basename(path)
+        ok = self.ev(e2e_js.give_file(
+            json.dumps(payload), json.dumps(name), json.dumps(mime)))
+        if ok != "ok":
+            raise AssertionError(f"{self.name}: {ok}")
+        time.sleep(3)
+
+    def attach_file(self, open_label, path, mime="image/png"):
+        """Open a picker and answer it, in the order those have to happen."""
+        self.watch_for_file_input()
+        self.click(open_label, settle=2)
+        self.give_file(path, mime)
 
     def wait_url(self, fragment, timeout=TIMEOUT):
         deadline = time.time() + timeout
@@ -209,5 +217,6 @@ class Client:
         with open(path, "wb") as fh:
             fh.write(base64.b64decode(data))
         print(f"    shot {path}")
+
 
 
