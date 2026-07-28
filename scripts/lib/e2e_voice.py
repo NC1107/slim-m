@@ -1,22 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Hold a real voice call across two web clients and assert both sides of it.
+"""A real voice call across two web clients, checked on both sides.
 
-Every claim here is checked twice over: once against what each client renders,
-and once against what the SFU itself reports, because a roster that looks right
-is not evidence that a track was ever published.
-
-Called by scripts/voice-e2e.sh, which owns the stack this talks to.
+Every claim is checked twice over: once against what each client renders, and
+once against what the SFU itself reports, because a roster that looks right is
+not evidence that a track was ever published.
 """
 import base64
 import hashlib
 import hmac
 import json
 import os
-import sys
 import time
 import urllib.request
 
-from voice_e2e_client import Client
 
 def sfu_participants(room):
     """Ask the SFU itself who is connected, rather than trusting either UI."""
@@ -41,81 +37,83 @@ def sfu_participants(room):
     return json.load(urllib.request.urlopen(req)).get("participants", [])
 
 
-def sign_in(client, server, username, password):
-    client.enable_semantics()
-    client.click("Connect to a Space")
-    client.type_into("Server address", server)
-    client.click("Continue")
-    client.click("It matches")
-    client.type_into("Username", username)
-    client.type_into("Password", password)
-    client.click("Sign in", settle=6)
-    client.wait_url("#/channels")
-    print(f"  {client.name}: signed in as {username}")
+def tracks_of(participant, source):
+    return [t for t in participant.get("tracks", [])
+            if t.get("source") == source]
 
 
-def send_and_receive(sender, receiver, channel, text):
-    """One message, typed by one client and waited for on the other.
-
-    Nothing is stubbed between them: it goes over REST, fans out through the
-    hub, and arrives on the other socket. The receiver is never told to
-    refresh, so a message that only appears on reconnect fails this.
-    """
-    for c in (sender, receiver):
-        c.click(channel)
-        c.wait_for('Message #')
-    sender.type_into('Message #', text)
-    sender.click('Send message', settle=2)
-
-    sender.wait_for(text)
-    receiver.wait_for(text)
-    receiver.shot('received-message')
-    print(f'  "{text[:32]}" reached {receiver.name} live')
-
-
-def main():
-    server, room_id, secret = sys.argv[1], sys.argv[2], sys.argv[3]
-    a = Client("alice", 9801)
-    b = Client("bob", 9802)
-
-    print("== sign in ==")
-    sign_in(a, server, "alice", secret)
-    sign_in(b, server, "bob", secret)
-
-    print("== a text message, both ways ==")
-    send_and_receive(a, b, 'general', 'first message from alice')
-    send_and_receive(b, a, 'general', 'and a reply from bob')
-
-    print("== join the call ==")
+def join_call(a, b, room_id, channel="lounge"):
+    """Both clients into the same room, each publishing and subscribed."""
     # Reached through the rail rather than by URL, which is also the only
     # end-to-end check that the rail is reachable at all: it published no
     # accessibility nodes until the shell stopped letting a modal barrier
     # block them, and nothing but a real run would have noticed.
     for c in (a, b):
-        c.click("lounge")
+        c.click(channel)
         c.click("Join call", settle=8)
         c.wait_for("in call")
 
     for c in (a, b):
         c.wait_for("2 in call")
         c.shot("in-call")
-    print("  both clients report 2 in call")
-
     a.wait_for("Bob")
     b.wait_for("Alice")
-    print("  each client lists the other in the call roster")
+    print("  both clients report 2 in call and list each other")
 
-    print("== what the SFU actually has ==")
     parts = sfu_participants(room_id)
     assert len(parts) == 2, f"SFU has {len(parts)} participants, expected 2"
     for p in parts:
-        mics = [t for t in p.get("tracks", []) if t.get("source") == "MICROPHONE"]
+        mics = tracks_of(p, "MICROPHONE")
         assert p["state"] == "ACTIVE", f'{p["identity"]} is {p["state"]}'
         assert mics, f'{p["identity"]} published no microphone track'
         assert not mics[0].get("muted"), f'{p["identity"]} is muted on join'
         print(f'  {p["identity"][:13]} ACTIVE, mic published unmuted')
 
-    print("== mute propagates ==")
+
+def share_screen(client, other, room_id):
+    """Publish a screen track, and see the other side told about it.
+
+    The browser is started with a capture source pre-selected, so the picker
+    the operating system would raise never appears; everything after that is
+    the app's own path.
+    """
+    client.click("Share a screen", settle=3)
+    # A quality is chosen before capture starts; picking one is what calls
+    # getDisplayMedia, and the browser answers it with a pre-selected source.
+    client.click("Balanced", settle=10)
+
+    deadline = time.time() + 45
+    shared = None
+    while time.time() < deadline:
+        for p in sfu_participants(room_id):
+            if tracks_of(p, "SCREEN_SHARE"):
+                shared = p
+                break
+        if shared:
+            break
+        time.sleep(2)
+    assert shared, "no screen-share track ever reached the SFU"
+    print(f'  {shared["identity"][:13]} is publishing a screen track')
+
+    client.wait_for("You are sharing your screen")
+    client.shot("sharing-screen")
+    other.shot("peer-sharing-screen")
+    print("  the sharing client says so on screen")
+
+    client.click("Stop sharing", settle=8)
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        live = [p for p in sfu_participants(room_id)
+                if tracks_of(p, "SCREEN_SHARE")]
+        if not live:
+            break
+        time.sleep(2)
+    assert not [p for p in sfu_participants(room_id)
+                if tracks_of(p, "SCREEN_SHARE")], "the screen track stayed up"
+    print("  and stopping it takes the track down")
+
+
+def mute_propagates(a, b, room_id):
     a.click("Mute")
     time.sleep(4)
     muted = {p["identity"][:13]: p["tracks"][0].get("muted", False)
@@ -125,15 +123,9 @@ def main():
     b.shot("peer-muted")
     print(f"  exactly one side muted: {muted}")
 
-    print("== leave ==")
-    a.click("Leave", settle=8)
+
+def leave_call(a, b):
+    a.click("Leave call", settle=8)
     b.wait_for("1 in call")
     b.shot("peer-left")
-    print("  remaining client dropped to 1 in call")
-
-    print("\nPASS: two clients, one call, audio published and subscribed "
-          "both ways.")
-
-
-if __name__ == "__main__":
-    main()
+    print("  the remaining client dropped to 1 in call")

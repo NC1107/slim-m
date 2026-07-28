@@ -7,7 +7,7 @@ turns every widget into an <flt-semantics> element with a real bounding box.
 That is what makes this label-driven rather than pixel-driven, and so survives
 a layout change.
 
-Split out of voice_e2e.py, which owns the scenario these methods are used by.
+Split out of the scenarios that use it, which live in e2e_*.py beside this.
 """
 import base64
 import json
@@ -18,7 +18,7 @@ import urllib.request
 
 TIMEOUT = 90
 # A private directory when unset, rather than a guessable shared one.
-SHOTS = os.environ.get("VOICE_E2E_SHOTS") or tempfile.mkdtemp(prefix="voice-e2e-")
+SHOTS = os.environ.get("E2E_SHOTS") or tempfile.mkdtemp(prefix="e2e-")
 
 
 class Client:
@@ -204,6 +204,100 @@ class Client:
         self.send("Input.insertText", {"text": text})
         time.sleep(0.4)
 
+    def gestures(self, on):
+        """Let real pointer events through to the canvas, or take them back.
+
+        With the accessibility tree on, Flutter's semantics elements sit over
+        the canvas and swallow pointer events, so a hover or a right-click
+        reaches nothing. Labelled controls are still clicked through the tree;
+        this is only for the affordances that have no label to click, which are
+        the ones a mouse is the only way to reach.
+        """
+        value = "none" if on else ""
+        self.ev(
+            "(function(){var h=document.querySelector('flt-semantics-host');"
+            f"if(h) h.style.pointerEvents={json.dumps(value)};}})()")
+        time.sleep(0.2)
+
+    def hover(self, x, y, settle=1.2):
+        self.send("Input.dispatchMouseEvent",
+                  {"type": "mouseMoved", "x": x, "y": y})
+        time.sleep(settle)
+
+    def mouse_click(self, x, y, button="left", hold=0.06):
+        for kind in ("mousePressed", "mouseReleased"):
+            self.send("Input.dispatchMouseEvent",
+                      {"type": kind, "x": x, "y": y, "button": button,
+                       "clickCount": 1})
+            time.sleep(hold)
+        time.sleep(1.0)
+
+    def watch_for_file_input(self):
+        """Catch the picker's <input> at the moment it is made.
+
+        Flutter's web file picker builds the element, clicks it, and never puts
+        it in the document, so there is nothing for CDP's own
+        `DOM.setFileInputFiles` to find and nothing to query for afterwards.
+        Wrapping `createElement` is what gets a handle on it.
+        """
+        self.ev("""
+        (function(){
+          window.__e2eFiles = [];
+          if (window.__e2eHooked) return;
+          var make = document.createElement.bind(document);
+          document.createElement = function(tag){
+            var el = make(tag);
+            if (String(tag).toLowerCase() === 'input') {
+              // The type is set after construction, so it is read later.
+              window.__e2eFiles.push(el);
+            }
+            return el;
+          };
+          window.__e2eHooked = 1;
+        })()""")
+
+    def give_file(self, path, mime="image/png"):
+        """Hand the caught input a real file, as a person's picker would.
+
+        `files` cannot be assigned a plain list, but it will take a
+        `DataTransfer`'s, which is how a file arrives without a dialog nobody
+        is there to answer.
+        """
+        with open(path, "rb") as fh:
+            payload = base64.b64encode(fh.read()).decode()
+        name = os.path.basename(path)
+        ok = self.ev(f"""
+        (function(){{
+          var inputs=(window.__e2eFiles||[]).filter(function(e){{
+            return e.type === 'file';
+          }});
+          if (!inputs.length) return 'no file input was created';
+          var raw = atob({json.dumps(payload)});
+          var bytes = new Uint8Array(raw.length);
+          for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+          // Every input caught since the picker opened, not just the last:
+          // more than one is sometimes made and only one is listened to.
+          inputs.forEach(function(el){{
+            var file = new File([bytes], {json.dumps(name)},
+                                {{type: {json.dumps(mime)}}});
+            var dt = new DataTransfer();
+            dt.items.add(file);
+            el.files = dt.files;
+            el.dispatchEvent(new Event('change', {{bubbles: true}}));
+            el.dispatchEvent(new Event('input', {{bubbles: true}}));
+          }});
+          return 'ok';
+        }})()""")
+        if ok != "ok":
+            raise AssertionError(f"{self.name}: {ok}")
+        time.sleep(3)
+
+    def attach_file(self, open_label, path, mime="image/png"):
+        """Open a picker and answer it, in the order those have to happen."""
+        self.watch_for_file_input()
+        self.click(open_label, settle=2)
+        self.give_file(path, mime)
+
     def wait_url(self, fragment, timeout=TIMEOUT):
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -226,5 +320,6 @@ class Client:
         with open(path, "wb") as fh:
             fh.write(base64.b64decode(data))
         print(f"    shot {path}")
+
 
 

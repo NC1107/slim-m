@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Seed a fresh deployment with the two accounts and voice channel the call needs.
 
-Prints shell assignments for scripts/voice-e2e.sh to eval. The first account
+Prints shell assignments for scripts/e2e.sh to eval. The first account
 registered claims the deployment, so the second has to come in on an invite the
 first one issues: that is the join gate working, not a quirk of the test.
 """
 import json
+import os
 import secrets
 import sys
 import urllib.error
@@ -43,8 +44,10 @@ def call(base, path, body, token=None):
 def main():
     base = local_base(sys.argv[1])
     # Minted per run rather than written down, so nothing here is a credential
-    # anyone could reuse against a deployment that outlives the test.
-    secret = secrets.token_urlsafe(16)
+    # anyone could reuse against a deployment that outlives the test. Set
+    # E2E_PASSWORD to pin it when debugging against a `--keep` stack, which is
+    # the only way to sign in as these accounts by hand.
+    secret = os.environ.get("E2E_PASSWORD") or secrets.token_urlsafe(16)
 
     alice = call(base, "/auth/register", {
         "username": "alice", "display_name": "Alice",
