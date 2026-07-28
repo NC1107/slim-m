@@ -139,11 +139,12 @@ class MessageRow extends StatelessWidget {
             onAddReaction: () =>
                 showEmojiPickerSheet(context, onSelect: onPickReaction),
             child: Padding(
+              // Top-only: a bottom inset here doubled the next row's top inset.
               padding: EdgeInsets.fromLTRB(
                 compact ? AppSizes.paneGutterCompact : AppSizes.paneGutter,
-                8,
+                AppDensity.normal.rowGap,
                 compact ? AppSizes.paneGutterCompact : AppSizes.paneGutter,
-                4,
+                0,
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -80,30 +80,28 @@ class ReactionsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     if (reactions.isEmpty && !showAddButton) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Wrap(
-        spacing: AppSpacing.s4,
-        runSpacing: AppSpacing.s4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          for (final reaction in reactions)
-            AppChip.reaction(
-              emoji: reaction.emoji,
-              count: reaction.count,
-              active: reaction.reacted,
-              glyph: switch (customEmojiIdFor(reaction.emoji, customEmoji)) {
-                final String id => CustomEmojiImage(
-                  emojiId: id,
-                  size: _reactionEmojiSize,
-                ),
-                null => null,
-              },
-              onTap: () => onReactionTap(reaction),
-            ),
-          if (showAddButton) EmojiPickerButton(onSelect: onPickReaction),
-        ],
-      ),
+    // No top inset: it reads as part of the message above, not a new line.
+    return Wrap(
+      spacing: AppSpacing.s4,
+      runSpacing: AppSpacing.s4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (final reaction in reactions)
+          AppChip.reaction(
+            emoji: reaction.emoji,
+            count: reaction.count,
+            active: reaction.reacted,
+            glyph: switch (customEmojiIdFor(reaction.emoji, customEmoji)) {
+              final String id => CustomEmojiImage(
+                emojiId: id,
+                size: _reactionEmojiSize,
+              ),
+              null => null,
+            },
+            onTap: () => onReactionTap(reaction),
+          ),
+        if (showAddButton) EmojiPickerButton(onSelect: onPickReaction),
+      ],
     );
   }
 }
