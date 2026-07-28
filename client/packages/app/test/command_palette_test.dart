@@ -14,6 +14,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/routing/routes.dart';
@@ -23,12 +24,12 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
-const _me = api.Me(
+api.Me _me(int permissions) => api.Me(
   id: 'self',
   username: 'self',
   displayName: 'Self',
   createdAt: 0,
-  permissions: 0,
+  permissions: permissions,
 );
 
 const _tokens = api.TokenPair(
@@ -68,7 +69,9 @@ http.Client _fakeClient() => MockClient((request) async {
   throw StateError('unexpected request in this test: ${request.url}');
 });
 
-({ProviderContainer container, SlimmDatabase db}) _setup() {
+({ProviderContainer container, SlimmDatabase db}) _setup({
+  int permissions = 0,
+}) {
   final db = SlimmDatabase(NativeDatabase.memory());
   final container = ProviderContainer(
     overrides: [
@@ -84,7 +87,7 @@ http.Client _fakeClient() => MockClient((request) async {
         return client;
       }),
       databaseProvider.overrideWith((ref) => db),
-      meProvider.overrideWith((ref) async => _me),
+      meProvider.overrideWith((ref) async => _me(permissions)),
       membersProvider.overrideWith((ref) async => [_profile('other', 'Ren')]),
     ],
   );
@@ -118,9 +121,14 @@ GoRouter _testRouter() => GoRouter(
           const HomeShell(child: Center(child: Text('conversation'))),
     ),
     GoRoute(
-      path: Routes.settings,
+      path: Routes.personalSettings,
       builder: (context, state) =>
-          const Scaffold(body: Text('settings-screen')),
+          const Scaffold(body: Text('personal-settings-screen')),
+    ),
+    GoRoute(
+      path: Routes.spaceSettings,
+      builder: (context, state) =>
+          const Scaffold(body: Text('space-settings-screen')),
     ),
   ],
 );
@@ -286,17 +294,46 @@ void main() {
     await _teardown(tester, setup.container, setup.db);
   });
 
-  testWidgets('selecting "Open settings" navigates to settings', (
-    tester,
-  ) async {
+  testWidgets(
+    'selecting "Open personal settings" navigates to personal settings',
+    (tester) async {
+      final setup = _setup();
+      await _pump(tester, setup.container);
+      await _pressCtrlK(tester);
+
+      await tester.tap(find.text('Open personal settings'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('personal-settings-screen'), findsOneWidget);
+
+      await _teardown(tester, setup.container, setup.db);
+    },
+  );
+
+  testWidgets(
+    '"Open Space settings" is offered, and reaches it, only for a caller '
+    'who can manage the Space',
+    (tester) async {
+      final setup = _setup(permissions: Perm.manageMessages);
+      await _pump(tester, setup.container);
+      await _pressCtrlK(tester);
+
+      await tester.tap(find.text('Open Space settings'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('space-settings-screen'), findsOneWidget);
+
+      await _teardown(tester, setup.container, setup.db);
+    },
+  );
+
+  testWidgets('"Open Space settings" is absent for a caller with none of the '
+      'gating bits', (tester) async {
     final setup = _setup();
     await _pump(tester, setup.container);
     await _pressCtrlK(tester);
 
-    await tester.tap(find.text('Open settings'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('settings-screen'), findsOneWidget);
+    expect(find.text('Open Space settings'), findsNothing);
 
     await _teardown(tester, setup.container, setup.db);
   });

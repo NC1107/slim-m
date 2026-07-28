@@ -2,15 +2,17 @@
 /// The two headers settings is built from: a group header naming who a run of
 /// sections belongs to, and the section header each one opens with.
 ///
-/// Pulled out of `settings_screen.dart` so a new section (the avatar one)
-/// can share it without that file growing past its line budget.
+/// Pulled out of the original combined settings screen so a new section (the
+/// avatar one) could share it without that file growing past its line budget.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-/// Names who the sections under it belong to: "Personal" is about the account
-/// holder, "Space" is about the deployment everyone here shares.
+/// Names who the sections under it belong to. Personal and Space settings
+/// are separate screens now, so the one caller left is [AppInfoSection],
+/// naming its "App" group against the personal sections above it on the
+/// same screen.
 ///
 /// A step up the type scale from [SettingsSectionHeader] rather than a
 /// different colour, so the two levels stay apart for a reader who cannot

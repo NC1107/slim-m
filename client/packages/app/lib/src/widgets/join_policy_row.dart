@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Who can join this Space: the one Space setting with no screen of its own.
+///
+/// Rendered as a [ListTile] rather than [SettingsSelectRow]'s own
+/// [AppListRow] presentation, to match the plain [ListTile] rows either side
+/// of it on [SpaceSettingsScreen] (leading icon, larger type, more height);
+/// the current value still shows, as a subtitle, since seeing it without
+/// opening the row is the point.
 library;
 
 import 'package:flutter/material.dart';
@@ -14,6 +20,18 @@ import 'settings_select_row.dart';
 final joinPolicyProvider = FutureProvider.autoDispose<api.JoinPolicy>(
   (ref) => ref.watch(apiProvider).spaceJoinPolicy(),
 );
+
+const _choices = [
+  SettingsChoice(value: api.JoinPolicy.invite, label: 'People with an invite'),
+  SettingsChoice(value: api.JoinPolicy.open, label: 'Anyone with the address'),
+];
+
+String _labelFor(api.JoinPolicy policy) => _choices
+    .firstWhere(
+      (choice) => choice.value == policy,
+      orElse: () => _choices.first,
+    )
+    .label;
 
 class JoinPolicyRow extends ConsumerStatefulWidget {
   const JoinPolicyRow({super.key});
@@ -67,22 +85,26 @@ class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow> {
           child: const Text('Retry'),
         ),
       ),
-      data: (current) => SettingsSelectRow<api.JoinPolicy>(
-        label: 'Who can join',
-        sheetTitle: 'Who can create an account',
-        value: current,
-        onChanged: _saving ? (_) {} : _set,
-        choices: const [
-          SettingsChoice(
-            value: api.JoinPolicy.invite,
-            label: 'People with an invite',
-          ),
-          SettingsChoice(
-            value: api.JoinPolicy.open,
-            label: 'Anyone with the address',
-          ),
-        ],
+      data: (current) => ListTile(
+        leading: const Icon(AppIcons.invite),
+        title: const Text('Who can join'),
+        subtitle: Text(
+          _labelFor(current),
+          style: TextStyle(color: tokens.textSecondary),
+        ),
+        trailing: const Icon(AppIcons.chevronRight),
+        onTap: _saving ? null : () => _open(context, current),
       ),
     );
+  }
+
+  Future<void> _open(BuildContext context, api.JoinPolicy current) async {
+    final chosen = await SettingsSelectRow.pick<api.JoinPolicy>(
+      context,
+      title: 'Who can create an account',
+      value: current,
+      choices: _choices,
+    );
+    if (chosen != null && chosen != current) await _set(chosen);
   }
 }
