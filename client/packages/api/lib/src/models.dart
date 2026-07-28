@@ -54,7 +54,7 @@ class Version {
   final bool? pushEnabled;
 
   /// Whether creating an account here needs an invite code. Null on servers
-  /// older than 0.15.0, which is "unknown": the sign-up screen stays quiet
+  /// older than 0.14.2, which is "unknown": the sign-up screen stays quiet
   /// rather than promising either way.
   final bool? inviteRequired;
 
