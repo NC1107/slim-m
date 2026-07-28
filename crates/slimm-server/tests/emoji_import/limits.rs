@@ -17,8 +17,8 @@ use crate::fixtures::*;
 #[tokio::test]
 async fn a_file_over_the_size_ceiling_is_refused() {
     let (store, _guard) = new_store().await;
-    let (media, blob_dir) = media_with_blobs();
-    let dir = pack_dir();
+    let (media, blob_dir, _mediadir) = media_with_blobs();
+    let (dir, _packdir) = pack_dir();
 
     let oversized = png(&vec![0u8; MAX_IMAGE_BYTES as usize]);
     write(&dir, "huge.png", &oversized);
@@ -62,8 +62,8 @@ async fn a_file_over_the_size_ceiling_is_refused() {
 #[tokio::test]
 async fn the_size_is_read_from_disk_rather_than_from_the_bytes() {
     let (store, _guard) = new_store().await;
-    let media = media_for_test();
-    let dir = pack_dir();
+    let (media, _mediadir) = media_for_test();
+    let (dir, _packdir) = pack_dir();
 
     let oversized = png(&vec![0u8; MAX_IMAGE_BYTES as usize]);
     write(&dir, "!!!.png", &oversized);
@@ -90,7 +90,7 @@ async fn the_size_is_read_from_disk_rather_than_from_the_bytes() {
 #[tokio::test]
 async fn add_emoji_refuses_bytes_over_the_ceiling_on_its_own() {
     let (store, _guard) = new_store().await;
-    let (media, blob_dir) = media_with_blobs();
+    let (media, blob_dir, _mediadir) = media_with_blobs();
 
     let oversized = png(&vec![0u8; MAX_IMAGE_BYTES as usize]);
     let err = emoji::add_emoji(&store, &media, "huge", oversized.clone(), None)
@@ -115,7 +115,7 @@ async fn add_emoji_refuses_bytes_over_the_ceiling_on_its_own() {
 #[tokio::test]
 async fn hitting_the_cap_reports_what_was_left_out_and_keeps_the_rest() {
     let (store, _guard) = new_store().await;
-    let (media, blob_dir) = media_with_blobs();
+    let (media, blob_dir, _mediadir) = media_with_blobs();
 
     // One attachment row, many names: the cap counts emoji, and the bytes
     // are content-addressed, so this seeds the limit without 499 blobs.
@@ -133,7 +133,7 @@ async fn hitting_the_cap_reports_what_was_left_out_and_keeps_the_rest() {
             .expect("under the cap");
     }
 
-    let dir = pack_dir();
+    let (dir, _packdir) = pack_dir();
     write(&dir, "a.png", &png(b"a"));
     write(&dir, "b.png", &png(b"b"));
     write(&dir, "d.png", &png(b"d"));

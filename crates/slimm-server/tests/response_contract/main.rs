@@ -32,6 +32,8 @@
 
 mod openapi;
 mod script;
+#[path = "../support/mod.rs"]
+mod support;
 mod verdict;
 mod world;
 

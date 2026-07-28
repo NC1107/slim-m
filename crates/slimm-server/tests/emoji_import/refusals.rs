@@ -14,8 +14,8 @@ use crate::fixtures::*;
 #[tokio::test]
 async fn a_non_image_is_refused_and_the_rest_of_the_directory_carries_on() {
     let (store, _guard) = new_store().await;
-    let media = media_for_test();
-    let dir = pack_dir();
+    let (media, _mediadir) = media_for_test();
+    let (dir, _packdir) = pack_dir();
     write(&dir, "notes.txt", b"read me first");
     write(&dir, "wave.png", &png(b"wave"));
     std::fs::create_dir(dir.join("nested")).expect("create a subdirectory");
@@ -55,8 +55,8 @@ async fn a_non_image_is_refused_and_the_rest_of_the_directory_carries_on() {
 #[tokio::test]
 async fn an_extension_that_lies_about_the_content_is_refused() {
     let (store, _guard) = new_store().await;
-    let media = media_for_test();
-    let dir = pack_dir();
+    let (media, _mediadir) = media_for_test();
+    let (dir, _packdir) = pack_dir();
     write(&dir, "sneaky.png", b"PK\x03\x04\x14\x00\x00\x00zip payload");
 
     let report = import_directory(&store, &media, &dir)
@@ -85,8 +85,8 @@ async fn an_extension_that_lies_about_the_content_is_refused() {
 #[tokio::test]
 async fn an_allowlisted_type_that_is_not_an_image_is_refused() {
     let (store, _guard) = new_store().await;
-    let (media, blob_dir) = media_with_blobs();
-    let dir = pack_dir();
+    let (media, blob_dir, _mediadir) = media_with_blobs();
+    let (dir, _packdir) = pack_dir();
     let pdf = b"%PDF-1.7\n1 0 obj\n<< >>\nendobj\n";
     write(&dir, "manual.pdf", pdf);
 
@@ -125,8 +125,8 @@ async fn an_allowlisted_type_that_is_not_an_image_is_refused() {
 #[tokio::test]
 async fn a_long_filename_is_refused_for_its_length_not_its_characters() {
     let (store, _guard) = new_store().await;
-    let media = media_for_test();
-    let dir = pack_dir();
+    let (media, _mediadir) = media_for_test();
+    let (dir, _packdir) = pack_dir();
 
     let long = "a".repeat(MAX_NAME_LEN + 1);
     write(&dir, &format!("{long}.png"), &png(b"long"));

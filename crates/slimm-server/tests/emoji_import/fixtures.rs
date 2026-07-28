@@ -14,7 +14,6 @@ use slimm_server::db;
 use slimm_server::emoji::import::{Outcome, Report};
 use slimm_server::media::Media;
 use slimm_server::store::Store;
-use uuid::Uuid;
 
 // --- Fixtures ---
 
@@ -30,16 +29,17 @@ pub async fn new_store() -> (Store, crate::support::TestDbGuard) {
     (Store::new(pool), guard)
 }
 
-pub fn media_for_test() -> Media {
-    media_with_blobs().0
+pub fn media_for_test() -> (Media, super::support::TestDirGuard) {
+    let (media, _blobs, guard) = media_with_blobs();
+    (media, guard)
 }
 
 /// A media handle plus the directory its blobs land in, for the tests that
 /// count files rather than reading one back by hash.
-pub fn media_with_blobs() -> (Media, PathBuf) {
-    let root = std::env::temp_dir().join(format!("slimm-emoji-media-{}", Uuid::now_v7()));
+pub fn media_with_blobs() -> (Media, PathBuf, super::support::TestDirGuard) {
+    let (root, guard) = super::support::TestDirGuard::new("slimm-emoji-media");
     let media = Media::new(&root, 10 * 1024 * 1024).expect("create temp media directories");
-    (media, root.join("attachments"))
+    (media, root.join("attachments"), guard)
 }
 
 /// Every blob written so far. Content-addressed, so one entry is one distinct
@@ -74,10 +74,10 @@ pub async fn stored(store: &Store, blob_dir: &Path, bytes: &[u8]) -> (bool, bool
     )
 }
 
-pub fn pack_dir() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("slimm-emoji-pack-{}", Uuid::now_v7()));
+pub fn pack_dir() -> (PathBuf, super::support::TestDirGuard) {
+    let (dir, guard) = super::support::TestDirGuard::new("slimm-emoji-pack");
     std::fs::create_dir_all(&dir).expect("create temp pack directory");
-    dir
+    (dir, guard)
 }
 
 /// A file the allowlist sniffs as a PNG. Only the magic number is real; the

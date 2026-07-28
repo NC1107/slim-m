@@ -17,7 +17,6 @@ use slimm_server::ids::EmojiId;
 use slimm_server::media::Media;
 use slimm_server::store::{MAX_CUSTOM_EMOJI, Store};
 use sqlx::SqlitePool;
-use uuid::Uuid;
 
 mod support;
 
@@ -39,10 +38,10 @@ async fn pool() -> (SqlitePool, support::TestDbGuard) {
 
 /// A media handle plus the directory its blobs land in, so a test can count
 /// the files as well as the rows.
-fn media_for_test() -> (Media, std::path::PathBuf) {
-    let root = std::env::temp_dir().join(format!("slimm-emoji-refusal-media-{}", Uuid::now_v7()));
+fn media_for_test() -> (Media, std::path::PathBuf, support::TestDirGuard) {
+    let (root, guard) = support::TestDirGuard::new("slimm-emoji-refusal-media");
     let media = Media::new(&root, 10 * 1024 * 1024).expect("create temp media directories");
-    (media, root.join("attachments"))
+    (media, root.join("attachments"), guard)
 }
 
 /// A file the allowlist sniffs as a PNG. Only the magic number is real; the
@@ -81,7 +80,7 @@ fn blob_count(dir: &std::path::Path) -> usize {
 async fn an_emoji_refused_at_the_cap_leaves_no_bytes_and_no_row() {
     let (pool, _guard) = pool().await;
     let store = Store::new(pool.clone());
-    let (media, blobs) = media_for_test();
+    let (media, blobs, _mediadir) = media_for_test();
 
     // One attachment row, many names: the cap counts emoji, and the bytes are
     // content-addressed, so this seeds the limit without 500 blobs.
@@ -144,7 +143,7 @@ async fn an_emoji_refused_at_the_cap_leaves_no_bytes_and_no_row() {
 async fn an_emoji_refused_for_its_name_leaves_no_bytes_and_no_row() {
     let (pool, _guard) = pool().await;
     let store = Store::new(pool.clone());
-    let (media, blobs) = media_for_test();
+    let (media, blobs, _mediadir) = media_for_test();
 
     let kept = png(b"the first party parrot");
     let kept_sha = Sha256::digest(&kept).to_vec();
