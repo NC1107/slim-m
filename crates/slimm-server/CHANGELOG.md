@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/NC1107/slim-m/compare/server-v0.14.0...server-v0.14.1) (2026-07-28)
+
+
+### Bug Fixes
+
+* **mobile:** image-only sends, fullscreen media, Fedora packaging, and Space naming ([#77](https://github.com/NC1107/slim-m/issues/77)) ([cbf89d4](https://github.com/NC1107/slim-m/commit/cbf89d494fb80e7f14a01677237358eda5c9bbe2))
+
 ## [0.14.0](https://github.com/NC1107/slim-m/compare/server-v0.13.0...server-v0.14.0) (2026-07-27)
 
 
