@@ -37,7 +37,11 @@ Things worth knowing before changing any of it:
 
 After this push every table in 0002 is wired except the canvas pair. `canvas_objects` and `canvas_ops` are referenced in exactly one place, `store/sessions.rs`, which anonymises their `author_id` on account deletion. That is correct and deliberate: account deletion has to cover a table the moment it exists, not the moment it is used. The canvas itself is Phase 5 and 6 work.
 
-Known gaps, deliberately left:
+Known gaps, deliberately left.
+**Date every entry in a list like this one, and strike it through rather than deleting it when it closes.**
+Five notes in this file went stale inside two days (2026-07-28): four recorded bugs that were already fixed, the claim that the overwrites screen "silently redirects to Deny", and the emoji picker below.
+A stale gap costs more than a missing one, because it sends work at a problem that no longer exists and gets quoted forward into later documents as though still live.
+A struck-through entry with the date it closed is what stops the next reader trusting it:
 
 - ~~**Live WebSocket frames omit poll, reaction and attachment data.**~~ Fixed 2026-07-28, and the note above it was wrong about the cost. It claimed the fix needed "a database read inside the hot fan-out path or reshaping a widely shared struct"; it needed neither. The send handler already read the attachment summaries for its own response, just *after* publishing, so reading them once before it and handing them to both costs nothing. `Event::MessageCreated` carries them beside the row rather than the row growing a field, so nothing else holding a `Message` changed. Reactions stay absent and that is correct: a message that has just been created cannot have any.
 - **Webhook and bot authorship is not built.** The design shows a CI message; an integrations system is well past beta scope, and the UI marker stays rather than being faked.
