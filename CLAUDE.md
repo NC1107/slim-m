@@ -252,12 +252,26 @@ A channel with kind `voice` rendered as a text channel, so there was no way to s
 `Routes.settings` was registered, built and tested, and nothing in the app ever navigated to it, which left sign-out, the device list and account deletion unreachable through a whole release.
 `client/packages/app/test/route_reachability_test.dart` now fails if any registered route has nothing navigating to it, ignoring the route's own `path:` registration (the evidence that was present for settings the whole time) and comments (its own first draft passed on a comment that merely named the route).
 
+**A voice call has been held, and it is a script now (2026-07-28).**
+`scripts/voice-e2e.sh` stands the whole stack up (a real LiveKit SFU, the release server binary, the web build), drives two isolated headless browsers through onboarding, sign-in and a call in one channel, then tears it down.
+It passes: both participants ACTIVE with an unmuted microphone track published, each subscribed to the other's track, a mute on one side reaching the SFU, and leaving dropping the other side's count.
+Mutation-tested by pointing the server at a dead SFU, which fails it at "2 in call" rather than passing quietly.
+
+That closes the criterion that had been open longest, and it closed on the third attempt at the tooling rather than the first.
+Three things make driving a canvas app possible at all, each of which fails silently rather than loudly:
+
+- **The accessibility tree is the only handle.** Flutter paints to a canvas and exposes nothing until one click on the `flt-semantics-placeholder` it leaves in the DOM. That click works reliably headless and did not work at all in a headed window on this box, which is the opposite of what you would guess.
+- **Only the focused text field has an `<input>`.** Every other field on the screen is paint. So a field is found by its `aria-label` and focused directly, never clicked at coordinates.
+- **The same label is painted onto a plain node and a tappable one**, and only the node carrying `flt-tappable` or `role="button"` answers a click. Clicking the other one does nothing and reports success.
+
+**The channel rail publishes no accessibility nodes at all on web.** Not the channel rows, not the section headers, not the search field, not the footer; only the centre pane and the member pane appear in the tree. The harness routes to the channel by URL instead, and says so in a comment rather than hiding it. Nothing in `channel_rail*.dart` excludes semantics and `AppListRow` wraps every row in a `Semantics` with a label, so this is unexplained rather than understood, and it wants a widget-test check of whether the rail reaches the framework's own semantics tree before anyone concludes it is a Flutter web quirk.
+
 Still open in Phase 4:
 - Voice UX polish: camera pre-toggle. The rail shows a real roster for a channel not yet joined now (see "A per-channel voice roster" above), but the join preview screen itself (`voice_screen.dart`) still does not show who is already in the room before you tap Join; it could reuse `voiceRosterProvider` to close that. The join preview, mic pre-toggle, in-call controls and collapse-to-strip indicator are built.
 - Android ConnectionService with a CallStyle notification.
 - The runtime half of the RTC spike. `MediaCapabilities.probeAll()` exists but nothing calls it, and the Wayland portal shows a picker, so it needs a human at the screen.
-- A real call on an iPhone through TestFlight, and an Android device for the heads-up path.
-- The aggregate egress budget, which needs several real clients at once.
+- A real call on an iPhone through TestFlight, and an Android device for the heads-up path. Two web clients is not a phone, and the mobile call path is still untaken.
+- The aggregate egress budget, which needs several real clients at once. `scripts/voice-e2e.sh` is the obvious thing to grow into that, since adding clients to it is now a loop rather than a person.
 
 **iOS work does not need a local Mac.** `release.yml` builds the ipa on `macos-latest`, `client-ci` runs XCTest there, `project.pbxproj` is a text file that can be edited directly, and a device build reaches a real iPhone through TestFlight. An earlier note here claimed otherwise; that was wrong, and it is why the phase 3 NSE sat parked longer than it needed to.
 
