@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT code AS \"code!\", max_uses, uses AS \"uses!\", expires_at,\n                      created_at AS \"created_at!\", revoked_at\n               FROM invites ORDER BY created_at DESC",
+  "query": "SELECT code AS \"code!\", max_uses, uses AS \"uses!\", expires_at,\n                      created_at AS \"created_at!\", revoked_at,\n                      role_grant AS \"role_grant: RoleId\"\n               FROM invites ORDER BY created_at DESC",
   "describe": {
     "columns": [
       {
@@ -32,6 +32,11 @@
         "name": "revoked_at",
         "ordinal": 5,
         "type_info": "Integer"
+      },
+      {
+        "name": "role_grant: RoleId",
+        "ordinal": 6,
+        "type_info": "Blob"
       }
     ],
     "parameters": {
@@ -43,8 +48,9 @@
       false,
       true,
       false,
+      true,
       true
     ]
   },
-  "hash": "ef820327d01fcb02079f80c6d3aefca362ee81c27b9f41cb72d921426dd40a6f"
+  "hash": "40aae5cdf8d9f922b4b4ec8c52cc8f588d012a7373a0b77affaa618b6eee9157"
 }

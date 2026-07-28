@@ -69,6 +69,7 @@ class Invite {
     required this.createdAt,
     required this.revoked,
     required this.usable,
+    this.roleGrant,
   });
 
   final String code;
@@ -87,6 +88,9 @@ class Invite {
   /// Whether the invite can be redeemed right now.
   final bool usable;
 
+  /// A role every account redeeming this code receives, or null for none.
+  final String? roleGrant;
+
   factory Invite.fromJson(Map<String, dynamic> json) => Invite(
         code: json['code'] as String,
         maxUses: json['max_uses'] as int?,
@@ -95,6 +99,7 @@ class Invite {
         createdAt: json['created_at'] as int,
         revoked: json['revoked'] as bool,
         usable: json['usable'] as bool,
+        roleGrant: json['role_grant'] as String?,
       );
 }
 

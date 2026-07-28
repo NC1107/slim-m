@@ -15,6 +15,7 @@ import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../../widgets/confirm_dialog.dart';
+import 'invite_role_grant_picker.dart';
 
 const _expiryOptions = <(String, Duration?)>[
   ('Never', null),
@@ -94,6 +95,7 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
   final _maxUses = TextEditingController();
   int _expiryIndex = 0;
   bool _submitting = false;
+  String? _roleGrant;
   api.Invite? _created;
 
   @override
@@ -112,7 +114,11 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
     try {
       final invite = await ref
           .read(apiProvider)
-          .createInvite(maxUses: maxUses, expiresAt: expiresAt);
+          .createInvite(
+            maxUses: maxUses,
+            expiresAt: expiresAt,
+            roleGrant: _roleGrant,
+          );
       if (context.mounted) ref.invalidate(invitesProvider);
       if (!mounted) return;
       setState(() {
@@ -120,6 +126,7 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
         _submitting = false;
         _maxUses.clear();
         _expiryIndex = 0;
+        _roleGrant = null;
       });
     } on api.ApiException catch (e) {
       if (!mounted) return;
@@ -158,6 +165,10 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
             ],
             selectedIndex: _expiryIndex,
             onSegmentSelected: (i) => setState(() => _expiryIndex = i),
+          ),
+          InviteRoleGrantPicker(
+            selected: _roleGrant,
+            onChanged: (id) => setState(() => _roleGrant = id),
           ),
           const SizedBox(height: AppSpacing.s12),
           AppButton(
