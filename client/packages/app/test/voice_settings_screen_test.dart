@@ -232,6 +232,13 @@ void main() {
     await tester.pumpWidget(_wrap(const VoiceSettingsScreen()));
     await tester.pumpAndSettle();
 
+    // The capability check section pushes this below the initial viewport.
+    await tester.scrollUntilVisible(
+      find.text('Crisp'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Balanced'), findsOneWidget);
     await tester.tap(find.text('Crisp'));
     await tester.pumpAndSettle();
@@ -244,12 +251,17 @@ void main() {
     await tester.pumpWidget(_wrap(const VoiceSettingsScreen()));
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byWidgetPredicate(
-        (w) =>
-            w is AppToggle && w.semanticLabel == 'Play join and leave sounds',
-      ),
+    final soundsToggle = find.byWidgetPredicate(
+      (w) => w is AppToggle && w.semanticLabel == 'Play join and leave sounds',
     );
+    // The capability check section pushes this below the initial viewport.
+    await tester.scrollUntilVisible(
+      soundsToggle,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(soundsToggle);
     await tester.pumpAndSettle();
 
     final prefs = await SharedPreferences.getInstance();
