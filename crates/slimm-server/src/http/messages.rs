@@ -76,11 +76,11 @@ pub(crate) struct MessageDto {
     /// Always present, empty when there are none - same convention as
     /// `reactions`. Unlike reactions and polls, a fresh send can carry these
     /// immediately (they are uploaded before the send, then referenced in
-    /// it), so [`send`] enriches its own single-message response rather than
-    /// leaving this empty the way it leaves `reactions` empty for a message
-    /// that cannot have any yet.
+    /// it), so the send path reads them once and fills this in on both its
+    /// own response and the live frame, rather than leaving it empty the way
+    /// `reactions` is left empty for a message that cannot have any yet.
     #[serde(default)]
-    attachments: Vec<AttachmentDto>,
+    pub(crate) attachments: Vec<AttachmentDto>,
 }
 
 /// One attachment as it appears on a message.
@@ -211,12 +211,24 @@ async fn send(
         .send_message(channel_id, ctx.user_id, id, content, &attachment_ids)
         .await?;
 
+    // Read once and used twice: the live frame and this response need the
+    // same summaries, and a fresh message can already have them.
+    let attachments: Vec<_> = state
+        .store
+        .attachments_for_messages(&[id])
+        .await?
+        .into_iter()
+        .next()
+        .map(|(_, summaries)| summaries)
+        .unwrap_or_default();
+
     // An idempotent retry must not fan out or push again; see the note on
     // this function.
     if sent.fresh {
-        state
-            .hub
-            .publish(Event::MessageCreated(sent.message.clone()));
+        state.hub.publish(Event::MessageCreated {
+            message: sent.message.clone(),
+            attachments: attachments.clone(),
+        });
 
         // Cheap in-memory decision only, real work detached; see the note on
         // this function.
@@ -230,17 +242,7 @@ async fn send(
     }
 
     let mut dto: MessageDto = sent.message.into();
-    // Attachments, unlike reactions, can exist on a brand new message; see
-    // the note on this function.
-    if let Some((_, summaries)) = state
-        .store
-        .attachments_for_messages(&[id])
-        .await?
-        .into_iter()
-        .next()
-    {
-        dto.attachments = summaries.into_iter().map(AttachmentDto::from).collect();
-    }
+    dto.attachments = attachments.into_iter().map(AttachmentDto::from).collect();
     Ok(Json(dto))
 }
 

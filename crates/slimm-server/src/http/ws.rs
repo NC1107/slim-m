@@ -28,7 +28,7 @@ use tokio::sync::broadcast::error::RecvError;
 
 use super::AppState;
 use super::PROTOCOL_VERSION;
-use super::messages::MessageDto;
+use super::messages::{AttachmentDto, MessageDto};
 use crate::hub::{Event, Hub};
 use crate::permissions::Permissions;
 use crate::store::{SessionContext, Store};
@@ -300,7 +300,7 @@ async fn authorize(
     }
 
     let channel_id = match &event {
-        Event::MessageCreated(message) | Event::MessageEdited(message) => message.channel_id,
+        Event::MessageCreated { message, .. } | Event::MessageEdited(message) => message.channel_id,
         Event::MessageDeleted { channel_id, .. } => *channel_id,
         Event::ReactionsChanged { channel_id, .. } => *channel_id,
         Event::MessagePinned { channel_id, .. } => *channel_id,
@@ -322,11 +322,20 @@ async fn authorize(
     }
 
     Some(match event {
-        Event::MessageCreated(message) => ServerFrame::MessageCreated {
-            channel_id: message.channel_id.to_string(),
-            seq: message.seq.0,
-            message: MessageDto::from(message),
-        },
+        Event::MessageCreated {
+            message,
+            attachments,
+        } => {
+            let channel_id = message.channel_id.to_string();
+            let seq = message.seq.0;
+            let mut dto = MessageDto::from(message);
+            dto.attachments = attachments.into_iter().map(AttachmentDto::from).collect();
+            ServerFrame::MessageCreated {
+                channel_id,
+                seq,
+                message: dto,
+            }
+        }
         Event::MessageEdited(message) => ServerFrame::MessageEdited {
             channel_id: message.channel_id.to_string(),
             seq: message.seq.0,
