@@ -12,11 +12,13 @@ Split out of voice_e2e.py, which owns the scenario these methods are used by.
 import base64
 import json
 import os
+import tempfile
 import time
 import urllib.request
 
 TIMEOUT = 90
-SHOTS = os.environ.get("VOICE_E2E_SHOTS", "/tmp/voice-e2e")
+# A private directory when unset, rather than a guessable shared one.
+SHOTS = os.environ.get("VOICE_E2E_SHOTS") or tempfile.mkdtemp(prefix="voice-e2e-")
 
 
 class Client:
@@ -197,7 +199,7 @@ class Client:
             f"{self.ev('location.href')}")
 
     def shot(self, tag):
-        os.makedirs(SHOTS, exist_ok=True)
+        os.makedirs(SHOTS, mode=0o700, exist_ok=True)
         r = self.send("Page.captureScreenshot", {"format": "png"})
         data = (r.get("result", {}).get("result", {}).get("data")
                 or r.get("result", {}).get("data"))

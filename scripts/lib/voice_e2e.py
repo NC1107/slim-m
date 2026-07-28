@@ -55,14 +55,14 @@ def sign_in(client, server, username, password):
 
 
 def main():
-    server, room_id = sys.argv[1], sys.argv[2]
+    server, room_id, secret = sys.argv[1], sys.argv[2], sys.argv[3]
     channel_id = room_id.removeprefix("channel-")
     a = Client("alice", 9801)
     b = Client("bob", 9802)
 
     print("== sign in ==")
-    sign_in(a, server, "alice", "hunter2hunter2")
-    sign_in(b, server, "bob", "hunter2hunter2")
+    sign_in(a, server, "alice", secret)
+    sign_in(b, server, "bob", secret)
 
     print("== join the call ==")
     # Routed to rather than clicked in the rail: the rail publishes no

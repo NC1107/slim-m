@@ -42,7 +42,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-need() { command -v "$1" >/dev/null || { echo "missing: $1"; exit 1; }; }
+need() {
+  local tool="$1"
+  command -v "$tool" >/dev/null || { echo "missing: $tool"; exit 1; }
+}
 need docker; need flutter; need cargo; need python3
 CHROME="$(command -v google-chrome-stable || command -v google-chrome || true)"
 [[ -n "$CHROME" ]] || { echo "missing: google-chrome-stable"; exit 1; }
@@ -114,5 +117,5 @@ sleep 6
 
 echo "== drive =="
 python3 "$ROOT/scripts/lib/voice_e2e.py" \
-  "http://localhost:$API_PORT" "$VOICE_ROOM"
+  "http://localhost:$API_PORT" "$VOICE_ROOM" "$VOICE_SECRET"
 echo "screenshots in $SHOTS"
