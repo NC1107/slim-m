@@ -88,7 +88,7 @@ echo "  voice channel $VOICE_CHANNEL_NAME ($VOICE_ROOM)"
 echo "== web build =="
 WEB_DIR="$ROOT/client/packages/app/build/web"
 if [[ ! -f "$WEB_DIR/main.dart.js" || -n "${VOICE_E2E_REBUILD:-}" ]]; then
-  ( cd "$ROOT/client" && flutter build web --release )
+  ( cd "$ROOT/client/packages/app" && flutter build web --release )
 fi
 ( cd "$WEB_DIR" && python3 -m http.server "$WEB_PORT" >/dev/null 2>&1 ) &
 WEB_PID=$!

@@ -142,10 +142,24 @@ class Client:
           }});
           // Flutter paints the same label onto a plain node and onto the
           // tappable one beside it; only the tappable one answers a click.
-          var target=hits.filter(function(e){{
+          var tappable=hits.filter(function(e){{
             return e.hasAttribute('flt-tappable') ||
                    e.getAttribute('role')==='button';
-          }}).pop();
+          }});
+          // Closest name wins, not the last one found: a channel row and its
+          // "Manage <name>" button both match the channel's own name, and
+          // taking the last opened the manage sheet every time.
+          function name(e){{
+            return (e.getAttribute('aria-label')||e.textContent||'').trim();
+          }}
+          tappable.sort(function(x,y){{
+            var nx=name(x), ny=name(y);
+            if ((nx.toLowerCase()===want)!==(ny.toLowerCase()===want)) {{
+              return nx.toLowerCase()===want ? -1 : 1;
+            }}
+            return nx.length-ny.length;
+          }});
+          var target=tappable[0];
           if (!target) {{
             target=hits.filter(function(e){{
               return !e.querySelector('flt-semantics');
@@ -165,8 +179,11 @@ class Client:
 
         A click lands on whatever is topmost at that point, which on a dialog is
         sometimes the barrier; focusing the input Flutter already made cannot
-        miss.
+        miss. Flutter only builds that input for the field holding focus, so a
+        field that has never held it is clicked once to bring it into being.
         """
+        if not self.find(label, field=True):
+            self.click(label, settle=1.0)
         self.wait_for(label, field=True)
         focused = self.ev(f"""
         (function(){{

@@ -54,9 +54,27 @@ def sign_in(client, server, username, password):
     print(f"  {client.name}: signed in as {username}")
 
 
+def send_and_receive(sender, receiver, channel, text):
+    """One message, typed by one client and waited for on the other.
+
+    Nothing is stubbed between them: it goes over REST, fans out through the
+    hub, and arrives on the other socket. The receiver is never told to
+    refresh, so a message that only appears on reconnect fails this.
+    """
+    for c in (sender, receiver):
+        c.click(channel)
+        c.wait_for('Message #')
+    sender.type_into('Message #', text)
+    sender.click('Send message', settle=2)
+
+    sender.wait_for(text)
+    receiver.wait_for(text)
+    receiver.shot('received-message')
+    print(f'  "{text[:32]}" reached {receiver.name} live')
+
+
 def main():
     server, room_id, secret = sys.argv[1], sys.argv[2], sys.argv[3]
-    channel_id = room_id.removeprefix("channel-")
     a = Client("alice", 9801)
     b = Client("bob", 9802)
 
@@ -64,12 +82,17 @@ def main():
     sign_in(a, server, "alice", secret)
     sign_in(b, server, "bob", secret)
 
+    print("== a text message, both ways ==")
+    send_and_receive(a, b, 'general', 'first message from alice')
+    send_and_receive(b, a, 'general', 'and a reply from bob')
+
     print("== join the call ==")
-    # Routed to rather than clicked in the rail: the rail publishes no
-    # accessibility nodes at all on web, so there is nothing there to click.
+    # Reached through the rail rather than by URL, which is also the only
+    # end-to-end check that the rail is reachable at all: it published no
+    # accessibility nodes until the shell stopped letting a modal barrier
+    # block them, and nothing but a real run would have noticed.
     for c in (a, b):
-        c.ev(f"location.hash = '#/channels/{channel_id}'")
-        c.wait_url(channel_id)
+        c.click("lounge")
         c.click("Join call", settle=8)
         c.wait_for("in call")
 
