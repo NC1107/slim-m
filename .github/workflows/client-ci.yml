@@ -86,6 +86,26 @@ jobs:
         working-directory: client/packages/app
         run: flutter build ios --simulator --no-codesign
 
+      # An app extension carrying a Frameworks directory is refused by the
+      # store with error 90206, which only surfaces at upload - after a
+      # release has been tagged and an archive built. Caught here instead.
+      - name: the broadcast extension embeds no frameworks
+        working-directory: client/packages/app
+        run: |
+          set -euo pipefail
+          appex="$(find build/ios -name 'BroadcastExtension.appex' -maxdepth 6 | head -n1)"
+          if [ -z "$appex" ]; then
+            echo "::error::BroadcastExtension.appex was not built"
+            exit 1
+          fi
+          echo "found $appex"
+          if [ -d "$appex/Frameworks" ]; then
+            echo "::error::$appex embeds frameworks; the store refuses this (90206)"
+            ls -la "$appex/Frameworks"
+            exit 1
+          fi
+          echo "the extension embeds no frameworks"
+
       # Chosen from what the runner actually has, not by name: a hardcoded
       # 'iPhone 16' broke on day one and would break on every image roll.
       - name: pick an available simulator
