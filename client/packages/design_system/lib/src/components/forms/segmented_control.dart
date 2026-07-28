@@ -19,12 +19,24 @@ import '../../app_typography.dart';
 import 'focusable_tap_target.dart';
 
 class AppSegmentedOption {
-  const AppSegmentedOption({required this.label, this.hint});
+  const AppSegmentedOption({
+    required this.label,
+    this.hint,
+    this.disabled = false,
+  });
 
   final String label;
 
   /// `cards`-only: an optional mono detail line (e.g. a server address).
   final String? hint;
+
+  /// Shown but not choosable, in [AppTokens.textDisabled] and wiring no tap
+  /// handler at all.
+  ///
+  /// Not the same as a caller dropping the callback: that leaves the option
+  /// looking available and reports it as a button to assistive tech, so the
+  /// only feedback for an unavailable choice is that nothing happens.
+  final bool disabled;
 }
 
 enum _Variant { inline, cards }
@@ -93,12 +105,14 @@ class AppSegmentedControl extends StatelessWidget {
   }
 
   Widget _inlineSegment(BuildContext context, AppTokens tokens, int index) {
+    final option = options[index];
     final selected = index == selectedIndex;
 
     return FocusableTapTarget(
-      onTap: () => onSegmentSelected(index),
+      onTap: option.disabled ? null : () => onSegmentSelected(index),
+      enabled: !option.disabled,
       selected: selected,
-      semanticLabel: options[index].label,
+      semanticLabel: option.label,
       builder: (context, focused, hovered) {
         return AnimatedContainer(
           duration: const Duration(milliseconds: 150),
@@ -112,10 +126,14 @@ class AppSegmentedControl extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadii.control),
           ),
           child: Text(
-            options[index].label,
+            option.label,
             textAlign: TextAlign.center,
             style: AppText.caption.copyWith(
-              color: selected ? tokens.textPrimary : tokens.textSecondary,
+              color: switch ((option.disabled, selected)) {
+                (true, _) => tokens.textDisabled,
+                (false, true) => tokens.textPrimary,
+                (false, false) => tokens.textSecondary,
+              },
               fontWeight: selected ? AppWeights.medium : AppWeights.regular,
               fontFamily: AppFonts.sans,
             ),
@@ -148,7 +166,8 @@ class AppSegmentedControl extends StatelessWidget {
     final option = options[index];
 
     return FocusableTapTarget(
-      onTap: () => onSegmentSelected(index),
+      onTap: option.disabled ? null : () => onSegmentSelected(index),
+      enabled: !option.disabled,
       selected: selected,
       semanticLabel: option.hint == null
           ? option.label
@@ -178,9 +197,11 @@ class AppSegmentedControl extends StatelessWidget {
                     child: Text(
                       option.label,
                       style: AppText.ui.copyWith(
-                        color: selected
-                            ? tokens.textPrimary
-                            : tokens.textSecondary,
+                        color: switch ((option.disabled, selected)) {
+                          (true, _) => tokens.textDisabled,
+                          (false, true) => tokens.textPrimary,
+                          (false, false) => tokens.textSecondary,
+                        },
                         fontWeight:
                             selected ? AppWeights.semi : AppWeights.medium,
                         fontFamily: AppFonts.sans,
@@ -194,7 +215,9 @@ class AppSegmentedControl extends StatelessWidget {
                 Text(
                   option.hint!,
                   style: AppText.micro.copyWith(
-                    color: selected ? tokens.accent : tokens.textSecondary,
+                    color: option.disabled
+                        ? tokens.textDisabled
+                        : (selected ? tokens.accent : tokens.textSecondary),
                     fontFamily: AppFonts.mono,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),

@@ -28,6 +28,8 @@ pub struct Invite {
     pub expires_at: Option<i64>,
     pub created_at: i64,
     pub revoked: bool,
+    /// A role every account redeeming this code receives.
+    pub role_grant: Option<RoleId>,
 }
 
 impl Invite {
@@ -120,6 +122,7 @@ impl Store {
             expires_at,
             created_at: now,
             revoked: false,
+            role_grant,
         })
     }
 
@@ -127,7 +130,8 @@ impl Store {
     pub async fn list_invites(&self) -> anyhow::Result<Vec<Invite>> {
         let rows = sqlx::query!(
             r#"SELECT code AS "code!", max_uses, uses AS "uses!", expires_at,
-                      created_at AS "created_at!", revoked_at
+                      created_at AS "created_at!", revoked_at,
+                      role_grant AS "role_grant: RoleId"
                FROM invites ORDER BY created_at DESC"#
         )
         .fetch_all(&self.pool)
@@ -141,6 +145,7 @@ impl Store {
                 expires_at: r.expires_at,
                 created_at: r.created_at,
                 revoked: r.revoked_at.is_some(),
+                role_grant: r.role_grant,
             })
             .collect())
     }

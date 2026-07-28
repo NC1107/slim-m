@@ -8,11 +8,16 @@ import 'package:flutter/material.dart';
 
 /// Asks before a destructive, hard-to-undo action. [message] must state what
 /// happens, not just ask "are you sure?".
+///
+/// [cancelLabel] names the way out where "Cancel" is vaguer than the choice
+/// deserves. Its absence is why one caller copied this whole dialog rather
+/// than reuse it.
 Future<bool> confirmDangerousAction(
   BuildContext context, {
   required String title,
   required String message,
   required String confirmLabel,
+  String cancelLabel = 'Cancel',
 }) async {
   final confirmed = await showDialog<bool>(
     context: context,
@@ -22,7 +27,7 @@ Future<bool> confirmDangerousAction(
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(cancelLabel),
         ),
         FilledButton(
           style: FilledButton.styleFrom(

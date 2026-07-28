@@ -37,13 +37,21 @@ extension SlimmApiModeration on SlimmApi {
 
   /// Creates an invite. Requires CREATE_INVITE. [maxUses] null means
   /// unlimited; [expiresAt] (Unix milliseconds) null means it never expires.
-  Future<Invite> createInvite({int? maxUses, int? expiresAt}) async {
+  /// [roleGrant] needs MANAGE_ROLES on top of CREATE_INVITE, and the role's
+  /// permissions must already be held by the caller: an invite that grants a
+  /// role is role assignment with a delay.
+  Future<Invite> createInvite({
+    int? maxUses,
+    int? expiresAt,
+    String? roleGrant,
+  }) async {
     final json = await _send(
       'POST',
       '/invites',
       body: {
         if (maxUses != null) 'max_uses': maxUses,
         if (expiresAt != null) 'expires_at': expiresAt,
+        if (roleGrant != null) 'role_grant': roleGrant,
       },
     );
     return Invite.fromJson(json as Map<String, dynamic>);

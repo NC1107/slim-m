@@ -469,3 +469,143 @@ async fn the_check_endpoint_is_rate_limited() {
         "a sustained flood of guesses must be refused: {statuses:?}"
     );
 }
+
+/// An invite that grants a role is role assignment with a delay, so it carries
+/// the same escalation risk and must carry the same guard.
+mod role_grant {
+    use super::*;
+    use slimm_server::permissions::Permissions;
+
+    /// Grants `bits` to the ordinary member from [`fixture`], so a test can
+    /// hold exactly the permissions it is about and nothing else.
+    async fn grant_member(store: &Store, bits: Permissions) {
+        let member = store.find_credentials("member").await.unwrap().unwrap().0;
+        let role = store.create_role("granted", bits, false).await.unwrap();
+        store.assign_role(member, role).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_admin_can_attach_a_role_and_it_is_applied_on_redemption() {
+        let (store, app, admin, _member) = fixture().await;
+        let role = store
+            .create_role("moderator", Permissions::MANAGE_MESSAGES, false)
+            .await
+            .unwrap();
+
+        let created = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/invites",
+                Some(&admin),
+                Some(json!({"role_grant": role.to_string()})),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(created.status(), StatusCode::OK);
+        let body = json_body(created).await;
+        assert_eq!(body["role_grant"], role.to_string());
+        let code = body["code"].as_str().unwrap().to_owned();
+
+        let registered = app
+            .oneshot(request(
+                "POST",
+                "/auth/register",
+                None,
+                Some(json!({
+                    "username": "carol",
+                    "display_name": "Carol",
+                    "password": "hunter2hunter2",
+                    "device_name": "cli",
+                    "invite_code": code,
+                })),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(registered.status(), StatusCode::OK);
+
+        let carol = store.find_credentials("carol").await.unwrap().unwrap().0;
+        assert!(
+            store
+                .base_permissions(carol)
+                .await
+                .unwrap()
+                .contains(Permissions::MANAGE_MESSAGES),
+            "redeeming the code must apply the role it grants"
+        );
+    }
+
+    #[tokio::test]
+    async fn create_invite_alone_cannot_attach_a_role() {
+        // May invite, may not decide what the invitee becomes.
+        let (store, app, _admin, member) = fixture().await;
+        grant_member(&store, Permissions::CREATE_INVITE).await;
+        let role = store
+            .create_role("target", Permissions::from_bits(0), false)
+            .await
+            .unwrap();
+
+        let refused = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/invites",
+                Some(&member),
+                Some(json!({"role_grant": role.to_string()})),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+
+        // The plain invite still works, so the refusal is the grant and not
+        // the route.
+        let plain = app
+            .oneshot(request("POST", "/invites", Some(&member), Some(json!({}))))
+            .await
+            .unwrap();
+        assert_eq!(plain.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn a_role_carrying_more_than_the_caller_holds_is_refused() {
+        // Both bits, but the role carries ADMINISTRATOR: without this check
+        // the pair mints an admin account for somebody who is not one.
+        let (store, app, _admin, member) = fixture().await;
+        grant_member(
+            &store,
+            Permissions::CREATE_INVITE.union(Permissions::MANAGE_ROLES),
+        )
+        .await;
+        let elevated = store
+            .create_role("superuser", Permissions::ADMINISTRATOR, false)
+            .await
+            .unwrap();
+
+        let refused = app
+            .oneshot(request(
+                "POST",
+                "/invites",
+                Some(&member),
+                Some(json!({"role_grant": elevated.to_string()})),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn a_role_that_does_not_exist_is_not_found_rather_than_a_silent_none() {
+        let (_store, app, admin, _member) = fixture().await;
+
+        let response = app
+            .oneshot(request(
+                "POST",
+                "/invites",
+                Some(&admin),
+                Some(json!({"role_grant": uuid::Uuid::now_v7().to_string()})),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+}

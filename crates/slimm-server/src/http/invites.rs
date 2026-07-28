@@ -44,11 +44,14 @@ struct InviteDto {
     created_at: i64,
     revoked: bool,
     usable: bool,
+    /// The role this code grants, or null.
+    role_grant: Option<String>,
 }
 
 fn dto(invite: Invite, now: i64) -> InviteDto {
     InviteDto {
         usable: invite.is_usable(now),
+        role_grant: invite.role_grant.map(|id| id.to_string()),
         code: invite.code,
         max_uses: invite.max_uses,
         uses: invite.uses,
@@ -64,6 +67,9 @@ struct CreateRequest {
     max_uses: Option<i64>,
     /// Unix milliseconds; null means it never expires.
     expires_at: Option<i64>,
+    /// A role every account redeeming this code receives. Null grants none.
+    #[serde(default)]
+    role_grant: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -94,6 +100,39 @@ struct InviteCommunity {
     expires_at: Option<i64>,
 }
 
+/// Resolves a requested role grant, refusing every way it could be an
+/// escalation.
+///
+/// An invite that grants a role assigns that role to whoever redeems it, so it
+/// is role assignment with a delay and must be gated exactly as `PUT
+/// /members/{id}/roles/{id}` is: MANAGE_ROLES on top of CREATE_INVITE, and the
+/// role's permissions already held by the caller. Without the second check,
+/// CREATE_INVITE plus MANAGE_ROLES would mint an administrator account for
+/// somebody holding neither bit.
+async fn resolve_grant(
+    state: &AppState,
+    caller: crate::ids::UserId,
+    raw: &str,
+) -> Result<crate::ids::RoleId, ApiError> {
+    let permissions = state.store.base_permissions(caller).await?;
+    if !permissions.contains(Permissions::MANAGE_ROLES) {
+        return Err(ApiError::Forbidden);
+    }
+    let role_id = crate::ids::RoleId(
+        raw.parse::<uuid::Uuid>()
+            .map_err(|_| ApiError::BadRequest("invalid role id"))?,
+    );
+    let role = state
+        .store
+        .role(role_id)
+        .await?
+        .ok_or(ApiError::NotFound("role not found"))?;
+    if !permissions.contains(role.permissions) {
+        return Err(ApiError::Forbidden);
+    }
+    Ok(role_id)
+}
+
 fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -120,9 +159,14 @@ async fn create(
         return Err(ApiError::BadRequest("max_uses must be at least 1"));
     }
 
+    let role_grant = match req.role_grant.as_deref() {
+        None => None,
+        Some(raw) => Some(resolve_grant(&state, ctx.user_id, raw).await?),
+    };
+
     let invite = state
         .store
-        .create_invite(ctx.user_id, None, req.max_uses, req.expires_at)
+        .create_invite(ctx.user_id, role_grant, req.max_uses, req.expires_at)
         .await?;
     Ok(Json(dto(invite, now_ms())))
 }

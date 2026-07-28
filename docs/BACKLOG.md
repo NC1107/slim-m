@@ -28,6 +28,25 @@ Each item is a real backlog entry with the segments that asked for it and a roug
 | Temporary member mute or timeout with auto-expiry | Community | S | Administration and moderation |
 | Color-blind-safe redundant cues and an adjustable UI density setting | Accessibility | S | Foundations, design system |
 | Webhooks, inbound and outbound, tightly scoped | Teams, power | M | Administration, extensibility |
+| Tap-to-add: bring two phones together to swap an invite or open a DM | Community, owner idea | M | Client, after invites settle |
+
+### Tap-to-add, in more detail
+
+Owner idea, 2026-07-28: the NameDrop gesture, where two iPhones held together glow and swap a contact, but for adding someone to a Space or opening a DM.
+
+The appeal is that it removes the worst part of the current flow. An invite today is a code somebody has to read out, paste, or screenshot, and a code in a screenshot is a code in someone's camera roll forever. A gesture that hands one over in person expires the whole problem.
+
+What it cannot be is NameDrop itself. That is Apple's own contact-exchange flow and there is no public API to hook an app into it: the glow, the haptics and the sheet all belong to the system, and an app cannot register a payload for it.
+
+So the honest options, cheapest first:
+
+- **A QR code**, which works on every platform today, needs no entitlement, and is the thing people actually reach for. Show the invite as a QR, scan it to redeem. This is the one worth building, and it makes the rest optional.
+- **AirDrop**, on iOS, by exporting the invite as a file or URL. Real, supported, and a share sheet away, but it is a share sheet rather than a gesture.
+- **Nearby Interaction plus MultipeerConnectivity**, iOS to iOS, which can genuinely do "hold them together" with UWB ranging. This is the closest to the idea and by far the most work: a second transport, its own pairing and trust story, and a permission prompt. Android's equivalent is Nearby Share, and the two do not talk to each other.
+
+The trap to avoid is building the third one first because it is the exciting one. A cross-platform QR covers the same need on every device the product ships to, and if the gesture ever lands it is a nicer front end onto the same invite code.
+
+One thing to settle before any of it: an invite handed over in person should probably be single-use and short-lived by default, which is a different default from the link you paste into a group chat. `POST /invites` already takes `max_uses` and `expires_at`, so that is a client decision rather than a server change.
 
 Priority note: push-to-talk, per-user volume, and device switching are close to mandatory for anyone arriving from Discord voice, and they are nearly free on the existing media stack, so they should ride with the voice phase rather than being treated as optional later polish.
 

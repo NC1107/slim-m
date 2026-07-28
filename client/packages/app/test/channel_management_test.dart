@@ -278,6 +278,49 @@ void main() {
       );
     });
 
+    testWidgets('the delete dialog names its way out, and taking it deletes '
+        'nothing', (tester) async {
+      final requests = <http.Request>[];
+      await tester.pumpWidget(
+        _harness(
+          TextChannelsSection(
+            channels: [_channel('c1', 'general'), _channel('c2', 'random')],
+            selectedId: 'c1',
+            canManage: true,
+          ),
+          initialLocation: Routes.channel('c1'),
+          handler: (request) {
+            requests.add(request);
+            return http.Response('{}', 200);
+          },
+        ),
+      );
+
+      await tester.tap(find.bySemanticsLabel('Manage general'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete channel'));
+      await tester.pumpAndSettle();
+
+      // "Keep channel", not "Cancel": next to "Delete permanently" the vaguer
+      // word is what made this dialog get copied instead of reused.
+      expect(find.text('Keep channel'), findsOneWidget);
+      expect(find.text('Cancel'), findsNothing);
+
+      await tester.tap(find.text('Keep channel'));
+      await tester.pumpAndSettle();
+
+      expect(
+        requests.where((r) => r.method == 'DELETE'),
+        isEmpty,
+        reason: 'backing out must not delete anything',
+      );
+      expect(
+        find.text('channel:c1'),
+        findsOneWidget,
+        reason: 'the channel is still open',
+      );
+    });
+
     testWidgets('deleting a channel that is not open still closes the sheet', (
       tester,
     ) async {
