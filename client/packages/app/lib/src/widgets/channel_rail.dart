@@ -8,14 +8,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_rtc/rtc.dart';
 
 import '../permissions.dart';
 import '../providers/dms.dart';
 import '../providers/providers.dart';
+import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'channel_rail_frame.dart';
 import 'channel_rail_sections.dart';
 import 'command_palette.dart';
+import 'voice_strip_indicator.dart';
 
 /// The channel id in [path], or null when [path] is not a channel route.
 String? channelIdInPath(String path) {
@@ -58,6 +61,11 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
     final me = ref.watch(meProvider).valueOrNull;
     final canManageChannels =
         me != null && me.permissions.hasPermission(Perm.manageChannels);
+    // Hidden for the channel it is a call for: that pane has the full call UI.
+    final voice = ref.watch(voiceControllerProvider);
+    final showVoiceStrip =
+        voice.state == VoiceSessionState.connected &&
+        voice.channelId != selected;
 
     return Container(
       color: tokens.surfaceSunken,
@@ -144,6 +152,7 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
               ),
             ),
           ),
+          if (showVoiceStrip) const VoiceStripIndicator(),
           const RailConnectionBar(),
           const RailUserFooter(),
         ],

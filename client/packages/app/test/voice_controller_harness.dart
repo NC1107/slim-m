@@ -106,6 +106,14 @@ class FakeSession implements VoiceSession {
     _states.add(_state);
   }
 
+  /// Pushes any other session-state transition through the same stream
+  /// `join`'s own outcome never emits on, since nothing here drives a real
+  /// `Room`'s events.
+  void emitState(VoiceSessionState next) {
+    _state = next;
+    _states.add(next);
+  }
+
   @override
   Future<void> join({
     required String url,
@@ -189,6 +197,10 @@ http.Client voiceApi({int status = 200, bool canPublish = true}) {
 /// Owns the container so a suite can tear it down in one place.
 class VoiceHarness {
   ProviderContainer? _container;
+
+  /// For a widget test to wrap in `UncontrolledProviderScope`; only valid
+  /// after [controllerWith] has built one.
+  ProviderContainer get container => _container!;
 
   void dispose() => _container?.dispose();
 
