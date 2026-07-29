@@ -15,13 +15,15 @@
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use axum::routing::{get, post};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, INVITE_CHECK, Json, RateLimited};
+use super::extract::{Authed, INVITE_CHECK, Json, RateLimited, enforce};
 use crate::permissions::Permissions;
+use crate::ratelimit::Class;
 use crate::store::{Invite, InviteCheck, RedeemError};
 
 const BODY_LIMIT: usize = 4 * 1024;
@@ -239,9 +241,14 @@ async fn check(
 /// Spends an invite for the signed-in account.
 async fn redeem(
     Authed(ctx): Authed,
+    parts: Parts,
     Path(code): Path<String>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
+    // Charged as a write: every attempt, hit or miss, opens the single-writer
+    // transaction, so an unthrottled loop of garbage codes serialised the whole
+    // server on the write lock while proving nothing.
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
     match state.store.redeem_invite(&code, ctx.user_id).await {
         Ok(()) => Ok(StatusCode::NO_CONTENT),
         // One answer for expired, spent, revoked, and never-existed.

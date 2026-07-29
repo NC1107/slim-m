@@ -128,9 +128,23 @@ async fn capabilities(state: AppState) -> Vec<&'static str> {
     if let Some(cached) = CAPABILITIES.get() {
         return cached.clone();
     }
-    let served = capability::served_by(router(state)).await;
-    let names = served.into_iter().map(capability::Capability::wire_name);
-    CAPABILITIES.get_or_init(|| names.collect()).clone()
+    let names = capability_names(router(state)).await;
+    CAPABILITIES.get_or_init(|| names).clone()
+}
+
+/// The `/version` capability list a router serves, as wire names.
+///
+/// Extracted as its own seam so a test can feed it a router that serves a
+/// different set. `capabilities` above is then a trivial one-liner over the
+/// real router, but the derivation, empty case included, is provable here
+/// against a bare router where a hardcoded `["block", "report"]` would give
+/// itself away.
+pub async fn capability_names(router: Router) -> Vec<&'static str> {
+    capability::served_by(router)
+        .await
+        .into_iter()
+        .map(capability::Capability::wire_name)
+        .collect()
 }
 
 /// The wire shape of [`crate::identity::ServerIdentity`]. Kept as a distinct

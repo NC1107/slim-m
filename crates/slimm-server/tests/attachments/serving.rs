@@ -68,15 +68,35 @@ async fn fetching_requires_view_channel_permission() {
 
     // Bob cannot see the channel, so he cannot fetch the attachment either,
     // despite knowing its exact, correct id.
-    let forbidden = app
+    let refused = app
         .clone()
         .oneshot(request_plain("GET", &fetch_uri, &bob_token))
         .await
         .unwrap();
     assert_eq!(
-        forbidden.status(),
-        StatusCode::FORBIDDEN,
+        refused.status(),
+        StatusCode::NOT_FOUND,
         "an unguessable id is not access control"
+    );
+
+    // And it is 404, not 403: an attachment id is the content's sha256, so a
+    // 403-versus-404 split would let bob confirm those exact bytes were shared
+    // in a channel he cannot see. Bytes nothing ever attached answer the same
+    // 404, so the two are indistinguishable and the oracle is closed.
+    let unknown_id = "0".repeat(64);
+    let unknown = app
+        .clone()
+        .oneshot(request_plain(
+            "GET",
+            &format!("/attachments/{unknown_id}"),
+            &bob_token,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        unknown.status(),
+        refused.status(),
+        "a hidden attachment and a never-uploaded one must look identical"
     );
 
     // Control: alice, who can view the channel, can fetch it.

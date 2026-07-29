@@ -111,9 +111,13 @@ async fn list(
 /// Creates a channel. Requires MANAGE_CHANNELS at the deployment level.
 async fn create(
     Authed(ctx): Authed,
+    parts: Parts,
     State(state): State<AppState>,
     Json(req): Json<CreateRequest>,
 ) -> Result<Json<ChannelDto>, ApiError> {
+    // Charged like rename and delete, which both do; create was the one write
+    // in this file that was not, so it could be looped without limit.
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
     if !state
         .store
         .base_permissions(ctx.user_id)

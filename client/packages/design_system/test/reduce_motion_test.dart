@@ -153,10 +153,15 @@ void main() {
           reduceMotion: reduceMotion,
         );
 
-        for (final container
-            in tester.widgetList<AnimatedContainer>(find.byType(
-          AnimatedContainer,
-        ))) {
+        final animated = tester.widgetList<AnimatedContainer>(
+          find.byType(AnimatedContainer),
+        );
+        // Without this the loop below passes on an empty match: widgetList
+        // returns an empty iterable rather than failing, so the assertion
+        // never ran and the test proved nothing.
+        expect(animated, isNotEmpty,
+            reason: 'the control has an AnimatedContainer to check');
+        for (final container in animated) {
           expect(
             container.duration,
             reduceMotion ? Duration.zero : const Duration(milliseconds: 150),

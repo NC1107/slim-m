@@ -19,7 +19,7 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
-use crate::ids::UserId;
+use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::Report;
@@ -92,11 +92,7 @@ async fn list(
     for report in reports {
         let allowed = match report.channel_id {
             None => true,
-            Some(channel_id) => state
-                .store
-                .has_permission(ctx.user_id, channel_id, Permissions::MANAGE_MESSAGES)
-                .await
-                .unwrap_or(false),
+            Some(channel_id) => report_visible_in(&state, ctx.user_id, channel_id).await,
         };
         if allowed {
             visible.push(ReportDto::from(report));
@@ -138,10 +134,7 @@ async fn resolve(
         return Err(ApiError::NotFound("report not found"));
     };
     if let Some(channel_id) = channel_id
-        && !state
-            .store
-            .has_permission(ctx.user_id, channel_id, Permissions::MANAGE_MESSAGES)
-            .await?
+        && !report_visible_in(&state, ctx.user_id, channel_id).await
     {
         return Err(ApiError::NotFound("report not found"));
     }
@@ -166,4 +159,25 @@ async fn require_manage_messages(state: &AppState, user_id: UserId) -> Result<()
         return Err(ApiError::Forbidden);
     }
     Ok(())
+}
+
+/// Whether a base-level moderator may see or act on a report in this channel.
+///
+/// The caller has already passed the deployment-wide `MANAGE_MESSAGES` check.
+/// A report in a live text or voice channel is further restricted to that
+/// channel's own moderators, so a moderator excluded from one channel cannot
+/// reach into it. A report in a DM or a since-deleted channel has no such
+/// moderators to defer to, so it stays with the deployment moderators rather
+/// than falling into a per-channel check that grants it to nobody. That hole
+/// was accepting DM harassment reports and hiding them forever.
+async fn report_visible_in(state: &AppState, user_id: UserId, channel_id: ChannelId) -> bool {
+    match state.store.channel_scopes_moderation(channel_id).await {
+        Ok(false) => true,
+        Ok(true) => state
+            .store
+            .has_permission(user_id, channel_id, Permissions::MANAGE_MESSAGES)
+            .await
+            .unwrap_or(false),
+        Err(_) => false,
+    }
 }

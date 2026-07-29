@@ -348,3 +348,40 @@ async fn typing_is_rate_limited() {
         channel_ids.len()
     );
 }
+
+/// A user appearing offline does not have their typing announced to a channel.
+///
+/// Typing carries the typist's id to every viewer, so it is a second way to
+/// learn someone is online, and it bypassed the appear-offline choke point:
+/// a hidden user's keystrokes announced them. The frame is dropped per viewer
+/// now, through the same status function every other presence surface uses.
+#[tokio::test]
+async fn a_hidden_user_typing_is_not_announced() {
+    use slimm_server::presence::Visibility;
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let state = state_for(&store, Hub::new());
+
+    let (alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    let (bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
+    store
+        .set_presence_visibility(alice_id, Visibility::Hidden)
+        .await
+        .unwrap();
+
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    send_typing(&mut alice_ws, &channel.id.to_string()).await;
+
+    assert_nothing_of_type(&mut bob_ws, "typing.started", &channel.id.to_string()).await;
+}

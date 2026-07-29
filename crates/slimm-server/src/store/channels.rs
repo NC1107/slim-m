@@ -77,6 +77,22 @@ impl Store {
         }))
     }
 
+    /// Whether a channel can scope moderation to moderators of its own.
+    ///
+    /// A live text or voice channel can: a member holding `MANAGE_MESSAGES`
+    /// there is a moderator of it, and a report about a message there is
+    /// theirs to see. A DM cannot, because it has no moderators, only its
+    /// pair; a deleted channel no longer can. A report about either belongs to
+    /// the deployment's moderators, so this answers false and the caller falls
+    /// back to the base check they already passed rather than a per-channel
+    /// check that a DM or a gone channel grants to nobody.
+    pub async fn channel_scopes_moderation(&self, id: ChannelId) -> anyhow::Result<bool> {
+        Ok(match self.channel(id).await? {
+            Some(channel) => channel.kind != super::dms::DM_CHANNEL_KIND,
+            None => false,
+        })
+    }
+
     /// Fetches a channel by id whether or not it is deleted. The delete
     /// handler needs this rather than [`Store::channel`] to tell "never
     /// existed" (a 404) apart from "already deleted" (an idempotent no-op),

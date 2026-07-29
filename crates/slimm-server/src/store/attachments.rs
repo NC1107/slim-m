@@ -68,6 +68,12 @@ impl Store {
     /// row (and its filename) in place rather than overwriting it, the same
     /// trade-off content addressing already makes for the storage itself.
     ///
+    /// The one field a re-upload does refresh is `created_at`, which the orphan
+    /// sweep measures its grace window from. Left stale, re-uploading bytes
+    /// that were first uploaded a day ago and never attached let the hourly
+    /// sweep delete the just-rewritten file inside the compose window, so the
+    /// send then failed. Refreshing it restarts the window on every upload.
+    ///
     /// `key_version` and `is_encrypted` are written as 0 explicitly rather
     /// than relying on the column defaults 0002 chose (`is_encrypted DEFAULT
     /// 1`): v1 is transport-only encryption, the same reality
@@ -86,7 +92,7 @@ impl Store {
         sqlx::query!(
             "INSERT INTO attachments (sha256, size, content_type, key_version, is_encrypted, filename, created_at)
              VALUES (?, ?, ?, 0, 0, ?, ?)
-             ON CONFLICT (sha256) DO NOTHING",
+             ON CONFLICT (sha256) DO UPDATE SET created_at = excluded.created_at",
             sha256,
             size,
             content_type,

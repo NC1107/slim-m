@@ -22,6 +22,7 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_app/src/widgets/channel_rail_frame.dart';
+import 'package:slimm_app/src/widgets/command_palette_items.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -150,6 +151,70 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('space-settings-screen'), findsOneWidget);
+      expect(find.text('personal-settings-screen'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'the command palette pushes settings over the app, so closing returns to '
+    'where it was rather than stranding the user',
+    (tester) async {
+      final container = _setup(Perm.manageServer);
+      addTearDown(container.dispose);
+
+      final router = GoRouter(
+        initialLocation: '/home',
+        routes: [
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => Scaffold(
+              body: Consumer(
+                builder: (context, ref, _) => TextButton(
+                  onPressed: () {
+                    final item = buildActionItems(
+                      '',
+                      Perm.manageServer,
+                    ).firstWhere((i) => i.label == 'Open personal settings');
+                    item.onSelect(context, ref);
+                  },
+                  child: const Text('home-shell'),
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: Routes.personalSettings,
+            builder: (context, state) =>
+                const Scaffold(body: Text('personal-settings-screen')),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('home-shell'));
+      await tester.pumpAndSettle();
+      expect(find.text('personal-settings-screen'), findsOneWidget);
+
+      // Pushed, not replaced: something is beneath to return to, so a back
+      // navigation lands on the shell rather than exiting it. go would have
+      // removed the shell and stranded the user here.
+      final navigator = Navigator.of(
+        tester.element(find.text('personal-settings-screen')),
+      );
+      expect(navigator.canPop(), isTrue);
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('home-shell'), findsOneWidget);
       expect(find.text('personal-settings-screen'), findsNothing);
     },
   );

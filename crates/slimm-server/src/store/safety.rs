@@ -151,6 +151,23 @@ impl Store {
 
     /// Blocks a user. Idempotent, and deliberately silent: the blocked user is
     /// never told, because telling them turns blocking into a provocation.
+    /// Whether a user id has ever named a real account, tombstoned or not.
+    ///
+    /// A report or a block about a `user` must name someone real, or the
+    /// moderation queue takes reports about random ids no foreign key bounds,
+    /// and a block insert hits a foreign-key violation `INSERT OR IGNORE` does
+    /// not cover. A deleted account still counts: you can report or block
+    /// someone who has since left, and their tombstone row satisfies the key.
+    pub async fn user_row_exists(&self, id: UserId) -> anyhow::Result<bool> {
+        let found = sqlx::query_scalar!(
+            r#"SELECT EXISTS(SELECT 1 FROM users WHERE id = ?) AS "found!: bool""#,
+            id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(found)
+    }
+
     pub async fn block_user(&self, blocker: UserId, blocked: UserId) -> anyhow::Result<bool> {
         if blocker == blocked {
             return Ok(false);

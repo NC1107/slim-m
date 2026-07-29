@@ -142,7 +142,12 @@ impl Store {
         // BEGIN IMMEDIATE, never deferred; see the note on this function.
         let mut tx = self.begin_write().await?;
 
-        if let Some(existing) = fetch_message(&mut *tx, id).await? {
+        // Probes including a tombstoned row, not just a live one: the id column
+        // is unique whether or not the message was deleted, so an idempotent
+        // retry of a since-deleted message must match here and be returned as
+        // the retry it is. Filtering deleted rows out let it fall through to an
+        // INSERT that hit the unique id and mapped to a 500.
+        if let Some(existing) = fetch_message_including_deleted(&mut *tx, id).await? {
             tx.commit().await?;
             if existing.channel_id == channel_id && existing.author_id == Some(author_id) {
                 return Ok(Sent {
@@ -398,6 +403,33 @@ impl Store {
 }
 
 /// Fetches one live message by id against any executor (pool or transaction).
+/// Like [`fetch_message`] but sees a deleted row too, for the send
+/// idempotency probe: a retried id must match whether or not the first send's
+/// message has since been deleted.
+async fn fetch_message_including_deleted<'e, E>(
+    executor: E,
+    id: MessageId,
+) -> anyhow::Result<Option<Message>>
+where
+    E: SqliteExecutor<'e>,
+{
+    let message = sqlx::query_as!(
+        Message,
+        r#"SELECT m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
+                  m.author_id AS "author_id: UserId",
+                  u.display_name AS "author_display_name?: String",
+                  m.seq AS "seq!: Seq",
+                  m.content AS "content!", m.created_at AS "created_at!", m.edited_at
+           FROM messages m
+           LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
+           WHERE m.id = ?"#,
+        id
+    )
+    .fetch_optional(executor)
+    .await?;
+    Ok(message)
+}
+
 async fn fetch_message<'e, E>(executor: E, id: MessageId) -> anyhow::Result<Option<Message>>
 where
     E: SqliteExecutor<'e>,

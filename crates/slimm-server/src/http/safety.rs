@@ -9,15 +9,17 @@
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use axum::routing::{delete, get, post};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json};
+use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{DeviceId, MessageId, UserId};
+use crate::ratelimit::Class;
 use crate::store::{Device, ReportError, ReportSubject};
 
 const BODY_LIMIT: usize = 8 * 1024;
@@ -115,12 +117,19 @@ async fn list_blocks(
 /// notified, because telling them turns blocking into a provocation.
 async fn block(
     Authed(ctx): Authed,
+    parts: Parts,
     Path(user_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
     let target = UserId(parse_uuid(&user_id)?);
     if target == ctx.user_id {
         return Err(ApiError::BadRequest("you cannot block yourself"));
+    }
+    // Checked before the insert: user_blocks has a foreign key on the target,
+    // which INSERT OR IGNORE does not cover, so a never-existed id was a 500.
+    if !state.store.user_row_exists(target).await? {
+        return Err(ApiError::NotFound("that user was not found"));
     }
     state.store.block_user(ctx.user_id, target).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -128,9 +137,11 @@ async fn block(
 
 async fn unblock(
     Authed(ctx): Authed,
+    parts: Parts,
     Path(user_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
     let target = UserId(parse_uuid(&user_id)?);
     state.store.unblock_user(ctx.user_id, target).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -142,9 +153,15 @@ async fn unblock(
 /// automatically; the whole point is that a person decides.
 async fn file_report(
     Authed(ctx): Authed,
+    parts: Parts,
     State(state): State<AppState>,
     Json(req): Json<ReportRequest>,
 ) -> Result<Json<ReportFiled>, ApiError> {
+    // Charged like any other write: intake was unthrottled while triage was
+    // rate-limited, so one account could fill the queue with a fresh random
+    // subject id per request faster than a moderator was allowed to clear it.
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+
     let reason = req.reason.trim();
     if reason.is_empty() {
         return Err(ApiError::BadRequest("a reason is required"));
@@ -160,25 +177,33 @@ async fn file_report(
         _ => return Err(ApiError::BadRequest("subject_kind must be message or user")),
     };
 
-    // Reporting a message requires being able to see it, so the endpoint cannot
-    // be used to confirm that a message exists in a channel you cannot read.
-    if let ReportSubject::Message(message_id) = subject {
-        let message = state.store.message(message_id).await?;
-        let visible = match message {
-            Some(ref m) => {
-                state
-                    .store
-                    .has_permission(
-                        ctx.user_id,
-                        m.channel_id,
-                        crate::permissions::Permissions::VIEW_CHANNEL,
-                    )
-                    .await?
+    match subject {
+        // Reporting a message requires being able to see it, so the endpoint
+        // cannot confirm a message exists in a channel you cannot read.
+        ReportSubject::Message(message_id) => {
+            let visible = match state.store.message(message_id).await? {
+                Some(ref m) => {
+                    state
+                        .store
+                        .has_permission(
+                            ctx.user_id,
+                            m.channel_id,
+                            crate::permissions::Permissions::VIEW_CHANNEL,
+                        )
+                        .await?
+                }
+                None => false,
+            };
+            if !visible {
+                return Err(ApiError::NotFound("that message was not found"));
             }
-            None => false,
-        };
-        if !visible {
-            return Err(ApiError::NotFound("that message was not found"));
+        }
+        // A user subject has no foreign key on the report row, so a random id
+        // would otherwise be accepted and sit in the queue naming nobody.
+        ReportSubject::User(user_id) => {
+            if !state.store.user_row_exists(user_id).await? {
+                return Err(ApiError::NotFound("that user was not found"));
+            }
         }
     }
 

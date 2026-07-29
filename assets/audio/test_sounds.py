@@ -38,6 +38,22 @@ def read(path: Path) -> np.ndarray:
     return np.frombuffer(raw, dtype="<i2").astype(np.float64) / 32767.0
 
 
+def _max_flat_rms_db(signal: np.ndarray) -> float:
+    """The loudest 200ms window's RMS in dB, with no weighting filter at all.
+
+    Independent of `synth.loudness` on purpose: it shares none of the
+    K-weighting code, so it can contradict a filter bug that measure cannot
+    see in itself.
+    """
+    window = int(0.2 * synth.SAMPLE_RATE)
+    squared = signal.astype(np.float64) ** 2
+    if squared.size <= window:
+        return 10.0 * np.log10(float(np.mean(squared)))
+    cumulative = np.concatenate([[0.0], np.cumsum(squared)])
+    sums = cumulative[window:] - cumulative[:-window]
+    return 10.0 * np.log10(float(np.max(sums)) / window)
+
+
 class SoundFamily(unittest.TestCase):
     def setUp(self) -> None:
         self.clips = {name: read(OUT / f"{name}.wav") for name in SOUNDS}
@@ -46,17 +62,35 @@ class SoundFamily(unittest.TestCase):
         self.assertEqual(len(self.clips), 7, "the family is seven sounds")
 
     def test_the_family_is_level_with_itself(self) -> None:
-        """The check the first build did not have.
+        """The normaliser converged: every clip is at the target it aimed for.
 
-        Measured on one consistent scale, not each clip by whichever meter
-        happened to answer for its length. A spread here is what a user hears
-        as one notification being startling next to another.
+        Measured with `synth.loudness`, which is also what `normalise` uses to
+        set the level, so this proves the normaliser ran and converged (it
+        catches a no-op normaliser) but not that `loudness` measures the right
+        thing. The independent check below is what covers that.
         """
         levels = {n: synth.loudness(x) for n, x in self.clips.items()}
         spread = max(levels.values()) - min(levels.values())
         self.assertLess(
             spread, 0.5,
-            f"the family spans {spread:.2f} dB: {levels}")
+            f"the family spans {spread:.2f} dB by its own meter: {levels}")
+
+    def test_the_family_is_level_by_an_independent_measure(self) -> None:
+        """Level by a measure that never touches the K-weighting filter.
+
+        The test above uses the same function that set the levels, so a bug in
+        the K-weighting biquad in `synth.loudness` would make a de-levelled
+        family pass it. Flat RMS over the loudest short window shares none of
+        that code: if the filter were wrong in a way that hid a real spread,
+        the two measures would disagree. Looser than the band above because
+        K-weighting deliberately shapes the spectrum, but a shared timbre keeps
+        the flat and weighted levels close, and 1.5 dB catches a real drift.
+        """
+        levels = {n: _max_flat_rms_db(x) for n, x in self.clips.items()}
+        spread = max(levels.values()) - min(levels.values())
+        self.assertLess(
+            spread, 1.5,
+            f"flat-RMS spread is {spread:.2f} dB: {levels}")
 
     def test_no_sound_is_peaky_in_a_way_loudness_missed(self) -> None:
         """An independent check, because the one above is the target itself.
