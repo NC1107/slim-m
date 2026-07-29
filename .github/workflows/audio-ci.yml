@@ -42,7 +42,10 @@ jobs:
       # included: a different float result is a different WAV, and this job
       # would then fail for a reason nobody changed.
       - name: install the generator's dependencies
-        run: pip install "numpy==2.4.6" "pyloudnorm==0.2.0"
+        # --only-binary, so a source distribution cannot run its own setup
+        # code on the runner. Both of these publish wheels, checked.
+        run: |
+          pip install --only-binary :all: "numpy==2.4.6" "pyloudnorm==0.2.0"
 
       - name: the family's own checks
         run: python3 -m unittest discover -s assets/audio -v

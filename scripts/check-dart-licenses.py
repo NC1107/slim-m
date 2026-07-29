@@ -16,6 +16,7 @@ not a gate. See docs/ci.md.
 
 import os
 import re
+from dataclasses import dataclass, field
 import subprocess
 import sys
 import tomllib
@@ -157,6 +158,57 @@ def license_text(name: str, version: str, cache: Path) -> tuple[Path, str] | Non
     return None
 
 
+@dataclass
+class Tally:
+    """What one pass over the lockfile found."""
+
+    failures: list[str] = field(default_factory=list)
+    seen: dict[str, int] = field(default_factory=dict)
+    hosted: int = 0
+    unpacked: int = 0
+    checked: int = 0
+
+
+def _check_one(
+    entry: tuple[str, str, str],
+    workspace: set[str],
+    cache: Path,
+    allowed: set[str],
+    exceptions: dict[str, set[str]],
+    tally: Tally,
+) -> None:
+    """Classify one locked package, recording what happened either way."""
+    name, version, source = entry
+    if source != "hosted":
+        # A path or git dependency has no pub licence to read, and the
+        # workspace's own packages are covered by this repository's licences.
+        if name not in workspace and source != "sdk":
+            tally.failures.append(
+                f"{name} {version} comes from '{source}', not {PUB_HOST}; classify it by hand")
+        return
+
+    tally.hosted += 1
+    if not (cache / "hosted" / PUB_HOST / f"{name}-{version}").is_dir():
+        return
+    tally.unpacked += 1
+
+    found = license_text(name, version, cache)
+    if found is None:
+        tally.failures.append(f"{name} {version} ships no LICENSE file in the pub cache")
+        return
+    path, text = found
+    spdx = classify(text)
+    if spdx is None:
+        tally.failures.append(
+            f"{name} {version} has a LICENSE this gate cannot identify ({path})")
+        return
+
+    tally.checked += 1
+    tally.seen[spdx] = tally.seen.get(spdx, 0) + 1
+    if spdx not in allowed and spdx not in exceptions.get(name, set()):
+        tally.failures.append(f"{name} {version} is {spdx}, which deny.toml does not allow")
+
+
 def main() -> int:
     root = Path(
         subprocess.run(
@@ -176,48 +228,23 @@ def main() -> int:
         return 1
 
     workspace = {p.name for p in (root / "client" / "packages").iterdir() if p.is_dir()}
-    failures: list[str] = []
-    seen: dict[str, int] = {}
-    hosted = 0
-    unpacked = 0
-    checked = 0
-
-    for name, version, source in packages:
-        if source != "hosted":
-            if name not in workspace and source != "sdk":
-                failures.append(f"{name} {version} comes from '{source}', not pub.dev; classify it by hand")
-            continue
-        hosted += 1
-        if not (cache / "hosted" / "pub.dev" / f"{name}-{version}").is_dir():
-            continue
-        unpacked += 1
-        found = license_text(name, version, cache)
-        if found is None:
-            failures.append(f"{name} {version} ships no LICENSE file in the pub cache")
-            continue
-        path, text = found
-        spdx = classify(text)
-        if spdx is None:
-            failures.append(f"{name} {version} has a LICENSE this gate cannot identify ({path})")
-            continue
-        checked += 1
-        seen[spdx] = seen.get(spdx, 0) + 1
-        if spdx not in allowed and spdx not in exceptions.get(name, set()):
-            failures.append(f"{name} {version} is {spdx}, which deny.toml does not allow")
+    tally = Tally()
+    for entry in packages:
+        _check_one(entry, workspace, cache, allowed, exceptions, tally)
 
     # A gate that skips what it cannot find would go green on an empty cache.
-    if unpacked < hosted:
-        failures.insert(
+    if tally.unpacked < tally.hosted:
+        tally.failures.insert(
             0,
-            f"only {unpacked} of {hosted} locked packages are unpacked under {cache}; "
-            "run 'flutter pub get --enforce-lockfile' in client/ first",
+            f"only {tally.unpacked} of {tally.hosted} locked packages are unpacked "
+            f"under {cache}; run 'flutter pub get --enforce-lockfile' in client/ first",
         )
 
-    for line in failures:
+    for line in tally.failures:
         print(f"::error file=client/pubspec.lock::{line}")
-    summary = ", ".join(f"{k} {v}" for k, v in sorted(seen.items()))
-    print(f"dart licenses: {checked} pub.dev packages checked ({summary})")
-    return 1 if failures else 0
+    summary = ", ".join(f"{k} {v}" for k, v in sorted(tally.seen.items()))
+    print(f"dart licenses: {tally.checked} pub.dev packages checked ({summary})")
+    return 1 if tally.failures else 0
 
 
 if __name__ == "__main__":
