@@ -46,6 +46,14 @@ Struck through when fixed, with the commit that closed it.
 
 ## Progress
 
-- [ ] H1  - [ ] H2  - [ ] M1  - [ ] M2  - [ ] M3  - [ ] M4  - [ ] M5
-- [ ] L1  - [ ] L2  - [ ] L3  - [ ] L4  - [ ] L5
-- [ ] T1  - [ ] T2  - [ ] T3  - [ ] T4
+All fixed 2026-07-29 in the `fix/audit-security` branch, except T3 (left as-is,
+the pixel-difference test in the same file is what actually guards that claim).
+
+- [x] H1  - [x] H2  - [x] M1  - [x] M2  - [x] M3  - [x] M4  - [x] M5
+- [x] L1  - [x] L2  - [x] L3  - [x] L4  - [x] L5
+- [x] T1  - [x] T2  - [~] T3 (superseded by the pixel test)  - [x] T4
+
+Each behavioural fix carries a regression test, and each was mutation-tested by
+reverting the fix and confirming the test fails, except M4 and M5, which are
+async-lifecycle guards matching an established sibling pattern and are fixed by
+inspection rather than a flaky timing test.
