@@ -205,7 +205,10 @@ class _MicrophoneSection extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
           child: TweenAnimationBuilder<double>(
             tween: Tween(end: speaking ? _speakingLevel : _quietLevel),
-            duration: const Duration(milliseconds: 200),
+            duration: AppMotion.reduced(
+              context,
+              const Duration(milliseconds: 200),
+            ),
             builder: (context, level, _) => AppSlider(
               tall: true,
               value: 0,

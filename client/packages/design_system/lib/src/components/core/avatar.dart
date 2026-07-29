@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import '../../app_metrics.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
+import 'speaking_ring.dart';
 import 'status_dot.dart';
 
 /// [circle] is the default, for a person. [square] marks a non-human
@@ -147,15 +148,22 @@ class AppAvatar extends StatelessWidget {
           borderRadius: BorderRadius.circular(radius), child: content),
     );
 
-    // A ring is drawn as a foreground overlay (like a CSS box-shadow) rather
-    // than a bordered wrapper, so it never changes the avatar's own layout size.
-    final ring = speaking ? tokens.accentFill : ringColor;
-    if (ring != null) {
+    // A foreground overlay, not a bordered wrapper, so layout size never moves.
+    if (speaking) {
+      content = AppSpeakingRing(
+        color: tokens.accentFill,
+        size: size,
+        round: round,
+        radius: radius,
+        glyphBackgroundColor: tokens.surfaceBase,
+        child: content,
+      );
+    } else if (ringColor != null) {
       content = Container(
         foregroundDecoration: BoxDecoration(
           shape: round ? BoxShape.circle : BoxShape.rectangle,
           borderRadius: round ? null : BorderRadius.circular(radius),
-          border: Border.all(color: ring, width: 2),
+          border: Border.all(color: ringColor!, width: 2),
         ),
         child: content,
       );

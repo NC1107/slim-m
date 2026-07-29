@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 
 import '../../app_icons.dart';
 import '../../app_metrics.dart';
+import '../../app_motion.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
 import 'focusable_tap_target.dart';
@@ -115,7 +116,8 @@ class AppSegmentedControl extends StatelessWidget {
       semanticLabel: option.label,
       builder: (context, focused, hovered) {
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          duration:
+              AppMotion.reduced(context, const Duration(milliseconds: 150)),
           height: 26,
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12),

@@ -37,6 +37,33 @@ Two smaller things this changed on the way past.
 The three notices moved into `ServerNotice` (`client/packages/app/lib/src/widgets/server_notice.dart`), which carries its own top gap, so a notice with nothing to say renders as nothing without leaving a hole where its spacer was.
 `Version` also moved out of `models.dart` into `models_version.dart`, since 380 lines was already past the review budget before this added to it.
 
+## Reduce motion, and proving presence survives greyscale (2026-07-28)
+
+The two Phase 8 accessibility exit criteria that need no audio are met.
+Read this before adding an animation to the client or touching `AppStatusDot`.
+
+**Every animated thing asks one question, and it lives in one place.**
+`AppMotion.isReduced` (`client/packages/design_system/lib/src/app_motion.dart`) is `MediaQuery.disableAnimationsOf(context) || MediaQuery.accessibleNavigationOf(context)`, and `AppMotion.reduced(context, d)` returns `Duration.zero` or `d`.
+Both signals, not just the first: a screen reader being on means a loop is movement nobody sees and a transition is only a delay in front of the next announcement.
+A new animation routes its duration through that call or it is not honouring the setting; the durations themselves still sit at their call sites, and folding them into the design language's named `fast`/`base`/`slow` steps is a separate visual change nobody has asked for yet.
+
+**The speaking ring is the one thing allowed to loop, and it did not loop at all before this.**
+Decision 0004 specifies a pulse, and `AppAvatar` was drawing a plain static border, so the "under reduce-motion it becomes static" half was vacuously true and the cue it was meant to preserve did not exist.
+`AppSpeakingRing` (`components/core/speaking_ring.dart`, split out rather than added to `avatar.dart`, which was near the 300-line budget) pulses the ring's alpha on a reversing controller, and under reduce-motion stops it at full strength and adds `AppSpeakingGlyph`, three level bars on a disc at the avatar's bottom-left corner.
+The glyph is drawn rather than set as a Lucide icon because it renders at roughly 10dp, where a 1.5px-stroked outline closes into a smudge; it is not emoji chrome.
+It mounts only while somebody is actually speaking, so nothing is left ticking.
+
+**Busy spinners are deliberately left spinning.** iOS and Android both keep their own activity indicators moving under reduce-motion, and a frozen spinner reads as a hung app rather than as a calmer one, so matching the platform beats a literal reading of the setting. That is written down in `app_motion.dart`'s own doc comment so the next contributor does not "finish the job".
+
+**The presence golden is arithmetic, not an image, and that is the strong version.**
+`test/presence_desaturation_test.dart` renders each `AppPresence` through the real widget, rasterises it, converts to Rec. 709 luma, binarises against the surface, and compares the five silhouettes pairwise.
+Binarised rather than compared as grey levels on purpose: two states painted the same shape in two different hues *do* differ in greyscale, and accepting that would be measuring the colour cue this test exists to remove.
+It runs everywhere, unlike a reference image (see `golden_matrix_test.dart`'s note); a PNG of the desaturated strip is written by the same file behind `SLIMM_GOLDENS`.
+The tightest real pair is offline against appearing-offline at roughly 2.2% of the box, which is the 2px bar struck across the ring and does not scale with the dot, so the floor sits at 1%.
+Two things it needs: the surface has to be painted *inside* the repaint boundary, or transparent pixels read as ink in a light theme and as background in a dark one; and `toImage()` has to run in `tester.runAsync`, for the reason the Fedora section below gives.
+
+What makes it worth having over `core_test.dart`'s existing check: mutating the away triangle to draw a disc while leaving `AppStatusDot.shapeOf` alone leaves `core_test.dart` green and fails this in all three themes.
+
 ## A per-channel voice roster (2026-07-28)
 
 The rail could only show who was in the one call already joined; every other voice channel looked empty even with people talking in it.
