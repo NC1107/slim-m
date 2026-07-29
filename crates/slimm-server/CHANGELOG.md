@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.0](https://github.com/NC1107/slim-m/compare/server-v0.17.0...server-v0.18.0) (2026-07-29)
+
+
+### Features
+
+* **client:** per-participant volume, roles, timeout and removal in the member profile ([#138](https://github.com/NC1107/slim-m/issues/138)) ([e746bcd](https://github.com/NC1107/slim-m/commit/e746bcd4c89e1dcd507d49c43ea345d6ea4d83d5))
+* **server:** member timeouts and removal from the Space ([#136](https://github.com/NC1107/slim-m/issues/136)) ([1474ef8](https://github.com/NC1107/slim-m/commit/1474ef89921907bdb1cbf20082249a1a07d11733))
+
 ## [0.17.0](https://github.com/NC1107/slim-m/compare/server-v0.16.1...server-v0.17.0) (2026-07-29)
 
 
