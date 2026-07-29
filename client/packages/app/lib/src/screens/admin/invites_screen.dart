@@ -34,10 +34,9 @@ class InvitesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Invites'),
-        leading: IconButton(
-          icon: const Icon(AppIcons.back),
+        leading: BackToButton(
           tooltip: 'Back to Space settings',
-          onPressed: () => closeScreen(context, Routes.spaceSettings),
+          fallback: Routes.spaceSettings,
         ),
       ),
       // top: false because the AppBar already clears the status bar.

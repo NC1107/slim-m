@@ -21,10 +21,9 @@ class SpaceSettingsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Space settings'),
         // Reached with go(), which replaces, so there is no stack to pop.
-        leading: IconButton(
-          icon: const Icon(AppIcons.back),
+        leading: BackToButton(
           tooltip: 'Back to channels',
-          onPressed: () => closeScreen(context, Routes.channels),
+          fallback: Routes.channels,
         ),
       ),
       body: AppContentColumn(

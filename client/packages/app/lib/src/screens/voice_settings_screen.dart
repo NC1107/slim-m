@@ -98,10 +98,9 @@ class VoiceSettingsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Voice settings'),
         // Reachable directly, as PersonalSettingsScreen is, so no stack to pop.
-        leading: IconButton(
-          icon: const Icon(AppIcons.back),
+        leading: BackToButton(
           tooltip: 'Back to settings',
-          onPressed: () => closeScreen(context, Routes.personalSettings),
+          fallback: Routes.personalSettings,
         ),
       ),
       // top: false because the AppBar already clears the status bar; without
