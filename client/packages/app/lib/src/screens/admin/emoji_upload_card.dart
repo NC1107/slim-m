@@ -76,7 +76,7 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open the file picker. $e')),
+        const SnackBar(content: Text('Could not open the file picker.')),
       );
       return;
     }

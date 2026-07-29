@@ -11,6 +11,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../routing/breakpoints.dart';
+
 /// The block at the very top of a channel's history: a mark, the channel's
 /// name, and its topic if it has one. It fills what would otherwise be a wide
 /// empty band above a short conversation (the list is bottom-anchored), and is
@@ -24,11 +26,15 @@ class ChannelStartHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    // The message rows' own gutter, so the block left-aligns with them.
+    final gutter = LayoutClass.of(context) == LayoutClass.compact
+        ? AppSizes.paneGutterCompact
+        : AppSizes.paneGutter;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.s20,
+      padding: EdgeInsets.fromLTRB(
+        gutter,
         AppSpacing.s24,
-        AppSpacing.s20,
+        gutter,
         AppSpacing.s8,
       ),
       child: Column(

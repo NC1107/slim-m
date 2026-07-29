@@ -67,6 +67,11 @@ class _ModalPanel extends StatelessWidget {
     final floating = Navigator.of(context).canPop();
     final size = MediaQuery.sizeOf(context);
 
+    // Floating over the dimmed app, the barrier already separates the panel
+    // and a shadow completes it. Opened cold there is no barrier and the
+    // ground is the panel's own colour, where a hairline border disappears
+    // in light theme and the content read as loose text on a blank window;
+    // a sunken backdrop separates the two by contrast instead.
     final panel = Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -75,20 +80,27 @@ class _ModalPanel extends StatelessWidget {
               ? size.height * 0.86
               : kModalMaxHeight,
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border.all(color: tokens.borderSubtle),
-              borderRadius: BorderRadius.circular(AppRadii.card),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            boxShadow: floating ? AppShadows.float : null,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: tokens.surfaceBase,
+                border: Border.all(color: tokens.borderSubtle),
+                borderRadius: BorderRadius.circular(AppRadii.card),
+              ),
+              child: child,
             ),
-            child: child,
           ),
         ),
       ),
     );
 
     if (floating) return panel;
-    return ColoredBox(color: tokens.surfaceBase, child: panel);
+    return ColoredBox(color: tokens.surfaceSunken, child: panel);
   }
 }

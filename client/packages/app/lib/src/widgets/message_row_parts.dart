@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../routing/breakpoints.dart';
+
 import 'custom_emoji_image.dart';
 import 'emoji_picker.dart';
 
@@ -170,8 +172,12 @@ class NewMessagesDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    // The rows' own gutter, or the divider sits 10dp right of them on phones.
+    final gutter = LayoutClass.of(context) == LayoutClass.compact
+        ? AppSizes.paneGutterCompact
+        : AppSizes.paneGutter;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+      padding: EdgeInsets.fromLTRB(gutter, 14, gutter, 6),
       child: Stack(
         alignment: Alignment.centerRight,
         children: [
@@ -202,10 +208,13 @@ class DayDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final gutter = LayoutClass.of(context) == LayoutClass.compact
+        ? AppSizes.paneGutterCompact
+        : AppSizes.paneGutter;
     Widget rule() =>
         Expanded(child: Container(height: 1, color: tokens.borderSubtle));
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+      padding: EdgeInsets.fromLTRB(gutter, 16, gutter, 6),
       child: Row(
         children: [
           rule(),

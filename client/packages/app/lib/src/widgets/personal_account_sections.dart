@@ -46,32 +46,44 @@ class DevicesSection extends ConsumerWidget {
           ),
           error: (e, _) => Padding(
             padding: const EdgeInsets.all(AppSpacing.s16),
-            child: Text('Could not load devices. $e'),
+            child: Text('Could not load devices.'),
           ),
-          data: (list) => Column(
-            children: [
-              for (final device in list)
-                ListTile(
-                  leading: const Icon(AppIcons.account),
-                  title: Text(device.name),
-                  subtitle: Text(
-                    device.isCurrent ? 'This device' : 'Signed in',
+          // Named like Blocked's empty state below: a bare section header
+          // over nothing reads as a loading glitch, not an intentional state.
+          data: (list) => list.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(AppSpacing.s16),
+                  child: Text(
+                    'No devices signed in.',
                     style: TextStyle(color: tokens.textSecondary),
                   ),
-                  trailing: device.isCurrent
-                      ? null
-                      : TextButton(
-                          onPressed: () async {
-                            await ref.read(apiProvider).removeDevice(device.id);
-                            if (context.mounted) {
-                              ref.invalidate(devicesProvider);
-                            }
-                          },
-                          child: const Text('Sign out'),
+                )
+              : Column(
+                  children: [
+                    for (final device in list)
+                      ListTile(
+                        leading: const Icon(AppIcons.account),
+                        title: Text(device.name),
+                        subtitle: Text(
+                          device.isCurrent ? 'This device' : 'Signed in',
+                          style: TextStyle(color: tokens.textSecondary),
                         ),
+                        trailing: device.isCurrent
+                            ? null
+                            : TextButton(
+                                onPressed: () async {
+                                  await ref
+                                      .read(apiProvider)
+                                      .removeDevice(device.id);
+                                  if (context.mounted) {
+                                    ref.invalidate(devicesProvider);
+                                  }
+                                },
+                                child: const Text('Sign out'),
+                              ),
+                      ),
+                  ],
                 ),
-            ],
-          ),
         ),
       ],
     );
@@ -100,7 +112,7 @@ class BlockedSection extends ConsumerWidget {
           ),
           error: (e, _) => Padding(
             padding: const EdgeInsets.all(AppSpacing.s16),
-            child: Text('Could not load the block list. $e'),
+            child: Text('Could not load the block list.'),
           ),
           data: (list) => list.isEmpty
               ? Padding(

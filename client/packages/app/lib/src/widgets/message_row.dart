@@ -166,59 +166,65 @@ class MessageRow extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.s12),
                   Expanded(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        maxWidth: kMessageColumnMax,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (!grouped)
-                            MessageRowHeader(
-                              message: message,
-                              isWebhook: isWebhook,
-                            ),
-                          if (editing)
-                            MessageEditField(
-                              initialContent: message.content,
-                              onSubmit: onSubmitEdit,
-                              onCancel: onCancelEdit,
-                            )
-                          // An attachment-only message has no body; an empty one still adds a blank line above the image.
-                          else if (message.content.isNotEmpty)
-                            MessageBody(
-                              content: message.content,
-                              knownUsernames: knownUsernames,
-                              customEmoji: customEmoji,
-                              dim: _unsent,
-                            ),
-                          if (message.editedAt != null && !editing)
-                            const EditedMarker(),
-                          if (poll != null)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                top: AppSpacing.s4,
+                    // Align loosens Expanded's tight width so the cap can
+                    // bite: without it the max was silently a no-op and body
+                    // text ran the full pane on any monitor.
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: kMessageColumnMax,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (!grouped)
+                              MessageRowHeader(
+                                message: message,
+                                isWebhook: isWebhook,
                               ),
-                              child: PollView(poll: poll!, onVote: onVote),
-                            ),
-                          for (final attachment in attachments)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                top: AppSpacing.s4,
+                            if (editing)
+                              MessageEditField(
+                                initialContent: message.content,
+                                onSubmit: onSubmitEdit,
+                                onCancel: onCancelEdit,
+                              )
+                            // An attachment-only message has no body; an empty one still adds a blank line above the image.
+                            else if (message.content.isNotEmpty)
+                              MessageBody(
+                                content: message.content,
+                                knownUsernames: knownUsernames,
+                                customEmoji: customEmoji,
+                                dim: _unsent,
                               ),
-                              child: AttachmentView(attachment: attachment),
-                            ),
-                          if (!_unsent)
-                            ReactionsRow(
-                              reactions: reactions,
-                              onReactionTap: onReactionTap,
-                              onPickReaction: onPickReaction,
-                              customEmoji: customEmoji,
-                              showAddButton: hovered,
-                            ),
-                          if (message.failed)
-                            FailedRow(onRetry: onRetry, onDiscard: onDiscard),
-                        ],
+                            if (message.editedAt != null && !editing)
+                              const EditedMarker(),
+                            if (poll != null)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: AppSpacing.s4,
+                                ),
+                                child: PollView(poll: poll!, onVote: onVote),
+                              ),
+                            for (final attachment in attachments)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: AppSpacing.s4,
+                                ),
+                                child: AttachmentView(attachment: attachment),
+                              ),
+                            if (!_unsent)
+                              ReactionsRow(
+                                reactions: reactions,
+                                onReactionTap: onReactionTap,
+                                onPickReaction: onPickReaction,
+                                customEmoji: customEmoji,
+                                showAddButton: hovered,
+                              ),
+                            if (message.failed)
+                              FailedRow(onRetry: onRetry, onDiscard: onDiscard),
+                          ],
+                        ),
                       ),
                     ),
                   ),

@@ -51,7 +51,7 @@ class InvitesScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.s16),
               invites.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => _Message('Could not load invites. $e'),
+                error: (e, _) => const _Message('Could not load invites.'),
                 data: (list) => list.isEmpty
                     ? const _Message('No invites yet.')
                     : Column(
@@ -156,6 +156,7 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
           AppInput(
             controller: _maxUses,
             placeholder: 'Uses allowed (blank for unlimited)',
+            semanticLabel: 'Uses allowed',
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: AppSpacing.s12),

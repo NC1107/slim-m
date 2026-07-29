@@ -73,11 +73,14 @@ class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow> {
         title: Text('Who can join'),
         subtitle: Text('Loading…'),
       ),
+      // A fixed sentence, never the exception itself: a raw parse error was
+      // rendering Dart type names into this row, which reads as a crash and
+      // tells nobody anything actionable. The object still reaches the log.
       error: (e, _) => ListTile(
         leading: const Icon(AppIcons.members),
         title: const Text('Who can join'),
         subtitle: Text(
-          'Could not load. $e',
+          'Could not load who can join.',
           style: TextStyle(color: tokens.dangerText),
         ),
         trailing: TextButton(

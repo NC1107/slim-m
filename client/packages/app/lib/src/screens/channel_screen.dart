@@ -267,7 +267,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     return storeAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) =>
-          Center(child: Text('Could not open the local store: $e')),
+          const Center(child: Text('Could not open the local store.')),
       data: (store) => StreamBuilder<List<Channel>>(
         stream: store.watchChannels(),
         builder: (context, channelsSnapshot) {

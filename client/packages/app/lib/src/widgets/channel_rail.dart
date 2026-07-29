@@ -121,7 +121,8 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
           Expanded(
             child: storeAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('$e')),
+              error: (e, _) =>
+                  const Center(child: Text('Could not load channels.')),
               data: (store) => StreamBuilder<List<Channel>>(
                 stream: store.watchChannels(),
                 builder: (context, snapshot) {
