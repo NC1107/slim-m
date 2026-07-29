@@ -13,6 +13,7 @@ import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
 import '../providers/voice_roster.dart';
+import '../widgets/call_participant_tiles.dart';
 import '../widgets/local_screen_share_banner.dart';
 import '../widgets/screen_share_stage.dart';
 import '../widgets/user_avatar.dart';
@@ -340,13 +341,43 @@ class _InCall extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.all(AppSpacing.s16),
             children: [
-              Text(
-                '${voice.participants.length} in call',
-                style: TextStyle(color: tokens.textSecondary, fontSize: 12),
+              Row(
+                children: [
+                  Text(
+                    '${voice.participants.length} in call',
+                    style: TextStyle(color: tokens.textSecondary, fontSize: 12),
+                  ),
+                  if (voice.connectedAt != null) ...[
+                    Text(
+                      ' · ',
+                      style: TextStyle(
+                        color: tokens.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    CallDuration(since: voice.connectedAt!),
+                  ],
+                ],
               ),
               const SizedBox(height: AppSpacing.s12),
-              for (final p in voice.participants)
-                _ParticipantRow(participant: p),
+              // Tiles centred like a call when the pane is theirs; compact
+              // rows when a share stage has taken the room.
+              if (sharer == null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.s24),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: AppSpacing.s16,
+                    runSpacing: AppSpacing.s16,
+                    children: [
+                      for (final p in voice.participants)
+                        CallParticipantTile(participant: p),
+                    ],
+                  ),
+                )
+              else
+                for (final p in voice.participants)
+                  _ParticipantRow(participant: p),
               if (voice.error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.s16),
