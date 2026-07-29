@@ -596,6 +596,7 @@ Left unconverted: `tests/response_contract/**` (a concurrent change owned it) an
 ## Contribution conventions
 
 - Branch, then PR, then squash-merge to main. release-please plus conventional-commit PR titles.
+  **The PR title is the only thing release-please reads**, because squashing throws the individual commits away and keeps them as bullets in the body, which it does not parse. A title without a `feat:`/`fix:` prefix produces a release whose changelog silently omits everything in that PR; client 0.8.0 shipped that way (#117) and the omission was only caught by reading the release PR afterwards. Hand-editing `CHANGELOG.md` to patch it is not the fix, since that file is generated.
 - Commit with `git commit -s` (DCO sign-off). NEVER add an AI attribution or co-author trailer to anything.
 - Never use the em dash character; use a plain dash. In long Markdown files, put each full sentence on its own physical line.
 - No emoji as interface chrome (a CI gate enforces this); use Lucide icons. SPDX headers on every source file (a CI gate checks the Rust ones).
