@@ -16,6 +16,8 @@ class UserProfile {
     required this.createdAt,
     this.avatarUpdatedAt,
     this.roles = const [],
+    this.roleIds = const [],
+    this.timedOutUntil,
   });
 
   final String id;
@@ -38,6 +40,19 @@ class UserProfile {
   /// data".
   final List<String> roles;
 
+  /// The same roles as ids, positionally matching [roles].
+  ///
+  /// Deciding "does this member hold that role" needs these, not the names:
+  /// nothing stops two roles sharing a name, and matching by name lights up
+  /// both. Empty on a server older than the field, which is why the roles
+  /// sheet treats an id it cannot resolve as unknown rather than as unheld.
+  final List<String> roleIds;
+
+  /// When this member's timeout lifts, in Unix milliseconds, or null if they
+  /// are not timed out. Already resolved against the clock server-side, so an
+  /// elapsed timeout arrives as null rather than as a past deadline.
+  final int? timedOutUntil;
+
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
         id: json['id'] as String,
         username: json['username'] as String,
@@ -47,6 +62,9 @@ class UserProfile {
         // Absent on a server older than the roles field is not the same as a
         // member holding none, but both render no badge, so empty reads either.
         roles: (json['roles'] as List<dynamic>?)?.cast<String>() ?? const [],
+        roleIds:
+            (json['role_ids'] as List<dynamic>?)?.cast<String>() ?? const [],
+        timedOutUntil: json['timed_out_until'] as int?,
       );
 }
 
@@ -64,6 +82,7 @@ class Me {
     required this.createdAt,
     required this.permissions,
     this.avatarUpdatedAt,
+    this.timedOutUntil,
   });
 
   final String id;
@@ -80,6 +99,13 @@ class Me {
   /// Same meaning as [UserProfile.avatarUpdatedAt].
   final int? avatarUpdatedAt;
 
+  /// When the caller's own timeout lifts, or null.
+  ///
+  /// [permissions] already has the timeout subtracted, so a UI hiding actions
+  /// on a missing bit needs no separate rule; this is what lets it say why
+  /// rather than leaving somebody with a dead composer and no explanation.
+  final int? timedOutUntil;
+
   factory Me.fromJson(Map<String, dynamic> json) => Me(
         id: json['id'] as String,
         username: json['username'] as String,
@@ -87,5 +113,6 @@ class Me {
         createdAt: json['created_at'] as int,
         permissions: json['permissions'] as int,
         avatarUpdatedAt: json['avatar_updated_at'] as int?,
+        timedOutUntil: json['timed_out_until'] as int?,
       );
 }

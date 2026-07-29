@@ -12,6 +12,57 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## Moderating a member: timeouts, removal, and per-participant volume (2026-07-29)
+
+The four sections the member profile popover rendered as absent, built out.
+Server side in PR #136, client in #138.
+Read this before touching permission reads, the login path, or anything to do with call audio.
+
+**A timeout is a subtraction where permissions are read, not a check per verb.**
+`TIMEOUT_DENY` (`store/timeouts.rs`) mirrors the shape `BLOCKED_DENY` already used in `store/dms.rs`, and it is applied at the exit of `permissions_in_channel` (wrapping *both* its DM early return and the evaluator), in `base_permissions`, and in both batched paths in `permissions_batch.rs`.
+That is what makes it reach send, react, attach, polls, pins and the LiveKit token with no edit to any of those files.
+`USE_CANVAS` is deliberately spared: that one bit means view *and* draw, so subtracting it would blank the canvas rather than make it read-only, and splitting the bit is Phase 6 work.
+Expiry is a comparison against the clock at every read, so a timeout lapses by arithmetic and nothing has to run on time for somebody to get their voice back.
+
+**Checking that design adversarially before building it found four real bypasses**, two of which predate the feature entirely and are fixed in #136.
+Message *edit* gated on `VIEW_CHANNEL` and then let the author through with no further bit, so anyone denied send could rewrite anything they ever posted and republish it to the whole channel - a complete substitute for sending. It needs `SEND_MESSAGES` now; delete is left on authorship alone, because a delete publishes an id rather than words.
+Attachment *upload* asked for no permission whatsoever; it needs `ATTACH_FILES` deployment-wide now, with the per-channel check still happening when the id is attached.
+The other two were mine to close in the design: DMs return before the evaluator, and the batched paths run their own copy of it.
+
+**A LiveKit token is a bearer credential the server cannot revoke**, so both timeout and removal also call `remove_participant` for every voice channel. Taking `SPEAK` away only affects the *next* token; `voice.rs`'s own `kick` doc had already recorded this and it was still easy to miss.
+
+**"Remove from Space" is a ban in behaviour and the docs say so.**
+There is no membership row to delete - one deployment is one community and holding an account *is* membership - so it has to be a durable row (`space_removals`), because a version that only closed today's sessions would be undone by signing in again.
+It does *not* stop the same person registering a fresh account on an open Space; nothing short of identity verification would, and `deploy/README.md` says that rather than implying a guarantee.
+Authorship is deliberately untouched: no `deleted_at IS NULL` join learns about this table, or a removal quietly becomes the account deletion it is not.
+`administrator_count` (`store/roles.rs`) **did** have to learn about it - it filtered only on `deleted_at`, so without that a deployment could be left with zero usable administrators and no recovery path, silently, with every existing test green.
+
+**Authorization is the two bits that already existed and had never been spent**: KICK_MEMBERS for the temporary act, BAN_MEMBERS for the durable one.
+On top of the bit, permission containment stands in for the role hierarchy this product does not have: you may only moderate somebody whose *granted* permissions yours already contain.
+Without it KICK_MEMBERS is enough to silence every administrator one at a time.
+It reads granted rather than effective permissions on purpose, so timing somebody out is not itself what makes them look junior enough to time out again.
+
+**`Helper.setVolume` works on three of the six platforms, and the two failure modes are opposite.**
+This is the one worth not rediscovering.
+livekit_client 2.8.1 has no per-participant gain API; flutter_webrtc (already a direct dependency of the rtc package) does. But:
+- **Android, iOS, macOS work.** Their native track lookups fall back to scanning the peer connection's transceivers, so a remote track is found.
+- **Linux and Windows throw.** They share `common/cpp`, whose lookup scans only a `remote_streams_` map filled by the Plan B `OnAddStream` callback; LiveKit uses Unified Plan, where that never fires, so the map is always empty and the call returns "Unable to find provided track". flutter_webrtc's wrapper does not catch it, unlike every sibling in that file.
+- **Web silently does nothing.** It becomes `applyConstraints({'volume': ...})`, which no browser honours, and `applyConstraints` constrains a track's *source* - a remote track's source is the RTP receiver. LiveKit plays remote audio through an `HTMLAudioElement` it does not expose, so there is no other handle.
+
+`supportsParticipantVolume` (`rtc/lib/src/audio_gain.dart`) is therefore derived from the platform and the slider is absent where it would do nothing.
+Note what that means: **Fedora and the web build are two of the three that cannot do it**, so the feature is invisible in both environments this project tests in locally, and real only on a phone.
+Gain also has to be reapplied on every room event, because it lives on the platform track object and a resubscribed track returns at 100% with nothing to say so; `LocalAudioState.applyTo` is the one place that happens.
+
+**Role names are not unique, and matching by them was a live bug.**
+Nothing in the schema constrains `roles.name`, so a client deciding "does this member hold that role" by name lights up every role sharing one.
+`UserProfile` carries `role_ids` beside `roles` now (names render badges, ids make assignments), and both role sheets match on the id.
+
+Three smaller traps this hit:
+
+- **`client/packages/api/lib/api.dart` exports through an explicit `show` list, and an extension's methods need the extension's own name in it.** There is a comment saying exactly that directly above the list, and it still cost a while to spot: the symptom is "method isn't defined for the type 'SlimmApi'" while a sibling extension's methods resolve fine.
+- **Both hygiene gates enumerate `git ls-files`, so untracked new files are invisible to them.** A local run before the first commit passes and CI then fails on the same tree. Stage before trusting either gate.
+- **`scripts/check-comment-cap.sh` was counting Rust `//!` module docs as plain comments**, though its own header exempts them: the awk matched `//` followed by anything that is not `/`. Nothing caught it because the allowlist had been calibrated against the wrong number. Fixed, and the allowlist regenerated at the true counts, which cleared 46 files outright and lowered 98.
+
 ## The nine-specialist audit, and seeing a shared screen (2026-07-29)
 
 Nine parallel specialist reviews (five code, four screenshot) over the running product; the consolidated report with everything found, fixed, and deliberately deferred is [docs/research/nine-specialist-audit-2026-07-29.md](docs/research/nine-specialist-audit-2026-07-29.md).

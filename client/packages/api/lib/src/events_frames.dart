@@ -114,6 +114,33 @@ class PresenceChanged extends ServerEvent {
   final PresenceState status;
 }
 
+/// A member was timed out, or their timeout was lifted.
+///
+/// Deployment-wide rather than channel-scoped, and carrying the deadline
+/// rather than only an id: unlike presence there is nothing per-viewer to
+/// resolve, since the badge is the same fact for everyone. Without this a
+/// timed-out member's composer stays enabled and their sends start failing
+/// with 403, which reads as the app being broken.
+class MemberTimeoutChanged extends ServerEvent {
+  const MemberTimeoutChanged({required this.userId, this.until});
+
+  final String userId;
+
+  /// Unix milliseconds, or null for a lift.
+  final int? until;
+}
+
+/// A member was removed from the Space.
+///
+/// The removed member's own sockets close on the accompanying session
+/// revocation; this is how everyone else's member list drops them without
+/// waiting for a refetch.
+class MemberRemoved extends ServerEvent {
+  const MemberRemoved({required this.userId});
+
+  final String userId;
+}
+
 /// Someone started typing in a channel. There is no explicit stop frame past
 /// [TypingStopped]: the state also lapses on its own without a refresh.
 class TypingStarted extends ServerEvent {

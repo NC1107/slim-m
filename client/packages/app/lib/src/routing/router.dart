@@ -15,6 +15,7 @@ import '../screens/admin/channel_overwrites_screen.dart';
 import '../screens/admin/emoji_screen.dart';
 import '../screens/admin/invites_screen.dart';
 import '../screens/admin/reports_screen.dart';
+import '../screens/admin/removed_members_screen.dart';
 import '../screens/admin/roles_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/debug_log_screen.dart';
@@ -109,6 +110,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.adminRoles,
         pageBuilder: (context, state) =>
             modalPage(context, const RolesScreen()),
+      ),
+      GoRoute(
+        path: Routes.adminRemovedMembers,
+        pageBuilder: (context, state) =>
+            modalPage(context, const RemovedMembersScreen()),
       ),
       GoRoute(
         path: Routes.adminOverwrites,

@@ -2,10 +2,9 @@
 /// Grants and revokes one role across members: `PUT`/`DELETE
 /// /members/{userId}/roles/{roleId}`, both idempotent.
 ///
-/// A member's held state is read off [api.UserProfile.roles], which is a
-/// list of role *names*; two roles sharing a name would be indistinguishable
-/// here, but nothing in the schema requires role names to be unique, so this
-/// is a real (accepted) limitation rather than an oversight.
+/// A member's held state is read off [api.UserProfile.roleIds], never the
+/// names beside them: nothing in the schema requires role names to be unique,
+/// so two roles called "mod" would both light up if this matched by name.
 library;
 
 import 'package:flutter/material.dart';
@@ -93,7 +92,7 @@ class _RoleAssignSheet extends ConsumerWidget {
                 itemCount: list.length,
                 itemBuilder: (context, i) {
                   final member = list[i];
-                  final has = member.roles.contains(role.name);
+                  final has = member.roleIds.contains(role.id);
                   return ListTile(
                     leading: const Icon(AppIcons.account),
                     title: Text(member.displayName),

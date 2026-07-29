@@ -17,6 +17,9 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
+import 'audio_gain.dart' as rtc_gain;
+import 'local_audio.dart';
+
 import 'broadcast_bridge.dart';
 import 'desktop_sources.dart';
 import 'screen_share.dart';
@@ -69,15 +72,9 @@ class VoiceSession {
   VoiceDisconnect? _lastDisconnect;
   bool _disposed = false;
 
-  /// Whether every remote participant's audio is locally silenced. Purely
-  /// local playback state: it never touches this session's own microphone
-  /// or publishes anything, so nobody else in the call can tell.
-  bool _deafened = false;
-
-  /// Identities this listener has silenced individually. Local exactly like
-  /// [_deafened]: the SFU is never told, so the muted participant cannot
-  /// learn they were muted, which is the same reason blocking is silent.
-  final Set<String> _locallyMuted = {};
+  /// Deafen, per-participant mute and per-participant gain, which are one
+  /// listener's own business and never reach the room; see [LocalAudioState].
+  final LocalAudioState _audio = LocalAudioState();
 
   VoiceSessionState get state => _state;
   Stream<VoiceSessionState> get states => _stateController.stream;
@@ -86,24 +83,42 @@ class VoiceSession {
   Stream<List<VoiceParticipant>> get participantChanges =>
       _participantsController.stream;
 
-  bool get deafened => _deafened;
+  bool get deafened => _audio.deafened;
 
   /// Whether [identity] is silenced for this listener alone.
-  bool isLocallyMuted(String identity) => _locallyMuted.contains(identity);
+  bool isLocallyMuted(String identity) => _audio.isMuted(identity);
+
+  /// Whether this host can change one participant's volume at all. See
+  /// [supportsParticipantVolume]: on the platforms that answer false the call
+  /// would either throw or quietly do nothing, so the control is not offered.
+  bool get supportsParticipantVolume => rtc_gain.supportsParticipantVolume;
+
+  /// [identity]'s playback gain for this listener, 1.0 being unchanged.
+  double volumeFor(String identity) => _audio.volumeFor(identity);
+
+  /// Sets [identity]'s playback gain for this listener only, clamped to the
+  /// range the UI offers.
+  ///
+  /// Stored as well as applied, and reapplied from [_applyLocalAudioState] on
+  /// every room event, because native gain lives on the platform track object
+  /// and a track that resubscribes arrives as a new one at full volume. A
+  /// setter that only touched currently-subscribed tracks would pass every
+  /// test and quietly reset somebody whose network blipped.
+  Future<void> setVolumeFor(String identity, double volume) async {
+    _audio.setVolumeFor(identity, volume);
+    final room = _room;
+    if (room != null) await _applyLocalAudioState(room);
+  }
 
   /// Silences (or restores) one participant, for this listener only.
   ///
-  /// Reapplied on every room event through [_applyDeafenState], so a track
+  /// Reapplied on every room event through [_applyLocalAudioState], so a track
   /// that resubscribes after the mute stays silenced without this class
   /// tracking subscriptions itself.
   Future<void> setLocallyMuted(String identity, bool muted) async {
-    if (muted) {
-      _locallyMuted.add(identity);
-    } else {
-      _locallyMuted.remove(identity);
-    }
+    _audio.setMuted(identity, muted);
     final room = _room;
-    if (room != null) await _applyDeafenState(room);
+    if (room != null) await _applyLocalAudioState(room);
     _refreshParticipants();
   }
 
@@ -183,8 +198,9 @@ class VoiceSession {
   Future<void> leave() async {
     await _teardown();
     _participants = const [];
-    _deafened = false;
-    _locallyMuted.clear();
+    _audio.deafened = false;
+    _audio.muted.clear();
+    // Gain deliberately survives: somebody you turned down stays turned down.
     _lastDisconnect = null;
     if (!_participantsController.isClosed) {
       _participantsController.add(_participants);
@@ -332,34 +348,16 @@ class VoiceSession {
   Future<bool> setDeafened(bool deafened) async {
     final room = _room;
     if (room == null) return false;
-    _deafened = deafened;
-    await _applyDeafenState(room);
+    _audio.deafened = deafened;
+    await _applyLocalAudioState(room);
     return true;
   }
 
-  /// Applies [_deafened] to every remote audio track currently subscribed.
-  /// Called again on every room event (see [_listen]), not just when the
-  /// toggle changes, which is what keeps a participant who joins (or whose
-  /// track resubscribes) after deafening starts silenced too, without this
-  /// session having to track subscriptions itself.
-  Future<void> _applyDeafenState(lk.Room room) async {
-    for (final participant in room.remoteParticipants.values) {
-      // Deafened silences everyone; otherwise only the individually muted.
-      final silence = _deafened || _locallyMuted.contains(participant.identity);
-      for (final publication in participant.audioTrackPublications) {
-        final track = publication.track;
-        if (track == null) continue;
-        try {
-          if (silence) {
-            await track.disable();
-          } else {
-            await track.enable();
-          }
-        } catch (e) {
-          _lastError = e;
-        }
-      }
-    }
+  /// Delegates to [LocalAudioState.applyTo]; see that class for why this
+  /// runs on every room event rather than only when a control moves.
+  Future<void> _applyLocalAudioState(lk.Room room) async {
+    final failure = await _audio.applyTo(room);
+    if (failure != null) _lastError = failure;
   }
 
   /// One coarse listener rather than a subscription per event type. Every
@@ -409,7 +407,7 @@ class VoiceSession {
 
     // Reapplied on every refresh, not only on toggle, so a participant or
     // track appearing after deafening starts is silenced too.
-    unawaited(_applyDeafenState(room));
+    unawaited(_applyLocalAudioState(room));
 
     final next = <VoiceParticipant>[];
     final local = room.localParticipant;

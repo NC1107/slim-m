@@ -25,7 +25,8 @@ bool spaceSettingsReachable(int permissions) =>
     permissions.hasPermission(Perm.manageMessages) ||
     permissions.hasPermission(Perm.createInvite) ||
     permissions.hasPermission(Perm.manageRoles) ||
-    permissions.hasPermission(Perm.manageServer);
+    permissions.hasPermission(Perm.manageServer) ||
+    permissions.hasPermission(Perm.banMembers);
 
 /// Each row is gated on the server bit its screen requires, per `GET /me`'s
 /// base permissions, rather than shown and left to answer 403: a member
@@ -48,6 +49,7 @@ class SpaceSettingsSection extends ConsumerWidget {
     final canInvite = permissions.hasPermission(Perm.createInvite);
     final canManageRoles = permissions.hasPermission(Perm.manageRoles);
     final canManageServer = permissions.hasPermission(Perm.manageServer);
+    final canBan = permissions.hasPermission(Perm.banMembers);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,6 +86,14 @@ class SpaceSettingsSection extends ConsumerWidget {
             onTap: () => context.push(Routes.adminOverwrites),
           ),
         ],
+        if (canBan)
+          ListTile(
+            leading: const Icon(AppIcons.signOut),
+            title: const Text('Removed members'),
+            subtitle: const Text('Who cannot get back in, and letting them.'),
+            trailing: const Icon(AppIcons.chevronRight),
+            onTap: () => context.push(Routes.adminRemovedMembers),
+          ),
         if (canManageServer) const JoinPolicyRow(),
         if (canManageServer)
           ListTile(

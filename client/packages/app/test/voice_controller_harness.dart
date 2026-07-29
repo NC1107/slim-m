@@ -33,6 +33,19 @@ const tokens = TokenPair(
 /// Implemented rather than subclassed so that adding a method to the real
 /// session is a compile error here, not a silently untested path.
 class FakeSession implements VoiceSession {
+  @override
+  bool get supportsParticipantVolume => true;
+
+  final Map<String, double> _volumes = {};
+
+  @override
+  double volumeFor(String identity) => _volumes[identity] ?? 1.0;
+
+  @override
+  Future<void> setVolumeFor(String identity, double volume) async {
+    _volumes[identity] = volume.clamp(0.0, 2.0);
+  }
+
   FakeSession({
     this.joinOutcome = VoiceSessionState.connected,
     this.microphoneGranted = true,

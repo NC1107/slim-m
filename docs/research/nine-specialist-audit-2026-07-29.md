@@ -156,11 +156,12 @@ Per-participant local mute is real: `VoiceSession.setLocallyMuted` disables that
 It is local exactly like deafen and like blocking - the SFU is never told, so the muted participant cannot learn they were muted.
 And the member pane's rows now open the profile instead of jumping straight into a DM, which is where Message became one verb among several rather than the only thing a row could do.
 
-Three sections of the spec are **absent rather than disabled**, which the spec's own rule makes the correct rendering rather than a shortfall:
+Three sections of the spec were **absent rather than disabled**, which the spec's own rule makes the correct rendering rather than a shortfall.
+**All four are built now** (PRs #136 and #138, same day); the reasons are kept below because two of them turned out to be wrong in instructive ways.
 
-- **Volume, 0-200%.** livekit_client 2.8.1 exposes no per-participant gain, only whether a track plays at all. A slider that did nothing between its ends would be worse than none; the mute half of that section ships and the slider waits on the library (or a web-audio gain node).
-- **Timeout, and the timed-out badge (card 04).** The server has no timeout concept: no route, no column, no enforcement. This is the largest missing piece and it is server work before it is client work.
-- **Remove from Space.** Likewise absent server-side; only a voice-channel kick exists.
-- **Roles...** is deferred for a different reason: the existing sheet assigns *members to a role*, and the popover needs the inverse. That is a new sheet rather than a missing capability.
+- ~~**Volume, 0-200%.**~~ Built. The premise was half right and the conclusion wrong: livekit_client really has no gain API, but flutter_webrtc - already a direct dependency of the rtc package - does, so this was never blocked on a library bump. What it *is* blocked on is the platform: `Helper.setVolume` works on Android, iOS and macOS, throws on Linux and Windows, and silently no-ops on web. The slider is guarded on that and absent where it would do nothing. See CLAUDE.md for the per-platform detail, which is not obvious from either package's API.
+- ~~**Timeout, and the timed-out badge (card 04).**~~ Built. This was correctly identified as the largest piece and as server work first. Enforcement is one permission subtraction at the point permissions are read, not a check per verb.
+- ~~**Remove from Space.**~~ Built, and named honestly: with no membership row to delete it has to be durable, which makes it a ban in behaviour whatever the button says.
+- ~~**Roles...**~~ Built. It was correctly diagnosed as a new sheet rather than a missing capability, and building it surfaced a live bug in the existing one: both matched a member's roles by *name*, and nothing in the schema makes role names unique.
 
-The popover is built so each arrives as a section rather than a rewrite.
+The popover was built so each arrived as a section rather than a rewrite, and that held.

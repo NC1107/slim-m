@@ -219,9 +219,6 @@ class VoiceController extends StateNotifier<VoiceState> {
     );
   }
 
-  /// Toggles local playback of everyone else's audio. Never touches this
-  /// session's own microphone: deafening and muting are independent, exactly
-  /// as they are for every other voice product this design is drawn from.
   /// Whether [identity] is silenced for this listener alone; see
   /// [VoiceSession.setLocallyMuted].
   bool isLocallyMuted(String identity) => _session.isLocallyMuted(identity);
@@ -233,6 +230,25 @@ class VoiceController extends StateNotifier<VoiceState> {
     state = state.copyWith(participants: _session.participants);
   }
 
+  /// Whether this host can change one participant's volume at all. False on
+  /// Linux, Windows and web, where the underlying call either throws or does
+  /// nothing; see `audio_gain.dart` in the rtc package for why.
+  bool get supportsParticipantVolume => _session.supportsParticipantVolume;
+
+  /// [identity]'s playback gain for this listener, 1.0 being unchanged.
+  double volumeFor(String identity) => _session.volumeFor(identity);
+
+  /// Sets [identity]'s playback gain for this listener only.
+  ///
+  /// Deliberately does not rebuild the controller state: this is dragged, and
+  /// republishing the roster on every frame of a drag is what makes the call
+  /// screen jank. The slider owns its own value while it moves.
+  Future<void> setVolumeFor(String identity, double volume) =>
+      _session.setVolumeFor(identity, volume);
+
+  /// Toggles local playback of everyone else's audio. Never touches this
+  /// session's own microphone: deafening and muting are independent, exactly
+  /// as they are for every other voice product this design is drawn from.
   Future<void> toggleDeafen() async {
     final want = !state.deafened;
     final got = await _session.setDeafened(want);

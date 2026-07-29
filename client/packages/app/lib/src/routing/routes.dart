@@ -15,6 +15,7 @@ abstract final class Routes {
   static const adminReports = '/settings/reports';
   static const adminInvites = '/settings/invites';
   static const adminRoles = '/settings/roles';
+  static const adminRemovedMembers = '/settings/removed-members';
   static const adminOverwrites = '/settings/permissions';
   static const adminEmoji = '/settings/emoji';
   static const debugLog = '/settings/debug-log';

@@ -79,6 +79,19 @@ http.Client _emptyApi() => MockClient((request) async {
 /// The minimum [VoiceSession] the controller needs, connecting on join so the
 /// in-call surface (and its bottom control bar) actually renders.
 class _FakeSession implements VoiceSession {
+  @override
+  bool get supportsParticipantVolume => true;
+
+  final Map<String, double> _volumes = {};
+
+  @override
+  double volumeFor(String identity) => _volumes[identity] ?? 1.0;
+
+  @override
+  Future<void> setVolumeFor(String identity, double volume) async {
+    _volumes[identity] = volume.clamp(0.0, 2.0);
+  }
+
   final _states = StreamController<VoiceSessionState>.broadcast();
   final _participants = StreamController<List<VoiceParticipant>>.broadcast();
 

@@ -19,9 +19,14 @@ import 'user_avatar.dart';
 /// One participant as a tile: a large avatar with the speaking ring, the
 /// name beneath, and the mute or share state as a small badge.
 class CallParticipantTile extends StatelessWidget {
-  const CallParticipantTile({super.key, required this.participant});
+  const CallParticipantTile({super.key, required this.participant, this.onTap});
 
   final VoiceParticipant participant;
+
+  /// Opens this participant's profile. The only route to per-participant
+  /// volume that does not go through the member pane, which is the wrong
+  /// place to look for it while you are staring at the person talking.
+  final VoidCallback? onTap;
 
   String get _semanticLabel {
     final parts = <String>[
@@ -39,59 +44,64 @@ class CallParticipantTile extends StatelessWidget {
     return Semantics(
       container: true,
       label: _semanticLabel,
+      button: onTap != null,
+      onTap: onTap,
       child: ExcludeSemantics(
-        child: SizedBox(
-          width: 112,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  AuthorAvatar(
-                    name: participant.name,
-                    userId: participant.identity,
-                    size: 64,
-                    speaking: participant.isSpeaking,
-                  ),
-                  Positioned(
-                    right: -2,
-                    bottom: -2,
-                    child: Container(
-                      width: 22,
-                      height: 22,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: tokens.surfaceRaised,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: tokens.borderSubtle),
-                      ),
-                      child: Icon(
-                        participant.isScreenSharing
-                            ? AppIcons.screenShare
-                            : participant.isMuted
-                            ? AppIcons.micOff
-                            : AppIcons.mic,
-                        size: 12,
-                        color: participant.isMuted
-                            ? tokens.textSecondary
-                            : tokens.accent,
+        child: GestureDetector(
+          onTap: onTap,
+          child: SizedBox(
+            width: 112,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AuthorAvatar(
+                      name: participant.name,
+                      userId: participant.identity,
+                      size: 64,
+                      speaking: participant.isSpeaking,
+                    ),
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: tokens.surfaceRaised,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: tokens.borderSubtle),
+                        ),
+                        child: Icon(
+                          participant.isScreenSharing
+                              ? AppIcons.screenShare
+                              : participant.isMuted
+                              ? AppIcons.micOff
+                              : AppIcons.mic,
+                          size: 12,
+                          color: participant.isMuted
+                              ? tokens.textSecondary
+                              : tokens.accent,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.s8),
-              Text(
-                participant.isLocal
-                    ? '${participant.name} (you)'
-                    : participant.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: AppText.ui.copyWith(color: tokens.textPrimary),
-              ),
-            ],
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.s8),
+                Text(
+                  participant.isLocal
+                      ? '${participant.name} (you)'
+                      : participant.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: AppText.ui.copyWith(color: tokens.textPrimary),
+                ),
+              ],
+            ),
           ),
         ),
       ),
