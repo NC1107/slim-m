@@ -13,6 +13,7 @@ import '../../format.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
+import '../../widgets/run_guarded.dart';
 import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import 'invite_role_grant_picker.dart';
@@ -217,7 +218,8 @@ class _InviteRow extends ConsumerStatefulWidget {
   ConsumerState<_InviteRow> createState() => _InviteRowState();
 }
 
-class _InviteRowState extends ConsumerState<_InviteRow> {
+class _InviteRowState extends ConsumerState<_InviteRow>
+    with GuardedActionState {
   bool _busy = false;
 
   Future<void> _revoke() async {
@@ -232,16 +234,16 @@ class _InviteRowState extends ConsumerState<_InviteRow> {
     if (!confirmed || !mounted) return;
 
     setState(() => _busy = true);
-    try {
-      await ref.read(apiProvider).revokeInvite(widget.invite.code);
-      if (context.mounted) ref.invalidate(invitesProvider);
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not revoke the invite. ${e.message}')),
-      );
+    final ok = await guard(
+      whatFailed: 'revoke the invite',
+      action: () => ref.read(apiProvider).revokeInvite(widget.invite.code),
+    );
+    if (!mounted) return;
+    if (ok) {
+      ref.invalidate(invitesProvider);
+      return;
     }
+    setState(() => _busy = false);
   }
 
   @override
@@ -255,49 +257,67 @@ class _InviteRowState extends ConsumerState<_InviteRow> {
         ? 'Never expires'
         : 'Expires ${formatDateTime(invite.expiresAt!)}';
 
-    return AppCard(
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      invite.code,
-                      style: const TextStyle(fontFamily: AppFonts.mono),
-                    ),
-                    const SizedBox(width: AppSpacing.s8),
-                    if (invite.revoked)
-                      const AppBadge(
-                        variant: AppBadgeVariant.warn,
-                        label: 'Revoked',
-                      )
-                    else if (!invite.usable)
-                      const AppBadge(
-                        variant: AppBadgeVariant.tag,
-                        label: 'Expired',
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.s4),
-                Text(
-                  '$usesLabel · $expiryLabel',
-                  style: AppText.caption.copyWith(color: tokens.textSecondary),
-                ),
-              ],
+    // A failed revoke is shown on the row it failed for, and stays until it
+    // is retried or dismissed - never a toast that floats away from it.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (actionError case final error?)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+            child: AppErrorState(
+              message: error,
+              onRetry: _busy ? null : _revoke,
+              onDismiss: clearActionError,
             ),
           ),
-          if (!invite.revoked)
-            AppIconButton(
-              icon: AppIcons.revoke,
-              semanticLabel: 'Revoke invite',
-              variant: AppIconButtonVariant.danger,
-              onPressed: _busy ? null : _revoke,
-            ),
-        ],
-      ),
+        AppCard(
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          invite.code,
+                          style: const TextStyle(fontFamily: AppFonts.mono),
+                        ),
+                        const SizedBox(width: AppSpacing.s8),
+                        if (invite.revoked)
+                          const AppBadge(
+                            variant: AppBadgeVariant.warn,
+                            label: 'Revoked',
+                          )
+                        else if (!invite.usable)
+                          const AppBadge(
+                            variant: AppBadgeVariant.tag,
+                            label: 'Expired',
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.s4),
+                    Text(
+                      '$usesLabel · $expiryLabel',
+                      style: AppText.caption.copyWith(
+                        color: tokens.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!invite.revoked)
+                AppIconButton(
+                  icon: AppIcons.revoke,
+                  semanticLabel: 'Revoke invite',
+                  variant: AppIconButtonVariant.danger,
+                  onPressed: _busy ? null : _revoke,
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
