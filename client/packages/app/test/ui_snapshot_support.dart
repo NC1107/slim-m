@@ -77,12 +77,17 @@ Future<void> loadRealFonts() async {
     '$design/fonts/IBMPlexMono-Medium.ttf',
   ]);
 
-  final lucide = File(
-    '${_pubCache()}/lucide_icons_flutter-${_lucideVersion()}'
-    '/assets/lucide.ttf',
-  );
+  final lucideDir = '${_pubCache()}/lucide_icons_flutter-${_lucideVersion()}';
+  final lucide = File('$lucideDir/assets/lucide.ttf');
   if (lucide.existsSync()) {
     await load('packages/lucide_icons_flutter/Lucide', [lucide.path]);
+  }
+  // AppIcons uses the 1.5-stroke variants, which live on their own family.
+  final lucide300 = File(
+    '$lucideDir/assets/build_font/LucideVariable-w300.ttf',
+  );
+  if (lucide300.existsSync()) {
+    await load('packages/lucide_icons_flutter/Lucide300', [lucide300.path]);
   }
 }
 

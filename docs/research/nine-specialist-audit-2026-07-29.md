@@ -69,3 +69,21 @@ The owner pointed out the first round's screenshot set skewed toward voice, so t
 - Desktop settings cold-open read as loose text on a blank window (hairline border on a same-colour ground): the panel now sits on a sunken backdrop, with the float shadow reserved for when it genuinely floats over the app.
 
 Recorded, not fixed here: the shared empty-state component extraction across the four admin lists, `AppSegmentedControl.inline`'s fixed-height text-scale risk (and its missing golden coverage), the four `ListTile` settings sections that bypass `AppListRow`'s focus ring, and the landscape channel-start clip under the app bar.
+
+## Round three: the owner's design agent reviewed the screenshot pack (same day)
+
+An external design review over the full 76-shot pack came back with a token-compliance list (its A1-A10), one bug claim, and a gap list.
+Verified before acting, which mattered: five of its claims were artifacts.
+The accent has not drifted (tokens are exactly the glacier anchors; the review measured anti-aliased pixels), the dark base is exactly `#17191C`, no 700 weight exists anywhere (the ramp stops at 600 and no bolder face is even loadable), the reaction "tofu" is the known snapshot-harness emoji gap (the live e2e capture shows the colour glyph), and the "missing" fingerprint step is built and wired into onboarding - cold renders just never walk the connect flow.
+
+What was real, and fixed:
+- `buildTheme` set almost nothing, so every raw Material widget ran M3 defaults: stadium-pill buttons, underline text fields, Material's own type ramp. The theme now carries the system - control-radius button shapes with 600-weight labels on all four button types, the hairline boxed input `AppInput` draws, an AppBar title from the scale, and a `TextTheme` mapped from `AppText`. Two traps found on the way: a button theme's `textStyle` replaces the inherited style wholesale (buttons silently fell back to the platform face until the family was named), and the global input theme double-boxed every field whose component draws its own chrome, so `AppInput`, the composer and the edit field explicitly opt out.
+- The leave-call control was a filled red tile; danger is outlined, never filled.
+- The wordmark now renders to spec (mono, medium, +0.04em) on both entry screens.
+- Icons moved to the 1.5-stroke Lucide variants (the `Lucide300` variable-font cut; the snapshot harness loads that face too).
+- The day divider and timestamps render in mono with tabular figures, per the type spec.
+- Channel-row kebabs reveal on hover or focus with a pointer (semantics stay present while invisible - the first attempt dropped them and a test caught it); touch keeps them visible.
+
+Its gap list, corrected: the fingerprint step, DM conversation view, message context menu, search, pins sheet and polls all exist - the captures simply cannot reach interaction states.
+Genuinely still open from it: member profile popover, per-participant volume, timeout/kick moderation actions on member rows, edit history, saved items, low-bandwidth mode.
+One reconcile note for the owner: custom emoji is built here while that reviewer's plan doc has it declined; their doc should be updated rather than the feature questioned.

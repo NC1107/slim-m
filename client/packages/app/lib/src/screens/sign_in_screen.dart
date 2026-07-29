@@ -237,11 +237,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 children: [
                   Text(
                     'slim-m',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: tokens.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
                     textAlign: TextAlign.center,
+                    style: AppText.heading.copyWith(
+                      color: tokens.textPrimary,
+                      fontFamily: AppFonts.mono,
+                      fontWeight: AppWeights.medium,
+                      letterSpacing: 20 * 0.04,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.s8),
                   Text(

@@ -87,6 +87,7 @@ class MessageRowLeading extends StatelessWidget {
             textAlign: TextAlign.right,
             style: AppText.micro.copyWith(
               color: tokens.textSecondary,
+              fontFamily: AppFonts.mono,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
@@ -162,6 +163,7 @@ class MessageRowHeader extends StatelessWidget {
             formatMessageTime(message.createdAt),
             style: AppText.micro.copyWith(
               color: tokens.textSecondary,
+              fontFamily: AppFonts.mono,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),

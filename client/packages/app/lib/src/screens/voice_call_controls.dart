@@ -141,16 +141,19 @@ class _ControlButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    // Danger is outlined, never filled: a destructive control must be
+    // unmistakable without being the brightest thing on the screen.
     final background = destructive
-        ? Theme.of(context).colorScheme.error
+        ? Colors.transparent
         : active
         ? tokens.accentSoft
         : tokens.surfaceRaised;
     final foreground = destructive
-        ? Theme.of(context).colorScheme.onError
+        ? tokens.dangerText
         : active
         ? tokens.accent
         : tokens.textSecondary;
+    final border = destructive ? tokens.dangerBorder : tokens.borderSubtle;
 
     return Tooltip(
       message: tooltip,
@@ -168,7 +171,7 @@ class _ControlButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: background,
               borderRadius: BorderRadius.circular(AppRadii.control),
-              border: Border.all(color: tokens.borderSubtle),
+              border: Border.all(color: border),
             ),
             child: pending
                 ? Center(

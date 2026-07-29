@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import 'package:flutter/material.dart';
 
-import 'app_typography.dart';
-
 /// Semantic design tokens for slim-m, exposed as a [ThemeExtension] so a widget
 /// does one lookup (`Theme.of(context).extension<AppTokens>()`).
 ///
@@ -445,25 +443,4 @@ abstract final class AppCanvasColors {
     Color(0xFF6FBF73),
     Color(0xFFC96FB8),
   ];
-}
-
-/// Builds a theme from the token set, so widgets read colours from tokens and
-/// never from raw literals. Shared by the app and the golden tests, which is
-/// what keeps goldens representative of what ships.
-ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
-  final scheme = ColorScheme.fromSeed(
-    seedColor: tokens.accentFill,
-    brightness: brightness,
-  ).copyWith(surface: tokens.surfaceBase);
-
-  return ThemeData(
-    useMaterial3: true,
-    brightness: brightness,
-    colorScheme: scheme,
-    scaffoldBackgroundColor: tokens.surfaceBase,
-    fontFamily: AppFonts.sans,
-    fontFamilyFallback: AppFonts.emoji,
-    extensions: [tokens],
-    dividerTheme: DividerThemeData(color: tokens.borderSubtle, space: 1),
-  );
 }

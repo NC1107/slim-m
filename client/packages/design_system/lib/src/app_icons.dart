@@ -11,97 +11,97 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 abstract final class AppIcons {
   // Navigation and structure.
-  static const IconData hash = LucideIcons.hash;
-  static const IconData voice = LucideIcons.volume2;
-  static const IconData settings = LucideIcons.settings;
-  static const IconData members = LucideIcons.users;
-  static const IconData back = LucideIcons.arrowLeft;
-  static const IconData add = LucideIcons.plus;
-  static const IconData search = LucideIcons.search;
-  static const IconData info = LucideIcons.info;
-  static const IconData chevronDown = LucideIcons.chevronDown;
-  static const IconData pin = LucideIcons.pin;
+  static const IconData hash = LucideIcons.hash300;
+  static const IconData voice = LucideIcons.volume2300;
+  static const IconData settings = LucideIcons.settings300;
+  static const IconData members = LucideIcons.users300;
+  static const IconData back = LucideIcons.arrowLeft300;
+  static const IconData add = LucideIcons.plus300;
+  static const IconData search = LucideIcons.search300;
+  static const IconData info = LucideIcons.info300;
+  static const IconData chevronDown = LucideIcons.chevronDown300;
+  static const IconData pin = LucideIcons.pin300;
 
   /// The trigger for a per-row overflow menu (a channel's manage sheet).
-  static const IconData moreVertical = LucideIcons.moreVertical;
+  static const IconData moreVertical = LucideIcons.moreVertical300;
 
   // Messaging.
-  static const IconData send = LucideIcons.send;
-  static const IconData edit = LucideIcons.pencil;
-  static const IconData retry = LucideIcons.rotateCw;
-  static const IconData pending = LucideIcons.clock;
-  static const IconData failed = LucideIcons.circleAlert;
-  static const IconData poll = LucideIcons.barChart2;
-  static const IconData code = LucideIcons.code;
-  static const IconData smile = LucideIcons.smile;
+  static const IconData send = LucideIcons.send300;
+  static const IconData edit = LucideIcons.pencil300;
+  static const IconData retry = LucideIcons.rotateCw300;
+  static const IconData pending = LucideIcons.clock300;
+  static const IconData failed = LucideIcons.circleAlert300;
+  static const IconData poll = LucideIcons.barChart2300;
+  static const IconData code = LucideIcons.code300;
+  static const IconData smile = LucideIcons.smile300;
 
   /// The emoji picker's category tabs. `smileysEmotion` reuses [smile] above
   /// and `recent` reuses [clock] below; these eight cover the rest of the
   /// `emojis` package's [EmojiGroup] set.
-  static const IconData peopleBody = LucideIcons.footprints;
-  static const IconData animalsNature = LucideIcons.pawPrint;
-  static const IconData foodDrink = LucideIcons.utensils;
-  static const IconData activities = LucideIcons.volleyball;
-  static const IconData travelPlaces = LucideIcons.planeTakeoff;
-  static const IconData objects = LucideIcons.lightbulb;
-  static const IconData symbols = LucideIcons.asterisk;
-  static const IconData flags = LucideIcons.flag;
+  static const IconData peopleBody = LucideIcons.footprints300;
+  static const IconData animalsNature = LucideIcons.pawPrint300;
+  static const IconData foodDrink = LucideIcons.utensils300;
+  static const IconData activities = LucideIcons.volleyball300;
+  static const IconData travelPlaces = LucideIcons.planeTakeoff300;
+  static const IconData objects = LucideIcons.lightbulb300;
+  static const IconData symbols = LucideIcons.asterisk300;
+  static const IconData flags = LucideIcons.flag300;
 
   /// The picker's tab for the deployment's own uploaded emoji, and the
   /// placeholder a tile falls back to when that image cannot be fetched.
-  static const IconData customEmoji = LucideIcons.sticker;
-  static const IconData imageMissing = LucideIcons.imageOff;
+  static const IconData customEmoji = LucideIcons.sticker300;
+  static const IconData imageMissing = LucideIcons.imageOff300;
 
   /// A staleness cue distinct from [pending]: the same glyph, a different
   /// role (an expiring device or invite rather than an in-flight send), kept
   /// as its own name so the two are never conflated at a call site.
-  static const IconData clock = LucideIcons.clock;
+  static const IconData clock = LucideIcons.clock300;
 
   // Calls and canvas, wired up in later phases.
-  static const IconData mic = LucideIcons.mic;
-  static const IconData micOff = LucideIcons.micOff;
-  static const IconData headphones = LucideIcons.headphones;
-  static const IconData camera = LucideIcons.video;
-  static const IconData screenShare = LucideIcons.monitorUp;
-  static const IconData leaveCall = LucideIcons.phoneOff;
-  static const IconData canvas = LucideIcons.pencilRuler;
+  static const IconData mic = LucideIcons.mic300;
+  static const IconData micOff = LucideIcons.micOff300;
+  static const IconData headphones = LucideIcons.headphones300;
+  static const IconData camera = LucideIcons.video300;
+  static const IconData screenShare = LucideIcons.monitorUp300;
+  static const IconData leaveCall = LucideIcons.phoneOff300;
+  static const IconData canvas = LucideIcons.pencilRuler300;
 
   // Account.
-  static const IconData signOut = LucideIcons.logOut;
-  static const IconData account = LucideIcons.circleUser;
+  static const IconData signOut = LucideIcons.logOut300;
+  static const IconData account = LucideIcons.circleUser300;
 
   // Notifications.
-  static const IconData notificationsOn = LucideIcons.bell;
-  static const IconData notificationsOff = LucideIcons.bellOff;
+  static const IconData notificationsOn = LucideIcons.bell300;
+  static const IconData notificationsOff = LucideIcons.bellOff300;
 
   /// Severity and surfaces (callouts, menus, code blocks). Distinct shapes
   /// (circle, triangle, sparkle, octagon) so a tone survives greyscale rather
   /// than resting on colour alone.
-  static const IconData warning = LucideIcons.triangleAlert;
-  static const IconData highlight = LucideIcons.sparkles;
-  static const IconData danger = LucideIcons.octagonAlert;
-  static const IconData check = LucideIcons.check;
-  static const IconData chevronRight = LucideIcons.chevronRight;
-  static const IconData copy = LucideIcons.copy;
+  static const IconData warning = LucideIcons.triangleAlert300;
+  static const IconData highlight = LucideIcons.sparkles300;
+  static const IconData danger = LucideIcons.octagonAlert300;
+  static const IconData check = LucideIcons.check300;
+  static const IconData chevronRight = LucideIcons.chevronRight300;
+  static const IconData copy = LucideIcons.copy300;
 
   /// A fourth, distinct shape for "not known", never to be confused with
   /// [danger]'s "known not to work".
-  static const IconData unknown = LucideIcons.circleHelp;
+  static const IconData unknown = LucideIcons.circleHelp300;
 
   // Moderation and administration: the reports queue, invite management,
   // roles, and channel permission overwrites.
-  static const IconData report = LucideIcons.messageSquareWarning;
-  static const IconData invite = LucideIcons.mailPlus;
-  static const IconData shield = LucideIcons.shield;
+  static const IconData report = LucideIcons.messageSquareWarning300;
+  static const IconData invite = LucideIcons.mailPlus300;
+  static const IconData shield = LucideIcons.shield300;
 
   /// A server that offers no reporting or blocking. Struck through, so "no
   /// recourse here" reads without colour, the same rule the severity icons
   /// above follow.
-  static const IconData shieldOff = LucideIcons.shieldOff;
+  static const IconData shieldOff = LucideIcons.shieldOff300;
 
-  static const IconData delete = LucideIcons.trash2;
-  static const IconData revoke = LucideIcons.ban;
-  static const IconData dismiss = LucideIcons.x;
-  static const IconData assignRole = LucideIcons.userCog;
-  static const IconData permissions = LucideIcons.lock;
+  static const IconData delete = LucideIcons.trash2300;
+  static const IconData revoke = LucideIcons.ban300;
+  static const IconData dismiss = LucideIcons.x300;
+  static const IconData assignRole = LucideIcons.userCog300;
+  static const IconData permissions = LucideIcons.lock300;
 }
