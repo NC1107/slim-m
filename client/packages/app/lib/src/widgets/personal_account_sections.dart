@@ -166,21 +166,6 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
       children: [
         const SettingsSectionHeader('Account'),
         ListTile(
-          leading: const Icon(AppIcons.signOut),
-          title: const Text('Sign out'),
-          onTap: () async {
-            await ref.read(syncControllerProvider.notifier).stop();
-            // Before the session goes, or this device keeps waking for nobody.
-            await ref.read(pushControllerProvider.notifier).unregister();
-            try {
-              await ref.read(apiProvider).logout();
-            } on api.ApiException {
-              // The session may already be gone; clear locally either way.
-              ref.read(sessionProvider).clear();
-            }
-          },
-        ),
-        ListTile(
           leading: Icon(
             AppIcons.failed,
             color: Theme.of(context).extension<AppTokens>()!.dangerText,
@@ -268,5 +253,44 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
       if (!mounted) return;
       setState(() => _deleteError = e.message);
     }
+  }
+}
+
+/// Signing out, on its own so it can be pinned to the settings nav's footer
+/// rather than sitting in a pane.
+///
+/// It is the one action here that is not about changing a setting, which is why
+/// it belongs on the frame: you do not go looking for it inside a category.
+/// Deliberately no longer beside "Delete account" - one is routine and the
+/// other is irreversible, and a routine action next to a destructive one is
+/// how a mis-tap happens.
+class SignOutRow extends ConsumerWidget {
+  const SignOutRow({super.key});
+
+  /// Push is unregistered before the session goes, or this device keeps waking
+  /// for an account that is no longer signed in on it.
+  static Future<void> signOut(WidgetRef ref) async {
+    await ref.read(syncControllerProvider.notifier).stop();
+    await ref.read(pushControllerProvider.notifier).unregister();
+    try {
+      await ref.read(apiProvider).logout();
+    } on api.ApiException {
+      // The session may already be gone; clear locally either way.
+      ref.read(sessionProvider).clear();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return AppListRow(
+      label: 'Sign out',
+      leading: Icon(
+        AppIcons.signOut,
+        size: AppSizes.icon16,
+        color: tokens.dangerText,
+      ),
+      onTap: () => signOut(ref),
+    );
   }
 }

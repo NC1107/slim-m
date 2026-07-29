@@ -11,7 +11,6 @@ abstract final class Routes {
   static const channels = '/channels';
   static const personalSettings = '/settings';
   static const spaceSettings = '/settings/space';
-  static const voiceSettings = '/settings/voice';
   static const adminReports = '/settings/reports';
   static const adminInvites = '/settings/invites';
   static const adminRoles = '/settings/roles';

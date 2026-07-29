@@ -25,7 +25,6 @@ import '../screens/onboarding_screen.dart';
 import '../screens/sign_in_screen.dart';
 import 'modal_page.dart';
 import 'page_transitions.dart';
-import '../screens/voice_settings_screen.dart';
 import 'routes.dart';
 
 /// The app's router.
@@ -90,11 +89,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.spaceSettings,
         pageBuilder: (context, state) =>
             modalPage(context, const SpaceSettingsScreen()),
-      ),
-      GoRoute(
-        path: Routes.voiceSettings,
-        pageBuilder: (context, state) =>
-            modalPage(context, const VoiceSettingsScreen()),
       ),
       GoRoute(
         path: Routes.adminReports,

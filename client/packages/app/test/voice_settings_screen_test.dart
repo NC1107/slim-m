@@ -11,14 +11,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
-import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_app/src/screens/personal_settings_screen.dart';
 import 'package:slimm_app/src/screens/voice_settings_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -162,7 +160,9 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) {
     )..read(preferencesProvider),
     child: MaterialApp(
       theme: buildTheme(Brightness.light, AppTokens.light),
-      home: child,
+      // A pane body, not a screen: it gets its frame from the settings
+      // scaffold in the app and needs an equivalent one here.
+      home: Scaffold(body: SingleChildScrollView(child: child)),
     ),
   );
 }
@@ -173,7 +173,7 @@ void main() {
   testWidgets(
     'out of a call, the meter says so instead of showing a live level',
     (tester) async {
-      await tester.pumpWidget(_wrap(const VoiceSettingsScreen()));
+      await tester.pumpWidget(_wrap(const VoiceSettingsBody()));
       await tester.pumpAndSettle();
 
       expect(
@@ -192,7 +192,7 @@ void main() {
   testWidgets('device selection is reported as unavailable, not faked', (
     tester,
   ) async {
-    await tester.pumpWidget(_wrap(const VoiceSettingsScreen()));
+    await tester.pumpWidget(_wrap(const VoiceSettingsBody()));
     await tester.pumpAndSettle();
 
     expect(
@@ -207,7 +207,7 @@ void main() {
     final session = _FakeSession();
     await tester.pumpWidget(
       _wrap(
-        const VoiceSettingsScreen(),
+        const VoiceSettingsBody(),
         overrides: [
           sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
           apiProvider.overrideWith((ref) {
@@ -228,7 +228,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final controller = ProviderScope.containerOf(
-      tester.element(find.byType(VoiceSettingsScreen)),
+      tester.element(find.byType(VoiceSettingsBody)),
     ).read(voiceControllerProvider.notifier);
     await controller.join('channel-1');
     session.emitParticipants(const [
@@ -256,7 +256,7 @@ void main() {
   });
 
   testWidgets('picking a screen share quality persists it', (tester) async {
-    await tester.pumpWidget(_wrap(const VoiceSettingsScreen()));
+    await tester.pumpWidget(_wrap(const VoiceSettingsBody()));
     await tester.pumpAndSettle();
 
     // The capability check section pushes this below the initial viewport.
@@ -275,7 +275,7 @@ void main() {
   });
 
   testWidgets('turning off join and leave sounds persists it', (tester) async {
-    await tester.pumpWidget(_wrap(const VoiceSettingsScreen()));
+    await tester.pumpWidget(_wrap(const VoiceSettingsBody()));
     await tester.pumpAndSettle();
 
     final soundsToggle = find.byWidgetPredicate(
@@ -294,21 +294,9 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getBool('slimm.voice.join_leave_sounds_enabled'), isFalse);
   });
-
-  testWidgets('the settings screen row reaches voice settings', (tester) async {
-    final router = GoRouter(
-      initialLocation: Routes.personalSettings,
-      routes: [
-        GoRoute(
-          path: Routes.personalSettings,
-          builder: (context, state) => const PersonalSettingsScreen(),
-        ),
-        GoRoute(
-          path: Routes.voiceSettings,
-          builder: (context, state) => const VoiceSettingsScreen(),
-        ),
-      ],
-    );
+  testWidgets('the Calls pane holds voice settings, with no second route', (
+    tester,
+  ) async {
     final container = ProviderContainer(
       overrides: [keyStoreProvider.overrideWithValue(InMemoryKeyStore())],
     );
@@ -318,25 +306,22 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp.router(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          routerConfig: router,
+        child: MediaQuery(
+          data: const MediaQueryData(size: Size(1200, 900)),
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const PersonalSettingsScreen(),
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    // The voice row sits past the list's cache extent now that appearance
-    // and presence sit above it, so it does not exist until scrolled to.
-    await tester.scrollUntilVisible(
-      find.text('Microphone, screen share, sounds'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Microphone, screen share, sounds'));
+    await tester.tap(find.text('Voice & screen share'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(VoiceSettingsScreen), findsOneWidget);
+    expect(find.byType(VoiceSettingsBody), findsOneWidget);
+    // The link row that used to push a second screen is gone with it.
+    expect(find.text('Microphone, screen share, sounds'), findsNothing);
   });
 }
