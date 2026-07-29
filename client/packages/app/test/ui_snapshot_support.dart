@@ -34,7 +34,6 @@ import 'package:slimm_app/src/screens/onboarding_screen.dart';
 import 'package:slimm_app/src/screens/personal_settings_screen.dart';
 import 'package:slimm_app/src/screens/sign_in_screen.dart';
 import 'package:slimm_app/src/screens/space_settings_screen.dart';
-import 'package:slimm_app/src/screens/voice_settings_screen.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -124,6 +123,9 @@ class _NoopSyncController extends SyncController {
 /// list, pins and a window of messages.
 MockClient fixtureClient() => MockClient((request) async {
   final path = request.url.path;
+  // 404 like a real server: the catch-all `[]` renders as a blank disc.
+  if (path.endsWith('/avatar')) return http.Response('', 404);
+
   final Object body = switch (path) {
     '/me' => {
       'id': 'user-nick',
@@ -277,11 +279,6 @@ GoRouter fixtureRouter(String location) => GoRouter(
       path: '/settings/space',
       pageBuilder: (context, state) =>
           modalPage(context, const SpaceSettingsScreen()),
-    ),
-    GoRoute(
-      path: '/settings/voice',
-      pageBuilder: (context, state) =>
-          modalPage(context, const VoiceSettingsScreen()),
     ),
     GoRoute(
       path: '/settings/reports',

@@ -30,7 +30,7 @@ import 'package:slimm_app/src/screens/admin/roles_screen.dart';
 import 'package:slimm_app/src/screens/onboarding_screen.dart';
 import 'package:slimm_app/src/screens/sign_in_screen.dart';
 import 'package:slimm_app/src/screens/voice_screen.dart';
-import 'package:slimm_app/src/screens/voice_settings_screen.dart';
+import 'package:slimm_app/src/screens/personal_settings_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -237,12 +237,12 @@ void _expectClearOfIndicator(WidgetTester tester, Finder finder, String what) {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('voice settings insets its list above the home indicator', (
+  testWidgets('personal settings insets its list above the home indicator', (
     tester,
   ) async {
     await _pump(
       tester,
-      const VoiceSettingsScreen(),
+      const PersonalSettingsScreen(),
       overrides: [
         voiceControllerProvider.overrideWith(
           (ref) => VoiceController(ref, session: _FakeSession()),

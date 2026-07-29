@@ -134,15 +134,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    /// Below the fold on the default test viewport; the account section is
-    /// last in the list. ListView builds every child eagerly, so the finder
-    /// already resolves before any scrolling; drag directly rather than via
-    /// scrollUntilVisible, which only scrolls until the finder resolves at
-    /// all, not until the target is actually within the viewport. The drag
-    /// is deliberately larger than the list's content: Flutter clamps to
-    /// `maxScrollExtent` rather than erroring, so this reaches the bottom
-    /// regardless of exactly how tall the sections above it are.
-    await tester.drag(find.byType(ListView), const Offset(0, -2000));
+    // Deletion sits in the About pane now, not at the end of one column.
+    await tester.tap(find.text('About slim-m'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete account'));
     await tester.pumpAndSettle();
@@ -196,7 +189,11 @@ void main() {
   /// The avatar disc used to sit flush on the hairline under it: its bottom
   /// edge and the divider's top edge were both at y=209 on a 390pt viewport,
   /// which reads as the picture overlapping the rule.
-  testWidgets('the avatar clears the divider under it at phone width', (
+  /// The full-width section dividers this used to guard against overlapping
+  /// went with the single-column layout, so that overlap cannot recur. What is
+  /// still worth pinning is that drilling into the pane at phone width puts the
+  /// avatar on screen whole rather than clipped by the pane's own edge.
+  testWidgets('the avatar renders whole inside its pane at phone width', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -209,25 +206,13 @@ void main() {
 
     await tester.pumpWidget(_screen(container));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Account & presence'));
+    await tester.pumpAndSettle();
 
-    final avatar = tester.getRect(find.byType(UserAvatar));
-    // The first divider at or below the avatar's top: the one it overlapped.
-    final below =
-        tester
-            .widgetList<Divider>(find.byType(Divider))
-            .map((d) => tester.getRect(find.byWidget(d)))
-            .where((r) => r.top >= avatar.top)
-            .toList()
-          ..sort((a, b) => a.top.compareTo(b.top));
-    expect(below, isNotEmpty, reason: 'no divider under the avatar to clear');
-
-    expect(
-      avatar.bottom,
-      lessThan(below.first.top),
-      reason:
-          'the avatar (bottom ${avatar.bottom}) touches or crosses the '
-          'divider below it (top ${below.first.top})',
-    );
+    final avatar = tester.getRect(find.byType(UserAvatar).last);
+    expect(avatar.left, greaterThanOrEqualTo(0.0));
+    expect(avatar.right, lessThanOrEqualTo(390.0));
+    expect(avatar.top, greaterThanOrEqualTo(0.0));
   });
 
   testWidgets('picking a presence option sends it and updates the display', (
@@ -279,11 +264,7 @@ void main() {
 
     await tester.pumpWidget(_screen(container));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('Status'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.tap(find.text('Account & presence'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Status'));
     await tester.pumpAndSettle();

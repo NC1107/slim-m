@@ -66,7 +66,6 @@ const _surfaces = <String, ({String route, List<String> viewports})>{
   'sign-in': (route: '/sign-in', viewports: _phoneAndDesktop),
   'settings': (route: '/settings', viewports: _phoneAndDesktop),
   'space-settings': (route: '/settings/space', viewports: _phoneAndDesktop),
-  'voice-settings': (route: '/settings/voice', viewports: _phoneAndDesktop),
   'admin-roles': (route: '/settings/roles', viewports: _phoneAndDesktop),
   'admin-invites': (route: '/settings/invites', viewports: _phoneAndDesktop),
   'admin-reports': (route: '/settings/reports', viewports: _phoneAndDesktop),

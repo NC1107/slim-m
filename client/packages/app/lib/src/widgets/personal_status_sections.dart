@@ -6,14 +6,12 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
-import '../routing/routes.dart';
 import 'settings_section_header.dart';
 import 'settings_select_row.dart';
 
@@ -102,22 +100,3 @@ class NotificationsSection extends ConsumerWidget {
 
 /// Voice call preferences: microphone, screen share quality, and sounds.
 /// A separate screen rather than inline rows, matching how much is on it.
-class VoiceSection extends StatelessWidget {
-  const VoiceSection({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SettingsSectionHeader('Voice'),
-        ListTile(
-          leading: const Icon(AppIcons.mic),
-          title: const Text('Microphone, screen share, sounds'),
-          trailing: const Icon(AppIcons.chevronRight),
-          onTap: () => context.push(Routes.voiceSettings),
-        ),
-      ],
-    );
-  }
-}

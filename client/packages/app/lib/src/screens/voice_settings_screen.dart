@@ -19,8 +19,6 @@ import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
-import '../routing/routes.dart';
-import 'settings_screen_scaffold.dart';
 import '../widgets/media_capability_section.dart';
 
 const _soundsKey = 'slimm.voice.join_leave_sounds_enabled';
@@ -89,32 +87,25 @@ final voiceSettingsControllerProvider =
       (ref) => VoiceSettingsController(ref),
     );
 
-class VoiceSettingsScreen extends ConsumerWidget {
-  const VoiceSettingsScreen({super.key});
+/// Everything about a call this device controls, as a pane body.
+///
+/// No scaffold of its own: it used to be a screen behind
+/// `Routes.voiceSettings`, reached by one row inside personal settings, which
+/// is a second route for a category rather than a category. It is the Calls
+/// pane of [PersonalSettingsScreen] now, and the route is gone.
+class VoiceSettingsBody extends StatelessWidget {
+  const VoiceSettingsBody({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return const SettingsScreenScaffold(
-      title: 'Voice settings',
-      // Reachable directly, as PersonalSettingsScreen is, so no stack to pop.
-      backTooltip: 'Back to settings',
-      backFallback: Routes.personalSettings,
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          _MicrophoneSection(),
-          Divider(height: 1),
-          MediaCapabilitySection(),
-          Divider(height: 1),
-          _DeviceSection(),
-          Divider(height: 1),
-          _ScreenShareSection(),
-          Divider(height: 1),
-          _SoundsSection(),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const Column(
+    children: [
+      _MicrophoneSection(),
+      MediaCapabilitySection(),
+      _DeviceSection(),
+      _ScreenShareSection(),
+      _SoundsSection(),
+    ],
+  );
 }
 
 class _SectionHeader extends StatelessWidget {

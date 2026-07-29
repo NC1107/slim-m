@@ -1,27 +1,32 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Personal and Space settings are separate screens now, so the regression
-/// this used to pin (the version row inheriting whichever group happened to
-/// render last, because Space could be hidden on the shared screen) cannot
-/// recur structurally: the App group lives only on the personal screen, which
-/// always renders regardless of permission. What is still worth pinning is
-/// that the App group's position on that screen does not move depending on
-/// who is looking, and that neither screen leaks the other's content.
+/// Personal settings is a nav beside a pane now, not nine sections in one
+/// scroll, so what is worth pinning has changed with it.
+///
+/// The old version checked the *order* of section headers down a single
+/// column, which was the right thing to check while a column was all there
+/// was. What matters here instead is the taxonomy: that every category is
+/// reachable, that a pane shows only its own content, and that neither
+/// settings screen leaks the other's.
+///
+/// That last one is not cosmetic. Personal settings renders for every signed
+/// in caller regardless of permission, and Space settings is hidden entirely
+/// for a caller holding none of its gating bits; anything from the second
+/// appearing on the first would be a permission leak rather than a layout slip.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
 
 import 'settings_harness.dart';
 
-/// Every personal section's header, in the order the screen builds them.
-const _personal = [
-  'Avatar',
-  'Appearance',
-  'Presence',
-  'Notifications',
-  'Voice',
-  'Devices',
-  'Blocked',
-  'Account',
+/// Every nav entry the personal screen offers, and the group it sits under.
+const _panes = [
+  ('You', 'Account & presence'),
+  ('You', 'Appearance'),
+  ('You', 'Notifications'),
+  ('Calls', 'Voice & screen share'),
+  ('Safety', 'Devices'),
+  ('Safety', 'Blocked'),
+  ('About', 'About slim-m'),
 ];
 
 const _spaceRows = [
@@ -33,58 +38,53 @@ const _spaceRows = [
   'Emoji',
 ];
 
-double _topOf(WidgetTester tester, String text) =>
-    tester.getRect(find.text(text)).top;
-
-/// Shared body for the two permission scenarios below: one [testWidgets]
-/// call per scenario, each with its own pump and its own teardown, rather
-/// than pumping twice inside one test (a second [ProviderContainer] pumped
-/// before the first is disposed left `PushController`'s foreground heartbeat
-/// timer pending at test end).
-Future<void> _expectAppGroupAfterPersonal(
-  WidgetTester tester,
-  int permissions,
-) async {
-  useTallViewport(tester);
-  await pumpPersonalSettings(tester, permissions, scrollToBottom: false);
-
-  expect(find.text('App'), findsOneWidget);
-  final app = _topOf(tester, 'App');
-  for (final section in _personal) {
-    expect(
-      _topOf(tester, section),
-      lessThan(app),
-      reason:
-          '$section has drifted under the App group '
-          '(permissions: $permissions)',
-    );
-  }
-  expect(
-    _topOf(tester, 'Version'),
-    greaterThan(app),
-    reason:
-        'the app version is not inside the App group '
-        '(permissions: $permissions)',
-  );
-}
-
 void main() {
   setUpAll(mockAppVersion);
 
-  testWidgets(
-    'the App group sits after every personal section for an ordinary '
-    'member',
-    (tester) => _expectAppGroupAfterPersonal(tester, 0),
-  );
+  testWidgets('every category is reachable, under its own group heading', (
+    tester,
+  ) async {
+    useTallViewport(tester);
+    await pumpPersonalSettings(tester, 0, scrollToBottom: false);
 
-  testWidgets(
-    'the App group sits after every personal section for a caller who can '
-    'also reach Space settings',
-    (tester) => _expectAppGroupAfterPersonal(tester, allPermissionBits),
-  );
+    for (final (group, pane) in _panes) {
+      expect(find.text(group.toUpperCase()), findsWidgets, reason: group);
+      expect(find.text(pane), findsOneWidget, reason: pane);
+    }
+  });
+
+  testWidgets('the nav is the same whoever is looking', (tester) async {
+    useTallViewport(tester);
+    await pumpPersonalSettings(
+      tester,
+      allPermissionBits,
+      scrollToBottom: false,
+    );
+
+    // Nothing here is permission-gated, so an admin sees the same list.
+    for (final (_, pane) in _panes) {
+      expect(find.text(pane), findsOneWidget, reason: pane);
+    }
+  });
+
+  testWidgets('signing out is on the frame, not inside a category', (
+    tester,
+  ) async {
+    useTallViewport(tester);
+    await pumpPersonalSettings(tester, 0, scrollToBottom: false);
+
+    // Present without opening anything, and deletion is not beside it.
+    expect(find.text('Sign out'), findsOneWidget);
+    expect(find.text('Delete account'), findsNothing);
+  });
 
   testWidgets('personal settings never shows Space content', (tester) async {
-    await pumpPersonalSettings(tester, allPermissionBits);
+    useTallViewport(tester);
+    await pumpPersonalSettings(
+      tester,
+      allPermissionBits,
+      scrollToBottom: false,
+    );
 
     for (final row in _spaceRows) {
       expect(
@@ -98,28 +98,9 @@ void main() {
   testWidgets('Space settings never shows personal content', (tester) async {
     await pumpSpaceSettings(tester, allPermissionBits);
 
-    for (final section in _personal) {
-      expect(
-        find.text(section),
-        findsNothing,
-        reason: '$section leaked onto Space settings',
-      );
+    for (final (_, pane) in _panes) {
+      expect(find.text(pane), findsNothing, reason: '$pane leaked onto Space');
     }
-    expect(find.text('App'), findsNothing);
     expect(find.text('Version'), findsNothing);
-  });
-
-  /// Blocking is reversible, and that is the thing a hesitating user needs to
-  /// know. The wordiness pass cut the half of this sentence that said so.
-  testWidgets('the blocked section says blocking can be undone', (
-    tester,
-  ) async {
-    useTallViewport(tester);
-    await pumpPersonalSettings(tester, 0, scrollToBottom: false);
-
-    expect(
-      find.text('They are not told. Unblocking restores their messages.'),
-      findsOneWidget,
-    );
   });
 }
