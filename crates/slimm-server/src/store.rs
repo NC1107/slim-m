@@ -23,6 +23,7 @@ mod emoji;
 mod invites;
 mod messages;
 mod permissions;
+mod permissions_batch;
 mod pins;
 mod polls;
 mod presence;
