@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.8.0](https://github.com/NC1107/slim-m/compare/client-v0.7.0...client-v0.8.0) (2026-07-29)
+
+
+### Features
+
+* **client:** split personal and Space settings into separate screens ([#109](https://github.com/NC1107/slim-m/issues/109)) ([54357c3](https://github.com/NC1107/slim-m/commit/54357c3b6788438fbe0200779f6be52388356919))
+
+
+### Bug Fixes
+
+* **client:** make the channel rail reachable to a screen reader ([#112](https://github.com/NC1107/slim-m/issues/112)) ([c5380f3](https://github.com/NC1107/slim-m/commit/c5380f395b76053a45d61f912ddd67bcf4683056))
+* **client:** open the document picker for a custom emoji, not just photos ([#108](https://github.com/NC1107/slim-m/issues/108)) ([a76d4bc](https://github.com/NC1107/slim-m/commit/a76d4bc6ed518d761ceec28d49c157730cfa15a7))
+* **client:** stop presenting a desktop window as a phone ([#116](https://github.com/NC1107/slim-m/issues/116)) ([573713f](https://github.com/NC1107/slim-m/commit/573713fafc1dff6fbf6f8a5c986c64f6c8ee4d49))
+* **ui:** tighten chat density and show a live screen share indicator ([#110](https://github.com/NC1107/slim-m/issues/110)) ([87a9bec](https://github.com/NC1107/slim-m/commit/87a9bec4673f390b555e0b952341a4bf33eeec4c))
+
 ## [0.7.0](https://github.com/NC1107/slim-m/compare/client-v0.6.0...client-v0.7.0) (2026-07-28)
 
 
