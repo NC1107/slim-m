@@ -18,11 +18,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/message_extras.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
+import 'package:slimm_app/src/routing/modal_page.dart';
+import 'package:slimm_app/src/screens/admin/channel_overwrites_screen.dart';
+import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
+import 'package:slimm_app/src/screens/admin/invites_screen.dart';
+import 'package:slimm_app/src/screens/admin/reports_screen.dart';
+import 'package:slimm_app/src/screens/admin/roles_screen.dart';
 import 'package:slimm_app/src/screens/home_shell.dart';
+import 'package:slimm_app/src/screens/onboarding_screen.dart';
+import 'package:slimm_app/src/screens/personal_settings_screen.dart';
+import 'package:slimm_app/src/screens/sign_in_screen.dart';
+import 'package:slimm_app/src/screens/space_settings_screen.dart';
+import 'package:slimm_app/src/screens/voice_settings_screen.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -135,6 +147,7 @@ MockClient fixtureClient() => MockClient((request) async {
     // read marker decodes a shape and type-errors on one.
     _ when path.endsWith('/read') => const {'last_read_seq': 3, 'unread': 0},
     _ when path.endsWith('/voice/roster') => const {'participants': <Object>[]},
+    '/space/settings' => const {'join_policy': 'invite'},
     _ => const <Object>[],
   };
   return http.Response(
@@ -199,6 +212,9 @@ final fixtureMessages = [
 Future<({ProviderContainer container, SlimmDatabase db})> fixtureContainer({
   List<Override> extraOverrides = const [],
 }) async {
+  // The voice settings screen reads SharedPreferences, which is a platform
+  // channel with no host in a test; empty mock values are its real defaults.
+  SharedPreferences.setMockInitialValues(const {});
   final db = SlimmDatabase(NativeDatabase.memory());
   final container = ProviderContainer(
     overrides: [
@@ -230,9 +246,61 @@ Future<({ProviderContainer container, SlimmDatabase db})> fixtureContainer({
 }
 
 /// The shell, on the real routes, at [location].
+///
+/// The settings and admin routes use the app's own [modalPage], so a desktop
+/// render shows the real cold-open presentation (the centred panel over the
+/// app background) and a phone render the full-screen one; onboarding and
+/// sign-in stand alone, exactly as the real router mounts them.
 GoRouter fixtureRouter(String location) => GoRouter(
   initialLocation: location,
   routes: [
+    GoRoute(
+      path: '/join',
+      builder: (context, state) =>
+          OnboardingScreen(onServerChosen: (server, invite) {}),
+    ),
+    GoRoute(
+      path: '/sign-in',
+      builder: (context, state) => const SignInScreen(),
+    ),
+    GoRoute(
+      path: '/settings',
+      pageBuilder: (context, state) =>
+          modalPage(context, const PersonalSettingsScreen()),
+    ),
+    GoRoute(
+      path: '/settings/space',
+      pageBuilder: (context, state) =>
+          modalPage(context, const SpaceSettingsScreen()),
+    ),
+    GoRoute(
+      path: '/settings/voice',
+      pageBuilder: (context, state) =>
+          modalPage(context, const VoiceSettingsScreen()),
+    ),
+    GoRoute(
+      path: '/settings/reports',
+      pageBuilder: (context, state) =>
+          modalPage(context, const ReportsScreen()),
+    ),
+    GoRoute(
+      path: '/settings/invites',
+      pageBuilder: (context, state) =>
+          modalPage(context, const InvitesScreen()),
+    ),
+    GoRoute(
+      path: '/settings/roles',
+      pageBuilder: (context, state) => modalPage(context, const RolesScreen()),
+    ),
+    GoRoute(
+      path: '/settings/permissions',
+      pageBuilder: (context, state) =>
+          modalPage(context, const ChannelOverwritesScreen()),
+    ),
+    GoRoute(
+      path: '/settings/emoji',
+      pageBuilder: (context, state) => modalPage(context, const EmojiScreen()),
+    ),
     ShellRoute(
       builder: (context, state, child) => HomeShell(child: child),
       routes: [

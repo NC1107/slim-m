@@ -85,7 +85,7 @@ class _RoleAssignSheet extends ConsumerWidget {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: Text(
-                  'Could not load members. $e',
+                  'Could not load members.',
                   style: TextStyle(color: tokens.textSecondary),
                 ),
               ),

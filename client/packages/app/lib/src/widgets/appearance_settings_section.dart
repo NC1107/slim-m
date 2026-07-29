@@ -27,10 +27,7 @@ class AppearanceSettingsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SettingsSectionHeader(
-          'Appearance',
-          description: 'System never picks true black.',
-        ),
+        const SettingsSectionHeader('Appearance'),
         SettingsSelectRow<AppThemeChoice>(
           label: 'Theme',
           value: choice,
@@ -38,6 +35,9 @@ class AppearanceSettingsSection extends ConsumerWidget {
             for (final option in AppThemeChoice.values)
               SettingsChoice(value: option, label: _labelFor(option)),
           ],
+          sheetFootnote:
+              'System follows your device. Pick True black for a pure black '
+              'background.',
           onChanged: (next) =>
               ref.read(themeControllerProvider.notifier).select(next),
         ),

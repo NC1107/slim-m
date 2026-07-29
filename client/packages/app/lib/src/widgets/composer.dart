@@ -136,7 +136,7 @@ class _ComposerState extends ConsumerState<Composer> {
       if (!mounted) return;
       _focus.requestFocus();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open the file picker. $e')),
+        const SnackBar(content: Text('Could not open the file picker.')),
       );
       return;
     }

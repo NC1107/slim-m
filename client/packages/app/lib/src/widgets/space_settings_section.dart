@@ -56,6 +56,7 @@ class SpaceSettingsSection extends ConsumerWidget {
           ListTile(
             leading: const Icon(AppIcons.report),
             title: const Text('Reports'),
+            subtitle: const Text('What members have flagged for review.'),
             trailing: const Icon(AppIcons.chevronRight),
             onTap: () => context.push(Routes.adminReports),
           ),
@@ -63,6 +64,7 @@ class SpaceSettingsSection extends ConsumerWidget {
           ListTile(
             leading: const Icon(AppIcons.invite),
             title: const Text('Invites'),
+            subtitle: const Text('Codes that let someone join this Space.'),
             trailing: const Icon(AppIcons.chevronRight),
             onTap: () => context.push(Routes.adminInvites),
           ),
@@ -70,12 +72,14 @@ class SpaceSettingsSection extends ConsumerWidget {
           ListTile(
             leading: const Icon(AppIcons.shield),
             title: const Text('Roles'),
+            subtitle: const Text('Named groups and what they may do.'),
             trailing: const Icon(AppIcons.chevronRight),
             onTap: () => context.push(Routes.adminRoles),
           ),
           ListTile(
             leading: const Icon(AppIcons.permissions),
             title: const Text('Channel permissions'),
+            subtitle: const Text('Per-channel exceptions to the roles.'),
             trailing: const Icon(AppIcons.chevronRight),
             onTap: () => context.push(Routes.adminOverwrites),
           ),
@@ -85,6 +89,7 @@ class SpaceSettingsSection extends ConsumerWidget {
           ListTile(
             leading: const Icon(AppIcons.smile),
             title: const Text('Emoji'),
+            subtitle: const Text('This Space\'s own custom emoji.'),
             trailing: const Icon(AppIcons.chevronRight),
             onTap: () => context.push(Routes.adminEmoji),
           ),

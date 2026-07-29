@@ -33,10 +33,48 @@ const _viewports = <String, Size>{
   'desktop': Size(1400, 880),
 };
 
-/// The surfaces worth a picture, by route.
-const _surfaces = <String, String>{
-  'channel': '/channels/c-general',
-  'voice': '/channels/c-main',
+/// The surfaces worth a picture: the route, and which viewports to render.
+///
+/// The two shell surfaces straddle every breakpoint because width changes
+/// their structure. The standalone screens keep one phone and one desktop
+/// render each: their layout is a single column either way, and 5x2 renders
+/// per screen would bury the reviewable ones in near-duplicates.
+const _phoneAndDesktop = ['phone-portrait', 'desktop'];
+
+const _surfaces = <String, ({String route, List<String> viewports})>{
+  'channel': (
+    route: '/channels/c-general',
+    viewports: [
+      'phone-portrait',
+      'phone-landscape',
+      'tablet-portrait',
+      'desktop-narrow',
+      'desktop',
+    ],
+  ),
+  'voice': (
+    route: '/channels/c-main',
+    viewports: [
+      'phone-portrait',
+      'phone-landscape',
+      'tablet-portrait',
+      'desktop-narrow',
+      'desktop',
+    ],
+  ),
+  'onboarding': (route: '/join', viewports: _phoneAndDesktop),
+  'sign-in': (route: '/sign-in', viewports: _phoneAndDesktop),
+  'settings': (route: '/settings', viewports: _phoneAndDesktop),
+  'space-settings': (route: '/settings/space', viewports: _phoneAndDesktop),
+  'voice-settings': (route: '/settings/voice', viewports: _phoneAndDesktop),
+  'admin-roles': (route: '/settings/roles', viewports: _phoneAndDesktop),
+  'admin-invites': (route: '/settings/invites', viewports: _phoneAndDesktop),
+  'admin-reports': (route: '/settings/reports', viewports: _phoneAndDesktop),
+  'admin-overwrites': (
+    route: '/settings/permissions',
+    viewports: _phoneAndDesktop,
+  ),
+  'admin-emoji': (route: '/settings/emoji', viewports: _phoneAndDesktop),
 };
 
 void main() {
@@ -44,11 +82,12 @@ void main() {
 
   for (final theme in const ['dark', 'light']) {
     for (final surface in _surfaces.entries) {
-      for (final viewport in _viewports.entries) {
+      for (final viewportName in surface.value.viewports) {
+        final viewport = _viewports[viewportName]!;
         testWidgets(
-          '${surface.key} at ${viewport.key} ($theme) fits its viewport',
+          '${surface.key} at $viewportName ($theme) fits its viewport',
           (tester) async {
-            tester.view.physicalSize = viewport.value;
+            tester.view.physicalSize = viewport;
             tester.view.devicePixelRatio = 1.0;
             addTearDown(tester.view.reset);
 
@@ -63,7 +102,7 @@ void main() {
                     theme: theme == 'dark'
                         ? buildTheme(Brightness.dark, AppTokens.dark)
                         : buildTheme(Brightness.light, AppTokens.light),
-                    routerConfig: fixtureRouter(surface.value),
+                    routerConfig: fixtureRouter(surface.value.route),
                   ),
                 ),
               ),
@@ -72,10 +111,7 @@ void main() {
             await tester.pump();
             await tester.pump(const Duration(milliseconds: 350));
 
-            await writeSnapshot(
-              tester,
-              '${surface.key}-${viewport.key}-$theme',
-            );
+            await writeSnapshot(tester, '${surface.key}-$viewportName-$theme');
 
             // pumpWidget already rethrows an overflow as a test failure, so
             // reaching here with no exception is the assertion.

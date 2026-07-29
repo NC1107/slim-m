@@ -80,7 +80,7 @@ class OnboardingScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppSpacing.s32),
                   _Entry(
-                    icon: AppIcons.add,
+                    icon: AppIcons.invite,
                     title: 'I have an invite',
                     description: 'Someone sent you a code for their Space.',
                     onTap: () => _redeemFlow(context),

@@ -46,14 +46,20 @@ class RolesScreen extends ConsumerWidget {
           top: false,
           child: roles.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Could not load roles. $e')),
-            data: (list) => ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.s16),
-              itemCount: list.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: AppSpacing.s8),
-              itemBuilder: (context, i) => _RoleCard(role: list[i]),
-            ),
+            error: (e, _) => const Center(child: Text('Could not load roles.')),
+            // Said, not blank: an empty page under a bare app bar reads as
+            // broken, and the sibling admin lists all name their empty state.
+            data: (list) => list.isEmpty
+                ? const Center(
+                    child: Text('No roles yet. Create one with the + above.'),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(AppSpacing.s16),
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: AppSpacing.s8),
+                    itemBuilder: (context, i) => _RoleCard(role: list[i]),
+                  ),
           ),
         ),
       ),

@@ -60,7 +60,7 @@ class RolePickerSheet extends ConsumerWidget {
       child: roles.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _PickerError(
-          message: 'Could not load roles. $e',
+          message: 'Could not load roles.',
           onRetry: () => ref.invalidate(rolesProvider),
         ),
         data: (list) => list.isEmpty
@@ -92,7 +92,7 @@ class MemberPickerSheet extends ConsumerWidget {
       child: members.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _PickerError(
-          message: 'Could not load members. $e',
+          message: 'Could not load members.',
           onRetry: () => ref.invalidate(membersProvider),
         ),
         data: (list) => list.isEmpty

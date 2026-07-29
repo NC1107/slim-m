@@ -42,7 +42,7 @@ class ReportsScreen extends ConsumerWidget {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(
               child: Text(
-                'Could not load reports. $e',
+                'Could not load reports.',
                 style: TextStyle(color: tokens.textSecondary),
               ),
             ),

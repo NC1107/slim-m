@@ -138,31 +138,38 @@ class _PinPill extends ConsumerWidget {
 
     return GestureDetector(
       onTap: () => showPinnedMessagesSheet(context, channelId),
+      // Opaque so the whole 44dp box hits, not just the 28dp pill drawn in it.
+      behavior: HitTestBehavior.opaque,
       child: Semantics(
         button: true,
         label: pins.pinned == null
             ? 'Pinned messages, loading'
             : 'Pinned messages, ${pins.pinned!.length}',
-        child: Container(
-          height: 28,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
-          decoration: BoxDecoration(
-            border: Border.all(color: tokens.borderSubtle),
-            borderRadius: BorderRadius.circular(AppRadii.control),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(AppIcons.pin, size: 14, color: tokens.textSecondary),
-              const SizedBox(width: AppSpacing.s4),
-              Text(
-                label,
-                style: AppText.micro.copyWith(
-                  color: tokens.textSecondary,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+        child: SizedBox(
+          height: 44,
+          child: Center(
+            child: Container(
+              height: 28,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+              decoration: BoxDecoration(
+                border: Border.all(color: tokens.borderSubtle),
+                borderRadius: BorderRadius.circular(AppRadii.control),
               ),
-            ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(AppIcons.pin, size: 14, color: tokens.textSecondary),
+                  const SizedBox(width: AppSpacing.s4),
+                  Text(
+                    label,
+                    style: AppText.micro.copyWith(
+                      color: tokens.textSecondary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

@@ -49,7 +49,7 @@ class EmojiScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.s16),
               emoji.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => _Message('Could not load emoji. $e'),
+                error: (e, _) => const _Message('Could not load emoji.'),
                 data: (list) => list.isEmpty
                     ? const _Message('No emoji yet.')
                     : Column(

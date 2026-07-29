@@ -53,6 +53,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   @override
   void initState() {
     super.initState();
+    // Somebody arriving with an invite code has no account here yet, so the
+    // screen opens on creating one rather than asserting "Sign in" at the one
+    // person it cannot apply to. The toggle still offers the other mode.
+    _creatingAccount = ref.read(pendingInviteProvider) != null;
     _probeServer();
   }
 
@@ -250,7 +254,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     controller: _server,
                     decoration: const InputDecoration(
                       labelText: 'Server',
-                      helperText: 'The address of the server you are joining.',
+                      helperText:
+                          "The Space you're joining - its server address.",
                     ),
                     keyboardType: TextInputType.url,
                     autocorrect: false,
