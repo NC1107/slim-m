@@ -62,7 +62,8 @@ void main() {
     expect(
       node.getSemanticsData().hasAction(SemanticsAction.longPress),
       isTrue,
-      reason: 'without this every action in the menu is lost to a screen '
+      reason:
+          'without this every action in the menu is lost to a screen '
           'reader, and nothing else would say so',
     );
     handle.dispose();
@@ -73,9 +74,12 @@ void main() {
 
     expect(find.text('Report'), findsNothing);
     final node = tester.getSemantics(find.byKey(_anchor));
-    tester.binding.pipelineOwner.semanticsOwner!.performAction(
-      node.id,
-      SemanticsAction.longPress,
+    tester.binding.performSemanticsAction(
+      SemanticsActionEvent(
+        type: SemanticsAction.longPress,
+        nodeId: node.id,
+        viewId: tester.view.viewId,
+      ),
     );
     await tester.pumpAndSettle();
 
