@@ -12,6 +12,34 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## Motion, haptics, and the device-testing polish pass (2026-07-29)
+
+Driven by real iPhone use plus a two-reviewer UI/UX pass over the snapshot set.
+Read this before touching motion, the message list, or iOS screen share.
+
+**iOS screen share was starting the broadcast twice, and the fix is one flag.**
+On iOS LiveKit's `BroadcastManager` shows the system picker and, once the ReplayKit extension is recording, re-invokes `setScreenShareEnabled` to publish the track.
+`captureOptionsFor` (`client/packages/rtc/lib/src/voice_session.dart`) left `useiOSBroadcastExtension` at its `false` default, so that second pass never got the `deviceId: 'broadcast-manual'` hint and flutter_webrtc's `getDisplayMedia` tried to start its *own* broadcast, colliding with the running extension ("already broadcasting").
+It is now `lk.lkPlatformIs(lk.PlatformType.iOS)` - iOS-only, since on desktop the same branch would clobber the real screen `sourceId`.
+The whole `BroadcastExtension` target and its Info.plist keys existed for exactly this path; the options just never opted in.
+Still needs a device to confirm end to end (no Mac/simulator here); the root cause is traced through LiveKit 2.8.1's `local.dart` and the flutter_webrtc constraint map, and a `voice_session_test` guards the flag from being hardcoded on (which would break desktop).
+
+**On-mount entrance animations render at opacity zero in the snapshot harness unless it pumps twice.**
+A Flutter ticker's first frame is its own `t=0`, so `ui_snapshot_test.dart`'s single `pump(350ms)` caught any `forward()`-on-mount animation before it moved - the voice screen came out blank, which both reviewers flagged as the top bug and neither it nor the desktop header's missing name was real.
+The harness now does `pump()` then `pump(350ms)`; two frames settle the entrance without `pumpAndSettle`, which would hang on the states that show a perpetual spinner (`_Connecting`, "catching up").
+That fix then surfaced a genuine one the blank was hiding: `_JoinPreview` overflowed a landscape phone, now wrapped in a `LayoutBuilder`/`SingleChildScrollView` that scrolls when short and centres when tall.
+
+New shared pieces, all reduce-motion aware through `AppMotion`:
+- `AppMotion` gained `fast`/`base`/`slow` (100/180/280ms) and `entrance`/`exit` curves, the design language's own tokens.
+- `AppHaptics` (`selection`/`impact`), guarded to iOS+Android, is the one place a tap becomes a tick; `AppListRow`, `AppButton` and `AppIconButton` now fire it and show a pressed state (a phone has no hover to stand in for the press).
+- `AppFadeIn` is a one-shot fade-and-rise for content that swaps within a stable route; `page_transitions.dart`'s `fadeThroughPage` cross-fades shell channel navigation so it no longer teleports.
+- Message list: `AppDensity.groupedRowGap` tightens continuations (a run of one author reads as a block), a `DayDivider` marks calendar-day boundaries (Today/Yesterday/absolute, and it breaks a group across midnight), and `ChannelStartHeader` fills the empty band above a short bottom-anchored conversation and is the one place the channel topic shows in the body. The transcript's two presentational widgets live in `message_transcript_widgets.dart` to keep the list file under the review budget.
+
+Two review findings verified as **non-issues**, recorded so they are not re-chased: the footer mic/deafen icons read "low contrast" only because they are correctly disabled when not in a call (WCAG exempts inactive controls); and the phone composer's poll/code actions are not lost but folded into the `+` "More actions" sheet, exactly the overflow the reviewer asked for.
+Left for the owner's eye rather than changed solo: header action-button treatment consistency (pin pill vs bare search icon vs filled member toggle), the fallback-avatar colour spread, and a `+` affordance on the DM rail section.
+
+Also fixed here: the member-list toggle showed lit at medium width where the pane is expanded-only and never renders (a dead control); it is now hidden below expanded width. The offline connection bar carries a warn tone and a retry glyph (connecting stays neutral), and the `Ctrl+K` search hint is dropped on touch layouts where no finger can press it.
+
 ## The capability handshake (2026-07-28)
 
 Phase 7's "verify a server exposes report and block before connecting and warn if absent" is built.
