@@ -16,4 +16,18 @@ See [docs/STRATEGY.md](docs/STRATEGY.md) and [docs/research/oss.md](docs/researc
 Every source file carries an `SPDX-License-Identifier` header, and CI checks the server headers are present.
 
 The canonical full license texts live in `LICENSES/AGPL-3.0-only.txt` and `LICENSES/Apache-2.0.txt` (REUSE style).
+
+## Paths this table does not name
+
+`scripts/`, `perf/`, `packaging/` and `assets/` carry `Apache-2.0`, matching the
+client rather than the server: none of them is part of the server binary, and
+the tooling is meant to be as reusable as the client is.
+
+`deploy/` carries `AGPL-3.0-only`, since it exists to run the server.
+
+`.github/` is currently mixed, six files `AGPL-3.0-only` and five `Apache-2.0`,
+and that is a real inconsistency rather than a decision. It is left alone here
+rather than resolved in passing: relicensing anything, even a workflow, is the
+owner's call and not a tidy-up. New files there should follow whichever of the
+two the change they serve belongs to until that is settled.
 These verbatim texts are added as a mechanical step (for example `reuse download --all`) and are tracked as a Phase 0 checklist item; the per-component licensing above is authoritative in the meantime.

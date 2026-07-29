@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: Apache-2.0
 #
 # Files already past the 500-line hard limit when the budget gate was written,
 # one per line as "<path> <lines> # why".
