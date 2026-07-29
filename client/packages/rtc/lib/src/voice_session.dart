@@ -74,6 +74,11 @@ class VoiceSession {
   /// or publishes anything, so nobody else in the call can tell.
   bool _deafened = false;
 
+  /// Identities this listener has silenced individually. Local exactly like
+  /// [_deafened]: the SFU is never told, so the muted participant cannot
+  /// learn they were muted, which is the same reason blocking is silent.
+  final Set<String> _locallyMuted = {};
+
   VoiceSessionState get state => _state;
   Stream<VoiceSessionState> get states => _stateController.stream;
 
@@ -82,6 +87,25 @@ class VoiceSession {
       _participantsController.stream;
 
   bool get deafened => _deafened;
+
+  /// Whether [identity] is silenced for this listener alone.
+  bool isLocallyMuted(String identity) => _locallyMuted.contains(identity);
+
+  /// Silences (or restores) one participant, for this listener only.
+  ///
+  /// Reapplied on every room event through [_applyDeafenState], so a track
+  /// that resubscribes after the mute stays silenced without this class
+  /// tracking subscriptions itself.
+  Future<void> setLocallyMuted(String identity, bool muted) async {
+    if (muted) {
+      _locallyMuted.add(identity);
+    } else {
+      _locallyMuted.remove(identity);
+    }
+    final room = _room;
+    if (room != null) await _applyDeafenState(room);
+    _refreshParticipants();
+  }
 
   /// Why the last attempt failed, when [state] is [VoiceSessionState.failed].
   Object? get lastError => _lastError;
@@ -160,6 +184,7 @@ class VoiceSession {
     await _teardown();
     _participants = const [];
     _deafened = false;
+    _locallyMuted.clear();
     _lastDisconnect = null;
     if (!_participantsController.isClosed) {
       _participantsController.add(_participants);
@@ -319,11 +344,13 @@ class VoiceSession {
   /// session having to track subscriptions itself.
   Future<void> _applyDeafenState(lk.Room room) async {
     for (final participant in room.remoteParticipants.values) {
+      // Deafened silences everyone; otherwise only the individually muted.
+      final silence = _deafened || _locallyMuted.contains(participant.identity);
       for (final publication in participant.audioTrackPublications) {
         final track = publication.track;
         if (track == null) continue;
         try {
-          if (_deafened) {
+          if (silence) {
             await track.disable();
           } else {
             await track.enable();
