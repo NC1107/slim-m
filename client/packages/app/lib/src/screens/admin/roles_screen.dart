@@ -27,10 +27,9 @@ class RolesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Roles'),
-        leading: IconButton(
-          icon: const Icon(AppIcons.back),
+        leading: BackToButton(
           tooltip: 'Back to Space settings',
-          onPressed: () => closeScreen(context, Routes.spaceSettings),
+          fallback: Routes.spaceSettings,
         ),
         actions: [
           IconButton(

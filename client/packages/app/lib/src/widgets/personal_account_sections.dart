@@ -146,11 +146,21 @@ class BlockedSection extends ConsumerWidget {
   }
 }
 
-class AccountSection extends ConsumerWidget {
+class AccountSection extends ConsumerStatefulWidget {
   const AccountSection({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AccountSection> createState() => _AccountSectionState();
+}
+
+class _AccountSectionState extends ConsumerState<AccountSection> {
+  /// A failed deletion stays on screen until it is retried or dismissed: it
+  /// is the most consequential action here, and a toast that floats away
+  /// leaves the user with no idea why nothing changed.
+  String? _deleteError;
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -173,15 +183,34 @@ class AccountSection extends ConsumerWidget {
         ListTile(
           leading: Icon(
             AppIcons.failed,
-            color: Theme.of(context).colorScheme.error,
+            color: Theme.of(context).extension<AppTokens>()!.dangerText,
           ),
           title: Text(
             'Delete account',
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
+            style: TextStyle(
+              color: Theme.of(context).extension<AppTokens>()!.dangerText,
+            ),
           ),
           subtitle: const Text('Permanent. This cannot be undone.'),
           onTap: () => _confirmDeletion(context, ref),
         ),
+        if (_deleteError case final error?)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s16,
+              0,
+              AppSpacing.s16,
+              AppSpacing.s16,
+            ),
+            child: AppErrorState(
+              message:
+                  'Could not delete the account. Your account is '
+                  'unchanged and you are still signed in.',
+              detail: error,
+              onRetry: () => _confirmDeletion(context, ref),
+              onDismiss: () => setState(() => _deleteError = null),
+            ),
+          ),
       ],
     );
   }
@@ -219,7 +248,9 @@ class AccountSection extends ConsumerWidget {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: Theme.of(
+                context,
+              ).extension<AppTokens>()!.dangerText,
             ),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Delete permanently'),
@@ -234,10 +265,8 @@ class AccountSection extends ConsumerWidget {
     try {
       await ref.read(apiProvider).deleteAccount();
     } on api.ApiException catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete the account. ${e.message}')),
-      );
+      if (!mounted) return;
+      setState(() => _deleteError = e.message);
     }
   }
 }

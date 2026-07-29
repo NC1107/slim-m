@@ -34,10 +34,9 @@ class InvitesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Invites'),
-        leading: IconButton(
-          icon: const Icon(AppIcons.back),
+        leading: BackToButton(
           tooltip: 'Back to Space settings',
-          onPressed: () => closeScreen(context, Routes.spaceSettings),
+          fallback: Routes.spaceSettings,
         ),
       ),
       // top: false because the AppBar already clears the status bar.
@@ -49,39 +48,29 @@ class InvitesScreen extends ConsumerWidget {
             children: [
               const _CreateInviteCard(),
               const SizedBox(height: AppSpacing.s16),
-              invites.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => const _Message('Could not load invites.'),
-                data: (list) => list.isEmpty
-                    ? const _Message('No invites yet.')
-                    : Column(
-                        children: [
-                          for (final invite in list) ...[
-                            _InviteRow(invite: invite),
-                            const SizedBox(height: AppSpacing.s8),
-                          ],
-                        ],
-                      ),
+              AppAsyncView<List<api.Invite>>(
+                value: AppAsyncState(
+                  data: invites.valueOrNull,
+                  error: invites.error,
+                ),
+                center: false,
+                errorMessage: 'Could not load invites.',
+                onRetry: () => ref.invalidate(invitesProvider),
+                isEmpty: (list) => list.isEmpty,
+                emptyMessage: 'No invites yet.',
+                data: (context, list) => Column(
+                  children: [
+                    for (final invite in list) ...[
+                      _InviteRow(invite: invite),
+                      const SizedBox(height: AppSpacing.s8),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-class _Message extends StatelessWidget {
-  const _Message(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s16),
-      child: Text(text, style: TextStyle(color: tokens.textSecondary)),
     );
   }
 }

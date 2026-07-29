@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 /// Asks before a destructive, hard-to-undo action. [message] must state what
 /// happens, not just ask "are you sure?".
@@ -24,17 +25,18 @@ Future<bool> confirmDangerousAction(
     builder: (context) => AlertDialog(
       title: Text(title),
       content: Text(message),
+      // Danger is outlined, never filled: the destructive choice must be
+      // unmistakable without being the brightest thing in the dialog.
       actions: [
-        TextButton(
+        AppButton(
+          label: cancelLabel,
+          variant: AppButtonVariant.ghost,
           onPressed: () => Navigator.of(context).pop(false),
-          child: Text(cancelLabel),
         ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+        AppButton(
+          label: confirmLabel,
+          variant: AppButtonVariant.danger,
           onPressed: () => Navigator.of(context).pop(true),
-          child: Text(confirmLabel),
         ),
       ],
     ),

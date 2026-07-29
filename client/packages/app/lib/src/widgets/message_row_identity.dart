@@ -60,6 +60,52 @@ String formatMessageDay(int epochMs, {DateTime? now}) {
       : '$month ${dt.day}, ${dt.year}';
 }
 
+/// The row's time slot, which is also its delivery state: the timestamp once
+/// sent, a clock and "sending" while in flight, and a red "not sent" on
+/// failure - full strength, because a failed message is still the author's
+/// to act on (error grammar 01).
+class MessageTimeMark extends StatelessWidget {
+  const MessageTimeMark({
+    super.key,
+    required this.message,
+    this.compact = false,
+  });
+
+  final Message message;
+
+  /// Glyph-only pending/failed marks, for the 36px continuation gutter where
+  /// a word cannot fit.
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final mono = AppText.micro.copyWith(
+      color: tokens.textSecondary,
+      fontFamily: AppFonts.mono,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    if (message.failed) {
+      return compact
+          ? Icon(AppIcons.failed, size: 11, color: tokens.dangerText)
+          : Text('not sent', style: mono.copyWith(color: tokens.dangerText));
+    }
+    if (message.pending) {
+      return compact
+          ? Icon(AppIcons.clock, size: 11, color: tokens.textSecondary)
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(AppIcons.clock, size: 11, color: tokens.textSecondary),
+                const SizedBox(width: 4),
+                Text('sending', style: mono),
+              ],
+            );
+    }
+    return Text(formatMessageTime(message.createdAt), style: mono);
+  }
+}
+
 class MessageRowLeading extends StatelessWidget {
   const MessageRowLeading({
     super.key,
@@ -82,15 +128,7 @@ class MessageRowLeading extends StatelessWidget {
         width: _avatarSize,
         child: Padding(
           padding: const EdgeInsets.only(top: 3),
-          child: Text(
-            formatMessageTime(message.createdAt),
-            textAlign: TextAlign.right,
-            style: AppText.micro.copyWith(
-              color: tokens.textSecondary,
-              fontFamily: AppFonts.mono,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
+          child: MessageTimeMark(message: message, compact: true),
         ),
       );
     }
@@ -159,14 +197,7 @@ class MessageRowHeader extends StatelessWidget {
             const AppBadge(variant: AppBadgeVariant.tag, label: 'webhook'),
           ],
           const SizedBox(width: AppSpacing.s8),
-          Text(
-            formatMessageTime(message.createdAt),
-            style: AppText.micro.copyWith(
-              color: tokens.textSecondary,
-              fontFamily: AppFonts.mono,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
+          MessageTimeMark(message: message),
         ],
       ),
     );

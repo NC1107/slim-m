@@ -20,6 +20,10 @@ import 'package:slimm_design_system/design_system.dart';
 const double kModalMaxWidth = 860;
 const double kModalMaxHeight = 720;
 
+/// The dim behind anything modal. One value, so a palette and a settings
+/// panel do not darken the app by different amounts.
+const Color kScrimColor = Color(0x99000000);
+
 /// The page for a route that is a screen on a phone and a modal on a desktop.
 ///
 /// [child] is the screen itself, unchanged: it keeps its own app bar, which
@@ -37,7 +41,7 @@ Page<void> modalPage(BuildContext context, Widget child) {
   return CustomTransitionPage<void>(
     opaque: false,
     barrierDismissible: true,
-    barrierColor: const Color(0x99000000),
+    barrierColor: kScrimColor,
     barrierLabel: 'Dismiss',
     transitionDuration: AppMotion.reduced(context, AppMotion.slow),
     reverseTransitionDuration: AppMotion.reduced(context, AppMotion.base),

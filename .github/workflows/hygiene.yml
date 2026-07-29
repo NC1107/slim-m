@@ -268,3 +268,8 @@ jobs:
       # Warns at 300 and fails at 500; the reasoning is in the script header.
       - name: file size budget
         run: bash scripts/check-file-budget.sh
+
+      # Ratchets the one-line comment cap: a file may not gain a new run, and
+      # the pre-existing ones are listed at their count. See the script header.
+      - name: comment cap
+        run: bash scripts/check-comment-cap.sh

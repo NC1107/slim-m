@@ -90,7 +90,7 @@ class NotificationsSection extends ConsumerWidget {
             color: registered
                 ? tokens.accent
                 : blocked
-                ? Theme.of(context).colorScheme.error
+                ? tokens.dangerText
                 : tokens.textSecondary,
           ),
           title: Text(status.label),

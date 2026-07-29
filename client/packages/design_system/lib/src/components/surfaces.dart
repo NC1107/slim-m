@@ -3,10 +3,12 @@
 /// fenced-code widgets built on top of them.
 library;
 
+export 'surfaces/async_view.dart';
 export 'surfaces/callout.dart';
 export 'surfaces/card.dart';
 export 'surfaces/code_block.dart';
 export 'surfaces/content_column.dart';
+export 'surfaces/error_state.dart';
 export 'surfaces/list_row.dart';
 export 'surfaces/menu.dart';
 export 'surfaces/sheet.dart';

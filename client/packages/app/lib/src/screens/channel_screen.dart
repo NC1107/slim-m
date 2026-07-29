@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 import '../ids.dart';
 import '../providers/admin_providers.dart';
@@ -222,12 +223,12 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
 
   void _scrollToLatest() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
+      if (!mounted || !_scroll.hasClients) return;
       _scroll.animateTo(
         // The list is reversed, so the latest message sits at offset zero.
         _scroll.position.minScrollExtent,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
+        duration: AppMotion.reduced(context, AppMotion.slow),
+        curve: AppMotion.entrance,
       );
     });
   }
@@ -338,6 +339,13 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                               onRetry: (m) => unawaited(retryMessage(ref, m)),
                               onDiscard: (m) =>
                                   unawaited(discardMessage(ref, m)),
+                              // Failed text lands back in the composer to fix
+                              // and resend; the failed row is then discarded,
+                              // so nothing the user wrote is ever lost.
+                              onEditFailed: (m) {
+                                _composer.text = m.content;
+                                unawaited(discardMessage(ref, m));
+                              },
                               onPickReaction: (m, emoji) =>
                                   unawaited(_pickReaction(m, emoji)),
                               onReactionTap: (m, reaction) =>

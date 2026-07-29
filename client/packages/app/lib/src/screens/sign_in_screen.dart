@@ -40,7 +40,14 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   bool _creatingAccount = false;
   bool _busy = false;
-  String? _error;
+
+  /// The current failure and the field it belongs to (error grammar 03: an
+  /// error lands on the thing that failed, with its content preserved).
+  /// [_ErrorField.form] is the fallback for failures no one field owns.
+  (_ErrorField, String)? _error;
+
+  String? _errorFor(_ErrorField field) =>
+      _error?.$1 == field ? _error!.$2 : null;
 
   /// What the server in the field said about itself, or null while nothing is
   /// known: the probe is pending, the host is unreachable, or it answered with
@@ -152,7 +159,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Future<void> _submit() async {
     final address = Uri.tryParse(_server.text.trim());
     if (address == null || !address.hasScheme || address.host.isEmpty) {
-      setState(() => _error = 'That does not look like a server address.');
+      setState(
+        () => _error = (
+          _ErrorField.server,
+          'That does not look like a server address.',
+        ),
+      );
       return;
     }
 
@@ -201,16 +213,29 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       // nothing about whether to fix their password or wait.
       setState(
         () => _error = switch (e) {
-          UnauthorizedException() =>
-            'That username and password did not match.',
-          ConflictException() => 'That username is already taken.',
-          BadRequestException(:final message) => message,
-          RateLimitedException() =>
+          UnauthorizedException() => (
+            _ErrorField.password,
+            'Wrong username or password.',
+          ),
+          ConflictException() => (
+            _ErrorField.username,
+            'That username is already taken.',
+          ),
+          BadRequestException(:final message) => (_ErrorField.form, message),
+          RateLimitedException() => (
+            _ErrorField.form,
             'Too many attempts just now. Wait a moment and try again.',
-          UnavailableException() => 'The server is busy. Try again shortly.',
-          TransportException() =>
-            'Could not reach that server. Check the address and your connection.',
-          _ => 'The server refused that. ${e.message}',
+          ),
+          UnavailableException() => (
+            _ErrorField.form,
+            'The server is busy. Try again shortly.',
+          ),
+          TransportException() => (
+            _ErrorField.server,
+            "This Space didn't answer. It may be restarting, or the "
+                'address may be wrong. Nothing was sent.',
+          ),
+          _ => (_ErrorField.form, 'The server refused that. ${e.message}'),
         },
       );
     } finally {
@@ -254,10 +279,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   const SizedBox(height: AppSpacing.s24),
                   TextField(
                     controller: _server,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Server',
                       helperText:
                           "The Space you're joining - its server address.",
+                      errorText: _errorFor(_ErrorField.server),
+                      errorMaxLines: 3,
                     ),
                     keyboardType: TextInputType.url,
                     autocorrect: false,
@@ -289,7 +316,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   const SizedBox(height: AppSpacing.s16),
                   TextField(
                     controller: _username,
-                    decoration: const InputDecoration(labelText: 'Username'),
+                    decoration: InputDecoration(
+                      labelText: 'Username',
+                      errorText: _errorFor(_ErrorField.username),
+                    ),
                     autocorrect: false,
                     autofillHints: const [AutofillHints.username],
                   ),
@@ -307,20 +337,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   const SizedBox(height: AppSpacing.s16),
                   TextField(
                     controller: _password,
-                    decoration: const InputDecoration(labelText: 'Password'),
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      errorText: _errorFor(_ErrorField.password),
+                    ),
                     obscureText: true,
                     autofillHints: const [AutofillHints.password],
                     onSubmitted: (_) => _busy ? null : _submit(),
                   ),
-                  if (_error != null) ...[
+                  if (_errorFor(_ErrorField.form) case final formError?) ...[
                     const SizedBox(height: AppSpacing.s16),
                     Semantics(
                       liveRegion: true,
                       child: Text(
-                        _error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                        formError,
+                        style: TextStyle(color: tokens.dangerText),
                       ),
                     ),
                   ],
@@ -366,3 +397,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     );
   }
 }
+
+/// Which part of the form a failure belongs to.
+enum _ErrorField { server, username, password, form }

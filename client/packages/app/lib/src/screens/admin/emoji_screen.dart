@@ -32,10 +32,9 @@ class EmojiScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Emoji'),
-        leading: IconButton(
-          icon: const Icon(AppIcons.back),
+        leading: BackToButton(
           tooltip: 'Back to Space settings',
-          onPressed: () => closeScreen(context, Routes.spaceSettings),
+          fallback: Routes.spaceSettings,
         ),
       ),
       // top: false because the AppBar already clears the status bar.
@@ -47,39 +46,29 @@ class EmojiScreen extends ConsumerWidget {
             children: [
               const EmojiUploadCard(),
               const SizedBox(height: AppSpacing.s16),
-              emoji.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => const _Message('Could not load emoji.'),
-                data: (list) => list.isEmpty
-                    ? const _Message('No emoji yet.')
-                    : Column(
-                        children: [
-                          for (final item in list) ...[
-                            _EmojiRow(emoji: item),
-                            const SizedBox(height: AppSpacing.s8),
-                          ],
-                        ],
-                      ),
+              AppAsyncView<List<api.CustomEmoji>>(
+                value: AppAsyncState(
+                  data: emoji.valueOrNull,
+                  error: emoji.error,
+                ),
+                center: false,
+                errorMessage: 'Could not load emoji.',
+                onRetry: () => ref.invalidate(customEmojiProvider),
+                isEmpty: (list) => list.isEmpty,
+                emptyMessage: 'No emoji yet.',
+                data: (context, list) => Column(
+                  children: [
+                    for (final item in list) ...[
+                      _EmojiRow(emoji: item),
+                      const SizedBox(height: AppSpacing.s8),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-class _Message extends StatelessWidget {
-  const _Message(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s16),
-      child: Text(text, style: TextStyle(color: tokens.textSecondary)),
     );
   }
 }

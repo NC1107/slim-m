@@ -299,7 +299,9 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
               liveRegion: true,
               child: Text(
                 _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                style: TextStyle(
+                  color: Theme.of(context).extension<AppTokens>()!.dangerText,
+                ),
               ),
             ),
         ],
@@ -394,7 +396,9 @@ class _ManualServerDialogState extends State<_ManualServerDialog> {
               liveRegion: true,
               child: Text(
                 _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                style: TextStyle(
+                  color: Theme.of(context).extension<AppTokens>()!.dangerText,
+                ),
               ),
             ),
           ],
