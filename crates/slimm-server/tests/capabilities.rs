@@ -127,3 +127,33 @@ async fn probing_does_not_reach_a_handler() {
     assert!(served_by(router).await.contains(&Capability::Report));
     assert!(!reached.load(std::sync::atomic::Ordering::SeqCst));
 }
+
+/// `/version` uses the derivation, not a list written beside it.
+///
+/// Every negative test above drives `served_by` against a synthetic router;
+/// this drives the exact function `/version` builds its list from
+/// (`http::capability_names`) against two routers, so a hardcoded
+/// `["block", "report"]` in that path could not answer differently for a bare
+/// router than for one that serves both. The one-line `capabilities` wrapper
+/// over `capability_names(router(state))` is then trivially the real router's
+/// answer.
+#[tokio::test]
+async fn version_capability_names_are_derived_from_the_router() {
+    let bare = Router::new().route("/healthz", get(|| async { "ok" }));
+    assert!(
+        http::capability_names(bare).await.is_empty(),
+        "a router without the safety routes advertises nothing"
+    );
+
+    let full = Router::new()
+        .route(
+            "/blocks/{user_id}",
+            post(|| async { StatusCode::NO_CONTENT }).delete(|| async { StatusCode::NO_CONTENT }),
+        )
+        .route("/reports", get(|| async { "[]" }).post(|| async { "{}" }));
+    assert_eq!(
+        http::capability_names(full).await,
+        vec!["block", "report"],
+        "a router with both serves both, by name"
+    );
+}
