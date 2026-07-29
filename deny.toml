@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# The dependency-license allowlist, and the only copy of it.
+# cargo-deny reads this file for the Rust tree and
+# scripts/check-dart-licenses.py reads the same [licenses] table for the Dart
+# tree, so the two ecosystems cannot drift onto different policies.
+# Every allowed license below is permissive and imposes no source-disclosure
+# obligation on either the AGPL server or the Apache-2.0 client; anything else
+# fails the gate and wants a human decision, one named package at a time.
+# Why each exception is here, and why advisories and bans are not configured,
+# is in docs/ci.md.
+
+[graph]
+all-features = true
+
+[licenses]
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "MIT",
+  "BSD-1-Clause",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "BSL-1.0",
+  "Unicode-3.0",
+  "Unlicense",
+  "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.9
+# A license only the Dart half uses is not an unused Rust allowance.
+unused-allowed-license = "allow"
+
+# Named rather than allowed outright, so a third-party AGPL crate still stops.
+[[licenses.exceptions]]
+name = "slimm-server"
+allow = ["AGPL-3.0-only"]
+
+# MPL-2.0 is per-file copyleft and reaches neither client; see docs/ci.md.
+[[licenses.exceptions]]
+name = "dbus"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+name = "nm"
+allow = ["MPL-2.0"]
+
+[bans]
+multiple-versions = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

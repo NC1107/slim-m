@@ -2,8 +2,8 @@
 
 Why the workflows in `.github/workflows/` are shaped the way they are.
 
-A YAML file has no doc-comment mechanism, so a `#` block is the only thing a workflow can carry, and this repo caps a plain comment at two lines.
-Anything that needs more room than that lives here, and the workflow keeps a two-line note pointing at the section.
+A YAML file has no doc-comment mechanism, so a `#` block at the top of a workflow is the only thing it can carry, and this repo caps a plain comment elsewhere at one line.
+Anything that needs more room than that lives here, and the workflow keeps a short note pointing at the section.
 Each section below is named for its workflow file.
 
 ## Workflows at a glance
@@ -15,7 +15,8 @@ Each section below is named for its workflow file.
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | the iOS CallKit XCTest on macOS, and the extension-embeds-no-frameworks check |
 | `schema-ci` | changes under `schema/`, `redocly.yaml` | redocly lint, and the additive-only oasdiff gate on pull requests |
 | `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
-| `hygiene` | every push and pull request | iOS purpose strings, no emoji in UI source, SPDX headers on Rust source |
+| `hygiene` | every push and pull request | iOS purpose strings, no emoji in UI source, SPDX headers on Rust source, the file-size budget |
+| `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main` | every Rust crate's and every pub package's license is in the one allowlist |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
 | `compose-smoke` | changes to the self-host stack, plus a weekly schedule | `docker compose up` on a fresh box produces a working deployment |
 | `push-relay-contract` | changes to the server's push path | a server-generated envelope through the relay repo's real HTTP handler |
@@ -95,6 +96,69 @@ This gate turns that into a red PR instead.
 Emoji are user content (reactions), never interface chrome; chrome uses Lucide icons.
 The gate fails on any emoji codepoint in client source.
 It matches text sources only and passes `--binary-files=without-match`, so a compiled artifact that happens to contain those bytes cannot trip it.
+
+### The file-size budget
+
+`scripts/check-file-budget.sh` enforces the rule in `CLAUDE.md`: 300 lines soft, 500 lines hard.
+It warns at 300 and fails at 500, because 300 is the review budget rather than a limit and failing on it would fail the repository as it stands.
+When this was written 64 files were over 300 and 14 were over 500.
+
+The check runs over hand-authored source only, from `git ls-files`, so nothing untracked or ignored is counted: `.rs`, `.dart`, `.py`, `.sh`, `.swift`, `.kt`, `.kts`, `.js`, `.sql`, `.yml`, `.yaml`, `.toml`, `.cc`, `.h`, `.gradle`.
+Generated Dart (`.g.dart`, `.freezed.dart`, the protobuf suffixes), the committed `.sqlx/` cache and the vendored `node_modules/` are excluded, because their size is nobody's decision here.
+Markdown is excluded too, deliberately: the budget is a code-review budget, and prose is not reviewed by the line.
+Including it would put this file, `CLAUDE.md` and most of `docs/` over the hard limit on day one, which would make the gate noise rather than a gate.
+
+The 14 files already past 500 are listed in `scripts/file-budget-allow.txt` with the line count they were listed at and a one-line reason.
+That number is the point.
+The gate treats it as that file's own ceiling, so a listed file may shrink and may not grow, and raising a number is a visible line in a diff somebody has to justify.
+An entry whose file has dropped back under 500, or which no longer names a checked file, is an error rather than a silent no-op, so the list cannot rot the way a plain exemption list would.
+
+Nothing in that list is a judgement that the file is acceptable.
+The two worst are production code, not tests: `store/sessions.rs` at 957 lines carries tokens, refresh rotation, ws tickets and account deletion together, and `push.rs` at 625 carries envelope sealing, the relay client and fan-out triggering.
+Splitting them is real work with real regression risk and does not belong in the change that introduces the gate.
+`schema/openapi.yaml` and `release.yml` are the two that will most likely stay: one OpenAPI document split across `$ref` files would give `tests/openapi_contract.rs` two sources to reconcile, and the release workflow's ten publish jobs share release-please's outputs.
+
+## licenses
+
+Two jobs, one policy.
+`deny.toml` holds the allowlist; cargo-deny reads it directly for the Rust tree and `scripts/check-dart-licenses.py` reads the same `[licenses]` table for the Dart tree.
+One file rather than two, because the failure this gate exists to catch is a copyleft dependency arriving quietly in the Apache-2.0 client, and two policies that can drift is how that arrives.
+
+It is not part of `hygiene` because both halves need a toolchain.
+`hygiene` is the seconds-long grep job that runs on every push with nothing installed, and a cargo metadata resolve plus a `flutter pub get` would turn that into minutes.
+So it is path-gated on the manifests, the lockfiles and the policy, plus every push to `main` whatever changed.
+
+### What is allowed, and what is not
+
+Every entry in `allow` is permissive and imposes no source-disclosure obligation on either the AGPL server or the Apache-2.0 client (see `LICENSING.md`).
+Nothing is listed speculatively: the list is exactly what the two trees resolve to today, so a new license of any kind stops the gate and gets a human decision.
+
+Three package-level exceptions, each named one package at a time rather than allowing the license outright:
+
+- `slimm-server` is allowed `AGPL-3.0-only`, since it is the server itself. Allowing AGPL across the board would let a third-party AGPL crate in unnoticed, which is the opposite of what this is for.
+- `dbus` and `nm` are allowed `MPL-2.0`. MPL-2.0 is per-file copyleft: the obligation reaches modifications to those packages' own files and not the application that links them, so it is compatible with shipping an Apache-2.0 client. That is a decision rather than a default, which is why it is two named entries and not a line in `allow`; a new MPL dependency still stops the gate. Both are Linux desktop transitives reached through `connectivity_plus`.
+
+Advisories and bans are deliberately not configured here, so this is `cargo deny check licenses` and not `check all`.
+A CVE published upstream would turn every unrelated pull request red through no fault of its own, which is a different job wanting a different trigger; `docs/STRATEGY.md` names `cargo audit` and `osv-scanner` for it and neither is wired yet.
+
+`-A license-exception-not-encountered` is passed because the allow list is shared: `dbus` and `nm` are pub packages, so cargo-deny correctly reports never having seen them, and that is not a finding.
+`unused-allowed-license = "allow"` in the config is there for the same reason in the other direction.
+
+### The Dart half, and why it reads license text
+
+pub has no cargo-deny, and a pub package declares no license anywhere in its pubspec; pub.dev derives what it displays from the package's `LICENSE` file.
+So the script parses `client/pubspec.lock`, finds each hosted package in the pub cache, and classifies the license text itself.
+
+That means the job has to run a real `flutter pub get --enforce-lockfile` first, and it means two failure modes are checked explicitly rather than skipped:
+
+- A package the classifier cannot identify is an error, not a pass. A gate that shrugs at what it cannot read is not a gate, and the fix is to look at the file and either widen the classifier or record what it is.
+- A package missing from the cache is an error naming the count, so an empty or partial cache fails loudly instead of the run going green having checked nothing.
+
+One trap in the classifier, found by running it rather than by reading it: MPL-2.0's own text names the GPL, the LGPL and the AGPL, in the clause defining a Secondary License.
+Matching the GNU family anywhere in the file therefore read `dbus` and `nm` as AGPL-3.0-only, which was a wrong label on a correct-enough refusal, and would have been a wrong label on a wrongly permissive answer just as easily.
+The GNU family is matched against the first 600 characters only, where a real GPL text carries its title.
+
+Today it reads 157 packages: 124 BSD-3-Clause, 24 MIT, 5 Apache-2.0, 2 BSD-2-Clause and the 2 MPL-2.0 above.
 
 ## perf
 
