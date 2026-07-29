@@ -44,8 +44,7 @@ class _ScreenShareViewState extends State<ScreenShareView> {
   @override
   void initState() {
     super.initState();
-    // Any room event can change track availability; rebuilding on each is
-    // cheap next to decoding video, and mounted-guarded.
+    // Any room event can change track availability; a rebuild is cheap next to decoding video.
     _cancel = widget.room.events.listen((_) {
       if (mounted) setState(() {});
     });
@@ -74,8 +73,7 @@ class _ScreenShareViewState extends State<ScreenShareView> {
   Widget build(BuildContext context) {
     final track = _shareTrack();
     if (track == null) {
-      // Honest about the beat between "sharing" and the track arriving; if
-      // the share ended instead, the roster flips and this unmounts.
+      // Honest about the beat between "sharing" and the track arriving.
       return const Center(
         child: Text(
           'Waiting for the shared screen...',

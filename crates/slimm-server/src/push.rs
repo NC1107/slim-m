@@ -219,9 +219,7 @@ async fn deliver(
         }
     };
 
-    // Not an optimization to skip; see the note on this function. Batched:
-    // the per-candidate has_permission loop here multiplied every message's
-    // write path by the push-registered member count, four queries each.
+    // Not an optimization to skip (see the note on this function); batched, since per-candidate checks multiplied the write path by the member count.
     let candidates: Vec<UserId> = candidates
         .into_iter()
         .filter(|user_id| *user_id != author_id)

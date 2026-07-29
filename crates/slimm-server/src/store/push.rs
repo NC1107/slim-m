@@ -171,9 +171,7 @@ impl Store {
         if user_ids.is_empty() {
             return Ok(Vec::new());
         }
-        // One batched query rather than one per recipient; built because the
-        // id list is variable length and SQLite has no array binding, the
-        // same shape roles_for_users uses.
+        // One batched query, built (no array binding in SQLite), the same shape roles_for_users uses.
         let mut builder = sqlx::QueryBuilder::new(
             "SELECT id, user_id, platform, push_token_ref, voip_push_token_ref, \
                     push_public_key, lifecycle_state, lifecycle_reported_at \

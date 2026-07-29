@@ -51,8 +51,7 @@ impl Store {
 
         if channel.kind == super::dms::DM_CHANNEL_KIND {
             let mut viewers = Vec::new();
-            // At most the two members of the pair survive dm_permissions, so
-            // this loop is bounded at two real checks however long the list.
+            // dm_permissions passes at most the pair, bounding this loop at two real checks.
             for &user_id in candidates {
                 if self
                     .dm_permissions(user_id, channel_id)
@@ -76,8 +75,7 @@ impl Store {
             None => (None, Permissions::NONE),
         };
 
-        // One batched query for every candidate's roles; SQLite has no array
-        // binding, so it is built, the same shape roles_for_users uses.
+        // One built query for every candidate's roles (no array binding in SQLite), the same shape roles_for_users uses.
         let mut builder = sqlx::QueryBuilder::new(
             "SELECT mr.user_id AS user_id, r.id AS role_id, r.permissions AS permissions \
              FROM roles r JOIN member_roles mr ON mr.role_id = r.id \
@@ -169,8 +167,7 @@ impl Store {
         }
         let roles = self.load_roles(user_id).await?;
 
-        // One query for every listed channel's overwrites; built because the
-        // id list is variable length and SQLite has no array binding.
+        // One built query for every listed channel's overwrites (no array binding in SQLite).
         let mut builder = sqlx::QueryBuilder::new(
             "SELECT channel_id, target_type, target_id, allow, deny \
              FROM channel_overwrites WHERE channel_id IN (",

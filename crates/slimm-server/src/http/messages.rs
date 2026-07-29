@@ -468,8 +468,7 @@ fn parse_attachment_ids(raw: &[String]) -> Result<Vec<Vec<u8>>, ApiError> {
                 .ok_or(ApiError::BadRequest("invalid attachment id"))
         })
         .collect::<Result<_, _>>()?;
-    // Refused here rather than surfacing as the 500 the link table's
-    // (message_id, sha256) primary key turns a repeat into.
+    // Refused here rather than as the 500 the link table's primary key turns a repeat into.
     let mut seen = std::collections::HashSet::new();
     if !ids.iter().all(|id| seen.insert(id.clone())) {
         return Err(ApiError::BadRequest("duplicate attachment id"));
