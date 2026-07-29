@@ -106,10 +106,13 @@ Four things cost real time to learn, and each fails silently rather than loudly:
 ## Two things it drives at the API, on purpose
 
 Reporting and blocking live behind a context menu that opens on right-click or
-long-press and offers nothing else.
-With the accessibility tree on, a synthetic pointer event cannot open it - and
-neither can a person who does not use a mouse, because there is no keyboard
-affordance and no semantic action.
+long-press.
+With the accessibility tree on, a synthetic pointer event cannot open it, so
+this harness cannot reach it.
+A screen reader can: `GestureDetector` publishes a long-press semantic action,
+which VoiceOver and TalkBack surface, and a test guards that.
+A keyboard-only user cannot, because the rows take no focus and no key opens
+the menu.
 So those two are driven at the API, and `scripts/lib/e2e_admin.py` says so in
 its docstring rather than implying the UI path was exercised.
 The underlying gap is recorded in `CLAUDE.md`; closing it would make the menu
