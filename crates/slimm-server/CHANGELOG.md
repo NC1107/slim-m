@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1](https://github.com/NC1107/slim-m/compare/server-v0.16.0...server-v0.16.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* close 16 defects a multi-agent audit found, moderation-queue holes first ([#118](https://github.com/NC1107/slim-m/issues/118)) ([b4eab36](https://github.com/NC1107/slim-m/commit/b4eab36e4e0b2b35a180542fe987225677fd82d7))
+
 ## [0.16.0](https://github.com/NC1107/slim-m/compare/server-v0.15.0...server-v0.16.0) (2026-07-28)
 
 
