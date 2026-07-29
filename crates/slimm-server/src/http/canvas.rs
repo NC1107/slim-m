@@ -152,6 +152,14 @@ async fn viewport(
         limit: limit + 1,
     };
 
+    // The cursor is read before the objects, not after, and the order is the
+    // whole point once a write route exists (Phase 6). Read after, an object
+    // placed between the two reads has a seq at or below the returned cursor
+    // but was absent from the page, so a client that resumes from this cursor
+    // over the same rect never sees it. Read before, the same object either
+    // has a higher seq (a later delta finds it) or is included here; either way
+    // it cannot be lost. Over-reporting self-heals, under-reporting does not.
+    let latest_seq = state.store.latest_canvas_seq(channel_id).await?;
     let mut objects = state.store.viewport_objects(channel_id, &query).await?;
     let has_more = objects.len() as i64 > limit;
     objects.truncate(limit as usize);
@@ -159,7 +167,7 @@ async fn viewport(
     Ok(Json(ViewportDto {
         objects: objects.into_iter().map(CanvasObjectDto::from).collect(),
         has_more,
-        latest_seq: state.store.latest_canvas_seq(channel_id).await?,
+        latest_seq,
     }))
 }
 
