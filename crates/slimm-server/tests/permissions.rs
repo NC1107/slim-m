@@ -180,3 +180,65 @@ async fn overwrites_for_other_targets_are_ignored() {
     let perms = s.permissions_in_channel(user.id, channel.id).await.unwrap();
     assert!(perms.contains(SEND), "another target's deny must not apply");
 }
+
+/// The batched fan-out check must be indistinguishable from asking
+/// [`Store::has_permission`] per candidate, across every rule the evaluator
+/// has: base deny, role grant, role-overwrite deny, member-overwrite regrant,
+/// the ADMINISTRATOR bypass, a DM's membership-only model, and a channel that
+/// does not exist. Push fan-out rides on this equivalence; a divergence here
+/// is a wrongly delivered (or wrongly suppressed) notification.
+#[tokio::test]
+async fn viewers_among_matches_the_per_user_check() {
+    let (s, _guard) = store().await;
+    s.create_role("everyone", NONE, true).await.unwrap();
+    let viewer_role = s.create_role("viewer", VIEW, false).await.unwrap();
+    let admin_role = s
+        .create_role("admin", Permissions::ADMINISTRATOR, false)
+        .await
+        .unwrap();
+
+    let plain = s.create_user("plain", "Plain").await.unwrap();
+    let viewer = s.create_user("viewer", "Viewer").await.unwrap();
+    let denied = s.create_user("denied", "Denied").await.unwrap();
+    let regranted = s.create_user("regranted", "Regranted").await.unwrap();
+    let admin = s.create_user("admin", "Admin").await.unwrap();
+    s.assign_role(viewer.id, viewer_role).await.unwrap();
+    s.assign_role(denied.id, viewer_role).await.unwrap();
+    s.assign_role(regranted.id, viewer_role).await.unwrap();
+    s.assign_role(admin.id, admin_role).await.unwrap();
+
+    let channel = s.create_channel("general", "text").await.unwrap();
+    // Role tier denies VIEW; one member gets it back individually.
+    s.set_role_overwrite(channel.id, viewer_role, NONE, VIEW)
+        .await
+        .unwrap();
+    s.set_member_overwrite(channel.id, regranted.id, VIEW, NONE)
+        .await
+        .unwrap();
+    // The denied member also carries an unrelated allow, so the member
+    // overwrite path is exercised without regranting VIEW.
+    s.set_member_overwrite(channel.id, denied.id, SEND, NONE)
+        .await
+        .unwrap();
+
+    let everyone = [plain.id, viewer.id, denied.id, regranted.id, admin.id];
+    let batched = s.viewers_among(channel.id, &everyone).await.unwrap();
+    for user_id in everyone {
+        let single = s.has_permission(user_id, channel.id, VIEW).await.unwrap();
+        assert_eq!(
+            batched.contains(&user_id),
+            single,
+            "batched and per-user answers diverged for {user_id:?}"
+        );
+    }
+    assert_eq!(batched, vec![regranted.id, admin.id]);
+
+    // A DM: only the pair is visible, however many candidates are offered.
+    let dm = s.open_dm(plain.id, viewer.id).await.unwrap();
+    let dm_viewers = s.viewers_among(dm.id, &everyone).await.unwrap();
+    assert_eq!(dm_viewers, vec![plain.id, viewer.id]);
+
+    // A channel that does not exist grants nothing, same as the single check.
+    let ghost = slimm_server::ids::ChannelId::generate();
+    assert!(s.viewers_among(ghost, &everyone).await.unwrap().is_empty());
+}

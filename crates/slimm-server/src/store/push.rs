@@ -168,11 +168,46 @@ impl Store {
     /// (or a stale row left by an earlier login on the same physical device)
     /// would keep receiving push indefinitely.
     pub async fn push_targets(&self, user_ids: &[UserId]) -> anyhow::Result<Vec<PushTarget>> {
-        let mut targets = Vec::new();
-        for &user_id in user_ids {
-            targets.extend(self.push_targets_for_user(user_id).await?);
+        if user_ids.is_empty() {
+            return Ok(Vec::new());
         }
-        Ok(targets)
+        // One batched query rather than one per recipient; built because the
+        // id list is variable length and SQLite has no array binding, the
+        // same shape roles_for_users uses.
+        let mut builder = sqlx::QueryBuilder::new(
+            "SELECT id, user_id, platform, push_token_ref, voip_push_token_ref, \
+                    push_public_key, lifecycle_state, lifecycle_reported_at \
+             FROM devices \
+             WHERE push_token_ref IS NOT NULL \
+               AND push_public_key IS NOT NULL AND platform IS NOT NULL \
+               AND EXISTS ( \
+                     SELECT 1 FROM sessions \
+                      WHERE sessions.device_id = devices.id AND sessions.revoked_at IS NULL \
+                   ) \
+               AND user_id IN (",
+        );
+        let mut separated = builder.separated(", ");
+        for id in user_ids {
+            separated.push_bind(*id);
+        }
+        builder.push(")");
+        let rows = builder.build().fetch_all(&self.pool).await?;
+
+        use sqlx::Row;
+        rows.into_iter()
+            .map(|r| {
+                Ok(PushTarget {
+                    user_id: r.try_get("user_id")?,
+                    device_id: r.try_get("id")?,
+                    platform: r.try_get("platform")?,
+                    push_token: r.try_get("push_token_ref")?,
+                    voip_push_token: r.try_get("voip_push_token_ref")?,
+                    push_public_key: r.try_get("push_public_key")?,
+                    lifecycle_state: r.try_get("lifecycle_state")?,
+                    lifecycle_reported_at: r.try_get("lifecycle_reported_at")?,
+                })
+            })
+            .collect()
     }
 
     /// Everyone who has at least one device that could actually receive a push
@@ -200,38 +235,6 @@ impl Store {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows.into_iter().map(|r| r.user_id).collect())
-    }
-
-    async fn push_targets_for_user(&self, user_id: UserId) -> anyhow::Result<Vec<PushTarget>> {
-        let rows = sqlx::query!(
-            r#"SELECT id AS "device_id!: DeviceId", user_id AS "user_id!: UserId",
-                      platform AS "platform!", push_token_ref AS "push_token!",
-                      voip_push_token_ref, push_public_key AS "push_public_key!",
-                      lifecycle_state, lifecycle_reported_at
-               FROM devices
-               WHERE user_id = ? AND push_token_ref IS NOT NULL
-                 AND push_public_key IS NOT NULL AND platform IS NOT NULL
-                 AND EXISTS (
-                       SELECT 1 FROM sessions
-                        WHERE sessions.device_id = devices.id AND sessions.revoked_at IS NULL
-                     )"#,
-            user_id
-        )
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(rows
-            .into_iter()
-            .map(|r| PushTarget {
-                user_id: r.user_id,
-                device_id: r.device_id,
-                platform: r.platform,
-                push_token: r.push_token,
-                voip_push_token: r.voip_push_token_ref,
-                push_public_key: r.push_public_key,
-                lifecycle_state: r.lifecycle_state,
-                lifecycle_reported_at: r.lifecycle_reported_at,
-            })
-            .collect())
     }
 
     /// Clears a device's push registration because the relay reported its
