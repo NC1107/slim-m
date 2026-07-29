@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/NC1107/slim-m/compare/client-v0.8.1...client-v0.9.0) (2026-07-29)
+
+
+### Features
+
+* **client:** motion, haptics, day dividers, and an ios screen-share fix ([#121](https://github.com/NC1107/slim-m/issues/121)) ([ca1669b](https://github.com/NC1107/slim-m/commit/ca1669b3794c05f95a633c494dedbf3680ca83b8))
+
 ## [0.8.1](https://github.com/NC1107/slim-m/compare/client-v0.8.0...client-v0.8.1) (2026-07-29)
 
 
