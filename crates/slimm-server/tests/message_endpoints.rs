@@ -532,3 +532,62 @@ async fn editing_is_rate_limited_like_the_other_writes() {
         "a sustained edit flood must be refused: {statuses:?}"
     );
 }
+
+/// Retrying a send whose message was deleted in between is the retry it is,
+/// not a 500.
+///
+/// The idempotency probe filtered deleted rows out, so the re-send fell through
+/// to an INSERT that hit the unique id and mapped to Internal. An honest
+/// at-least-once client racing a moderator delete hit this; so could any member
+/// deliberately.
+#[tokio::test]
+async fn retrying_a_deleted_send_is_not_a_500() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL
+                .union(Permissions::SEND_MESSAGES)
+                .union(Permissions::MANAGE_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let app = app(store.clone());
+    let (token, _user) = register(&store, "alice").await;
+
+    let uri = format!("/channels/{}/messages", channel.id);
+    let message_id = Uuid::now_v7().to_string();
+    let send = json!({ "id": message_id, "content": "will be deleted" });
+
+    let first = app
+        .clone()
+        .oneshot(request("POST", &uri, Some(&token), Some(send.clone())))
+        .await
+        .unwrap();
+    assert_eq!(first.status(), StatusCode::OK);
+
+    let deleted = app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/channels/{}/messages/{message_id}", channel.id),
+            Some(&token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+
+    let retry = app
+        .clone()
+        .oneshot(request("POST", &uri, Some(&token), Some(send)))
+        .await
+        .unwrap();
+    assert_eq!(
+        retry.status(),
+        StatusCode::OK,
+        "a retry of a deleted message returns it, not a 500"
+    );
+}

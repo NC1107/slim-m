@@ -158,7 +158,13 @@ async fn fetch(
         }
     }
     if !allowed {
-        return Err(ApiError::Forbidden);
+        // 404, not 403, and the difference is the whole point. An attachment id
+        // is the content's sha256, so anyone holding a candidate file can
+        // compute it; a 403-versus-404 split would tell them whether those
+        // exact bytes were shared in a DM or a private channel they cannot see.
+        // Existence follows permission here, the same collapse search and the
+        // channel API already make.
+        return Err(ApiError::NotFound("attachment not found"));
     }
 
     let meta = state

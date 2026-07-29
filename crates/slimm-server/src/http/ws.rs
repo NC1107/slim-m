@@ -321,6 +321,18 @@ async fn authorize(
         return None;
     }
 
+    // Typing carries the typist's id to everyone in the channel, so it is a
+    // second way to learn someone is online. Appear-offline is enforced at
+    // one choke point for exactly this reason, and a typing frame bypassed it:
+    // a hidden user's keystrokes announced them. Dropped here, per viewer,
+    // through the same function every other presence surface uses.
+    if let Event::TypingStarted { user_id, .. } | Event::TypingStopped { user_id, .. } = event
+        && signals::presence_status(store, hub, ctx.user_id, user_id).await
+            == Some(crate::presence::Status::Offline)
+    {
+        return None;
+    }
+
     Some(match event {
         Event::MessageCreated {
             message,
