@@ -124,8 +124,12 @@ class _RealProbe implements MediaDevicesProbe {
 
   @override
   Future<int> countScreenSources() async {
-    final sources = await desktopCapturer
-        .getSources(types: [SourceType.Screen, SourceType.Window]);
+    // Screens only, never SourceType.Window: enumerating windows segfaults
+    // the whole process on Wayland (see WebrtcDesktopSources, which learned
+    // this first); this probe had the crash the sibling already avoided.
+    final sources = await desktopCapturer.getSources(
+      types: [SourceType.Screen],
+    );
     return sources.length;
   }
 }

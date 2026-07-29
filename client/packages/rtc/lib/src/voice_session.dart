@@ -89,16 +89,42 @@ class VoiceSession {
   /// Why the last call ended, when the SFU ended it rather than this client.
   VoiceDisconnect? get lastDisconnect => _lastDisconnect;
 
+  /// The in-flight join, so a second call serializes behind it; see [join].
+  Future<void>? _joining;
+
   /// Joins a room with a token minted by the server.
   ///
   /// The token decides what this connection may do: a member without SPEAK gets
   /// one that cannot publish, and the SFU enforces that, so nothing here needs
   /// to know about permissions. Rejoining an already-connected session leaves
   /// the old one first rather than stacking two connections.
+  ///
+  /// Overlapping calls serialize rather than race: both would otherwise pass
+  /// the `_room != null` check before either assigns it, and two rooms then
+  /// fight over one session's state, stranding the UI on connecting. A second
+  /// tap of Join, or a channel switch mid-connect, now waits for the first
+  /// attempt to settle and then runs, which ends in the state the *last*
+  /// caller asked for.
   Future<void> join({
     required String url,
     required String token,
     bool microphoneEnabled = true,
+  }) {
+    final previous = _joining ?? Future<void>.value();
+    final current = previous.catchError((_) {}).then(
+          (_) => _join(
+              url: url, token: token, microphoneEnabled: microphoneEnabled),
+        );
+    _joining = current.whenComplete(() {
+      if (identical(_joining, current)) _joining = null;
+    });
+    return current;
+  }
+
+  Future<void> _join({
+    required String url,
+    required String token,
+    required bool microphoneEnabled,
   }) async {
     if (_disposed) return;
     if (_room != null) await leave();
