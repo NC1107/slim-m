@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.11.0](https://github.com/NC1107/slim-m/compare/client-v0.10.1...client-v0.11.0) (2026-07-29)
+
+
+### Features
+
+* **client:** implement the motion and feedback spec ([#131](https://github.com/NC1107/slim-m/issues/131)) ([4bdc7f0](https://github.com/NC1107/slim-m/commit/4bdc7f02fd1011f6e6f079f564933a06273fd4f3))
+* **client:** move raw Material widgets onto the design system ([#129](https://github.com/NC1107/slim-m/issues/129)) ([8136440](https://github.com/NC1107/slim-m/commit/8136440c094fee84610fb21226e44f3474db8f43))
+* **client:** the error-states grammar, and the component-audit fixes it converged with ([#132](https://github.com/NC1107/slim-m/issues/132)) ([f2b78f5](https://github.com/NC1107/slim-m/commit/f2b78f5ba2a9c578111b477aa6987f3aa15b4388))
+
 ## [0.10.1](https://github.com/NC1107/slim-m/compare/client-v0.10.0...client-v0.10.1) (2026-07-29)
 
 
