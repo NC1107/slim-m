@@ -53,7 +53,12 @@ A fix (`949af6b`, "the broadcast extension must embed no frameworks") landed on 
 The JSON performance baseline exists (`perf/baselines/0.8.0.json`, both RSS figures under the 30MB budget) but is stale: it was taken at server 0.8.0, the server is now at 0.15.0 across seven releases, and nothing re-measures or re-baselines it automatically.
 The size-regression gate is real (`server-ci.yml` fails the build past 20MiB) and the contrast gate is real and currently green (`client/packages/design_system/test/contrast_test.dart`, 22 tests against the live tokens).
 The contrast gate's original failures were genuinely resolved, not just triaged into a backlog: `docs/decisions/0004-visual-identity-review.md` documents the failing values found and the token fixes applied, and states the result clears the gate.
-Two deliverables named earlier in this phase never got the CI automation promised for them, worth flagging even though the exit criteria above don't name them directly: no workflow checks the 300-line file budget, and no workflow runs a license-allowlist check (the `LICENSES/` directory and per-file SPDX headers exist, but nothing gates on them beyond `hygiene.yml`'s SPDX-presence check).
+~~Two deliverables named earlier in this phase never got the CI automation promised for them, worth flagging even though the exit criteria above don't name them directly: no workflow checks the 300-line file budget, and no workflow runs a license-allowlist check (the `LICENSES/` directory and per-file SPDX headers exist, but nothing gates on them beyond `hygiene.yml`'s SPDX-presence check).~~
+Both closed 2026-07-28, and see `docs/ci.md` for what each one actually gates.
+The file budget is `scripts/check-file-budget.sh`, run from `hygiene`: it warns at 300 and fails at 500 over hand-authored source, since failing at 300 would fail the repository as it stands (64 files were over 300 when it was written).
+The 14 files already past 500 are in `scripts/file-budget-allow.txt` at the line count they were listed at, which the gate treats as their own ceiling, so that list is a frozen debt register rather than an exemption; the two worst are production code (`store/sessions.rs` at 957, `push.rs` at 625) and splitting them is still owed.
+The license allowlist is the new `licenses` workflow over one policy file, `deny.toml`, read by cargo-deny for the Rust tree and by `scripts/check-dart-licenses.py` for the Dart tree so the two cannot drift apart.
+It found nothing AGPL-incompatible, and one thing worth knowing: `dbus` and `nm` are MPL-2.0, which is per-file copyleft and compatible with the Apache-2.0 client, recorded as two named exceptions rather than a blanket allowance.
 
 ## Phase 1 - Server and Protocol Core
 
