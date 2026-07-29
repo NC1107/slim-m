@@ -115,13 +115,34 @@ class AttachmentView extends ConsumerWidget {
           filename: attachment.filename,
           bytes: bytes,
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.contain,
-            semanticLabel: attachment.filename,
-          ),
+        // Bordered like the chip and error states beside it (border-first
+        // elevation), and captioned: a bare rectangle with no name or size
+        // read as decoration rather than a file anyone could open.
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: tokens.borderSubtle),
+                borderRadius: BorderRadius.circular(AppRadii.control),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadii.control),
+                child: Image.memory(
+                  bytes,
+                  fit: BoxFit.contain,
+                  semanticLabel: attachment.filename,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s4),
+            Text(
+              '${attachment.filename} · ${formatByteSize(attachment.size)}',
+              overflow: TextOverflow.ellipsis,
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
+          ],
         ),
       ),
     );

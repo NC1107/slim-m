@@ -211,6 +211,27 @@ void main() {
     expect(session.state, VoiceSessionState.failed);
   });
 
+  test('overlapping joins serialize instead of racing one room slot', () async {
+    var built = 0;
+    final session = VoiceSession(
+      roomFactory: () {
+        built++;
+        return _EmptyRoom();
+      },
+    );
+    addTearDown(session.dispose);
+
+    // Unawaited on purpose: both are in flight at once, which used to let
+    // both pass the room-null check and fight over the session's one slot.
+    final first = session.join(url: 'wss://a.invalid', token: 't1');
+    final second = session.join(url: 'wss://a.invalid', token: 't2');
+    await Future.wait([first, second]);
+
+    expect(built, 2,
+        reason: 'the second join runs after, not inside, the first');
+    expect(session.state, VoiceSessionState.connected);
+  });
+
   test('dispose is idempotent and survives never having joined', () async {
     final session = VoiceSession(roomFactory: () => lk.Room());
     await session.dispose();

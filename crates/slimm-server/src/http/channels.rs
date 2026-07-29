@@ -90,21 +90,19 @@ struct UpdateChannelRequest {
     topic: Option<String>,
 }
 
-/// Lists the channels the caller can view.
+/// Lists the channels the caller can view. One batched store call: the
+/// per-channel has_permission loop this replaces cost 1 + 4C queries.
 async fn list(
     Authed(ctx): Authed,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ChannelDto>>, ApiError> {
-    let mut visible = Vec::new();
-    for channel in state.store.list_channels().await? {
-        if state
-            .store
-            .has_permission(ctx.user_id, channel.id, Permissions::VIEW_CHANNEL)
-            .await?
-        {
-            visible.push(ChannelDto::from(channel));
-        }
-    }
+    let visible = state
+        .store
+        .visible_channels(ctx.user_id)
+        .await?
+        .into_iter()
+        .map(ChannelDto::from)
+        .collect();
     Ok(Json(visible))
 }
 

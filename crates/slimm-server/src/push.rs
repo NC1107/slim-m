@@ -43,7 +43,6 @@ use url::{Host, Url};
 
 use crate::config::Config;
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
-use crate::permissions::Permissions;
 use crate::store::{Store, now_ms};
 
 /// How long a burst of messages in one channel collapses into a single wake.
@@ -220,24 +219,18 @@ async fn deliver(
         }
     };
 
-    let mut recipients: Vec<UserId> = Vec::with_capacity(candidates.len());
-    for user_id in candidates {
-        if user_id == author_id {
-            continue;
+    // Not an optimization to skip (see the note on this function); batched, since per-candidate checks multiplied the write path by the member count.
+    let candidates: Vec<UserId> = candidates
+        .into_iter()
+        .filter(|user_id| *user_id != author_id)
+        .collect();
+    let recipients = match store.viewers_among(channel_id, &candidates).await {
+        Ok(recipients) => recipients,
+        Err(err) => {
+            tracing::warn!(error = %err, %channel_id, "push: failed to check recipients' view permission");
+            return;
         }
-        // Not an optimization to skip; see the note on this function.
-        match store
-            .has_permission(user_id, channel_id, Permissions::VIEW_CHANNEL)
-            .await
-        {
-            Ok(true) => recipients.push(user_id),
-            Ok(false) => {}
-            Err(err) => {
-                tracing::warn!(error = %err, %channel_id, "push: failed to check a recipient's view permission");
-                return;
-            }
-        }
-    }
+    };
     if recipients.is_empty() {
         return;
     }

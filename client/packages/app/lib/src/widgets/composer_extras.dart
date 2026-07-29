@@ -87,7 +87,9 @@ class ComposerField extends StatelessWidget {
             IgnorePointer(
               child: Text.rich(
                 TextSpan(
-                  style: AppText.body.copyWith(color: tokens.textDisabled),
+                  // textSecondary, matching AppInput's hint: this input is
+                  // active, and textDisabled's AA exemption does not apply.
+                  style: AppText.body.copyWith(color: tokens.textSecondary),
                   children: [
                     const TextSpan(text: 'Message '),
                     TextSpan(

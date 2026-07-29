@@ -28,11 +28,12 @@ import '../../touch_targets.dart';
 ///   alike, so unread's *distinguishing* cue from selected is the dot, shown
 ///   only when [trailing] is absent (a trailing count badge already carries
 ///   the same meaning, so the dot would be redundant next to it).
-/// - [muted]: `opacity: 0.62` over the entire row in the source, dimming
-///   marker, icon, label and trailing together. This is a wholesale
-///   de-emphasis, not a colour substitution, so it is ported as [Opacity]
-///   rather than swapping in a "disabled" text colour: `textDisabled` means
-///   "not actionable", which a muted channel still is.
+/// - [muted]: dims the leading and trailing content to `opacity: 0.62`, but
+///   deliberately not the label. The source dimmed the whole row, and doing
+///   that here dragged an offline member's name below the AA contrast floor
+///   (`textSecondary` is already near it); the icon and badge carry the
+///   de-emphasis while the name stays readable. Not `textDisabled` either:
+///   that means "not actionable", which a muted channel still is.
 /// - [touch]: raises the row to [AppSizes.rowTouch]; nothing else about the
 ///   row changes. Left unset it follows [AppTouchTargets.of].
 ///
@@ -163,7 +164,13 @@ class _AppListRowState extends State<AppListRow> {
         children: [
           // Excluded for the same reason the label below is: an avatar names
           // itself, so a member row announced its name twice.
-          if (widget.leading != null) ExcludeSemantics(child: widget.leading!),
+          if (widget.leading != null)
+            ExcludeSemantics(
+              child: Opacity(
+                opacity: widget.muted ? 0.62 : 1,
+                child: widget.leading!,
+              ),
+            ),
           Expanded(
             // Excluded because the Semantics wrapper below already names this
             // row; without it a screen reader announces "general, general".
@@ -182,7 +189,11 @@ class _AppListRowState extends State<AppListRow> {
                 style: AppText.caption.copyWith(color: tokens.textSecondary),
               ),
             ),
-          if (trailingContent != null) trailingContent,
+          if (trailingContent != null)
+            Opacity(
+              opacity: widget.muted ? 0.62 : 1,
+              child: trailingContent,
+            ),
         ],
       ),
     );
@@ -273,7 +284,10 @@ class _AppListRowState extends State<AppListRow> {
                   AppHaptics.selection();
                   widget.onTap!();
                 },
-          child: Opacity(opacity: widget.muted ? 0.62 : 1, child: visual),
+          // Muted dims the leading and trailing content only, never the
+          // label: textSecondary is already near the AA floor, and scaling
+          // the whole row's opacity dragged offline member names to 3.7:1.
+          child: visual,
         ),
       ),
     );

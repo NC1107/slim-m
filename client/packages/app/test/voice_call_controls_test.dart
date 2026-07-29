@@ -54,6 +54,10 @@ class _InertSession implements VoiceSession {
   Future<List<ScreenShareSource>> screenShareSources() async => const [];
 
   @override
+  Widget screenShareViewFor(String identity) =>
+      SizedBox.shrink(key: Key('fake-share-view-$identity'));
+
+  @override
   Future<void> join({
     required String url,
     required String token,

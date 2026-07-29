@@ -123,13 +123,18 @@ impl Auth {
 
     /// Burns roughly one verification's worth of time against the decoy hash.
     /// Called on the no-such-user path so timing does not leak account existence.
-    pub async fn verify_decoy(&self) {
-        let _ = self
-            .verify_password(
-                "slim-m-decoy-password".to_owned(),
-                self.dummy_hash.to_string(),
-            )
-            .await;
+    ///
+    /// Propagates [`HashError`] rather than swallowing it: under semaphore
+    /// contention the real-user branch answers 503, and if this branch
+    /// answered an instant 401 instead, the load itself would become the
+    /// oracle this decoy exists to close.
+    pub async fn verify_decoy(&self) -> Result<(), HashError> {
+        self.verify_password(
+            "slim-m-decoy-password".to_owned(),
+            self.dummy_hash.to_string(),
+        )
+        .await
+        .map(|_| ())
     }
 }
 

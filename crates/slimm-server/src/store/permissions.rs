@@ -11,11 +11,11 @@ use crate::ids::{ChannelId, RoleId, UserId};
 use crate::permissions::{Overwrite, Permissions, evaluate};
 
 /// A user's roles, resolved once and reused by both permission read paths.
-struct RoleContext {
-    everyone_id: Option<Uuid>,
-    everyone_perms: Permissions,
-    role_perms: Vec<Permissions>,
-    role_ids: Vec<Uuid>,
+pub(super) struct RoleContext {
+    pub(super) everyone_id: Option<Uuid>,
+    pub(super) everyone_perms: Permissions,
+    pub(super) role_perms: Vec<Permissions>,
+    pub(super) role_ids: Vec<Uuid>,
 }
 
 impl Store {
@@ -267,21 +267,6 @@ impl Store {
         ))
     }
 
-    /// Live users who can view a channel: the recipient set for push fan-out.
-    /// A nonexistent channel yields nobody, the same as [`Self::permissions_in_channel`].
-    pub async fn channel_viewer_ids(&self, channel_id: ChannelId) -> anyhow::Result<Vec<UserId>> {
-        let mut viewers = Vec::new();
-        for user_id in self.live_user_ids().await? {
-            if self
-                .has_permission(user_id, channel_id, Permissions::VIEW_CHANNEL)
-                .await?
-            {
-                viewers.push(user_id);
-            }
-        }
-        Ok(viewers)
-    }
-
     /// Whether the user holds every bit in `needed` in this channel.
     pub async fn has_permission(
         &self,
@@ -295,7 +280,7 @@ impl Store {
             .contains(needed))
     }
 
-    async fn load_roles(&self, user_id: UserId) -> anyhow::Result<RoleContext> {
+    pub(super) async fn load_roles(&self, user_id: UserId) -> anyhow::Result<RoleContext> {
         // At most one @everyone role exists (a partial unique index enforces it),
         // so LIMIT 1 resolves the base deterministically.
         let everyone = sqlx::query!(

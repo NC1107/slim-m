@@ -13,7 +13,9 @@ import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
 import '../providers/voice_roster.dart';
+import '../widgets/call_participant_tiles.dart';
 import '../widgets/local_screen_share_banner.dart';
+import '../widgets/screen_share_stage.dart';
 import '../widgets/user_avatar.dart';
 import 'voice_call_controls.dart';
 
@@ -299,6 +301,13 @@ class _InCall extends ConsumerWidget {
     final voice = ref.watch(voiceControllerProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
 
+    // The first remote share gets the stage; your own is not echoed back
+    // (the banner already says so), and two at once is not worth a grid at
+    // this product's size - the second waits its turn.
+    final sharer = voice.participants
+        .where((p) => p.isScreenSharing && !p.isLocal)
+        .firstOrNull;
+
     return Column(
       children: [
         // Pinned above the roster: a per-row glyph is too easy to scroll past.
@@ -312,17 +321,63 @@ class _InCall extends ConsumerWidget {
             ),
             child: LocalScreenShareBanner(),
           ),
+        if (sharer != null)
+          Expanded(
+            flex: 3,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s16,
+                AppSpacing.s16,
+                AppSpacing.s16,
+                0,
+              ),
+              child: ScreenShareStage(
+                sharerName: sharer.name,
+                child: controller.screenShareViewFor(sharer.identity),
+              ),
+            ),
+          ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.all(AppSpacing.s16),
             children: [
-              Text(
-                '${voice.participants.length} in call',
-                style: TextStyle(color: tokens.textSecondary, fontSize: 12),
+              Row(
+                children: [
+                  Text(
+                    '${voice.participants.length} in call',
+                    style: TextStyle(color: tokens.textSecondary, fontSize: 12),
+                  ),
+                  if (voice.connectedAt != null) ...[
+                    Text(
+                      ' · ',
+                      style: TextStyle(
+                        color: tokens.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    CallDuration(since: voice.connectedAt!),
+                  ],
+                ],
               ),
               const SizedBox(height: AppSpacing.s12),
-              for (final p in voice.participants)
-                _ParticipantRow(participant: p),
+              // Tiles centred like a call when the pane is theirs; compact
+              // rows when a share stage has taken the room.
+              if (sharer == null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.s24),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: AppSpacing.s16,
+                    runSpacing: AppSpacing.s16,
+                    children: [
+                      for (final p in voice.participants)
+                        CallParticipantTile(participant: p),
+                    ],
+                  ),
+                )
+              else
+                for (final p in voice.participants)
+                  _ParticipantRow(participant: p),
               if (voice.error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.s16),
@@ -348,40 +403,65 @@ class _ParticipantRow extends StatelessWidget {
 
   final VoiceParticipant participant;
 
+  /// What a screen reader hears for this row. The visual states are all bare
+  /// icons, so without this the flagship feature announced only names:
+  /// muted, speaking and sharing were entirely silent.
+  String get _semanticLabel {
+    final parts = <String>[
+      participant.isLocal ? '${participant.name}, you' : participant.name,
+      participant.isMuted ? 'muted' : 'microphone on',
+      if (participant.isSpeaking) 'speaking',
+      if (participant.isScreenSharing) 'sharing their screen',
+    ];
+    return parts.join(', ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
-      child: Row(
-        children: [
-          // Speaking is a ring, and never the only cue: the muted icon repeats it.
-          AuthorAvatar(
-            name: participant.name,
-            userId: participant.identity,
-            size: 32,
-            speaking: participant.isSpeaking,
+    return Semantics(
+      container: true,
+      label: _semanticLabel,
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
+          child: Row(
+            children: [
+              // Speaking is a ring, and never the only cue: the muted icon repeats it.
+              AuthorAvatar(
+                name: participant.name,
+                userId: participant.identity,
+                size: 32,
+                speaking: participant.isSpeaking,
+              ),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(
+                child: Text(
+                  participant.isLocal
+                      ? '${participant.name} (you)'
+                      : participant.name,
+                  style: TextStyle(color: tokens.textPrimary),
+                ),
+              ),
+              if (participant.isScreenSharing)
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.s8),
+                  child: Icon(
+                    AppIcons.screenShare,
+                    size: 16,
+                    color: tokens.accent,
+                  ),
+                ),
+              Icon(
+                participant.isMuted ? AppIcons.micOff : AppIcons.mic,
+                size: 16,
+                color: participant.isMuted
+                    ? tokens.textSecondary
+                    : tokens.accent,
+              ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.s12),
-          Expanded(
-            child: Text(
-              participant.isLocal
-                  ? '${participant.name} (you)'
-                  : participant.name,
-              style: TextStyle(color: tokens.textPrimary),
-            ),
-          ),
-          if (participant.isScreenSharing)
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.s8),
-              child: Icon(AppIcons.screenShare, size: 16, color: tokens.accent),
-            ),
-          Icon(
-            participant.isMuted ? AppIcons.micOff : AppIcons.mic,
-            size: 16,
-            color: participant.isMuted ? tokens.textSecondary : tokens.accent,
-          ),
-        ],
+        ),
       ),
     );
   }

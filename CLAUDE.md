@@ -12,6 +12,28 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The nine-specialist audit, and seeing a shared screen (2026-07-29)
+
+Nine parallel specialist reviews (five code, four screenshot) over the running product; the consolidated report with everything found, fixed, and deliberately deferred is [docs/research/nine-specialist-audit-2026-07-29.md](docs/research/nine-specialist-audit-2026-07-29.md).
+Read that before the next audit pass so nothing is re-found.
+What to know before touching the affected code:
+
+**Screen share viewing exists now, and the seam shape matters.**
+Publishing a share and seeing one are separate halves, and only the first had ever been built - the e2e proved subscription at the SFU while the viewer's pane rendered a roster glyph and nothing else.
+`VoiceSession.screenShareViewFor(identity)` returns the live view as a plain `Widget`, so no LiveKit type crosses the rtc package seam; the real renderer (`screen_share_view.dart`, deliberately not exported) listens to room events itself because the track routinely arrives a beat after the roster flips to sharing.
+Every fake implementing `VoiceSession` had to grow the method; the app-test fakes return a keyed `SizedBox` so widget tests can assert the stage mounted for the right participant.
+Verified end to end: the e2e's `bob-peer-sharing-screen.png` shows the sharer's actual screen. Note `scripts/e2e.sh` reuses a cached web build unless `E2E_REBUILD=1` - a verification run after a client change *must* set it, or it screenshots the old build (that cost one confused cycle).
+
+**The batched permission paths must stay equivalent to the per-user one.**
+`viewers_among` (push fan-out: many candidates, one channel) and `visible_channels` (the rail: one caller, many channels) live in `store/permissions_batch.rs` and run the same pure `evaluate()` as `permissions_in_channel` after loading the role context and overwrites with a bounded number of queries.
+`tests/permissions.rs` carries an equivalence test for each, driving every precedence rule plus the ADMINISTRATOR bypass, DMs, and a nonexistent channel; any change to one path has to keep those green, and a new batched consumer should reuse these rather than looping `has_permission`.
+
+**Recorded correctness debt, still open:** message edits and deletes made while a client is offline never reconcile - edit does not advance `seq`, `/sync` filters purely by `seq`, and deleted rows are filtered out of deltas, so only a reset heals it.
+That needs a designed protocol answer (op watermark or tombstones in the sync response), not a patch.
+The per-socket WS fan-out permission cost (four queries per event per connection) is the other big recorded item; the safe fix is a per-connection visibility cache with real invalidation on role and overwrite edits.
+
+Smaller traps this pass hit: `Opacity` over a whole row silently destroys AA contrast (the muted `AppListRow` now dims leading/trailing only, and a design_system test pins that); `VoiceSession.join` serializes overlapping calls (both used to pass the room-null check and race one slot); and `SourceType.Window` must never be requested on Wayland from *any* call site - `media_capabilities.dart` had the segfault `desktop_sources.dart` already documented.
+
 ## Motion, haptics, and the device-testing polish pass (2026-07-29)
 
 Driven by real iPhone use plus a two-reviewer UI/UX pass over the snapshot set.

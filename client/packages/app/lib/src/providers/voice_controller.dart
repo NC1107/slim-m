@@ -8,6 +8,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_rtc/rtc.dart';
@@ -28,6 +29,7 @@ class VoiceState {
     this.deafened = false,
     this.error,
     this.retryable = true,
+    this.connectedAt,
   });
 
   /// The channel this call belongs to, so a screen can tell "in a call here"
@@ -62,6 +64,11 @@ class VoiceState {
   /// transient, where trying again might really work.
   final bool retryable;
 
+  /// When this call connected, for the in-call duration readout. Null
+  /// whenever not connected; survives reconnect-free state churn but resets
+  /// with the call.
+  final DateTime? connectedAt;
+
   VoiceState copyWith({
     String? channelId,
     VoiceSessionState? state,
@@ -74,6 +81,8 @@ class VoiceState {
     String? error,
     bool clearError = false,
     bool? retryable,
+    DateTime? connectedAt,
+    bool clearConnectedAt = false,
   }) => VoiceState(
     channelId: channelId ?? this.channelId,
     state: state ?? this.state,
@@ -85,6 +94,7 @@ class VoiceState {
     deafened: deafened ?? this.deafened,
     error: clearError ? null : (error ?? this.error),
     retryable: clearError ? true : (retryable ?? this.retryable),
+    connectedAt: clearConnectedAt ? null : (connectedAt ?? this.connectedAt),
   );
 }
 
@@ -101,10 +111,24 @@ class VoiceController extends StateNotifier<VoiceState> {
       final dropped = _session.lastDisconnect;
       if (s == VoiceSessionState.failed && dropped != null) {
         _log('Call ended: ${dropped.name}', detail: dropped.message);
-        state = state.copyWith(state: s, error: dropped.message);
+        state = state.copyWith(
+          state: s,
+          error: dropped.message,
+          clearConnectedAt: true,
+        );
         return;
       }
-      state = state.copyWith(state: s);
+      // The duration clock starts at the connected transition and only there,
+      // so participant churn does not restart it.
+      state = switch (s) {
+        VoiceSessionState.connected when state.connectedAt == null =>
+          state.copyWith(state: s, connectedAt: DateTime.now()),
+        VoiceSessionState.idle || VoiceSessionState.failed => state.copyWith(
+          state: s,
+          clearConnectedAt: true,
+        ),
+        _ => state.copyWith(state: s),
+      };
     });
     _participants = _session.participantChanges.listen((p) {
       // Trust the session's view of the local participant over the local
@@ -215,6 +239,11 @@ class VoiceController extends StateNotifier<VoiceState> {
 
   Future<List<ScreenShareSource>> screenShareSources() =>
       _session.screenShareSources();
+
+  /// The live view of [identity]'s shared screen; see
+  /// [VoiceSession.screenShareViewFor].
+  Widget screenShareViewFor(String identity) =>
+      _session.screenShareViewFor(identity);
 
   Future<void> setScreenShare(
     bool enabled, {

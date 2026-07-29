@@ -147,3 +147,42 @@ async fn a_send_carrying_an_attachment_needs_no_text() {
         "carrying nothing at all is still refused"
     );
 }
+
+/// A repeated id in `attachment_ids` is a 400 naming the problem, not the 500
+/// the link table's (message_id, sha256) primary key otherwise turns it into.
+#[tokio::test]
+async fn a_duplicated_attachment_id_is_refused_as_bad_request() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL
+                .union(Permissions::SEND_MESSAGES)
+                .union(Permissions::ATTACH_FILES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let app = app(store.clone());
+    let (token, _id) = register(&store, "alice").await;
+
+    let uploaded = upload(&app, &token, "twice.png", png(4)).await;
+    let attachment_id = uploaded["id"].as_str().unwrap().to_owned();
+
+    let sent = app
+        .clone()
+        .oneshot(request_json(
+            "POST",
+            &format!("/channels/{}/messages", channel.id),
+            &token,
+            json!({
+                "id": Uuid::now_v7().to_string(),
+                "content": "the same file twice",
+                "attachment_ids": [attachment_id.clone(), attachment_id],
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(sent.status(), StatusCode::BAD_REQUEST);
+}
