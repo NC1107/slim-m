@@ -20,7 +20,7 @@ import 'package:slimm_rtc/rtc.dart';
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
-import '../routing/close_screen.dart';
+import 'settings_screen_scaffold.dart';
 import '../widgets/media_capability_section.dart';
 
 const _soundsKey = 'slimm.voice.join_leave_sounds_enabled';
@@ -94,34 +94,24 @@ class VoiceSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Voice settings'),
-        // Reachable directly, as PersonalSettingsScreen is, so no stack to pop.
-        leading: BackToButton(
-          tooltip: 'Back to settings',
-          fallback: Routes.personalSettings,
-        ),
-      ),
-      // top: false because the AppBar already clears the status bar; without
-      // the bottom edge the last section runs under the home indicator.
-      body: AppContentColumn(
-        child: SafeArea(
-          top: false,
-          child: ListView(
-            children: const [
-              _MicrophoneSection(),
-              Divider(height: 1),
-              MediaCapabilitySection(),
-              Divider(height: 1),
-              _DeviceSection(),
-              Divider(height: 1),
-              _ScreenShareSection(),
-              Divider(height: 1),
-              _SoundsSection(),
-            ],
-          ),
-        ),
+    return const SettingsScreenScaffold(
+      title: 'Voice settings',
+      // Reachable directly, as PersonalSettingsScreen is, so no stack to pop.
+      backTooltip: 'Back to settings',
+      backFallback: Routes.personalSettings,
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          _MicrophoneSection(),
+          Divider(height: 1),
+          MediaCapabilitySection(),
+          Divider(height: 1),
+          _DeviceSection(),
+          Divider(height: 1),
+          _ScreenShareSection(),
+          Divider(height: 1),
+          _SoundsSection(),
+        ],
       ),
     );
   }

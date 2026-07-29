@@ -12,7 +12,7 @@ import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
-import '../../routing/close_screen.dart';
+import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import 'role_assign_sheet.dart';
 import 'role_editor_sheet.dart';
@@ -24,42 +24,30 @@ class RolesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final roles = ref.watch(rolesProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Roles'),
-        leading: BackToButton(
-          tooltip: 'Back to Space settings',
-          fallback: Routes.spaceSettings,
+    return SettingsScreenScaffold(
+      title: 'Roles',
+      backTooltip: 'Back to Space settings',
+      backFallback: Routes.spaceSettings,
+      actions: [
+        IconButton(
+          icon: const Icon(AppIcons.add),
+          tooltip: 'New role',
+          onPressed: () => showRoleEditorSheet(context),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(AppIcons.add),
-            tooltip: 'New role',
-            onPressed: () => showRoleEditorSheet(context),
-          ),
-        ],
-      ),
-      // top: false because the AppBar already clears the status bar.
-      body: AppContentColumn(
-        child: SafeArea(
-          top: false,
-          child: roles.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => const Center(child: Text('Could not load roles.')),
-            // Said, not blank: an empty page under a bare app bar reads as
-            // broken, and the sibling admin lists all name their empty state.
-            data: (list) => list.isEmpty
-                ? const Center(
-                    child: Text('No roles yet. Create one with the + above.'),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(AppSpacing.s16),
-                    itemCount: list.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: AppSpacing.s8),
-                    itemBuilder: (context, i) => _RoleCard(role: list[i]),
-                  ),
-          ),
+      ],
+      scrollable: false,
+      padding: EdgeInsets.zero,
+      child: AppAsyncView<List<api.Role>>(
+        value: AppAsyncState(data: roles.valueOrNull, error: roles.error),
+        errorMessage: 'Could not load roles.',
+        onRetry: () => ref.invalidate(rolesProvider),
+        isEmpty: (list) => list.isEmpty,
+        emptyMessage: 'No roles yet. Create one with the + above.',
+        data: (context, list) => ListView.separated(
+          padding: const EdgeInsets.all(AppSpacing.s16),
+          itemCount: list.length,
+          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s8),
+          itemBuilder: (context, i) => _RoleCard(role: list[i]),
         ),
       ),
     );
