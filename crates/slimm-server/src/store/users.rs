@@ -133,6 +133,7 @@ impl Store {
                       display_name AS "display_name!", created_at AS "created_at!",
                       avatar_updated_at
                FROM users WHERE deleted_at IS NULL AND id > ?
+               AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)
                ORDER BY id ASC LIMIT ?"#,
             after,
             limit

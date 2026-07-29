@@ -202,6 +202,36 @@ A file that did not fit leaves nothing behind: both the limit and the name are c
 The command exits non-zero if any file in the directory did not end up as an emoji, so a script notices, and the report above it says which files and why.
 A pack folder with a `README` or a `LICENSE` in it will therefore exit non-zero on a run that was otherwise fine, with those files named as the reason.
 
+## Moderating a member, and what "remove from Space" really is
+
+Two tools sit between deleting a message and deleting an account.
+
+A **timeout** takes away sending, reacting, attaching files, and joining or speaking in voice, for a set time.
+It takes away nothing else: the member keeps reading, and keeps seeing every channel they could see before.
+It lapses on its own at its deadline, with nothing needing to run on time for that to happen, and a moderator can lift or shorten it early.
+Issuing one needs the KICK_MEMBERS permission.
+
+A **removal** ends their access to the deployment.
+Every live session is revoked, signing in stops working, invites they had handed out are revoked, and they stop appearing in the member list.
+Issuing one needs BAN_MEMBERS, and it is reversible: readmitting them restores the right to sign in, though their devices all sign in again rather than resuming.
+
+Two things about a removal are worth being plain about, because the word undersells one and oversells the other.
+
+**It is a ban in behaviour, not a kick.**
+There is no membership row to delete here - one deployment is one community, and holding an account *is* membership - so a removal has to be a standing refusal recorded against the account.
+A version that only closed today's sessions would be undone by signing in again.
+
+**It does not stop the same person making a new account** on a Space whose join policy is `open`.
+Nothing short of identity verification would, that is well outside what a self-hosted friend group can or should do, and the honest answer is to say so rather than imply a guarantee that is not there.
+If that matters to you, set the join policy to `invite`.
+
+Everything a removed member wrote stays exactly where it is, still attributed to them.
+Removing somebody is not a reason to rewrite a conversation other people were part of.
+Anonymizing their content is what *deleting an account* does, which is a separate and heavier act that the account's own holder chooses.
+
+Neither tool can be used on yourself, nor on a member whose permissions your own do not already include - so holding KICK_MEMBERS is not a way to silence the administrators one at a time.
+The last remaining administrator cannot be removed at all.
+
 ## Files
 
 - `docker-compose.yml` (repository root) - the stack itself.

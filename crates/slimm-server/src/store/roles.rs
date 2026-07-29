@@ -203,7 +203,7 @@ impl Store {
         Ok(Some(()))
     }
 
-    /// Non-`@everyone` role names for a batch of users, in one query no
+    /// Non-`@everyone` roles for a batch of users, as (id, name) pairs, in one query no
     /// matter how many are asked about - the same batching shape
     /// [`Store::reactions_for_messages`] uses to keep a page of messages from
     /// paying one query per row. `GET /members` is the caller that actually
@@ -216,10 +216,16 @@ impl Store {
     /// nothing beyond that base role is simply absent from the result, the
     /// same "missing means none" contract [`Store::user_profiles`] already
     /// has for a batch of ids.
+    ///
+    /// The id rides along with the name because a role name is not unique -
+    /// nothing in the schema stops two roles being called `mod` - so a client
+    /// deciding which roles a member holds by matching names would light up
+    /// both of them. The name is what a badge renders; the id is what an
+    /// assignment is made against.
     pub async fn roles_for_users(
         &self,
         user_ids: &[UserId],
-    ) -> anyhow::Result<Vec<(UserId, Vec<String>)>> {
+    ) -> anyhow::Result<Vec<(UserId, Vec<(RoleId, String)>)>> {
         if user_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -227,7 +233,7 @@ impl Store {
         // Built rather than a fixed `query!` because the id list is variable
         // length and SQLite has no array binding.
         let mut builder = QueryBuilder::new(
-            "SELECT mr.user_id AS user_id, r.name AS name \
+            "SELECT mr.user_id AS user_id, r.id AS role_id, r.name AS name \
              FROM member_roles mr JOIN roles r ON r.id = mr.role_id \
              WHERE r.is_everyone = 0 AND mr.user_id IN (",
         );
@@ -240,13 +246,13 @@ impl Store {
         let rows = builder.build().fetch_all(&self.pool).await?;
 
         use sqlx::Row;
-        let mut grouped: Vec<(UserId, Vec<String>)> = Vec::new();
+        let mut grouped: Vec<(UserId, Vec<(RoleId, String)>)> = Vec::new();
         for row in rows {
             let user_id: UserId = row.try_get("user_id")?;
-            let name: String = row.try_get("name")?;
+            let role = (row.try_get("role_id")?, row.try_get("name")?);
             match grouped.iter_mut().find(|(id, _)| *id == user_id) {
-                Some((_, names)) => names.push(name),
-                None => grouped.push((user_id, vec![name])),
+                Some((_, roles)) => roles.push(role),
+                None => grouped.push((user_id, vec![role])),
             }
         }
         Ok(grouped)
@@ -289,7 +295,8 @@ pub(super) async fn administrator_count(conn: &mut SqliteConnection) -> Result<i
     let admin_bit = Permissions::ADMINISTRATOR.bits();
     sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "count!: i64" FROM users u
-           WHERE u.deleted_at IS NULL AND (
+           WHERE u.deleted_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = u.id) AND (
                EXISTS (SELECT 1 FROM roles WHERE is_everyone = 1 AND (permissions & ?) != 0)
                OR EXISTS (
                    SELECT 1 FROM member_roles mr JOIN roles r ON r.id = mr.role_id

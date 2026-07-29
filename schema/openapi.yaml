@@ -1239,6 +1239,178 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /members/removed:
+    get:
+      operationId: listRemovedMembers
+      tags: [moderation]
+      summary: Every member removed from the Space. Requires BAN_MEMBERS.
+      description: >
+        The only place a removed member is still nameable: `GET /members`
+        drops them, which is the point of a removal.
+      responses:
+        "200":
+          description: The removals in force, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SpaceRemoval"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /members/{userId}/timeout:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The member's UUID.
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: timeOutMember
+      tags: [moderation]
+      summary: Time a member out. Requires KICK_MEMBERS.
+      description: >
+        A timeout takes away sending, reacting, attaching, and joining or
+        speaking in voice, and takes away nothing else: the member keeps
+        reading. It lapses on its own at `until` with nothing needing to run.
+        Re-issuing replaces any timeout already in force, which is also how
+        one is shortened. Refused on yourself, and on a member whose granted
+        permissions the caller's own do not contain.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [duration_seconds]
+              properties:
+                duration_seconds:
+                  type: integer
+                  format: int64
+                  description: >
+                    How long from now. The deadline is computed server-side,
+                    so a skewed client clock cannot ask for one already past.
+                    At most 28 days; past that the honest tool is a removal.
+                reason:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: The timeout is in force.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user_id, until]
+                properties:
+                  user_id:
+                    type: string
+                    format: uuid
+                  until:
+                    type: integer
+                    format: int64
+                    description: Unix milliseconds.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: liftMemberTimeout
+      tags: [moderation]
+      summary: Lift a member's timeout. Requires KICK_MEMBERS.
+      description: >
+        Idempotent: lifting a timeout that already expired, or one that never
+        existed, still leaves the member able to speak, which is what was
+        asked for.
+      responses:
+        "204":
+          description: The member is no longer timed out.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /members/{userId}/removal:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The member's UUID.
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: removeMember
+      tags: [moderation]
+      summary: Remove a member from the Space. Requires BAN_MEMBERS.
+      description: >
+        Revokes every live session, refuses future sign-in, revokes invites
+        they created, and drops them from the member list. Everything they
+        wrote stays, still attributed to them: anonymizing content is what
+        deleting an account does, and this is deliberately not that.
+
+        Durable rather than a one-off session revocation, because signing in
+        again would otherwise undo it. It is therefore a ban in behaviour,
+        and it does not stop the same person registering a fresh account on
+        a Space whose join policy is open.
+
+        Refused on yourself, on a member whose granted permissions the
+        caller's own do not contain, and on the last administrator.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  nullable: true
+      responses:
+        "204":
+          description: The member is removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: restoreMember
+      tags: [moderation]
+      summary: Let a removed member back in. Requires BAN_MEMBERS.
+      description: >
+        Restores the right to sign in. Their sessions stay revoked, so every
+        device signs in again rather than resuming.
+      responses:
+        "204":
+          description: The member may sign in again.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /channels/{channelId}/overwrites/{kind}/{id}:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -2709,6 +2881,47 @@ components:
             accent, not a per-role one. Absent on servers older than this
             field, which a client must treat as unknown rather than "no
             roles".
+        role_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: >
+            The same roles as ids, positionally matching `roles`. Both,
+            rather than one: a badge renders the name, and an assignment is
+            made against the id. Nothing stops two roles sharing a name, so a
+            client deciding "does this member hold that role" by name would
+            answer yes for both of them.
+        timed_out_until:
+          type: [integer, "null"]
+          format: int64
+          description: >
+            When this member's timeout lifts, in Unix milliseconds, or null
+            if they are not timed out. An elapsed timeout reads as null
+            rather than as a past deadline, so a client never has to do the
+            comparison to know whether the badge belongs on screen.
+
+    SpaceRemoval:
+      type: object
+      required: [user_id, username, display_name, removed_at]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        display_name:
+          type: string
+        reason:
+          type: [string, "null"]
+        removed_by:
+          type: [string, "null"]
+          format: uuid
+          description: Null once the removing moderator's own account is deleted.
+        removed_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds.
 
     Me:
       type: object
@@ -2737,6 +2950,17 @@ components:
             any per-channel overwrite. A UI nicety for hiding actions the
             caller cannot perform; every write is still re-authorized
             server-side regardless of what this says.
+
+            Already has any timeout subtracted, so a client that greys the
+            composer on a missing SEND_MESSAGES bit needs no separate rule
+            for being timed out; `timed_out_until` is what says why.
+        timed_out_until:
+          type: [integer, "null"]
+          format: int64
+          description: >
+            When the caller's own timeout lifts, or null. Present so a client
+            can name what happened rather than leaving somebody with a
+            disabled composer and no explanation.
 
     UpdateMeRequest:
       type: object

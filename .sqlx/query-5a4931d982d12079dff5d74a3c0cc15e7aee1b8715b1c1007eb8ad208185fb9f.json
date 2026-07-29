@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT until, reason, issued_by AS \"issued_by?: UserId\", issued_at\n               FROM member_timeouts WHERE user_id = ? AND until > ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "until",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "reason",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "issued_by?: UserId",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "issued_at",
+        "ordinal": 3,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "5a4931d982d12079dff5d74a3c0cc15e7aee1b8715b1c1007eb8ad208185fb9f"
+}

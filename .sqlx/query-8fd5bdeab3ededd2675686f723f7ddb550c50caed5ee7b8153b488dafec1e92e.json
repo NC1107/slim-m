@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO devices (id, user_id, name, created_at)\n             SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)\n               AND NOT EXISTS (SELECT 1 FROM space_removals WHERE user_id = ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "8fd5bdeab3ededd2675686f723f7ddb550c50caed5ee7b8153b488dafec1e92e"
+}

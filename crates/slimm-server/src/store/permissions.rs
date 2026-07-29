@@ -184,8 +184,20 @@ impl Store {
     }
 
     /// The user's guild-level permissions, ignoring any channel. Applies the
-    /// `@everyone` base, the role union, and the administrator bypass.
+    /// `@everyone` base, the role union, and the administrator bypass, then
+    /// subtracts any timeout in force.
     pub async fn base_permissions(&self, user_id: UserId) -> anyhow::Result<Permissions> {
+        Ok(self
+            .granted_base_permissions(user_id)
+            .await?
+            .remove(self.timeout_deny(user_id).await?))
+    }
+
+    /// [`Self::base_permissions`] before the timeout subtraction: what this
+    /// member's roles grant them, which is what a moderation check has to
+    /// compare against so that timing somebody out cannot itself be what
+    /// makes them look junior enough to time out again.
+    pub async fn granted_base_permissions(&self, user_id: UserId) -> anyhow::Result<Permissions> {
         let roles = self.load_roles(user_id).await?;
         Ok(evaluate(
             roles.everyone_perms,
@@ -209,6 +221,24 @@ impl Store {
     /// why that has to hold even against ADMINISTRATOR, which the evaluator
     /// bypasses for every other channel on purpose.
     pub async fn permissions_in_channel(
+        &self,
+        user_id: UserId,
+        channel_id: ChannelId,
+    ) -> anyhow::Result<Permissions> {
+        Ok(self
+            .granted_in_channel(user_id, channel_id)
+            .await?
+            .remove(self.timeout_deny(user_id).await?))
+    }
+
+    /// [`Self::permissions_in_channel`] before the timeout subtraction.
+    ///
+    /// Split out rather than masking inline so that both the role path and
+    /// the direct-message early return are covered by construction: a mask
+    /// written after the `evaluate` call would have silently spared DMs,
+    /// which is the one channel kind where being timed out matters most to
+    /// get right, since nobody else is there to notice it did not apply.
+    async fn granted_in_channel(
         &self,
         user_id: UserId,
         channel_id: ChannelId,

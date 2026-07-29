@@ -14,6 +14,7 @@ use sqlx::SqlitePool;
 
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
+mod account_deletion;
 mod attachments;
 mod bootstrap;
 mod canvas;
@@ -31,12 +32,15 @@ mod push;
 mod reactions;
 mod read_state;
 mod recovery;
+mod removals;
 mod roles;
 mod safety;
 mod sessions;
 mod space;
+mod timeouts;
 mod users;
 
+pub use account_deletion::DeleteAccountError;
 pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
 pub use bootstrap::Bootstrap;
 pub use canvas::{CanvasObject, PlaceError, Rect, ViewportQuery, WORLD_LIMIT};
@@ -54,13 +58,14 @@ pub use polls::{
 pub use push::{PushError, PushTarget};
 pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
 pub use recovery::{ConsumeResetError, IssueResetError};
+pub use removals::{RemoveMemberError, SpaceRemoval};
 pub use roles::{Role, RoleGuardError};
 pub use safety::{Device, Report, ReportError, ReportSubject};
 pub use sessions::{
-    Account, DeleteAccountError, IssuedTokens, OpenError, RefreshOutcome, RegisterError,
-    SessionContext, SweptTokens,
+    Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext, SweptTokens,
 };
 pub use space::JoinPolicy;
+pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout};
 
 /// Unix milliseconds, `pub(crate)` so the push trigger path (outside this
 /// module) can compare a lifecycle report's age against the same clock
