@@ -20,9 +20,9 @@ declare -A hit=()
 while IFS= read -r line; do
   line=${line%%#*}
   read -r path max _ <<<"$line" || true
-  [ -n "${path:-}" ] || continue
+  [[ -n ${path:-} ]] || continue
   if ! [[ ${max:-} =~ ^[0-9]+$ ]]; then
-    echo "::error file=$allowfile::'$path' has no line-count ceiling; the format is '<path> <lines> # why'"
+    echo "::error file=$allowfile::'$path' has no line-count ceiling; the format is '<path> <lines> # why'" >&2
     exit 1
   fi
   ceiling["$path"]=$max
@@ -45,19 +45,19 @@ hard_count=0
 for f in "${files[@]}"; do
   n=$(wc -l <"$f")
   limit=${ceiling[$f]:-}
-  if [ -n "$limit" ]; then
+  if [[ -n $limit ]]; then
     hit["$f"]=$n
-    if [ "$n" -gt "$limit" ]; then
-      echo "::error file=$f::$n lines, past the $limit it was allowlisted at; split it rather than raising the entry"
+    if [[ $n -gt $limit ]]; then
+      echo "::error file=$f::$n lines, past the $limit it was allowlisted at; split it rather than raising the entry" >&2
       fail=1
     fi
     continue
   fi
-  if [ "$n" -gt "$hard" ]; then
-    echo "::error file=$f::$n lines, over the ${hard}-line hard limit; split it in this change"
+  if [[ $n -gt $hard ]]; then
+    echo "::error file=$f::$n lines, over the ${hard}-line hard limit; split it in this change" >&2
     hard_count=$((hard_count + 1))
     fail=1
-  elif [ "$n" -gt "$soft" ]; then
+  elif [[ $n -gt $soft ]]; then
     echo "::warning file=$f::$n lines, over the ${soft}-line review budget; split it before it grows again"
     soft_count=$((soft_count + 1))
   fi
@@ -65,11 +65,11 @@ done
 
 for f in "${!ceiling[@]}"; do
   n=${hit[$f]:-}
-  if [ -z "$n" ]; then
-    echo "::error file=$allowfile::$f is allowlisted but is not a checked source file any more; remove the entry"
+  if [[ -z $n ]]; then
+    echo "::error file=$allowfile::$f is allowlisted but is not a checked source file any more; remove the entry" >&2
     fail=1
-  elif [ "$n" -le "$hard" ]; then
-    echo "::error file=$allowfile::$f is down to $n lines and no longer needs an entry; remove it"
+  elif [[ $n -le $hard ]]; then
+    echo "::error file=$allowfile::$f is down to $n lines and no longer needs an entry; remove it" >&2
     fail=1
   fi
 done

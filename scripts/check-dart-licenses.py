@@ -40,51 +40,83 @@ MARKERS = [
 
 BSD_STEM = "redistribution and use in source and binary forms"
 
+# The one pub host these packages come from, named once.
+PUB_HOST = "pub.dev"
+
+
+def _gnu(head: str) -> str | None:
+    """Matched on the title block only: MPL-2.0 names all three in its body."""
+    for family, needle in GNU_FAMILY:
+        if needle not in head:
+            continue
+        if "version 3" in head:
+            return f"{family}-3.0-only"
+        if family == "LGPL":
+            return f"{family}-2.1-only"
+        return f"{family}-2.0-only"
+    return None
+
+
+def _bsd(flat: str) -> str | None:
+    """Which BSD, by the clauses actually present."""
+    if BSD_STEM not in flat:
+        return None
+    if "endorse or promote" in flat:
+        return "BSD-3-Clause"
+    if "reproduce the above copyright" in flat:
+        return "BSD-2-Clause"
+    return "BSD-1-Clause"
+
 
 def classify(text: str) -> str | None:
     flat = re.sub(r"\s+", " ", text.lower())
-    # Title block only: MPL-2.0 names all three GNU licenses in its own body.
-    head = flat[:600]
-    for family, needle in GNU_FAMILY:
-        if needle in head:
-            version = "3.0" if "version 3" in head else "2.1" if family == "LGPL" else "2.0"
-            return f"{family}-{version}-only"
+    gnu = _gnu(flat[:600])
+    if gnu:
+        return gnu
     for name, needles in MARKERS:
         if all(n in flat for n in needles):
             return name
-    if BSD_STEM in flat:
-        if "endorse or promote" in flat:
-            return "BSD-3-Clause"
-        if "reproduce the above copyright" in flat:
-            return "BSD-2-Clause"
-        return "BSD-1-Clause"
-    return None
+    return _bsd(flat)
+
+
+def _package_lines(text: str) -> list[str]:
+    """The indented lines under `packages:`, and nothing else.
+
+    A hand-rolled reader rather than a YAML dependency, because this script
+    runs before anything is installed and its whole job is to have no
+    dependencies of its own to vouch for.
+    """
+    lines: list[str] = []
+    inside = False
+    for raw in text.splitlines():
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        if not raw.startswith(" "):
+            inside = raw.startswith("packages:")
+            continue
+        if inside:
+            lines.append(raw)
+    return lines
 
 
 def parse_lock(path: Path) -> list[tuple[str, str, str]]:
     """Every package in a pubspec.lock, as (name, version, source)."""
     packages: list[tuple[str, str, str]] = []
     current: dict[str, str] = {}
-    in_packages = False
-    for raw in path.read_text().splitlines():
-        if not raw.strip() or raw.lstrip().startswith("#"):
-            continue
-        if not raw.startswith(" "):
-            in_packages = raw.startswith("packages:")
-            continue
-        if not in_packages:
-            continue
+    for raw in _package_lines(path.read_text()):
         indent = len(raw) - len(raw.lstrip())
         line = raw.strip()
         if indent == 2 and line.endswith(":"):
             if current:
                 packages.append(_finish(current, path))
             current = {"key": line[:-1].strip('"')}
-        elif current:
-            key, _, value = line.partition(":")
-            value = value.strip().strip('"')
-            if key in ("version", "source", "name") and value:
-                current.setdefault(key, value)
+            continue
+        if not current:
+            continue
+        key, _, value = line.partition(":")
+        value = value.strip().strip('"')
+        if key in ("version", "source", "name") and value:
+            current.setdefault(key, value)
     if current:
         packages.append(_finish(current, path))
     return packages
@@ -107,7 +139,7 @@ def pub_cache() -> Path:
         candidates.append(Path(os.environ["XDG_CACHE_HOME"]) / "dart")
     candidates.append(Path.home() / ".cache" / "dart")
     for candidate in candidates:
-        if (candidate / "hosted" / "pub.dev").is_dir():
+        if (candidate / "hosted" / PUB_HOST).is_dir():
             return candidate
     sys.exit(
         "::error::no pub cache found in "
@@ -117,7 +149,7 @@ def pub_cache() -> Path:
 
 
 def license_text(name: str, version: str, cache: Path) -> tuple[Path, str] | None:
-    root = cache / "hosted" / "pub.dev" / f"{name}-{version}"
+    root = cache / "hosted" / PUB_HOST / f"{name}-{version}"
     for candidate in ("LICENSE", "LICENSE.md", "LICENSE.txt", "license", "COPYING"):
         path = root / candidate
         if path.is_file():
