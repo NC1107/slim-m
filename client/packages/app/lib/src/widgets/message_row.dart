@@ -36,6 +36,7 @@ class MessageRow extends StatelessWidget {
     required this.message,
     required this.grouped,
     required this.showNewDivider,
+    this.dayLabel,
     required this.knownUsernames,
     required this.onRetry,
     required this.onDiscard,
@@ -61,6 +62,12 @@ class MessageRow extends StatelessWidget {
   final bool grouped;
 
   final bool showNewDivider;
+
+  /// A formatted calendar-day label ("Today", "Yesterday", "July 28, 2026")
+  /// shown as a divider above this row when it is the first message of a new
+  /// day. Null on every other row. Decided by the caller for the same reason
+  /// [grouped] is: only the list knows what came before this row.
+  final String? dayLabel;
 
   /// Lower-cased usernames the mention renderer treats as real. See
   /// [MessageBody].
@@ -132,6 +139,7 @@ class MessageRow extends StatelessWidget {
       builder: (context, hovered) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (dayLabel != null) DayDivider(label: dayLabel!),
           if (showNewDivider) const NewMessagesDivider(),
           MessageContextMenuRegion(
             content: message.content,
@@ -142,7 +150,9 @@ class MessageRow extends StatelessWidget {
               // Top-only: a bottom inset here doubled the next row's top inset.
               padding: EdgeInsets.fromLTRB(
                 compact ? AppSizes.paneGutterCompact : AppSizes.paneGutter,
-                AppDensity.normal.rowGap,
+                grouped
+                    ? AppDensity.normal.groupedRowGap
+                    : AppDensity.normal.rowGap,
                 compact ? AppSizes.paneGutterCompact : AppSizes.paneGutter,
                 0,
               ),

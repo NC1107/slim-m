@@ -213,6 +213,42 @@ void main() {
   });
 
   testWidgets(
+    'the member toggle shows only where the pane can, not at medium width',
+    (tester) async {
+      final setup = _setup(httpClient: _quietClient(), signedIn: true);
+      await MessageStore(setup.db).upsertChannels([
+        const api.Channel(
+          id: 'c1',
+          name: 'general',
+          kind: 'text',
+          createdAt: 0,
+        ),
+      ]);
+
+      // Expanded: the pane can show, so the header offers its toggle.
+      await _pumpAtWidth(
+        tester,
+        setup.container,
+        1400,
+        location: '/channels/c1',
+      );
+      expect(find.bySemanticsLabel('Toggle member list'), findsOneWidget);
+
+      // Medium: the pane never shows here, so a lit toggle over it would lie.
+      await _pumpAtWidth(
+        tester,
+        setup.container,
+        700,
+        location: '/channels/c1',
+      );
+      expect(find.byType(AppMemberPane), findsNothing);
+      expect(find.bySemanticsLabel('Toggle member list'), findsNothing);
+
+      await _teardown(tester, setup.container, setup.db);
+    },
+  );
+
+  testWidgets(
     'hiding the pane at expanded width removes it, not just styles it',
     (tester) async {
       final setup = _setup();

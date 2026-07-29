@@ -23,6 +23,7 @@ import '../screens/space_settings_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/sign_in_screen.dart';
 import 'modal_page.dart';
+import 'page_transitions.dart';
 import '../screens/voice_settings_screen.dart';
 import 'routes.dart';
 
@@ -124,19 +125,30 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) =>
             modalPage(context, const DebugLogScreen()),
       ),
-      // The shell keeps the channel list alive across conversation changes.
+      // The shell keeps the channel list alive across conversation changes;
+      // the child pages fade through so switching one for another reads as a
+      // navigation rather than an instant swap.
       ShellRoute(
         builder: (context, state, child) => HomeShell(child: child),
         routes: [
           GoRoute(
             path: Routes.channels,
-            builder: (context, state) => const NoChannelSelected(),
+            pageBuilder: (context, state) => fadeThroughPage(
+              context,
+              const NoChannelSelected(),
+              key: const ValueKey('no-channel'),
+            ),
             routes: [
               GoRoute(
                 path: ':channelId',
-                builder: (context, state) => ConversationPane(
-                  channelId: state.pathParameters['channelId']!,
-                ),
+                pageBuilder: (context, state) {
+                  final channelId = state.pathParameters['channelId']!;
+                  return fadeThroughPage(
+                    context,
+                    ConversationPane(channelId: channelId),
+                    key: ValueKey('channel-$channelId'),
+                  );
+                },
               ),
             ],
           ),

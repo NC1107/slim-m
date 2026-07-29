@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/pins_controller.dart';
+import '../routing/breakpoints.dart';
 import 'member_pane.dart';
 import 'pinned_messages_sheet.dart';
 
@@ -35,6 +36,9 @@ class ChannelHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final membersVisible = ref.watch(memberPaneVisibleProvider);
+    // The member pane only exists at expanded width, so the toggle only does
+    // there; at medium width it would sit lit over a pane that never appears.
+    final canToggleMembers = LayoutClass.of(context) == LayoutClass.expanded;
 
     return Container(
       height: 52,
@@ -97,15 +101,17 @@ class ChannelHeader extends ConsumerWidget {
             active: searchOpen,
             onPressed: onToggleSearch,
           ),
-          const SizedBox(width: AppSpacing.s4),
-          AppIconButton(
-            icon: AppIcons.members,
-            semanticLabel: 'Toggle member list',
-            active: membersVisible,
-            onPressed: () =>
-                ref.read(memberPaneVisibleProvider.notifier).state =
-                    !membersVisible,
-          ),
+          if (canToggleMembers) ...[
+            const SizedBox(width: AppSpacing.s4),
+            AppIconButton(
+              icon: AppIcons.members,
+              semanticLabel: 'Toggle member list',
+              active: membersVisible,
+              onPressed: () =>
+                  ref.read(memberPaneVisibleProvider.notifier).state =
+                      !membersVisible,
+            ),
+          ],
         ],
       ),
     );

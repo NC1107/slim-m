@@ -36,27 +36,28 @@ class VoiceStripIndicator extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(AppIcons.voice, size: 16, color: tokens.accent),
+          Icon(
+            voice.screenSharing ? AppIcons.screenShare : AppIcons.voice,
+            size: 16,
+            color: tokens.accent,
+          ),
           const SizedBox(width: AppSpacing.s8),
+          // A collapsed strip is where a live share is easiest to miss, so it is said in words, not a small glyph.
           Expanded(
             child: Text(
-              '${voice.participants.length} in call',
-              style: TextStyle(color: tokens.textPrimary, fontSize: 12),
-            ),
-          ),
-          // Collapsed is exactly when a live share is easiest to forget.
-          if (voice.screenSharing)
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.s8),
-              child: Tooltip(
-                message: 'You are sharing your screen',
-                child: Icon(
-                  AppIcons.screenShare,
-                  size: 16,
-                  color: tokens.accent,
-                ),
+              voice.screenSharing
+                  ? 'Sharing your screen · ${voice.participants.length} in call'
+                  : '${voice.participants.length} in call',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: voice.screenSharing ? tokens.accent : tokens.textPrimary,
+                fontWeight: voice.screenSharing
+                    ? AppWeights.medium
+                    : AppWeights.regular,
+                fontSize: 12,
               ),
             ),
+          ),
           IconButton(
             iconSize: 16,
             tooltip: 'Leave call',

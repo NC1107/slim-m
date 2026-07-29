@@ -163,10 +163,19 @@ class RailConnectionBar extends ConsumerWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     if (status == SyncStatus.live) return const SizedBox.shrink();
 
-    final label = switch (status) {
-      SyncStatus.connecting => 'Connecting',
-      SyncStatus.offline => 'Offline, retrying',
-      SyncStatus.live => '',
+    // Offline (messages have stopped) carries the warn tone; connecting is transient and stays neutral.
+    final (label, icon, color) = switch (status) {
+      SyncStatus.connecting => (
+        'Connecting',
+        AppIcons.pending,
+        tokens.textSecondary,
+      ),
+      SyncStatus.offline => (
+        'Offline, retrying',
+        AppIcons.retry,
+        tokens.warnText,
+      ),
+      SyncStatus.live => ('', AppIcons.info, tokens.textSecondary),
     };
 
     return Container(
@@ -176,13 +185,19 @@ class RailConnectionBar extends ConsumerWidget {
         vertical: AppSpacing.s8,
       ),
       decoration: BoxDecoration(
+        color: status == SyncStatus.offline ? tokens.warnSoft : null,
         border: Border(top: BorderSide(color: tokens.borderSubtle)),
       ),
       child: Semantics(
         liveRegion: true,
-        child: Text(
-          label,
-          style: AppText.caption.copyWith(color: tokens.textSecondary),
+        child: Row(
+          children: [
+            Icon(icon, size: AppSizes.icon16, color: color),
+            const SizedBox(width: AppSpacing.s8),
+            Expanded(
+              child: Text(label, style: AppText.caption.copyWith(color: color)),
+            ),
+          ],
         ),
       ),
     );

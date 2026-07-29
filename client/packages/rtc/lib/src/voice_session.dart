@@ -304,12 +304,24 @@ class VoiceSession {
   /// Extracted so the [sourceId] hand-off is assertable: it reaches LiveKit as
   /// `deviceId`, and dropping it is what made a desktop share fail with
   /// `source not found!` while every other setting looked right.
+  ///
+  /// [lk.ScreenShareCaptureOptions.useiOSBroadcastExtension] is the load-bearing
+  /// flag on iOS. LiveKit's `BroadcastManager` shows the system picker and,
+  /// once the ReplayKit extension is recording, re-publishes through this same
+  /// path. Without the flag, that second pass leaves flutter_webrtc's
+  /// `getDisplayMedia` unaware a broadcast is already live (it never sees the
+  /// `deviceId: 'broadcast-manual'` hint the flag adds), so it tries to start
+  /// its own - a second picker that fails with "already broadcasting". The
+  /// extension and its Info.plist keys exist precisely for this path; the
+  /// options just never opted in. iOS-only: on desktop the flag is inert and
+  /// [sourceId] carries the chosen screen instead.
   @visibleForTesting
   static lk.ScreenShareCaptureOptions captureOptionsFor(
     ScreenShareQuality quality,
     String? sourceId,
   ) =>
       lk.ScreenShareCaptureOptions(
+        useiOSBroadcastExtension: lk.lkPlatformIs(lk.PlatformType.iOS),
         sourceId: sourceId,
         maxFrameRate: quality.fps.toDouble(),
         params: lk.VideoParameters(

@@ -105,14 +105,25 @@ abstract final class AppShadows {
 /// it. Someone choosing "compact" wants more messages on screen, not smaller
 /// text, and conflating the two produces a mode nobody can read.
 enum AppDensity {
-  compact(rowGap: 4, groupWindow: Duration(minutes: 7)),
-  normal(rowGap: 8, groupWindow: Duration(minutes: 5)),
-  spacious(rowGap: 12, groupWindow: Duration(minutes: 3));
+  compact(rowGap: 4, groupedRowGap: 1, groupWindow: Duration(minutes: 7)),
+  normal(rowGap: 8, groupedRowGap: 2, groupWindow: Duration(minutes: 5)),
+  spacious(rowGap: 12, groupedRowGap: 4, groupWindow: Duration(minutes: 3));
 
-  const AppDensity({required this.rowGap, required this.groupWindow});
+  const AppDensity({
+    required this.rowGap,
+    required this.groupedRowGap,
+    required this.groupWindow,
+  });
 
-  /// Space between message rows.
+  /// Space above a message that starts a new group: a different author, or the
+  /// same author past the [groupWindow]. This is the separation between one
+  /// person's turn and the next, so it stays generous.
   final double rowGap;
+
+  /// Space above a continuation of the same group. Much tighter than
+  /// [rowGap]: a run of one person's messages should read as one block, not a
+  /// ladder of evenly-spaced lines, which is what a uniform gap produced.
+  final double groupedRowGap;
 
   /// How long after a message the same author's next one still counts as part
   /// of the same group and drops its avatar and header.

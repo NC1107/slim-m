@@ -36,17 +36,18 @@ abstract class BroadcastBridge {
   Future<void> requestStop();
 }
 
-/// Answers over a method channel an iOS host registers.
+/// Answers over a method channel the iOS host registers in
+/// `BroadcastChannel.swift`.
 ///
-/// **Nothing registers it today.** The broadcast upload extension is parked
-/// until two Apple Developer portal objects exist, so on iOS every call here
-/// misses its handler, [isAvailable] answers false, and the share control
-/// reports [ScreenShareOutcome.unsupported]. That is the truth about an iOS
-/// build with no extension, which is why this ships rather than waiting: the
-/// alternative was a button that lit up over a share nobody could see.
-///
-/// Landing the extension is what turns the false into a real answer. Nothing
-/// on this side has to change.
+/// The broadcast upload extension now exists (target `BroadcastExtension`, its
+/// App Group and profile provisioned), so on a correctly signed build
+/// [isAvailable] answers true and the share publishes through LiveKit's
+/// `BroadcastManager` path - see `VoiceSession.captureOptionsFor` for the flag
+/// that keeps that path from double-starting. A build still missing the
+/// extension, or one where the App
+/// Group entitlement did not make it into the signature, answers false here
+/// and the share control reports [ScreenShareOutcome.unsupported] rather than
+/// lighting up over a share nobody could see.
 class MethodChannelBroadcastBridge implements BroadcastBridge {
   const MethodChannelBroadcastBridge();
 
