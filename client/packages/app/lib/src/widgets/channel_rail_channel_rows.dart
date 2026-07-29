@@ -24,7 +24,7 @@ import 'user_avatar.dart';
 /// Pairs a channel row with its manage-sheet trigger, kept as a sibling
 /// rather than [AppListRow.trailing] so it never displaces that slot's own
 /// job (the unread dot, the voice channel's live head count).
-class ManagedChannelRow extends StatelessWidget {
+class ManagedChannelRow extends StatefulWidget {
   const ManagedChannelRow({
     super.key,
     required this.canManage,
@@ -37,30 +37,63 @@ class ManagedChannelRow extends StatelessWidget {
   final Widget row;
 
   @override
+  State<ManagedChannelRow> createState() => _ManagedChannelRowState();
+}
+
+class _ManagedChannelRowState extends State<ManagedChannelRow> {
+  bool _hovered = false;
+  bool _kebabFocused = false;
+
+  @override
   Widget build(BuildContext context) {
-    if (!canManage) return row;
+    if (!widget.canManage) return widget.row;
     // Mirrors _SectionLabel's own trailing inset so this glyph and the
     // section's add glyph share a right edge; both are AppIconButtonSize.sm.
-    final trailingPad = AppTouchTargets.of(context) ? 0.0 : 4.0;
-    return Padding(
-      padding: EdgeInsets.only(right: trailingPad),
-      child: Row(
-        // Centring floats the button between a voice row and its strip below.
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: row),
-          SizedBox(
-            height: AppListRow.heightFor(context),
-            child: Center(
-              child: AppIconButton(
-                icon: AppIcons.moreVertical,
-                semanticLabel: 'Manage ${channel.name}',
-                size: AppIconButtonSize.sm,
-                onPressed: () => showManageChannelSheet(context, channel),
-              ),
+    final touch = AppTouchTargets.of(context);
+    final trailingPad = touch ? 0.0 : 4.0;
+
+    // A persistent kebab on every row adds a column of noise to the calmest
+    // part of the shell, so a pointer reveals it on row hover (or when tab
+    // reaches it, so a keyboard user never focuses something invisible). The
+    // slot keeps its width either way; nothing reflows. A finger has no
+    // hover, so touch keeps it always visible.
+    final shown = touch || _hovered || _kebabFocused;
+    final kebab = SizedBox(
+      height: AppListRow.heightFor(context),
+      child: Center(
+        child: Focus(
+          skipTraversal: true,
+          canRequestFocus: false,
+          onFocusChange: (v) => setState(() => _kebabFocused = v),
+          child: AnimatedOpacity(
+            opacity: shown ? 1 : 0,
+            duration: AppMotion.reduced(context, AppMotion.fast),
+            // Hidden from the eye is not hidden from a screen reader: the
+            // manage action must stay in the semantics tree while unhovered.
+            alwaysIncludeSemantics: true,
+            child: AppIconButton(
+              icon: AppIcons.moreVertical,
+              semanticLabel: 'Manage ${widget.channel.name}',
+              size: AppIconButtonSize.sm,
+              onPressed: () => showManageChannelSheet(context, widget.channel),
             ),
           ),
-        ],
+        ),
+      ),
+    );
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Padding(
+        padding: EdgeInsets.only(right: trailingPad),
+        child: Row(
+          // Centring floats the button between a voice row and its strip below.
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: widget.row),
+            kebab,
+          ],
+        ),
       ),
     );
   }

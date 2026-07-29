@@ -158,6 +158,11 @@ class _AppInputState extends State<AppInput> {
               decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
+                // The inner field opts out of the global boxed-input theme
+                // entirely: this component draws its own chrome.
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
                 hintText: widget.placeholder,
                 hintStyle: textStyle.copyWith(color: tokens.textSecondary),
                 contentPadding: EdgeInsets.zero,

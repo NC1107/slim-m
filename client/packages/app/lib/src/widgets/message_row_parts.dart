@@ -222,7 +222,13 @@ class DayDivider extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12),
             child: Text(
               label,
-              style: AppText.label.copyWith(color: tokens.textSecondary),
+              // Mono with tabular figures: dates and times are the mono
+              // surfaces in this system, and the brand rides on that.
+              style: AppText.label.copyWith(
+                color: tokens.textSecondary,
+                fontFamily: AppFonts.mono,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
           rule(),

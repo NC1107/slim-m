@@ -81,6 +81,11 @@ class _MessageEditFieldState extends State<MessageEditField> {
               decoration: const InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
+                // Opts out of the global boxed-input theme; the surrounding
+                // widget draws its own chrome.
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
                 contentPadding: EdgeInsets.zero,
               ),
             ),

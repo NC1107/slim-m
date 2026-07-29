@@ -67,9 +67,11 @@ class OnboardingScreen extends ConsumerWidget {
                   Text(
                     'slim-m',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    style: AppText.heading.copyWith(
                       color: tokens.textPrimary,
-                      fontWeight: FontWeight.w600,
+                      fontFamily: AppFonts.mono,
+                      fontWeight: AppWeights.medium,
+                      letterSpacing: 20 * 0.04,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.s8),
