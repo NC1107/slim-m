@@ -3,6 +3,7 @@
 /// fenced-code widgets built on top of them.
 library;
 
+export 'surfaces/async_view.dart';
 export 'surfaces/callout.dart';
 export 'surfaces/card.dart';
 export 'surfaces/code_block.dart';
