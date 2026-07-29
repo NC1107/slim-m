@@ -371,3 +371,148 @@ async fn a_report_you_cannot_read_is_one_you_cannot_resolve_either() {
         .unwrap();
     assert_eq!(closed.status(), StatusCode::NO_CONTENT);
 }
+
+/// A report about a message in a DM must reach the deployment's moderators.
+///
+/// It did not: `list` and `resolve` re-check MANAGE_MESSAGES in the report's
+/// own channel, and a DM channel grants that to nobody, so intake returned 200
+/// while the report was invisible and unresolvable forever. This is the exact
+/// black hole the audit found, in the one place harassment is most private.
+#[tokio::test]
+async fn a_report_filed_in_a_dm_reaches_the_moderators() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, bob_id) = register(&store, "bob").await;
+    let (_carol_token, carol_id) = register(&store, "carol").await;
+
+    let bob = UserId(Uuid::parse_str(&bob_id).unwrap());
+    let carol = UserId(Uuid::parse_str(&carol_id).unwrap());
+    let dm = store.open_dm(bob, carol).await.expect("open dm");
+    let message_id = slimm_server::ids::MessageId(Uuid::now_v7());
+    store
+        .send_message(dm.id, bob, message_id, "abuse", &[])
+        .await
+        .expect("send in dm");
+
+    let filed = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/reports",
+            Some(&bob_token),
+            Some(json!({
+                "subject_kind": "message",
+                "subject_id": message_id.0.to_string(),
+                "reason": "reporting my own dm message for the test",
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(filed.status(), StatusCode::OK, "intake accepts it");
+    let report_id = json_body(filed).await["id"].as_str().unwrap().to_string();
+
+    let queue = app
+        .clone()
+        .oneshot(request("GET", "/reports", Some(&admin_token), None))
+        .await
+        .unwrap();
+    let rows = json_body(queue).await;
+    assert_eq!(
+        rows.as_array().unwrap().len(),
+        1,
+        "the DM report is in the moderator queue, not a black hole"
+    );
+
+    let closed = app
+        .clone()
+        .oneshot(request(
+            "PATCH",
+            &format!("/reports/{report_id}"),
+            Some(&admin_token),
+            Some(json!({ "resolution": "resolved" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        closed.status(),
+        StatusCode::NO_CONTENT,
+        "and a moderator can close it"
+    );
+}
+
+/// A report about a message in a channel that is later deleted stays visible.
+///
+/// Same root cause as the DM case: a soft-deleted channel resolves to NONE, so
+/// the per-channel re-check dropped the report out of the queue on delete.
+#[tokio::test]
+async fn a_report_survives_its_channel_being_deleted() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let channel_id = general_channel_id(&store).await;
+
+    let extra = store.create_channel("scratch", "text").await.unwrap();
+    let report_id = file_a_report(
+        &app,
+        &extra.id.to_string(),
+        &admin_token,
+        &admin_token,
+        "worth keeping across a delete",
+    )
+    .await;
+
+    let deleted = app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/channels/{}", extra.id),
+            Some(&admin_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+
+    let queue = app
+        .clone()
+        .oneshot(request("GET", "/reports", Some(&admin_token), None))
+        .await
+        .unwrap();
+    let rows = json_body(queue).await;
+    assert!(
+        rows.as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["id"] == report_id.as_str()),
+        "the report is still in the queue after its channel was deleted"
+    );
+    let _ = channel_id;
+}
+
+/// A `user`-subject report about an id that never named an account is refused.
+///
+/// It was accepted with no existence check and no foreign key, so the queue
+/// could be flooded with reports naming random uuids.
+#[tokio::test]
+async fn a_report_about_a_nonexistent_user_is_refused() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let (bob_token, _bob_id) = register(&store, "bob").await;
+
+    let filed = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/reports",
+            Some(&bob_token),
+            Some(json!({
+                "subject_kind": "user",
+                "subject_id": Uuid::now_v7().to_string(),
+                "reason": "nobody by this id exists",
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(filed.status(), StatusCode::NOT_FOUND);
+}
