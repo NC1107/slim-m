@@ -17,17 +17,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../providers/dms.dart';
 import '../providers/member_presence.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
-import '../routing/routes.dart';
-import 'context_menu_region.dart';
-import 'member_actions.dart';
+import 'member_profile.dart';
 import 'user_avatar.dart';
 
 /// Whether the member pane is shown at expanded width. Defaults open; the
@@ -247,39 +243,11 @@ class _MemberRow extends ConsumerWidget {
         size: 26,
         status: status,
       ),
-      onTap: isSelf
-          ? null
-          : () async {
-              final channelId = await openDirectMessage(ref, profile.id);
-              if (context.mounted) context.go(Routes.channel(channelId));
-            },
+      // Opens the profile, which is where every verb about a member lives now.
+      onTap: () => unawaited(
+        showMemberProfile(context, ref, profile: profile, status: status),
+      ),
     );
-
-    // No report/block on your own row: nothing to investigate, and no concept of blocking yourself.
-    if (isSelf) return row;
-
-    return ContextMenuRegion(
-      itemsBuilder: (close) => [
-        AppMenuItem(
-          label: 'Report user',
-          leading: AppIcons.report,
-          onTap: () {
-            close();
-            unawaited(reportMember(context, ref, profile));
-          },
-        ),
-        const AppMenuDivider(),
-        AppMenuItem(
-          label: 'Block',
-          leading: AppIcons.revoke,
-          tone: AppMenuItemTone.danger,
-          onTap: () {
-            close();
-            unawaited(blockMember(context, ref, profile));
-          },
-        ),
-      ],
-      child: row,
-    );
+    return row;
   }
 }

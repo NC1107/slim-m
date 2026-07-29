@@ -143,3 +143,24 @@ The helper maps by exception type instead - a `BadRequest` carries the server's 
 The invite row is the first adopter; the remaining twenty-five are mechanical and each needs its own decision about where the message renders, `BackToButton` (done: the identical five-line `IconButton` around `closeScreen` in eight screens is one widget now, so a change to the back affordance is one edit and no screen can drift into a different glyph or a missing tooltip), the sign-in and onboarding fields moving onto `AppInput` (needs `helperText`/`autofillHints` passthrough first), 25 raw `ListTile`s that want `AppListRow`, nine invented `fontSize: 13` sites, and the multi-line `//` runs, which got the gate rather than the sweep: `scripts/check-comment-cap.sh` counts runs per file, `scripts/comment-cap-allow.txt` records each file's count at listing time, and the check fails when a file gains one.
 Ratcheting rather than a big-bang sweep because 801 runs across 309 files predate the rule (broader than the audit's 174/68, which counted Dart only), and a sweep that large is unreviewable; lowering a number as a file gets fixed is.
 Mutation-tested both ways: a new run in an unlisted file exits 1, the clean tree exits 0.
+
+## Round six: the member profile popover (2026-07-29)
+
+The design agent answered the brief's top-ranked ask with a six-card spec, and it is implemented as far as the backend allows.
+
+`showMemberProfile` is one surface with two presentations - anchored popover where there is a pointer, bottom sheet where there is not - and the sections compose in the spec's fixed order.
+The rule that mattered most is "absent rights or context means an absent section, never a disabled row", and it is what the test file pins: a plain member's popover carries the social verbs and Block and nothing else, the call section appears only while you actually share a call, and the mention row is absent when no channel is in view.
+
+Two things shipped that had no home before.
+Per-participant local mute is real: `VoiceSession.setLocallyMuted` disables that participant's audio track for this listener only, reapplied on every room event through the same path deafen already used, so a track that resubscribes stays silenced.
+It is local exactly like deafen and like blocking - the SFU is never told, so the muted participant cannot learn they were muted.
+And the member pane's rows now open the profile instead of jumping straight into a DM, which is where Message became one verb among several rather than the only thing a row could do.
+
+Three sections of the spec are **absent rather than disabled**, which the spec's own rule makes the correct rendering rather than a shortfall:
+
+- **Volume, 0-200%.** livekit_client 2.8.1 exposes no per-participant gain, only whether a track plays at all. A slider that did nothing between its ends would be worse than none; the mute half of that section ships and the slider waits on the library (or a web-audio gain node).
+- **Timeout, and the timed-out badge (card 04).** The server has no timeout concept: no route, no column, no enforcement. This is the largest missing piece and it is server work before it is client work.
+- **Remove from Space.** Likewise absent server-side; only a voice-channel kick exists.
+- **Roles...** is deferred for a different reason: the existing sheet assigns *members to a role*, and the popover needs the inverse. That is a new sheet rather than a missing capability.
+
+The popover is built so each arrives as a section rather than a rewrite.

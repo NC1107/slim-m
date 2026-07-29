@@ -102,6 +102,16 @@ class FakeSession implements VoiceSession {
 
   /// Keyed so a widget test can assert the share surface mounted for the
   /// right participant without a real room behind it.
+  final Set<String> _locallyMuted = {};
+
+  @override
+  bool isLocallyMuted(String identity) => _locallyMuted.contains(identity);
+
+  @override
+  Future<void> setLocallyMuted(String identity, bool muted) async {
+    muted ? _locallyMuted.add(identity) : _locallyMuted.remove(identity);
+  }
+
   @override
   Widget screenShareViewFor(String identity) =>
       SizedBox.shrink(key: Key('fake-share-view-$identity'));

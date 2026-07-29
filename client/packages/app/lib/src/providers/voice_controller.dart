@@ -222,6 +222,17 @@ class VoiceController extends StateNotifier<VoiceState> {
   /// Toggles local playback of everyone else's audio. Never touches this
   /// session's own microphone: deafening and muting are independent, exactly
   /// as they are for every other voice product this design is drawn from.
+  /// Whether [identity] is silenced for this listener alone; see
+  /// [VoiceSession.setLocallyMuted].
+  bool isLocallyMuted(String identity) => _session.isLocallyMuted(identity);
+
+  /// Silences (or restores) one participant locally. Rebuilds the state so a
+  /// popover reading [isLocallyMuted] repaints with the new label.
+  Future<void> setLocallyMuted(String identity, bool muted) async {
+    await _session.setLocallyMuted(identity, muted);
+    state = state.copyWith(participants: _session.participants);
+  }
+
   Future<void> toggleDeafen() async {
     final want = !state.deafened;
     final got = await _session.setDeafened(want);
