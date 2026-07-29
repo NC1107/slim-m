@@ -53,7 +53,12 @@ A fix (`949af6b`, "the broadcast extension must embed no frameworks") landed on 
 The JSON performance baseline exists (`perf/baselines/0.8.0.json`, both RSS figures under the 30MB budget) but is stale: it was taken at server 0.8.0, the server is now at 0.15.0 across seven releases, and nothing re-measures or re-baselines it automatically.
 The size-regression gate is real (`server-ci.yml` fails the build past 20MiB) and the contrast gate is real and currently green (`client/packages/design_system/test/contrast_test.dart`, 22 tests against the live tokens).
 The contrast gate's original failures were genuinely resolved, not just triaged into a backlog: `docs/decisions/0004-visual-identity-review.md` documents the failing values found and the token fixes applied, and states the result clears the gate.
-Two deliverables named earlier in this phase never got the CI automation promised for them, worth flagging even though the exit criteria above don't name them directly: no workflow checks the 300-line file budget, and no workflow runs a license-allowlist check (the `LICENSES/` directory and per-file SPDX headers exist, but nothing gates on them beyond `hygiene.yml`'s SPDX-presence check).
+~~Two deliverables named earlier in this phase never got the CI automation promised for them, worth flagging even though the exit criteria above don't name them directly: no workflow checks the 300-line file budget, and no workflow runs a license-allowlist check (the `LICENSES/` directory and per-file SPDX headers exist, but nothing gates on them beyond `hygiene.yml`'s SPDX-presence check).~~
+Both closed 2026-07-28, and see `docs/ci.md` for what each one actually gates.
+The file budget is `scripts/check-file-budget.sh`, run from `hygiene`: it warns at 300 and fails at 500 over hand-authored source, since failing at 300 would fail the repository as it stands (64 files were over 300 when it was written).
+The 14 files already past 500 are in `scripts/file-budget-allow.txt` at the line count they were listed at, which the gate treats as their own ceiling, so that list is a frozen debt register rather than an exemption; the two worst are production code (`store/sessions.rs` at 957, `push.rs` at 625) and splitting them is still owed.
+The license allowlist is the new `licenses` workflow over one policy file, `deny.toml`, read by cargo-deny for the Rust tree and by `scripts/check-dart-licenses.py` for the Dart tree so the two cannot drift apart.
+It found nothing AGPL-incompatible, and one thing worth knowing: `dbus` and `nm` are MPL-2.0, which is per-file copyleft and compatible with the Apache-2.0 client, recorded as two named exceptions rather than a blanket allowance.
 
 ## Phase 1 - Server and Protocol Core
 
@@ -174,6 +179,7 @@ The CallKit synchronous-report invariant test is green: `client/packages/app/ios
 The egress budget and active-call memory budgets are not met, because neither has ever been measured; `perf/baselines/0.8.0.json` carries no such figures, and every mention of them elsewhere is a planning target, not a result.
 The device media-capability probe is now genuinely wired into the UI (`media_capability_section.dart` calling `probeAll()`, surfaced from `voice_settings_screen.dart`), closing a gap this roadmap's own notes previously carried as open.
 Two deliverables are close but not landed as of this writing: an Android incoming-call notification (open PR #95, `feat/android-call-notification`) ships `NotificationCompat.CallStyle` with an optional full-screen intent, by its own commit message explicitly *not* `android.telecom.ConnectionService` integration; and a per-channel voice roster (open PR #98, `feat/voice-channel-roster`) adds a server roster endpoint and a client provider, neither yet merged to `dev`.
+Update (2026-07-28): the join preview shows who is already in the call now, which was the last open piece of the voice UX item; it renders the roster's three answers as three different things, since a deployment with no SFU never leaves 'not known' and showing that as an empty room would claim a check that never happened.
 
 ## Phase 5 - Voice Canvas De-risking Spike
 
@@ -252,8 +258,11 @@ Status (2026-07-28): further along than this roadmap's own phase ordering (and C
 Real, wired admin screens exist for reports, invites, roles, and per-channel permission overwrites (`reports_screen.dart`, `invites_screen.dart`, `roles_screen.dart`, `role_editor_sheet.dart`, `role_assign_sheet.dart`, `channel_overwrites_screen.dart`), each gated per-permission-bit off a settings section.
 User management is partial: `client_admin.dart` exposes only admin-issued password reset codes, with no user list, ban, or admin-initiated account deletion.
 The `/metrics` Prometheus endpoint and the SQLite time-series store do not exist: there is no metrics module anywhere in `crates/slimm-server/src` and no `/metrics` path in `schema/openapi.yaml`.
-The capability handshake (a client checking a server exposes report and block before connecting) does not exist either; nothing in the client checks for this before connecting.
+~~The capability handshake (a client checking a server exposes report and block before connecting) does not exist either.~~ Built 2026-07-28.
+`GET /version` carries a `capabilities` list derived from the router at runtime (`crates/slimm-server/src/http/capability.rs`), and the sign-in screen names what is missing before anyone commits (`client/packages/app/lib/src/widgets/server_notice.dart`).
+A server too old to advertise anything reads as unknown and says so differently, and neither answer blocks the connection: an operator may knowingly self-host without them.
 The content and legal-reporting policy is documented in prose (`STRATEGY.md`, `decisions/0001-owner-decisions.md`) but has no implementation artifact beyond that prose.
+Update (2026-07-28): the capability handshake is built and is derived from the router rather than written beside it, so it cannot claim a safety tool the deployment does not actually mount; the client tells apart present, absent and too-old-to-say, and never blocks the connection. The metrics half of this phase's title is still the open one.
 
 ## Phase 8 - Audio Design and Interaction Polish
 
@@ -274,11 +283,28 @@ Dependencies: Phase 0, Phase 2 (client shell), Phase 3 (NSE), Phase 4 (CallKit a
 
 Exit criteria: seven distinguishable, consistently normalized sounds play correctly on Fedora, iOS, and Android; in-app chimes never glitch a live call; reduce-motion collapses non-essential motion; the polish pass has no known visible defects in the primary flows; and a golden proves every presence state stays distinguishable desaturated, since the shape-first cue only matters if it survives the greyscale screenshot a bug report arrives as.
 
-Status (2026-07-28): not started.
+Status (2026-07-28): the two exit criteria that need no audio are met; the audio half is not started.
+
+~~Nothing in the client handles reduced motion; a repo-wide search for it turns up nothing.~~
+Closed 2026-07-28.
+`AppMotion` (`client/packages/design_system/lib/src/app_motion.dart`) reads `MediaQuery.disableAnimationsOf` and `accessibleNavigationOf` together, and every animated thing in the chrome routes its duration through it: the toggle thumb, the segmented control, the modal and fullscreen-image transitions, and the microphone meter.
+The speaking ring is decision 0004's one looping animation and is now built as one, `AppSpeakingRing`; under reduce-motion it stops at full strength and gains the bar glyph the decision asks for, so speaking is still said twice.
+Busy spinners are deliberately left spinning, because iOS and Android both leave their own alone under the setting and a frozen spinner reads as a hung app.
+
+~~The one test that touches presence-state distinguishability is a logic assertion, not the golden, pixel, desaturated proof this exit criterion actually asks for.~~
+Closed 2026-07-28 by `client/packages/design_system/test/presence_desaturation_test.dart`, which renders each state through the real widget, converts the pixels to greyscale, binarises them against the surface, and compares the five silhouettes pairwise.
+Binarised rather than compared as grey levels on purpose: two states painted the same shape in different hues do differ in greyscale, and accepting that would be measuring the colour cue the test exists to remove.
+It is machine-independent, which the `SLIMM_GOLDENS` note in `golden_matrix_test.dart` explains is the only way a rendered check runs everywhere; a reference image of the desaturated strip is written by the same file behind that flag.
+The tightest pair is offline against appearing-offline at roughly 2.2% of the box, which is the 2px bar struck across the ring and does not scale with the dot, so the floor is set at 1%.
+Mutation-tested by drawing the away triangle as a disc: `core_test.dart` still passed, which is exactly the gap this closes, and the new test failed in all three themes.
+
 No `assets/audio/`, `synth.py`, or numpy/pyloudnorm pipeline exists anywhere; the whole audio deliverable is still only the description in `STRATEGY.md`.
-Nothing in the client handles reduced motion; a repo-wide search for it turns up nothing.
-The one test that touches presence-state distinguishability (`core_test.dart`, asserting `AppStatusDot.shapeOf` values are pairwise distinct) is a logic assertion, not the golden, pixel, desaturated proof this exit criterion actually asks for.
 Whether the polish pass has any known visible defects cannot be assessed from the repo alone; it needs a human at a screen, and no pass has been logged specifically as this phase's dedicated polish pass, as distinct from the several ad hoc UI fixes that have landed as incidental cleanup during other work.
+Update (2026-07-28): two of this phase's four deliverables have landed, and the status above is otherwise still accurate.
+The synthesis pipeline exists (`assets/audio/`): one shared `synth.py`, seven sounds sharing one bell-like timbre and differing only by contour, count and duration, committed WAVs, and an `audio-ci` job that regenerates and diffs them.
+It does not normalise the way this roadmap and STRATEGY.md describe, and the reason is written into `synth.py`: built as specified, pyloudnorm with a whole-clip fallback under 400ms, the family spanned 3.4 dB measured on any one consistent scale. Level is set by the loudest short-term K-weighted window instead, which is defined identically at every length.
+Reduce motion and the desaturated presence proof are both done; see CLAUDE.md.
+Still open here: per-platform playback (nothing plays these sounds yet, and no client bundles them), the CallKit ringtone, the CI bundle-check, and the motion, haptic and hover polish pass.
 
 ## Phase 9 - Release Readiness and Store Submission
 

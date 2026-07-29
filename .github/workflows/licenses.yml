@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# The dependency-license allowlist, one job per ecosystem.
+# One policy of record in deny.toml: cargo-deny reads it for the Rust tree and
+# scripts/check-dart-licenses.py reads the same [licenses] table for the Dart
+# tree, so the client cannot pick up a copyleft dependency that the server's
+# gate would have refused. It lives outside hygiene.yml because both halves
+# need a toolchain and hygiene is the seconds-long check that needs none.
+# See docs/ci.md.
+name: licenses
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**/Cargo.toml"
+      - "deny.toml"
+      - "client/pubspec.yaml"
+      - "client/pubspec.lock"
+      - "client/packages/**/pubspec.yaml"
+      - "scripts/check-dart-licenses.py"
+      - ".github/workflows/licenses.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: licenses-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: cargo dependency licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # -A because the allow list is shared and a Dart-only entry is not a finding.
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check licenses
+          command-arguments: "-A license-exception-not-encountered"
+
+  dart:
+    name: pub dependency licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          cache: true
+
+      # The gate reads LICENSE files out of the pub cache, so it needs a real resolve.
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
+
+      - name: dependency licenses are allowlisted
+        run: python3 scripts/check-dart-licenses.py

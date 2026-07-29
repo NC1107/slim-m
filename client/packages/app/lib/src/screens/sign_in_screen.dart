@@ -13,6 +13,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../routing/routes.dart';
+import '../widgets/server_notice.dart';
 
 /// Sign in or create an account on a chosen server.
 ///
@@ -41,19 +42,18 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   bool _busy = false;
   String? _error;
 
-  /// Whether the server in the field can deliver push, from its /version:
-  /// true, false, or null while unknown (probe pending, unreachable, or a
-  /// server too old to say). Only an explicit false renders the notice,
-  /// because warning someone off a server that has push is worse than
-  /// staying quiet.
-  bool? _pushEnabled;
-  bool? _inviteRequired;
+  /// What the server in the field said about itself, or null while nothing is
+  /// known: the probe is pending, the host is unreachable, or it answered with
+  /// something that is not a slim-m `/version`. Every notice below reads from
+  /// this, and null renders none of them, because warning someone off a server
+  /// that is merely slow to answer is worse than staying quiet.
+  Version? _probed;
   Timer? _probeDebounce;
 
   @override
   void initState() {
     super.initState();
-    _probePush();
+    _probeServer();
   }
 
   @override
@@ -82,9 +82,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     );
   }
 
-  /// Asks the server in the field whether it can deliver push at all, so
-  /// someone joining a LAN-only deployment learns their phone will stay
-  /// silent while they are still choosing, not after a week of wondering.
+  /// Asks the server in the field what it is, so the facts worth knowing
+  /// before joining are on screen while the choice is still open: whether it
+  /// can deliver push at all, whether joining needs an invite, and whether it
+  /// offers reporting and blocking.
   ///
   /// Every failure resolves to "unknown". A host that answers 200 with
   /// something that is not a slim-m `/version` body is as unknown as one that
@@ -94,19 +95,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   /// The result is applied only if the field still holds the address that was
   /// probed, on every path including failures, so a slow answer about a
   /// previously typed address cannot relabel the current one either way.
-  Future<void> _probePush() async {
+  Future<void> _probeServer() async {
     final target = _probeTarget(_server.text);
     if (target == null) {
-      setState(() => _pushEnabled = null);
+      setState(() => _probed = null);
       return;
     }
     final client = ref.read(probeApiProvider)(target);
-    bool? answer;
-    bool? needsInvite;
+    Version? answer;
     try {
-      final version = await client.version();
-      answer = version.pushEnabled;
-      needsInvite = version.inviteRequired;
+      answer = await client.version();
     } on ApiException {
       // Unreachable or refusing means unknown, and sign-in itself will say
       // "could not reach that server" with more authority than a probe.
@@ -119,23 +117,17 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
     if (!mounted) return;
     if (_probeTarget(_server.text) == target) {
-      setState(() {
-        _pushEnabled = answer;
-        _inviteRequired = needsInvite;
-      });
+      setState(() => _probed = answer);
     }
   }
 
   void _onServerEdited(String _) {
     // The old answer is about the old address the moment the field changes.
-    if (_pushEnabled != null || _inviteRequired != null) {
-      setState(() {
-        _pushEnabled = null;
-        _inviteRequired = null;
-      });
+    if (_probed != null) {
+      setState(() => _probed = null);
     }
     _probeDebounce?.cancel();
-    _probeDebounce = Timer(const Duration(milliseconds: 600), _probePush);
+    _probeDebounce = Timer(const Duration(milliseconds: 600), _probeServer);
   }
 
   /// Signs in or registers, then starts push.
@@ -264,65 +256,29 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     autocorrect: false,
                     onChanged: _onServerEdited,
                   ),
+                  // First of the three: the other two are about convenience,
+                  // this one is about whether you have any recourse here.
+                  if (_probed case final version?)
+                    ServerSafetyNotice(version: version),
                   // Only while creating an account: it is not a fact a
                   // returning member has any use for.
-                  if (_creatingAccount && _inviteRequired == true) ...[
-                    const SizedBox(height: AppSpacing.s8),
-                    Semantics(
-                      liveRegion: true,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            AppIcons.invite,
-                            size: 16,
-                            color: tokens.textSecondary,
-                          ),
-                          const SizedBox(width: AppSpacing.s8),
-                          Expanded(
-                            child: Text(
-                              'This Space is invite only. Ask a member for a '
-                              'code, then use "Join a different Space" below '
-                              'to redeem it. An admin can open joining to '
-                              'anyone in Settings, under Space.',
-                              style: TextStyle(
-                                color: tokens.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                  if (_creatingAccount && _probed?.inviteRequired == true)
+                    const ServerNotice(
+                      icon: AppIcons.invite,
+                      message:
+                          'This Space is invite only. Ask a member for a '
+                          'code, then use "Join a different Space" below '
+                          'to redeem it. An admin can open joining to '
+                          'anyone in Settings, under Space.',
                     ),
-                  ],
-                  if (_pushEnabled == false) ...[
-                    const SizedBox(height: AppSpacing.s8),
-                    Semantics(
-                      liveRegion: true,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            AppIcons.notificationsOff,
-                            size: 16,
-                            color: tokens.textSecondary,
-                          ),
-                          const SizedBox(width: AppSpacing.s8),
-                          Expanded(
-                            child: Text(
-                              'This Space cannot send push notifications. '
-                              'You can still use it, but phones will only see '
-                              'new messages while the app is open.',
-                              style: TextStyle(
-                                color: tokens.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                  if (_probed?.pushEnabled == false)
+                    const ServerNotice(
+                      icon: AppIcons.notificationsOff,
+                      message:
+                          'This Space cannot send push notifications. '
+                          'You can still use it, but phones will only see '
+                          'new messages while the app is open.',
                     ),
-                  ],
                   const SizedBox(height: AppSpacing.s16),
                   TextField(
                     controller: _username,

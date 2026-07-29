@@ -264,3 +264,7 @@ jobs:
             fi
           done < <(find crates -name '*.rs')
           exit $missing
+
+      # Warns at 300 and fails at 500; the reasoning is in the script header.
+      - name: file size budget
+        run: bash scripts/check-file-budget.sh

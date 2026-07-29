@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: Apache-2.0
+name: audio-ci
+#
+# The notification WAVs are committed and generated from source. This
+# regenerates them and fails if anything drifts, which is the whole reason
+# they are synthesised rather than authored: a sound file nobody can rebuild
+# from the repository is a binary blob with a plausible story attached.
+#
+# It also runs the family's own checks, the important one being that the seven
+# are level with each other. The first build of the set passed every per-file
+# check while spanning 3.4 dB, because nothing had ever compared them.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "assets/audio/**"
+      - ".github/workflows/audio-ci.yml"
+  pull_request:
+    paths:
+      - "assets/audio/**"
+      - ".github/workflows/audio-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audio-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sounds:
+    name: the sounds rebuild to the same bytes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      # Pinned to what the committed WAVs were generated with, interpreter
+      # included: a different float result is a different WAV, and this job
+      # would then fail for a reason nobody changed.
+      - name: install the generator's dependencies
+        # --only-binary, so a source distribution cannot run its own setup
+        # code on the runner. Both of these publish wheels, checked.
+        run: |
+          pip install --only-binary :all: "numpy==2.4.6" "pyloudnorm==0.2.0"
+
+      - name: the family's own checks
+        run: python3 -m unittest discover -s assets/audio -v
+
+      - name: regenerate, and fail on any drift
+        run: |
+          set -euo pipefail
+          python3 assets/audio/generate.py
+          if ! git diff --exit-code -- assets/audio; then
+            echo "::error::a committed sound does not match what the code makes"
+            exit 1
+          fi
+          echo "every sound rebuilt to the bytes that are committed"

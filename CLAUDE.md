@@ -12,6 +12,58 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The capability handshake (2026-07-28)
+
+Phase 7's "verify a server exposes report and block before connecting and warn if absent" is built.
+`GET /version` grew a `capabilities` array, and the sign-in screen names what a server is missing while the choice is still open.
+
+**The list is read off the router, not written beside it.**
+`crates/slimm-server/src/http/capability.rs` sends one request per capability through the real `router()` using a method no route can register (`SLIMMPROBE`), and reads the `Allow` header axum puts on the resulting 405.
+So routing answers on its own: no handler runs, nothing authenticates, nothing is written, and a report is not filed to find out whether reports can be filed.
+A hand-kept list would only ever have proved that somebody remembered to update it, which is the one thing a safety guarantee cannot rest on, and `tests/capabilities.rs` gates that by asserting the derivation can also say *no* (a bare router advertises neither).
+
+**Method, not just path, and that is not a detail.**
+`/reports` is mounted twice: `GET` is the moderator's queue (`http/reports.rs`) and `POST` is a member filing one (`http/safety.rs`).
+A path-only probe reads a deployment that kept the queue and dropped the intake as still offering reporting, which is exactly backwards.
+Mutation-tested: dropping the method check fails `the_moderator_queue_alone_is_not_a_way_to_report` and nothing else.
+
+**Unknown is not absent, on the client side.**
+A server older than 0.17.0 sends no `capabilities` key at all, and `Version.safetyTools` reports `SafetyTools.unknown` for that, with its own wording ("too old to say") rather than the accusation.
+An unreachable or foreign host renders nothing whatsoever, since nothing has been heard back.
+Neither ever blocks the connection: an operator may knowingly self-host without them, so the notice informs and stops there.
+
+Two smaller things this changed on the way past.
+`sign_in_screen.dart` held `_pushEnabled` and `_inviteRequired` as separate fields; it holds the probed `Version?` now, which is one piece of state instead of three and made the file 46 lines shorter rather than longer.
+The three notices moved into `ServerNotice` (`client/packages/app/lib/src/widgets/server_notice.dart`), which carries its own top gap, so a notice with nothing to say renders as nothing without leaving a hole where its spacer was.
+`Version` also moved out of `models.dart` into `models_version.dart`, since 380 lines was already past the review budget before this added to it.
+
+## Reduce motion, and proving presence survives greyscale (2026-07-28)
+
+The two Phase 8 accessibility exit criteria that need no audio are met.
+Read this before adding an animation to the client or touching `AppStatusDot`.
+
+**Every animated thing asks one question, and it lives in one place.**
+`AppMotion.isReduced` (`client/packages/design_system/lib/src/app_motion.dart`) is `MediaQuery.disableAnimationsOf(context) || MediaQuery.accessibleNavigationOf(context)`, and `AppMotion.reduced(context, d)` returns `Duration.zero` or `d`.
+Both signals, not just the first: a screen reader being on means a loop is movement nobody sees and a transition is only a delay in front of the next announcement.
+A new animation routes its duration through that call or it is not honouring the setting; the durations themselves still sit at their call sites, and folding them into the design language's named `fast`/`base`/`slow` steps is a separate visual change nobody has asked for yet.
+
+**The speaking ring is the one thing allowed to loop, and it did not loop at all before this.**
+Decision 0004 specifies a pulse, and `AppAvatar` was drawing a plain static border, so the "under reduce-motion it becomes static" half was vacuously true and the cue it was meant to preserve did not exist.
+`AppSpeakingRing` (`components/core/speaking_ring.dart`, split out rather than added to `avatar.dart`, which was near the 300-line budget) pulses the ring's alpha on a reversing controller, and under reduce-motion stops it at full strength and adds `AppSpeakingGlyph`, three level bars on a disc at the avatar's bottom-left corner.
+The glyph is drawn rather than set as a Lucide icon because it renders at roughly 10dp, where a 1.5px-stroked outline closes into a smudge; it is not emoji chrome.
+It mounts only while somebody is actually speaking, so nothing is left ticking.
+
+**Busy spinners are deliberately left spinning.** iOS and Android both keep their own activity indicators moving under reduce-motion, and a frozen spinner reads as a hung app rather than as a calmer one, so matching the platform beats a literal reading of the setting. That is written down in `app_motion.dart`'s own doc comment so the next contributor does not "finish the job".
+
+**The presence golden is arithmetic, not an image, and that is the strong version.**
+`test/presence_desaturation_test.dart` renders each `AppPresence` through the real widget, rasterises it, converts to Rec. 709 luma, binarises against the surface, and compares the five silhouettes pairwise.
+Binarised rather than compared as grey levels on purpose: two states painted the same shape in two different hues *do* differ in greyscale, and accepting that would be measuring the colour cue this test exists to remove.
+It runs everywhere, unlike a reference image (see `golden_matrix_test.dart`'s note); a PNG of the desaturated strip is written by the same file behind `SLIMM_GOLDENS`.
+The tightest real pair is offline against appearing-offline at roughly 2.2% of the box, which is the 2px bar struck across the ring and does not scale with the dot, so the floor sits at 1%.
+Two things it needs: the surface has to be painted *inside* the repaint boundary, or transparent pixels read as ink in a light theme and as background in a dark one; and `toImage()` has to run in `tester.runAsync`, for the reason the Fedora section below gives.
+
+What makes it worth having over `core_test.dart`'s existing check: mutating the away triangle to draw a disc while leaving `AppStatusDot.shapeOf` alone leaves `core_test.dart` green and fails this in all three themes.
+
 ## A per-channel voice roster (2026-07-28)
 
 The rail could only show who was in the one call already joined; every other voice channel looked empty even with people talking in it.
@@ -230,7 +282,7 @@ Confirmed but not fixed, still real:
 - **No UI ever called `SlimmApi.report` or `blockUser`.** The endpoints, wire model, and an admin triage screen all existed with zero call sites in `packages/app`. A concurrent, unrelated change landed in this same working tree while this pass was running and closed it (`report_dialog.dart`, `context_menu_region.dart`, wired into both the message context menu and the member row); it was not this pass's work, so it is not itemised above, but a future contributor should know the gap this pass found is already closed. Its own regression test (`message_row_test.dart`) was missing a `pumpAndSettle` between closing the menu and reopening it for the second tap, which failed the gate deterministically rather than flakily; fixed in the same run, no app code changed.
 - ~~**`ContextMenuRegion` repeats the same missing-`Positioned` mistake.**~~ Stale, checked 2026-07-28: the `overlayChildBuilder` in `context_menu_region.dart` wraps its follower in `Positioned` and carries a comment saying why.
 - ~~**The server-menu chevron opens a blank, full-viewport overlay.**~~ Stale, checked 2026-07-28 by opening it on a live web build: the Space menu opens correctly and its items are reachable.
-- **A context menu is unreachable without a pointer, which is most of the message and member actions.** `ContextMenuRegion` opens on `onSecondaryTapDown` or `onLongPress` and offers nothing else: no keyboard affordance, no semantic action. Everything inside it - report, block, edit, delete, pin - is therefore unreachable to a keyboard or screen-reader user. Found while trying to drive it: with the accessibility tree on, the semantics elements sit over the canvas and swallow pointer events, so neither a synthetic right-click nor a long press opens it either, which is the same wall a real assistive-technology user hits. `scripts/lib/e2e_admin.py` covers report and block at the API and says so in its docstring rather than pretending the UI path was exercised.
+- **A context menu is unreachable by keyboard, though not by a screen reader.** `ContextMenuRegion` and `MessageContextMenuRegion` open on `onSecondaryTapDown` or `onLongPress` only. An earlier version of this note claimed that left them with no semantic action either; that was wrong, checked 2026-07-28: `GestureDetector` publishes `SemanticsAction.longPress` for its own `onLongPress`, so VoiceOver and TalkBack have always been able to open these, and `context_menu_reachability_test.dart` now guards that, since it is a side effect of one widget choice and a `Listener` or `excludeFromSemantics` would remove it silently. What is genuinely missing is the keyboard: the rows do not take focus and no key opens the menu, so report, block, edit, delete and pin have no keyboard route. The e2e harness cannot drive them either, for a different reason - it dispatches DOM events rather than semantic actions - so `scripts/lib/e2e_admin.py` covers report and block at the API and says so.
 - **A revoked session mid-app drops the user all the way to the bare onboarding root**, not sign-in, losing the remembered server address and showing no explanation, contradicting `router.dart`'s own doc comment. Still open.
 
 Three touched files now exceed the 300-line review budget: `sync_controller.dart` (316, crossed it this pass), `member_pane.dart` (396, crossed it this pass), `channel_screen.dart` (583, already over before this pass). Split before opening a PR from this work rather than adding to them further.

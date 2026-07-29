@@ -27,15 +27,23 @@ const double kModalMaxHeight = 720;
 /// know which of the two it is being shown as.
 Page<void> modalPage(BuildContext context, Widget child) {
   if (MediaQuery.sizeOf(context).width < kCompactWidth) {
-    return MaterialPage<void>(child: child);
+    return AppMotion.isReduced(context)
+        ? NoTransitionPage<void>(child: child)
+        : MaterialPage<void>(child: child);
   }
   return CustomTransitionPage<void>(
     opaque: false,
     barrierDismissible: true,
     barrierColor: const Color(0x99000000),
     barrierLabel: 'Dismiss',
-    transitionDuration: const Duration(milliseconds: 140),
-    reverseTransitionDuration: const Duration(milliseconds: 100),
+    transitionDuration: AppMotion.reduced(
+      context,
+      const Duration(milliseconds: 140),
+    ),
+    reverseTransitionDuration: AppMotion.reduced(
+      context,
+      const Duration(milliseconds: 100),
+    ),
     transitionsBuilder: (context, animation, _, child) => FadeTransition(
       opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
       child: child,

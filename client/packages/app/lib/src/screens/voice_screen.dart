@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
+import '../providers/voice_roster.dart';
 import '../widgets/local_screen_share_banner.dart';
 import '../widgets/user_avatar.dart';
 import 'voice_call_controls.dart';
@@ -108,7 +109,9 @@ class _JoinPreview extends ConsumerWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: tokens.textSecondary, fontSize: 13),
               ),
-              const SizedBox(height: AppSpacing.s24),
+              const SizedBox(height: AppSpacing.s16),
+              _WhoIsHere(channelId: channelId),
+              const SizedBox(height: AppSpacing.s16),
               _PreToggle(
                 icon: voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
                 label: 'Microphone',
@@ -154,6 +157,65 @@ class _JoinPreview extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Who is already in the call, above the button that joins it.
+///
+/// The rail has shown this for a channel you have not joined since the
+/// per-channel roster landed; the preview, which is the screen you are
+/// actually looking at when deciding whether to join, did not.
+///
+/// The three answers the roster can give are rendered as three different
+/// things, because collapsing them lies. Not known yet draws nothing rather
+/// than an empty room, since a deployment with no SFU configured stays in
+/// that state forever and "nobody is here" would be a claim this client
+/// never checked.
+class _WhoIsHere extends ConsumerWidget {
+  const _WhoIsHere({required this.channelId});
+
+  final String channelId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final roster = ref.watch(voiceRosterProvider(channelId)).valueOrNull;
+    if (roster == null) return const SizedBox.shrink();
+
+    if (roster.isEmpty) {
+      return Text(
+        'Nobody is in this call yet.',
+        textAlign: TextAlign.center,
+        style: AppText.caption.copyWith(color: tokens.textSecondary),
+      );
+    }
+
+    final names = roster.map((p) => p.displayName).join(', ');
+    return Column(
+      children: [
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: AppSpacing.s4,
+          children: [
+            for (final participant in roster.take(8))
+              AuthorAvatar(
+                name: participant.displayName,
+                userId: participant.userId,
+                size: 28,
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.s8),
+        Text(
+          roster.length == 1 ? '$names is here' : '$names are here',
+          textAlign: TextAlign.center,
+          style: AppText.caption.copyWith(color: tokens.textSecondary),
+          semanticsLabel: roster.length == 1
+              ? '$names is in this call'
+              : '${roster.length} people in this call: $names',
+        ),
+      ],
     );
   }
 }

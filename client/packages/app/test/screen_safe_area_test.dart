@@ -20,6 +20,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/providers/voice_roster.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/admin/channel_overwrites_screen.dart';
 import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
@@ -219,6 +220,12 @@ void main() {
         voiceControllerProvider.overrideWith(
           (ref) => VoiceController(ref, session: _FakeSession()),
         ),
+        // The preview polls this every 15 seconds now that it shows who is
+        // already in the call; without a stub the timer outlives the test.
+        voiceRosterProvider.overrideWith(
+          (ref, channelId) =>
+              const Stream<List<VoiceRosterParticipant>>.empty(),
+        ),
       ],
     );
 
@@ -314,6 +321,12 @@ void main() {
       overrides: [
         voiceControllerProvider.overrideWith(
           (ref) => VoiceController(ref, session: _FakeSession()),
+        ),
+        // The preview polls this every 15 seconds now that it shows who is
+        // already in the call; without a stub the timer outlives the test.
+        voiceRosterProvider.overrideWith(
+          (ref, channelId) =>
+              const Stream<List<VoiceRosterParticipant>>.empty(),
         ),
       ],
     );

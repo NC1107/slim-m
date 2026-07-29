@@ -14,6 +14,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/providers/voice_roster.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/voice_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -128,6 +129,12 @@ void main() {
     (tester) async {
       final container = ProviderContainer(
         overrides: [
+          // The preview polls this every 15 seconds now that it shows who
+          // is already in the call; without a stub the timer outlives the test.
+          voiceRosterProvider.overrideWith(
+            (ref, channelId) =>
+                const Stream<List<VoiceRosterParticipant>>.empty(),
+          ),
           keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
           sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
           apiProvider.overrideWith((ref) {
@@ -164,6 +171,12 @@ void main() {
     (tester) async {
       final container = ProviderContainer(
         overrides: [
+          // The preview polls this every 15 seconds now that it shows who
+          // is already in the call; without a stub the timer outlives the test.
+          voiceRosterProvider.overrideWith(
+            (ref, channelId) =>
+                const Stream<List<VoiceRosterParticipant>>.empty(),
+          ),
           keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
           sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
           apiProvider.overrideWith((ref) {

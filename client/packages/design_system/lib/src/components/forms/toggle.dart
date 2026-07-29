@@ -14,6 +14,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../app_metrics.dart';
+import '../../app_motion.dart';
 import '../../app_tokens.dart';
 import 'focusable_tap_target.dart';
 
@@ -72,7 +73,8 @@ class AppToggle extends StatelessWidget {
             ),
             child: AnimatedAlign(
               alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-              duration: const Duration(milliseconds: 150),
+              duration:
+                  AppMotion.reduced(context, const Duration(milliseconds: 150)),
               curve: Curves.easeOut,
               child: Container(
                 width: _thumbSize,
