@@ -143,8 +143,7 @@ async fn a_moderator_cannot_reach_above_their_own_level() {
         .unwrap();
     assert_eq!(removal_refused.status(), StatusCode::FORBIDDEN);
 
-    // The same moderator against an ordinary member is fine, so the refusal
-    // above is about the target's standing and not about the caller's bits.
+    // Fine against an ordinary member, so the refusal is about the target.
     let allowed = app
         .clone()
         .oneshot(request(

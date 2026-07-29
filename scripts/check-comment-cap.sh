@@ -39,8 +39,9 @@ fi
 # Counts maximal runs of 2+ consecutive plain-comment lines in one file.
 runs_in() {
   awk '
-    # A plain comment is // not followed by /, or # not followed by !.
-    /^[[:space:]]*\/\/[^\/]/ || /^[[:space:]]*\/\/$/ { streak++; next }
+    # A plain comment is // followed by neither / nor ! (both are doc
+    # comments), or # not followed by !.
+    /^[[:space:]]*\/\/[^\/!]/ || /^[[:space:]]*\/\/$/ { streak++; next }
     /^[[:space:]]*#([^!]|$)/ { streak++; next }
     { if (streak > 1) runs++; streak = 0 }
     END { if (streak > 1) runs++; print runs + 0 }

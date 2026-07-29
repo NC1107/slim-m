@@ -80,8 +80,7 @@ async fn a_timeout_removes_expression_and_leaves_reading() {
     ] {
         assert!(!after.intersects(gone), "{gone:?} should be gone");
     }
-    // Not USE_CANVAS: that one bit means view *and* draw, so subtracting it
-    // would blank the canvas rather than make it read-only.
+    // Not USE_CANVAS: it means view *and* draw, so losing it blanks the canvas.
     assert!(after.contains(Permissions::USE_CANVAS));
 }
 
@@ -102,9 +101,7 @@ async fn the_deployment_wide_read_is_masked_too() {
     assert!(!base.intersects(Permissions::ATTACH_FILES));
     assert!(base.contains(VIEW));
 
-    // The unmasked read is what a moderation check compares against, so it
-    // must NOT have moved: otherwise timing somebody out is itself what makes
-    // them look junior enough to time out again.
+    // Must not move: else a timeout is what makes somebody re-timeout-able.
     let granted = s.granted_base_permissions(user.id).await.unwrap();
     assert!(granted.contains(Permissions::ATTACH_FILES));
 }
@@ -226,8 +223,7 @@ async fn re_issuing_replaces_the_deadline_in_both_directions() {
 
     s.clear_member_timeout(user.id).await.unwrap();
     assert_eq!(s.timed_out_until(user.id).await.unwrap(), None);
-    // Lifting one that is not there is a success: afterwards they can speak,
-    // which is what the caller asked for either way.
+    // Lifting an absent one still succeeds: they can speak either way.
     s.clear_member_timeout(user.id).await.unwrap();
 }
 
@@ -289,8 +285,7 @@ async fn an_administrator_is_masked_like_anyone_else() {
         .unwrap();
 
     assert!(!perms.intersects(SEND));
-    // Only the expression bits go. They are still an administrator, so they
-    // can still lift their own timeout rather than being locked out by it.
+    // Only expression bits go, so they can still lift their own timeout.
     assert!(perms.contains(Permissions::ADMINISTRATOR));
     assert!(perms.contains(Permissions::MANAGE_MESSAGES));
 }

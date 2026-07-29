@@ -120,8 +120,7 @@ impl Store {
             revoke_session_rows(&mut tx, *session_id, now).await?;
         }
 
-        // Their unspent invites go with them, or a removal hands out the way
-        // back in to whoever they gave a code to on the way out.
+        // Their unspent invites go too, or a removal hands out the way back in.
         sqlx::query!(
             "UPDATE invites SET revoked_at = ? WHERE created_by = ? AND revoked_at IS NULL",
             now,

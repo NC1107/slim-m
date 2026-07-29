@@ -73,8 +73,7 @@ impl Store {
         let now = now_ms();
         let mut tx = self.pool.begin().await?;
 
-        // Write-first, taking the lock up front and capturing the sessions to
-        // close in one shot; deleting devices below cascades those rows away.
+        // Write-first: takes the lock up front; deleting devices cascades these.
         let revoked: Vec<SessionId> = sqlx::query!(
             r#"UPDATE sessions SET revoked_at = ? WHERE user_id = ?
                RETURNING id AS "id!: SessionId""#,
@@ -145,8 +144,7 @@ impl Store {
         .execute(&mut *tx)
         .await?;
 
-        // Tombstone and anonymize the account. The username frees up because the
-        // live-username unique index excludes rows with `deleted_at` set.
+        // The live-username index excludes tombstones, so the name frees up.
         let tombstone = format!("deleted-{user_id}");
         sqlx::query!(
             "UPDATE users
@@ -160,8 +158,7 @@ impl Store {
         .execute(&mut *tx)
         .await?;
 
-        // Refused only while somebody else would be stranded; see the note on
-        // this function.
+        // Refused only while somebody else would be stranded; see the note.
         if super::roles::administrator_count(&mut tx).await? == 0 {
             let others = sqlx::query_scalar!(
                 r#"SELECT COUNT(*) AS "n!: i64" FROM users

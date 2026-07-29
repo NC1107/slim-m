@@ -154,8 +154,7 @@ impl Store {
             return Ok(HashMap::new());
         }
         let now = now_ms();
-        // Built rather than a fixed `query!` because the id list is variable
-        // length and SQLite has no array binding.
+        // Built, not `query!`: the id list is variable and SQLite has no arrays.
         let mut builder =
             sqlx::QueryBuilder::new("SELECT user_id, until FROM member_timeouts WHERE until > ");
         builder.push_bind(now);
