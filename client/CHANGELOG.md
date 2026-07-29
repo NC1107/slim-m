@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/NC1107/slim-m/compare/client-v0.8.0...client-v0.8.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* close 16 defects a multi-agent audit found, moderation-queue holes first ([#118](https://github.com/NC1107/slim-m/issues/118)) ([b4eab36](https://github.com/NC1107/slim-m/commit/b4eab36e4e0b2b35a180542fe987225677fd82d7))
+
 ## [0.8.0](https://github.com/NC1107/slim-m/compare/client-v0.7.0...client-v0.8.0) (2026-07-29)
 
 
