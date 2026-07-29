@@ -102,8 +102,7 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
     final wide = MediaQuery.sizeOf(context).width >= _twoPaneFloor;
     final panes = _allPanes;
 
-    // Wide always has something on the right: an empty pane beside a nav is a
-    // hole, and the first entry is the one somebody came for most often.
+    // Wide always shows something: an empty pane beside a nav is a hole.
     final selected = wide ? (_selected ?? panes.firstOrNull) : _selected;
 
     if (!wide && selected != null) {
@@ -123,9 +122,7 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
     final nav = _Nav(
       groups: widget.groups,
       selectedId: selected?.id,
-      // Only the wide layout marks a row as current: on compact the nav is
-      // never on screen beside the pane, so a lit row would describe a state
-      // nobody can see.
+      // Wide only: on compact no lit row is ever visible beside its pane.
       showSelection: wide,
       header: widget.header,
       footer: widget.footer,
@@ -254,8 +251,7 @@ class _Nav extends StatelessWidget {
                     label: pane.label,
                     meta: pane.badge,
                     selected: showSelection && pane.id == selectedId,
-                    // A chevron only where the row goes somewhere else; on
-                    // wide it changes the pane beside it and stays put.
+                    // A chevron only where the row actually goes somewhere.
                     trailing: showSelection
                         ? null
                         : Icon(
