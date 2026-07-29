@@ -6,6 +6,8 @@
 /// rather than every widget.
 library;
 
+export 'src/app_fade_in.dart';
+export 'src/app_haptics.dart';
 export 'src/app_icons.dart';
 export 'src/app_metrics.dart';
 export 'src/app_motion.dart';

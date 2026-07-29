@@ -12,6 +12,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../app_haptics.dart';
 import '../../app_metrics.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
@@ -123,6 +124,11 @@ class _AppListRowState extends State<AppListRow> {
   bool _hovered = false;
   bool _focused = false;
 
+  /// A finger has no hover, so on a phone this is the only sign a tap landed
+  /// before its action runs. Shown as the same raised fill hover uses, but it
+  /// appears the instant the finger touches down rather than on release.
+  bool _pressed = false;
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -186,7 +192,9 @@ class _AppListRowState extends State<AppListRow> {
       decoration: BoxDecoration(
         color: widget.selected
             ? tokens.accentSoft
-            : (_hovered ? tokens.surfaceRaised : Colors.transparent),
+            : (_pressed || _hovered
+                ? tokens.surfaceRaised
+                : Colors.transparent),
         borderRadius: BorderRadius.circular(AppRadii.control),
       ),
       foregroundDecoration: _focused
@@ -250,7 +258,21 @@ class _AppListRowState extends State<AppListRow> {
                 ),
               },
         child: GestureDetector(
-          onTap: widget.onTap,
+          onTapDown: widget.onTap == null
+              ? null
+              : (_) => setState(() => _pressed = true),
+          onTapUp: widget.onTap == null
+              ? null
+              : (_) => setState(() => _pressed = false),
+          onTapCancel: widget.onTap == null
+              ? null
+              : () => setState(() => _pressed = false),
+          onTap: widget.onTap == null
+              ? null
+              : () {
+                  AppHaptics.selection();
+                  widget.onTap!();
+                },
           child: Opacity(opacity: widget.muted ? 0.62 : 1, child: visual),
         ),
       ),

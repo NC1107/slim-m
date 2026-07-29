@@ -28,15 +28,25 @@ class VoiceScreen extends ConsumerWidget {
     final voice = ref.watch(voiceControllerProvider);
     final inThisChannel = voice.channelId == channelId;
 
+    // Keyed by branch so each step of joining - preview, connecting, in-call - fades through rather than snapping.
+    final stage = switch (voice.state) {
+      VoiceSessionState.connected when inThisChannel => 'in-call',
+      VoiceSessionState.connecting when inThisChannel => 'connecting',
+      _ => 'preview',
+    };
     return Container(
       color: tokens.surfaceBase,
-      child: switch (voice.state) {
-        VoiceSessionState.connected when inThisChannel => _InCall(
-          channelId: channelId,
-        ),
-        VoiceSessionState.connecting when inThisChannel => const _Connecting(),
-        _ => _JoinPreview(channelId: channelId),
-      },
+      child: AppFadeIn(
+        key: ValueKey('voice-$stage'),
+        child: switch (voice.state) {
+          VoiceSessionState.connected when inThisChannel => _InCall(
+            channelId: channelId,
+          ),
+          VoiceSessionState.connecting when inThisChannel =>
+            const _Connecting(),
+          _ => _JoinPreview(channelId: channelId),
+        },
+      ),
     );
   }
 }
@@ -82,78 +92,89 @@ class _JoinPreview extends ConsumerWidget {
     final error = showingLastAttempt ? voice.error : null;
     final canRetry = !showingLastAttempt || voice.retryable;
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.s24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Icon(AppIcons.voice, size: 32, color: tokens.textSecondary),
-              const SizedBox(height: AppSpacing.s16),
-              Text(
-                'Voice channel',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: tokens.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s8),
-              Text(
-                'Joining connects you and opens your microphone. '
-                'Nothing is sent before you join.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: tokens.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: AppSpacing.s16),
-              _WhoIsHere(channelId: channelId),
-              const SizedBox(height: AppSpacing.s16),
-              _PreToggle(
-                icon: voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
-                label: 'Microphone',
-                value: voice.microphoneEnabled ? 'on' : 'muted',
-                enabled: voice.microphoneEnabled,
-                onChanged: controller.setMicrophonePreference,
-              ),
-              const SizedBox(height: AppSpacing.s8),
-              // Camera is deliberately absent rather than shown disabled: there
-              // is no camera path yet, and a dead control reads as broken.
-              const SizedBox(height: AppSpacing.s16),
-              if (error != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.s12),
-                  child: Text(
-                    error,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                      fontSize: 13,
+    // Scroll-safe and centred: a short viewport (landscape phone) scrolls, a tall one centres via the min-height floor.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.s24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Icon(AppIcons.voice, size: 32, color: tokens.textSecondary),
+                    const SizedBox(height: AppSpacing.s16),
+                    Text(
+                      'Voice channel',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: tokens.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ),
-              // No button at all for a failure retrying cannot fix, rather
-              // than one that only invites the same failure a second time.
-              if (canRetry)
-                FilledButton(
-                  onPressed:
-                      showingLastAttempt &&
-                          voice.state == VoiceSessionState.connecting
-                      ? null
-                      : () => controller.join(channelId),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: tokens.accentFill,
-                    foregroundColor: tokens.accentOn,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.s16,
+                    const SizedBox(height: AppSpacing.s8),
+                    Text(
+                      'Joining connects you and opens your microphone. '
+                      'Nothing is sent before you join.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: tokens.textSecondary,
+                        fontSize: 13,
+                      ),
                     ),
-                  ),
-                  child: const Text('Join call'),
+                    const SizedBox(height: AppSpacing.s16),
+                    _WhoIsHere(channelId: channelId),
+                    const SizedBox(height: AppSpacing.s16),
+                    _PreToggle(
+                      icon: voice.microphoneEnabled
+                          ? AppIcons.mic
+                          : AppIcons.micOff,
+                      label: 'Microphone',
+                      value: voice.microphoneEnabled ? 'on' : 'muted',
+                      enabled: voice.microphoneEnabled,
+                      onChanged: controller.setMicrophonePreference,
+                    ),
+                    const SizedBox(height: AppSpacing.s8),
+                    // Camera is absent, not disabled: no camera path exists yet and a dead control reads as broken.
+                    const SizedBox(height: AppSpacing.s16),
+                    if (error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+                        child: Text(
+                          error,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    // No button for a failure a retry cannot fix, rather than one that only invites the same failure again.
+                    if (canRetry)
+                      FilledButton(
+                        onPressed:
+                            showingLastAttempt &&
+                                voice.state == VoiceSessionState.connecting
+                            ? null
+                            : () => controller.join(channelId),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: tokens.accentFill,
+                          foregroundColor: tokens.accentOn,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.s16,
+                          ),
+                        ),
+                        child: const Text('Join call'),
+                      ),
+                  ],
                 ),
-            ],
+              ),
+            ),
           ),
         ),
       ),

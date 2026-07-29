@@ -13,7 +13,9 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../app_haptics.dart';
 import '../../app_metrics.dart';
+import '../../app_motion.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
 import '../../touch_targets.dart';
@@ -143,6 +145,10 @@ class AppButton extends StatefulWidget {
 class _AppButtonState extends State<AppButton> {
   bool _focused = false;
 
+  /// The finger-down state a phone has no hover to stand in for; drawn as a
+  /// slight scale-down so the press is felt as well as ticked.
+  bool _pressed = false;
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -213,7 +219,23 @@ class _AppButtonState extends State<AppButton> {
                       onInvoke: (_) => widget.onPressed!()),
                 },
           child: GestureDetector(
-              onTap: enabled ? widget.onPressed : null, child: button),
+            onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+            onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
+            onTapCancel:
+                enabled ? () => setState(() => _pressed = false) : null,
+            onTap: enabled
+                ? () {
+                    AppHaptics.selection();
+                    widget.onPressed!();
+                  }
+                : null,
+            child: AnimatedScale(
+              scale: _pressed ? 0.97 : 1,
+              duration: AppMotion.reduced(context, AppMotion.fast),
+              curve: AppMotion.entrance,
+              child: button,
+            ),
+          ),
         ),
       ),
     );

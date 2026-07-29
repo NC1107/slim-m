@@ -17,6 +17,21 @@ import 'package:flutter/widgets.dart';
 
 /// Durations and the reduce-motion signal.
 abstract final class AppMotion {
+  /// Press and hover micro-feedback. The design language's `duration.fast`.
+  static const Duration fast = Duration(milliseconds: 100);
+
+  /// Panel and route transitions. The design language's `duration.base`.
+  static const Duration base = Duration(milliseconds: 180);
+
+  /// Modal entrances, and the chrome's ceiling: nothing here runs longer.
+  /// The design language's `duration.slow`.
+  static const Duration slow = Duration(milliseconds: 280);
+
+  /// The one standard ease-out for entrances, and its accelerating
+  /// counterpart for exits, named once so every transition agrees.
+  static const Curve entrance = Curves.easeOut;
+  static const Curve exit = Curves.easeIn;
+
   /// One direction of the speaking ring's pulse. It reverses, so a full cycle
   /// is twice this; the chrome's 280ms ceiling governs transitions, not a loop.
   static const Duration speakingPulse = Duration(milliseconds: 600);

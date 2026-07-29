@@ -68,6 +68,8 @@ void main() {
                 ),
               ),
             );
+            // Two pumps settle on-mount entrance animations (a ticker's first frame is its own t=0) without pumpAndSettle, which would hang on the states that show a perpetual spinner.
+            await tester.pump();
             await tester.pump(const Duration(milliseconds: 350));
 
             await writeSnapshot(

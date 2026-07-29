@@ -5,7 +5,9 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../app_haptics.dart';
 import '../../app_metrics.dart';
+import '../../app_motion.dart';
 import '../../app_tokens.dart';
 import '../../touch_targets.dart';
 
@@ -76,6 +78,10 @@ class AppIconButton extends StatefulWidget {
 class _AppIconButtonState extends State<AppIconButton> {
   bool _hovered = false;
   bool _focused = false;
+
+  /// Finger-down feedback for a phone, where there is no hover fill to lean
+  /// on; a small scale-down that a haptic tick lands alongside.
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -155,11 +161,28 @@ class _AppIconButtonState extends State<AppIconButton> {
                       onInvoke: (_) => widget.onPressed!()),
                 },
           child: GestureDetector(
-            onTap: enabled ? widget.onPressed : null,
+            onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+            onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
+            onTapCancel:
+                enabled ? () => setState(() => _pressed = false) : null,
+            onTap: enabled
+                ? () {
+                    AppHaptics.selection();
+                    widget.onPressed!();
+                  }
+                : null,
             child: SizedBox(
-                width: outerSize,
-                height: outerSize,
-                child: Center(child: button)),
+              width: outerSize,
+              height: outerSize,
+              child: Center(
+                child: AnimatedScale(
+                  scale: _pressed ? 0.9 : 1,
+                  duration: AppMotion.reduced(context, AppMotion.fast),
+                  curve: AppMotion.entrance,
+                  child: button,
+                ),
+              ),
+            ),
           ),
         ),
       ),

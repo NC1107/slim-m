@@ -92,24 +92,27 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                     size: AppSizes.icon16,
                     color: tokens.textSecondary,
                   ),
-                  // AppKbd draws one keycap; a chained shortcut is composed
-                  // by the caller, per that widget's own doc comment.
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const AppKbd('Ctrl'),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: Text(
-                          '+',
-                          style: AppText.micro.copyWith(
-                            color: tokens.textDisabled,
-                          ),
+                  // Keycaps only where a keyboard is; a touch layout drops the Ctrl+K hint no finger can press.
+                  trailing: AppTouchTargets.of(context)
+                      ? null
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const AppKbd('Ctrl'),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                              ),
+                              child: Text(
+                                '+',
+                                style: AppText.micro.copyWith(
+                                  color: tokens.textDisabled,
+                                ),
+                              ),
+                            ),
+                            const AppKbd('K'),
+                          ],
                         ),
-                      ),
-                      const AppKbd('K'),
-                    ],
-                  ),
                   semanticLabel: 'Search channels, members and messages',
                 ),
               ),

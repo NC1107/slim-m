@@ -189,3 +189,36 @@ class NewMessagesDivider extends StatelessWidget {
     );
   }
 }
+
+/// A calendar-day separator: a centred date with a rule to each side, shown
+/// above the first message of a new day. It answers the "two messages a day
+/// apart still just show the time" gap, where a timestamp alone cannot say
+/// which day it belongs to.
+class DayDivider extends StatelessWidget {
+  const DayDivider({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    Widget rule() =>
+        Expanded(child: Container(height: 1, color: tokens.borderSubtle));
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+      child: Row(
+        children: [
+          rule(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12),
+            child: Text(
+              label,
+              style: AppText.label.copyWith(color: tokens.textSecondary),
+            ),
+          ),
+          rule(),
+        ],
+      ),
+    );
+  }
+}

@@ -84,7 +84,7 @@ void main() {
   });
 
   group('the collapsed strip', () {
-    testWidgets('shows a share glyph for a live share', (tester) async {
+    testWidgets('names the share in words for a live share', (tester) async {
       final session = FakeSession();
       final controller = harness.controllerWith(session, voiceApi());
       await controller.join('channel-1');
@@ -97,7 +97,9 @@ void main() {
       await controller.setScreenShare(true);
       await tester.pump();
 
-      expect(find.byTooltip('You are sharing your screen'), findsOneWidget);
+      // Said in words, not left to a small glyph a tooltip has to explain: the
+      // collapsed strip is exactly where a live share is easiest to miss.
+      expect(find.textContaining('Sharing your screen'), findsOneWidget);
     });
 
     testWidgets('stays quiet for a share only requested, not live', (
@@ -118,7 +120,7 @@ void main() {
       await tester.pump();
 
       expect(controller.state.awaitingBroadcast, isTrue);
-      expect(find.byTooltip('You are sharing your screen'), findsNothing);
+      expect(find.textContaining('Sharing your screen'), findsNothing);
 
       // Clears the pending-broadcast deadline timer before the test ends.
       await controller.setScreenShare(false);
@@ -135,7 +137,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byTooltip('You are sharing your screen'), findsNothing);
+      expect(find.textContaining('Sharing your screen'), findsNothing);
     });
   });
 }

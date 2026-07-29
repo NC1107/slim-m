@@ -310,6 +310,22 @@ void main() {
       expect(options.deviceId, isNull);
     });
 
+    test('the iOS broadcast flag tracks the platform, never hardcoded on', () {
+      // On iOS the flag adds deviceId: 'broadcast-manual', which tells
+      // flutter_webrtc to attach to the extension LiveKit's BroadcastManager
+      // already started rather than launching a second broadcast (the "already
+      // broadcasting" failure). On a desktop share that same constant would
+      // clobber the real screen sourceId, so the flag must be false off iOS -
+      // which is what this host is. Guards against a "simplify to true" edit.
+      final options = VoiceSession.captureOptionsFor(
+        ScreenShareQuality.balanced,
+        'screen-2',
+      );
+
+      expect(options.useiOSBroadcastExtension, isFalse);
+      expect(options.deviceId, 'screen-2');
+    });
+
     test('sources are listed through the injected seam, never a global',
         () async {
       final session = VoiceSession(

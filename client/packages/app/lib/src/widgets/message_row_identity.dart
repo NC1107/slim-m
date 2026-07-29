@@ -27,6 +27,39 @@ String formatMessageTime(int epochMs) {
   return '$hour:$minute';
 }
 
+const List<String> _monthNames = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+/// The label a [DayDivider] carries: "Today" and "Yesterday" for the two days
+/// a reader thinks of by name, an absolute date otherwise, and the year only
+/// when it is not the current one. [now] is injectable so the relative days
+/// are testable without depending on the wall clock.
+String formatMessageDay(int epochMs, {DateTime? now}) {
+  final dt = DateTime.fromMillisecondsSinceEpoch(epochMs);
+  final today = now ?? DateTime.now();
+  final thatDay = DateTime(dt.year, dt.month, dt.day);
+  final todayDay = DateTime(today.year, today.month, today.day);
+  final daysApart = todayDay.difference(thatDay).inDays;
+  if (daysApart == 0) return 'Today';
+  if (daysApart == 1) return 'Yesterday';
+  final month = _monthNames[dt.month - 1];
+  return dt.year == today.year
+      ? '$month ${dt.day}'
+      : '$month ${dt.day}, ${dt.year}';
+}
+
 class MessageRowLeading extends StatelessWidget {
   const MessageRowLeading({
     super.key,

@@ -17,16 +17,20 @@ import '../providers/message_extras.dart';
 import '../providers/sync_controller.dart';
 import 'message_context_menu.dart';
 import 'message_row.dart';
+import 'message_row_identity.dart';
+import 'message_transcript_widgets.dart';
 
 /// What a viewer may do to one message, decided by the screen because it is
 /// the screen that knows who is looking and what they hold.
 typedef MessageActionsFor = MessageActions Function(Message message);
 
-class MessageTranscript extends StatelessWidget {
+class MessageTranscript extends StatefulWidget {
   const MessageTranscript({
     super.key,
     required this.messages,
     required this.syncStatus,
+    this.channelName,
+    this.channelTopic,
     required this.scrollController,
     required this.lastReadSeq,
     required this.editingId,
@@ -47,6 +51,12 @@ class MessageTranscript extends StatelessWidget {
 
   /// Read only to tell an empty channel from one that has not caught up.
   final SyncStatus syncStatus;
+
+  /// The channel's name and topic, for the start-of-channel header above the
+  /// oldest message. Null on a surface that has no such header (a DM, whose
+  /// "name" is a person, or a voice channel), which simply omits it.
+  final String? channelName;
+  final String? channelTopic;
 
   final ScrollController scrollController;
   final int lastReadSeq;
@@ -69,40 +79,86 @@ class MessageTranscript extends StatelessWidget {
   final VoidCallback onCancelEdit;
 
   @override
+  State<MessageTranscript> createState() => _MessageTranscriptState();
+}
+
+class _MessageTranscriptState extends State<MessageTranscript> {
+  /// Message ids already on screen at least once. The newest row animates in
+  /// only when its id is not in here, so a genuinely new arrival slides in
+  /// while the initial load, a recycle on scroll-back, and an unrelated parent
+  /// rebuild all render it statically. Reset with the widget, which is per
+  /// channel, so switching channels does not replay a stale entrance.
+  final Set<String> _seen = {};
+  bool _hydrated = false;
+
+  @override
   Widget build(BuildContext context) {
-    if (messages.isEmpty) return EmptyMessages(syncStatus: syncStatus);
-    // Reversed so the design's bottom-filled column puts a short
-    // conversation against the composer.
+    final messages = widget.messages;
+    final start = widget.channelName == null
+        ? null
+        : ChannelStartHeader(
+            name: widget.channelName!,
+            topic: widget.channelTopic,
+          );
+
+    if (messages.isEmpty) {
+      // A brand-new channel is welcomed at the top; connecting and offline still say what they are.
+      if (start != null && widget.syncStatus == SyncStatus.live) {
+        return SingleChildScrollView(
+          controller: widget.scrollController,
+          child: start,
+        );
+      }
+      return EmptyMessages(syncStatus: widget.syncStatus);
+    }
+
+    final newestId = messages.last.id;
+    final animateNewest = _hydrated && !_seen.contains(newestId);
+    // Everything on screen counts as seen, so a recycle never replays.
+    _seen.addAll(messages.map((m) => m.id));
+    _hydrated = true;
+
+    // Reversed so a short conversation sits against the composer; the start header rides one past the oldest message, which reverse puts at the top.
     return ListView.builder(
-      controller: scrollController,
+      controller: widget.scrollController,
       reverse: true,
       padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-      itemCount: messages.length,
+      itemCount: messages.length + (start != null ? 1 : 0),
       itemBuilder: (context, i) {
+        if (start != null && i == messages.length) return start;
         // Index 0 is the newest; `previous` stays the row visually above,
         // so grouping still reads right.
         final index = messages.length - 1 - i;
         final message = messages[index];
         final previous = index == 0 ? null : messages[index - 1];
-        final extras = extrasById[message.id] ?? MessageExtras.empty;
-        return MessageRow(
+        final extras = widget.extrasById[message.id] ?? MessageExtras.empty;
+        final newDay = isNewDay(message, previous);
+        final row = MessageRow(
           message: message,
-          grouped: isGrouped(message, previous),
-          showNewDivider: startsUnread(message, previous, lastReadSeq),
-          knownUsernames: knownUsernames,
-          customEmoji: customEmoji,
-          onRetry: () => onRetry(message),
-          onDiscard: () => onDiscard(message),
-          onPickReaction: (emoji) => onPickReaction(message, emoji),
-          onReactionTap: (reaction) => onReactionTap(message, reaction),
-          onVote: (option) => onVote(message, option),
+          // A new day breaks a group so a continuation across midnight regains its avatar and header.
+          grouped: isGrouped(message, previous) && !newDay,
+          showNewDivider: startsUnread(message, previous, widget.lastReadSeq),
+          dayLabel: newDay ? formatMessageDay(message.createdAt) : null,
+          knownUsernames: widget.knownUsernames,
+          customEmoji: widget.customEmoji,
+          onRetry: () => widget.onRetry(message),
+          onDiscard: () => widget.onDiscard(message),
+          onPickReaction: (emoji) => widget.onPickReaction(message, emoji),
+          onReactionTap: (reaction) => widget.onReactionTap(message, reaction),
+          onVote: (option) => widget.onVote(message, option),
           reactions: extras.reactions,
           attachments: extras.attachments,
           poll: extras.poll,
-          editing: message.id == editingId,
-          onSubmitEdit: (content) => onSubmitEdit(message, content),
-          onCancelEdit: onCancelEdit,
-          actions: actionsFor(message),
+          editing: message.id == widget.editingId,
+          onSubmitEdit: (content) => widget.onSubmitEdit(message, content),
+          onCancelEdit: widget.onCancelEdit,
+          actions: widget.actionsFor(message),
+        );
+        if (i != 0) return row;
+        return MessageEntrance(
+          key: ValueKey('entrance-$newestId'),
+          animateOnMount: animateNewest,
+          child: row,
         );
       },
     );
@@ -168,3 +224,14 @@ bool isGrouped(Message message, Message? previous) =>
 bool startsUnread(Message message, Message? previous, int lastReadSeq) =>
     message.seq > lastReadSeq &&
     (previous == null || previous.seq <= lastReadSeq);
+
+/// True when this message falls on a different calendar day than the one above
+/// it, so a day divider lands exactly once at each day boundary. The oldest
+/// loaded message ([previous] null) also counts, anchoring the top of the
+/// transcript with the day it began.
+bool isNewDay(Message message, Message? previous) {
+  if (previous == null) return true;
+  final a = DateTime.fromMillisecondsSinceEpoch(previous.createdAt);
+  final b = DateTime.fromMillisecondsSinceEpoch(message.createdAt);
+  return a.year != b.year || a.month != b.month || a.day != b.day;
+}
