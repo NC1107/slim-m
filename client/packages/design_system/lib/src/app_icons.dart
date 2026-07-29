@@ -93,6 +93,12 @@ abstract final class AppIcons {
   static const IconData report = LucideIcons.messageSquareWarning;
   static const IconData invite = LucideIcons.mailPlus;
   static const IconData shield = LucideIcons.shield;
+
+  /// A server that offers no reporting or blocking. Struck through, so "no
+  /// recourse here" reads without colour, the same rule the severity icons
+  /// above follow.
+  static const IconData shieldOff = LucideIcons.shieldOff;
+
   static const IconData delete = LucideIcons.trash2;
   static const IconData revoke = LucideIcons.ban;
   static const IconData dismiss = LucideIcons.x;

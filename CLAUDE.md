@@ -12,6 +12,31 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The capability handshake (2026-07-28)
+
+Phase 7's "verify a server exposes report and block before connecting and warn if absent" is built.
+`GET /version` grew a `capabilities` array, and the sign-in screen names what a server is missing while the choice is still open.
+
+**The list is read off the router, not written beside it.**
+`crates/slimm-server/src/http/capability.rs` sends one request per capability through the real `router()` using a method no route can register (`SLIMMPROBE`), and reads the `Allow` header axum puts on the resulting 405.
+So routing answers on its own: no handler runs, nothing authenticates, nothing is written, and a report is not filed to find out whether reports can be filed.
+A hand-kept list would only ever have proved that somebody remembered to update it, which is the one thing a safety guarantee cannot rest on, and `tests/capabilities.rs` gates that by asserting the derivation can also say *no* (a bare router advertises neither).
+
+**Method, not just path, and that is not a detail.**
+`/reports` is mounted twice: `GET` is the moderator's queue (`http/reports.rs`) and `POST` is a member filing one (`http/safety.rs`).
+A path-only probe reads a deployment that kept the queue and dropped the intake as still offering reporting, which is exactly backwards.
+Mutation-tested: dropping the method check fails `the_moderator_queue_alone_is_not_a_way_to_report` and nothing else.
+
+**Unknown is not absent, on the client side.**
+A server older than 0.17.0 sends no `capabilities` key at all, and `Version.safetyTools` reports `SafetyTools.unknown` for that, with its own wording ("too old to say") rather than the accusation.
+An unreachable or foreign host renders nothing whatsoever, since nothing has been heard back.
+Neither ever blocks the connection: an operator may knowingly self-host without them, so the notice informs and stops there.
+
+Two smaller things this changed on the way past.
+`sign_in_screen.dart` held `_pushEnabled` and `_inviteRequired` as separate fields; it holds the probed `Version?` now, which is one piece of state instead of three and made the file 46 lines shorter rather than longer.
+The three notices moved into `ServerNotice` (`client/packages/app/lib/src/widgets/server_notice.dart`), which carries its own top gap, so a notice with nothing to say renders as nothing without leaving a hole where its spacer was.
+`Version` also moved out of `models.dart` into `models_version.dart`, since 380 lines was already past the review budget before this added to it.
+
 ## A per-channel voice roster (2026-07-28)
 
 The rail could only show who was in the one call already joined; every other voice channel looked empty even with people talking in it.

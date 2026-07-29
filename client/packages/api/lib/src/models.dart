@@ -24,55 +24,13 @@ export 'models_presence.dart';
 export 'models_reactions.dart';
 export 'models_roles.dart';
 export 'models_users.dart';
+export 'models_version.dart';
 
-// Version and Message need these in scope here, which only `import` grants;
-// the exports above are what re-surface them to callers of this file.
+// Message needs these in scope here, which only `import` grants; the exports
+// above are what re-surface them to callers of this file.
 import 'models_attachments.dart';
-import 'models_identity.dart';
 import 'models_polls.dart';
 import 'models_reactions.dart';
-
-/// The server's identity and negotiated protocol version.
-class Version {
-  const Version({
-    required this.name,
-    required this.version,
-    required this.protocol,
-    this.pushEnabled,
-    this.inviteRequired,
-    this.identity,
-  });
-
-  final String name;
-  final String version;
-  final int protocol;
-
-  /// Whether the server can deliver push notifications at all. Null on
-  /// servers too old to report it, which is "unknown", not "no": warning
-  /// someone off a server that actually has push would be worse than
-  /// staying quiet.
-  final bool? pushEnabled;
-
-  /// Whether creating an account here needs an invite code. Null on servers
-  /// older than 0.14.2, which is "unknown": the sign-up screen stays quiet
-  /// rather than promising either way.
-  final bool? inviteRequired;
-
-  /// The server's trust-on-first-use identity. Null on servers too old to
-  /// report it, the same "unknown" treatment [pushEnabled] gets.
-  final ServerIdentity? identity;
-
-  factory Version.fromJson(Map<String, dynamic> json) => Version(
-        name: json['name'] as String,
-        version: json['version'] as String,
-        protocol: json['protocol'] as int,
-        pushEnabled: json['push_enabled'] as bool?,
-        inviteRequired: json['invite_required'] as bool?,
-        identity: json['identity'] == null
-            ? null
-            : ServerIdentity.fromJson(json['identity'] as Map<String, dynamic>),
-      );
-}
 
 /// A session's credentials. The tokens are secrets: never log this.
 class TokenPair {

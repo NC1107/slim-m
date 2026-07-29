@@ -21,6 +21,7 @@ use extract::Json;
 mod attachments;
 mod auth;
 mod canvas;
+pub mod capability;
 mod channels;
 mod dms;
 mod emoji;
@@ -110,7 +111,26 @@ struct Version {
     /// Whether creating an account here needs an invite code. Onboarding
     /// needs this before an account exists, so it rides on /version.
     invite_required: bool,
+    /// The optional features this build serves, read off the router itself.
+    /// See [`capability`] for why it is not a list kept by hand.
+    capabilities: Vec<&'static str>,
     identity: ServerIdentityDto,
+}
+
+/// The capability list for this build, computed on first ask and kept.
+///
+/// Which routes are mounted is a property of the binary, not of the request
+/// or the deployment's configuration, so asking once is the whole answer; the
+/// alternative is rebuilding the router on every unauthenticated `/version`.
+static CAPABILITIES: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
+
+async fn capabilities(state: AppState) -> Vec<&'static str> {
+    if let Some(cached) = CAPABILITIES.get() {
+        return cached.clone();
+    }
+    let served = capability::served_by(router(state)).await;
+    let names = served.into_iter().map(capability::Capability::wire_name);
+    CAPABILITIES.get_or_init(|| names.collect()).clone()
 }
 
 /// The wire shape of [`crate::identity::ServerIdentity`]. Kept as a distinct
@@ -135,15 +155,16 @@ struct ServerIdentityDto {
 }
 
 /// Build version, the wire-protocol envelope version a client negotiates,
-/// whether this deployment can deliver push at all, and the server's
-/// trust-on-first-use identity.
+/// whether this deployment can deliver push at all, what optional features it
+/// serves, and the server's trust-on-first-use identity.
 ///
-/// Push state and identity are both here rather than behind auth because
-/// onboarding needs them before an account exists: someone choosing a
-/// LAN-only server should learn their phone will not get notifications
-/// while they can still choose differently, and the "connect by address"
-/// flow shows the fingerprint before anyone has signed in. Both reveal only
-/// deployment configuration, never user data.
+/// All of it is here rather than behind auth because onboarding needs it
+/// before an account exists: someone choosing a LAN-only server should learn
+/// their phone will not get notifications while they can still choose
+/// differently, someone joining a server with no report or block route should
+/// learn there is no recourse here before they commit, and the "connect by
+/// address" flow shows the fingerprint before anyone has signed in. All of it
+/// reveals deployment configuration only, never user data.
 async fn version(State(state): State<AppState>) -> Result<Json<Version>, ApiError> {
     let identity = state.store.server_identity().await?;
     Ok(Json(Version {
@@ -152,6 +173,7 @@ async fn version(State(state): State<AppState>) -> Result<Json<Version>, ApiErro
         protocol: PROTOCOL_VERSION,
         push_enabled: state.push.is_enabled(),
         invite_required: state.store.join_policy().await? == JoinPolicy::Invite,
+        capabilities: capabilities(state).await,
         identity: ServerIdentityDto {
             public_key: BASE64.encode(identity.public_key()),
             fingerprint: identity.fingerprint_hex(),

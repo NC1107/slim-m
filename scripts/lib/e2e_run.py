@@ -71,6 +71,8 @@ def scenarios(a, b, admin, member, room_id):
             L.FIRST_MESSAGE)),
         ("moderation: blocking a member", lambda: e2e_admin.block_and_unblock(
             member, admin.me()["id"])),
+        ("moderation: the capability handshake is honest",
+         lambda: e2e_admin.capabilities_are_honest(member)),
         ("permissions: the server refuses what the UI hides",
          lambda: e2e_admin.permissions_are_enforced(member, admin)),
         ("settings: personal settings stand alone",

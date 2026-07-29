@@ -252,7 +252,9 @@ Status (2026-07-28): further along than this roadmap's own phase ordering (and C
 Real, wired admin screens exist for reports, invites, roles, and per-channel permission overwrites (`reports_screen.dart`, `invites_screen.dart`, `roles_screen.dart`, `role_editor_sheet.dart`, `role_assign_sheet.dart`, `channel_overwrites_screen.dart`), each gated per-permission-bit off a settings section.
 User management is partial: `client_admin.dart` exposes only admin-issued password reset codes, with no user list, ban, or admin-initiated account deletion.
 The `/metrics` Prometheus endpoint and the SQLite time-series store do not exist: there is no metrics module anywhere in `crates/slimm-server/src` and no `/metrics` path in `schema/openapi.yaml`.
-The capability handshake (a client checking a server exposes report and block before connecting) does not exist either; nothing in the client checks for this before connecting.
+~~The capability handshake (a client checking a server exposes report and block before connecting) does not exist either.~~ Built 2026-07-28.
+`GET /version` carries a `capabilities` list derived from the router at runtime (`crates/slimm-server/src/http/capability.rs`), and the sign-in screen names what is missing before anyone commits (`client/packages/app/lib/src/widgets/server_notice.dart`).
+A server too old to advertise anything reads as unknown and says so differently, and neither answer blocks the connection: an operator may knowingly self-host without them.
 The content and legal-reporting policy is documented in prose (`STRATEGY.md`, `decisions/0001-owner-decisions.md`) but has no implementation artifact beyond that prose.
 
 ## Phase 8 - Audio Design and Interaction Polish
