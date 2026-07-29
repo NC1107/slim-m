@@ -88,19 +88,25 @@ class ReactionsRow extends StatelessWidget {
       runSpacing: AppSpacing.s4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
+        // Keyed by emoji and wrapped in a one-shot pop (scale .85 to 1 with
+        // fade): a chip that just appeared confirms the tap landed, and an
+        // existing chip keeps its state so it never replays.
         for (final reaction in reactions)
-          AppChip.reaction(
-            emoji: reaction.emoji,
-            count: reaction.count,
-            active: reaction.reacted,
-            glyph: switch (customEmojiIdFor(reaction.emoji, customEmoji)) {
-              final String id => CustomEmojiImage(
-                emojiId: id,
-                size: _reactionEmojiSize,
-              ),
-              null => null,
-            },
-            onTap: () => onReactionTap(reaction),
+          _ChipPop(
+            key: ValueKey('reaction-${reaction.emoji}'),
+            child: AppChip.reaction(
+              emoji: reaction.emoji,
+              count: reaction.count,
+              active: reaction.reacted,
+              glyph: switch (customEmojiIdFor(reaction.emoji, customEmoji)) {
+                final String id => CustomEmojiImage(
+                  emojiId: id,
+                  size: _reactionEmojiSize,
+                ),
+                null => null,
+              },
+              onTap: () => onReactionTap(reaction),
+            ),
           ),
         if (showAddButton) EmojiPickerButton(onSelect: onPickReaction),
       ],
@@ -236,4 +242,25 @@ class DayDivider extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A one-shot pop for a chip that just appeared: scale .85 to 1 with a fade,
+/// the motion spec's confirmation entrance. Mount-only, so a rebuild of an
+/// existing chip never replays it.
+class _ChipPop extends StatelessWidget {
+  const _ChipPop({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: 0, end: 1),
+    duration: AppMotion.reduced(context, AppMotion.pop),
+    curve: AppMotion.entrance,
+    builder: (context, t, child) => Opacity(
+      opacity: t,
+      child: Transform.scale(scale: 0.85 + 0.15 * t, child: child),
+    ),
+    child: child,
+  );
 }

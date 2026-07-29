@@ -6,6 +6,7 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -96,6 +97,10 @@ class MessageContextMenuRegion extends StatefulWidget {
 
 class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
   final _controller = OverlayPortalController();
+
+  /// True from finger-down until the long press commits or cancels; drives
+  /// the hold-progress tint.
+  bool _holding = false;
 
   /// The list this row sits in, subscribed to only while the menu is open.
   ScrollPosition? _watched;
@@ -230,8 +235,31 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
       ),
       child: GestureDetector(
         onSecondaryTapDown: (_) => _setOpen(true),
-        onLongPress: () => _setOpen(true, pinRow: false),
-        child: widget.child,
+        // The tint below deepens across the hold, so a long press shows
+        // visible progress toward its threshold instead of a dead finger
+        // (motion spec 10). GestureDetector rather than a raw recognizer on
+        // purpose: it is what publishes SemanticsAction.longPress, which
+        // context_menu_reachability_test guards; the tint runs over the
+        // framework's own threshold rather than the spec's 350ms for the
+        // same reason.
+        onLongPressDown: (_) => setState(() => _holding = true),
+        onLongPressCancel: () => setState(() => _holding = false),
+        onLongPress: () {
+          setState(() => _holding = false);
+          _setOpen(true, pinRow: false);
+        },
+        child: AnimatedContainer(
+          duration: _holding
+              ? AppMotion.reduced(context, kLongPressTimeout)
+              : AppMotion.reduced(context, AppMotion.fast),
+          curve: Curves.linear,
+          color: _holding
+              ? Theme.of(
+                  context,
+                ).extension<AppTokens>()!.accentSoft.withValues(alpha: 0.5)
+              : Colors.transparent,
+          child: widget.child,
+        ),
       ),
     );
   }

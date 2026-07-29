@@ -60,7 +60,43 @@ class HomeShell extends ConsumerWidget {
             // screen reader at all. The member pane paints after it and so
             // was never affected, which is what made this look like a rail bug.
             Expanded(child: Semantics(container: true, child: child)),
-            if (showMembers) const AppMemberPane(),
+            // The pane comes from the edge it lives on: the slot's width
+            // animates while the content slides in and fades (motion spec
+            // 05). Hidden, the pane itself unmounts rather than sitting at
+            // opacity zero - it fetches while built, and home_shell_test pins
+            // exactly that - so the exit is the gap closing over the panel
+            // duration while the entrance gets the full slide.
+            if (layout == LayoutClass.expanded)
+              ClipRect(
+                child: AnimatedContainer(
+                  duration: AppMotion.reduced(context, AppMotion.base),
+                  curve: AppMotion.entrance,
+                  width: showMembers ? AppMemberPane.width : 0,
+                  child: showMembers
+                      ? OverflowBox(
+                          minWidth: AppMemberPane.width,
+                          maxWidth: AppMemberPane.width,
+                          alignment: Alignment.centerLeft,
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0, end: 1),
+                            duration: AppMotion.reduced(
+                              context,
+                              AppMotion.base,
+                            ),
+                            curve: AppMotion.entrance,
+                            builder: (context, t, child) => Opacity(
+                              opacity: t,
+                              child: Transform.translate(
+                                offset: Offset(16 * (1 - t), 0),
+                                child: child,
+                              ),
+                            ),
+                            child: const AppMemberPane(),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
           ],
         ),
       );

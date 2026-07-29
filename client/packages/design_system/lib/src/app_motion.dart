@@ -28,9 +28,18 @@ abstract final class AppMotion {
   static const Duration slow = Duration(milliseconds: 280);
 
   /// The one standard ease-out for entrances, and its accelerating
-  /// counterpart for exits, named once so every transition agrees.
-  static const Curve entrance = Curves.easeOut;
+  /// counterpart for exits, named once so every transition agrees. The
+  /// motion spec names these as `Curves.easeOutCubic` / `Curves.easeIn`.
+  static const Curve entrance = Curves.easeOutCubic;
   static const Curve exit = Curves.easeIn;
+
+  /// A confirmation pop (a reaction chip, an unread dot): scale .85 to 1
+  /// with a fade, enough to confirm the tap landed, no bounce.
+  static const Duration pop = Duration(milliseconds: 140);
+
+  /// How far a pressed button may shrink. The spec's own ceiling: "buttons
+  /// may add scale(.98) on press - never more".
+  static const double pressScale = 0.98;
 
   /// One direction of the speaking ring's pulse. It reverses, so a full cycle
   /// is twice this; the chrome's 280ms ceiling governs transitions, not a loop.

@@ -103,6 +103,9 @@ class SlimMApp extends ConsumerWidget {
       // Without this line MaterialApp's own ThemeMode.system default applies,
       // and no choice the user makes can reach the theme; that is what shipped.
       themeMode: _themeModeFor(choice),
+      // Theme switching is on the motion spec's never-animates list, and
+      // Material lerps it over 200ms by default.
+      themeAnimationDuration: Duration.zero,
       routerConfig: ref.watch(routerProvider),
       // Material's own list rows are sized for a thumb whatever the window,
       // which is what made the settings and administration screens read as a
