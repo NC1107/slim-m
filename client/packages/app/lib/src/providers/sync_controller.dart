@@ -129,8 +129,19 @@ class SyncController extends StateNotifier<SyncStatus> {
     /// calls that each re-requested all ten scopes. Next tick rather than
     /// straight through, so a long backlog does not block the first paint.
     if (more) {
+      // This continuation runs outside start()'s try/catch, so a failure in a
+      // later backlog round (a 429 from the server's own limiter, a transient
+      // 5xx) was an unhandled async error: the catch-up stopped silently while
+      // the socket kept the status at live, leaving a permanent gap. Routed to
+      // the same drop path a lost socket takes, which reconnects and catches
+      // up fresh.
       unawaited(
-        Future<void>.delayed(Duration.zero, () => _catchUp(api, store)),
+        Future<void>.delayed(
+          Duration.zero,
+          () => _catchUp(api, store),
+        ).catchError((_) {
+          if (!_disposed) _onDropped();
+        }),
       );
     }
   }

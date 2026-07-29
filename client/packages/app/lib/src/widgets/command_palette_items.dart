@@ -123,16 +123,21 @@ List<PaletteResultItem> buildMessageItems(
 /// could not also reach from the rail.
 List<PaletteResultItem> buildActionItems(String query, int permissions) {
   final actions = [
+    // push, not go: settings float as a modal over the app, so they need the
+    // shell left beneath them, exactly as every rail entry point does. go
+    // replaced the shell, so closing the modal stranded the user on the empty
+    // channel view with the open channel lost. The channel entries above stay
+    // on go, since a channel is a shell route and replacing is right there.
     PaletteResultItem(
       label: 'Open personal settings',
       leading: AppIcons.settings,
-      onSelect: (context, ref) async => context.go(Routes.personalSettings),
+      onSelect: (context, ref) async => context.push(Routes.personalSettings),
     ),
     if (spaceSettingsReachable(permissions))
       PaletteResultItem(
         label: 'Open Space settings',
         leading: AppIcons.settings,
-        onSelect: (context, ref) async => context.go(Routes.spaceSettings),
+        onSelect: (context, ref) async => context.push(Routes.spaceSettings),
       ),
   ];
   if (query.isEmpty) return actions;

@@ -59,14 +59,22 @@ class PinsController extends StateNotifier<PinsState> {
   late final StreamSubscription<api.ServerEvent> _sub;
 
   Future<void> refresh() async {
+    // Guarded after every await, because this is an autoDispose family fired
+    // unawaited from the constructor and the live-event listener: switching
+    // channels mid-fetch disposes this instance, and assigning or even reading
+    // `state` afterwards throws an unhandled StateError. Matches
+    // channel_search_controller, which guards the identical pattern.
     try {
       final pinned = await _ref
           .read(apiProvider)
           .listPinnedMessages(_channelId);
+      if (!mounted) return;
       state = PinsState(pinned: pinned);
     } on api.ForbiddenException {
+      if (!mounted) return;
       state = PinsState(pinned: state.pinned, failed: true, forbidden: true);
     } on api.ApiException {
+      if (!mounted) return;
       state = PinsState(pinned: state.pinned, failed: true);
     }
   }
