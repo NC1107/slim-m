@@ -14,13 +14,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
+import '../routing/close_screen.dart';
 import '../widgets/media_capability_section.dart';
 
 const _soundsKey = 'slimm.voice.join_leave_sounds_enabled';
@@ -101,7 +101,7 @@ class VoiceSettingsScreen extends ConsumerWidget {
         leading: IconButton(
           icon: const Icon(AppIcons.back),
           tooltip: 'Back to settings',
-          onPressed: () => context.go(Routes.personalSettings),
+          onPressed: () => closeScreen(context, Routes.personalSettings),
         ),
       ),
       // top: false because the AppBar already clears the status bar; without
