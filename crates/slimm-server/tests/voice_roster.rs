@@ -110,14 +110,20 @@ async fn spawn_room_service(participants: Value) -> String {
     format!("http://{addr}")
 }
 
-/// A loopback address nothing is listening on: connecting to it fails fast
-/// and locally, with no DNS lookup and no dependence on outbound network
+/// A loopback address nothing can be listening on: connecting to it fails
+/// fast and locally, with no DNS lookup and no dependence on outbound network
 /// access, unlike pointing at a real unreachable hostname would.
-async fn unreachable_url() -> String {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    drop(listener);
-    format!("http://{addr}")
+///
+/// A privileged port rather than a freed ephemeral one. This used to bind
+/// port zero, read the address back and drop the listener, which left a port
+/// that merely happened to be free: the operating system is then free to hand
+/// that same port to the next mock room service this suite starts, and the
+/// unreachable SFU becomes reachable. That is a race, it needs no unusual
+/// timing to lose, and it was losing about one full `cargo test --all` in
+/// three. Binding below 1024 needs a capability no test process has, so
+/// nothing here can take this one.
+fn unreachable_url() -> String {
+    "http://127.0.0.1:1".to_owned()
 }
 
 fn voice_at(url: &str) -> VoiceService {
@@ -235,7 +241,7 @@ async fn an_unreachable_sfu_answers_service_unavailable_not_an_empty_room() {
         .await
         .unwrap();
     let channel = store.create_channel("general", "voice").await.unwrap();
-    let voice = voice_at(&unreachable_url().await);
+    let voice = voice_at(&unreachable_url());
     let app = app(store.clone(), voice);
     let (token, _) = member(&store, "alice").await;
 
