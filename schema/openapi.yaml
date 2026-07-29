@@ -2491,6 +2491,29 @@ components:
             0.14.2, which a client must treat as unknown rather than false.
             Unauthenticated for the same reason `push_enabled` is: the
             sign-up screen has to say so before an account exists.
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [block, report]
+          description: >
+            The optional features this build serves, read off the router at
+            runtime rather than declared, so the list cannot drift from what
+            is really mounted. `report` means a member can file a report
+            (`POST /reports`, not the moderator queue `GET /reports`), and
+            `block` means a member can block someone (`POST /blocks/{userId}`).
+
+
+            slim-m's safety model is manual reporting plus blocking and
+            nothing else, so a deployment missing either leaves a member being
+            harassed with no tool for it. A client is expected to check this
+            during onboarding and say so, without refusing the connection: an
+            operator may knowingly self-host without them.
+
+
+            Absent on servers older than 0.17.0. That is "unknown", not
+            "neither": a client must say it could not tell rather than accuse
+            an old server of having no safety tools.
         identity:
           type: object
           required:

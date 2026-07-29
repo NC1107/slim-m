@@ -42,6 +42,7 @@ tile is not a published track.
 | who can join | the UI | `/space/settings` and `/version` |
 | creating a role | the UI | `GET /roles` |
 | reporting, blocking | the API (see below) | the moderation queue, the block list |
+| the capability handshake | the API | that `/version` names the two routes the run just used |
 | permissions | the API | that a member is refused and an admin is not |
 | a voice call, mute, leaving | the UI | the SFU's participant and track list |
 | sharing a screen | the UI | a `SCREEN_SHARE` track on the SFU |

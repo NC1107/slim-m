@@ -39,12 +39,12 @@ crypto_box.workspace = true
 reqwest.workspace = true
 url.workspace = true
 ed25519-dalek.workspace = true
+# tower::ServiceExt::oneshot asks the router what it serves (http/capability.rs).
+tower = { version = "0.5", features = ["util"] }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
-# tower::ServiceExt::oneshot drives the HTTP round-trip tests in-process with no
-# socket; tokio-tungstenite is a real client for the fan-out test.
-tower = { version = "0.5", features = ["util"] }
+# A real client for the fan-out test; the round-trip tests use tower above.
 tokio-tungstenite = "0.24"
 # Validates real responses against schema/openapi.yaml in tests/response_contract.rs.
 # The `default-features = false` cut is deliberate; see docs/dependencies.md.

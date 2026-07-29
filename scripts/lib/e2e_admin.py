@@ -76,6 +76,24 @@ def block_and_unblock(api, other_id):
     print('  and unblocking removed it, so the run leaves nothing blocked')
 
 
+def capabilities_are_honest(api):
+    """The handshake must name the two routes this run has just used.
+
+    A client warns someone off a server whose /version omits these, so an
+    advertisement that drifted from the router would either scare people away
+    from a healthy deployment or hide a broken one. This runs after reporting
+    and blocking on purpose: both are known to work at this point, so a
+    missing name here is the advertisement being wrong, not the feature.
+    """
+    advertised = api.version().get('capabilities')
+    assert advertised is not None, \
+        'the server advertises no capability list at all'
+    for name in ('report', 'block'):
+        assert name in advertised, \
+            f'{name} is missing from {advertised}, and this run just used it'
+    print(f'  the server advertises what it serves: {sorted(advertised)}')
+
+
 def permissions_are_enforced(member_api, admin_api):
     """An ordinary member must not be able to do an administrator's work.
 
