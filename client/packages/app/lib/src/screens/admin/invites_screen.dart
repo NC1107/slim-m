@@ -257,8 +257,7 @@ class _InviteRowState extends ConsumerState<_InviteRow>
         ? 'Never expires'
         : 'Expires ${formatDateTime(invite.expiresAt!)}';
 
-    // A failed revoke is shown on the row it failed for, and stays until it
-    // is retried or dismissed - never a toast that floats away from it.
+    // A failed revoke shows on the row it failed for and stays until dealt with.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
