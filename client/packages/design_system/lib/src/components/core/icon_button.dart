@@ -176,7 +176,7 @@ class _AppIconButtonState extends State<AppIconButton> {
               height: outerSize,
               child: Center(
                 child: AnimatedScale(
-                  scale: _pressed ? 0.9 : 1,
+                  scale: _pressed ? AppMotion.pressScale : 1,
                   duration: AppMotion.reduced(context, AppMotion.fast),
                   curve: AppMotion.entrance,
                   child: button,

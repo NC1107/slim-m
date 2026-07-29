@@ -230,7 +230,7 @@ class _AppButtonState extends State<AppButton> {
                   }
                 : null,
             child: AnimatedScale(
-              scale: _pressed ? 0.97 : 1,
+              scale: _pressed ? AppMotion.pressScale : 1,
               duration: AppMotion.reduced(context, AppMotion.fast),
               curve: AppMotion.entrance,
               child: button,

@@ -31,23 +31,34 @@ Page<void> modalPage(BuildContext context, Widget child) {
         ? NoTransitionPage<void>(child: child)
         : MaterialPage<void>(child: child);
   }
+  // The motion spec's one 280ms moment: scrim and panel enter together, the
+  // panel rising 16px; the exit runs faster (180ms, ease-in) because leaving
+  // should always feel quicker than arriving.
   return CustomTransitionPage<void>(
     opaque: false,
     barrierDismissible: true,
     barrierColor: const Color(0x99000000),
     barrierLabel: 'Dismiss',
-    transitionDuration: AppMotion.reduced(
-      context,
-      const Duration(milliseconds: 140),
-    ),
-    reverseTransitionDuration: AppMotion.reduced(
-      context,
-      const Duration(milliseconds: 100),
-    ),
-    transitionsBuilder: (context, animation, _, child) => FadeTransition(
-      opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-      child: child,
-    ),
+    transitionDuration: AppMotion.reduced(context, AppMotion.slow),
+    reverseTransitionDuration: AppMotion.reduced(context, AppMotion.base),
+    transitionsBuilder: (context, animation, _, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: AppMotion.entrance,
+        reverseCurve: AppMotion.exit,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: AnimatedBuilder(
+          animation: curved,
+          builder: (context, child) => Transform.translate(
+            offset: Offset(0, (1 - curved.value) * 16),
+            child: child,
+          ),
+          child: child,
+        ),
+      );
+    },
     child: _ModalPanel(child: child),
   );
 }

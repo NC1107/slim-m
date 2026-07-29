@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 
 import '../../app_haptics.dart';
 import '../../app_metrics.dart';
+import '../../app_motion.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
 import '../../touch_targets.dart';
@@ -146,14 +147,25 @@ class _AppListRowState extends State<AppListRow> {
     );
 
     Widget? trailingContent = widget.trailing;
+    // The dot pops in (scale and fade) to confirm the state change, then sits
+    // still: the motion spec forbids it ever pulsing while resting.
     trailingContent ??= widget.unread
-        ? DecoratedBox(
-            key: AppListRow.unreadDotKey,
-            decoration: BoxDecoration(
-              color: tokens.textPrimary,
-              borderRadius: BorderRadius.circular(AppRadii.full),
+        ? TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: AppMotion.reduced(context, AppMotion.base),
+            curve: AppMotion.entrance,
+            builder: (context, t, child) => Opacity(
+              opacity: t,
+              child: Transform.scale(scale: 0.85 + 0.15 * t, child: child),
             ),
-            child: const SizedBox(width: 6, height: 6),
+            child: DecoratedBox(
+              key: AppListRow.unreadDotKey,
+              decoration: BoxDecoration(
+                color: tokens.textPrimary,
+                borderRadius: BorderRadius.circular(AppRadii.full),
+              ),
+              child: const SizedBox(width: 6, height: 6),
+            ),
           )
         : null;
 
@@ -198,46 +210,73 @@ class _AppListRowState extends State<AppListRow> {
       ),
     );
 
-    final visual = Container(
+    // Two fill layers on the motion spec's two clocks: the selection tint
+    // fades over the panel duration while hover shifts at press speed, and
+    // one AnimatedContainer cannot serve both.
+    // Height on a plain box: density is layout, not motion, and animating it
+    // smears a settings change. The AnimatedContainer carries only the tint.
+    final visual = SizedBox(
       height: rowHeight,
-      decoration: BoxDecoration(
-        color: widget.selected
-            ? tokens.accentSoft
-            : (_pressed || _hovered
-                ? tokens.surfaceRaised
-                : Colors.transparent),
-        borderRadius: BorderRadius.circular(AppRadii.control),
-      ),
-      foregroundDecoration: _focused
-          ? BoxDecoration(
-              border: Border.all(color: tokens.focusRing, width: 2),
-              borderRadius: BorderRadius.circular(AppRadii.control),
-            )
-          : null,
-      child: Stack(
-        // Expand, or the row's content takes its intrinsic height and a Stack
-        // aligns it top-start: the icon, label and unread dot all sat above
-        // the centre of a 30pt row, and higher still on a 44pt touch one.
-        fit: StackFit.expand,
-        children: [
-          content,
-          if (widget.selected)
-            Positioned(
-              left: 0,
-              top: 5,
-              bottom: 5,
-              width: 2,
-              child: DecoratedBox(
-                key: AppListRow.selectionMarkerKey,
-                decoration: BoxDecoration(
-                  color: tokens.accentFill,
-                  // A literal 2px in the source rather than an AppRadii
-                  // step; ported as-is rather than rounded to a token.
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      child: AnimatedContainer(
+        duration: AppMotion.reduced(context, AppMotion.base),
+        curve: AppMotion.entrance,
+        decoration: BoxDecoration(
+          color: widget.selected ? tokens.accentSoft : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+        foregroundDecoration: _focused
+            ? BoxDecoration(
+                border: Border.all(color: tokens.focusRing, width: 2),
+                borderRadius: BorderRadius.circular(AppRadii.control),
+              )
+            : null,
+        child: Stack(
+          // Expand, or the row's content takes its intrinsic height and a Stack
+          // aligns it top-start: the icon, label and unread dot all sat above
+          // the centre of a 30pt row, and higher still on a 44pt touch one.
+          fit: StackFit.expand,
+          children: [
+            AnimatedContainer(
+              duration: AppMotion.reduced(context, AppMotion.fast),
+              curve: AppMotion.entrance,
+              decoration: BoxDecoration(
+                color: !widget.selected && (_pressed || _hovered)
+                    ? tokens.surfaceRaised
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(AppRadii.control),
               ),
             ),
-        ],
+            content,
+            if (widget.selected)
+              Positioned(
+                left: 0,
+                top: 5,
+                bottom: 5,
+                width: 2,
+                // Grows from centre (scaleY 0 to 1) as selection arrives, per
+                // the motion spec; a tween rather than an implicit container so
+                // the growth also plays on the frame the marker first mounts.
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: 1),
+                  duration: AppMotion.reduced(context, AppMotion.base),
+                  curve: AppMotion.entrance,
+                  builder: (context, t, child) => Transform.scale(
+                    scaleY: t,
+                    child: child,
+                  ),
+                  child: DecoratedBox(
+                    key: AppListRow.selectionMarkerKey,
+                    decoration: BoxDecoration(
+                      color: tokens.accentFill,
+                      // A literal 2px in the source rather than an AppRadii
+                      // step; ported as-is rather than rounded to a token.
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
 

@@ -161,8 +161,6 @@ class RailConnectionBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(syncControllerProvider);
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    if (status == SyncStatus.live) return const SizedBox.shrink();
-
     // Offline (messages have stopped) carries the warn tone; connecting is transient and stays neutral.
     final (label, icon, color) = switch (status) {
       SyncStatus.connecting => (
@@ -178,28 +176,41 @@ class RailConnectionBar extends ConsumerWidget {
       SyncStatus.live => ('', AppIcons.info, tokens.textSecondary),
     };
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s16,
-        vertical: AppSpacing.s8,
-      ),
-      decoration: BoxDecoration(
-        color: status == SyncStatus.offline ? tokens.warnSoft : null,
-        border: Border(top: BorderSide(color: tokens.borderSubtle)),
-      ),
-      child: Semantics(
-        liveRegion: true,
-        child: Row(
-          children: [
-            Icon(icon, size: AppSizes.icon16, color: color),
-            const SizedBox(width: AppSpacing.s8),
-            Expanded(
-              child: Text(label, style: AppText.caption.copyWith(color: color)),
+    // One AnimatedSize across both states: the banner pushes content by its
+    // height (motion spec 08), growing and shrinking over the panel duration
+    // instead of jumping the rail's footer around.
+    return AnimatedSize(
+      duration: AppMotion.reduced(context, AppMotion.base),
+      curve: AppMotion.entrance,
+      alignment: Alignment.topCenter,
+      child: status == SyncStatus.live
+          ? const SizedBox(width: double.infinity)
+          : Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s16,
+                vertical: AppSpacing.s8,
+              ),
+              decoration: BoxDecoration(
+                color: status == SyncStatus.offline ? tokens.warnSoft : null,
+                border: Border(top: BorderSide(color: tokens.borderSubtle)),
+              ),
+              child: Semantics(
+                liveRegion: true,
+                child: Row(
+                  children: [
+                    Icon(icon, size: AppSizes.icon16, color: color),
+                    const SizedBox(width: AppSpacing.s8),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: AppText.caption.copyWith(color: color),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
-      ),
     );
   }
 }

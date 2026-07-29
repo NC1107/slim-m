@@ -87,3 +87,9 @@ What was real, and fixed:
 Its gap list, corrected: the fingerprint step, DM conversation view, message context menu, search, pins sheet and polls all exist - the captures simply cannot reach interaction states.
 Genuinely still open from it: member profile popover, per-participant volume, timeout/kick moderation actions on member rows, edit history, saved items, low-bandwidth mode.
 One reconcile note for the owner: custom emoji is built here while that reviewer's plan doc has it declined; their doc should be updated rather than the feature questioned.
+
+## Round four: the motion and feedback spec (same day)
+
+The design agent followed the reviews with a motion spec (11 live patterns in the claude design project), implemented the same day: spec curves (`easeOutCubic` in, `easeIn` out) and the .98 press ceiling, the selection marker growing from centre on its own clock beside the 100ms hover fill, reaction-chip and unread-dot confirmation pops, the member pane sliding from its edge (unmounting when hidden - it fetches while built), the compact drill-down with 30% parallax, the 280/180 modal, the connection banner pushing by animated height, hold-progress tint on message long-press, and theme switching joining the never-animates list.
+Two contracts the tests defended during this: row height never animates (density is layout, not motion), and the hidden member pane must genuinely unmount.
+One deviation and one deferral, both recorded: the hold tint runs over Flutter's own long-press timeout because `GestureDetector` is what publishes `SemanticsAction.longPress`, and the level-driven speaking ring (spec 09) needs a live audio-level stream beside the roster, whose churn-coalescing exists precisely to avoid per-level rebuilds.
