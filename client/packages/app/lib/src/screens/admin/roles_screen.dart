@@ -5,7 +5,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
@@ -13,6 +12,7 @@ import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
+import '../../routing/close_screen.dart';
 import '../../widgets/confirm_dialog.dart';
 import 'role_assign_sheet.dart';
 import 'role_editor_sheet.dart';
@@ -30,7 +30,7 @@ class RolesScreen extends ConsumerWidget {
         leading: IconButton(
           icon: const Icon(AppIcons.back),
           tooltip: 'Back to Space settings',
-          onPressed: () => context.go(Routes.spaceSettings),
+          onPressed: () => closeScreen(context, Routes.spaceSettings),
         ),
         actions: [
           IconButton(
@@ -41,16 +41,19 @@ class RolesScreen extends ConsumerWidget {
         ],
       ),
       // top: false because the AppBar already clears the status bar.
-      body: SafeArea(
-        top: false,
-        child: roles.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Could not load roles. $e')),
-          data: (list) => ListView.separated(
-            padding: const EdgeInsets.all(AppSpacing.s16),
-            itemCount: list.length,
-            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s8),
-            itemBuilder: (context, i) => _RoleCard(role: list[i]),
+      body: AppContentColumn(
+        child: SafeArea(
+          top: false,
+          child: roles.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Could not load roles. $e')),
+            data: (list) => ListView.separated(
+              padding: const EdgeInsets.all(AppSpacing.s16),
+              itemCount: list.length,
+              separatorBuilder: (_, __) =>
+                  const SizedBox(height: AppSpacing.s8),
+              itemBuilder: (context, i) => _RoleCard(role: list[i]),
+            ),
           ),
         ),
       ),

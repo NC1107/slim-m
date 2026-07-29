@@ -153,10 +153,9 @@ Future<void> _sheet(
   BuildContext context,
   Widget Function(BuildContext context, double width) build,
 ) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  return showAppSheet<void>(
+    context,
+    maxWidth: 520,
     builder: (context) => Padding(
       padding: EdgeInsets.only(
         left: _sheetInset,

@@ -6,10 +6,10 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../routing/routes.dart';
+import '../routing/close_screen.dart';
 import '../widgets/space_settings_section.dart';
 
 class SpaceSettingsScreen extends StatelessWidget {
@@ -24,12 +24,14 @@ class SpaceSettingsScreen extends StatelessWidget {
         leading: IconButton(
           icon: const Icon(AppIcons.back),
           tooltip: 'Back to channels',
-          onPressed: () => context.go(Routes.channels),
+          onPressed: () => closeScreen(context, Routes.channels),
         ),
       ),
-      body: SafeArea(
-        top: false,
-        child: ListView(children: const [SpaceSettingsSection()]),
+      body: AppContentColumn(
+        child: SafeArea(
+          top: false,
+          child: ListView(children: const [SpaceSettingsSection()]),
+        ),
       ),
     );
   }

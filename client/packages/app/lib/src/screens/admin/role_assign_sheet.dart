@@ -17,10 +17,9 @@ import '../../providers/member_presence.dart' show membersProvider;
 import '../../providers/providers.dart';
 
 Future<void> showRoleAssignSheet(BuildContext context, api.Role role) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  return showAppSheet<void>(
+    context,
+    scrolls: true,
     builder: (context) => _RoleAssignSheet(role: role),
   );
 }

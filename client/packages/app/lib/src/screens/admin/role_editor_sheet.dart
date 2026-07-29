@@ -19,10 +19,9 @@ import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 
 Future<void> showRoleEditorSheet(BuildContext context, {api.Role? role}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  return showAppSheet<void>(
+    context,
+    scrolls: true,
     builder: (context) => _RoleEditorSheet(role: role),
   );
 }

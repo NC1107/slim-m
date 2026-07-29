@@ -11,9 +11,8 @@ Future<ScreenShareSource?> showScreenSourceSheet(
   BuildContext context,
   List<ScreenShareSource> sources,
 ) {
-  return showModalBottomSheet<ScreenShareSource>(
-    context: context,
-    showDragHandle: true,
+  return showAppSheet<ScreenShareSource>(
+    context,
     builder: (context) => _ScreenSourceSheet(sources: sources),
   );
 }

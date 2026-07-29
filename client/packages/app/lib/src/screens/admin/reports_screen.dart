@@ -7,7 +7,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
@@ -15,6 +14,7 @@ import '../../format.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
+import '../../routing/close_screen.dart';
 import '../../widgets/confirm_dialog.dart';
 
 class ReportsScreen extends ConsumerWidget {
@@ -31,34 +31,36 @@ class ReportsScreen extends ConsumerWidget {
         leading: IconButton(
           icon: const Icon(AppIcons.back),
           tooltip: 'Back to Space settings',
-          onPressed: () => context.go(Routes.spaceSettings),
+          onPressed: () => closeScreen(context, Routes.spaceSettings),
         ),
       ),
       // top: false because the AppBar already clears the status bar.
-      body: SafeArea(
-        top: false,
-        child: reports.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: Text(
-              'Could not load reports. $e',
-              style: TextStyle(color: tokens.textSecondary),
+      body: AppContentColumn(
+        child: SafeArea(
+          top: false,
+          child: reports.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(
+              child: Text(
+                'Could not load reports. $e',
+                style: TextStyle(color: tokens.textSecondary),
+              ),
             ),
-          ),
-          data: (list) => list.isEmpty
-              ? Center(
-                  child: Text(
-                    'The queue is empty.',
-                    style: TextStyle(color: tokens.textSecondary),
+            data: (list) => list.isEmpty
+                ? Center(
+                    child: Text(
+                      'The queue is empty.',
+                      style: TextStyle(color: tokens.textSecondary),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(AppSpacing.s16),
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: AppSpacing.s12),
+                    itemBuilder: (context, i) => _ReportCard(report: list[i]),
                   ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(AppSpacing.s16),
-                  itemCount: list.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(height: AppSpacing.s12),
-                  itemBuilder: (context, i) => _ReportCard(report: list[i]),
-                ),
+          ),
         ),
       ),
     );

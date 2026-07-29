@@ -10,7 +10,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
@@ -18,6 +17,7 @@ import '../../format.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
+import '../../routing/close_screen.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/custom_emoji_image.dart';
 import 'emoji_upload_card.dart';
@@ -35,32 +35,34 @@ class EmojiScreen extends ConsumerWidget {
         leading: IconButton(
           icon: const Icon(AppIcons.back),
           tooltip: 'Back to Space settings',
-          onPressed: () => context.go(Routes.spaceSettings),
+          onPressed: () => closeScreen(context, Routes.spaceSettings),
         ),
       ),
       // top: false because the AppBar already clears the status bar.
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.s16),
-          children: [
-            const EmojiUploadCard(),
-            const SizedBox(height: AppSpacing.s16),
-            emoji.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => _Message('Could not load emoji. $e'),
-              data: (list) => list.isEmpty
-                  ? const _Message('No emoji yet.')
-                  : Column(
-                      children: [
-                        for (final item in list) ...[
-                          _EmojiRow(emoji: item),
-                          const SizedBox(height: AppSpacing.s8),
+      body: AppContentColumn(
+        child: SafeArea(
+          top: false,
+          child: ListView(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            children: [
+              const EmojiUploadCard(),
+              const SizedBox(height: AppSpacing.s16),
+              emoji.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => _Message('Could not load emoji. $e'),
+                data: (list) => list.isEmpty
+                    ? const _Message('No emoji yet.')
+                    : Column(
+                        children: [
+                          for (final item in list) ...[
+                            _EmojiRow(emoji: item),
+                            const SizedBox(height: AppSpacing.s8),
+                          ],
                         ],
-                      ],
-                    ),
-            ),
-          ],
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

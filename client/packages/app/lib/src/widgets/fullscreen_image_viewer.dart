@@ -25,6 +25,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+/// How large the floating viewer is allowed to get on a desktop window.
+const double kViewerMaxWidth = 1100;
+const double kViewerMaxHeight = 820;
+
 /// Opens [bytes] fullscreen. Non-opaque so the conversation behind stays
 /// visible through the fade rather than the route cutting to black.
 Future<void> showFullscreenImage(
@@ -109,10 +113,15 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
     // Zoomed, every drag belongs to the viewer's own pan; the dismiss
     // gesture would otherwise steal it and leave the image un-pannable.
     final dismissible = !_zoomed;
+    // A phone gives the image the whole window, which is the point of opening
+    // it. A desktop window has room to keep the app visible around it, so the
+    // image floats in a panel and a click beside it puts the image away.
+    final compact = MediaQuery.sizeOf(context).width < kCompactWidth;
     return Theme(
       data: buildTheme(Brightness.dark, AppTokens.dark),
-      child: ColoredBox(
-        color: Colors.black.withValues(alpha: 0.94),
+      child: _Backdrop(
+        compact: compact,
+        onDismiss: _close,
         child: SafeArea(
           child: Column(
             children: [
@@ -177,6 +186,71 @@ class _ViewerHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The dark field the image sits on, and what a click on it means.
+///
+/// On a phone it is the window and a click on it does nothing, because there
+/// is no "outside" to click: the drag gesture is how the image is dismissed.
+/// On a desktop window it is a scrim around a floating panel, and clicking it
+/// closes the viewer the way clicking beside any modal does.
+class _Backdrop extends StatelessWidget {
+  const _Backdrop({
+    required this.compact,
+    required this.onDismiss,
+    required this.child,
+  });
+
+  final bool compact;
+  final VoidCallback onDismiss;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    if (compact) {
+      return ColoredBox(
+        color: Colors.black.withValues(alpha: 0.94),
+        child: child,
+      );
+    }
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onDismiss,
+            child: ColoredBox(color: Colors.black.withValues(alpha: 0.72)),
+          ),
+        ),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: kViewerMaxWidth,
+              maxHeight: kViewerMaxHeight,
+            ),
+            // Swallows the taps that land on the panel, so only a click that
+            // reaches the scrim behind it counts as clicking outside.
+            child: GestureDetector(
+              onTap: () {},
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadii.card),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.94),
+                    border: Border.all(color: tokens.borderSubtle),
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                  ),
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

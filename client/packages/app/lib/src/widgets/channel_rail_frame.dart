@@ -133,7 +133,7 @@ class _SpaceMenuButtonState extends ConsumerState<_SpaceMenuButton> {
                     leading: AppIcons.settings,
                     onTap: () {
                       _controller.hide();
-                      context.go(Routes.spaceSettings);
+                      context.push(Routes.spaceSettings);
                     },
                   ),
                 ],
@@ -271,7 +271,7 @@ class RailUserFooter extends ConsumerWidget {
                 AppIconButton(
                   icon: AppIcons.settings,
                   semanticLabel: 'Personal settings',
-                  onPressed: () => context.go(Routes.personalSettings),
+                  onPressed: () => context.push(Routes.personalSettings),
                 ),
               ],
             ),

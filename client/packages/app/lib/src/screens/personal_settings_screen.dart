@@ -11,10 +11,10 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../routing/routes.dart';
+import '../routing/close_screen.dart';
 import '../widgets/app_info_section.dart';
 import '../widgets/appearance_settings_section.dart';
 import '../widgets/avatar_settings_section.dart';
@@ -33,29 +33,31 @@ class PersonalSettingsScreen extends StatelessWidget {
         leading: IconButton(
           icon: const Icon(AppIcons.back),
           tooltip: 'Back to channels',
-          onPressed: () => context.go(Routes.channels),
+          onPressed: () => closeScreen(context, Routes.channels),
         ),
       ),
-      body: ListView(
-        children: const [
-          AvatarSettingsSection(),
-          Divider(height: 1),
-          AppearanceSettingsSection(),
-          Divider(height: 1),
-          PresenceSection(),
-          Divider(height: 1),
-          NotificationsSection(),
-          Divider(height: 1),
-          VoiceSection(),
-          Divider(height: 1),
-          DevicesSection(),
-          Divider(height: 1),
-          BlockedSection(),
-          Divider(height: 1),
-          AccountSection(),
-          Divider(height: 1),
-          AppInfoSection(),
-        ],
+      body: AppContentColumn(
+        child: ListView(
+          children: const [
+            AvatarSettingsSection(),
+            Divider(height: 1),
+            AppearanceSettingsSection(),
+            Divider(height: 1),
+            PresenceSection(),
+            Divider(height: 1),
+            NotificationsSection(),
+            Divider(height: 1),
+            VoiceSection(),
+            Divider(height: 1),
+            DevicesSection(),
+            Divider(height: 1),
+            BlockedSection(),
+            Divider(height: 1),
+            AccountSection(),
+            Divider(height: 1),
+            AppInfoSection(),
+          ],
+        ),
       ),
     );
   }

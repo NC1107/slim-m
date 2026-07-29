@@ -22,6 +22,7 @@ import '../screens/personal_settings_screen.dart';
 import '../screens/space_settings_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/sign_in_screen.dart';
+import 'modal_page.dart';
 import '../screens/voice_settings_screen.dart';
 import 'routes.dart';
 
@@ -34,6 +35,11 @@ import 'routes.dart';
 /// signed out, not new, and sending them to onboarding asks them to retype an
 /// address the app is holding.
 final routerProvider = Provider<GoRouter>((ref) {
+  // Settings and administration are pushed over the app so they can float as
+  // modals with it still visible behind. Without this the address bar would
+  // keep saying /channels while a modal is open, so the URL could not be
+  // copied, shared or reloaded, and browser back would not close it.
+  GoRouter.optionURLReflectsImperativeAPIs = true;
   final session = ref.watch(sessionProvider);
 
   // Read, not watched: main() awaits restoreSession before the router is
@@ -75,39 +81,48 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.personalSettings,
-        builder: (context, state) => const PersonalSettingsScreen(),
+        pageBuilder: (context, state) =>
+            modalPage(context, const PersonalSettingsScreen()),
       ),
       GoRoute(
         path: Routes.spaceSettings,
-        builder: (context, state) => const SpaceSettingsScreen(),
+        pageBuilder: (context, state) =>
+            modalPage(context, const SpaceSettingsScreen()),
       ),
       GoRoute(
         path: Routes.voiceSettings,
-        builder: (context, state) => const VoiceSettingsScreen(),
+        pageBuilder: (context, state) =>
+            modalPage(context, const VoiceSettingsScreen()),
       ),
       GoRoute(
         path: Routes.adminReports,
-        builder: (context, state) => const ReportsScreen(),
+        pageBuilder: (context, state) =>
+            modalPage(context, const ReportsScreen()),
       ),
       GoRoute(
         path: Routes.adminInvites,
-        builder: (context, state) => const InvitesScreen(),
+        pageBuilder: (context, state) =>
+            modalPage(context, const InvitesScreen()),
       ),
       GoRoute(
         path: Routes.adminRoles,
-        builder: (context, state) => const RolesScreen(),
+        pageBuilder: (context, state) =>
+            modalPage(context, const RolesScreen()),
       ),
       GoRoute(
         path: Routes.adminOverwrites,
-        builder: (context, state) => const ChannelOverwritesScreen(),
+        pageBuilder: (context, state) =>
+            modalPage(context, const ChannelOverwritesScreen()),
       ),
       GoRoute(
         path: Routes.adminEmoji,
-        builder: (context, state) => const EmojiScreen(),
+        pageBuilder: (context, state) =>
+            modalPage(context, const EmojiScreen()),
       ),
       GoRoute(
         path: Routes.debugLog,
-        builder: (context, state) => const DebugLogScreen(),
+        pageBuilder: (context, state) =>
+            modalPage(context, const DebugLogScreen()),
       ),
       // The shell keeps the channel list alive across conversation changes.
       ShellRoute(

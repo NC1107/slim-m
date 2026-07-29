@@ -48,10 +48,9 @@ class SettingsSelectRow<T> extends StatelessWidget {
     required T value,
     required List<SettingsChoice<T>> choices,
   }) {
-    return showModalBottomSheet<T>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
+    return showAppSheet<T>(
+      context,
+      bare: true,
       builder: (sheetContext) => SafeArea(
         top: false,
         child: AppMenu(
@@ -61,7 +60,6 @@ class SettingsSelectRow<T> extends StatelessWidget {
               AppMenuItem(
                 label: choice.label,
                 selected: choice.value == value,
-                touch: true,
                 leading: choice.value == value ? AppIcons.check : null,
                 onTap: () => Navigator.of(sheetContext).pop(choice.value),
               ),
@@ -87,7 +85,6 @@ class SettingsSelectRow<T> extends StatelessWidget {
     return AppListRow(
       label: label,
       meta: _currentLabel,
-      touch: true,
       semanticLabel: '$label, currently $_currentLabel',
       trailing: Icon(
         AppIcons.chevronRight,
