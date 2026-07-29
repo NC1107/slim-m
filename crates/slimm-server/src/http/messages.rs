@@ -460,13 +460,21 @@ fn parse_attachment_ids(raw: &[String]) -> Result<Vec<Vec<u8>>, ApiError> {
     if raw.len() > MAX_ATTACHMENTS_PER_MESSAGE {
         return Err(ApiError::BadRequest("too many attachments"));
     }
-    raw.iter()
+    let ids: Vec<Vec<u8>> = raw
+        .iter()
         .map(|s| {
             media::from_hex(s)
                 .filter(|bytes| bytes.len() == 32)
                 .ok_or(ApiError::BadRequest("invalid attachment id"))
         })
-        .collect()
+        .collect::<Result<_, _>>()?;
+    // Refused here rather than surfacing as the 500 the link table's
+    // (message_id, sha256) primary key turns a repeat into.
+    let mut seen = std::collections::HashSet::new();
+    if !ids.iter().all(|id| seen.insert(id.clone())) {
+        return Err(ApiError::BadRequest("duplicate attachment id"));
+    }
+    Ok(ids)
 }
 
 pub(crate) fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {

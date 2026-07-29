@@ -120,29 +120,39 @@ void main() {
       expect(find.text('2'), findsOneWidget);
     });
 
-    testWidgets('muted dims the whole row rather than recolouring the label',
+    testWidgets('muted dims the trailing content but never the label',
         (tester) async {
       await _pump(
         tester,
         const SizedBox(
-            width: 240, child: AppListRow(label: 'general', muted: true)),
+          width: 240,
+          child: AppListRow(
+            label: 'general',
+            muted: true,
+            leading: Icon(Icons.tag),
+            trailing: Text('3'),
+          ),
+        ),
       );
-      final opacity = tester.widget<Opacity>(
-        find
-            .ancestor(of: find.text('general'), matching: find.byType(Opacity))
-            .first,
+      // The label stays at full strength: textSecondary is already near the
+      // AA floor, and dimming the whole row dragged names below it.
+      expect(
+        find.ancestor(of: find.text('general'), matching: find.byType(Opacity)),
+        findsNothing,
       );
-      expect(opacity.opacity, 0.62);
+      // The de-emphasis lives on the leading and trailing content instead.
+      for (final finder in [find.byIcon(Icons.tag), find.text('3')]) {
+        final opacity = tester.widget<Opacity>(
+          find.ancestor(of: finder, matching: find.byType(Opacity)).first,
+        );
+        expect(opacity.opacity, 0.62);
+      }
       // Muted must not borrow textDisabled ("not actionable"): a muted row is
       // still fully actionable, just de-emphasised.
       expect(
         tester.widget<Text>(find.text('general')).style!.color,
         isNot(AppTokens.light.textDisabled),
       );
-
-      await _pump(tester,
-          const SizedBox(width: 240, child: AppListRow(label: 'general')));
-      expect(tester.widget<Opacity>(find.byType(Opacity)).opacity, 1.0);
     });
 
     testWidgets(

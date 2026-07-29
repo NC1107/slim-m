@@ -128,7 +128,15 @@ class _RoleCardState extends ConsumerState<_RoleCard> {
                 ),
                 const SizedBox(height: AppSpacing.s4),
                 Text(
-                  count == 1 ? '1 permission' : '$count permissions',
+                  // Named, not counted, for the two counts that read as bugs:
+                  // "1 permission" on the most powerful role, "0" on a fresh one.
+                  role.permissions.hasPermission(Perm.administrator)
+                      ? 'Administrator, full access'
+                      : count == 0
+                      ? 'No permissions yet, edit to add some'
+                      : count == 1
+                      ? '1 permission'
+                      : '$count permissions',
                   style: AppText.caption.copyWith(color: tokens.textSecondary),
                 ),
               ],
@@ -150,6 +158,14 @@ class _RoleCardState extends ConsumerState<_RoleCard> {
               semanticLabel: 'Delete ${role.name}',
               variant: AppIconButtonVariant.danger,
               onPressed: _busy ? null : _delete,
+            )
+          else
+            // An empty slot the width of the button it stands in for, so the
+            // assign and edit columns land at the same x on every row.
+            SizedBox(
+              width: AppTouchTargets.of(context)
+                  ? AppSizes.rowTouch
+                  : AppSizes.rowPointer,
             ),
         ],
       ),

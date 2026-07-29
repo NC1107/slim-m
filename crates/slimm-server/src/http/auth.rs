@@ -180,7 +180,7 @@ async fn login(
         // Spend a comparable amount of time so a missing account is not
         // distinguishable from a wrong password by response latency.
         None => {
-            state.auth.verify_decoy().await;
+            state.auth.verify_decoy().await?;
             false
         }
     };

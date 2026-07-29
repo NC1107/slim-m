@@ -69,12 +69,12 @@ class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow> {
 
     return policy.when(
       loading: () => const ListTile(
-        leading: Icon(AppIcons.invite),
+        leading: Icon(AppIcons.members),
         title: Text('Who can join'),
         subtitle: Text('Loading…'),
       ),
       error: (e, _) => ListTile(
-        leading: const Icon(AppIcons.invite),
+        leading: const Icon(AppIcons.members),
         title: const Text('Who can join'),
         subtitle: Text(
           'Could not load. $e',
@@ -86,7 +86,7 @@ class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow> {
         ),
       ),
       data: (current) => ListTile(
-        leading: const Icon(AppIcons.invite),
+        leading: const Icon(AppIcons.members),
         title: const Text('Who can join'),
         subtitle: Text(
           _labelFor(current),

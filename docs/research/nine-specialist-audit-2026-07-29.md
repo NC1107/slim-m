@@ -1,0 +1,56 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+# The nine-specialist audit (2026-07-29)
+
+Nine specialist reviews run in parallel over the same build: five over the code (server performance, database, Rust correctness, Flutter correctness, client performance) and four over screenshots of the running product (product design, a first-time end user, a Discord power user, accessibility).
+The screenshot set was 13 captures from a live two-user e2e run plus the 20 static shell renders.
+51 findings came back; every one acted on below was re-verified against the code before any fix, and two turned out to be artifacts (noted at the end).
+This file is the single consolidated report; per-finding detail lives in the workflow transcripts.
+
+## Fixed in this pass
+
+**A peer's screen share was never rendered, anywhere.**
+Three of the four screenshot auditors independently ranked this first, and it was found before they reported by reading the e2e's own captures: Alice shares, Bob is subscribed to the track at the SFU, and Bob's pane shows a glyph on a roster row and nothing else.
+Publishing had been built and viewing never was.
+`VoiceSession.screenShareViewFor` now returns the live view as a plain Widget (no LiveKit type crosses the rtc seam), and the call screen mounts it on a named `ScreenShareStage` above the roster.
+Verified end to end: the re-run e2e's `bob-peer-sharing-screen.png` shows Alice's actual shared screen rendered on Bob's stage.
+
+**Push fan-out multiplied the write path by the member count.**
+Every message asked `has_permission` once per push-registered user, and each ask was four queries.
+`viewers_among` batches the whole candidate set into a fixed number of queries and runs the same pure evaluator per candidate; an equivalence test proves the batched and per-user answers identical across every precedence rule, the ADMINISTRATOR bypass, DMs, and a nonexistent channel.
+`push_targets` likewise became one `IN` query, and migration 0019 adds the indexes for scans that grow with content (the account-deletion anonymization UPDATEs, the attachment sweep's `created_at`, the token sweeps' `expires_at`).
+
+**Two rtc landmines.**
+`countScreenSources` enumerated Wayland windows, which segfaults the whole process; the sibling file avoided exactly this and the probe now matches it.
+And overlapping `VoiceSession.join` calls raced one room slot and could strand the UI on connecting; they serialize now, with a two-concurrent-joins test.
+
+## Chosen next, in order
+
+1. Offline member rows fail WCAG AA: the wholesale `Opacity(0.62)` on a muted `AppListRow` drags already-minimum text below 4.5:1 (measured 3.7:1 light, 4.9:1 dark against 7:1 unmuted). Restructure so the label keeps a compliant colour.
+2. In-call participant state (muted, sharing, speaking) is icon-only with no semantics; a screen-reader user in the flagship feature hears names and nothing else.
+3. The composer placeholder uses `textDisabled` for an active input's hint, failing AA in every screenshot; `AppInput`'s own hint token is the fix.
+4. Attachments render borderless with no filename or size, read as decoration rather than files (two auditors independently).
+5. The roles screen's trailing icons re-pack per row (conditional delete button), so columns misalign.
+6. "Invites" and "Who can join" share one icon in Space settings.
+7. `GET /channels` is 1+4C queries for C channels; the caller's role context should load once.
+8. A duplicated id in `attachment_ids` 500s instead of 400ing; the login decoy-hash path swallows `HashError::Busy`, weakening the timing defence it exists for.
+9. The in-call screen reads as a debug list: tiles and a call-duration line, sized for the two-to-eight-person calls this product is for.
+
+## Recorded, deliberately not this pass
+
+**Protocol: edits and deletes made while a client is offline never reconcile.**
+Edit does not advance `seq`, `/sync` filters purely by `seq`, and deleted rows are filtered out of deltas, so a client that was offline for either carries the stale row until a reset heals it.
+This needs a designed answer (a per-channel op watermark or tombstone list in the sync response), not a patch, and it interacts with E2EE plans; it is the most important open correctness item in this report.
+
+**WS fan-out cost.**
+Every event still re-derives permissions per connected socket (four queries each); the hub is deployment-wide.
+The safe fix is a per-connection visibility cache with real invalidation, which wants its own change with tests around role and overwrite edits taking effect immediately.
+
+**Feature gaps a Discord group would hit weekly**, confirmed against BACKLOG.md so nothing deliberately declined is re-proposed: replies (the backlog reserves `parent_message_id` as a hook), camera video in calls, per-channel notification mute, per-user volume and push-to-talk, a mention-versus-ambient unread distinction on the rail, paste and drag-and-drop attachments, and free-text custom status.
+Each is roadmap-shaped, not bug-shaped.
+
+**Smaller recorded items**: resolved reports are retained forever (decide: sweep or document), the DM block answer may be inferable by the blocked party (wants a product decision), `list_dm_conversations` and `GET /presence` batch poorly, avatar and profile fetches re-fetch on scroll (wants a keep-alive grace), the voice roster's per-channel timers fire unjittered bursts, message tokenization re-runs per rebuild, "Notifications: not available on this device" is a dead end with no explanation, the "System never picks true black" caption reads as jargon, role cards show raw permission counts ("admin, 1 permission" reads as a bug), the offline banner offers no manual retry and the composer stays fully interactive while offline, and the channel-page transition keys make `ChannelScreen` doc comments describe a lifecycle the router no longer provides.
+
+## Verified non-issues
+
+The two mic icons "disagreeing" is the footer's correctly disabled state when not in a call (WCAG exempts inactive controls), though the endUser point that two mic glyphs coexist during a call stands as a design consideration.
+The static renders' missing avatars are the snapshot harness's async-image limitation, matching its known reaction-chip gap; the live e2e captures show initials discs correctly.
