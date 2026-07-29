@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_app/src/routing/modal_page.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -52,6 +53,40 @@ Future<void> _open(WidgetTester tester, Size window) async {
   await tester.pumpAndSettle();
 }
 
+/// The page [modalPage] hands back, without pushing it: the transition is a
+/// property of the page, and reading it there says what a viewer would get
+/// rather than what one run of the animation happened to do.
+Future<Page<void>> _pageFor(
+  WidgetTester tester,
+  Size window, {
+  required bool reduceMotion,
+}) async {
+  tester.view.physicalSize = window;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+
+  late Page<void> page;
+  await tester.pumpWidget(
+    MediaQuery(
+      // From the view: a bare MediaQueryData reports Size.zero, which reads as
+      // a phone and would answer the desktop half of this with the other one.
+      data: MediaQueryData.fromView(
+        tester.view,
+      ).copyWith(disableAnimations: reduceMotion),
+      child: MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: Builder(
+          builder: (context) {
+            page = modalPage(context, const SizedBox.shrink());
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    ),
+  );
+  return page;
+}
+
 void main() {
   testWidgets('a phone gives the screen the whole window', (tester) async {
     await _open(tester, _phone);
@@ -90,5 +125,34 @@ void main() {
     final route = ModalRoute.of(tester.element(find.byKey(_screenKey)))!;
     expect(route.opaque, isFalse);
     expect(route.barrierDismissible, isTrue);
+  });
+
+  group('reduce motion', () {
+    testWidgets('takes the fade off the floating panel', (tester) async {
+      final moving = await _pageFor(tester, _desktop, reduceMotion: false);
+      expect(
+        (moving as CustomTransitionPage<void>).transitionDuration,
+        greaterThan(Duration.zero),
+      );
+
+      final still = await _pageFor(tester, _desktop, reduceMotion: true);
+      expect(
+        (still as CustomTransitionPage<void>).transitionDuration,
+        Duration.zero,
+      );
+      expect(still.reverseTransitionDuration, Duration.zero);
+    });
+
+    testWidgets('takes the slide off the phone screen', (tester) async {
+      expect(
+        await _pageFor(tester, _phone, reduceMotion: false),
+        isA<MaterialPage<void>>(),
+      );
+      // A page route's length is fixed, so skipping it needs a different page.
+      expect(
+        await _pageFor(tester, _phone, reduceMotion: true),
+        isA<NoTransitionPage<void>>(),
+      );
+    });
   });
 }

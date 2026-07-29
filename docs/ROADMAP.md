@@ -274,10 +274,22 @@ Dependencies: Phase 0, Phase 2 (client shell), Phase 3 (NSE), Phase 4 (CallKit a
 
 Exit criteria: seven distinguishable, consistently normalized sounds play correctly on Fedora, iOS, and Android; in-app chimes never glitch a live call; reduce-motion collapses non-essential motion; the polish pass has no known visible defects in the primary flows; and a golden proves every presence state stays distinguishable desaturated, since the shape-first cue only matters if it survives the greyscale screenshot a bug report arrives as.
 
-Status (2026-07-28): not started.
+Status (2026-07-28): the two exit criteria that need no audio are met; the audio half is not started.
+
+~~Nothing in the client handles reduced motion; a repo-wide search for it turns up nothing.~~
+Closed 2026-07-28.
+`AppMotion` (`client/packages/design_system/lib/src/app_motion.dart`) reads `MediaQuery.disableAnimationsOf` and `accessibleNavigationOf` together, and every animated thing in the chrome routes its duration through it: the toggle thumb, the segmented control, the modal and fullscreen-image transitions, and the microphone meter.
+The speaking ring is decision 0004's one looping animation and is now built as one, `AppSpeakingRing`; under reduce-motion it stops at full strength and gains the bar glyph the decision asks for, so speaking is still said twice.
+Busy spinners are deliberately left spinning, because iOS and Android both leave their own alone under the setting and a frozen spinner reads as a hung app.
+
+~~The one test that touches presence-state distinguishability is a logic assertion, not the golden, pixel, desaturated proof this exit criterion actually asks for.~~
+Closed 2026-07-28 by `client/packages/design_system/test/presence_desaturation_test.dart`, which renders each state through the real widget, converts the pixels to greyscale, binarises them against the surface, and compares the five silhouettes pairwise.
+Binarised rather than compared as grey levels on purpose: two states painted the same shape in different hues do differ in greyscale, and accepting that would be measuring the colour cue the test exists to remove.
+It is machine-independent, which the `SLIMM_GOLDENS` note in `golden_matrix_test.dart` explains is the only way a rendered check runs everywhere; a reference image of the desaturated strip is written by the same file behind that flag.
+The tightest pair is offline against appearing-offline at roughly 2.2% of the box, which is the 2px bar struck across the ring and does not scale with the dot, so the floor is set at 1%.
+Mutation-tested by drawing the away triangle as a disc: `core_test.dart` still passed, which is exactly the gap this closes, and the new test failed in all three themes.
+
 No `assets/audio/`, `synth.py`, or numpy/pyloudnorm pipeline exists anywhere; the whole audio deliverable is still only the description in `STRATEGY.md`.
-Nothing in the client handles reduced motion; a repo-wide search for it turns up nothing.
-The one test that touches presence-state distinguishability (`core_test.dart`, asserting `AppStatusDot.shapeOf` values are pairwise distinct) is a logic assertion, not the golden, pixel, desaturated proof this exit criterion actually asks for.
 Whether the polish pass has any known visible defects cannot be assessed from the repo alone; it needs a human at a screen, and no pass has been logged specifically as this phase's dedicated polish pass, as distinct from the several ad hoc UI fixes that have landed as incidental cleanup during other work.
 
 ## Phase 9 - Release Readiness and Store Submission

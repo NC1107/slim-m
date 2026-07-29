@@ -39,8 +39,14 @@ Future<void> showFullscreenImage(
   return Navigator.of(context, rootNavigator: true).push<void>(
     PageRouteBuilder<void>(
       opaque: false,
-      transitionDuration: const Duration(milliseconds: 160),
-      reverseTransitionDuration: const Duration(milliseconds: 120),
+      transitionDuration: AppMotion.reduced(
+        context,
+        const Duration(milliseconds: 160),
+      ),
+      reverseTransitionDuration: AppMotion.reduced(
+        context,
+        const Duration(milliseconds: 120),
+      ),
       pageBuilder: (_, animation, _) => FadeTransition(
         opacity: animation,
         child: FullscreenImageViewer(filename: filename, bytes: bytes),
