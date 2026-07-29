@@ -179,6 +179,7 @@ The CallKit synchronous-report invariant test is green: `client/packages/app/ios
 The egress budget and active-call memory budgets are not met, because neither has ever been measured; `perf/baselines/0.8.0.json` carries no such figures, and every mention of them elsewhere is a planning target, not a result.
 The device media-capability probe is now genuinely wired into the UI (`media_capability_section.dart` calling `probeAll()`, surfaced from `voice_settings_screen.dart`), closing a gap this roadmap's own notes previously carried as open.
 Two deliverables are close but not landed as of this writing: an Android incoming-call notification (open PR #95, `feat/android-call-notification`) ships `NotificationCompat.CallStyle` with an optional full-screen intent, by its own commit message explicitly *not* `android.telecom.ConnectionService` integration; and a per-channel voice roster (open PR #98, `feat/voice-channel-roster`) adds a server roster endpoint and a client provider, neither yet merged to `dev`.
+Update (2026-07-28): the join preview shows who is already in the call now, which was the last open piece of the voice UX item; it renders the roster's three answers as three different things, since a deployment with no SFU never leaves 'not known' and showing that as an empty room would claim a check that never happened.
 
 ## Phase 5 - Voice Canvas De-risking Spike
 
@@ -261,6 +262,7 @@ The `/metrics` Prometheus endpoint and the SQLite time-series store do not exist
 `GET /version` carries a `capabilities` list derived from the router at runtime (`crates/slimm-server/src/http/capability.rs`), and the sign-in screen names what is missing before anyone commits (`client/packages/app/lib/src/widgets/server_notice.dart`).
 A server too old to advertise anything reads as unknown and says so differently, and neither answer blocks the connection: an operator may knowingly self-host without them.
 The content and legal-reporting policy is documented in prose (`STRATEGY.md`, `decisions/0001-owner-decisions.md`) but has no implementation artifact beyond that prose.
+Update (2026-07-28): the capability handshake is built and is derived from the router rather than written beside it, so it cannot claim a safety tool the deployment does not actually mount; the client tells apart present, absent and too-old-to-say, and never blocks the connection. The metrics half of this phase's title is still the open one.
 
 ## Phase 8 - Audio Design and Interaction Polish
 
@@ -298,6 +300,11 @@ Mutation-tested by drawing the away triangle as a disc: `core_test.dart` still p
 
 No `assets/audio/`, `synth.py`, or numpy/pyloudnorm pipeline exists anywhere; the whole audio deliverable is still only the description in `STRATEGY.md`.
 Whether the polish pass has any known visible defects cannot be assessed from the repo alone; it needs a human at a screen, and no pass has been logged specifically as this phase's dedicated polish pass, as distinct from the several ad hoc UI fixes that have landed as incidental cleanup during other work.
+Update (2026-07-28): two of this phase's four deliverables have landed, and the status above is otherwise still accurate.
+The synthesis pipeline exists (`assets/audio/`): one shared `synth.py`, seven sounds sharing one bell-like timbre and differing only by contour, count and duration, committed WAVs, and an `audio-ci` job that regenerates and diffs them.
+It does not normalise the way this roadmap and STRATEGY.md describe, and the reason is written into `synth.py`: built as specified, pyloudnorm with a whole-clip fallback under 400ms, the family spanned 3.4 dB measured on any one consistent scale. Level is set by the loudest short-term K-weighted window instead, which is defined identically at every length.
+Reduce motion and the desaturated presence proof are both done; see CLAUDE.md.
+Still open here: per-platform playback (nothing plays these sounds yet, and no client bundles them), the CallKit ringtone, the CI bundle-check, and the motion, haptic and hover polish pass.
 
 ## Phase 9 - Release Readiness and Store Submission
 
