@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../widgets/onboarding_shell.dart';
 import '../widgets/server_identity_confirmation.dart';
 
 /// The official instance. Someone with no invite and no server of their own
@@ -51,62 +52,46 @@ class OnboardingScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
-    return Scaffold(
-      // Both edges: this screen has no AppBar, so nothing else clears the
-      // notch, and its content runs the full height of the view.
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.s24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'slim-m',
-                    textAlign: TextAlign.center,
-                    style: AppText.heading.copyWith(
-                      color: tokens.textPrimary,
-                      fontFamily: AppFonts.mono,
-                      fontWeight: AppWeights.medium,
-                      letterSpacing: 20 * 0.04,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  Text(
-                    'Where are you joining?',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: tokens.textSecondary),
-                  ),
-                  const SizedBox(height: AppSpacing.s32),
-                  _Entry(
-                    icon: AppIcons.invite,
-                    title: 'I have an invite',
-                    description: 'Someone sent you a code for their Space.',
-                    onTap: () => _redeemFlow(context),
-                  ),
-                  const SizedBox(height: AppSpacing.s12),
-                  _Entry(
-                    icon: AppIcons.settings,
-                    title: 'Connect to a Space',
-                    description: 'You run your own, or you have its address.',
-                    onTap: () => _manualFlow(context, ref),
-                  ),
-                  const SizedBox(height: AppSpacing.s12),
-                  _Entry(
-                    icon: AppIcons.members,
-                    title: 'Join the official Space',
-                    description: officialServer,
-                    onTap: () =>
-                        onServerChosen(Uri.parse(officialServer), null),
-                  ),
-                ],
-              ),
+    return OnboardingShell(
+      step: OnboardingStep.invite,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Where are you joining?',
+            style: AppText.title.copyWith(
+              color: tokens.textPrimary,
+              fontWeight: AppWeights.semi,
             ),
           ),
-        ),
+          const SizedBox(height: AppSpacing.s8),
+          Text(
+            'A Space is one server, run by somebody. Pick which.',
+            style: AppText.body.copyWith(color: tokens.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.s24),
+          _Entry(
+            icon: AppIcons.invite,
+            title: 'I have an invite',
+            description: 'Someone sent you a code for their Space.',
+            onTap: () => _redeemFlow(context),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          _Entry(
+            icon: AppIcons.settings,
+            title: 'Connect to a Space',
+            description: 'You run your own, or you have its address.',
+            onTap: () => _manualFlow(context, ref),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          _Entry(
+            icon: AppIcons.members,
+            title: 'Join the official Space',
+            description: officialServer,
+            onTap: () => onServerChosen(Uri.parse(officialServer), null),
+          ),
+        ],
       ),
     );
   }

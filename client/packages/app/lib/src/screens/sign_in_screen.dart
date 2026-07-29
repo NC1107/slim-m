@@ -13,6 +13,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../routing/routes.dart';
+import '../widgets/onboarding_shell.dart';
 import '../widgets/server_notice.dart';
 
 /// Sign in or create an account on a chosen server.
@@ -247,152 +248,137 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
-    return Scaffold(
-      // Both edges: this screen has no AppBar, so nothing else clears
-      // the notch, and its form runs the full height of the view.
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.s24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'slim-m',
-                    textAlign: TextAlign.center,
-                    style: AppText.heading.copyWith(
-                      color: tokens.textPrimary,
-                      fontFamily: AppFonts.mono,
-                      fontWeight: AppWeights.medium,
-                      letterSpacing: 20 * 0.04,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  Text(
-                    _creatingAccount ? 'Create an account' : 'Sign in',
-                    style: TextStyle(color: tokens.textSecondary),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppSpacing.s24),
-                  TextField(
-                    controller: _server,
-                    decoration: InputDecoration(
-                      labelText: 'Server',
-                      helperText:
-                          "The Space you're joining - its server address.",
-                      errorText: _errorFor(_ErrorField.server),
-                      errorMaxLines: 3,
-                    ),
-                    keyboardType: TextInputType.url,
-                    autocorrect: false,
-                    onChanged: _onServerEdited,
-                  ),
-                  // First of the three: the other two are about convenience,
-                  // this one is about whether you have any recourse here.
-                  if (_probed case final version?)
-                    ServerSafetyNotice(version: version),
-                  // Only while creating an account: it is not a fact a
-                  // returning member has any use for.
-                  if (_creatingAccount && _probed?.inviteRequired == true)
-                    const ServerNotice(
-                      icon: AppIcons.invite,
-                      message:
-                          'This Space is invite only. Ask a member for a '
-                          'code, then use "Join a different Space" below '
-                          'to redeem it. An admin can open joining to '
-                          'anyone in Settings, under Space.',
-                    ),
-                  if (_probed?.pushEnabled == false)
-                    const ServerNotice(
-                      icon: AppIcons.notificationsOff,
-                      message:
-                          'This Space cannot send push notifications. '
-                          'You can still use it, but phones will only see '
-                          'new messages while the app is open.',
-                    ),
-                  const SizedBox(height: AppSpacing.s16),
-                  TextField(
-                    controller: _username,
-                    decoration: InputDecoration(
-                      labelText: 'Username',
-                      errorText: _errorFor(_ErrorField.username),
-                    ),
-                    autocorrect: false,
-                    autofillHints: const [AutofillHints.username],
-                  ),
-                  if (_creatingAccount) ...[
-                    const SizedBox(height: AppSpacing.s16),
-                    TextField(
-                      controller: _displayName,
-                      decoration: const InputDecoration(
-                        labelText: 'Display name',
-                        helperText:
-                            'What others see. Defaults to your username.',
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: AppSpacing.s16),
-                  TextField(
-                    controller: _password,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      errorText: _errorFor(_ErrorField.password),
-                    ),
-                    obscureText: true,
-                    autofillHints: const [AutofillHints.password],
-                    onSubmitted: (_) => _busy ? null : _submit(),
-                  ),
-                  if (_errorFor(_ErrorField.form) case final formError?) ...[
-                    const SizedBox(height: AppSpacing.s16),
-                    Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        formError,
-                        style: TextStyle(color: tokens.dangerText),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: AppSpacing.s24),
-                  FilledButton(
-                    onPressed: _busy ? null : _submit,
-                    child: _busy
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(_creatingAccount ? 'Create account' : 'Sign in'),
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  TextButton(
-                    onPressed: _busy
-                        ? null
-                        : () => setState(() {
-                            _creatingAccount = !_creatingAccount;
-                            _error = null;
-                          }),
-                    child: Text(
-                      _creatingAccount
-                          ? 'I already have an account'
-                          : 'Create an account instead',
-                    ),
-                  ),
-                  // Once a Space is remembered, sign-in is where a signed-out
-                  // user lands, so this is the only way back to invite redemption.
-                  TextButton(
-                    onPressed: _busy
-                        ? null
-                        : () => context.go(Routes.onboarding),
-                    child: const Text('Join a different Space'),
-                  ),
-                ],
-              ),
+    return OnboardingShell(
+      // Creating an account is the last of the join steps; signing back in to
+      // a server you already trust is one act and gets no stepper.
+      step: _creatingAccount ? OnboardingStep.identity : null,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            _creatingAccount ? 'Create an account' : 'Welcome back',
+            style: AppText.title.copyWith(
+              color: tokens.textPrimary,
+              fontWeight: AppWeights.semi,
             ),
           ),
-        ),
+          const SizedBox(height: AppSpacing.s8),
+          // Only once it has answered; a typed address says nothing yet.
+          if (_probed case final version?)
+            ServerIdentityChip(
+              spaceName: version.name,
+              host: Uri.tryParse(_server.text)?.host ?? _server.text,
+              confirmed: version.identity != null,
+            ),
+          const SizedBox(height: AppSpacing.s8),
+          TextField(
+            controller: _server,
+            decoration: InputDecoration(
+              labelText: 'Server',
+              helperText: "The Space you're joining - its server address.",
+              errorText: _errorFor(_ErrorField.server),
+              errorMaxLines: 3,
+            ),
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            onChanged: _onServerEdited,
+          ),
+          // First of the three: the other two are about convenience,
+          // this one is about whether you have any recourse here.
+          if (_probed case final version?) ServerSafetyNotice(version: version),
+          // Only while creating an account: it is not a fact a
+          // returning member has any use for.
+          if (_creatingAccount && _probed?.inviteRequired == true)
+            const ServerNotice(
+              icon: AppIcons.invite,
+              message:
+                  'This Space is invite only. Ask a member for a '
+                  'code, then use "Join a different Space" below '
+                  'to redeem it. An admin can open joining to '
+                  'anyone in Settings, under Space.',
+            ),
+          if (_probed?.pushEnabled == false)
+            const ServerNotice(
+              icon: AppIcons.notificationsOff,
+              message:
+                  'This Space cannot send push notifications. '
+                  'You can still use it, but phones will only see '
+                  'new messages while the app is open.',
+            ),
+          const SizedBox(height: AppSpacing.s16),
+          TextField(
+            controller: _username,
+            decoration: InputDecoration(
+              labelText: 'Username',
+              errorText: _errorFor(_ErrorField.username),
+            ),
+            autocorrect: false,
+            autofillHints: const [AutofillHints.username],
+          ),
+          if (_creatingAccount) ...[
+            const SizedBox(height: AppSpacing.s16),
+            TextField(
+              controller: _displayName,
+              decoration: const InputDecoration(
+                labelText: 'Display name',
+                helperText: 'What others see. Defaults to your username.',
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.s16),
+          TextField(
+            controller: _password,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              errorText: _errorFor(_ErrorField.password),
+            ),
+            obscureText: true,
+            autofillHints: const [AutofillHints.password],
+            onSubmitted: (_) => _busy ? null : _submit(),
+          ),
+          if (_errorFor(_ErrorField.form) case final formError?) ...[
+            const SizedBox(height: AppSpacing.s16),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                formError,
+                style: TextStyle(color: tokens.dangerText),
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.s24),
+          FilledButton(
+            onPressed: _busy ? null : _submit,
+            child: _busy
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(_creatingAccount ? 'Create account' : 'Sign in'),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () => setState(() {
+                    _creatingAccount = !_creatingAccount;
+                    _error = null;
+                  }),
+            child: Text(
+              _creatingAccount
+                  ? 'I already have an account'
+                  : 'Create an account instead',
+            ),
+          ),
+          // Once a Space is remembered, sign-in is where a signed-out
+          // user lands, so this is the only way back to invite redemption.
+          TextButton(
+            onPressed: _busy ? null : () => context.go(Routes.onboarding),
+            child: const Text('Join a different Space'),
+          ),
+        ],
       ),
     );
   }
