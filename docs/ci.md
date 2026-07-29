@@ -14,6 +14,7 @@ Each section below is named for its workflow file.
 | `client-ci` | changes under `client/` | dart analyze, format, every package's tests |
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | the iOS CallKit XCTest on macOS, and the extension-embeds-no-frameworks check |
 | `schema-ci` | changes under `schema/`, `redocly.yaml` | redocly lint, and the additive-only oasdiff gate on pull requests |
+| `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
 | `hygiene` | every push and pull request | iOS purpose strings, no emoji in UI source, SPDX headers on Rust source |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
 | `compose-smoke` | changes to the self-host stack, plus a weekly schedule | `docker compose up` on a fresh box produces a working deployment |
