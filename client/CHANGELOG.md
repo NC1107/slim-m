@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.0](https://github.com/NC1107/slim-m/compare/client-v0.11.0...client-v0.12.0) (2026-07-29)
+
+
+### Features
+
+* **client:** per-participant volume, roles, timeout and removal in the member profile ([#138](https://github.com/NC1107/slim-m/issues/138)) ([e746bcd](https://github.com/NC1107/slim-m/commit/e746bcd4c89e1dcd507d49c43ea345d6ea4d83d5))
+* **client:** the member profile popover ([#134](https://github.com/NC1107/slim-m/issues/134)) ([4ef62de](https://github.com/NC1107/slim-m/commit/4ef62de3417e6644c5db7501a2f0dc00194614a1))
+
 ## [0.11.0](https://github.com/NC1107/slim-m/compare/client-v0.10.1...client-v0.11.0) (2026-07-29)
 
 
