@@ -14,7 +14,7 @@ import '../../format.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
-import '../../routing/close_screen.dart';
+import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 
 class ReportsScreen extends ConsumerWidget {
@@ -23,43 +23,23 @@ class ReportsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reports = ref.watch(openReportsProvider);
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reports'),
-        leading: BackToButton(
-          tooltip: 'Back to Space settings',
-          fallback: Routes.spaceSettings,
-        ),
-      ),
-      // top: false because the AppBar already clears the status bar.
-      body: AppContentColumn(
-        child: SafeArea(
-          top: false,
-          child: reports.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(
-              child: Text(
-                'Could not load reports.',
-                style: TextStyle(color: tokens.textSecondary),
-              ),
-            ),
-            data: (list) => list.isEmpty
-                ? Center(
-                    child: Text(
-                      'The queue is empty.',
-                      style: TextStyle(color: tokens.textSecondary),
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(AppSpacing.s16),
-                    itemCount: list.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: AppSpacing.s12),
-                    itemBuilder: (context, i) => _ReportCard(report: list[i]),
-                  ),
-          ),
+    return SettingsScreenScaffold(
+      title: 'Reports',
+      backTooltip: 'Back to Space settings',
+      backFallback: Routes.spaceSettings,
+      scrollable: false,
+      padding: EdgeInsets.zero,
+      child: AppAsyncView<List<api.Report>>(
+        value: AppAsyncState(data: reports.valueOrNull, error: reports.error),
+        errorMessage: 'Could not load reports.',
+        onRetry: () => ref.invalidate(openReportsProvider),
+        isEmpty: (list) => list.isEmpty,
+        emptyMessage: 'The queue is empty.',
+        data: (context, list) => ListView.separated(
+          padding: const EdgeInsets.all(AppSpacing.s16),
+          itemCount: list.length,
+          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s12),
+          itemBuilder: (context, i) => _ReportCard(report: list[i]),
         ),
       ),
     );

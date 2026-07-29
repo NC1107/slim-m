@@ -13,7 +13,7 @@ import '../../format.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
-import '../../routing/close_screen.dart';
+import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import 'invite_role_grant_picker.dart';
 
@@ -31,45 +31,35 @@ class InvitesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final invites = ref.watch(invitesProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Invites'),
-        leading: BackToButton(
-          tooltip: 'Back to Space settings',
-          fallback: Routes.spaceSettings,
-        ),
-      ),
-      // top: false because the AppBar already clears the status bar.
-      body: AppContentColumn(
-        child: SafeArea(
-          top: false,
-          child: ListView(
-            padding: const EdgeInsets.all(AppSpacing.s16),
-            children: [
-              const _CreateInviteCard(),
-              const SizedBox(height: AppSpacing.s16),
-              AppAsyncView<List<api.Invite>>(
-                value: AppAsyncState(
-                  data: invites.valueOrNull,
-                  error: invites.error,
-                ),
-                center: false,
-                errorMessage: 'Could not load invites.',
-                onRetry: () => ref.invalidate(invitesProvider),
-                isEmpty: (list) => list.isEmpty,
-                emptyMessage: 'No invites yet.',
-                data: (context, list) => Column(
-                  children: [
-                    for (final invite in list) ...[
-                      _InviteRow(invite: invite),
-                      const SizedBox(height: AppSpacing.s8),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+    return SettingsScreenScaffold(
+      title: 'Invites',
+      backTooltip: 'Back to Space settings',
+      backFallback: Routes.spaceSettings,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _CreateInviteCard(),
+          const SizedBox(height: AppSpacing.s16),
+          AppAsyncView<List<api.Invite>>(
+            value: AppAsyncState(
+              data: invites.valueOrNull,
+              error: invites.error,
+            ),
+            center: false,
+            errorMessage: 'Could not load invites.',
+            onRetry: () => ref.invalidate(invitesProvider),
+            isEmpty: (list) => list.isEmpty,
+            emptyMessage: 'No invites yet.',
+            data: (context, list) => Column(
+              children: [
+                for (final invite in list) ...[
+                  _InviteRow(invite: invite),
+                  const SizedBox(height: AppSpacing.s8),
+                ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

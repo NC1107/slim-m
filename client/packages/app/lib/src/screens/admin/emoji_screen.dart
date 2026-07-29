@@ -17,7 +17,7 @@ import '../../format.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
-import '../../routing/close_screen.dart';
+import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/custom_emoji_image.dart';
 import 'emoji_upload_card.dart';
@@ -29,45 +29,32 @@ class EmojiScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final emoji = ref.watch(customEmojiProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Emoji'),
-        leading: BackToButton(
-          tooltip: 'Back to Space settings',
-          fallback: Routes.spaceSettings,
-        ),
-      ),
-      // top: false because the AppBar already clears the status bar.
-      body: AppContentColumn(
-        child: SafeArea(
-          top: false,
-          child: ListView(
-            padding: const EdgeInsets.all(AppSpacing.s16),
-            children: [
-              const EmojiUploadCard(),
-              const SizedBox(height: AppSpacing.s16),
-              AppAsyncView<List<api.CustomEmoji>>(
-                value: AppAsyncState(
-                  data: emoji.valueOrNull,
-                  error: emoji.error,
-                ),
-                center: false,
-                errorMessage: 'Could not load emoji.',
-                onRetry: () => ref.invalidate(customEmojiProvider),
-                isEmpty: (list) => list.isEmpty,
-                emptyMessage: 'No emoji yet.',
-                data: (context, list) => Column(
-                  children: [
-                    for (final item in list) ...[
-                      _EmojiRow(emoji: item),
-                      const SizedBox(height: AppSpacing.s8),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+    return SettingsScreenScaffold(
+      title: 'Emoji',
+      backTooltip: 'Back to Space settings',
+      backFallback: Routes.spaceSettings,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const EmojiUploadCard(),
+          const SizedBox(height: AppSpacing.s16),
+          AppAsyncView<List<api.CustomEmoji>>(
+            value: AppAsyncState(data: emoji.valueOrNull, error: emoji.error),
+            center: false,
+            errorMessage: 'Could not load emoji.',
+            onRetry: () => ref.invalidate(customEmojiProvider),
+            isEmpty: (list) => list.isEmpty,
+            emptyMessage: 'No emoji yet.',
+            data: (context, list) => Column(
+              children: [
+                for (final item in list) ...[
+                  _EmojiRow(emoji: item),
+                  const SizedBox(height: AppSpacing.s8),
+                ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -6,10 +6,9 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:slimm_design_system/design_system.dart';
 
 import '../routing/routes.dart';
-import '../routing/close_screen.dart';
+import 'settings_screen_scaffold.dart';
 import '../widgets/space_settings_section.dart';
 
 class SpaceSettingsScreen extends StatelessWidget {
@@ -17,21 +16,13 @@ class SpaceSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Space settings'),
-        // Reached with go(), which replaces, so there is no stack to pop.
-        leading: BackToButton(
-          tooltip: 'Back to channels',
-          fallback: Routes.channels,
-        ),
-      ),
-      body: AppContentColumn(
-        child: SafeArea(
-          top: false,
-          child: ListView(children: const [SpaceSettingsSection()]),
-        ),
-      ),
+    return const SettingsScreenScaffold(
+      title: 'Space settings',
+      // Reached with go(), which replaces, so there is no stack to pop.
+      backTooltip: 'Back to channels',
+      backFallback: Routes.channels,
+      padding: EdgeInsets.zero,
+      child: SpaceSettingsSection(),
     );
   }
 }
