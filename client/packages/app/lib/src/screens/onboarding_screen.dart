@@ -65,11 +65,6 @@ class OnboardingScreen extends ConsumerWidget {
               fontWeight: AppWeights.semi,
             ),
           ),
-          const SizedBox(height: AppSpacing.s8),
-          Text(
-            'A Space is one server, run by somebody. Pick which.',
-            style: AppText.body.copyWith(color: tokens.textSecondary),
-          ),
           const SizedBox(height: AppSpacing.s24),
           _Entry(
             icon: AppIcons.invite,
