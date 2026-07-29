@@ -140,30 +140,44 @@ class AttachmentPlaceholder extends StatelessWidget {
 }
 
 class FailedRow extends StatelessWidget {
-  const FailedRow({super.key, required this.onRetry, required this.onDiscard});
+  const FailedRow({
+    super.key,
+    required this.onRetry,
+    required this.onDiscard,
+    this.onEdit,
+  });
 
   final VoidCallback onRetry;
   final VoidCallback onDiscard;
 
+  /// Puts the failed text somewhere editable rather than losing it; absent,
+  /// the action is simply not offered.
+  final VoidCallback? onEdit;
+
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
+    // The time slot already says "not sent" in red (MessageTimeMark), so this
+    // row is only the way forward: Retry outlined in danger, the neutral
+    // verbs beside it (error grammar: red is outlined, never filled, and
+    // always ships a verb).
     return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.s4),
-      child: Row(
+      padding: const EdgeInsets.only(top: AppSpacing.s8),
+      child: Wrap(
+        spacing: AppSpacing.s8,
         children: [
-          Icon(
-            AppIcons.failed,
-            size: AppSizes.icon16,
-            color: tokens.dangerText,
+          AppButton(
+            label: 'Retry',
+            size: AppButtonSize.sm,
+            variant: AppButtonVariant.danger,
+            onPressed: onRetry,
           ),
-          const SizedBox(width: AppSpacing.s8),
-          Text(
-            'Not sent.',
-            style: AppText.caption.copyWith(color: tokens.dangerText),
+          if (onEdit != null)
+            AppButton(label: 'Edit', size: AppButtonSize.sm, onPressed: onEdit),
+          AppButton(
+            label: 'Discard',
+            size: AppButtonSize.sm,
+            onPressed: onDiscard,
           ),
-          TextButton(onPressed: onRetry, child: const Text('Retry')),
-          TextButton(onPressed: onDiscard, child: const Text('Discard')),
         ],
       ),
     );

@@ -151,7 +151,7 @@ class _JoinPreview extends ConsumerWidget {
                           error,
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
+                            color: tokens.dangerText,
                             fontSize: 13,
                           ),
                         ),
@@ -383,10 +383,7 @@ class _InCall extends ConsumerWidget {
                   padding: const EdgeInsets.only(top: AppSpacing.s16),
                   child: Text(
                     voice.error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: tokens.dangerText, fontSize: 13),
                   ),
                 ),
             ],

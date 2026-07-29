@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
 import '../providers/admin_providers.dart';
+import '../routing/modal_page.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import 'channel_rail.dart' show selectedChannelId;
@@ -33,8 +34,8 @@ Future<void> openCommandPalette(BuildContext context) async {
     context: context,
     barrierLabel: 'Command palette',
     barrierDismissible: true,
-    barrierColor: const Color(0x8A000000),
-    transitionDuration: const Duration(milliseconds: 120),
+    barrierColor: kScrimColor,
+    transitionDuration: AppMotion.reduced(context, AppMotion.fast),
     pageBuilder: (context, animation, secondaryAnimation) =>
         _CommandPaletteContent(currentChannelId: channelId),
     transitionBuilder: (context, animation, secondaryAnimation, child) =>

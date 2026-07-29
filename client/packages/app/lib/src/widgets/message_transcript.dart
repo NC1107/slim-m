@@ -40,6 +40,7 @@ class MessageTranscript extends StatefulWidget {
     required this.actionsFor,
     required this.onRetry,
     required this.onDiscard,
+    this.onEditFailed,
     required this.onPickReaction,
     required this.onReactionTap,
     required this.onVote,
@@ -71,6 +72,9 @@ class MessageTranscript extends StatefulWidget {
 
   final void Function(Message message) onRetry;
   final void Function(Message message) onDiscard;
+
+  /// Recovers a failed message's text into the composer; see MessageRow.
+  final void Function(Message message)? onEditFailed;
   final void Function(Message message, String emoji) onPickReaction;
   final void Function(Message message, api.ReactionSummary reaction)
   onReactionTap;
@@ -143,6 +147,9 @@ class _MessageTranscriptState extends State<MessageTranscript> {
           customEmoji: widget.customEmoji,
           onRetry: () => widget.onRetry(message),
           onDiscard: () => widget.onDiscard(message),
+          onEditFailed: widget.onEditFailed == null
+              ? null
+              : () => widget.onEditFailed!(message),
           onPickReaction: (emoji) => widget.onPickReaction(message, emoji),
           onReactionTap: (reaction) => widget.onReactionTap(message, reaction),
           onVote: (option) => widget.onVote(message, option),

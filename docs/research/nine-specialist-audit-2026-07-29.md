@@ -93,3 +93,39 @@ One reconcile note for the owner: custom emoji is built here while that reviewer
 The design agent followed the reviews with a motion spec (11 live patterns in the claude design project), implemented the same day: spec curves (`easeOutCubic` in, `easeIn` out) and the .98 press ceiling, the selection marker growing from centre on its own clock beside the 100ms hover fill, reaction-chip and unread-dot confirmation pops, the member pane sliding from its edge (unmounting when hidden - it fetches while built), the compact drill-down with 30% parallax, the 280/180 modal, the connection banner pushing by animated height, hold-progress tint on message long-press, and theme switching joining the never-animates list.
 Two contracts the tests defended during this: row height never animates (density is layout, not motion), and the hidden member pane must genuinely unmount.
 One deviation and one deferral, both recorded: the hold tint runs over Flutter's own long-press timeout because `GestureDetector` is what publishes `SemanticsAction.longPress`, and the level-driven speaking ring (spec 09) needs a live audio-level stream beside the roster, whose churn-coalescing exists precisely to avoid per-level rebuilds.
+
+## Round five: the error grammar, and a component-usage audit (same day)
+
+The design agent's Error States spec landed alongside a three-specialist audit of how the app actually uses its own component library.
+The two converged on the same finding from opposite directions, which is why they shipped together.
+
+**The convergence: 27 failures were told only by a vanishing toast.**
+The spec's rule is that a failure is a state, not an event - it appears at the point of the action, persists, and always ships a verb.
+The audit counted 27 `showSnackBar` sites carrying the only record of a failed account deletion, block, report, role assignment, invite revocation, emoji upload and more, and found the design system had no persistent inline-error component to use instead (`AppCallout` deliberately has no danger tone).
+`AppErrorState` closes that gap: outlined danger hairline, plain-language message, an optional mono detail line for whoever runs the server, and Retry/Dismiss verbs.
+Account deletion - the most consequential of them, and the one whose own doc comment warned about exactly this - uses it now.
+
+**Two different reds meant "danger".**
+`ColorScheme.fromSeed` derives its own `error` from the accent seed, which is not the hand-picked `dangerText`; ten sites read Material's and fifteen read the token, with no rule.
+`buildTheme` now overrides `error` with the token, so any raw `colorScheme.error` is correct by construction, and the ten sites were converted anyway.
+The shared confirm dialog was also *filling* a button with it, which the grammar forbids outright; it and the account-deletion dialog now use `AppButton(variant: danger)`.
+
+**Message lifecycle (spec 01).**
+Sent, sending and failed are one `MessageTimeMark`: the timestamp, a clock plus "sending", or "not sent" in red.
+Pending dims; **failed does not** - a failed message is still the author's to act on - and the row carries a red hairline down its left edge with Retry / Edit / Discard beneath.
+Edit puts the text back in the composer and drops the failed row, so nothing written is ever lost.
+
+**Offline is amber, and never blocks (spec 02).**
+The banner keeps its warn tone and retry glyph and the composer stays open; the spec's queued *count* was built and then reverted, which is worth recording.
+A live drift stream in the rail footer keeps every test that renders the rail from ever settling (the timer trap this file's own local-development notes describe), so the count needs a non-streaming read - a value refreshed on sync-status change - rather than a `watchSingle` behind an autoDispose provider.
+Caught by the suite, not in review: three tests hung for five minutes each.
+
+**Sign-in errors land on their field (spec 03).**
+Wrong password marks the password field, a taken username marks the username, an unreachable host marks the server address with "Nothing was sent"; only errors no field owns fall back to the form.
+The theme grew `errorBorder`/`errorStyle` so this is the default for every field in the app, not one screen's special case.
+
+One spec item is deliberately **not** implemented: 05 asks to distinguish an expired invite (with its date) from an invalid one.
+The server answers expired, spent, revoked and never-issued identically so codes cannot be mined, and naming the reason client-side would undo that from the other end.
+The safe half - a local format hint for a typo, which contacts no server - is the only part worth taking.
+
+Recorded from the audit, not yet done: a shared `AppAsyncView` for the five different loading/empty/error treatments across 18 `.when()` sites, a `SettingsScreenScaffold` for eight verbatim-duplicated screen skeletons, a `runGuarded` helper for 26 near-identical catch blocks, an `AppBackButton` for nine copies, the sign-in and onboarding fields moving onto `AppInput` (needs `helperText`/`autofillHints` passthrough first), 25 raw `ListTile`s that want `AppListRow`, nine invented `fontSize: 13` sites, and 174 multi-line `//` runs across 68 files that want a CI gate rather than a sweep.

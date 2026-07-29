@@ -24,10 +24,17 @@ import 'app_typography.dart';
 /// full), inputs take the hairline box `AppInput` draws, and the text theme
 /// carries this system's scale, whose heaviest weight is 600 by rule.
 ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
+  // error is overridden, not left to fromSeed: Material derives its own red
+  // from the accent seed, which is a different colour from the hand-picked
+  // danger tokens. Two reds meaning "danger" were in use across the app; this
+  // makes any raw colorScheme.error correct by construction.
   final scheme = ColorScheme.fromSeed(
     seedColor: tokens.accentFill,
     brightness: brightness,
-  ).copyWith(surface: tokens.surfaceBase);
+  ).copyWith(
+    surface: tokens.surfaceBase,
+    error: tokens.dangerText,
+  );
 
   final controlShape = RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(AppRadii.control),
@@ -119,6 +126,18 @@ ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
         borderRadius: BorderRadius.circular(AppRadii.control),
         borderSide: BorderSide(color: tokens.focusRing, width: 2),
       ),
+      // A failing field is marked on the field itself (error grammar 03):
+      // red hairline, red caption, content preserved. The button never
+      // turns red - the field failed, not the button.
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        borderSide: BorderSide(color: tokens.dangerBorder),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        borderSide: BorderSide(color: tokens.dangerBorder, width: 2),
+      ),
+      errorStyle: AppText.caption.copyWith(color: tokens.dangerText),
     ),
   );
 }
