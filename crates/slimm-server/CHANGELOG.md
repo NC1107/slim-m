@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/NC1107/slim-m/compare/server-v0.16.1...server-v0.17.0) (2026-07-29)
+
+
+### Features
+
+* render peer screen shares, call tiles, and the nine-specialist audit batch ([#123](https://github.com/NC1107/slim-m/issues/123)) ([b34be33](https://github.com/NC1107/slim-m/commit/b34be33bc6b87f68995479f39a440e841cf18170))
+
 ## [0.16.1](https://github.com/NC1107/slim-m/compare/server-v0.16.0...server-v0.16.1) (2026-07-29)
 
 
