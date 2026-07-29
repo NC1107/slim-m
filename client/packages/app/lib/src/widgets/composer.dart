@@ -7,12 +7,18 @@ import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/admin_providers.dart';
+import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/typing_controller.dart';
+import 'composer_autocomplete.dart';
+import 'composer_autocomplete_items.dart';
+import 'composer_autocomplete_query.dart';
 import 'composer_extras.dart';
 import 'emoji_picker.dart';
 import 'poll_composer_sheet.dart';
@@ -48,7 +54,16 @@ class _ComposerState extends ConsumerState<Composer> {
   bool _hasSendableText = false;
   bool _uploading = false;
   final List<api.Attachment> _pendingAttachments = [];
-  final FocusNode _focus = FocusNode();
+  late final FocusNode _focus = FocusNode(onKeyEvent: _onKey);
+
+  /// The trigger the caret is inside, and which of its offers is current.
+  ///
+  /// Held here rather than in the panel because all three act on the text
+  /// field this widget owns: the keys are intercepted on its focus node, and
+  /// accepting rewrites its value.
+  AutocompleteQuery? _query;
+  List<AutocompleteSuggestion> _suggestions = const [];
+  int _selected = 0;
 
   /// A staged file is sendable on its own: a photo needs no caption, and the
   /// server accepts an empty body precisely when attachments ride along.
@@ -72,11 +87,96 @@ class _ComposerState extends ConsumerState<Composer> {
   void _handleChange() {
     final hasText = widget.controller.text.isNotEmpty;
     final sendable = widget.controller.text.trim().isNotEmpty;
-    if (hasText == _hasText && sendable == _hasSendableText) return;
+    final query = autocompleteQueryAt(
+      widget.controller.text,
+      widget.controller.selection.baseOffset,
+    );
+    final changed =
+        hasText != _hasText || sendable != _hasSendableText || query != _query;
+    if (!changed) return;
     setState(() {
       _hasText = hasText;
       _hasSendableText = sendable;
+      if (query != _query) {
+        _query = query;
+        // Back to row one, so Enter takes whatever now ranks first.
+        _selected = 0;
+      }
     });
+  }
+
+  /// Rebuilt during build rather than stored, since the member list and the
+  /// Space's emoji are both watched providers and either can arrive late.
+  List<AutocompleteSuggestion> _buildSuggestions() {
+    final query = _query;
+    if (query == null) return const [];
+    return autocompleteSuggestions(
+      query: query,
+      custom: ref.watch(customEmojiProvider).valueOrNull ?? const [],
+      members: ref.watch(membersProvider).valueOrNull ?? const [],
+      selfId: ref.watch(meProvider).valueOrNull?.id,
+    );
+  }
+
+  void _dismissAutocomplete() {
+    if (_query == null) return;
+    setState(() {
+      _query = null;
+      _selected = 0;
+    });
+  }
+
+  /// Replaces the trigger span with what was chosen and closes the list.
+  void _accept(AutocompleteSuggestion suggestion) {
+    final query = _query;
+    if (query == null) return;
+    final text = widget.controller.text;
+    widget.controller.value = TextEditingValue(
+      text: text.replaceRange(query.start, query.end, suggestion.insert),
+      selection: TextSelection.collapsed(
+        offset: query.start + suggestion.insert.length,
+      ),
+    );
+    _focus.requestFocus();
+    _dismissAutocomplete();
+  }
+
+  /// Intercepts the keys the list needs, on the field's own focus node.
+  ///
+  /// It has to be this node rather than an ancestor: text editing handles the
+  /// arrows through `Actions` installed above the field, so a handler higher
+  /// up would run after the caret had already moved.
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (_query == null || _suggestions.isEmpty) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.escape) {
+      _dismissAutocomplete();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      setState(() => _selected = (_selected + 1) % _suggestions.length);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      setState(
+        () => _selected =
+            (_selected - 1 + _suggestions.length) % _suggestions.length,
+      );
+      return KeyEventResult.handled;
+    }
+    // Both accept; Enter would otherwise send the half-typed trigger.
+    if (key == LogicalKeyboardKey.tab || key == LogicalKeyboardKey.enter) {
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        return KeyEventResult.ignored;
+      }
+      _accept(_suggestions[_selected]);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   /// Replaces the current selection (or inserts at the caret) and leaves the
@@ -186,6 +286,8 @@ class _ComposerState extends ConsumerState<Composer> {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final touch = AppTouchTargets.of(context);
+    // In build because both sources are watched and can arrive late.
+    _suggestions = _buildSuggestions();
 
     // top: false because the composer only ever touches the bottom edge; the
     // padding self-cancels when the keyboard covers the home indicator.
@@ -218,6 +320,13 @@ class _ComposerState extends ConsumerState<Composer> {
                   ],
                 ),
               ),
+            // Above the field, never below: that is the send row and keyboard.
+            ComposerAutocomplete(
+              suggestions: _suggestions,
+              selected: _selected,
+              onPick: _accept,
+              onHover: (i) => setState(() => _selected = i),
+            ),
             Padding(
               padding: const EdgeInsets.only(left: 4, bottom: 2),
               child: TypingIndicator(channelId: widget.channelId),
