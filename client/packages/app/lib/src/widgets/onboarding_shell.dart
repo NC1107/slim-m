@@ -51,8 +51,7 @@ class OnboardingShell extends StatelessWidget {
     final wide = MediaQuery.sizeOf(context).width >= _panelFloor;
 
     final content = Align(
-      // Top-ish with room, so the form sits where the eye starts rather than
-      // floating mid-pane; centred on a phone, which has no height to spare.
+      // Top-ish with room; centred on a phone, which has no height to spare.
       alignment: wide ? const Alignment(0, -0.55) : Alignment.center,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.s24),
@@ -66,8 +65,7 @@ class OnboardingShell extends StatelessWidget {
             ],
             Center(
               child: ConstrainedBox(
-                // Wider than the 440 the form wants, so the three step labels
-                // have room; the form itself stays 440 inside it.
+                // Wider than the form so the three step labels have room.
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -141,94 +139,27 @@ class _Wordmark extends StatelessWidget {
   }
 }
 
-/// What this thing is, in the words the product already uses about itself.
+/// The left column: the mark, and room kept for whatever goes under it.
+///
+/// Deliberately blank below the wordmark. It carried a headline, a subtitle
+/// and three promises, and most of it was either marketing or not true yet -
+/// it advertised a shared canvas the product does not have. Copy that
+/// overstates what a self-hosted server does is worse here than nowhere,
+/// because this is the screen where somebody decides whether to trust one.
+///
+/// The layout is kept rather than collapsed so there is a place to put real
+/// words when there are some.
 class _BrandPanel extends StatelessWidget {
   const _BrandPanel();
 
-  static final _promises = <(IconData, String, String)>[
-    (
-      AppIcons.shield,
-      'Nothing goes through us.',
-      'Your account and your messages only ever reach the server you pick.',
-    ),
-    (
-      AppIcons.members,
-      'One server is one community.',
-      'No feed, no recommendations, nobody else to find.',
-    ),
-    (AppIcons.code, 'Open source.', 'Read it, fork it, run your own.'),
-  ];
-
   @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.s32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _Wordmark(),
-          const SizedBox(height: AppSpacing.s32),
-          Text(
-            'A place for one group of friends. Nothing else.',
-            style: AppText.title.copyWith(
-              color: tokens.textPrimary,
-              fontWeight: AppWeights.semi,
-              height: 1.15,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          Text(
-            'Text, voice, screen share and a shared canvas, on a server '
-            'one of you owns.',
-            style: AppText.body.copyWith(
-              color: tokens.textSecondary,
-              height: 1.5,
-            ),
-          ),
-          const Spacer(),
-          for (final (icon, title, detail) in _promises)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.s16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Icon(
-                      icon,
-                      size: AppSizes.icon16,
-                      color: tokens.accent,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.s12),
-                  Expanded(
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: '$title ',
-                            style: TextStyle(
-                              color: tokens.textPrimary,
-                              fontWeight: AppWeights.medium,
-                            ),
-                          ),
-                          TextSpan(
-                            text: detail,
-                            style: TextStyle(color: tokens.textSecondary),
-                          ),
-                        ],
-                      ),
-                      style: AppText.caption.copyWith(height: 1.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.all(AppSpacing.s32),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [_Wordmark()],
+    ),
+  );
 }
 
 /// `1 invite - 2 confirm the server - 3 who are you`.
@@ -251,16 +182,14 @@ class OnboardingStepper extends StatelessWidget {
       container: true,
       label: 'Step ${current.index + 1} of ${steps.length}: ${current.label}',
       child: ExcludeSemantics(
-        // Every label together needs about 420px. Below that only the step you
-        // are on keeps its words; the count is what has to survive.
+        // Under ~420px only the current step keeps its words; the count stays.
         child: LayoutBuilder(
           builder: (context, constraints) {
             final labelled = constraints.maxWidth >= 420;
             return Row(
               children: [
                 for (final (i, step) in steps.indexed) ...[
-                  // Fixed rather than Expanded: a stretching connector took a
-                  // flex share from the pips and truncated the longest label.
+                  // Fixed, not Expanded: stretching truncated the longest label.
                   if (i > 0)
                     Container(
                       width: 24,
@@ -270,9 +199,7 @@ class OnboardingStepper extends StatelessWidget {
                       ),
                       color: tokens.borderSubtle,
                     ),
-                  // A loose flex child: takes its natural width when there is
-                  // room and ellipsizes when there is not. flex 0 would read
-                  // as non-flex to RenderFlex and constrain nothing.
+                  // Loose flex: flex 0 reads as non-flex and constrains nothing.
                   Flexible(
                     child: _Pip(
                       index: i,

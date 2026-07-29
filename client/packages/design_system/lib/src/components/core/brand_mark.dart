@@ -72,8 +72,7 @@ class _MarkPainter extends CustomPainter {
       return;
     }
 
-    // The 15.056-unit square from brand/glyph.svg: sized for equal ink with
-    // the full mark rather than an equal bounding box.
+    // brand/glyph.svg's square: sized for equal ink, not an equal box.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(8.472 * unit, 8.472 * unit, 15.056 * unit, 15.056 * unit),

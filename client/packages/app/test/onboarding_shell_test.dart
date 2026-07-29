@@ -109,7 +109,7 @@ void main() {
   });
 
   group('the shell', () {
-    testWidgets('shows the brand panel with room, and the wordmark without', (
+    testWidgets('keeps the brand panel with room and drops it without', (
       tester,
     ) async {
       const marker = Key('form');
@@ -119,10 +119,8 @@ void main() {
           size: const Size(1200, 900),
         ),
       );
-      expect(
-        find.textContaining('Open source', findRichText: true),
-        findsOneWidget,
-      );
+      // Just the mark for now; what is pinned is that it is there at all.
+      expect(find.byType(AppBrandMark), findsOneWidget);
       expect(find.byKey(marker), findsOneWidget);
 
       await tester.pumpWidget(
@@ -131,13 +129,8 @@ void main() {
           size: const Size(420, 900),
         ),
       );
-      expect(
-        find.textContaining('Open source', findRichText: true),
-        findsNothing,
-        reason:
-            'the pitch is chrome and goes first when the form needs the '
-            'width; the wordmark stays so the screen is still identifiable',
-      );
+      // One mark, not two, so the panel really did collapse.
+      expect(find.byType(AppBrandMark), findsOneWidget);
       expect(find.text('slim-m'), findsOneWidget);
       expect(find.byKey(marker), findsOneWidget);
     });
