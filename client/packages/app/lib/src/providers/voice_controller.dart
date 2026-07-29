@@ -8,6 +8,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_rtc/rtc.dart';
@@ -215,6 +216,11 @@ class VoiceController extends StateNotifier<VoiceState> {
 
   Future<List<ScreenShareSource>> screenShareSources() =>
       _session.screenShareSources();
+
+  /// The live view of [identity]'s shared screen; see
+  /// [VoiceSession.screenShareViewFor].
+  Widget screenShareViewFor(String identity) =>
+      _session.screenShareViewFor(identity);
 
   Future<void> setScreenShare(
     bool enabled, {

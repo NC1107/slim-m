@@ -10,6 +10,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -98,6 +99,12 @@ class FakeSession implements VoiceSession {
     sourceListings++;
     return sources;
   }
+
+  /// Keyed so a widget test can assert the share surface mounted for the
+  /// right participant without a real room behind it.
+  @override
+  Widget screenShareViewFor(String identity) =>
+      SizedBox.shrink(key: Key('fake-share-view-$identity'));
 
   /// Drives a drop the SFU decided on, the way a real room event would.
   void dropWith(VoiceDisconnect reason) {

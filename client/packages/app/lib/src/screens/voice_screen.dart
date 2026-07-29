@@ -14,6 +14,7 @@ import 'package:slimm_rtc/rtc.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_roster.dart';
 import '../widgets/local_screen_share_banner.dart';
+import '../widgets/screen_share_stage.dart';
 import '../widgets/user_avatar.dart';
 import 'voice_call_controls.dart';
 
@@ -299,6 +300,13 @@ class _InCall extends ConsumerWidget {
     final voice = ref.watch(voiceControllerProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
 
+    // The first remote share gets the stage; your own is not echoed back
+    // (the banner already says so), and two at once is not worth a grid at
+    // this product's size - the second waits its turn.
+    final sharer = voice.participants
+        .where((p) => p.isScreenSharing && !p.isLocal)
+        .firstOrNull;
+
     return Column(
       children: [
         // Pinned above the roster: a per-row glyph is too easy to scroll past.
@@ -311,6 +319,22 @@ class _InCall extends ConsumerWidget {
               0,
             ),
             child: LocalScreenShareBanner(),
+          ),
+        if (sharer != null)
+          Expanded(
+            flex: 3,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s16,
+                AppSpacing.s16,
+                AppSpacing.s16,
+                0,
+              ),
+              child: ScreenShareStage(
+                sharerName: sharer.name,
+                child: controller.screenShareViewFor(sharer.identity),
+              ),
+            ),
           ),
         Expanded(
           child: ListView(

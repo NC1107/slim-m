@@ -14,97 +14,14 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
 import 'broadcast_bridge.dart';
 import 'desktop_sources.dart';
 import 'screen_share.dart';
-
-/// Where a session is in its lifecycle.
-enum VoiceSessionState {
-  /// Not in a call.
-  idle,
-
-  /// Token in hand, negotiating with the SFU.
-  connecting,
-
-  /// In the call.
-  connected,
-
-  /// The last attempt failed, or the connection dropped and did not recover.
-  /// [VoiceSession.lastError] says what happened.
-  failed,
-}
-
-/// Why a call ended, when it was not this client that ended it.
-///
-/// The SFU reports a reason on every disconnect and nothing read it, so a call
-/// that was dropped looked exactly like a call that was left.
-enum VoiceDisconnect {
-  /// The same account joined from somewhere else and took this slot. The SFU
-  /// allows one connection per identity and evicts the older one.
-  replacedByOtherDevice,
-
-  /// A moderator removed this participant, or the room went away.
-  removed,
-
-  /// The connection dropped and reconnecting did not recover it.
-  connectionLost,
-
-  /// Ended for a reason this client cannot name.
-  unknown;
-
-  /// What to tell the user, in their terms rather than the SFU's.
-  String get message => switch (this) {
-        replacedByOtherDevice =>
-          'You joined this call from another device, so this one left it.',
-        removed => 'You were removed from the call.',
-        connectionLost => 'The call disconnected and could not reconnect.',
-        unknown => 'The call ended unexpectedly.',
-      };
-}
-
-/// Somebody in the call, including you.
-///
-/// Deliberately a plain value rather than a LiveKit participant: the UI needs
-/// an identity, a name, and three booleans, and handing it a live SDK object
-/// would let a widget subscribe to something this class is supposed to own.
-class VoiceParticipant {
-  const VoiceParticipant({
-    required this.identity,
-    required this.name,
-    required this.isSpeaking,
-    required this.isMuted,
-    required this.isLocal,
-    required this.isScreenSharing,
-  });
-
-  /// The server's user id. The token's `sub`, so it is trustworthy.
-  final String identity;
-
-  /// Display name as the token carried it.
-  final String name;
-
-  final bool isSpeaking;
-  final bool isMuted;
-  final bool isLocal;
-  final bool isScreenSharing;
-
-  @override
-  bool operator ==(Object other) =>
-      other is VoiceParticipant &&
-      other.identity == identity &&
-      other.name == name &&
-      other.isSpeaking == isSpeaking &&
-      other.isMuted == isMuted &&
-      other.isLocal == isLocal &&
-      other.isScreenSharing == isScreenSharing;
-
-  @override
-  int get hashCode => Object.hash(
-      identity, name, isSpeaking, isMuted, isLocal, isScreenSharing);
-}
+import 'screen_share_view.dart';
+import 'voice_models.dart';
 
 /// Builds the LiveKit room a session drives. The injection seam.
 typedef RoomFactory = lk.Room Function();
@@ -339,6 +256,19 @@ class VoiceSession {
       p?.videoTrackPublications
           .any((t) => t.source == lk.TrackSource.screenShareVideo) ??
       false;
+
+  /// The widget that renders [identity]'s shared screen, live.
+  ///
+  /// Returned as a plain [Widget] so no LiveKit type crosses the package
+  /// seam; the real rendering is [ScreenShareView], which tracks the room's
+  /// events itself so a share track arriving a beat after the roster flips
+  /// still appears. Out of a call it renders nothing, not a placeholder:
+  /// there is no room to watch.
+  Widget screenShareViewFor(String identity) {
+    final room = _room;
+    if (room == null) return const SizedBox.shrink();
+    return ScreenShareView(room: room, identity: identity);
+  }
 
   /// Silences (or restores) every remote participant's audio locally, by
   /// disabling the underlying WebRTC track rather than unsubscribing from

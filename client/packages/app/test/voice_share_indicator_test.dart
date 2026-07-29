@@ -83,6 +83,71 @@ void main() {
     });
   });
 
+  group('the share stage', () {
+    testWidgets('renders a remote share, named for its sharer', (tester) async {
+      final session = FakeSession();
+      final controller = harness.controllerWith(session, voiceApi());
+      await controller.join('channel-1');
+      session.emitState(VoiceSessionState.connected);
+
+      await tester.pumpWidget(
+        _harness(const VoiceScreen(channelId: 'channel-1'), harness.container),
+      );
+      await tester.pump();
+      session.emitParticipants(const [
+        VoiceParticipant(
+          identity: 'me',
+          name: 'Me',
+          isSpeaking: false,
+          isMuted: false,
+          isLocal: true,
+          isScreenSharing: false,
+        ),
+        VoiceParticipant(
+          identity: 'peer-1',
+          name: 'Ada',
+          isSpeaking: false,
+          isMuted: false,
+          isLocal: false,
+          isScreenSharing: true,
+        ),
+      ]);
+      await tester.pump();
+
+      // The stage mounted, wired to the sharing participant specifically.
+      expect(find.byKey(const Key('fake-share-view-peer-1')), findsOneWidget);
+      expect(find.text("Ada's screen"), findsOneWidget);
+    });
+
+    testWidgets('your own share gets the banner, never an echo stage', (
+      tester,
+    ) async {
+      final session = FakeSession();
+      final controller = harness.controllerWith(session, voiceApi());
+      await controller.join('channel-1');
+      session.emitState(VoiceSessionState.connected);
+
+      await tester.pumpWidget(
+        _harness(const VoiceScreen(channelId: 'channel-1'), harness.container),
+      );
+      await tester.pump();
+      session.emitParticipants(const [
+        VoiceParticipant(
+          identity: 'me',
+          name: 'Me',
+          isSpeaking: false,
+          isMuted: false,
+          isLocal: true,
+          isScreenSharing: true,
+        ),
+      ]);
+      await tester.pump();
+
+      expect(find.text('You are sharing your screen.'), findsOneWidget);
+      expect(find.byKey(const Key('fake-share-view-me')), findsNothing);
+    });
+  });
+
   group('the collapsed strip', () {
     testWidgets('names the share in words for a live share', (tester) async {
       final session = FakeSession();
