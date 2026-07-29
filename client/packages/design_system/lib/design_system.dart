@@ -11,6 +11,7 @@ export 'src/app_haptics.dart';
 export 'src/app_icons.dart';
 export 'src/app_metrics.dart';
 export 'src/app_motion.dart';
+export 'src/app_theme.dart';
 export 'src/app_tokens.dart';
 export 'src/app_typography.dart';
 export 'src/components/core.dart';
