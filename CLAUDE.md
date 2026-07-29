@@ -16,6 +16,8 @@ Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/
 
 Nine parallel specialist reviews (five code, four screenshot) over the running product; the consolidated report with everything found, fixed, and deliberately deferred is [docs/research/nine-specialist-audit-2026-07-29.md](docs/research/nine-specialist-audit-2026-07-29.md).
 Read that before the next audit pass so nothing is re-found.
+A second round the same day covered what the first under-covered: the snapshot harness's `_surfaces` map (`ui_snapshot_test.dart`) now renders all 12 routed screens, not just the two shell ones, so `scripts/ui-snapshots.sh` yields the whole app (60 renders) and the settings/admin screens sit under the CI overflow gate.
+Two harness facts worth keeping: `fixtureContainer` must call `SharedPreferences.setMockInitialValues` (the voice settings screen reads it and the platform channel has no host in a test), and the fixture's fake HTTP catch-all answers `[]`, so any endpoint whose real answer is a map needs an explicit case or the screen renders its error state - which is exactly how it exposed 14 sites interpolating `$e` into visible copy.
 What to know before touching the affected code:
 
 **Screen share viewing exists now, and the seam shape matters.**
