@@ -13,7 +13,11 @@ use crate::fixtures::*;
 async fn an_oversized_upload_is_refused() {
     let (store, _guard) = new_store().await;
     store
-        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::ATTACH_FILES),
+            true,
+        )
         .await
         .unwrap();
     let app = app(store.clone());
@@ -45,7 +49,11 @@ async fn an_oversized_upload_is_refused() {
 async fn a_disallowed_content_type_is_refused_even_when_the_filename_lies() {
     let (store, _guard) = new_store().await;
     store
-        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::ATTACH_FILES),
+            true,
+        )
         .await
         .unwrap();
     let app = app(store.clone());
@@ -67,7 +75,11 @@ async fn a_disallowed_content_type_is_refused_even_when_the_filename_lies() {
 async fn uploads_are_rate_limited() {
     let (store, _guard) = new_store().await;
     store
-        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::ATTACH_FILES),
+            true,
+        )
         .await
         .unwrap();
     let app = app(store.clone());
@@ -96,4 +108,35 @@ async fn uploads_are_rate_limited() {
         statuses.contains(&StatusCode::TOO_MANY_REQUESTS),
         "a sustained upload flood must be refused: {statuses:?}"
     );
+}
+
+/// Uploading asks for ATTACH_FILES deployment-wide, which until this existed
+/// it did not ask for at all: the handler had no permission check of any
+/// kind, so a member denied attachments everywhere - or one currently timed
+/// out - could still write bytes into media storage and only be stopped one
+/// step later, when the id was attached to a message.
+///
+/// Deployment-wide rather than per-channel because an upload names no
+/// channel; the per-channel bit is still checked when the id is used.
+#[tokio::test]
+async fn uploading_needs_the_attach_files_permission() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let (token, _id) = register(&store, "alice").await;
+
+    let response = app
+        .clone()
+        .oneshot(request_bytes(
+            "POST",
+            "/attachments?filename=nope.png",
+            &token,
+            png(16),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }

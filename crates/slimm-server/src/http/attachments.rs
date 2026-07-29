@@ -70,6 +70,13 @@ struct UploadParams {
 /// The file is written before the metadata row on purpose: a crash between
 /// the two leaves an orphaned file (harmless, eventually swept) rather than a
 /// row that promises bytes which were never actually written.
+///
+/// Requires ATTACH_FILES deployment-wide. An upload names no channel, so the
+/// per-channel check still happens when the resulting id is attached to a
+/// message; this is the half that was missing entirely. Until it existed the
+/// handler asked for no permission of any kind, so a member denied
+/// attachments everywhere - or one currently timed out - could still write
+/// bytes into media storage.
 async fn upload(
     Authed(ctx): Authed,
     parts: Parts,
@@ -78,6 +85,16 @@ async fn upload(
     Bytes(body): Bytes,
 ) -> Result<(StatusCode, Json<AttachmentUploadDto>), ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Upload)?;
+
+    // Deployment-wide because an upload names no channel; see the note above.
+    if !state
+        .store
+        .base_permissions(ctx.user_id)
+        .await?
+        .contains(Permissions::ATTACH_FILES)
+    {
+        return Err(ApiError::Forbidden);
+    }
 
     if body.is_empty() {
         return Err(ApiError::BadRequest("attachment is empty"));

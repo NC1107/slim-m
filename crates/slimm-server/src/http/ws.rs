@@ -117,6 +117,10 @@ enum ServerFrame {
     },
     #[serde(rename = "presence.changed")]
     PresenceChanged { user_id: String, status: String },
+    #[serde(rename = "member.timeout")]
+    MemberTimeoutChanged { user_id: String, until: Option<i64> },
+    #[serde(rename = "member.removed")]
+    MemberRemoved { user_id: String },
     #[serde(rename = "typing.started")]
     TypingStarted { channel_id: String, user_id: String },
     #[serde(rename = "typing.stopped")]
@@ -298,6 +302,21 @@ async fn authorize(
             status: status.as_str().to_owned(),
         });
     }
+    // Deployment-wide like presence, but with nothing per-viewer to resolve.
+    match event {
+        Event::MemberTimeoutChanged { user_id, until } => {
+            return Some(ServerFrame::MemberTimeoutChanged {
+                user_id: user_id.to_string(),
+                until,
+            });
+        }
+        Event::MemberRemoved(user_id) => {
+            return Some(ServerFrame::MemberRemoved {
+                user_id: user_id.to_string(),
+            });
+        }
+        _ => {}
+    }
 
     let channel_id = match &event {
         Event::MessageCreated { message, .. } | Event::MessageEdited(message) => message.channel_id,
@@ -309,9 +328,12 @@ async fn authorize(
         Event::TypingStarted { channel_id, .. } | Event::TypingStopped { channel_id, .. } => {
             *channel_id
         }
-        // Control events are handled in the loop, never here. PresenceChanged
-        // already returned above.
-        Event::SessionRevoked(_) | Event::PresenceChanged(_) => return None,
+        // Control events are handled in the loop, never here. The
+        // deployment-wide ones already returned above.
+        Event::SessionRevoked(_)
+        | Event::PresenceChanged(_)
+        | Event::MemberTimeoutChanged { .. }
+        | Event::MemberRemoved(_) => return None,
     };
     let visible = store
         .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
@@ -416,8 +438,11 @@ async fn authorize(
             channel_id: channel_id.to_string(),
             user_id: user_id.to_string(),
         },
-        // PresenceChanged already returned above; unreachable here.
-        Event::SessionRevoked(_) | Event::PresenceChanged(_) => return None,
+        // The deployment-wide events already returned above; unreachable here.
+        Event::SessionRevoked(_)
+        | Event::PresenceChanged(_)
+        | Event::MemberTimeoutChanged { .. }
+        | Event::MemberRemoved(_) => return None,
     })
 }
 

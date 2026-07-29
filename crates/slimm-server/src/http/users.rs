@@ -24,7 +24,7 @@ use super::auth::validate_label;
 use super::error::ApiError;
 use super::extract::{Authed, Bytes, Json, Query, enforce};
 use super::messages::parse_uuid;
-use crate::ids::UserId;
+use crate::ids::{RoleId, UserId};
 use crate::media;
 use crate::ratelimit::Class;
 use crate::store::{Store, User};
@@ -87,6 +87,18 @@ struct UserDto {
     /// already follows. Deliberately no colour: badges use the design
     /// system's accent, not a per-role one.
     roles: Vec<String>,
+    /// The same roles as ids, positionally matching [`Self::roles`].
+    ///
+    /// Both, rather than one: a badge renders the name, and an assignment is
+    /// made against the id. Nothing stops two roles sharing a name, so a
+    /// client deciding "does this member hold that role" by name would answer
+    /// yes for both of them.
+    role_ids: Vec<String>,
+    /// When this member's timeout lifts, in Unix milliseconds, or `null` if
+    /// they are not timed out. An elapsed timeout reads as `null` rather than
+    /// as a past deadline, so a client never has to do the comparison to know
+    /// whether the badge belongs on screen.
+    timed_out_until: Option<i64>,
 }
 
 /// Builds one profile DTO, including this user's non-`@everyone` role names.
@@ -103,17 +115,24 @@ async fn to_dto(store: &Store, user: User) -> anyhow::Result<UserDto> {
 /// query per row.
 async fn to_dtos(store: &Store, users: Vec<User>) -> anyhow::Result<Vec<UserDto>> {
     let ids: Vec<UserId> = users.iter().map(|u| u.id).collect();
-    let role_names: HashMap<UserId, Vec<String>> =
+    let roles: HashMap<UserId, Vec<(RoleId, String)>> =
         store.roles_for_users(&ids).await?.into_iter().collect();
+    // Batched for the same reason the roles above are; see this function's note.
+    let timed_out = store.timed_out_among_until(&ids).await?;
     Ok(users
         .into_iter()
-        .map(|user| UserDto {
-            id: user.id.to_string(),
-            username: user.username,
-            display_name: user.display_name,
-            created_at: user.created_at,
-            avatar_updated_at: user.avatar_updated_at,
-            roles: role_names.get(&user.id).cloned().unwrap_or_default(),
+        .map(|user| {
+            let held = roles.get(&user.id).cloned().unwrap_or_default();
+            UserDto {
+                id: user.id.to_string(),
+                username: user.username,
+                display_name: user.display_name,
+                created_at: user.created_at,
+                avatar_updated_at: user.avatar_updated_at,
+                roles: held.iter().map(|(_, name)| name.clone()).collect(),
+                role_ids: held.iter().map(|(id, _)| id.to_string()).collect(),
+                timed_out_until: timed_out.get(&user.id).copied(),
+            }
         })
         .collect())
 }
@@ -130,7 +149,15 @@ struct MeDto {
     /// overwrite. A client uses this to decide which actions to show, but
     /// that is a UI nicety only; every write is re-authorized server-side
     /// from scratch regardless of what a client chose to display.
+    ///
+    /// Already has any timeout subtracted, so a client that greys the
+    /// composer on a missing SEND_MESSAGES bit needs no separate rule for
+    /// being timed out; [`Self::timed_out_until`] is what says *why*.
     permissions: i64,
+    /// When the caller's own timeout lifts, or `null`. Present so the client
+    /// can name what happened rather than leaving somebody with a disabled
+    /// composer and no explanation.
+    timed_out_until: Option<i64>,
 }
 
 /// The editable half of a profile.
@@ -174,6 +201,7 @@ async fn get_me(
         created_at: user.created_at,
         avatar_updated_at: user.avatar_updated_at,
         permissions: permissions.bits(),
+        timed_out_until: state.store.timed_out_until(ctx.user_id).await?,
     }))
 }
 

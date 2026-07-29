@@ -340,6 +340,13 @@ async fn delete(
 /// Edits a message. Rate-limited like the other writes in this module: an edit
 /// re-runs the FTS5 re-index trigger, so leaving it uncapped let one account
 /// churn the search index as fast as it could send requests.
+///
+/// Editing your own message needs SEND_MESSAGES, not merely authorship. An
+/// edit republishes arbitrary new content to the whole channel, so without
+/// that bit a member denied send - by an overwrite, or by being timed out -
+/// keeps a complete substitute for sending, by rewriting anything they ever
+/// posted. Deleting is left on authorship alone, because a delete publishes
+/// an id rather than words.
 async fn edit(
     Authed(ctx): Authed,
     parts: Parts,
@@ -367,13 +374,17 @@ async fn edit(
         .filter(|m| m.channel_id == channel_id)
         .ok_or(ApiError::NotFound("message not found"))?;
 
-    // Editing your own message is allowed; editing another's needs manage rights.
+    // Your own needs send rights, another's needs manage rights; see the note.
     let is_author = message.author_id == Some(ctx.user_id);
-    if !is_author
-        && !state
-            .store
-            .has_permission(ctx.user_id, channel_id, Permissions::MANAGE_MESSAGES)
-            .await?
+    let needed = if is_author {
+        Permissions::SEND_MESSAGES
+    } else {
+        Permissions::MANAGE_MESSAGES
+    };
+    if !state
+        .store
+        .has_permission(ctx.user_id, channel_id, needed)
+        .await?
     {
         return Err(ApiError::Forbidden);
     }

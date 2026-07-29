@@ -97,6 +97,20 @@ pub enum Event {
     /// present in the event payload, only in the answer computed for one
     /// specific viewer.
     PresenceChanged(UserId),
+    /// A member was timed out, or their timeout was lifted. `until` is Unix
+    /// milliseconds, or `None` for a lift.
+    ///
+    /// Deployment-wide rather than channel-scoped, and carrying the deadline
+    /// rather than only an id: unlike presence there is nothing per-viewer to
+    /// derive, since the badge is the same fact for everyone who can see the
+    /// member at all. Without this a timed-out member's composer stays
+    /// enabled and their sends start failing with 403, which reads as the app
+    /// being broken rather than as something a moderator did.
+    MemberTimeoutChanged { user_id: UserId, until: Option<i64> },
+    /// A member was removed from the Space. Their own sockets close on the
+    /// `SessionRevoked` events that accompany this; everyone else's member
+    /// list uses this to drop them without waiting for a refetch.
+    MemberRemoved(UserId),
     /// Someone started or refreshed typing in a channel.
     TypingStarted {
         channel_id: ChannelId,

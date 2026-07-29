@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM space_removals WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "c347b1a4d22cec6cf474e7b2e016e2432e32974dc72c6ede833d5e34d3806adb"
+}

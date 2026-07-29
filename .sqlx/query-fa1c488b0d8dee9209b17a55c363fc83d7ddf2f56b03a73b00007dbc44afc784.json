@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT r.user_id AS \"user_id!: UserId\", u.username, u.display_name,\n                      r.reason, r.removed_by AS \"removed_by?: UserId\", r.removed_at\n               FROM space_removals r\n               JOIN users u ON u.id = r.user_id\n               WHERE u.deleted_at IS NULL\n               ORDER BY r.removed_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "username",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "reason",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "removed_by?: UserId",
+        "ordinal": 4,
+        "type_info": "Blob"
+      },
+      {
+        "name": "removed_at",
+        "ordinal": 5,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "fa1c488b0d8dee9209b17a55c363fc83d7ddf2f56b03a73b00007dbc44afc784"
+}

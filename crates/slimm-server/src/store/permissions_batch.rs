@@ -11,6 +11,7 @@
 use uuid::Uuid;
 
 use super::Store;
+use super::timeouts::TIMEOUT_DENY;
 use crate::ids::{ChannelId, RoleId, UserId};
 use crate::permissions::{Overwrite, Permissions, evaluate};
 
@@ -49,6 +50,16 @@ impl Store {
             return Ok(Vec::new());
         };
 
+        // One query: asking per candidate restores the cost this function removes.
+        let timed_out = self.timed_out_among_until(candidates).await?;
+        let deny_for = |user_id: UserId| {
+            if timed_out.contains_key(&user_id) {
+                TIMEOUT_DENY
+            } else {
+                Permissions::NONE
+            }
+        };
+
         if channel.kind == super::dms::DM_CHANNEL_KIND {
             let mut viewers = Vec::new();
             // dm_permissions passes at most the pair, bounding this loop at two real checks.
@@ -56,6 +67,7 @@ impl Store {
                 if self
                     .dm_permissions(user_id, channel_id)
                     .await?
+                    .remove(deny_for(user_id))
                     .contains(Permissions::VIEW_CHANNEL)
                 {
                     viewers.push(user_id);
@@ -144,7 +156,8 @@ impl Store {
                 everyone_overwrite,
                 &role_overwrites,
                 member_overwrite,
-            );
+            )
+            .remove(deny_for(user_id));
             if perms.contains(Permissions::VIEW_CHANNEL) {
                 viewers.push(user_id);
             }
@@ -166,6 +179,8 @@ impl Store {
             return Ok(channels);
         }
         let roles = self.load_roles(user_id).await?;
+        // Hoisted: the filter closure below is synchronous and cannot await.
+        let timeout_deny = self.timeout_deny(user_id).await?;
 
         // One built query for every listed channel's overwrites (no array binding in SQLite).
         let mut builder = sqlx::QueryBuilder::new(
@@ -230,6 +245,7 @@ impl Store {
                     &role_overwrites,
                     member_overwrite,
                 )
+                .remove(timeout_deny)
                 .contains(Permissions::VIEW_CHANNEL)
             })
             .collect())

@@ -262,6 +262,49 @@ async fn farewell_calls(c: &mut Contract, root: &str, bob_id: &str, code: &str, 
     c.get("listMessages", &format!("{messages}?limit=50"), root)
         .await;
 
+    // Erin exists only to be moderated: a removal revokes the target's sessions.
+    let erin = c
+        .call(
+            "register",
+            "POST",
+            "/auth/register",
+            None,
+            Payload::Json(signup("erin", "desktop", Some(code))),
+        )
+        .await;
+    let erin_id = text(&erin, "user_id");
+    c.json(
+        "timeOutMember",
+        "PUT",
+        &format!("/members/{erin_id}/timeout"),
+        root,
+        json!({ "duration_seconds": 300, "reason": "contract" }),
+    )
+    .await;
+    c.bare(
+        "liftMemberTimeout",
+        "DELETE",
+        &format!("/members/{erin_id}/timeout"),
+        root,
+    )
+    .await;
+    c.json(
+        "removeMember",
+        "PUT",
+        &format!("/members/{erin_id}/removal"),
+        root,
+        json!({ "reason": "contract" }),
+    )
+    .await;
+    c.get("listRemovedMembers", "/members/removed", root).await;
+    c.bare(
+        "restoreMember",
+        "DELETE",
+        &format!("/members/{erin_id}/removal"),
+        root,
+    )
+    .await;
+
     let issued = c
         .bare(
             "issueResetCode",

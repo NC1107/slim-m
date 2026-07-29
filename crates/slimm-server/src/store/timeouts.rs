@@ -1,0 +1,177 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Member timeouts: a moderator takes away every way of expressing yourself
+//! for a while, and takes away nothing else.
+//!
+//! The enforcement is one subtraction applied where permissions are read, not
+//! a check bolted onto each thing a timed-out member must not do. That is the
+//! same shape [`super::dms`]'s `BLOCKED_DENY` uses, and it is what makes this
+//! reach message send, edits, reactions, attachments, polls, pins and the
+//! LiveKit token with no edit to any of those files: they all already ask
+//! [`Store::permissions_in_channel`], and the voice token even degrades to
+//! listen-only on its own because `VoiceService::mint` derives `can_publish`
+//! from [`Permissions::SPEAK`].
+//!
+//! `until` is compared against the clock at every read rather than swept by a
+//! job, so a timeout expires by arithmetic. Nothing has to run on time for a
+//! member to get their voice back, which is the property worth having.
+
+use std::collections::HashMap;
+
+use super::{Store, now_ms};
+use crate::ids::UserId;
+use crate::permissions::Permissions;
+
+/// The longest timeout that can be issued, matching the ceiling the shape of
+/// this feature implies: past about a month, the honest tool is a removal.
+pub const MAX_TIMEOUT_MS: i64 = 28 * 24 * 60 * 60 * 1000;
+
+/// What a timeout takes away: everything that puts something into the Space,
+/// plus the two voice bits.
+///
+/// `VIEW_CHANNEL` survives, so a timed-out member reads the conversation they
+/// are being kept out of - that is the entire difference between this and a
+/// removal, and it is why the client copy says "can read, can't post".
+///
+/// `USE_CANVAS` is deliberately absent even though drawing is plainly a way
+/// of posting: that one bit means "view *and* draw the canvas" (see its
+/// definition in `permissions.rs`), so subtracting it would blank the canvas
+/// rather than make it read-only. The canvas write path checks the timeout
+/// directly instead; splitting the bit is a schema and role migration that
+/// belongs to the Phase 6 canvas work rather than to this.
+pub(crate) const TIMEOUT_DENY: Permissions = Permissions::SEND_MESSAGES
+    .union(Permissions::ADD_REACTIONS)
+    .union(Permissions::ATTACH_FILES)
+    .union(Permissions::CONNECT)
+    .union(Permissions::SPEAK);
+
+/// A timeout in force, as a moderator sees it.
+#[derive(Debug, Clone)]
+pub struct MemberTimeout {
+    pub user_id: UserId,
+    pub until: i64,
+    pub reason: Option<String>,
+    /// Null once the issuing moderator's own account is deleted.
+    pub issued_by: Option<UserId>,
+    pub issued_at: i64,
+}
+
+impl Store {
+    /// Applies a timeout, replacing any timeout already on this member.
+    ///
+    /// Replacing rather than refusing is what lets a moderator shorten one
+    /// they overdid, and re-issuing is the only thing "extend it" could mean.
+    pub async fn set_member_timeout(
+        &self,
+        user_id: UserId,
+        until: i64,
+        reason: Option<&str>,
+        issued_by: UserId,
+    ) -> anyhow::Result<()> {
+        let now = now_ms();
+        sqlx::query!(
+            "INSERT INTO member_timeouts (user_id, until, reason, issued_by, issued_at)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(user_id) DO UPDATE SET
+                 until = excluded.until,
+                 reason = excluded.reason,
+                 issued_by = excluded.issued_by,
+                 issued_at = excluded.issued_at",
+            user_id,
+            until,
+            reason,
+            issued_by,
+            now
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Lifts a timeout. Idempotent: lifting one that already expired, or one
+    /// that never existed, is a success rather than an error, because in both
+    /// cases the member can speak afterwards, which is what the caller asked.
+    pub async fn clear_member_timeout(&self, user_id: UserId) -> anyhow::Result<()> {
+        sqlx::query!("DELETE FROM member_timeouts WHERE user_id = ?", user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// The timeout in force on this member right now, if any. An elapsed row
+    /// answers `None`, since the row outliving its own deadline is normal.
+    pub async fn member_timeout(&self, user_id: UserId) -> anyhow::Result<Option<MemberTimeout>> {
+        let now = now_ms();
+        let row = sqlx::query!(
+            r#"SELECT until, reason, issued_by AS "issued_by?: UserId", issued_at
+               FROM member_timeouts WHERE user_id = ? AND until > ?"#,
+            user_id,
+            now
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| MemberTimeout {
+            user_id,
+            until: r.until,
+            reason: r.reason,
+            issued_by: r.issued_by,
+            issued_at: r.issued_at,
+        }))
+    }
+
+    /// When this member's timeout lifts, or `None` if they are not timed out.
+    /// The cheap read the profile and member-list responses carry.
+    pub async fn timed_out_until(&self, user_id: UserId) -> anyhow::Result<Option<i64>> {
+        let now = now_ms();
+        let row = sqlx::query_scalar!(
+            "SELECT until FROM member_timeouts WHERE user_id = ? AND until > ?",
+            user_id,
+            now
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    /// What to subtract from this member's permissions, everywhere.
+    pub(super) async fn timeout_deny(&self, user_id: UserId) -> anyhow::Result<Permissions> {
+        Ok(match self.timed_out_until(user_id).await? {
+            Some(_) => TIMEOUT_DENY,
+            None => Permissions::NONE,
+        })
+    }
+
+    /// Which of `candidates` are timed out and until when, in one query.
+    ///
+    /// Batched for the same reason the role lookups beside it are: push
+    /// fan-out and the member list both ask about many people at once, and a
+    /// per-candidate query would restore exactly the N+1 those paths exist to
+    /// remove. Absent from the map means not timed out.
+    pub async fn timed_out_among_until(
+        &self,
+        candidates: &[UserId],
+    ) -> anyhow::Result<HashMap<UserId, i64>> {
+        if candidates.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let now = now_ms();
+        // Built rather than a fixed `query!` because the id list is variable
+        // length and SQLite has no array binding.
+        let mut builder =
+            sqlx::QueryBuilder::new("SELECT user_id, until FROM member_timeouts WHERE until > ");
+        builder.push_bind(now);
+        builder.push(" AND user_id IN (");
+        let mut separated = builder.separated(", ");
+        for id in candidates {
+            separated.push_bind(*id);
+        }
+        builder.push(")");
+
+        use sqlx::Row;
+        let rows = builder.build().fetch_all(&self.pool).await?;
+        let mut out = HashMap::new();
+        for row in rows {
+            out.insert(row.try_get("user_id")?, row.try_get("until")?);
+        }
+        Ok(out)
+    }
+}

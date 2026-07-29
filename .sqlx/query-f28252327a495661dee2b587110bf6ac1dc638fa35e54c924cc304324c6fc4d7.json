@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) AS \"count!: i64\" FROM users u\n           WHERE u.deleted_at IS NULL\n           AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = u.id) AND (\n               EXISTS (SELECT 1 FROM roles WHERE is_everyone = 1 AND (permissions & ?) != 0)\n               OR EXISTS (\n                   SELECT 1 FROM member_roles mr JOIN roles r ON r.id = mr.role_id\n                   WHERE mr.user_id = u.id AND (r.permissions & ?) != 0\n               )\n           )",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f28252327a495661dee2b587110bf6ac1dc638fa35e54c924cc304324c6fc4d7"
+}

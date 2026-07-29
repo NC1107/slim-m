@@ -28,6 +28,7 @@ mod emoji;
 mod error;
 mod extract;
 mod invites;
+mod members;
 mod messages;
 mod overwrites;
 mod pins;
@@ -73,6 +74,7 @@ pub fn router(state: AppState) -> Router {
         .merge(channels::routes())
         .merge(emoji::routes())
         .merge(invites::routes())
+        .merge(members::routes())
         .merge(messages::routes())
         .merge(overwrites::routes())
         .merge(presence::routes())

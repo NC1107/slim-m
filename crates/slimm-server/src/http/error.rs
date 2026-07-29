@@ -164,6 +164,8 @@ impl From<OpenError> for ApiError {
         match err {
             // The account vanished mid-login; treat it as a failed credential.
             OpenError::AccountGone => ApiError::Unauthorized,
+            // 403 because the credentials were right; retrying cannot help.
+            OpenError::Removed => ApiError::Forbidden,
             OpenError::Internal(e) => {
                 tracing::error!(error = %e, "opening a session failed");
                 ApiError::Internal
