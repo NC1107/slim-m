@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/NC1107/slim-m/compare/client-v0.10.0...client-v0.10.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* **client:** the full-screen audit round - settings, admin, entry, and the reading cap ([#126](https://github.com/NC1107/slim-m/issues/126)) ([9d30771](https://github.com/NC1107/slim-m/commit/9d30771a30e06c6819031cc6b268e74cf562bcb0))
+
 ## [0.10.0](https://github.com/NC1107/slim-m/compare/client-v0.9.0...client-v0.10.0) (2026-07-29)
 
 
