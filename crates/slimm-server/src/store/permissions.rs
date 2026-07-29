@@ -406,6 +406,90 @@ impl Store {
         Ok(viewers)
     }
 
+    /// The channels this user can view, in rail order: [`Store::list_channels`]
+    /// filtered by VIEW_CHANNEL with the caller's role context loaded once.
+    ///
+    /// The handler used to ask [`Self::has_permission`] per channel, which
+    /// re-fetched the channel row it already held and the same role context
+    /// every iteration - 1 + 4C queries for C channels on a request every
+    /// client fires at startup. This is four queries however many channels
+    /// exist, evaluated by the same pure [`evaluate`].
+    pub async fn visible_channels(&self, user_id: UserId) -> anyhow::Result<Vec<super::Channel>> {
+        let channels = self.list_channels().await?;
+        if channels.is_empty() {
+            return Ok(channels);
+        }
+        let roles = self.load_roles(user_id).await?;
+
+        // One query for every listed channel's overwrites; built because the
+        // id list is variable length and SQLite has no array binding.
+        let mut builder = sqlx::QueryBuilder::new(
+            "SELECT channel_id, target_type, target_id, allow, deny \
+             FROM channel_overwrites WHERE channel_id IN (",
+        );
+        let mut separated = builder.separated(", ");
+        for channel in &channels {
+            separated.push_bind(channel.id);
+        }
+        builder.push(")");
+        let rows = builder.build().fetch_all(&self.pool).await?;
+
+        use sqlx::Row;
+        use std::collections::HashMap;
+        struct RawOverwrite {
+            target_type: String,
+            target_id: Uuid,
+            overwrite: Overwrite,
+        }
+        let mut by_channel: HashMap<Uuid, Vec<RawOverwrite>> = HashMap::new();
+        for row in rows {
+            let channel_id: Uuid = row.try_get("channel_id")?;
+            by_channel
+                .entry(channel_id)
+                .or_default()
+                .push(RawOverwrite {
+                    target_type: row.try_get("target_type")?,
+                    target_id: row.try_get("target_id")?,
+                    overwrite: Overwrite {
+                        allow: row.try_get("allow")?,
+                        deny: row.try_get("deny")?,
+                    },
+                });
+        }
+
+        let empty = Vec::new();
+        Ok(channels
+            .into_iter()
+            .filter(|channel| {
+                let mut everyone_overwrite = None;
+                let mut role_overwrites = Vec::new();
+                let mut member_overwrite = None;
+                for raw in by_channel.get(&channel.id.0).unwrap_or(&empty) {
+                    match raw.target_type.as_str() {
+                        "role" if Some(raw.target_id) == roles.everyone_id => {
+                            everyone_overwrite = Some(raw.overwrite);
+                        }
+                        "role" if roles.role_ids.contains(&raw.target_id) => {
+                            role_overwrites.push(raw.overwrite);
+                        }
+                        "member" if raw.target_id == user_id.0 => {
+                            member_overwrite = Some(raw.overwrite);
+                        }
+                        _ => {}
+                    }
+                }
+                evaluate(
+                    roles.everyone_perms,
+                    &roles.role_perms,
+                    everyone_overwrite,
+                    &role_overwrites,
+                    member_overwrite,
+                )
+                .contains(Permissions::VIEW_CHANNEL)
+            })
+            .collect())
+    }
+
     /// Whether the user holds every bit in `needed` in this channel.
     pub async fn has_permission(
         &self,

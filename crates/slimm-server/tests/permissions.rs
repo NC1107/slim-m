@@ -242,3 +242,53 @@ async fn viewers_among_matches_the_per_user_check() {
     let ghost = slimm_server::ids::ChannelId::generate();
     assert!(s.viewers_among(ghost, &everyone).await.unwrap().is_empty());
 }
+
+/// The batched channel listing must be indistinguishable from filtering
+/// [`Store::list_channels`] with [`Store::has_permission`] per channel; the
+/// rail is built from this on every client startup.
+#[tokio::test]
+async fn visible_channels_matches_the_per_channel_check() {
+    let (s, _guard) = store().await;
+    let everyone_id = s.create_role("everyone", VIEW, true).await.unwrap();
+    let mod_role = s.create_role("mod", SEND, false).await.unwrap();
+
+    let member = s.create_user("member", "Member").await.unwrap();
+    let modded = s.create_user("modded", "Modded").await.unwrap();
+    s.assign_role(modded.id, mod_role).await.unwrap();
+
+    let open = s.create_channel("open", "text").await.unwrap();
+    let staff = s.create_channel("staff", "text").await.unwrap();
+    let restored = s.create_channel("restored", "text").await.unwrap();
+    // staff: @everyone denied VIEW, mod role regrants it.
+    s.set_role_overwrite(staff.id, everyone_id, NONE, VIEW)
+        .await
+        .unwrap();
+    s.set_role_overwrite(staff.id, mod_role, VIEW, NONE)
+        .await
+        .unwrap();
+    // restored: @everyone denied, one member individually regranted.
+    s.set_role_overwrite(restored.id, everyone_id, NONE, VIEW)
+        .await
+        .unwrap();
+    s.set_member_overwrite(restored.id, member.id, VIEW, NONE)
+        .await
+        .unwrap();
+
+    for user in [member.id, modded.id] {
+        let batched: Vec<_> = s
+            .visible_channels(user)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+        for channel in [open.id, staff.id, restored.id] {
+            let single = s.has_permission(user, channel, VIEW).await.unwrap();
+            assert_eq!(
+                batched.contains(&channel),
+                single,
+                "batched and per-channel answers diverged for {user:?} in {channel:?}"
+            );
+        }
+    }
+}
