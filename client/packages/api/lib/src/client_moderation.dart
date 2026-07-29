@@ -61,3 +61,69 @@ extension SlimmApiModeration on SlimmApi {
   Future<void> revokeInvite(String code) =>
       _send('DELETE', '/invites/$code', expectNoContent: true);
 }
+
+/// Moderating a member: a timeout that lapses on its own, and a removal that
+/// does not.
+///
+/// Both refuse on yourself, and on a member whose permissions yours do not
+/// already contain - the rule standing in for the role hierarchy this product
+/// does not have. Neither is something a client should try to pre-empt beyond
+/// hiding the control; the server decides.
+extension SlimmApiMemberModeration on SlimmApi {
+  /// Times a member out for [duration]. Requires KICK_MEMBERS.
+  ///
+  /// A timeout takes away sending, reacting, attaching and joining or
+  /// speaking in voice, and takes away nothing else: they keep reading.
+  /// Returns when it lifts, in Unix milliseconds. Re-issuing replaces any
+  /// timeout already in force, which is also how one is shortened.
+  Future<int> timeOutMember({
+    required String userId,
+    required Duration duration,
+    String? reason,
+  }) async {
+    final json = await _send(
+      'PUT',
+      '/members/$userId/timeout',
+      body: {
+        'duration_seconds': duration.inSeconds,
+        if (reason != null) 'reason': reason,
+      },
+    );
+    return (json as Map<String, dynamic>)['until'] as int;
+  }
+
+  /// Lifts a member's timeout. Requires KICK_MEMBERS. Idempotent.
+  Future<void> liftMemberTimeout(String userId) => _send(
+        'DELETE',
+        '/members/$userId/timeout',
+        expectNoContent: true,
+      );
+
+  /// Removes a member from the Space. Requires BAN_MEMBERS.
+  ///
+  /// Revokes their sessions, stops them signing in, revokes invites they
+  /// handed out, and drops them from the member list. Everything they wrote
+  /// stays, still attributed to them.
+  Future<void> removeMember({required String userId, String? reason}) => _send(
+        'PUT',
+        '/members/$userId/removal',
+        body: {if (reason != null) 'reason': reason},
+        expectNoContent: true,
+      );
+
+  /// Lets a removed member back in. Requires BAN_MEMBERS. 404 if they were
+  /// not removed, so an undo is distinguishable from a no-op.
+  Future<void> restoreMember(String userId) => _send(
+        'DELETE',
+        '/members/$userId/removal',
+        expectNoContent: true,
+      );
+
+  /// Every removal in force, newest first. Requires BAN_MEMBERS.
+  Future<List<SpaceRemoval>> listRemovedMembers() async {
+    final json = await _send('GET', '/members/removed');
+    return (json as List<dynamic>)
+        .map((r) => SpaceRemoval.fromJson(r as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+}

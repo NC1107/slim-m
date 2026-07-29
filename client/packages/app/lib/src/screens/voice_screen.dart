@@ -11,9 +11,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../providers/member_presence.dart' show membersProvider, presenceOf;
+import '../providers/presence_controller.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_roster.dart';
 import '../widgets/call_participant_tiles.dart';
+import '../widgets/member_profile.dart';
 import '../widgets/local_screen_share_banner.dart';
 import '../widgets/screen_share_stage.dart';
 import '../widgets/user_avatar.dart';
@@ -371,7 +374,10 @@ class _InCall extends ConsumerWidget {
                     runSpacing: AppSpacing.s16,
                     children: [
                       for (final p in voice.participants)
-                        CallParticipantTile(participant: p),
+                        CallParticipantTile(
+                          participant: p,
+                          onTap: () => _openProfile(context, ref, p),
+                        ),
                     ],
                   ),
                 )
@@ -393,6 +399,35 @@ class _InCall extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Opens a caller's profile from their tile, which is the only route to the
+/// per-participant volume control that does not go via the member pane.
+///
+/// The roster carries an identity and a name, not a profile, so the member
+/// list is where the rest comes from. Absent from it (a member past the
+/// page cap) means no profile to show rather than a wrong one, so nothing
+/// opens - the alternative is a popover whose moderation half is missing
+/// with no way to tell that it is.
+void _openProfile(
+  BuildContext context,
+  WidgetRef ref,
+  VoiceParticipant participant,
+) {
+  if (participant.isLocal) return;
+  final profile = ref
+      .read(membersProvider)
+      .valueOrNull
+      ?.where((m) => m.id == participant.identity)
+      .firstOrNull;
+  if (profile == null) return;
+
+  showMemberProfile(
+    context,
+    ref,
+    profile: profile,
+    status: presenceOf(ref.read(presenceControllerProvider)[profile.id]),
+  );
 }
 
 class _ParticipantRow extends StatelessWidget {

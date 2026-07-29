@@ -174,3 +174,40 @@ class InviteCommunity {
         expiresAt: json['expires_at'] as int?,
       );
 }
+
+/// A member removed from the Space, as the administration screen that
+/// reverses it sees them.
+///
+/// Carries their name because `GET /members` deliberately no longer does:
+/// this listing is the only place a removed member is still nameable.
+class SpaceRemoval {
+  const SpaceRemoval({
+    required this.userId,
+    required this.username,
+    required this.displayName,
+    required this.removedAt,
+    this.reason,
+    this.removedBy,
+  });
+
+  final String userId;
+  final String username;
+  final String displayName;
+
+  /// Unix milliseconds.
+  final int removedAt;
+
+  final String? reason;
+
+  /// Null once the removing moderator's own account is deleted.
+  final String? removedBy;
+
+  factory SpaceRemoval.fromJson(Map<String, dynamic> json) => SpaceRemoval(
+        userId: json['user_id'] as String,
+        username: json['username'] as String,
+        displayName: json['display_name'] as String,
+        removedAt: json['removed_at'] as int,
+        reason: json['reason'] as String?,
+        removedBy: json['removed_by'] as String?,
+      );
+}

@@ -23,6 +23,19 @@ import 'package:slimm_rtc/rtc.dart';
 /// The controls take their [VoiceState] as a parameter, so the session behind
 /// the controller never has to reach any of these states itself.
 class _InertSession implements VoiceSession {
+  @override
+  bool get supportsParticipantVolume => true;
+
+  final Map<String, double> _volumes = {};
+
+  @override
+  double volumeFor(String identity) => _volumes[identity] ?? 1.0;
+
+  @override
+  Future<void> setVolumeFor(String identity, double volume) async {
+    _volumes[identity] = volume.clamp(0.0, 2.0);
+  }
+
   final _states = StreamController<VoiceSessionState>.broadcast();
   final _participants = StreamController<List<VoiceParticipant>>.broadcast();
 

@@ -55,6 +55,19 @@ http.Client _voiceTokenClient() => MockClient((request) async {
 /// Implemented rather than subclassed so a new member on the real session is
 /// a compile error here, matching `voice_controller_test.dart`'s own fake.
 class _FakeSession implements VoiceSession {
+  @override
+  bool get supportsParticipantVolume => true;
+
+  final Map<String, double> _volumes = {};
+
+  @override
+  double volumeFor(String identity) => _volumes[identity] ?? 1.0;
+
+  @override
+  Future<void> setVolumeFor(String identity, double volume) async {
+    _volumes[identity] = volume.clamp(0.0, 2.0);
+  }
+
   final _states = StreamController<VoiceSessionState>.broadcast();
   final _participants = StreamController<List<VoiceParticipant>>.broadcast();
 

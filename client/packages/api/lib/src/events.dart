@@ -92,6 +92,14 @@ sealed class ServerEvent {
           userId: decoded['user_id'] as String,
           status: _presenceStateOf(decoded['status'])!,
         ),
+      'member.timeout' when decoded['user_id'] is String =>
+        MemberTimeoutChanged(
+          userId: decoded['user_id'] as String,
+          // Absent and null both mean "no timeout", which is what a lift sends.
+          until: decoded['until'] as int?,
+        ),
+      'member.removed' when decoded['user_id'] is String =>
+        MemberRemoved(userId: decoded['user_id'] as String),
       'typing.started'
           when decoded['channel_id'] is String &&
               decoded['user_id'] is String =>

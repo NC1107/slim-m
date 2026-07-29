@@ -61,6 +61,12 @@ abstract final class AppIcons {
   static const IconData mic = LucideIcons.mic300;
   static const IconData micOff = LucideIcons.micOff300;
   static const IconData headphones = LucideIcons.headphones300;
+
+  /// Hearing one person, and not hearing them. Distinct from [mic]/[micOff],
+  /// which are about your own microphone: these two are about what reaches
+  /// your ears, so a call site that confuses them says the opposite thing.
+  static const IconData speaker = LucideIcons.volume2300;
+  static const IconData speakerOff = LucideIcons.volumeX300;
   static const IconData camera = LucideIcons.video300;
   static const IconData screenShare = LucideIcons.monitorUp300;
   static const IconData leaveCall = LucideIcons.phoneOff300;

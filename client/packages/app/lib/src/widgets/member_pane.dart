@@ -46,6 +46,8 @@ class AppMemberPane extends ConsumerWidget {
     ref.watch(presenceSeedProvider);
     // Purely a side-effect subscription: no value of its own, only a possible invalidate on membersProvider.
     ref.watch(memberRosterKeepAliveProvider);
+    // Same shape: a timeout or a removal makes a row on screen wrong.
+    ref.watch(memberModerationWatcherProvider);
     final presence = ref.watch(presenceControllerProvider);
     final myId = ref.watch(meProvider).valueOrNull?.id;
 

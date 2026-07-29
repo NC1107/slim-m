@@ -74,6 +74,24 @@ final memberRosterKeepAliveProvider = Provider.autoDispose<void>((ref) {
   });
 });
 
+/// Refetches the roster when a moderation event says one of its rows is now
+/// wrong: somebody was timed out (their badge belongs on screen), had a
+/// timeout lifted, or was removed (they belong off it).
+///
+/// Its own provider rather than another branch in
+/// [memberRosterKeepAliveProvider], because that one exists to *infer* a join
+/// nothing announces and is hedged accordingly - it gives up on a full page
+/// and debounces bursts. These events are explicit and exact, so neither
+/// hedge applies, and folding them in would inherit both.
+final memberModerationWatcherProvider = Provider.autoDispose<void>((ref) {
+  final sub = ref.read(liveEventsProvider).listen((event) {
+    if (event is api.MemberTimeoutChanged || event is api.MemberRemoved) {
+      ref.invalidate(membersProvider);
+    }
+  });
+  ref.onDispose(() => unawaited(sub.cancel()));
+});
+
 /// The design-system status a server [api.PresenceState] renders as. Both
 /// [PresenceState.away] and [PresenceState.dnd] still group under "online"
 /// below (see [groupMembersByPresence]): each is reachable in some capacity,

@@ -5,14 +5,16 @@
 /// the same content: the member pane, a message author, and the call roster
 /// all open this rather than each growing its own menu.
 ///
-/// The sections compose in a fixed order - header, call, social verbs,
-/// moderation, block - and a section you have no rights or context for is
-/// *absent* rather than present-and-disabled, which is what keeps a plain
-/// member's popover to two verbs instead of a wall of greyed rows.
+/// The sections compose in a fixed order - header, timeout badge, call,
+/// social verbs, moderation, block - and a section you have no rights or
+/// context for is *absent* rather than present-and-disabled, which is what
+/// keeps a plain member's popover to two verbs instead of a wall of greyed
+/// rows.
 ///
-/// Everything in the call section is local to this listener and never
-/// reaches the room; anything room-visible would sit under the moderation
-/// label, which is why "Mute for me" is named the way it is.
+/// Everything in the call section is local to this listener and never reaches
+/// the room; anything room-visible sits under the MODERATION label, which is
+/// why "Mute for me" is named the way it is and why a timeout is not next to
+/// it.
 library;
 
 import 'dart:async';
@@ -24,12 +26,18 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../permissions.dart';
+import '../providers/admin_providers.dart';
 import '../providers/dms.dart';
+import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
+import 'confirm_dialog.dart';
 import 'member_actions.dart';
-import 'user_avatar.dart';
+import 'member_profile_sections.dart';
+import 'member_roles_sheet.dart';
+import 'run_guarded.dart';
 
 /// The popover's width on a pointer layout, from the design.
 const double _popoverWidth = 280;
@@ -46,8 +54,12 @@ Future<void> showMemberProfile(
   required api.UserProfile profile,
   required AppPresence status,
   String? mentionChannelName,
+  String? callChannelName,
 }) {
+  // Read before anything pops: a popped context has no navigator above it.
+  final host = Navigator.of(anchor, rootNavigator: true).context;
   final compact = MediaQuery.sizeOf(anchor).width < kCompactWidth;
+
   if (compact) {
     return showModalBottomSheet<void>(
       context: anchor,
@@ -59,7 +71,9 @@ Future<void> showMemberProfile(
           profile: profile,
           status: status,
           mentionChannelName: mentionChannelName,
+          callChannelName: callChannelName,
           compact: true,
+          host: host,
           onDone: () => Navigator.of(context).pop(),
         ),
       ),
@@ -86,7 +100,9 @@ Future<void> showMemberProfile(
         profile: profile,
         status: status,
         mentionChannelName: mentionChannelName,
+        callChannelName: callChannelName,
         compact: false,
+        host: host,
         onDone: () => Navigator.of(context).pop(),
       ),
     ),
@@ -154,7 +170,7 @@ class _AnchoredPopover extends StatelessWidget {
 }
 
 /// The sections themselves, shared by both presentations.
-class MemberProfileBody extends ConsumerWidget {
+class MemberProfileBody extends ConsumerStatefulWidget {
   const MemberProfileBody({
     super.key,
     required this.profile,
@@ -162,6 +178,8 @@ class MemberProfileBody extends ConsumerWidget {
     required this.compact,
     required this.onDone,
     this.mentionChannelName,
+    this.callChannelName,
+    this.host,
   });
 
   final api.UserProfile profile;
@@ -171,36 +189,124 @@ class MemberProfileBody extends ConsumerWidget {
   /// there is no channel in view, and the row goes with it.
   final String? mentionChannelName;
 
+  /// The voice channel shared with this member, so the header can say "in
+  /// lounge with you" instead of restating a presence everyone can see.
+  final String? callChannelName;
+
   final bool compact;
   final VoidCallback onDone;
 
+  /// A context that outlives this surface, for anything that opens a second
+  /// one after this closes. Without it a follow-up sheet looks a navigator up
+  /// through a context whose route has already popped, which throws.
+  final BuildContext? host;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MemberProfileBody> createState() => _MemberProfileBodyState();
+}
+
+class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
+    with GuardedActionState<MemberProfileBody> {
+  api.UserProfile get _profile {
+    // Live, so a timeout applied here repaints as the badge without reopening.
+    final live = ref
+        .watch(membersProvider)
+        .valueOrNull
+        ?.where((m) => m.id == widget.profile.id)
+        .firstOrNull;
+    return live ?? widget.profile;
+  }
+
+  Future<void> _timeOut(Duration duration) async {
+    final ok = await guard(
+      whatFailed: 'time this member out',
+      action: () => ref
+          .read(apiProvider)
+          .timeOutMember(userId: widget.profile.id, duration: duration),
+    );
+    if (ok && mounted) ref.invalidate(membersProvider);
+  }
+
+  Future<void> _liftTimeout() async {
+    final ok = await guard(
+      whatFailed: 'lift the timeout',
+      action: () => ref.read(apiProvider).liftMemberTimeout(widget.profile.id),
+    );
+    if (ok && mounted) ref.invalidate(membersProvider);
+  }
+
+  Future<void> _remove(BuildContext host) async {
+    final name = widget.profile.displayName;
+    final confirmed = await confirmDangerousAction(
+      host,
+      title: 'Remove $name from this Space?',
+      // Says what it does and does not do; "remove" misleads in both directions.
+      message:
+          'They will be signed out and cannot sign in again, and any '
+          'invites they handed out stop working. Everything they wrote stays, '
+          'still shown as theirs. You can let them back in later.',
+      confirmLabel: 'Remove',
+    );
+    if (!confirmed) return;
+    await runGuarded(
+      whatFailed: 'remove $name',
+      action: () =>
+          ref.read(apiProvider).removeMember(userId: widget.profile.id),
+    ).then((failure) {
+      if (failure == null) {
+        ref.invalidate(membersProvider);
+      } else if (host.mounted) {
+        ScaffoldMessenger.of(
+          host,
+        ).showSnackBar(SnackBar(content: Text(failure)));
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = _profile;
     final me = ref.watch(meProvider).valueOrNull;
     final isSelf = me?.id == profile.id;
+    final mine = ref.watch(myPermissionsProvider);
     final voice = ref.watch(voiceControllerProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
+    final host = widget.host ?? context;
+
     // The call section exists only while you share a call: it is about your ears in this room, not the person.
     final inCallTogether =
         voice.state == VoiceSessionState.connected &&
         voice.participants.any((p) => p.identity == profile.id && !p.isLocal);
 
+    final canTimeOut = !isSelf && mine.hasPermission(Perm.kickMembers);
+    final canRemove = !isSelf && mine.hasPermission(Perm.banMembers);
+    final canManageRoles = !isSelf && mine.hasPermission(Perm.manageRoles);
+    final showModeration = canTimeOut || canRemove || canManageRoles;
+
     void run(Future<void> Function() action) {
-      onDone();
+      widget.onDone();
       unawaited(action());
     }
 
     final rows = <Widget>[
-      _Header(
+      MemberProfileHeader(
         profile: profile,
-        status: status,
+        status: widget.status,
         isSelf: isSelf,
         inCallTogether: inCallTogether,
+        callChannelName: widget.callChannelName,
       ),
+
+      if (profile.timedOutUntil != null)
+        MemberTimeoutBadge(
+          until: profile.timedOutUntil!,
+          onLift: canTimeOut ? _liftTimeout : null,
+        ),
+
       const AppMenuDivider(),
 
       if (inCallTogether) ...[
-        _LocalAudioSection(profile: profile, controller: controller),
+        MemberLocalAudioSection(identity: profile.id, controller: controller),
         const AppMenuDivider(),
       ],
 
@@ -209,8 +315,8 @@ class MemberProfileBody extends ConsumerWidget {
           label: 'Profile settings',
           leading: AppIcons.settings,
           onTap: () {
-            onDone();
-            context.push(Routes.personalSettings);
+            widget.onDone();
+            host.push(Routes.personalSettings);
           },
         ),
       ] else ...[
@@ -219,17 +325,45 @@ class MemberProfileBody extends ConsumerWidget {
           leading: AppIcons.send,
           onTap: () => run(() async {
             final channelId = await openDirectMessage(ref, profile.id);
-            if (context.mounted) context.go(Routes.channel(channelId));
+            if (host.mounted) host.go(Routes.channel(channelId));
           }),
         ),
-        if (mentionChannelName != null)
+        if (widget.mentionChannelName != null)
           AppMenuItem(
-            label: 'Mention in #$mentionChannelName',
+            label: 'Mention in #${widget.mentionChannelName}',
             leading: AppIcons.hash,
             onTap: () {
-              onDone();
+              widget.onDone();
               ref.read(pendingMentionProvider.notifier).state =
                   profile.username;
+            },
+          ),
+      ],
+
+      if (showModeration) ...[
+        const AppMenuDivider(),
+        const AppMenuLabel('Moderation'),
+        if (canManageRoles)
+          AppMenuItem(
+            label: 'Roles...',
+            leading: AppIcons.shield,
+            submenu: true,
+            onTap: () {
+              widget.onDone();
+              unawaited(showMemberRolesSheet(host, profile.id));
+            },
+          ),
+        // Absent while one is in force: the badge above already carries it.
+        if (canTimeOut && profile.timedOutUntil == null)
+          TimeoutDurationChips(onChosen: _timeOut),
+        if (canRemove)
+          AppMenuItem(
+            label: 'Remove from Space...',
+            leading: AppIcons.signOut,
+            tone: AppMenuItemTone.danger,
+            onTap: () {
+              widget.onDone();
+              unawaited(_remove(host));
             },
           ),
       ],
@@ -239,18 +373,27 @@ class MemberProfileBody extends ConsumerWidget {
         AppMenuItem(
           label: 'Report user',
           leading: AppIcons.report,
-          onTap: () => run(() => reportMember(context, ref, profile)),
+          onTap: () => run(() => reportMember(host, ref, profile)),
         ),
         AppMenuItem(
           label: 'Block',
           leading: AppIcons.revoke,
           tone: AppMenuItemTone.danger,
-          onTap: () => run(() => blockMember(context, ref, profile)),
+          onTap: () => run(() => blockMember(host, ref, profile)),
         ),
       ],
+
+      if (actionError != null)
+        Padding(
+          padding: const EdgeInsets.all(AppSpacing.s8),
+          child: AppErrorState(
+            message: actionError!,
+            onDismiss: clearActionError,
+          ),
+        ),
     ];
 
-    if (compact) {
+    if (widget.compact) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.s8,
@@ -262,118 +405,5 @@ class MemberProfileBody extends ConsumerWidget {
       );
     }
     return AppMenu(width: _popoverWidth, children: rows);
-  }
-}
-
-/// Avatar, name, role badge, and the presence word beside its dot - never
-/// the dot alone, which is the same rule the member pane follows.
-class _Header extends StatelessWidget {
-  const _Header({
-    required this.profile,
-    required this.status,
-    required this.isSelf,
-    required this.inCallTogether,
-  });
-
-  final api.UserProfile profile;
-  final AppPresence status;
-  final bool isSelf;
-  final bool inCallTogether;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final badge = profile.roles.isEmpty ? null : profile.roles.first;
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.s12),
-      child: Row(
-        children: [
-          UserAvatar(
-            userId: profile.id,
-            avatarUpdatedAt: profile.avatarUpdatedAt,
-            name: profile.displayName,
-            size: 44,
-            speaking: inCallTogether,
-          ),
-          const SizedBox(width: AppSpacing.s12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        profile.displayName,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.body.copyWith(
-                          color: tokens.textPrimary,
-                          fontWeight: AppWeights.semi,
-                        ),
-                      ),
-                    ),
-                    if (badge != null) ...[
-                      const SizedBox(width: AppSpacing.s8),
-                      AppBadge(variant: AppBadgeVariant.role, label: badge),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    AppStatusDot(status: status),
-                    const SizedBox(width: AppSpacing.s8),
-                    Flexible(
-                      child: Text(
-                        isSelf
-                            ? '${_presenceWord(status)} - you'
-                            : _presenceWord(status),
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.caption.copyWith(
-                          color: tokens.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-String _presenceWord(AppPresence status) => switch (status) {
-  AppPresence.online => 'online',
-  AppPresence.away => 'away',
-  AppPresence.dnd => 'do not disturb',
-  AppPresence.offline => 'offline',
-  AppPresence.hidden => 'appearing offline',
-};
-
-/// What this listener can do about hearing them, all of it local.
-///
-/// The design's 0-200% volume slider is not here: livekit_client 2.8.1
-/// exposes no per-participant gain, only whether a track plays at all, so a
-/// slider would be a control that does nothing between its ends. The mute
-/// half is real and ships; the slider waits for the capability.
-class _LocalAudioSection extends StatelessWidget {
-  const _LocalAudioSection({required this.profile, required this.controller});
-
-  final api.UserProfile profile;
-  final VoiceController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = controller.isLocallyMuted(profile.id);
-    return AppMenuItem(
-      label: muted ? 'Unmute for me' : 'Mute for me',
-      leading: muted ? AppIcons.micOff : AppIcons.mic,
-      selected: muted,
-      onTap: () => controller.setLocallyMuted(profile.id, !muted),
-    );
   }
 }

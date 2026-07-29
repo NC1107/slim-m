@@ -36,6 +36,13 @@ final invitesProvider = FutureProvider.autoDispose<List<api.Invite>>(
   (ref) => ref.watch(apiProvider).listInvites(),
 );
 
+/// Everyone removed from the Space, newest first. The only list that still
+/// names them: `GET /members` deliberately drops them.
+final removedMembersProvider =
+    FutureProvider.autoDispose<List<api.SpaceRemoval>>(
+      (ref) => ref.watch(apiProvider).listRemovedMembers(),
+    );
+
 /// Every role.
 final rolesProvider = FutureProvider.autoDispose<List<api.Role>>(
   (ref) => ref.watch(apiProvider).listRoles(),

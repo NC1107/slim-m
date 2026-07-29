@@ -31,6 +31,19 @@ const _tokens = TokenPair(
 /// A [VoiceSession] this file never actually drives into a call: every test
 /// here cares only about a failed `join`, before any session state matters.
 class _NoopSession implements VoiceSession {
+  @override
+  bool get supportsParticipantVolume => true;
+
+  final Map<String, double> _volumes = {};
+
+  @override
+  double volumeFor(String identity) => _volumes[identity] ?? 1.0;
+
+  @override
+  Future<void> setVolumeFor(String identity, double volume) async {
+    _volumes[identity] = volume.clamp(0.0, 2.0);
+  }
+
   final _states = StreamController<VoiceSessionState>.broadcast();
   final _participants = StreamController<List<VoiceParticipant>>.broadcast();
 
