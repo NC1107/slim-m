@@ -231,6 +231,20 @@ impl Store {
             .remove(self.timeout_deny(user_id).await?))
     }
 
+    /// [`Self::permissions_in_channel`] before the timeout subtraction, for a
+    /// caller that needs the unmasked grant itself - the per-channel sibling
+    /// of [`Self::granted_base_permissions`], and for the same reason: an
+    /// actor-versus-target escalation check has to compare what a target's
+    /// roles and overwrites grant them, not what a timeout already in force
+    /// has left them with.
+    pub async fn granted_permissions_in_channel(
+        &self,
+        user_id: UserId,
+        channel_id: ChannelId,
+    ) -> anyhow::Result<Permissions> {
+        self.granted_in_channel(user_id, channel_id).await
+    }
+
     /// [`Self::permissions_in_channel`] before the timeout subtraction.
     ///
     /// Split out rather than masking inline so that both the role path and

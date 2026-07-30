@@ -254,6 +254,8 @@ async fn unknown_permission_bits_are_rejected() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
+// See tests/role_escalation.rs: unassign/update/delete above your level.
+
 // --- The last-administrator invariant ---
 
 /// The sole administrator cannot remove their own admin role: that would
@@ -293,46 +295,29 @@ async fn cannot_unassign_the_last_administrator() {
 }
 
 /// Deleting the role that is the deployment's only source of ADMINISTRATOR is
-/// refused the same way removing the assignment is, even though the caller
-/// (holding only MANAGE_ROLES via a second role) is not trying to touch their
-/// own access at all.
+/// refused the same way removing the assignment is, even for the
+/// administrator doing it themselves - the escalation guard cannot be what
+/// refuses this, since an administrator's granted set already contains
+/// whatever the role carries, so it has to be the structural invariant.
+///
+/// A MANAGE_ROLES holder who is not themselves an administrator is refused
+/// earlier and for a different reason now: see
+/// `only_the_administrators_own_bits_let_them_touch_an_administrator_role`,
+/// which pins that as 403 rather than 409 and proves it is not this test in
+/// disguise by leaving a second administrator role in place.
 #[tokio::test]
 async fn cannot_delete_the_only_administrator_role() {
     let (store, _guard) = new_store().await;
     let app = app(store.clone());
     let (admin_token, _admin_id) = register(&store, "alice").await;
-    let (member_token, member_id) = register(&store, "bob").await;
     let admin_role = admin_role_id(&store).await;
-
-    let manager_role = json_body(
-        app.clone()
-            .oneshot(request(
-                "POST",
-                "/roles",
-                Some(&admin_token),
-                Some(json!({ "name": "manager", "permissions": Permissions::MANAGE_ROLES.bits() })),
-            ))
-            .await
-            .unwrap(),
-    )
-    .await;
-    let manager_role_id = manager_role["id"].as_str().unwrap().to_owned();
-    app.clone()
-        .oneshot(request(
-            "PUT",
-            &format!("/members/{member_id}/roles/{manager_role_id}"),
-            Some(&admin_token),
-            None,
-        ))
-        .await
-        .unwrap();
 
     let response = app
         .clone()
         .oneshot(request(
             "DELETE",
             &format!("/roles/{admin_role}"),
-            Some(&member_token),
+            Some(&admin_token),
             None,
         ))
         .await
