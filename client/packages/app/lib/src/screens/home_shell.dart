@@ -18,6 +18,7 @@ import '../providers/voice_controller.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import '../widgets/channel_rail.dart';
+import '../widgets/channel_rail_frame.dart';
 import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/member_pane.dart';
@@ -121,14 +122,15 @@ class HomeShell extends ConsumerWidget {
           width: AppMemberPane.width,
           child: SafeArea(child: AppMemberPane()),
         ),
-        body: showVoiceStrip
-            ? Column(
-                children: [
-                  Expanded(child: child),
-                  const SafeArea(top: false, child: VoiceStripIndicator()),
-                ],
-              )
-            : child,
+        // No rail here either, so the connection bar mounts under the app bar.
+        body: Column(
+          children: [
+            const RailConnectionBar(),
+            Expanded(child: child),
+            if (showVoiceStrip)
+              const SafeArea(top: false, child: VoiceStripIndicator()),
+          ],
+        ),
       );
     } else {
       scaffold = const Scaffold(body: ChannelRail());
