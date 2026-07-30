@@ -290,32 +290,44 @@ class VoiceSession {
   /// `source not found!` while every other setting looked right.
   ///
   /// [lk.ScreenShareCaptureOptions.useiOSBroadcastExtension] is the load-bearing
-  /// flag on iOS. LiveKit's `BroadcastManager` shows the system picker and,
+  /// flag on iOS: LiveKit's `BroadcastManager` shows the system picker and,
   /// once the ReplayKit extension is recording, re-publishes through this same
-  /// path. Without the flag, that second pass leaves flutter_webrtc's
-  /// `getDisplayMedia` unaware a broadcast is already live (it never sees the
-  /// `deviceId: 'broadcast-manual'` hint the flag adds), so it tries to start
-  /// its own - a second picker that fails with "already broadcasting". The
-  /// extension and its Info.plist keys exist precisely for this path; the
-  /// options just never opted in. iOS-only: on desktop the flag is inert and
-  /// [sourceId] carries the chosen screen instead.
+  /// path, and without the flag that second pass starts its own broadcast
+  /// instead of joining the running one ("already broadcasting").
+  ///
+  /// [isIOS] is the platform seam, mirroring how [DesktopSources] is injected
+  /// on this class: null (the production default) asks the real platform, and
+  /// a test supplies its own so both branches are assertable. It stays a
+  /// parameter here rather than an instance field like [DesktopSources]
+  /// because `FakeSession` in `packages/app` `implements` this class, and this
+  /// method's return type is a LiveKit type nothing outside this package may
+  /// otherwise touch. The `broadcast-manual` device id is set here, on
+  /// [isIOS], rather than left to LiveKit's own downstream substitution, which
+  /// re-asks the real platform and so cannot be driven by a fake.
   @visibleForTesting
   static lk.ScreenShareCaptureOptions captureOptionsFor(
     ScreenShareQuality quality,
-    String? sourceId,
-  ) =>
-      lk.ScreenShareCaptureOptions(
-        useiOSBroadcastExtension: lk.lkPlatformIs(lk.PlatformType.iOS),
-        sourceId: sourceId,
-        maxFrameRate: quality.fps.toDouble(),
-        params: lk.VideoParameters(
-          dimensions: lk.VideoDimensions(quality.width, quality.height),
-          encoding: lk.VideoEncoding(
-            maxBitrate: quality.maxBitrate,
-            maxFramerate: quality.fps,
-          ),
+    String? sourceId, {
+    bool? isIOS,
+  }) {
+    final onIOS = isIOS ?? lk.lkPlatformIs(lk.PlatformType.iOS);
+    return lk.ScreenShareCaptureOptions(
+      useiOSBroadcastExtension: onIOS,
+      sourceId: onIOS ? _iosBroadcastManualDeviceId : sourceId,
+      maxFrameRate: quality.fps.toDouble(),
+      params: lk.VideoParameters(
+        dimensions: lk.VideoDimensions(quality.width, quality.height),
+        encoding: lk.VideoEncoding(
+          maxBitrate: quality.maxBitrate,
+          maxFramerate: quality.fps,
         ),
-      );
+      ),
+    );
+  }
+
+  /// LiveKit's own hint for the `BroadcastManager`'s second pass; see
+  /// [captureOptionsFor].
+  static const _iosBroadcastManualDeviceId = 'broadcast-manual';
 
   /// A published screen track is the only thing that means anybody can see a
   /// screen, so it is what both the roster and the outcome above read.

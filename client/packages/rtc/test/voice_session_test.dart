@@ -317,6 +317,7 @@ void main() {
       final options = VoiceSession.captureOptionsFor(
         ScreenShareQuality.balanced,
         'screen-2',
+        isIOS: false,
       );
 
       // LiveKit carries sourceId as deviceId, and it is the only field
@@ -325,26 +326,38 @@ void main() {
     });
 
     test('no source named is left unset rather than defaulted', () {
-      final options =
-          VoiceSession.captureOptionsFor(ScreenShareQuality.balanced, null);
+      final options = VoiceSession.captureOptionsFor(
+        ScreenShareQuality.balanced,
+        null,
+        isIOS: false,
+      );
 
       expect(options.deviceId, isNull);
     });
 
-    test('the iOS broadcast flag tracks the platform, never hardcoded on', () {
-      // On iOS the flag adds deviceId: 'broadcast-manual', which tells
-      // flutter_webrtc to attach to the extension LiveKit's BroadcastManager
-      // already started rather than launching a second broadcast (the "already
-      // broadcasting" failure). On a desktop share that same constant would
-      // clobber the real screen sourceId, so the flag must be false off iOS -
-      // which is what this host is. Guards against a "simplify to true" edit.
+    test('off iOS the flag is false and the real source id survives', () {
+      // A desktop share names its own screen; isIOS must never clobber it.
       final options = VoiceSession.captureOptionsFor(
         ScreenShareQuality.balanced,
         'screen-2',
+        isIOS: false,
       );
 
       expect(options.useiOSBroadcastExtension, isFalse);
       expect(options.deviceId, 'screen-2');
+    });
+
+    test('on iOS the flag is true and the device id is the broadcast hint', () {
+      // Without this exact hint LiveKit's second pass starts a broadcast of
+      // its own, "already broadcasting", instead of joining the running one.
+      final options = VoiceSession.captureOptionsFor(
+        ScreenShareQuality.balanced,
+        null,
+        isIOS: true,
+      );
+
+      expect(options.useiOSBroadcastExtension, isTrue);
+      expect(options.deviceId, 'broadcast-manual');
     });
 
     test('sources are listed through the injected seam, never a global',
