@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.13.0](https://github.com/NC1107/slim-m/compare/client-v0.12.0...client-v0.13.0) (2026-07-30)
+
+
+### Features
+
+* **client:** a real collapsed call strip in the rail ([#143](https://github.com/NC1107/slim-m/issues/143)) ([b51c7b6](https://github.com/NC1107/slim-m/commit/b51c7b63dac6d6d380f94d1661721636445c4633))
+* **client:** inline autocomplete for emoji, mentions and slash commands ([#139](https://github.com/NC1107/slim-m/issues/139)) ([c3d8117](https://github.com/NC1107/slim-m/commit/c3d81177e22e13b32e1865707351531adaf35d3d))
+* **client:** onboarding as an installer, not a card ([#140](https://github.com/NC1107/slim-m/issues/140)) ([009767c](https://github.com/NC1107/slim-m/commit/009767cfdb4e60d91ab04fe9951057e2254e17f4))
+* **client:** settings as a nav beside a pane ([#142](https://github.com/NC1107/slim-m/issues/142)) ([df0a8ca](https://github.com/NC1107/slim-m/commit/df0a8caec75062386ffec6641260e6b8fa037252))
+
+
+### Bug Fixes
+
+* **api:** encode request path segments at the transport choke point ([#153](https://github.com/NC1107/slim-m/issues/153)) ([98564eb](https://github.com/NC1107/slim-m/commit/98564eb2900adfed9a1bd6cd6194c140bb14b9e4))
+* bound the two reads that answered with everything ([#148](https://github.com/NC1107/slim-m/issues/148)) ([eb352cd](https://github.com/NC1107/slim-m/commit/eb352cd26a3c2578c14b0d9685442650b0f28f5d))
+* **client:** bind the identity check to connecting, and the https rule to ([#155](https://github.com/NC1107/slim-m/issues/155)) ([baf7715](https://github.com/NC1107/slim-m/commit/baf7715d68004d114552050a45ce9eb01a12c2f9))
+* **client:** give the snapshot gate real data, real breakpoints and the real app wrapper ([#166](https://github.com/NC1107/slim-m/issues/166)) ([eed75b5](https://github.com/NC1107/slim-m/commit/eed75b5982e10edb640b86b83342bcf61cf25465))
+* **client:** hold a handle that outlives the surface before dismissing it ([#159](https://github.com/NC1107/slim-m/issues/159)) ([c352333](https://github.com/NC1107/slim-m/commit/c35233301ee6efbc438b5d82b8bd27a2f706ce93))
+* **client:** lint the six unlinted packages, and stop inverting 401 and 403 ([#160](https://github.com/NC1107/slim-m/issues/160)) ([147006e](https://github.com/NC1107/slim-m/commit/147006ebdc99ea90714a76bc1454f37928b07c5a))
+* **client:** refuse a plaintext SFU address off a public deployment ([#152](https://github.com/NC1107/slim-m/issues/152)) ([6a27782](https://github.com/NC1107/slim-m/commit/6a27782794a99ea734ba555712a67f83d5073af0))
+* **client:** stop rendering raw transport strings, and route failures through one description ([#167](https://github.com/NC1107/slim-m/issues/167)) ([8ae34cd](https://github.com/NC1107/slim-m/commit/8ae34cd4d551ab9a40fc3b004f01690237b9bbe6))
+* **client:** window the newest messages, and sort a pending send last ([#154](https://github.com/NC1107/slim-m/issues/154)) ([4ba1795](https://github.com/NC1107/slim-m/commit/4ba1795fd5441aa287abaa73fa7e7c5a02da8da0))
+* **design:** pin primary, and give ListTile and inputs the text tokens ([#162](https://github.com/NC1107/slim-m/issues/162)) ([e6bd135](https://github.com/NC1107/slim-m/commit/e6bd1356bbd774d2ce53af4be99eac516a93b0a9))
+* make blocking actually hide what it says it hides ([#147](https://github.com/NC1107/slim-m/issues/147)) ([7cf0618](https://github.com/NC1107/slim-m/commit/7cf0618b2f5b1ee4cda59b2df62a0c01611a1338))
+* name the subject of a report before asking to close it ([#157](https://github.com/NC1107/slim-m/issues/157)) ([4546722](https://github.com/NC1107/slim-m/commit/45467221e564cf122e3dc8a90ce4f1852e92f27f))
+* **rtc:** give captureOptionsFor a platform seam, test both directions ([#172](https://github.com/NC1107/slim-m/issues/172)) ([53b13d4](https://github.com/NC1107/slim-m/commit/53b13d41260648225891f98646774611eda139b4))
+* **server:** publish the role, overwrite and channel events nothing published ([#161](https://github.com/NC1107/slim-m/issues/161)) ([bef83ee](https://github.com/NC1107/slim-m/commit/bef83ee1411fd6e97f365f8d688878a2ecf28b97))
+
 ## [0.12.0](https://github.com/NC1107/slim-m/compare/client-v0.11.0...client-v0.12.0) (2026-07-29)
 
 
