@@ -290,4 +290,179 @@ void main() {
       );
     });
   });
+
+  group('the https rule', () {
+    testWidgets('the manual dialog still refuses a public http address', (
+      tester,
+    ) async {
+      await _pumpOnboarding(
+        tester,
+        versionBody: const {
+          'name': 'slim-m',
+          'version': '0.6.0',
+          'protocol': 1,
+        },
+        onServerChosen: (server, invite) {},
+      );
+
+      await tester.tap(find.text('Connect to a Space'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'http://chat.example.com');
+      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Use https'), findsOneWidget);
+    });
+  });
+
+  group('pinning identity on paths that previously pinned nothing', () {
+    testWidgets('choosing the official Space pins its identity', (
+      tester,
+    ) async {
+      final keyStore = InMemoryKeyStore();
+      final httpClient = MockClient((request) async {
+        if (request.method == 'GET' && request.url.path == '/version') {
+          return http.Response(
+            jsonEncode({
+              'name': 'slim-m',
+              'version': '0.10.0',
+              'protocol': 1,
+              'identity': _identityA,
+            }),
+            200,
+            headers: const {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('{}', 200);
+      });
+
+      Uri? chosen;
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(keyStore),
+          probeApiProvider.overrideWithValue(
+            (baseUrl) => SlimmApi(baseUrl: baseUrl, httpClient: httpClient),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: OnboardingScreen(
+              onServerChosen: (server, invite) => chosen = server,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Join the official Space'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Confirm this server'),
+        findsOneWidget,
+        reason: 'nothing was pinned for the official server before this',
+      );
+      await _tapButton(tester, 'It matches - continue');
+
+      expect(chosen, Uri.parse(officialServer));
+      expect(
+        await keyStore.read('server_identity:$officialServer'),
+        _identityA['public_key'],
+      );
+    });
+
+    testWidgets('redeeming an invite for the first time pins its identity', (
+      tester,
+    ) async {
+      final keyStore = InMemoryKeyStore();
+      final httpClient = MockClient((request) async {
+        if (request.method == 'GET' && request.url.path == '/version') {
+          return http.Response(
+            jsonEncode({
+              'name': 'slim-m',
+              'version': '0.10.0',
+              'protocol': 1,
+              'identity': _identityA,
+            }),
+            200,
+            headers: const {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'GET' && request.url.path.endsWith('/check')) {
+          return http.Response(
+            jsonEncode({
+              'usable': true,
+              'community': {
+                'name': 'Space',
+                'member_count': 3,
+                'invited_by': 'alice',
+                'uses_remaining': null,
+                'expires_at': null,
+              },
+            }),
+            200,
+            headers: const {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('{}', 200);
+      });
+
+      Uri? chosen;
+      String? redeemedCode;
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(keyStore),
+          probeApiProvider.overrideWithValue(
+            (baseUrl) => SlimmApi(baseUrl: baseUrl, httpClient: httpClient),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: OnboardingScreen(
+              onServerChosen: (server, invite) {
+                chosen = server;
+                redeemedCode = invite;
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('I have an invite'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, _server);
+      await tester.enterText(find.byType(TextField).at(1), 'CODE123');
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Confirm this server'),
+        findsOneWidget,
+        reason: 'nothing was pinned for an invited address before this',
+      );
+      await _tapButton(tester, 'It matches - continue');
+
+      expect(chosen, Uri.parse(_server));
+      expect(redeemedCode, 'CODE123');
+      expect(
+        await keyStore.read(_handleFor(_server)),
+        _identityA['public_key'],
+      );
+    });
+  });
 }

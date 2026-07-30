@@ -12,34 +12,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/providers.dart';
+import '../server_scheme_policy.dart';
 import '../widgets/onboarding_shell.dart';
 import '../widgets/server_identity_confirmation.dart';
 
 /// The official instance. Someone with no invite and no server of their own
 /// still needs somewhere to land.
 const officialServer = 'https://slim.npc-server.top';
-
-/// Whether an address is on the loopback interface or a private network.
-///
-/// These are the ranges where plain http is reasonable: a self-hosted box on a
-/// home network cannot get a public certificate for an address that does not
-/// resolve publicly, and the traffic never crosses the internet anyway.
-bool isLocalAddress(Uri address) {
-  final host = address.host;
-  if (host == 'localhost' || host.endsWith('.local')) return true;
-
-  final parts = host.split('.');
-  if (parts.length != 4) return false;
-  final octets = parts.map(int.tryParse).toList();
-  if (octets.any((o) => o == null || o < 0 || o > 255)) return false;
-
-  final [a, b, _, _] = octets.cast<int>();
-  // 127/8 loopback, 10/8, 192.168/16, and 172.16/12 private ranges.
-  return a == 127 ||
-      a == 10 ||
-      (a == 192 && b == 168) ||
-      (a == 172 && b >= 16 && b <= 31);
-}
 
 class OnboardingScreen extends ConsumerWidget {
   const OnboardingScreen({required this.onServerChosen, super.key});
@@ -70,7 +50,7 @@ class OnboardingScreen extends ConsumerWidget {
             icon: AppIcons.invite,
             title: 'I have an invite',
             description: 'Someone sent you a code for their Space.',
-            onTap: () => _redeemFlow(context),
+            onTap: () => _redeemFlow(context, ref),
           ),
           const SizedBox(height: AppSpacing.s12),
           _Entry(
@@ -84,19 +64,27 @@ class OnboardingScreen extends ConsumerWidget {
             icon: AppIcons.members,
             title: 'Join the official Space',
             description: officialServer,
-            onTap: () => onServerChosen(Uri.parse(officialServer), null),
+            onTap: () => _officialFlow(context, ref),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _redeemFlow(BuildContext context) async {
+  /// The dialog validates and pops before this runs, the same order
+  /// [_manualFlow] uses: identity confirmation navigates full-screen, and
+  /// that must never happen underneath a still-open dialog.
+  Future<void> _redeemFlow(BuildContext context, WidgetRef ref) async {
     final result = await showDialog<(Uri, String)>(
       context: context,
       builder: (context) => const _InviteDialog(),
     );
-    if (result != null) onServerChosen(result.$1, result.$2);
+    if (result == null || !context.mounted) return;
+
+    final (server, code) = result;
+    if (await confirmServerIdentity(context, ref, server)) {
+      onServerChosen(server, code);
+    }
   }
 
   Future<void> _manualFlow(BuildContext context, WidgetRef ref) async {
@@ -106,6 +94,16 @@ class OnboardingScreen extends ConsumerWidget {
     );
     if (server == null || !context.mounted) return;
 
+    if (await confirmServerIdentity(context, ref, server)) {
+      onServerChosen(server, null);
+    }
+  }
+
+  /// The official address is a compile-time constant, never user input, so
+  /// there is nothing to validate here beyond confirming its identity - the
+  /// same pin-on-first-connect every other entry point now goes through.
+  Future<void> _officialFlow(BuildContext context, WidgetRef ref) async {
+    final server = Uri.parse(officialServer);
     if (await confirmServerIdentity(context, ref, server)) {
       onServerChosen(server, null);
     }
@@ -205,12 +203,18 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
       setState(() => _error = 'That does not look like a server address.');
       return;
     }
+    if (requireSecureScheme(address) case final schemeError?) {
+      setState(() => _error = schemeError);
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
     });
 
-    final client = api.SlimmApi(baseUrl: address);
+    // The same probe seam confirmServerIdentity uses, so a test can fake the
+    // transport for this untrusted address the same way it does for that.
+    final client = ref.read(probeApiProvider)(address);
     try {
       final check = await client.checkInvite(_code.text.trim());
       if (check is api.InviteUnusable) {
@@ -325,20 +329,9 @@ class _ManualServerDialogState extends State<_ManualServerDialog> {
       return;
     }
 
-    /// Typing a server address by hand is a trust decision, so it is stated
-    /// rather than implied: whoever runs it can read everything sent there.
-    ///
-    /// https is required over the internet, but not on a local network. A box on
-    /// your own LAN has no public hostname to get a certificate for, and
-    /// refusing http there would make self-hosting, the normal case for this
-    /// app, impossible without a pile of certificate work.
-    if (address.scheme != 'https' && !isLocalAddress(address)) {
-      setState(
-        () => _error =
-            'Use https for a server on the internet, so '
-            'traffic cannot be read in transit. Plain http is only accepted for '
-            'an address on your own network.',
-      );
+    // See requireSecureScheme for why a LAN address is exempt from this.
+    if (requireSecureScheme(address) case final schemeError?) {
+      setState(() => _error = schemeError);
       return;
     }
     Navigator.of(context).pop(address);

@@ -14,7 +14,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_rtc/rtc.dart';
 
 import '../diagnostics/debug_log.dart';
-import '../screens/onboarding_screen.dart' show isLocalAddress;
+import '../server_scheme_policy.dart' show isLocalAddress;
 import 'providers.dart';
 
 /// Refuses a plaintext SFU address unless it is on a LAN.
@@ -28,7 +28,8 @@ import 'providers.dart';
 /// which would send a user's microphone and screen share unencrypted with
 /// nothing on screen to say so. This stays in the app package rather than
 /// the `rtc` package: [isLocalAddress] is one of the app's own connection
-/// rules, and `rtc` has no dependency on the app to reuse it from.
+/// rules - the same one `server_scheme_policy.dart` applies to a server
+/// address - and `rtc` has no dependency on the app to reuse it from.
 String? _insecureSfuReason(String rawUrl) {
   final uri = Uri.tryParse(rawUrl);
   if (uri != null) {
