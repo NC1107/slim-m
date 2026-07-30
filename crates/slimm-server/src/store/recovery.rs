@@ -15,6 +15,7 @@
 use crate::auth::{generate_secret, hash_secret};
 use crate::ids::{SessionId, UserId};
 
+use super::sessions::revoke_session_rows;
 use super::{Store, now_ms};
 
 /// How long an issued code stays redeemable. Short, since it is meant to be
@@ -119,9 +120,21 @@ impl Store {
     /// were revoked, so the caller can close their live sockets the same way
     /// [`Store::delete_account`] and [`Store::remove_device`] do.
     ///
-    /// The claim is a single conditional `UPDATE` as the transaction's first
-    /// statement, so two simultaneous redemptions of the same code cannot
-    /// both win.
+    /// The claim, the password write, and every session revocation share one
+    /// transaction, committed once at the end. That matters here more than in
+    /// most places: this path exists to recover an account an attacker may
+    /// still hold a session on, and the code that authorizes it can only ever
+    /// be spent once. A commit that lands after the claim and the password
+    /// write but before the revocations would leave that exact attacker
+    /// session alive with no way to retry, since the one thing that could
+    /// authorize a second attempt is now spent. Doing it all in one
+    /// transaction means a failure anywhere in the middle rolls the whole
+    /// thing back: the code stays live and the caller can simply try again.
+    ///
+    /// The transaction opens with a plain `BEGIN` rather than
+    /// [`Store::begin_write`]: its first statement is already the claiming
+    /// `UPDATE`, so it takes SQLite's write lock immediately regardless, and
+    /// there is no read-then-upgrade window for `begin_write` to close.
     pub async fn consume_reset_code(
         &self,
         code: &str,
@@ -153,10 +166,10 @@ impl Store {
         .execute(&mut *tx)
         .await?
         .rows_affected();
-        tx.commit().await?;
         if updated == 0 {
             // The account went away between issue and consume. The code is
             // spent regardless and there is nothing left to secure.
+            tx.commit().await?;
             return Ok(Vec::new());
         }
 
@@ -165,14 +178,15 @@ impl Store {
                WHERE user_id = ? AND revoked_at IS NULL"#,
             claimed.user_id
         )
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *tx)
         .await?
         .into_iter()
         .map(|r| r.id)
         .collect();
         for session_id in &live_sessions {
-            self.revoke_session(*session_id).await?;
+            revoke_session_rows(&mut tx, *session_id, now).await?;
         }
+        tx.commit().await?;
         Ok(live_sessions)
     }
 }

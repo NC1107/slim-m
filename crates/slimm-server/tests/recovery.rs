@@ -3,6 +3,8 @@
 //! public but single-use, and a successful consumption revokes every session
 //! that predates it.
 
+use std::collections::HashSet;
+
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -12,6 +14,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
+use slimm_server::ids::UserId;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
@@ -293,4 +296,111 @@ async fn a_code_cannot_be_redeemed_twice() {
         .await
         .unwrap();
     assert_eq!(second.status(), StatusCode::BAD_REQUEST);
+}
+
+/// A reset that finds sessions on more than one device revokes every one of
+/// them, and the ids handed back name exactly those sessions - no fewer, no
+/// extras - since the caller uses that list to close live sockets.
+#[tokio::test]
+async fn consuming_revokes_sessions_across_multiple_devices_and_returns_their_ids() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, bob_id) = register(&store, "bob").await;
+    let bob_user_id = UserId(Uuid::parse_str(&bob_id).unwrap());
+
+    let laptop_session = store
+        .authenticate(&bob_token)
+        .await
+        .unwrap()
+        .expect("the session register() just opened is live")
+        .session_id;
+    let phone = store
+        .open_session(bob_user_id, "phone")
+        .await
+        .expect("a second device on the same account");
+
+    let code = issue_code(&app, &admin_token, &bob_id).await;
+    let auth = Auth::new(2).unwrap();
+    let hash = auth
+        .hash_password("brandnewpassword123".to_owned())
+        .await
+        .unwrap();
+    let revoked = store
+        .consume_reset_code(&code, &hash)
+        .await
+        .expect("a live code spends");
+
+    let revoked_set: HashSet<_> = revoked.into_iter().collect();
+    let expected: HashSet<_> = [laptop_session, phone.session_id].into_iter().collect();
+    assert_eq!(
+        revoked_set, expected,
+        "every live session comes back, and only those"
+    );
+    assert!(
+        store.authenticate(&bob_token).await.unwrap().is_none(),
+        "the laptop session must die"
+    );
+    assert!(
+        store
+            .authenticate(&phone.access_token)
+            .await
+            .unwrap()
+            .is_none(),
+        "the phone session must die too"
+    );
+}
+
+/// Resetting an account with nothing live to revoke still succeeds: the
+/// password changes and the code spends, it just has an empty list to hand
+/// back rather than failing for want of anything to close.
+#[tokio::test]
+async fn consuming_succeeds_with_no_live_sessions_to_revoke() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, bob_id) = register(&store, "bob").await;
+
+    let bob_session = store
+        .authenticate(&bob_token)
+        .await
+        .unwrap()
+        .expect("the session register() just opened is live")
+        .session_id;
+    store
+        .revoke_session(bob_session)
+        .await
+        .expect("sign bob out everywhere before the reset");
+
+    let code = issue_code(&app, &admin_token, &bob_id).await;
+    let auth = Auth::new(2).unwrap();
+    let hash = auth
+        .hash_password("brandnewpassword123".to_owned())
+        .await
+        .unwrap();
+    let revoked = store
+        .consume_reset_code(&code, &hash)
+        .await
+        .expect("a reset with nothing live to revoke still succeeds");
+    assert!(revoked.is_empty(), "there was nothing live to revoke");
+
+    let new_password_login = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/auth/login",
+            None,
+            Some(json!({
+                "username": "bob",
+                "password": "brandnewpassword123",
+                "device_name": "cli"
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        new_password_login.status(),
+        StatusCode::OK,
+        "the password change still took effect"
+    );
 }

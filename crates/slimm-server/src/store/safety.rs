@@ -8,8 +8,9 @@
 use sqlx::QueryBuilder;
 use uuid::Uuid;
 
+use super::sessions::revoke_session_rows;
 use super::{Store, now_ms};
-use crate::ids::{ChannelId, DeviceId, MessageId, UserId};
+use crate::ids::{ChannelId, DeviceId, MessageId, SessionId, UserId};
 
 /// A device on the account, for the settings device list.
 #[derive(Debug, Clone)]
@@ -122,37 +123,52 @@ impl Store {
     /// Removes a device from the account and revokes its sessions. Returns the
     /// sessions that were killed so live sockets can be closed. `None` when the
     /// device is not on this account, so one user cannot sign another out.
+    ///
+    /// Ownership check, session lookup, revocation and the device delete all
+    /// share one `BEGIN IMMEDIATE` transaction: the four used to run as
+    /// separate statements (the last two against `self.pool` directly, after
+    /// [`Store::revoke_device`] had already committed its own), so a failure
+    /// between them could leave the device deleted with a session still live,
+    /// or revoked with the device row still sitting there. Uses
+    /// [`revoke_session_rows`] directly rather than `Store::revoke_device`,
+    /// since that method opens its own transaction and cannot join this one.
     pub async fn remove_device(
         &self,
         user_id: UserId,
         device_id: DeviceId,
-    ) -> anyhow::Result<Option<Vec<crate::ids::SessionId>>> {
+    ) -> anyhow::Result<Option<Vec<SessionId>>> {
+        let now = now_ms();
+        let mut tx = self.begin_write().await?;
+
         let owned = sqlx::query_scalar!(
             r#"SELECT 1 AS "one!: i64" FROM devices WHERE id = ? AND user_id = ?"#,
             device_id,
             user_id
         )
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?;
         if owned.is_none() {
             return Ok(None);
         }
 
-        let sessions = sqlx::query!(
-            r#"SELECT id AS "id!: crate::ids::SessionId" FROM sessions WHERE device_id = ?"#,
+        let sessions: Vec<SessionId> = sqlx::query!(
+            r#"SELECT id AS "id!: SessionId" FROM sessions WHERE device_id = ?"#,
             device_id
         )
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *tx)
         .await?
         .into_iter()
         .map(|r| r.id)
         .collect();
+        for session_id in &sessions {
+            revoke_session_rows(&mut tx, *session_id, now).await?;
+        }
 
-        // Revoking cascades the sessions and their tokens away with the device.
-        self.revoke_device(device_id).await?;
+        // The device row itself; cascade removes its now-revoked session rows too.
         sqlx::query!("DELETE FROM devices WHERE id = ?", device_id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
+        tx.commit().await?;
         Ok(Some(sessions))
     }
 
