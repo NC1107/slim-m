@@ -21,6 +21,7 @@
 //! open at once so a connection flood cannot exhaust the process.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, broadcast};
@@ -202,6 +203,37 @@ pub struct Hub {
     slots: Arc<Semaphore>,
     presence: PresenceTracker,
     typing: TypingTracker,
+    permissions_epoch: Arc<AtomicU64>,
+}
+
+/// Whether this event means somebody's permissions may have moved.
+///
+/// Exhaustive on purpose: a new variant does not compile until somebody
+/// decides, and the safe answer for anything permission-shaped is `true`.
+/// Over-reporting only costs a re-derivation; under-reporting is a stale
+/// answer served to a caller who should no longer have it.
+fn moves_permissions(event: &Event) -> bool {
+    match event {
+        Event::RoleChanged { .. }
+        | Event::MemberRoleChanged { .. }
+        | Event::MemberTimeoutChanged { .. }
+        | Event::MemberRemoved(_)
+        | Event::OverwriteChanged { .. }
+        | Event::ChannelCreated(_)
+        | Event::ChannelUpdated(_)
+        | Event::ChannelDeleted { .. } => true,
+        Event::MessageCreated { .. }
+        | Event::MessageEdited(_)
+        | Event::MessageDeleted { .. }
+        | Event::ReactionsChanged { .. }
+        | Event::MessagePinned { .. }
+        | Event::MessageUnpinned { .. }
+        | Event::PollVoted { .. }
+        | Event::TypingStarted { .. }
+        | Event::TypingStopped { .. }
+        | Event::PresenceChanged(_)
+        | Event::SessionRevoked(_) => false,
+    }
 }
 
 impl Default for Hub {
@@ -218,6 +250,7 @@ impl Hub {
             slots: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
             presence: PresenceTracker::new(),
             typing: TypingTracker::new(),
+            permissions_epoch: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -230,13 +263,35 @@ impl Hub {
             slots: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
             presence: PresenceTracker::new(),
             typing: TypingTracker::with_ttl(ttl),
+            permissions_epoch: Arc::new(AtomicU64::new(0)),
         }
     }
 
     /// Publishes an event to every current subscriber. Does nothing if there are
     /// none; never blocks or errors from the caller's point of view.
     pub fn publish(&self, event: Event) {
+        // Bumped before the send, so no subscriber can act on a stale answer.
+        if moves_permissions(&event) {
+            self.permissions_epoch.fetch_add(1, Ordering::Release);
+        }
         let _ = self.sender.send(event);
+    }
+
+    /// A counter bumped whenever a published event means permissions moved.
+    ///
+    /// This exists so a cached permission answer can be invalidated by the
+    /// *write*, not by the reader's place in the event stream. Delivery order
+    /// across concurrent writers is best-effort (see this module's own note),
+    /// so a connection can receive a `message.created` published by one
+    /// request before the `overwrite.changed` published by another that
+    /// already committed. A cache keyed on events alone would serve the
+    /// pre-revocation answer for that message. Bumping a shared counter inside
+    /// `publish`, before the send, makes the invalidation immediate and global
+    /// instead, and leaves only the gap between a handler's commit and its
+    /// publish call - which carries no await in any handler that publishes one
+    /// of these.
+    pub fn permissions_epoch(&self) -> u64 {
+        self.permissions_epoch.load(Ordering::Acquire)
     }
 
     /// Subscribes a new connection to the event stream.
@@ -258,5 +313,92 @@ impl Hub {
     /// The shared, cloneable typing tracker (a cheap `Arc` clone).
     pub fn typing(&self) -> TypingTracker {
         self.typing.clone()
+    }
+}
+
+#[cfg(test)]
+mod epoch_tests {
+    use super::*;
+    use crate::ids::{ChannelId, RoleId, UserId};
+
+    /// The property the view cache rests on: the counter moves inside
+    /// `publish`, so it has already moved by the time anybody could receive
+    /// the event - and for a subscriber that never receives it at all.
+    ///
+    /// That is the whole difference from invalidating as events arrive. A
+    /// connection lagging behind its queue would otherwise keep serving a
+    /// pre-revocation answer for every event still ahead of the revocation in
+    /// its own backlog, however long ago the write committed.
+    #[test]
+    fn the_epoch_moves_before_any_subscriber_receives() {
+        let hub = Hub::new();
+        let mut rx = hub.subscribe();
+        let before = hub.permissions_epoch();
+
+        hub.publish(Event::OverwriteChanged {
+            channel_id: ChannelId::generate(),
+            previously_visible_to: Vec::new(),
+        });
+
+        assert!(
+            hub.permissions_epoch() > before,
+            "the epoch must move without anybody having read the event yet",
+        );
+        assert!(rx.try_recv().is_ok(), "and the event is still delivered");
+    }
+
+    /// A clone is what every handler holds, so an epoch that did not travel
+    /// with it would move for nobody.
+    #[test]
+    fn a_clone_shares_the_same_counter() {
+        let hub = Hub::new();
+        let handle = hub.clone();
+        let before = hub.permissions_epoch();
+        handle.publish(Event::MemberRemoved(UserId::generate()));
+        assert!(hub.permissions_epoch() > before);
+    }
+
+    /// Ordinary traffic must not move it, or the cache never holds anything
+    /// and the whole change is a no-op with extra steps.
+    #[test]
+    fn channel_traffic_leaves_it_alone() {
+        let hub = Hub::new();
+        let before = hub.permissions_epoch();
+        hub.publish(Event::TypingStarted {
+            channel_id: ChannelId::generate(),
+            user_id: UserId::generate(),
+        });
+        hub.publish(Event::PresenceChanged(UserId::generate()));
+        hub.publish(Event::MessageDeleted {
+            channel_id: ChannelId::generate(),
+            message_id: crate::ids::MessageId::generate(),
+        });
+        assert_eq!(hub.permissions_epoch(), before);
+    }
+
+    #[test]
+    fn every_permission_shaped_event_moves_it() {
+        let hub = Hub::new();
+        for event in [
+            Event::RoleChanged {
+                role_id: RoleId::generate(),
+            },
+            Event::MemberRoleChanged {
+                user_id: UserId::generate(),
+                role_id: RoleId::generate(),
+            },
+            Event::MemberTimeoutChanged {
+                user_id: UserId::generate(),
+                until: Some(1),
+            },
+            Event::MemberRemoved(UserId::generate()),
+            Event::ChannelDeleted {
+                channel_id: ChannelId::generate(),
+            },
+        ] {
+            let before = hub.permissions_epoch();
+            hub.publish(event);
+            assert!(hub.permissions_epoch() > before);
+        }
     }
 }

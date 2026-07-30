@@ -86,7 +86,7 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
     let mut events = state.hub.subscribe();
 
     // Per connection, and dropped with it; see `view_cache`.
-    let mut view_cache = ViewCache::new(ctx.user_id);
+    let mut view_cache = ViewCache::new();
 
     // Guarantees the matching disconnect however this function returns; see
     // `signals::PresenceGuard`.
@@ -146,8 +146,6 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                         }
                     }
                     Ok(event) => {
-                        // Before authorizing it; see `ViewCache::observe`.
-                        view_cache.observe(&event);
                         if let Some(frame) =
                             authorize(&state.store, &state.hub, &ctx, &mut view_cache, event).await
                             && send_frame(&mut sink, &frame).await.is_err()
@@ -284,14 +282,16 @@ async fn authorize(
         Event::OverwriteChanged { previously_visible_to, .. }
             if previously_visible_to.contains(&ctx.user_id)
     );
-    let visible = match view_cache.get(channel_id, Instant::now()) {
+    // Read before the query, never after; see `ViewCache::insert`.
+    let epoch = hub.permissions_epoch();
+    let visible = match view_cache.get(channel_id, Instant::now(), epoch) {
         Some(cached) => cached,
         None => match store
             .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
             .await
         {
             Ok(answer) => {
-                view_cache.insert(channel_id, answer, Instant::now());
+                view_cache.insert(channel_id, answer, Instant::now(), epoch);
                 answer
             }
             // Fails closed for this event only; a blip must not be remembered.
