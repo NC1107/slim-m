@@ -7,7 +7,7 @@
 # Nothing here is a decision that the file is fine; see docs/ci.md.
 
 schema/openapi.yaml 4062 # one OpenAPI document is one document; splitting it across $ref files would give the router-vs-schema gate two sources to reconcile. This number rises when the API does; raising it is the deliberate act, and the diff is where that shows
-.github/workflows/release.yml 785 # ten publish jobs sharing release-please outputs; separating them means reusable workflows and re-resolving those outputs per file
+.github/workflows/release.yml 822 # ten publish jobs sharing release-please outputs, plus two thin jobs (verify-server-ci, verify-client-ci) wiring every publish path to a required commit-status gate; the gate's own polling logic already lives in verify-release-checks.yml rather than being duplicated here
 crates/slimm-server/src/store/sessions.rs 957 # tokens, refresh rotation, ws tickets and account deletion in one file; account deletion is the obvious first split
 crates/slimm-server/src/push.rs 625 # envelope sealing, relay client and fan-out triggering; the sealed-box half has no dependency on the other two
 client/packages/app/test/push_controller_test.dart 925 # one suite over registration, lifecycle reporting and revocation
