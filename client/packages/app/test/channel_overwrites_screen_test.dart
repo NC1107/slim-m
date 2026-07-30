@@ -159,4 +159,64 @@ void main() {
           'resolves, not stay empty forever',
     );
   });
+
+  testWidgets(
+    'clearing an overwrite reports the resulting state, not a claimed change',
+    (tester) async {
+      // Tall enough that the sixteen permission rows leave "Clear" on screen.
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      var deleted = false;
+      await _pumpToTargetPicker(
+        tester,
+        handler: (request) {
+          if (request.url.path == '/roles') {
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 'r1',
+                  'name': 'Moderators',
+                  'permissions': 0,
+                  'is_everyone': false,
+                  'created_at': 0,
+                },
+              ]),
+              200,
+            );
+          }
+          if (request.method == 'DELETE' &&
+              request.url.path == '/channels/c1/overwrites/role/r1') {
+            deleted = true;
+            return http.Response('', 204);
+          }
+          return http.Response('{}', 200);
+        },
+      );
+
+      await tester.tap(find.text('Choose a role'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Moderators'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(AppButton, 'Clear'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(AppButton, 'Clear').last);
+      await tester.pumpAndSettle();
+
+      expect(deleted, isTrue);
+      expect(
+        find.textContaining('cleared'),
+        findsNothing,
+        reason:
+            'there is no read-back route, so the screen never knew whether '
+            'an overwrite existed to clear in the first place',
+      );
+      expect(
+        find.textContaining('now inherits every permission'),
+        findsOneWidget,
+      );
+    },
+  );
 }

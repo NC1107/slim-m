@@ -49,7 +49,7 @@ class _ServerIdentityChangedStepState extends State<ServerIdentityChangedStep> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'STEP 2 OF 3',
+                  'SECURITY CHECK',
                   style: AppText.label.copyWith(color: tokens.textSecondary),
                 ),
                 const SizedBox(height: AppSpacing.s8),

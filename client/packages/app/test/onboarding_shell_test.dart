@@ -28,17 +28,19 @@ void main() {
       await tester.pumpWidget(
         _harness(
           const Scaffold(
-            body: OnboardingStepper(current: OnboardingStep.server),
+            body: OnboardingStepper(current: OnboardingStep.identity),
           ),
         ),
       );
 
       expect(
-        find.bySemanticsLabel('Step 2 of 3: confirm the server'),
+        find.bySemanticsLabel('Step 2 of 2: who are you'),
         findsOneWidget,
         reason:
             'the count is the whole reason the stepper exists, so it has '
-            'to reach a screen reader as a count',
+            'to reach a screen reader as a count - and as the count of the '
+            'two panes the join flow actually has, not a third that no '
+            'production widget ever reaches',
       );
     });
 
@@ -53,9 +55,9 @@ void main() {
         ),
       );
 
-      // Two behind, so two ticks; the current one keeps its number.
-      expect(find.byIcon(AppIcons.check), findsNWidgets(2));
-      expect(find.text('3'), findsOneWidget);
+      // One behind, so one tick; the current one keeps its number.
+      expect(find.byIcon(AppIcons.check), findsNWidgets(1));
+      expect(find.text('2'), findsOneWidget);
       expect(
         find.text('1'),
         findsNothing,
@@ -71,7 +73,7 @@ void main() {
           const Scaffold(
             body: SizedBox(
               width: 700,
-              child: OnboardingStepper(current: OnboardingStep.server),
+              child: OnboardingStepper(current: OnboardingStep.identity),
             ),
           ),
         ),
@@ -90,21 +92,21 @@ void main() {
           const Scaffold(
             body: SizedBox(
               width: 300,
-              child: OnboardingStepper(current: OnboardingStep.server),
+              child: OnboardingStepper(current: OnboardingStep.invite),
             ),
           ),
         ),
       );
 
-      expect(find.text('confirm the server'), findsOneWidget);
+      expect(find.text('invite'), findsOneWidget);
       expect(
         find.text('who are you'),
         findsNothing,
         reason: 'the step you are on keeps its words; the rest stay pips',
       );
-      // Still three pips, so the count survives.
+      // Still both pips, so the count survives.
+      expect(find.text('1'), findsOneWidget);
       expect(find.text('2'), findsOneWidget);
-      expect(find.text('3'), findsOneWidget);
     });
   });
 

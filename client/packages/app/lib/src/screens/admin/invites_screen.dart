@@ -218,6 +218,40 @@ class _CreatedInviteCallout extends StatelessWidget {
   }
 }
 
+/// Which state badge an invite gets, or null for a usable code with nothing
+/// to flag.
+///
+/// Order matters when more than one applies. Revoked always wins: it is a
+/// deliberate admin action, not an arithmetic fact, and stays true regardless
+/// of uses or expiry. Fully used is checked before expiry because the uses
+/// pair already on the row (`10/10 uses`) is the more concrete explanation;
+/// an invite that is both spent and past its date is still spent first. A
+/// server that reports `usable: false` for neither reason (a future case
+/// this client cannot yet name) still gets a label rather than none.
+(AppBadgeVariant, String)? _inviteBadge(api.Invite invite, int nowMs) {
+  if (invite.revoked) return (AppBadgeVariant.warn, 'Revoked');
+  if (invite.usable) return null;
+  if (invite.maxUses != null && invite.uses >= invite.maxUses!) {
+    return (AppBadgeVariant.tag, 'Fully used');
+  }
+  if (invite.expiresAt != null && invite.expiresAt! <= nowMs) {
+    return (AppBadgeVariant.tag, 'Expired');
+  }
+  return (AppBadgeVariant.tag, 'Unusable');
+}
+
+/// What to say about the role an invite grants, or null for one that grants
+/// none. Distinguishes "still loading" from "granted, but that role is gone"
+/// so a resolved-but-missing id does not silently read as no grant at all.
+String? _roleGrantLabel(String? roleId, AsyncValue<List<api.Role>> roles) {
+  if (roleId == null) return null;
+  return switch (roles) {
+    AsyncData(:final value) =>
+      'Grants ${value.where((r) => r.id == roleId).firstOrNull?.name ?? 'a since-removed role'}',
+    _ => 'Grants a role',
+  };
+}
+
 class _InviteRow extends ConsumerStatefulWidget {
   const _InviteRow({required this.invite});
 
@@ -265,6 +299,11 @@ class _InviteRowState extends ConsumerState<_InviteRow>
     final expiryLabel = invite.expiresAt == null
         ? 'Never expires'
         : 'Expires ${formatDateTime(invite.expiresAt!)}';
+    final badge = _inviteBadge(invite, DateTime.now().millisecondsSinceEpoch);
+    // Watched only for a role-granting invite, the one row needing the roles list at all.
+    final roleGrantLabel = invite.roleGrant == null
+        ? null
+        : _roleGrantLabel(invite.roleGrant, ref.watch(rolesProvider));
 
     // A failed revoke shows on the row it failed for and stays until dealt with.
     return Column(
@@ -293,16 +332,8 @@ class _InviteRowState extends ConsumerState<_InviteRow>
                           style: const TextStyle(fontFamily: AppFonts.mono),
                         ),
                         const SizedBox(width: AppSpacing.s8),
-                        if (invite.revoked)
-                          const AppBadge(
-                            variant: AppBadgeVariant.warn,
-                            label: 'Revoked',
-                          )
-                        else if (!invite.usable)
-                          const AppBadge(
-                            variant: AppBadgeVariant.tag,
-                            label: 'Expired',
-                          ),
+                        if (badge case (final variant, final label)?)
+                          AppBadge(variant: variant, label: label),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.s4),
@@ -312,8 +343,26 @@ class _InviteRowState extends ConsumerState<_InviteRow>
                         color: tokens.textSecondary,
                       ),
                     ),
+                    if (roleGrantLabel != null) ...[
+                      const SizedBox(height: AppSpacing.s4),
+                      Text(
+                        roleGrantLabel,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.caption.copyWith(color: tokens.accent),
+                      ),
+                    ],
                   ],
                 ),
+              ),
+              AppIconButton(
+                icon: AppIcons.copy,
+                semanticLabel: 'Copy invite code',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: invite.code));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invite code copied.')),
+                  );
+                },
               ),
               if (!invite.revoked)
                 AppIconButton(

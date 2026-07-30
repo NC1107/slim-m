@@ -153,8 +153,14 @@ class _ChannelOverwritesScreenState
           );
       if (!mounted) return;
       setState(_resetState);
+      // States the result the idempotent DELETE guarantees, not a "cleared" this screen can never know happened.
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Overwrite cleared for $_targetLabel.')),
+        SnackBar(
+          content: Text(
+            '$_targetLabel now inherits every permission in '
+            '"${_channel!.name}" from their roles.',
+          ),
+        ),
       );
     } on api.ApiException catch (e) {
       if (!mounted) return;

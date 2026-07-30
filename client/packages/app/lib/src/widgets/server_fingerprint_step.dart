@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Step 2 of the manual "connect to a server" flow: the one moment
-/// trust-on-first-use asks for a human to compare its identity out of band
-/// rather than assume it silently.
+/// The one moment trust-on-first-use asks for a human to compare a server's
+/// identity out of band rather than assume it silently.
+///
+/// Deliberately outside `OnboardingShell`'s numbered stepper: this fires
+/// exactly when nothing is pinned yet for the address, which is not a fixed
+/// position in the join flow, so it carries no step count rather than a
+/// false one.
 library;
 
 import 'package:flutter/material.dart';
@@ -118,7 +122,7 @@ class ServerFingerprintStep extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'STEP 2 OF 3',
+                  'SECURITY CHECK',
                   style: AppText.label.copyWith(color: tokens.textSecondary),
                 ),
                 const SizedBox(height: AppSpacing.s8),

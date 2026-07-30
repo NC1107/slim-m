@@ -9,6 +9,8 @@
 /// drift; see `emoji_name.dart`.
 library;
 
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -153,11 +155,18 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: AppSpacing.s8),
-          _NamePreview(typed: _name.text, normalized: normalized),
+          _NamePreview(typed: _name.text, normalized: normalized, taken: taken),
           const SizedBox(height: AppSpacing.s12),
+          if (_bytes case final bytes?) ...[
+            _EmojiImagePreview(
+              bytes: bytes,
+              onClear: () => setState(() => _bytes = null),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+          ],
           AppButton(
-            label: _bytes == null ? 'Choose image' : 'Image chosen',
-            icon: _bytes == null ? AppIcons.add : AppIcons.check,
+            label: _bytes == null ? 'Choose image' : 'Choose a different image',
+            icon: _bytes == null ? AppIcons.add : AppIcons.image,
             full: true,
             disabled: _submitting,
             onPressed: _pick,
@@ -184,18 +193,29 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
 
 /// What the server will store, shown while typing.
 ///
-/// Three states rather than one, because "nothing usable" and "too long" are
-/// refusals the uploader can act on, and a blank line would leave them
-/// guessing why the button is disabled.
+/// Four states rather than one: "nothing usable", "too long" and "already
+/// taken" are refusals the uploader can act on, and a blank line would leave
+/// them guessing why the button is disabled. Taken renders nothing rather
+/// than its own sentence, because [AppInput]'s error slot already names the
+/// problem right above this line; repeating it here previously left "Already
+/// taken." sitting directly beside "Will be added as :name:", one line
+/// promising the upload would succeed and the other saying it could not.
 class _NamePreview extends StatelessWidget {
-  const _NamePreview({required this.typed, required this.normalized});
+  const _NamePreview({
+    required this.typed,
+    required this.normalized,
+    required this.taken,
+  });
 
   final String typed;
   final String normalized;
+  final bool taken;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+
+    if (taken) return const SizedBox.shrink();
 
     if (typed.trim().isEmpty) {
       return Text(
@@ -235,4 +255,45 @@ class _NamePreview extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The picked image, at the two sizes the app actually draws an emoji at
+/// (inline in a message body, and in this same admin list once uploaded), so
+/// an uploader sees the picture rather than a checkmark standing in for it.
+class _EmojiImagePreview extends StatelessWidget {
+  const _EmojiImagePreview({required this.bytes, required this.onClear});
+
+  final List<int> bytes;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final data = Uint8List.fromList(bytes);
+
+    return Row(
+      children: [
+        _swatch(data, 20, tokens),
+        const SizedBox(width: AppSpacing.s12),
+        _swatch(data, 32, tokens),
+        const Spacer(),
+        AppIconButton(
+          icon: AppIcons.dismiss,
+          semanticLabel: 'Remove the chosen image',
+          onPressed: onClear,
+        ),
+      ],
+    );
+  }
+
+  Widget _swatch(Uint8List data, double size, AppTokens tokens) => Container(
+    width: size,
+    height: size,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      border: Border.all(color: tokens.borderSubtle),
+      borderRadius: BorderRadius.circular(AppRadii.control),
+    ),
+    child: Image.memory(data, fit: BoxFit.contain, gaplessPlayback: true),
+  );
 }
