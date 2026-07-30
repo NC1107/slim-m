@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.13.3](https://github.com/NC1107/slim-m/compare/client-v0.13.2...client-v0.13.3) (2026-07-30)
+
+
+### Bug Fixes
+
+* **canvas:** a web z-index truncation, an unbounded refetch loop, and stacked headers ([#198](https://github.com/NC1107/slim-m/issues/198)) ([5875cc4](https://github.com/NC1107/slim-m/commit/5875cc4d57e999dc5b9364204c829d2139a2be6d))
+* **client:** follow the read marker to where the user actually is ([#189](https://github.com/NC1107/slim-m/issues/189)) ([7533ed9](https://github.com/NC1107/slim-m/commit/7533ed9b1868320c93d9c057d800e31988057535))
+* **client:** give per-message context actions a keyboard route ([#195](https://github.com/NC1107/slim-m/issues/195)) ([bab2b2e](https://github.com/NC1107/slim-m/commit/bab2b2e80109ea8970f0afca2e2339eb652d5dcd))
+* **client:** name devices by platform and host, and validate invite uses ([#192](https://github.com/NC1107/slim-m/issues/192)) ([c42ca1b](https://github.com/NC1107/slim-m/commit/c42ca1b794b0c24af0209bf594c54d5ce742a4f6))
+* **client:** page channel history and stop claiming the start of it ([#197](https://github.com/NC1107/slim-m/issues/197)) ([e471acd](https://github.com/NC1107/slim-m/commit/e471acda86b9633afca19302f29e06e6a5f4bb17))
+* **client:** restore presence on refusal and cap image decode size ([#193](https://github.com/NC1107/slim-m/issues/193)) ([cb32f34](https://github.com/NC1107/slim-m/commit/cb32f34831b3c4aa032707031a282cc73eb3590d))
+* **client:** show the connection bar on phone and gate role assignment by permission ([#190](https://github.com/NC1107/slim-m/issues/190)) ([ab9d418](https://github.com/NC1107/slim-m/commit/ab9d41855de4e4bf31382204fc2d7dccf24e64c2))
+
 ## [0.13.2](https://github.com/NC1107/slim-m/compare/client-v0.13.1...client-v0.13.2) (2026-07-30)
 
 
