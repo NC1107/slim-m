@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json};
+use super::extract::{Authed, AuthedLimited, Json, WRITE};
 use super::messages::{MessageDto, parse_uuid, with_reactions};
 use crate::ids::ChannelId;
 use crate::permissions::Permissions;
@@ -108,7 +108,7 @@ async fn get_read(
 }
 
 async fn put_read(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<WRITE>,
     Path(channel_id): Path<String>,
     State(state): State<AppState>,
     Json(req): Json<MarkReadRequest>,
@@ -145,7 +145,7 @@ async fn put_read(
 /// all while the same message fetched by list carried them, and a client that
 /// trusts its local store showed the difference.
 async fn sync(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<WRITE>,
     State(state): State<AppState>,
     Json(req): Json<SyncRequest>,
 ) -> Result<Json<SyncResponse>, ApiError> {

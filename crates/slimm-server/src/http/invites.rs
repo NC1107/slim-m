@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, INVITE_CHECK, Json, RateLimited, enforce};
+use super::extract::{Authed, AuthedLimited, INVITE_CHECK, Json, RateLimited, WRITE, enforce};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{Invite, InviteCheck, RedeemError};
@@ -145,7 +145,7 @@ fn now_ms() -> i64 {
 
 /// Creates an invite. Requires the permission to manage invites.
 async fn create(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<WRITE>,
     State(state): State<AppState>,
     Json(req): Json<CreateRequest>,
 ) -> Result<Json<InviteDto>, ApiError> {
@@ -191,7 +191,7 @@ async fn list(
 }
 
 async fn revoke(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<WRITE>,
     Path(code): Path<String>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {

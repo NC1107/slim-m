@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, enforce};
+use super::extract::{Authed, AuthedLimited, Json, WRITE, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{DeviceId, MessageId, UserId};
@@ -85,7 +85,7 @@ async fn list_devices(
 /// Signs a device out. Only ever your own: a device on someone else's account
 /// is reported as missing, so this cannot be used to probe for or evict others.
 async fn remove_device(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<WRITE>,
     Path(device_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {

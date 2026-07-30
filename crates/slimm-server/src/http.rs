@@ -2,10 +2,15 @@
 //! HTTP surface: liveness, version, the auth routes, and the message routes. The
 //! WebSocket routes are added as the protocol is built.
 
+use std::time::Duration;
+
+use axum::http::StatusCode;
 use axum::{Router, extract::State, routing::get};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::Serialize;
+use tower::limit::ConcurrencyLimitLayer;
+use tower_http::timeout::{RequestBodyTimeoutLayer, TimeoutLayer};
 use tower_http::trace::TraceLayer;
 
 use crate::auth::Auth;
@@ -16,7 +21,7 @@ use crate::ratelimit::RateLimiter;
 use crate::store::{JoinPolicy, Store};
 use crate::voice::VoiceService;
 use error::ApiError;
-use extract::Json;
+use extract::{Json, READ, RateLimited};
 
 mod attachments;
 mod auth;
@@ -50,6 +55,33 @@ mod ws;
 /// The wire-protocol envelope version a client negotiates on connect. Bumped
 /// only for a breaking change to the envelope; additive changes keep it.
 pub(crate) const PROTOCOL_VERSION: u32 = 1;
+
+/// How long one HTTP request may take before it is abandoned.
+///
+/// The socket surface has had a bound like this from the start, with a comment
+/// saying why: a peer that stops reading could otherwise wedge its task
+/// indefinitely. The HTTP surface had none, against a process whose measured
+/// idle RSS is 7 MB and whose committed budget is under 30 MB. Generous enough
+/// for the heaviest real request (a bundled `/sync`, or an attachment upload at
+/// the operator's ceiling over a slow link) and far short of forever.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// How long a request body may trickle in before it is abandoned.
+///
+/// Separate from [`REQUEST_TIMEOUT`] because this is the cheaper attack: a
+/// request that declares a body and then sends a byte a minute holds a task and
+/// its partial buffer for as long as it likes. Caddy's own read-body timeout
+/// defaults to unlimited, so the shipped proxy does not cover this either.
+const BODY_READ_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// How many HTTP requests may be in flight at once.
+///
+/// The equivalent of `hub::MAX_CONNECTIONS` for the other surface, and set to
+/// the same order of magnitude for the same reason: past some number, admitting
+/// more work makes every request slower rather than serving anybody. Requests
+/// over it queue rather than fail, so a burst is absorbed and a flood is
+/// bounded.
+const MAX_INFLIGHT_REQUESTS: usize = 1024;
 
 /// What every handler shares: the persistence layer, the auth service, and the
 /// fan-out hub. Cloning is cheap (a pool handle and a couple of `Arc`s).
@@ -93,12 +125,26 @@ pub fn router(state: AppState) -> Router {
         .merge(polls::routes())
         .merge(users::routes())
         .merge(attachments::routes(state.media.max_attachment_bytes()))
+        // Bounded, and the socket is deliberately outside this: see below.
+        .layer(ConcurrencyLimitLayer::new(MAX_INFLIGHT_REQUESTS))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::GATEWAY_TIMEOUT,
+            REQUEST_TIMEOUT,
+        ))
+        .layer(RequestBodyTimeoutLayer::new(BODY_READ_TIMEOUT))
         .merge(ws::routes())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
 
 /// Liveness probe: 200 while the process is serving and the database answers.
+///
+/// Deliberately the one route that charges no rate limit. A probe is what an
+/// orchestrator calls to decide whether this process is alive, and a 429 there
+/// reads as unhealthy and gets the container restarted - so throttling it turns
+/// a flood into an outage rather than preventing one. It costs one indexed
+/// `SELECT 1`, and the request timeout and concurrency limit on the router bound
+/// it the same way they bound everything else.
 async fn healthz(State(state): State<AppState>) -> Result<&'static str, StatusError> {
     state.store.ping().await.map_err(|_| StatusError)?;
     Ok("ok")
@@ -181,7 +227,10 @@ struct ServerIdentityDto {
 /// learn there is no recourse here before they commit, and the "connect by
 /// address" flow shows the fingerprint before anyone has signed in. All of it
 /// reveals deployment configuration only, never user data.
-async fn version(State(state): State<AppState>) -> Result<Json<Version>, ApiError> {
+async fn version(
+    _limited: RateLimited<READ>,
+    State(state): State<AppState>,
+) -> Result<Json<Version>, ApiError> {
     let identity = state.store.server_identity().await?;
     Ok(Json(Version {
         name: "slim-m",

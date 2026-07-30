@@ -51,20 +51,58 @@ impl FromRequestParts<AppState> for Authed {
 /// user so a limit follows the account across devices and networks, rather than
 /// being shed by reconnecting from a new address.
 ///
-/// The unauthenticated key is deliberately the peer address, not a forwarded
-/// header: this server may sit behind a proxy it does not control, and a
-/// spoofable header would let a caller mint unlimited keys. A reverse proxy
-/// that terminates for real clients should apply its own per-IP limit as well.
-pub(crate) fn limit_key(parts: &Parts, ctx: Option<&SessionContext>) -> String {
+/// The unauthenticated key is the peer address unless the operator has said how
+/// many proxies sit in front of this server (`trusted_hops`). A forwarded header
+/// is unsigned and anyone may send one, so believing it by default would let a
+/// caller mint a fresh bucket per request.
+///
+/// What makes a non-zero setting safe is counting from the *right*. A proxy
+/// appends the address it saw, so the rightmost entry was written by the nearest
+/// proxy and each step left is one hop further out. A caller can prepend as many
+/// entries as they like and never reach the slot `trusted_hops` selects.
+///
+/// This matters more than it looks: with no setting and a reverse proxy in
+/// front - which is what `deploy/` ships - every unauthenticated caller in the
+/// world shares one bucket, so one client can hold the password bucket empty and
+/// nobody can sign in. Caddy has no built-in per-IP limit to do this instead.
+pub(crate) fn limit_key(
+    parts: &Parts,
+    ctx: Option<&SessionContext>,
+    trusted_hops: usize,
+) -> String {
     if let Some(ctx) = ctx {
         return format!("u:{}", ctx.user_id);
     }
-    // Peer address, never a forwarded header; see the note on this function.
+    if trusted_hops > 0
+        && let Some(addr) = forwarded_for(parts, trusted_hops)
+    {
+        return format!("ip:{addr}");
+    }
     parts
         .extensions
         .get::<ConnectInfo<SocketAddr>>()
         .map(|ConnectInfo(addr)| format!("ip:{}", addr.ip()))
         .unwrap_or_else(|| "ip:unknown".to_owned())
+}
+
+/// The address `hops` from the right of `X-Forwarded-For`, or `None` when the
+/// header is absent or too short to have one.
+///
+/// Too short is deliberately `None` rather than the leftmost entry: falling back
+/// to whatever the client sent is exactly the spoof this counts from the right to
+/// avoid, and the peer address is a safe answer where this has none.
+fn forwarded_for(parts: &Parts, hops: usize) -> Option<String> {
+    let header = parts.headers.get("x-forwarded-for")?.to_str().ok()?;
+    let addrs: Vec<&str> = header
+        .split(',')
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .collect();
+    addrs
+        .len()
+        .checked_sub(hops)
+        .and_then(|index| addrs.get(index))
+        .map(|addr| (*addr).to_owned())
 }
 
 /// Enforces the rate limit for `class`, keyed by the caller.
@@ -74,7 +112,8 @@ pub(crate) fn enforce(
     ctx: Option<&SessionContext>,
     class: Class,
 ) -> Result<(), ApiError> {
-    if state.limiter.check(class, &limit_key(parts, ctx)) {
+    let key = limit_key(parts, ctx, state.limiter.trusted_hops());
+    if state.limiter.check(class, &key) {
         Ok(())
     } else {
         Err(ApiError::TooManyRequests)
@@ -85,16 +124,31 @@ pub(crate) fn enforce(
 /// Used by the password and refresh endpoints, which are reachable by anyone.
 pub(crate) struct RateLimited<const C: u8>;
 
-/// Class codes for [`RateLimited`], since const generics cannot take an enum.
+/// Class codes for [`RateLimited`] and [`AuthedLimited`], since const generics
+/// cannot take an enum.
 pub(crate) const PASSWORD: u8 = 0;
 pub(crate) const REFRESH: u8 = 1;
 pub(crate) const INVITE_CHECK: u8 = 2;
+pub(crate) const WRITE: u8 = 3;
+pub(crate) const READ: u8 = 4;
+pub(crate) const UPLOAD: u8 = 5;
 
+/// Panics on an unknown code rather than falling back.
+///
+/// It used to end `_ => Class::Refresh`, which meant a new code compiled clean
+/// and silently charged a budget twenty times looser on refill than Password's -
+/// on endpoints that are unauthenticated and expensive. There is no safe default
+/// here, so there is no default: every code is named, and the panic is
+/// unreachable for any code this module defines.
 fn class_of(code: u8) -> Class {
     match code {
         PASSWORD => Class::Password,
+        REFRESH => Class::Refresh,
         INVITE_CHECK => Class::InviteCheck,
-        _ => Class::Refresh,
+        WRITE => Class::Write,
+        READ => Class::Read,
+        UPLOAD => Class::Upload,
+        other => unreachable!("no rate-limit class for code {other}"),
     }
 }
 
@@ -107,6 +161,33 @@ impl<const C: u8> FromRequestParts<AppState> for RateLimited<C> {
     ) -> Result<Self, Self::Rejection> {
         enforce(state, parts, None, class_of(C))?;
         Ok(RateLimited)
+    }
+}
+
+/// An authenticated request that has also paid its rate limit.
+///
+/// One extractor rather than the three-part idiom it replaces (`Authed(ctx)`
+/// plus `parts: Parts` plus a remembered `enforce(...)` call), because the
+/// charge being a line somebody has to remember is exactly how it went missing:
+/// eight routes charged nothing, and this project had already found and fixed
+/// the same omission once before on message edit.
+///
+/// Declaring the class in the signature makes "no limit" a visible, reviewable
+/// choice instead of an absence. It also drops the `parts: Parts` argument,
+/// which axum satisfies by cloning every header on the request.
+pub(crate) struct AuthedLimited<const C: u8>(pub(crate) SessionContext);
+
+impl<const C: u8> FromRequestParts<AppState> for AuthedLimited<C> {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        // Authenticate first: the charge belongs on the account, not an address.
+        let Authed(ctx) = Authed::from_request_parts(parts, state).await?;
+        enforce(state, parts, Some(&ctx), class_of(C))?;
+        Ok(AuthedLimited(ctx))
     }
 }
 

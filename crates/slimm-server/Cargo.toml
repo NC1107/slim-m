@@ -39,8 +39,12 @@ crypto_box.workspace = true
 reqwest.workspace = true
 url.workspace = true
 ed25519-dalek.workspace = true
-# tower::ServiceExt::oneshot asks the router what it serves (http/capability.rs).
-tower = { version = "0.5", features = ["util"] }
+# `util` for ServiceExt::oneshot, which asks the router what it serves
+# (http/capability.rs); `limit` for the router's concurrency bound. Both named
+# explicitly rather than relied on through feature unification: `timeout` is
+# reachable today only because reqwest happens to enable it, which would break
+# confusingly in an unrelated crate if reqwest ever went away.
+tower = { version = "0.5", features = ["util", "limit"] }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

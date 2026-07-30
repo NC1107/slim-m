@@ -92,6 +92,28 @@ impl Store {
         Ok((code, expires_at))
     }
 
+    /// Whether a reset code could currently be spent, without spending it.
+    ///
+    /// One indexed lookup, for a caller that wants to refuse a doomed request
+    /// before paying for something expensive. Deliberately advisory: it is not
+    /// an authorization decision and races anything, which is why
+    /// [`Store::consume_reset_code`] re-checks the same conditions inside its
+    /// own transaction and remains the only thing that can spend a code. Same
+    /// two-layer shape `register` uses for the invite gate.
+    pub async fn reset_code_is_live(&self, code: &str) -> anyhow::Result<bool> {
+        let hash = hash_secret(code);
+        let now = now_ms();
+        let found = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM password_reset_codes
+               WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?"#,
+            hash,
+            now
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(found.is_some())
+    }
+
     /// Spends a reset code exactly once, setting a new password hash and
     /// revoking every live session on the account. Returns the sessions that
     /// were revoked, so the caller can close their live sockets the same way

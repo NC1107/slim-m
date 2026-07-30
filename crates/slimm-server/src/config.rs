@@ -69,6 +69,26 @@ pub struct Config {
     /// so only a web build of the client needs this; see [`crate::cors`] for
     /// why that default is the safe one.
     pub cors_allowed_origins: Option<String>,
+
+    /// How many reverse proxies in front of this server may be believed about
+    /// who an unauthenticated caller is, for rate limiting.
+    ///
+    /// Zero, the default, believes none of them and keys on the TCP peer, which
+    /// is the only safe answer for a directly-exposed server: `X-Forwarded-For`
+    /// is unsigned and anyone may send one.
+    ///
+    /// Set it to the number of proxies you actually run - 1 behind the Caddy in
+    /// `deploy/` - and the address that many places from the right of that
+    /// header is used instead. Counting from the right is what makes it safe;
+    /// see [`crate::http::extract::limit_key`].
+    ///
+    /// Getting it wrong is not equally bad in both directions. Too low keys
+    /// every unauthenticated caller together, so one of them can hold a bucket
+    /// empty for everybody. Too high reads an address the client chose, so each
+    /// caller can mint unlimited buckets. Neither is silent in the logs, but
+    /// only the second is a bypass, which is why the default is zero.
+    #[serde(default)]
+    pub trust_proxy_hops: usize,
 }
 
 fn default_port() -> u16 {
@@ -105,6 +125,7 @@ impl Default for Config {
             attachments_dir: default_attachments_dir(),
             attachment_max_bytes: default_attachment_max_bytes(),
             cors_allowed_origins: None,
+            trust_proxy_hops: 0,
         }
     }
 }

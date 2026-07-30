@@ -13,12 +13,20 @@ use crate::ids::{ChannelId, MessageId, Seq, UserId};
 impl Store {
     /// Advances a user's last-read marker in a channel. Monotonic: a lower seq
     /// never moves it backwards, so out-of-order marks are safe.
+    ///
+    /// Clamped to what the channel has actually reached, because the monotonic
+    /// `MAX` below makes an over-large value permanent: one mark of `i64::MAX`
+    /// pinned the marker there for good and left the unread count reading zero
+    /// for every future message, with nothing in the API able to lower it again.
+    /// Only `VIEW_CHANNEL` is needed to reach this, and the counter read is a
+    /// single indexed lookup rather than a scan of the messages.
     pub async fn mark_read(
         &self,
         user_id: UserId,
         channel_id: ChannelId,
         seq: i64,
     ) -> anyhow::Result<()> {
+        let seq = seq.min(self.latest_message_seq(channel_id).await?);
         let now = now_ms();
         sqlx::query!(
             "INSERT INTO read_states (user_id, channel_id, last_read_seq, updated_at)

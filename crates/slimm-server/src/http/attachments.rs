@@ -17,7 +17,6 @@
 use axum::Router;
 use axum::body::Body;
 use axum::extract::{DefaultBodyLimit, Path, State};
-use axum::http::request::Parts;
 use axum::http::{HeaderName, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -26,10 +25,9 @@ use sha2::{Digest, Sha256};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Bytes, Json, Query, enforce};
+use super::extract::{Authed, AuthedLimited, Bytes, Json, Query, UPLOAD};
 use crate::media;
 use crate::permissions::Permissions;
-use crate::ratelimit::Class;
 
 /// A fetched attachment's bytes never change (they are keyed by their own
 /// content hash), so a client may cache one forever.
@@ -71,6 +69,12 @@ struct UploadParams {
 /// the two leaves an orphaned file (harmless, eventually swept) rather than a
 /// row that promises bytes which were never actually written.
 ///
+/// The rate limit is charged in the signature rather than in the body, and that
+/// ordering is the point: `Bytes` is a `FromRequest` extractor, so it resolves
+/// last and the whole body was buffered before the old `enforce` call ever ran.
+/// A caller over budget, or holding no ATTACH_FILES bit at all, still cost the
+/// process the memory and the bandwidth of the upload.
+///
 /// Requires ATTACH_FILES deployment-wide. An upload names no channel, so the
 /// per-channel check still happens when the resulting id is attached to a
 /// message; this is the half that was missing entirely. Until it existed the
@@ -78,14 +82,11 @@ struct UploadParams {
 /// attachments everywhere - or one currently timed out - could still write
 /// bytes into media storage.
 async fn upload(
-    Authed(ctx): Authed,
-    parts: Parts,
+    AuthedLimited(ctx): AuthedLimited<UPLOAD>,
     Query(params): Query<UploadParams>,
     State(state): State<AppState>,
     Bytes(body): Bytes,
 ) -> Result<(StatusCode, Json<AttachmentUploadDto>), ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Upload)?;
-
     // Deployment-wide because an upload names no channel; see the note above.
     if !state
         .store
