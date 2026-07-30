@@ -13,7 +13,10 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../routing/routes.dart';
+import '../server_address_reduction.dart';
+import '../server_scheme_policy.dart';
 import '../widgets/onboarding_shell.dart';
+import '../widgets/server_identity_confirmation.dart';
 import '../widgets/server_notice.dart';
 
 /// Sign in or create an account on a chosen server.
@@ -58,6 +61,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Version? _probed;
   Timer? _probeDebounce;
 
+  /// How [_probed]'s identity compares against whatever this app already
+  /// pinned for the address in the field. Read alongside [_probed] so the
+  /// chip never has to guess a status for an answer it has not seen yet.
+  ServerIdentityStatus? _identityStatus;
+
   @override
   void initState() {
     super.initState();
@@ -87,11 +95,25 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
       return null;
     }
-    return Uri(
-      scheme: parsed.scheme,
-      host: parsed.host,
-      port: parsed.hasPort ? parsed.port : null,
-    );
+    return reduceServerAddress(parsed);
+  }
+
+  /// How [identity] compares against whatever is pinned for [target], for
+  /// the passive chip only: read-only, no pinning and no navigation. The
+  /// active check that pins and can block a connection lives in [_submit],
+  /// via [confirmServerIdentity].
+  Future<ServerIdentityStatus> _identityStatusFor(
+    Uri target,
+    ServerIdentity? identity,
+  ) async {
+    if (identity == null) return ServerIdentityStatus.unknown;
+    final pinned = await ref
+        .read(keyStoreProvider)
+        .read(identityHandleFor(target));
+    if (pinned == null) return ServerIdentityStatus.unknown;
+    return pinned == identity.publicKey
+        ? ServerIdentityStatus.confirmed
+        : ServerIdentityStatus.mismatch;
   }
 
   /// Asks the server in the field what it is, so the facts worth knowing
@@ -110,7 +132,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Future<void> _probeServer() async {
     final target = _probeTarget(_server.text);
     if (target == null) {
-      setState(() => _probed = null);
+      setState(() {
+        _probed = null;
+        _identityStatus = null;
+      });
       return;
     }
     final client = ref.read(probeApiProvider)(target);
@@ -127,16 +152,23 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     } finally {
       client.close();
     }
+    final status = await _identityStatusFor(target, answer?.identity);
     if (!mounted) return;
     if (_probeTarget(_server.text) == target) {
-      setState(() => _probed = answer);
+      setState(() {
+        _probed = answer;
+        _identityStatus = status;
+      });
     }
   }
 
   void _onServerEdited(String _) {
     // The old answer is about the old address the moment the field changes.
     if (_probed != null) {
-      setState(() => _probed = null);
+      setState(() {
+        _probed = null;
+        _identityStatus = null;
+      });
     }
     _probeDebounce?.cancel();
     _probeDebounce = Timer(const Duration(milliseconds: 600), _probeServer);
@@ -157,6 +189,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   ///
   /// Push registration is fire-and-forget: a denied permission or unreachable
   /// server must never hold up a sign-in that is already complete.
+  ///
+  /// The address is reduced and its identity confirmed before anything is
+  /// persisted or sent: this is "connecting", in the sense
+  /// [confirmServerIdentity] means it, and binding the check here (rather
+  /// than to the field being typed) is what makes a returning sign-in - not
+  /// only the manual onboarding dialog - a place TOFU's comparison runs.
   Future<void> _submit() async {
     final address = Uri.tryParse(_server.text.trim());
     if (address == null || !address.hasScheme || address.host.isEmpty) {
@@ -169,12 +207,24 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       return;
     }
 
+    if (requireSecureScheme(address) case final schemeError?) {
+      setState(() => _error = (_ErrorField.server, schemeError));
+      return;
+    }
+
     setState(() {
       _busy = true;
       _error = null;
     });
 
-    ref.read(chosenServerProvider.notifier).choose(address);
+    final reduced = reduceServerAddress(address);
+    if (!await confirmServerIdentity(context, ref, reduced)) {
+      if (mounted) setState(() => _busy = false);
+      return;
+    }
+    if (!mounted) return;
+
+    ref.read(chosenServerProvider.notifier).choose(reduced);
     final api = ref.read(apiProvider);
 
     final invite = ref.read(pendingInviteProvider);
@@ -269,7 +319,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ServerIdentityChip(
               spaceName: version.name,
               host: Uri.tryParse(_server.text)?.host ?? _server.text,
-              confirmed: version.identity != null,
+              status: _identityStatus ?? ServerIdentityStatus.unknown,
             ),
           const SizedBox(height: AppSpacing.s8),
           TextField(
