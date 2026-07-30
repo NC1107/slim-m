@@ -108,9 +108,12 @@ class _RoleCardState extends ConsumerState<_RoleCard> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      role.name,
-                      style: TextStyle(color: tokens.textPrimary),
+                    Flexible(
+                      child: Text(
+                        role.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: tokens.textPrimary),
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.s8),
                     if (role.isEveryone)

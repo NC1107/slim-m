@@ -111,13 +111,23 @@ class SlimMApp extends ConsumerWidget {
       // which is what made the settings and administration screens read as a
       // phone blown up. Applied here rather than per screen so a new one
       // cannot forget, and read from the window so nothing has to say which.
-      builder: (context, child) => ListTileTheme.merge(
-        dense: !AppTouchTargets.of(context),
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: appChromeBuilder,
     );
   }
 }
+
+/// The one wrapper every top-level `MaterialApp` in this app must apply.
+///
+/// Pulled out of [SlimMApp.build] so the UI snapshot test harness can import
+/// and reuse this exact function rather than rebuilding its own copy: a copy
+/// is what previously let the harness render every desktop settings and
+/// admin screen at touch density, silently, because it had drifted from what
+/// this file actually wraps the router in.
+Widget appChromeBuilder(BuildContext context, Widget? child) =>
+    ListTileTheme.merge(
+      dense: !AppTouchTargets.of(context),
+      child: child ?? const SizedBox.shrink(),
+    );
 
 ThemeMode _themeModeFor(AppThemeChoice choice) => switch (choice) {
   AppThemeChoice.system => ThemeMode.system,
