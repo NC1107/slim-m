@@ -5,6 +5,7 @@
 /// "not present", and treating them the same would have the client tell
 /// someone an older server has no safety tools when it has simply never been
 /// asked.
+library;
 
 import 'package:slimm_api/api.dart';
 import 'package:test/test.dart';

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /// What a server says about itself before anyone signs in: its build, the
 /// protocol it speaks, what it can do, and the identity a client pins.
+library;
 
 import 'models_identity.dart';
 

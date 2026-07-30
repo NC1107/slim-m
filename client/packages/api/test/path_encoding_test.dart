@@ -4,6 +4,7 @@
 /// which resource a request reaches. Mirrors finding 9 of
 /// docs/research/audit-2026-07-30/security.md, including its own worked
 /// example (`../../account` resolving away the intended reactions path).
+library;
 
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
