@@ -5,9 +5,32 @@ part of 'client.dart';
 /// that filing a report, checking an invite, and redeeming one (all in
 /// client.dart) do not cover.
 extension SlimmApiModeration on SlimmApi {
-  /// The open moderation queue, oldest first. Requires MANAGE_MESSAGES.
-  Future<List<Report>> listOpenReports() async {
-    final json = await _send('GET', '/reports');
+  /// One page of the open moderation queue, oldest first. Requires
+  /// MANAGE_MESSAGES.
+  ///
+  /// The cursor is composite and exclusive: pass the `createdAt` *and* `id` of
+  /// the last report already held. Both or neither - `createdAt` is
+  /// milliseconds, so reports can share one, and a timestamp-only cursor skips
+  /// every remaining member of a tied group a page boundary falls inside.
+  ///
+  /// Channels the caller cannot moderate are excluded server-side before the
+  /// limit, not after it, so a short page means the end of the queue and
+  /// nothing else.
+  Future<List<Report>> listOpenReports({
+    int? after,
+    String? afterId,
+    int? limit,
+  }) async {
+    final query = <String, String>{
+      if (after != null) 'after': '$after',
+      if (afterId != null) 'after_id': afterId,
+      if (limit != null) 'limit': '$limit',
+    };
+    final json = await _send(
+      'GET',
+      '/reports',
+      query: query.isEmpty ? null : query,
+    );
     return (json as List<dynamic>)
         .map((r) => Report.fromJson(r as Map<String, dynamic>))
         .toList(growable: false);

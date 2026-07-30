@@ -16,13 +16,6 @@ use crate::ids::{ChannelId, RoleId, UserId};
 use crate::permissions::{Overwrite, Permissions, evaluate};
 
 impl Store {
-    /// Live users who can view a channel: the recipient set for push fan-out.
-    /// A nonexistent channel yields nobody, the same as [`Self::permissions_in_channel`].
-    pub async fn channel_viewer_ids(&self, channel_id: ChannelId) -> anyhow::Result<Vec<UserId>> {
-        let live = self.live_user_ids().await?;
-        self.viewers_among(channel_id, &live).await
-    }
-
     /// Which of `candidates` hold VIEW_CHANNEL in `channel_id`, answered with
     /// a bounded number of queries instead of a full evaluation per candidate.
     ///
@@ -35,9 +28,18 @@ impl Store {
     /// candidate, so the answers are identical by construction.
     ///
     /// A DM never reaches the evaluator, mirroring
-    /// [`Self::permissions_in_channel`]: its pair is fetched once and only
-    /// members of it are checked further, so the candidate count stops
-    /// mattering there too.
+    /// [`Self::permissions_in_channel`]. Its pair is fetched once here and the
+    /// candidates are narrowed to it before anything else is asked, so the
+    /// candidate count stops mattering on that branch too.
+    ///
+    /// It did not, until 2026-07-30. This doc comment and the one inside the
+    /// branch both claimed the loop was bounded at two real checks while it ran
+    /// `dm_permissions` - itself a `dm_channels` lookup plus up to two block
+    /// lookups - once per candidate. The cost was negligible in practice, since
+    /// the candidates are a self-host's push-registered users, which is exactly
+    /// why nothing caught it; a comment stating a bound that is not there is
+    /// worse than no comment, because the next reader believes it and looks
+    /// somewhere else.
     pub async fn viewers_among(
         &self,
         channel_id: ChannelId,
@@ -61,9 +63,15 @@ impl Store {
         };
 
         if channel.kind == super::dms::DM_CHANNEL_KIND {
+            let Some((user_a, user_b)) = self.dm_pair(channel_id).await? else {
+                return Ok(Vec::new());
+            };
             let mut viewers = Vec::new();
-            // dm_permissions passes at most the pair, bounding this loop at two real checks.
+            // Narrowed to the pair first, so this really is at most two checks.
             for &user_id in candidates {
+                if user_id != user_a && user_id != user_b {
+                    continue;
+                }
                 if self
                     .dm_permissions(user_id, channel_id)
                     .await?
@@ -165,15 +173,28 @@ impl Store {
         Ok(viewers)
     }
 
-    /// The channels this user can view, in rail order: [`Store::list_channels`]
-    /// filtered by VIEW_CHANNEL with the caller's role context loaded once.
+    /// The channels this user can view, in rail order.
+    pub async fn visible_channels(&self, user_id: UserId) -> anyhow::Result<Vec<super::Channel>> {
+        self.channels_where(user_id, Permissions::VIEW_CHANNEL)
+            .await
+    }
+
+    /// [`Store::list_channels`] filtered by `needed`, with the caller's role
+    /// context loaded once. DMs and deleted channels are outside it, because
+    /// they are outside `list_channels`.
     ///
-    /// The handler used to ask [`Self::has_permission`] per channel, which
+    /// The rail handler used to ask [`Self::has_permission`] per channel, which
     /// re-fetched the channel row it already held and the same role context
     /// every iteration - 1 + 4C queries for C channels on a request every
     /// client fires at startup. This is four queries however many channels
-    /// exist, evaluated by the same pure [`evaluate`].
-    pub async fn visible_channels(&self, user_id: UserId) -> anyhow::Result<Vec<super::Channel>> {
+    /// exist, evaluated by the same pure [`evaluate`]. The moderation queue
+    /// asks the same question about MANAGE_MESSAGES, which is why the
+    /// permission is a parameter rather than the VIEW_CHANNEL this started as.
+    pub async fn channels_where(
+        &self,
+        user_id: UserId,
+        needed: Permissions,
+    ) -> anyhow::Result<Vec<super::Channel>> {
         let channels = self.list_channels().await?;
         if channels.is_empty() {
             return Ok(channels);
@@ -246,7 +267,7 @@ impl Store {
                     member_overwrite,
                 )
                 .remove(timeout_deny)
-                .contains(Permissions::VIEW_CHANNEL)
+                .contains(needed)
             })
             .collect())
     }
