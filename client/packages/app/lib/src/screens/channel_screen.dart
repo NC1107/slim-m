@@ -249,11 +249,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
           orElse: () => const <String>{},
         );
     final customEmoji = ref.watch(customEmojiIndexProvider);
-    final transcript =
-        ref
-            .watch(visibleChannelMessagesProvider(widget.channelId))
-            .valueOrNull ??
-        const VisibleTranscript(messages: [], newestSeq: 0);
+    final blocked = ref.watch(blocksProvider.select((state) => state.ids));
     final extrasById = ref.watch(messageExtrasProvider);
     final syncStatus = ref.watch(syncControllerProvider);
     final myId = ref.watch(meProvider).valueOrNull?.id;
@@ -278,10 +274,6 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               .firstOrNull;
           final channelName = channel?.name ?? '';
           final lastReadSeq = channel?.lastReadSeq ?? 0;
-          // Not while search stands in: the newest message is not on screen.
-          if (search.query == null) {
-            _markReadUpToLatest(transcript.newestSeq, lastReadSeq);
-          }
 
           return Column(
             children: [
@@ -315,43 +307,57 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                           forbidden: search.forbidden,
                           onRetry: () => _search(search.query!),
                         )
-                      : MessageTranscript(
-                          messages: transcript.messages,
-                          syncStatus: syncStatus,
-                          // Only a real named channel gets the header; a DM's name is a person, and voice never reaches here.
-                          channelName: channel?.kind == 'text'
-                              ? channelName
-                              : null,
-                          channelTopic: channel?.topic,
-                          scrollController: _scroll,
-                          lastReadSeq: lastReadSeq,
-                          editingId: _editingId,
-                          knownUsernames: knownUsernames,
-                          customEmoji: customEmoji,
-                          extrasById: extrasById,
-                          actionsFor: (message) => _actionsFor(
-                            message,
-                            myId: myId,
-                            myPermissions: myPermissions,
-                            pinnedIds: pinnedIds,
-                          ),
-                          onRetry: (m) => unawaited(retryMessage(ref, m)),
-                          onDiscard: (m) => unawaited(discardMessage(ref, m)),
-                          // Failed text lands back in the composer to fix
-                          // and resend; the failed row is then discarded,
-                          // so nothing the user wrote is ever lost.
-                          onEditFailed: (m) {
-                            _composer.text = m.content;
-                            unawaited(discardMessage(ref, m));
+                      : StreamBuilder<List<Message>>(
+                          stream: store.watchChannel(widget.channelId),
+                          builder: (context, snapshot) {
+                            final transcript = visibleTranscript(
+                              snapshot.data ?? const <Message>[],
+                              blocked,
+                            );
+                            _markReadUpToLatest(
+                              transcript.newestSeq,
+                              lastReadSeq,
+                            );
+                            return MessageTranscript(
+                              messages: transcript.messages,
+                              syncStatus: syncStatus,
+                              // Only a real named channel gets the header; a DM's name is a person, and voice never reaches here.
+                              channelName: channel?.kind == 'text'
+                                  ? channelName
+                                  : null,
+                              channelTopic: channel?.topic,
+                              scrollController: _scroll,
+                              lastReadSeq: lastReadSeq,
+                              editingId: _editingId,
+                              knownUsernames: knownUsernames,
+                              customEmoji: customEmoji,
+                              extrasById: extrasById,
+                              actionsFor: (message) => _actionsFor(
+                                message,
+                                myId: myId,
+                                myPermissions: myPermissions,
+                                pinnedIds: pinnedIds,
+                              ),
+                              onRetry: (m) => unawaited(retryMessage(ref, m)),
+                              onDiscard: (m) =>
+                                  unawaited(discardMessage(ref, m)),
+                              // Failed text lands back in the composer to fix
+                              // and resend; the failed row is then discarded,
+                              // so nothing the user wrote is ever lost.
+                              onEditFailed: (m) {
+                                _composer.text = m.content;
+                                unawaited(discardMessage(ref, m));
+                              },
+                              onPickReaction: (m, emoji) =>
+                                  unawaited(_pickReaction(m, emoji)),
+                              onReactionTap: (m, reaction) =>
+                                  unawaited(_toggleReaction(m, reaction)),
+                              onVote: (m, option) =>
+                                  unawaited(castVote(ref, m.id, option)),
+                              onSubmitEdit: _submitEdit,
+                              onCancelEdit: _cancelEdit,
+                            );
                           },
-                          onPickReaction: (m, emoji) =>
-                              unawaited(_pickReaction(m, emoji)),
-                          onReactionTap: (m, reaction) =>
-                              unawaited(_toggleReaction(m, reaction)),
-                          onVote: (m, option) =>
-                              unawaited(castVote(ref, m.id, option)),
-                          onSubmitEdit: _submitEdit,
-                          onCancelEdit: _cancelEdit,
                         ),
                 ),
               ),

@@ -38,7 +38,7 @@ class HomeShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final layout = LayoutClass.of(context);
     final selected = selectedChannelId(context);
-    // Fetched with the shell, since the transcript waits for it to settle.
+    // With the shell, or the first surface to consult it filters against none.
     ref.watch(blocksProvider);
     // Never below expanded width, whatever the header toggle says: it can only
     // hide the pane, not summon room for it that is not there.

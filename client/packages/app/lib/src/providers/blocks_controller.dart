@@ -179,49 +179,41 @@ class VisibleTranscript {
   /// Read state has to keep counting them. A blocked author's message is hidden,
   /// not unreceived, and a marker that only advanced past what is shown would
   /// leave the channel lit as unread forever the moment they had the last word.
+  ///
+  /// KNOWN GAP, deliberately left: this filters against whatever is known, so a
+  /// launch can paint a blocked author's message for the frames between the
+  /// local store answering (fast, on disk) and `GET /blocks` answering (a round
+  /// trip). Holding the transcript back until the block set settled was tried
+  /// and reverted - it couples every channel's first paint to an unrelated
+  /// network call. The real answer is a block set persisted beside the session,
+  /// known synchronously at launch, with the fetch only correcting it.
   final int newestSeq;
 }
 
-/// One channel's transcript with blocked authors dropped.
+/// Builds the transcript to render from the local store's rows.
 ///
-/// The screen reads this rather than the store directly, so the filter is a
-/// property of the only stream it can get at instead of a `where` clause
-/// somebody has to remember at each place messages are rendered.
+/// A pure function with one call site rather than a provider wrapping the
+/// stream, which is what this was first: a `StreamProvider.autoDispose.family`
+/// watched from the screen thrashed create-and-dispose against drift's
+/// deferred stream cleanup, and `pumpAndSettle` then never settled - which
+/// hung `home_shell_test` and `router_recovery_test` and looked exactly like
+/// CI being slow. The screen keeps its own long-lived subscription to
+/// `watchChannel` and hands the rows here.
 ///
-/// Watching the block set re-subscribes on a block or an unblock, which is what
-/// makes both take effect on the open channel without a refetch.
-///
-/// KNOWN GAP, deliberately left: this filters against whatever is known, so a
-/// launch can paint a blocked author's message for the frames between the local
-/// store answering (fast, on disk) and `GET /blocks` answering (a round trip).
-/// Holding the transcript back until the block set settled was tried and
-/// reverted: it couples the first paint of every channel to an unrelated network
-/// call, and an empty stream standing in meanwhile stops `pumpAndSettle` ever
-/// settling. The real answer is a block set persisted beside the session, so it
-/// is known synchronously at launch and the fetch only corrects it - which is
-/// its own change, with its own sign-out handling to get right.
-///
-/// It returns the store's own stream mapped, never an `async*` body delegating to
-/// it with `yield*`. Cancelling that shape deadlocks a widget test: drift defers
-/// a cancelled query stream's cleanup onto a zero-duration timer, and the fake
-/// clock only advances on the next pump, which never comes.
-final visibleChannelMessagesProvider = StreamProvider.autoDispose
-    .family<VisibleTranscript, String>((ref, channelId) {
-      final store = ref.watch(storeProvider).valueOrNull;
-      if (store == null) return const Stream<VisibleTranscript>.empty();
-      final blocked = ref.watch(blocksProvider.select((state) => state.ids));
-      return store.watchChannel(channelId).map((rows) {
-        var newestSeq = 0;
-        for (final message in rows) {
-          if (!message.pending && message.seq > newestSeq) {
-            newestSeq = message.seq;
-          }
-        }
-        return VisibleTranscript(
-          messages: rows
-              .where((message) => !blocked.contains(message.authorId))
-              .toList(growable: false),
-          newestSeq: newestSeq,
-        );
-      });
-    });
+/// Filtering stays in one named place with the reasoning attached, which was
+/// the point: what it is not any more is something a new render site gets for
+/// free. A second transcript surface has to call this.
+VisibleTranscript visibleTranscript(List<Message> rows, Set<String> blocked) {
+  var newestSeq = 0;
+  for (final message in rows) {
+    if (!message.pending && message.seq > newestSeq) {
+      newestSeq = message.seq;
+    }
+  }
+  return VisibleTranscript(
+    messages: rows
+        .where((message) => !blocked.contains(message.authorId))
+        .toList(growable: false),
+    newestSeq: newestSeq,
+  );
+}

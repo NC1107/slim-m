@@ -154,10 +154,12 @@ It is the obvious way to stop a launch painting a blocked author for a frame, an
 The residual is recorded in `blocks_controller.dart` with the real answer named - a block set persisted beside the session, known synchronously at launch, with the fetch only correcting it.
 Search, pins and typing filter against whatever is known for the same reason, so all four surfaces behave alike.
 
-**A `StreamProvider` body must return the stream, not `yield*` it.**
-Cancelling an `async*` generator that delegates to a drift query stream deadlocks a widget test: drift defers a cancelled stream's cleanup onto a zero-duration timer, and the fake clock only advances on the next pump, which never comes.
-The symptom is the test hanging until the harness kills it and flutter_tools crashing with "Cannot close sink while adding stream", which names nothing relevant.
-Mapping the stream directly has none of that and is shorter.
+**Do not put a drift query stream behind a `StreamProvider` a screen watches.**
+Two shapes of this were tried and both hang a widget test, with the same useless symptom: the test never completes, flutter_tools crashes with "Cannot close sink while adding stream", and from CI it is indistinguishable from a slow job.
+An `async*` body that `yield*`s the stream deadlocks on cancellation, because drift defers a cancelled stream's cleanup onto a zero-duration timer the fake clock only advances on the next pump, which never comes.
+Returning the mapped stream directly fixes that one and then hits the other: a `StreamProvider.autoDispose.family` watched from a `ConsumerState.build` thrashes create-and-dispose against that same deferred cleanup, and `pumpAndSettle` never settles - which took out `home_shell_test` and `router_recovery_test`, neither of which has anything to do with the feature.
+The transcript keeps its own long-lived `StreamBuilder` on `watchChannel` and hands the rows to a pure `visibleTranscript` function.
+That gives up one thing worth naming: filtering is no longer a property of the only stream a screen can reach, so a second transcript surface has to call the function rather than getting it for free.
 
 Also done here: report and block existed twice, once per subject kind, with byte-identical copy in `member_actions.dart` and `channel_message_actions.dart`; they are one implementation in `widgets/safety_actions.dart` with two call sites now.
 The blocked list rendered raw 36-character uuids where names belong (it reads as corruption, and two of them cannot be told apart) and resolves through `userProfileProvider`.
