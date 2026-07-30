@@ -23,16 +23,26 @@ import 'app_typography.dart';
 /// drifting toward default Material. Buttons take the control radius (6, not
 /// full), inputs take the hairline box `AppInput` draws, and the text theme
 /// carries this system's scale, whose heaviest weight is 600 by rule.
+///
+/// Both accent roles are pinned to their tokens rather than left to
+/// `fromSeed`, for one reason: Material derives its own tone from the seed,
+/// and a derived tone is a different colour from the hand-picked token even
+/// when the seed *is* that token. `error` was pinned an audit round ago after
+/// two reds meaning "danger" turned up across the app. `primary` was left out
+/// and had the same effect on every raw `FilledButton`, `TextButton` and
+/// `OutlinedButton`, so the front door's button and the wordmark beside it
+/// were measurably two different accents. Pinning both makes any raw
+/// `colorScheme.primary` or `.error` correct by construction rather than by
+/// every call site remembering.
 ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
-  // error is overridden, not left to fromSeed: Material derives its own red
-  // from the accent seed, which is a different colour from the hand-picked
-  // danger tokens. Two reds meaning "danger" were in use across the app; this
-  // makes any raw colorScheme.error correct by construction.
+  // Overridden, never left to fromSeed; see this function's own doc comment.
   final scheme = ColorScheme.fromSeed(
     seedColor: tokens.accentFill,
     brightness: brightness,
   ).copyWith(
     surface: tokens.surfaceBase,
+    primary: tokens.accentFill,
+    onPrimary: tokens.accentOn,
     error: tokens.dangerText,
   );
 
@@ -138,6 +148,17 @@ ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
         borderSide: BorderSide(color: tokens.dangerBorder, width: 2),
       ),
       errorStyle: AppText.caption.copyWith(color: tokens.dangerText),
+      labelStyle: AppText.body.copyWith(color: tokens.textSecondary),
+      floatingLabelStyle: AppText.caption.copyWith(color: tokens.textSecondary),
+      hintStyle: AppText.body.copyWith(color: tokens.textDisabled),
+      helperStyle: AppText.caption.copyWith(color: tokens.textSecondary),
+    ),
+    // Raw ListTiles took M3's onSurface, putting two blacks in one panel.
+    listTileTheme: ListTileThemeData(
+      textColor: tokens.textPrimary,
+      iconColor: tokens.textSecondary,
+      titleTextStyle: AppText.body.copyWith(color: tokens.textPrimary),
+      subtitleTextStyle: AppText.caption.copyWith(color: tokens.textSecondary),
     ),
   );
 }
