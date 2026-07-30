@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/emoji_catalog_provider.dart';
+import 'image_decode.dart';
 
 /// The emoji id a `:shortcode:` names, or null when [token] names none of the
 /// deployment's own. [index] is `customEmojiIndexProvider`'s name-to-id map.
@@ -48,6 +49,8 @@ class CustomEmojiImage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final bytes = ref.watch(customEmojiImageProvider(emojiId));
+    // Never decodes past the pixels this tile is ever drawn at.
+    final edge = decodeEdge(context, size);
     final image = SizedBox(
       width: size,
       height: size,
@@ -56,6 +59,8 @@ class CustomEmojiImage extends ConsumerWidget {
           value,
           fit: BoxFit.contain,
           gaplessPlayback: true,
+          cacheWidth: edge,
+          cacheHeight: edge,
         ),
         // A fetch that failed says so rather than leaving a tile that looks
         // tappable and blank; one still in flight just holds the space.

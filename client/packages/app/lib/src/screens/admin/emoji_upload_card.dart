@@ -20,6 +20,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../api_failure.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
+import '../../widgets/image_decode.dart';
 import 'emoji_name.dart';
 
 /// Picks an image and returns its bytes, or null if nothing was chosen.
@@ -273,9 +274,9 @@ class _EmojiImagePreview extends StatelessWidget {
 
     return Row(
       children: [
-        _swatch(data, 20, tokens),
+        _swatch(context, data, 20, tokens),
         const SizedBox(width: AppSpacing.s12),
-        _swatch(data, 32, tokens),
+        _swatch(context, data, 32, tokens),
         const Spacer(),
         AppIconButton(
           icon: AppIcons.dismiss,
@@ -286,7 +287,12 @@ class _EmojiImagePreview extends StatelessWidget {
     );
   }
 
-  Widget _swatch(Uint8List data, double size, AppTokens tokens) => Container(
+  Widget _swatch(
+    BuildContext context,
+    Uint8List data,
+    double size,
+    AppTokens tokens,
+  ) => Container(
     width: size,
     height: size,
     alignment: Alignment.center,
@@ -294,6 +300,13 @@ class _EmojiImagePreview extends StatelessWidget {
       border: Border.all(color: tokens.borderSubtle),
       borderRadius: BorderRadius.circular(AppRadii.control),
     ),
-    child: Image.memory(data, fit: BoxFit.contain, gaplessPlayback: true),
+    // Never decodes past the pixels this swatch is ever drawn at.
+    child: Image.memory(
+      data,
+      fit: BoxFit.contain,
+      gaplessPlayback: true,
+      cacheWidth: decodeEdge(context, size),
+      cacheHeight: decodeEdge(context, size),
+    ),
   );
 }

@@ -25,10 +25,15 @@ class SettingsSelectRow<T> extends StatelessWidget {
     required this.onChanged,
     this.sheetTitle,
     this.sheetFootnote,
+    this.unknownLabel = 'Unknown',
   });
 
   final String label;
-  final T value;
+
+  /// Null means "no choice known yet", not any of [choices]: a caller with
+  /// nothing to read the current value back from must be able to say so
+  /// rather than being forced to assert one of the real choices in its place.
+  final T? value;
   final List<SettingsChoice<T>> choices;
   final ValueChanged<T> onChanged;
 
@@ -41,9 +46,17 @@ class SettingsSelectRow<T> extends StatelessWidget {
   /// nobody asked yet.
   final String? sheetFootnote;
 
-  String get _currentLabel => choices
-      .firstWhere((c) => c.value == value, orElse: () => choices.first)
-      .label;
+  /// Shown in place of a choice's label when [value] is null. Must never be a
+  /// real choice's own label, or "not known" reads as that choice.
+  final String unknownLabel;
+
+  String get _currentLabel {
+    final current = value;
+    if (current == null) return unknownLabel;
+    return choices
+        .firstWhere((c) => c.value == current, orElse: () => choices.first)
+        .label;
+  }
 
   /// Opens the choice sheet standalone, for a caller that wants this row's
   /// picker without its [AppListRow] presentation: [JoinPolicyRow] renders
@@ -51,7 +64,7 @@ class SettingsSelectRow<T> extends StatelessWidget {
   static Future<T?> pick<T>(
     BuildContext context, {
     required String title,
-    required T value,
+    required T? value,
     required List<SettingsChoice<T>> choices,
     String? footnote,
   }) {

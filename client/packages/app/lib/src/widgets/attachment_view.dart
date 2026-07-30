@@ -17,6 +17,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/attachment_bytes.dart';
 import 'fullscreen_image_viewer.dart';
+import 'image_decode.dart';
 import 'message_row_parts.dart' show AttachmentPlaceholder;
 
 /// Mirrors `media::is_inline` in `crates/slimm-server/src/media.rs`: the
@@ -129,10 +130,12 @@ class AttachmentView extends ConsumerWidget {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadii.control),
+                // Never decodes wider than the column can ever draw it.
                 child: Image.memory(
                   bytes,
                   fit: BoxFit.contain,
                   semanticLabel: attachment.filename,
+                  cacheWidth: decodeEdge(context, kMessageColumnMax),
                 ),
               ),
             ),

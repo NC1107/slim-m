@@ -81,6 +81,51 @@ ProviderContainer _container() => ProviderContainer(
   ],
 );
 
+/// `/presence` refuses every request; `/me` still answers so the footer has
+/// a caller to render.
+ProviderContainer _containerFailingPresence() => ProviderContainer(
+  overrides: [
+    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+    sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+    syncControllerProvider.overrideWith(_StubSyncController.new),
+    apiProvider.overrideWith((ref) {
+      final client = api.SlimmApi(
+        baseUrl: Uri.parse('http://localhost:8080'),
+        session: ref.watch(sessionProvider),
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/me') {
+            return http.Response(
+              jsonEncode({
+                'id': 'self',
+                'username': 'self',
+                'display_name': 'Self',
+                'created_at': 0,
+                'permissions': 0,
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          if (request.url.path == '/presence') {
+            return http.Response(
+              '{}',
+              500,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response(
+            '{}',
+            404,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      ref.onDispose(client.close);
+      return client;
+    }),
+  ],
+);
+
 Future<void> _pumpFooter(
   WidgetTester tester,
   ProviderContainer container,
@@ -178,5 +223,30 @@ void main() {
         )
         .where((item) => item.selected);
     expect(selected.map((item) => item.label), ['Appear offline']);
+  });
+
+  testWidgets('a refused change restores the previous choice and shows why, '
+      'without closing the menu over it', (tester) async {
+    final container = _containerFailingPresence();
+    addTearDown(container.dispose);
+    container.read(presenceVisibilityDisplayProvider.notifier).state =
+        api.PresenceVisibility.away;
+    await _pumpFooter(tester, container);
+
+    await tester.tap(find.byType(UserAvatar));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Appear offline'));
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(presenceVisibilityDisplayProvider),
+      api.PresenceVisibility.away,
+      reason:
+          'a refusal must never leave the echo asserting a visibility the '
+          'server never applied',
+    );
+    expect(find.byType(AppErrorState), findsOneWidget);
+    // Still open: closing it now would hide the one place showing the error.
+    expect(find.byType(AppMenu), findsOneWidget);
   });
 }

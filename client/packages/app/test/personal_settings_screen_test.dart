@@ -78,6 +78,60 @@ ProviderContainer _signedInContainer(List<Uri> requests) {
   );
 }
 
+/// Like [_signedInContainer], but `/presence` refuses every request.
+ProviderContainer _signedInContainerFailingPresence(List<Uri> requests) {
+  return ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(SessionStore(tokens: _signedIn)),
+      apiProvider.overrideWith((ref) {
+        final api = SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: MockClient((request) async {
+            requests.add(request.url);
+            if (request.url.path == '/devices' ||
+                request.url.path == '/blocks') {
+              return http.Response(
+                '[]',
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            if (request.url.path == '/me') {
+              return http.Response(
+                jsonEncode({
+                  'id': 'self',
+                  'username': 'self',
+                  'display_name': 'Self',
+                  'created_at': 0,
+                  'permissions': 0,
+                }),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            if (request.url.path == '/presence') {
+              return http.Response(
+                '{}',
+                500,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            return http.Response(
+              '{}',
+              404,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        );
+        ref.onDispose(api.close);
+        return api;
+      }),
+    ],
+  );
+}
+
 Widget _screen(ProviderContainer container) => UncontrolledProviderScope(
   container: container,
   child: MaterialApp(
@@ -248,6 +302,67 @@ void main() {
       container.read(presenceVisibilityDisplayProvider),
       PresenceVisibility.away,
     );
+  });
+
+  testWidgets('an unresolved visibility reads as its own Unknown, not Online', (
+    tester,
+  ) async {
+    final requests = <Uri>[];
+    final container = _signedInContainer(requests);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_screen(container));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Status'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(find.text('Status'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Online'),
+      findsNothing,
+      reason:
+          'a value this client cannot read back must never read as the '
+          'most public choice',
+    );
+    expect(find.text('Unknown'), findsOneWidget);
+  });
+
+  testWidgets('a refused presence change keeps the last known choice and '
+      'reports the failure, rather than reading as Online', (tester) async {
+    final requests = <Uri>[];
+    final container = _signedInContainerFailingPresence(requests);
+    addTearDown(container.dispose);
+    container.read(presenceVisibilityDisplayProvider.notifier).state =
+        PresenceVisibility.away;
+
+    await tester.pumpWidget(_screen(container));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Status'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(find.text('Status'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Status'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Appear offline').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(presenceVisibilityDisplayProvider),
+      PresenceVisibility.away,
+      reason:
+          'a refusal must restore the last choice, never keep the one '
+          'the server rejected',
+    );
+    expect(find.text('Online'), findsNothing);
+    expect(find.text('Away'), findsOneWidget);
+    expect(find.byType(AppErrorState), findsOneWidget);
   });
 
   // Once fixed by scrolling the four options horizontally; a sheet now.
