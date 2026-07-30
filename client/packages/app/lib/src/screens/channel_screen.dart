@@ -31,6 +31,7 @@ import '../routing/breakpoints.dart';
 import '../widgets/channel_header.dart';
 import '../widgets/channel_search.dart';
 import '../widgets/composer.dart';
+import '../widgets/jump_to_latest_button.dart';
 import '../widgets/message_context_menu.dart';
 import '../widgets/message_transcript.dart';
 import 'channel_message_actions.dart';
@@ -68,10 +69,31 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// calls for a seq that is already recorded as read.
   final Map<String, int> _markedReadSeq = {};
 
+  /// The channel's newest delivered seq and last-read marker as of the most
+  /// recent build, cached for [_onScrollChanged]: scrolling never rebuilds
+  /// the transcript's `StreamBuilder`, so nothing else keeps these current
+  /// for it.
+  int _latestSeq = 0;
+  int _lastReadSeq = 0;
+
+  /// Whether the transcript is scrolled away from the newest message, for the
+  /// "jump to latest" affordance alone. A [ValueNotifier] rather than a
+  /// `setState`-tracked field on purpose: rebuilding the whole screen on every
+  /// scroll frame that crosses the threshold would make the read marker's own
+  /// correctness depend on that rebuild reaching the transcript's gate, which
+  /// is exactly the coupling [_onScrollChanged] is not allowed to lean on.
+  final ValueNotifier<bool> _scrolledAway = ValueNotifier(false);
+
+  /// How close to [ScrollPosition.minScrollExtent] still counts as "at the
+  /// latest message", covering overscroll bounce and float rounding from
+  /// [_scrollToLatest]'s own animation landing.
+  static const double _atLatestSlop = 4;
+
   @override
   void initState() {
     super.initState();
     unawaited(_hydrateExtras());
+    _scroll.addListener(_onScrollChanged);
   }
 
   @override
@@ -97,7 +119,10 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   @override
   void dispose() {
     _composer.dispose();
-    _scroll.dispose();
+    _scroll
+      ..removeListener(_onScrollChanged)
+      ..dispose();
+    _scrolledAway.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -197,6 +222,10 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// (`MessageStore.setReadMarker`, the server's `PUT .../read`), so a
   /// redundant call is harmless; [_markedReadSeq] exists only to keep a busy
   /// channel from re-sending the same seq on every unrelated rebuild.
+  ///
+  /// Callers are responsible for the scroll gate: this only knows the seq to
+  /// advance to, never whether the viewport is actually showing it, since
+  /// both `build` and [_onScrollChanged] call it under their own check.
   void _markReadUpToLatest(int seq, int lastReadSeq) {
     if (seq == 0) return;
     if (seq <= lastReadSeq) return;
@@ -226,6 +255,27 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         curve: AppMotion.entrance,
       );
     });
+  }
+
+  /// True while the viewport shows the newest message: no scrollable has
+  /// attached yet (nothing has laid out to have scrolled away from, and the
+  /// list starts bottom-anchored so a first paint always begins there), or
+  /// the offset already sits within [_atLatestSlop] of
+  /// [ScrollPosition.minScrollExtent].
+  bool get _atLatest {
+    if (!_scroll.hasClients) return true;
+    final position = _scroll.position;
+    return position.pixels <= position.minScrollExtent + _atLatestSlop;
+  }
+
+  /// Scrolling never rebuilds the transcript's `StreamBuilder`, so returning
+  /// to the latest message needs its own trigger to re-mark read; this is it,
+  /// on its own, independent of whether the affordance below happens to
+  /// repaint.
+  void _onScrollChanged() {
+    final atLatest = _atLatest;
+    _scrolledAway.value = !atLatest;
+    if (atLatest) _markReadUpToLatest(_latestSeq, _lastReadSeq);
   }
 
   @override
@@ -307,57 +357,82 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                           forbidden: search.forbidden,
                           onRetry: () => _search(search.query!),
                         )
-                      : StreamBuilder<List<Message>>(
-                          stream: store.watchChannel(widget.channelId),
-                          builder: (context, snapshot) {
-                            final transcript = visibleTranscript(
-                              snapshot.data ?? const <Message>[],
-                              blocked,
-                            );
-                            _markReadUpToLatest(
-                              transcript.newestSeq,
-                              lastReadSeq,
-                            );
-                            return MessageTranscript(
-                              messages: transcript.messages,
-                              syncStatus: syncStatus,
-                              // Only a real named channel gets the header; a DM's name is a person, and voice never reaches here.
-                              channelName: channel?.kind == 'text'
-                                  ? channelName
-                                  : null,
-                              channelTopic: channel?.topic,
-                              scrollController: _scroll,
-                              lastReadSeq: lastReadSeq,
-                              editingId: _editingId,
-                              knownUsernames: knownUsernames,
-                              customEmoji: customEmoji,
-                              extrasById: extrasById,
-                              actionsFor: (message) => _actionsFor(
-                                message,
-                                myId: myId,
-                                myPermissions: myPermissions,
-                                pinnedIds: pinnedIds,
-                              ),
-                              onRetry: (m) => unawaited(retryMessage(ref, m)),
-                              onDiscard: (m) =>
-                                  unawaited(discardMessage(ref, m)),
-                              // Failed text lands back in the composer to fix
-                              // and resend; the failed row is then discarded,
-                              // so nothing the user wrote is ever lost.
-                              onEditFailed: (m) {
-                                _composer.text = m.content;
-                                unawaited(discardMessage(ref, m));
+                      : Stack(
+                          children: [
+                            StreamBuilder<List<Message>>(
+                              stream: store.watchChannel(widget.channelId),
+                              builder: (context, snapshot) {
+                                final transcript = visibleTranscript(
+                                  snapshot.data ?? const <Message>[],
+                                  blocked,
+                                );
+                                _latestSeq = transcript.newestSeq;
+                                _lastReadSeq = lastReadSeq;
+                                // Gated on the viewport: scrolled into history, this rebuild is a message arriving somewhere unread.
+                                if (_atLatest) {
+                                  _markReadUpToLatest(
+                                    transcript.newestSeq,
+                                    lastReadSeq,
+                                  );
+                                }
+                                return MessageTranscript(
+                                  messages: transcript.messages,
+                                  syncStatus: syncStatus,
+                                  // Only a real named channel gets the header; a DM's name is a person, and voice never reaches here.
+                                  channelName: channel?.kind == 'text'
+                                      ? channelName
+                                      : null,
+                                  channelTopic: channel?.topic,
+                                  scrollController: _scroll,
+                                  lastReadSeq: lastReadSeq,
+                                  editingId: _editingId,
+                                  knownUsernames: knownUsernames,
+                                  customEmoji: customEmoji,
+                                  extrasById: extrasById,
+                                  actionsFor: (message) => _actionsFor(
+                                    message,
+                                    myId: myId,
+                                    myPermissions: myPermissions,
+                                    pinnedIds: pinnedIds,
+                                  ),
+                                  onRetry: (m) =>
+                                      unawaited(retryMessage(ref, m)),
+                                  onDiscard: (m) =>
+                                      unawaited(discardMessage(ref, m)),
+                                  // Failed text lands back in the composer to fix
+                                  // and resend; the failed row is then discarded,
+                                  // so nothing the user wrote is ever lost.
+                                  onEditFailed: (m) {
+                                    _composer.text = m.content;
+                                    unawaited(discardMessage(ref, m));
+                                  },
+                                  onPickReaction: (m, emoji) =>
+                                      unawaited(_pickReaction(m, emoji)),
+                                  onReactionTap: (m, reaction) =>
+                                      unawaited(_toggleReaction(m, reaction)),
+                                  onVote: (m, option) =>
+                                      unawaited(castVote(ref, m.id, option)),
+                                  onSubmitEdit: _submitEdit,
+                                  onCancelEdit: _cancelEdit,
+                                );
                               },
-                              onPickReaction: (m, emoji) =>
-                                  unawaited(_pickReaction(m, emoji)),
-                              onReactionTap: (m, reaction) =>
-                                  unawaited(_toggleReaction(m, reaction)),
-                              onVote: (m, option) =>
-                                  unawaited(castVote(ref, m.id, option)),
-                              onSubmitEdit: _submitEdit,
-                              onCancelEdit: _cancelEdit,
-                            );
-                          },
+                            ),
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              child: Center(
+                                child: ValueListenableBuilder<bool>(
+                                  valueListenable: _scrolledAway,
+                                  builder: (context, scrolledAway, _) =>
+                                      JumpToLatestButton(
+                                        visible: scrolledAway,
+                                        onTap: _scrollToLatest,
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                 ),
               ),
