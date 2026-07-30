@@ -771,6 +771,11 @@ async fn revoke_family(
 /// filter in [`Store::push_targets`] alone, so a signed-out device stops being
 /// a push target the instant it is revoked rather than on whatever cadence
 /// the next read happens to run.
+///
+/// Both timestamp writes are guarded on the row still being live, so calling
+/// this for an already-revoked session is a no-op on when it died rather than
+/// a re-stamp. That matters wherever a caller revokes a set it did not filter
+/// first, as [`Store::remove_device`] does.
 pub(super) async fn revoke_session_rows(
     conn: &mut SqliteConnection,
     session_id: SessionId,
@@ -798,8 +803,9 @@ pub(super) async fn revoke_session_rows(
     )
     .execute(&mut *conn)
     .await?;
+    // Guarded like the refresh_tokens update above; see this function's doc.
     sqlx::query!(
-        "UPDATE sessions SET revoked_at = ? WHERE id = ?",
+        "UPDATE sessions SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
         now,
         session_id
     )
