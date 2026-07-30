@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.4](https://github.com/NC1107/slim-m/compare/server-v0.18.3...server-v0.18.4) (2026-07-30)
+
+
+### Bug Fixes
+
+* **server:** make the typing presence gate fail closed on a store error ([#184](https://github.com/NC1107/slim-m/issues/184)) ([9eb1824](https://github.com/NC1107/slim-m/commit/9eb1824e336cbe7c17f0073ac20cc93b97636a9e))
+* **server:** rebuild messages onto an explicit rowid alias ([#183](https://github.com/NC1107/slim-m/issues/183)) ([adc009a](https://github.com/NC1107/slim-m/commit/adc009a8252203a9a38fec4fb340560699ebb276))
+
 ## [0.18.3](https://github.com/NC1107/slim-m/compare/server-v0.18.2...server-v0.18.3) (2026-07-30)
 
 
