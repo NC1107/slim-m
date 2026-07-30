@@ -12,7 +12,7 @@
 //! leaks a channel the caller could not read over REST. If the connection falls
 //! behind the broadcast buffer it is closed and the client resyncs over REST.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use axum::Router;
 use axum::extract::State;
@@ -33,9 +33,11 @@ use crate::hub::{Event, Hub};
 use crate::permissions::Permissions;
 use crate::store::{SessionContext, Store};
 use frames::{ClientFrame, PollOptionCountDto, ReactionCountDto, ServerFrame};
+use view_cache::ViewCache;
 
 mod frames;
 mod signals;
+mod view_cache;
 
 /// How long a freshly connected socket has to send its `hello` before it is
 /// dropped, so unauthenticated sockets cannot linger.
@@ -82,6 +84,9 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
     // Subscribe before acking the hello, so an event published during the
     // handshake is buffered rather than missed.
     let mut events = state.hub.subscribe();
+
+    // Per connection, and dropped with it; see `view_cache`.
+    let mut view_cache = ViewCache::new(ctx.user_id);
 
     // Guarantees the matching disconnect however this function returns; see
     // `signals::PresenceGuard`.
@@ -141,7 +146,10 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                         }
                     }
                     Ok(event) => {
-                        if let Some(frame) = authorize(&state.store, &state.hub, &ctx, event).await
+                        // Before authorizing it; see `ViewCache::observe`.
+                        view_cache.observe(&event);
+                        if let Some(frame) =
+                            authorize(&state.store, &state.hub, &ctx, &mut view_cache, event).await
                             && send_frame(&mut sink, &frame).await.is_err()
                         {
                             break;
@@ -200,6 +208,7 @@ async fn authorize(
     store: &Store,
     hub: &Hub,
     ctx: &SessionContext,
+    view_cache: &mut ViewCache,
     event: Event,
 ) -> Option<ServerFrame> {
     // Ahead of the channel-scoped match below; see the note on this function.
@@ -275,10 +284,20 @@ async fn authorize(
         Event::OverwriteChanged { previously_visible_to, .. }
             if previously_visible_to.contains(&ctx.user_id)
     );
-    let visible = store
-        .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
-        .await
-        .unwrap_or(false);
+    let visible = match view_cache.get(channel_id, Instant::now()) {
+        Some(cached) => cached,
+        None => match store
+            .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
+            .await
+        {
+            Ok(answer) => {
+                view_cache.insert(channel_id, answer, Instant::now());
+                answer
+            }
+            // Fails closed for this event only; a blip must not be remembered.
+            Err(_) => false,
+        },
+    };
     if !visible && !held_it_before {
         return None;
     }
