@@ -181,7 +181,8 @@ crates/slimm-server/src/http/roles.rs 1
 crates/slimm-server/src/http/safety.rs 4
 crates/slimm-server/src/http/sync.rs 3
 crates/slimm-server/src/http/users.rs 2
-crates/slimm-server/src/http/ws.rs 10
+crates/slimm-server/src/http/ws.rs 7
+crates/slimm-server/src/http/ws/frames.rs 2
 crates/slimm-server/src/http/ws/signals.rs 1
 crates/slimm-server/src/identity.rs 1
 crates/slimm-server/src/ids.rs 2

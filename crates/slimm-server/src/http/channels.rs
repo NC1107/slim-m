@@ -25,6 +25,7 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
+use crate::hub::Event;
 use crate::ids::ChannelId;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
@@ -44,8 +45,11 @@ pub fn routes() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(CHANNEL_BODY_LIMIT))
 }
 
+/// `pub(crate)` so `http::ws` can reuse the exact same wire shape for the
+/// live `channel.created`/`channel.updated` frames, the way `MessageDto`
+/// already does for messages.
 #[derive(Serialize)]
-struct ChannelDto {
+pub(crate) struct ChannelDto {
     id: String,
     name: String,
     kind: String,
@@ -132,6 +136,7 @@ async fn create(
     }
 
     let channel = state.store.create_channel(name, kind).await?;
+    state.hub.publish(Event::ChannelCreated(channel.clone()));
     Ok(Json(channel.into()))
 }
 
@@ -172,6 +177,7 @@ async fn update(
         .update_channel(channel_id, name, topic.as_ref().map(|t| t.as_deref()))
         .await?
         .ok_or(ApiError::NotFound("channel not found"))?;
+    state.hub.publish(Event::ChannelUpdated(channel.clone()));
     Ok(Json(channel.into()))
 }
 
@@ -225,7 +231,12 @@ async fn delete(
     }
 
     match state.store.delete_channel(channel_id).await {
-        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        // Only a genuine delete is worth publishing; a retry changes nothing.
+        Ok(true) => {
+            state.hub.publish(Event::ChannelDeleted { channel_id });
+            Ok(StatusCode::NO_CONTENT)
+        }
+        Ok(false) => Ok(StatusCode::NO_CONTENT),
         Err(DeleteChannelError::LastChannel) => Err(ApiError::Conflict(
             "cannot delete the deployment's last channel",
         )),

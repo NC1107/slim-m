@@ -194,7 +194,9 @@ Verified end to end: the e2e's `bob-peer-sharing-screen.png` shows the sharer's 
 
 **Recorded correctness debt, still open:** message edits and deletes made while a client is offline never reconcile - edit does not advance `seq`, `/sync` filters purely by `seq`, and deleted rows are filtered out of deltas, so only a reset heals it.
 That needs a designed protocol answer (op watermark or tombstones in the sync response), not a patch.
-The per-socket WS fan-out permission cost (four queries per event per connection) is the other big recorded item; the safe fix is a per-connection visibility cache with real invalidation on role and overwrite edits.
+The per-socket WS fan-out permission cost is the other big recorded item: **five** queries per event per connection, not the four recorded here until 2026-07-30 - channel, two role queries, overwrites, timeout deny - and six on a typing frame, which also resolves presence.
+The safe fix is a per-connection visibility cache with real invalidation, and the events it would invalidate on now exist (2026-07-30): `roles.rs`, `overwrites.rs` and `channels.rs` published nothing at all until then, so a revoked channel view never reached a live client and there was nothing a cache could have listened to.
+The cache itself is still open and is the remaining half.
 
 Smaller traps this pass hit: `Opacity` over a whole row silently destroys AA contrast (the muted `AppListRow` now dims leading/trailing only, and a design_system test pins that); `VoiceSession.join` serializes overlapping calls (both used to pass the room-null check and race one slot); and `SourceType.Window` must never be requested on Wayland from *any* call site - `media_capabilities.dart` had the segfault `desktop_sources.dart` already documented.
 

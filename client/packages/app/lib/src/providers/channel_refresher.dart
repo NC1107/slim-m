@@ -23,7 +23,9 @@ class ChannelRefresher {
   /// `GET /channels` deliberately excludes). Both land in the same local
   /// channel table under the same shape, so everything downstream (the
   /// rail, sync cursors, read state) treats a DM exactly like any other
-  /// channel once it is here.
+  /// channel once it is here. Also prunes any channel the server no longer
+  /// lists, so one whose view was just revoked leaves the rail rather than
+  /// sitting there until sign-out.
   ///
   /// Also hydrates each channel's read marker from the server. `ScopeDelta`
   /// carries no read state, so `/sync` can never do this, and
@@ -34,7 +36,7 @@ class ChannelRefresher {
     final channels = await api.listChannels();
     final dms = await api.listDirectMessages();
     final all = [...channels, ...dms.map(channelFromDm)];
-    await store.upsertChannels(all);
+    await store.replaceChannels(all);
 
     /// Per channel: the server has no bulk read-state endpoint, and one
     /// channel's failure must not stop the rest from hydrating.

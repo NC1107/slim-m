@@ -114,6 +114,26 @@ sealed class ServerEvent {
           channelId: decoded['channel_id'] as String,
           userId: decoded['user_id'] as String,
         ),
+      'role.changed' when decoded['role_id'] is String =>
+        RoleChanged(roleId: decoded['role_id'] as String),
+      'member.role_changed'
+          when decoded['user_id'] is String && decoded['role_id'] is String =>
+        MemberRoleChanged(
+          userId: decoded['user_id'] as String,
+          roleId: decoded['role_id'] as String,
+        ),
+      'channel.created' when decoded['channel'] is Map<String, dynamic> =>
+        ChannelCreated(
+          Channel.fromJson(decoded['channel'] as Map<String, dynamic>),
+        ),
+      'channel.updated' when decoded['channel'] is Map<String, dynamic> =>
+        ChannelUpdated(
+          Channel.fromJson(decoded['channel'] as Map<String, dynamic>),
+        ),
+      'channel.deleted' when decoded['channel_id'] is String =>
+        ChannelDeleted(channelId: decoded['channel_id'] as String),
+      'overwrite.changed' when decoded['channel_id'] is String =>
+        OverwriteChanged(channelId: decoded['channel_id'] as String),
       'pong' => const PongEvent(),
       'error' => ErrorEvent(decoded['message'] as String? ?? 'unknown'),
       _ => null,

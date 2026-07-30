@@ -34,6 +34,7 @@ use super::error::ApiError;
 use super::escalation::escalation_guard;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
+use crate::hub::Event;
 use crate::ids::{RoleId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
@@ -117,6 +118,7 @@ async fn create(
     // `Store::bootstrap_deployment`, and this endpoint cannot ask for it.
     let id = state.store.create_role(name, permissions, false).await?;
     let role = state.store.role(id).await?.ok_or(ApiError::Internal)?;
+    state.hub.publish(Event::RoleChanged { role_id: id });
     Ok(Json(role.into()))
 }
 
@@ -149,7 +151,10 @@ async fn update(
     }
 
     match state.store.update_role(role_id, name, permissions).await {
-        Ok(Some(role)) => Ok(Json(role.into())),
+        Ok(Some(role)) => {
+            state.hub.publish(Event::RoleChanged { role_id });
+            Ok(Json(role.into()))
+        }
         Ok(None) => Err(ApiError::NotFound("role not found")),
         Err(guard_err) => Err(role_guard_error(guard_err)),
     }
@@ -178,7 +183,10 @@ async fn delete(
     }
 
     match state.store.delete_role(role_id).await {
-        Ok(Some(())) => Ok(StatusCode::NO_CONTENT),
+        Ok(Some(())) => {
+            state.hub.publish(Event::RoleChanged { role_id });
+            Ok(StatusCode::NO_CONTENT)
+        }
         Ok(None) => Err(ApiError::NotFound("role not found")),
         Err(guard_err) => Err(role_guard_error(guard_err)),
     }
@@ -208,6 +216,9 @@ async fn assign(
     escalation_guard(caller_granted(&state, ctx.user_id).await?, role.permissions)?;
 
     state.store.assign_role(user_id, role_id).await?;
+    state
+        .hub
+        .publish(Event::MemberRoleChanged { user_id, role_id });
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -234,7 +245,12 @@ async fn unassign(
     }
 
     match state.store.unassign_role(user_id, role_id).await {
-        Ok(()) => Ok(StatusCode::NO_CONTENT),
+        Ok(()) => {
+            state
+                .hub
+                .publish(Event::MemberRoleChanged { user_id, role_id });
+            Ok(StatusCode::NO_CONTENT)
+        }
         Err(guard_err) => Err(role_guard_error(guard_err)),
     }
 }

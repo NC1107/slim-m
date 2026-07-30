@@ -22,6 +22,7 @@ class RolesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(roleChangeWatcherProvider);
     final roles = ref.watch(rolesProvider);
 
     return SettingsScreenScaffold(
