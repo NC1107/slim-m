@@ -5,9 +5,23 @@ part of 'client.dart';
 /// that filing a report, checking an invite, and redeeming one (all in
 /// client.dart) do not cover.
 extension SlimmApiModeration on SlimmApi {
-  /// The open moderation queue, oldest first. Requires MANAGE_MESSAGES.
-  Future<List<Report>> listOpenReports() async {
-    final json = await _send('GET', '/reports');
+  /// One page of the open moderation queue, oldest first. Requires
+  /// MANAGE_MESSAGES.
+  ///
+  /// Pass the `createdAt` of the last report already held as [after] to page
+  /// forward. Visibility is re-checked per channel server-side after the page
+  /// is read, so a page can come back holding fewer entries than [limit], or
+  /// none, while more remain: keep paging while a *full* page arrives rather
+  /// than stopping at the first short one.
+  Future<List<Report>> listOpenReports({int? after, int? limit}) async {
+    final query = <String, String>{
+      if (after != null) 'after': '$after',
+      if (limit != null) 'limit': '$limit',
+    };
+    final path = query.isEmpty
+        ? '/reports'
+        : '/reports?${Uri(queryParameters: query).query}';
+    final json = await _send('GET', path);
     return (json as List<dynamic>)
         .map((r) => Report.fromJson(r as Map<String, dynamic>))
         .toList(growable: false);

@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, enforce};
+use super::extract::{Authed, AuthedLimited, Json, Query, READ, enforce};
 use super::messages::parse_uuid;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
@@ -25,6 +25,13 @@ use crate::ratelimit::Class;
 use crate::store::Report;
 
 const BODY_LIMIT: usize = 4 * 1024;
+
+/// Default and maximum reports returned in one page, matching the plain
+/// message list's shape. A page is bounded because the handler pays several
+/// indexed queries per report to re-check visibility, and nothing else bounds
+/// how many reports members file.
+const DEFAULT_LIMIT: i64 = 50;
+const MAX_LIMIT: i64 = 200;
 
 /// The report triage routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
@@ -65,13 +72,21 @@ impl From<Report> for ReportDto {
     }
 }
 
+/// One page of the queue. `after` is the `created_at` of the last report the
+/// caller already holds, exclusive.
+#[derive(Deserialize)]
+struct ListParams {
+    after: Option<i64>,
+    limit: Option<i64>,
+}
+
 #[derive(Deserialize)]
 struct ResolveReportRequest {
     /// "resolved" or "dismissed".
     resolution: String,
 }
 
-/// Lists the open moderation queue, oldest first.
+/// Lists one page of the open moderation queue, oldest first.
 ///
 /// A report carries the reported content verbatim, so the queue is filtered
 /// per channel rather than shown wholesale. `base_permissions` ignores channel
@@ -79,12 +94,21 @@ struct ResolveReportRequest {
 /// MANAGE_MESSAGES in one channel would otherwise still read every message
 /// reported there. Reports with no channel are deployment-wide (a report about
 /// a user rather than a message) and stay on the base check alone.
+///
+/// That filter runs after the page is read, so a page can come back holding
+/// fewer than `limit` reports, or none at all, while more remain. A caller
+/// paging through should keep going while a *full* page arrives rather than
+/// stopping at the first short one - which is also why the page is read
+/// bounded rather than the whole queue being read and then filtered, since the
+/// visibility check is what costs, at several indexed queries per report.
 async fn list(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<READ>,
+    Query(params): Query<ListParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ReportDto>>, ApiError> {
     require_manage_messages(&state, ctx.user_id).await?;
-    let reports = state.store.list_open_reports().await?;
+    let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+    let reports = state.store.list_open_reports(params.after, limit).await?;
 
     // Re-checked per channel, not just deployment-wide; see the note on this
     // function.

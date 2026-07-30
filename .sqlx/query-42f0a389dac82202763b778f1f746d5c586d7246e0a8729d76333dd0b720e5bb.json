@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: Uuid\", reporter_id AS \"reporter_id: UserId\",\n                      subject_kind AS \"subject_kind!\", subject_id AS \"subject_id!: Uuid\",\n                      channel_id AS \"channel_id: ChannelId\", reason AS \"reason!\",\n                      snapshot, created_at AS \"created_at!\",\n                      resolved_at, resolved_by AS \"resolved_by: UserId\", resolution\n               FROM reports WHERE resolved_at IS NULL ORDER BY created_at",
+  "query": "SELECT id AS \"id!: Uuid\", reporter_id AS \"reporter_id: UserId\",\n                      subject_kind AS \"subject_kind!\", subject_id AS \"subject_id!: Uuid\",\n                      channel_id AS \"channel_id: ChannelId\", reason AS \"reason!\",\n                      snapshot, created_at AS \"created_at!\",\n                      resolved_at, resolved_by AS \"resolved_by: UserId\", resolution\n               FROM reports\n               WHERE resolved_at IS NULL AND created_at > ?\n               ORDER BY created_at, id\n               LIMIT ?",
   "describe": {
     "columns": [
       {
@@ -60,7 +60,7 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 2
     },
     "nullable": [
       false,
@@ -76,5 +76,5 @@
       true
     ]
   },
-  "hash": "ef9fef71498619c3b71286ca746eee5aeff438f603684a71da6e1cdc1226ac0d"
+  "hash": "42f0a389dac82202763b778f1f746d5c586d7246e0a8729d76333dd0b720e5bb"
 }

@@ -14,6 +14,15 @@ use anyhow::Context;
 use super::{Message, Store, now_ms};
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
+/// How many messages may be pinned in one channel at a time.
+///
+/// A ceiling at the write rather than a page at the read, for the same reason
+/// [`super::MAX_DISTINCT_EMOJI_PER_MESSAGE`] is: it keeps the set small enough
+/// that every reader can have all of it, instead of making every reader page
+/// through something a member can grow without limit. Generous against what a
+/// pin is for - a channel with two hundred highlights has none.
+pub const MAX_PINS_PER_CHANNEL: i64 = 200;
+
 /// A pinned message, with the pin's own metadata alongside the message it
 /// points at.
 #[derive(Debug, Clone)]
@@ -30,6 +39,8 @@ pub struct PinnedMessage {
 pub enum PinError {
     /// The message does not exist in this channel, or is deleted.
     UnknownMessage,
+    /// The channel already holds [`MAX_PINS_PER_CHANNEL`] pins.
+    TooMany,
     Internal(anyhow::Error),
 }
 
@@ -48,7 +59,8 @@ impl From<anyhow::Error> for PinError {
 impl Store {
     /// Pins a message in a channel. Idempotent: pinning an already-pinned
     /// message leaves the original pin's timestamp and pinner in place rather
-    /// than moving them to whoever asked most recently.
+    /// than moving them to whoever asked most recently, and does not count
+    /// against [`MAX_PINS_PER_CHANNEL`], since it adds nothing.
     ///
     /// The existence check and the insert share a transaction that takes the
     /// write lock up front (see [`Store::begin_write`]), so a message deleted
@@ -66,6 +78,28 @@ impl Store {
         let Some(message) = message else {
             return Err(PinError::UnknownMessage);
         };
+
+        // Counted inside the write transaction, or two concurrent pins race it.
+        let already = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM pinned_messages
+               WHERE channel_id = ? AND message_id = ?"#,
+            channel_id,
+            message_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .is_some();
+        if !already {
+            let pinned = sqlx::query_scalar!(
+                r#"SELECT COUNT(*) AS "n!: i64" FROM pinned_messages WHERE channel_id = ?"#,
+                channel_id
+            )
+            .fetch_one(&mut *tx)
+            .await?;
+            if pinned >= MAX_PINS_PER_CHANNEL {
+                return Err(PinError::TooMany);
+            }
+        }
 
         sqlx::query!(
             "INSERT OR IGNORE INTO pinned_messages (channel_id, message_id, pinned_by, pinned_at)

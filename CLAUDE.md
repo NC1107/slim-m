@@ -63,6 +63,31 @@ Three smaller traps this hit:
 - **Both hygiene gates enumerate `git ls-files`, so untracked new files are invisible to them.** A local run before the first commit passes and CI then fails on the same tree. Stage before trusting either gate.
 - **`scripts/check-comment-cap.sh` was counting Rust `//!` module docs as plain comments**, though its own header exempts them: the awk matched `//` followed by anything that is not `/`. Nothing caught it because the allowlist had been calibrated against the wrong number. Fixed, and the allowlist regenerated at the true counts, which cleared 46 files outright and lowered 98.
 
+## Read bounds: what a list may answer with (2026-07-30)
+
+Two read surfaces answered with as much as a deployment happened to hold.
+Neither was reachable without a permission, so neither was a way in from outside; what they were is a cost set by how much members have done rather than by anything an operator chose.
+
+**A pin set is bounded at the write, a report queue is paged at the read, and the difference is what the thing is for.**
+`MAX_PINS_PER_CHANNEL` is 200 and pinning past it is a 400, refused in the same write transaction that counts, so two concurrent pins cannot both pass the check.
+That keeps the set small enough that every reader can have all of it, which is the point of a pin; a channel with two hundred highlights has none.
+`/reports` is genuinely paged instead, forward on `created_at`, because its ceiling is reporters times subjects and a moderator has to work through a backlog.
+Re-pinning an already-pinned message does not count against the ceiling, or a retry would break at exactly the moment the set is full.
+
+**The report queue's filter runs after the page is read, and every layer says so.**
+Visibility is re-checked channel by channel, several indexed queries each, so a page can arrive holding fewer entries than `limit`, or none, while more remain.
+A caller pages while a *full page* arrives rather than stopping at the first short one - that sentence is in the handler's doc comment, in `schema/openapi.yaml`, in `SlimmApiModeration.listOpenReports` and in `reports_controller.dart`, because it is the one thing about this endpoint a reader will get wrong.
+The alternative was returning the cursor in the body, which would have meant changing a documented response from an array to an object, and the wire is additive-only.
+
+**`GET /presence` was in the audit's pagination table and did not belong there.**
+It already capped its batch at 100 and documented that in the schema.
+What it had none of was a rate-limit charge, which puts it with the uncharged-routes family from PR #145; it takes the Read class now.
+
+**A comment that states a bound the code does not have is worse than no comment.**
+`viewers_among`'s DM branch had two of them, both claiming the loop was bounded at two real checks while it called `dm_permissions` - itself a `dm_channels` lookup plus up to two block lookups - once per candidate.
+The cost really was negligible (candidates are a self-host's push-registered users), which is exactly why nothing caught it, and why the fix is to narrow the candidates to the pair first so the claim becomes true rather than to reword it.
+`channel_viewer_ids` is deleted rather than documented, and `live_user_ids` with it: that was its only caller, and its doc comment existed to explain a path nothing took.
+
 ## The nine-specialist audit, and seeing a shared screen (2026-07-29)
 
 Nine parallel specialist reviews (five code, four screenshot) over the running product; the consolidated report with everything found, fixed, and deliberately deferred is [docs/research/nine-specialist-audit-2026-07-29.md](docs/research/nine-specialist-audit-2026-07-29.md).

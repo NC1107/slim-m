@@ -225,6 +225,24 @@ impl Store {
     /// `ADMINISTRATOR` included, since that bypass belongs to the
     /// deployment's own channels, not to a conversation between two
     /// specific people who happen to be on it.
+    /// The two accounts a DM channel is between, or `None` if it is not a DM.
+    ///
+    /// Exists so a caller with many candidates can narrow them to the pair
+    /// before asking anything per candidate; see [`Store::viewers_among`].
+    pub(crate) async fn dm_pair(
+        &self,
+        channel_id: ChannelId,
+    ) -> anyhow::Result<Option<(UserId, UserId)>> {
+        let pair = sqlx::query!(
+            r#"SELECT user_a AS "user_a!: UserId", user_b AS "user_b!: UserId"
+               FROM dm_channels WHERE channel_id = ?"#,
+            channel_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(pair.map(|p| (p.user_a, p.user_b)))
+    }
+
     pub(crate) async fn dm_permissions(
         &self,
         user_id: UserId,

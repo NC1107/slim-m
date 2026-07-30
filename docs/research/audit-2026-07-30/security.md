@@ -287,6 +287,11 @@ It is not on the send path - `PushSender::notify_message` hands the whole thing 
 The defect is that both comments state the loop is bounded at two real checks when it is one query per candidate, so the next contributor will believe it and look elsewhere.
 Worth resolving `channel_viewer_ids` (`permissions_batch.rs:21`) in the same pass: it feeds every live account into that function and has no caller anywhere in `src/`, so it is a loaded gun rather than a live bug.
 
+**Closed 2026-07-30, PR #148**, all four, with one correction and one choice worth naming.
+The correction: `GET /presence` was never an unbounded read - it already capped its batch at 100 and documented that in the schema. What it lacked was any rate-limit charge at all, which puts it with findings 1 and 2's family rather than this one; it takes the Read class now.
+The choice: `/channels/{id}/pins` is bounded at the **write** rather than paged at the read. A channel holds at most 200 pins and pinning past that is a 400, so every reader can still have the whole set, which is what a pin is for; a `limit` exists for a caller that wants fewer. `/reports` is genuinely paged, forward on `created_at`, because its ceiling is reporters times subjects and a moderator needs to work through a backlog. Its visibility filter runs after the page is read, so a page can arrive short while more remain - the handler's doc comment, the schema and the Dart client all say so in those words, and `reports_controller.dart` pages on "the page was full" rather than on any total.
+`channel_viewer_ids` is deleted rather than documented, and `live_user_ids` with it: that was its only caller, and its own doc comment existed to explain the dead path.
+
 ## Hardening details
 
 ### 15. `POST /auth/reset` pays a full Argon2id hash before the reset code is looked at - low

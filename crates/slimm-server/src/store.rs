@@ -50,7 +50,7 @@ pub use dms::{DmConversation, OpenDmError};
 pub use emoji::{CreateEmojiError, CustomEmoji, MAX_CUSTOM_EMOJI};
 pub use invites::{Invite, InviteCheck, InviteMetadata, RedeemError};
 pub use messages::{MessageDeletion, SearchError, SendError, Sent};
-pub use pins::{PinError, PinnedMessage};
+pub use pins::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};
 pub use polls::{
     CreatePollError, MAX_OPTION_CHARS, MAX_OPTIONS, MAX_QUESTION_CHARS, MIN_OPTIONS, Poll,
     PollOption, PollTally, VoteError,
@@ -203,17 +203,6 @@ impl Store {
             created_at: now,
             avatar_updated_at: None,
         })
-    }
-
-    /// Every live user's id. Used to compute who can view a channel for push
-    /// fan-out; small self-hosted deployments make an O(users) scan cheap
-    /// enough that a dedicated membership table is not worth carrying yet.
-    pub async fn live_user_ids(&self) -> anyhow::Result<Vec<UserId>> {
-        let rows =
-            sqlx::query!(r#"SELECT id AS "id!: UserId" FROM users WHERE deleted_at IS NULL"#)
-                .fetch_all(&self.pool)
-                .await?;
-        Ok(rows.into_iter().map(|r| r.id).collect())
     }
 
     /// The server's long-lived identity keypair, generating and persisting

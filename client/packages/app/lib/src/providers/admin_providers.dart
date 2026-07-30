@@ -26,11 +26,6 @@ final myPermissionsProvider = Provider<int>(
   (ref) => ref.watch(meProvider).valueOrNull?.permissions ?? 0,
 );
 
-/// The open moderation queue, oldest first.
-final openReportsProvider = FutureProvider.autoDispose<List<api.Report>>(
-  (ref) => ref.watch(apiProvider).listOpenReports(),
-);
-
 /// Every invite, in the order the server returns them.
 final invitesProvider = FutureProvider.autoDispose<List<api.Invite>>(
   (ref) => ref.watch(apiProvider).listInvites(),

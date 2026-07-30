@@ -717,13 +717,32 @@ paths:
     get:
       operationId: listOpenReports
       tags: [moderation]
-      summary: The open moderation queue, oldest first. Requires MANAGE_MESSAGES.
+      summary: One page of the open moderation queue, oldest first. Requires MANAGE_MESSAGES.
       description: >
         Carries each report's content snapshot, so this must never answer to
         anyone below the MANAGE_MESSAGES bar.
+
+
+        Bounded, and paged forward on `created_at`. Visibility is re-checked per
+        channel after the page is read, so a page can come back holding fewer
+        entries than `limit`, or none, while more remain: keep paging while a
+        full page arrives rather than stopping at the first short one.
+      parameters:
+        - name: after
+          in: query
+          description: Return only reports filed strictly after this `created_at`.
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          description: Page size; the server clamps it.
+          schema:
+            type: integer
+            format: int32
       responses:
         "200":
-          description: Open reports.
+          description: One page of open reports.
           content:
             application/json:
               schema:
@@ -1761,9 +1780,15 @@ paths:
         evaluated in this channel specifically; holding it in another channel
         is not enough. Live connections are told over the WebSocket
         (`message.pinned`).
+
+
+        A channel holds at most 200 pins. Pinning past that is a 400; pinning
+        one that is already pinned is not, since it adds nothing.
       responses:
         "204":
           description: The message was pinned (or already was).
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1801,6 +1826,18 @@ paths:
       description: >
         Requires only VIEW_CHANNEL. Each entry is the full message, flattened,
         plus when and by whom it was pinned.
+
+
+        A channel holds at most 200 pins, refused at the pin rather than paged
+        at the read, so this answers with the whole set unless `limit` narrows
+        it.
+      parameters:
+        - name: limit
+          in: query
+          description: Page size; the server clamps it.
+          schema:
+            type: integer
+            format: int32
       responses:
         "200":
           description: The channel's pinned messages, newest pin first.

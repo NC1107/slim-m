@@ -293,8 +293,26 @@ impl Store {
         Ok(count)
     }
 
-    /// The moderation queue: open reports, oldest first.
-    pub async fn list_open_reports(&self) -> anyhow::Result<Vec<Report>> {
+    /// One page of the moderation queue: open reports, oldest first, starting
+    /// after `after` when one is given.
+    ///
+    /// Bounded because the caller pays per report, not per request: the queue
+    /// handler re-checks visibility channel by channel, which is several
+    /// indexed queries each, and the queue's length is set by how many reports
+    /// members have filed rather than by anything an operator chose.
+    ///
+    /// The cursor is a `created_at`, not an id, and is exclusive. `created_at`
+    /// is milliseconds, so two reports filed in the same millisecond could in
+    /// principle straddle a page boundary and one be skipped; the id tiebreak
+    /// in the ordering makes the page itself stable, and closing that last gap
+    /// would need a composite cursor the response has no additive room to
+    /// carry. Reports are filed by people pressing a button, not in bulk.
+    pub async fn list_open_reports(
+        &self,
+        after: Option<i64>,
+        limit: i64,
+    ) -> anyhow::Result<Vec<Report>> {
+        let after = after.unwrap_or(i64::MIN);
         let rows = sqlx::query_as!(
             Report,
             r#"SELECT id AS "id!: Uuid", reporter_id AS "reporter_id: UserId",
@@ -302,7 +320,12 @@ impl Store {
                       channel_id AS "channel_id: ChannelId", reason AS "reason!",
                       snapshot, created_at AS "created_at!",
                       resolved_at, resolved_by AS "resolved_by: UserId", resolution
-               FROM reports WHERE resolved_at IS NULL ORDER BY created_at"#
+               FROM reports
+               WHERE resolved_at IS NULL AND created_at > ?
+               ORDER BY created_at, id
+               LIMIT ?"#,
+            after,
+            limit
         )
         .fetch_all(&self.pool)
         .await?;
