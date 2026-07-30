@@ -76,6 +76,14 @@ pub struct Report {
     /// The reported content as it was at filing time; the author may have
     /// since edited or deleted it.
     pub snapshot: Option<String>,
+    /// Who wrote the reported message, for a report about one.
+    ///
+    /// Joined at read time rather than stored beside the snapshot, because a
+    /// report is filed about a message id and the authorship of that id does
+    /// not change - only its content does, which is what the snapshot is for.
+    /// Null for a report about a user (there is no message), for a message
+    /// since hard-deleted, and once the author's account is anonymized.
+    pub subject_author_id: Option<UserId>,
     pub created_at: i64,
     pub resolved_at: Option<i64>,
     pub resolved_by: Option<UserId>,
@@ -357,28 +365,32 @@ impl Store {
         limit: i64,
     ) -> anyhow::Result<Vec<Report>> {
         let mut builder = QueryBuilder::new(
-            r#"SELECT id, reporter_id, subject_kind, subject_id, channel_id, reason,
-                      snapshot, created_at, resolved_at, resolved_by, resolution
-               FROM reports WHERE resolved_at IS NULL"#,
+            r#"SELECT r.id, r.reporter_id, r.subject_kind, r.subject_id, r.channel_id,
+                      r.reason, r.snapshot, r.created_at, r.resolved_at, r.resolved_by,
+                      r.resolution, m.author_id AS subject_author_id
+               FROM reports r
+               LEFT JOIN messages m
+                 ON r.subject_kind = 'message' AND m.id = r.subject_id
+               WHERE r.resolved_at IS NULL"#,
         );
         if let Some((created_at, id)) = after {
-            builder.push(" AND (created_at > ");
+            builder.push(" AND (r.created_at > ");
             builder.push_bind(created_at);
-            builder.push(" OR (created_at = ");
+            builder.push(" OR (r.created_at = ");
             builder.push_bind(created_at);
-            builder.push(" AND id > ");
+            builder.push(" AND r.id > ");
             builder.push_bind(id);
             builder.push("))");
         }
         if !hidden_channels.is_empty() {
-            builder.push(" AND (channel_id IS NULL OR channel_id NOT IN (");
+            builder.push(" AND (r.channel_id IS NULL OR r.channel_id NOT IN (");
             let mut separated = builder.separated(", ");
             for channel_id in hidden_channels {
                 separated.push_bind(*channel_id);
             }
             builder.push("))");
         }
-        builder.push(" ORDER BY created_at, id LIMIT ");
+        builder.push(" ORDER BY r.created_at, r.id LIMIT ");
         builder.push_bind(limit);
 
         use sqlx::Row;
@@ -394,6 +406,7 @@ impl Store {
                     reason: row.try_get("reason")?,
                     snapshot: row.try_get("snapshot")?,
                     created_at: row.try_get("created_at")?,
+                    subject_author_id: row.try_get("subject_author_id")?,
                     resolved_at: row.try_get("resolved_at")?,
                     resolved_by: row.try_get("resolved_by")?,
                     resolution: row.try_get("resolution")?,

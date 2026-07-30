@@ -1,0 +1,108 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: verify-release-checks
+
+# Called twice from release.yml, once per component, so every publish job (a
+# GHCR push, a cosign signature, a GitHub Release asset, a Play or TestFlight
+# upload) requires this exact commit's own CI to have completed and succeeded
+# first, on both trigger paths: a release-please merge to main and a hand-
+# pushed server-v*/client-v* tag. Before this existed, the tag path published
+# unconditionally with no test workflow ever having run on that ref, straight
+# to a production deployment that auto-updates from the moving `latest` tag.
+#
+# workflow_run cannot do this: it fires only when a *named* workflow completes
+# for the event that triggered it, and none of server-ci, client-ci,
+# client-ios-ci, hygiene or licenses trigger on a tag push at all (deliberately,
+# to avoid re-running CI on a ref that already ran it on main). A tag push
+# raises no workflow_run event for any of them, so that mechanism cannot gate
+# the one path most in need of gating.
+#
+# A check run is attached to the commit, not to the event that produced it, so
+# polling the commits check-runs API by SHA answers both paths uniformly: the
+# SHA a tag points at is normally already on main and already carries whatever
+# check runs its original push or PR produced, so re-pushing a tag to the same
+# SHA still finds them and still publishes. A required name absent from the
+# response is treated as a failure rather than a pass, so a commit that never
+# went through CI at all (never pushed to main, never opened as a PR) times
+# out and fails closed instead of silently passing an empty result.
+#
+# The names below are matched exactly, so a job renamed in server-ci.yml or
+# client-ci.yml without the matching edit here blocks every release. That is
+# the safe direction to fail, and the absence grace period exists so it says
+# which name it could not find rather than sitting for the full deadline.
+
+on:
+  workflow_call:
+    inputs:
+      required_checks:
+        description: >-
+          Pipe-separated, exact check-run names that must show conclusion
+          "success" on github.sha before this call returns success.
+        required: true
+        type: string
+
+permissions:
+  checks: read
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # Generous but bounded: a required check missing outright fails at the
+    # deadline below well before this, so the ceiling only covers slow queues.
+    timeout-minutes: 35
+    steps:
+      - name: wait for the required checks and require they all succeeded here
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          REQUIRED_CHECKS: ${{ inputs.required_checks }}
+        run: |
+          set -o pipefail
+          IFS='|' read -r -a required <<< "$REQUIRED_CHECKS"
+          started=$(date +%s)
+          deadline=$(( started + 1800 ))
+          # A check run is created when its workflow starts, which on both paths
+          # is at or before this one. A name still absent past this is far more
+          # likely a typo in required_checks than a slow queue, and waiting the
+          # full deadline for that reports the wrong cause.
+          creation_grace=300
+          while :; do
+            if ! runs=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" \
+              --paginate --jq '.check_runs[]' | jq -s '.'); then
+              echo "::error::could not read check runs for ${SHA}; this gate cannot pass without them"
+              exit 1
+            fi
+            missing=() pending=() failed=()
+            for name in "${required[@]}"; do
+              status=$(jq -r --arg n "$name" \
+                '[.[] | select(.name==$n)] | sort_by(.started_at) | last | .status // "absent"' \
+                <<<"$runs")
+              conclusion=$(jq -r --arg n "$name" \
+                '[.[] | select(.name==$n)] | sort_by(.started_at) | last | .conclusion // "none"' \
+                <<<"$runs")
+              case "$status" in
+                absent) missing+=("$name") ;;
+                completed) [ "$conclusion" = success ] || failed+=("$name:$conclusion") ;;
+                *) pending+=("$name") ;;
+              esac
+            done
+            if [ "${#failed[@]}" -gt 0 ]; then
+              echo "::error::required check(s) failed on ${SHA}: ${failed[*]}"
+              exit 1
+            fi
+            if [ "${#missing[@]}" -eq 0 ] && [ "${#pending[@]}" -eq 0 ]; then
+              echo "required checks passed on ${SHA}: ${required[*]}"
+              exit 0
+            fi
+            now=$(date +%s)
+            if [ "${#missing[@]}" -gt 0 ] && [ $(( now - started )) -ge "$creation_grace" ]; then
+              echo "::error::no check run named ${missing[*]} exists on ${SHA}; either it never ran or required_checks names it wrongly"
+              exit 1
+            fi
+            if [ "$now" -ge "$deadline" ]; then
+              echo "::error::timed out waiting on ${SHA} (missing: ${missing[*]:-none}, pending: ${pending[*]:-none})"
+              exit 1
+            fi
+            echo "waiting on ${SHA} (missing: ${missing[*]:-none}, pending: ${pending[*]:-none})"
+            sleep 30
+          done

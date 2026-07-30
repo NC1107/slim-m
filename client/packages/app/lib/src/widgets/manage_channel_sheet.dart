@@ -83,11 +83,10 @@ class _ManageChannelSheetState extends ConsumerState<_ManageChannelSheet> {
       await store.upsertChannels([updated]);
       if (mounted) Navigator.of(context).pop();
     } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _saving = false;
-      });
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      // Any escape, not just ApiException, must not wedge "Saving..." on.
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -125,19 +124,18 @@ class _ManageChannelSheetState extends ConsumerState<_ManageChannelSheet> {
     } on api.ConflictException {
       // The server's wording is accurate but terse, and this feature's own
       // requirement is a full sentence rather than a bare error.
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _error =
-            'This is the last channel here. Create another channel '
-            'before deleting this one.';
-      });
+      if (mounted) {
+        setState(
+          () => _error =
+              'This is the last channel here. Create another channel '
+              'before deleting this one.',
+        );
+      }
     } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _error = e.message;
-      });
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      // Any escape, not just the two catches, must not wedge "Deleting..." on.
+      if (mounted) setState(() => _deleting = false);
     }
   }
 
