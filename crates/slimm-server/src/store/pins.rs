@@ -17,7 +17,7 @@ use crate::ids::{ChannelId, MessageId, Seq, UserId};
 /// How many messages may be pinned in one channel at a time.
 ///
 /// A ceiling at the write rather than a page at the read, for the same reason
-/// [`super::MAX_DISTINCT_EMOJI_PER_MESSAGE`] is: it keeps the set small enough
+/// `MAX_DISTINCT_EMOJI_PER_MESSAGE` is: it keeps the set small enough
 /// that every reader can have all of it, instead of making every reader page
 /// through something a member can grow without limit. Generous against what a
 /// pin is for - a channel with two hundred highlights has none.
