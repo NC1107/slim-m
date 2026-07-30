@@ -143,6 +143,13 @@ extension SlimmApiTransport on SlimmApi {
   ///
   /// The deadline covers the round trip rather than each half, so a slow
   /// response cannot be granted twice the budget by arriving in two stages.
+  /// It is composed with `.then` and never by wrapping the send in
+  /// `Future(() async { ... })`: that wrapper defers even *starting* the
+  /// request by an event-loop turn, which is invisible against a real clock
+  /// and moves every response a pump later under a widget test's fake one. It
+  /// broke a dozen unrelated tests, only some of the time, and the failure
+  /// names nothing relevant - the harness crashes with "Cannot add event while
+  /// adding stream" and the job never finishes.
   /// What it does not do is cancel the request: `Future.timeout` abandons the
   /// wait, and the socket is left to the client's own cleanup. That is the
   /// difference between a caller that recovers and one that does not, which is
@@ -153,10 +160,11 @@ extension SlimmApiTransport on SlimmApi {
     required Duration deadline,
   }) async {
     try {
-      return await Future(() async {
-        final streamed = await _http.send(request);
-        return http.Response.fromStream(streamed);
-      }).timeout(deadline);
+      // Chained, never `Future(() async { ... })`; see the note on this method.
+      return await _http
+          .send(request)
+          .then(http.Response.fromStream)
+          .timeout(deadline);
     } on TimeoutException {
       throw TransportException(
         '$label got no answer within ${deadline.inSeconds} seconds',
