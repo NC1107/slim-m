@@ -13,8 +13,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../diagnostics/debug_log.dart';
 import '../providers/providers.dart';
+import 'run_guarded.dart';
 import 'settings_select_row.dart';
 
 final joinPolicyProvider = FutureProvider.autoDispose<api.JoinPolicy>(
@@ -40,26 +40,19 @@ class JoinPolicyRow extends ConsumerStatefulWidget {
   ConsumerState<JoinPolicyRow> createState() => _JoinPolicyRowState();
 }
 
-class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow> {
+class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow>
+    with GuardedActionState<JoinPolicyRow> {
   bool _saving = false;
 
   Future<void> _set(api.JoinPolicy policy) async {
     setState(() => _saving = true);
-    try {
-      await ref.read(apiProvider).setSpaceJoinPolicy(policy);
-      if (!mounted) return;
-      ref.invalidate(joinPolicyProvider);
-    } on api.ApiException catch (e) {
-      ref
-          .read(debugLogProvider.notifier)
-          .record('space', 'Could not change who can join', detail: e);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+    final ok = await guard(
+      whatFailed: 'change who can join',
+      action: () => ref.read(apiProvider).setSpaceJoinPolicy(policy),
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (ok) ref.invalidate(joinPolicyProvider);
   }
 
   @override
@@ -67,37 +60,55 @@ class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow> {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final policy = ref.watch(joinPolicyProvider);
 
-    return policy.when(
-      loading: () => const ListTile(
-        leading: Icon(AppIcons.members),
-        title: Text('Who can join'),
-        subtitle: Text('Loading…'),
-      ),
-      // A fixed sentence, never the exception itself: a raw parse error was
-      // rendering Dart type names into this row, which reads as a crash and
-      // tells nobody anything actionable. The object still reaches the log.
-      error: (e, _) => ListTile(
-        leading: const Icon(AppIcons.members),
-        title: const Text('Who can join'),
-        subtitle: Text(
-          'Could not load who can join.',
-          style: TextStyle(color: tokens.dangerText),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        policy.when(
+          loading: () => const ListTile(
+            leading: Icon(AppIcons.members),
+            title: Text('Who can join'),
+            subtitle: Text('Loading…'),
+          ),
+          // A fixed sentence, never the exception itself: a raw parse error
+          // was rendering Dart type names into this row, which reads as a
+          // crash and tells nobody anything actionable.
+          error: (e, _) => ListTile(
+            leading: const Icon(AppIcons.members),
+            title: const Text('Who can join'),
+            subtitle: Text(
+              'Could not load who can join.',
+              style: TextStyle(color: tokens.dangerText),
+            ),
+            trailing: TextButton(
+              onPressed: () => ref.invalidate(joinPolicyProvider),
+              child: const Text('Retry'),
+            ),
+          ),
+          data: (current) => ListTile(
+            leading: const Icon(AppIcons.members),
+            title: const Text('Who can join'),
+            subtitle: Text(
+              _labelFor(current),
+              style: TextStyle(color: tokens.textSecondary),
+            ),
+            trailing: const Icon(AppIcons.chevronRight),
+            onTap: _saving ? null : () => _open(context, current),
+          ),
         ),
-        trailing: TextButton(
-          onPressed: () => ref.invalidate(joinPolicyProvider),
-          child: const Text('Retry'),
-        ),
-      ),
-      data: (current) => ListTile(
-        leading: const Icon(AppIcons.members),
-        title: const Text('Who can join'),
-        subtitle: Text(
-          _labelFor(current),
-          style: TextStyle(color: tokens.textSecondary),
-        ),
-        trailing: const Icon(AppIcons.chevronRight),
-        onTap: _saving ? null : () => _open(context, current),
-      ),
+        if (actionError != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s16,
+              0,
+              AppSpacing.s16,
+              AppSpacing.s8,
+            ),
+            child: AppErrorState(
+              message: actionError!,
+              onDismiss: clearActionError,
+            ),
+          ),
+      ],
     );
   }
 

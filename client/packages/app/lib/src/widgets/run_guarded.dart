@@ -18,13 +18,13 @@ library;
 import 'package:flutter/widgets.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import '../api_failure.dart';
+
 /// Runs [action], returning null on success or a human sentence on failure.
 ///
 /// [whatFailed] names the action from the user's side ("revoke the invite"),
-/// and the returned sentence reads "Could not revoke the invite." A server
-/// message is appended only when it is worth reading: a `BadRequest` carries
-/// the server's own explanation of what was wrong with the request, while a
-/// transport failure carries a Dart exception string that helps nobody.
+/// and the returned sentence reads "Could not revoke the invite." See
+/// [describeApiFailure] for what each kind of failure says and why.
 Future<String?> runGuarded({
   required String whatFailed,
   required Future<void> Function() action,
@@ -32,22 +32,8 @@ Future<String?> runGuarded({
   try {
     await action();
     return null;
-  } on api.BadRequestException catch (e) {
-    return 'Could not $whatFailed. ${e.message}';
-  } on api.ConflictException catch (e) {
-    return 'Could not $whatFailed. ${e.message}';
-  } on api.ForbiddenException {
-    return 'Could not $whatFailed: you are not allowed to do that.';
-  } on api.UnauthorizedException {
-    return 'Could not $whatFailed: you are signed out. Sign in and try again.';
-  } on api.RateLimitedException {
-    return 'Could not $whatFailed: too many requests just now. '
-        'Wait a moment and try again.';
-  } on api.TransportException {
-    return 'Could not $whatFailed: the server could not be reached. '
-        'Nothing was changed.';
-  } on api.ApiException {
-    return 'Could not $whatFailed.';
+  } on api.ApiException catch (e) {
+    return describeApiFailure(whatFailed, e);
   }
 }
 

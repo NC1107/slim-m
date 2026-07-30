@@ -20,6 +20,7 @@ import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/custom_emoji_image.dart';
+import '../../widgets/run_guarded.dart';
 import 'emoji_upload_card.dart';
 
 class EmojiScreen extends ConsumerWidget {
@@ -69,7 +70,8 @@ class _EmojiRow extends ConsumerStatefulWidget {
   ConsumerState<_EmojiRow> createState() => _EmojiRowState();
 }
 
-class _EmojiRowState extends ConsumerState<_EmojiRow> {
+class _EmojiRowState extends ConsumerState<_EmojiRow>
+    with GuardedActionState<_EmojiRow> {
   bool _busy = false;
 
   Future<void> _delete() async {
@@ -85,16 +87,14 @@ class _EmojiRowState extends ConsumerState<_EmojiRow> {
     if (!confirmed || !mounted) return;
 
     setState(() => _busy = true);
-    try {
-      await ref.read(apiProvider).deleteCustomEmoji(widget.emoji.id);
-      if (context.mounted) ref.invalidate(customEmojiProvider);
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not remove $shortcode. ${e.message}')),
-      );
-    }
+    final ok = await guard(
+      // Not "remove $shortcode": a shortcode's own trailing colon collides with the one some failure sentences end in.
+      whatFailed: 'remove the $shortcode emoji',
+      action: () => ref.read(apiProvider).deleteCustomEmoji(widget.emoji.id),
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) ref.invalidate(customEmojiProvider);
   }
 
   @override
@@ -103,34 +103,45 @@ class _EmojiRowState extends ConsumerState<_EmojiRow> {
     final emoji = widget.emoji;
 
     return AppCard(
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // The same widget and the same cache a message row draws it
-          // through, so this list shows what a member will actually see.
-          CustomEmojiImage(emojiId: emoji.id, size: 32),
-          const SizedBox(width: AppSpacing.s12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  emoji.shortcode,
-                  style: const TextStyle(fontFamily: AppFonts.mono),
+          Row(
+            children: [
+              // The same widget and the same cache a message row draws it
+              // through, so this list shows what a member will actually see.
+              CustomEmojiImage(emojiId: emoji.id, size: 32),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      emoji.shortcode,
+                      style: const TextStyle(fontFamily: AppFonts.mono),
+                    ),
+                    const SizedBox(height: AppSpacing.s4),
+                    Text(
+                      'Added ${formatDateTime(emoji.createdAt)}',
+                      style: AppText.caption.copyWith(
+                        color: tokens.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.s4),
-                Text(
-                  'Added ${formatDateTime(emoji.createdAt)}',
-                  style: AppText.caption.copyWith(color: tokens.textSecondary),
-                ),
-              ],
-            ),
+              ),
+              AppIconButton(
+                icon: AppIcons.delete,
+                semanticLabel: 'Remove ${emoji.shortcode}',
+                variant: AppIconButtonVariant.danger,
+                onPressed: _busy ? null : _delete,
+              ),
+            ],
           ),
-          AppIconButton(
-            icon: AppIcons.delete,
-            semanticLabel: 'Remove ${emoji.shortcode}',
-            variant: AppIconButtonVariant.danger,
-            onPressed: _busy ? null : _delete,
-          ),
+          if (actionError != null) ...[
+            const SizedBox(height: AppSpacing.s8),
+            AppErrorState(message: actionError!, onDismiss: clearActionError),
+          ],
         ],
       ),
     );

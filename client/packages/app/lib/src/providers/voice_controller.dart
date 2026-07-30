@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_rtc/rtc.dart';
 
+import '../api_failure.dart';
 import '../diagnostics/debug_log.dart';
 import '../server_scheme_policy.dart' show isLocalAddress;
 import 'providers.dart';
@@ -240,7 +241,7 @@ class VoiceController extends StateNotifier<VoiceState> {
     } on api.ApiException catch (e) {
       state = state.copyWith(
         state: VoiceSessionState.failed,
-        error: e.message,
+        error: describeApiFailure('join the call', e),
         retryable: true,
       );
     }

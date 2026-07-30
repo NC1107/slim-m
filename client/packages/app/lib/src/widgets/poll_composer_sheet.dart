@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../api_failure.dart';
 import '../ids.dart';
 import '../providers/message_extras.dart';
 import '../providers/providers.dart';
@@ -77,7 +78,9 @@ class _PollComposerSheetState extends ConsumerState<_PollComposerSheet> {
       ref.read(messageExtrasProvider.notifier).applyMessage(sent);
       if (mounted) Navigator.of(context).pop();
     } on api.ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (mounted) {
+        setState(() => _error = describeApiFailure('send the poll', e));
+      }
     } finally {
       // Any escape, not just ApiException, must not wedge "Sending..." on.
       if (mounted) setState(() => _submitting = false);
@@ -123,10 +126,7 @@ class _PollComposerSheetState extends ConsumerState<_PollComposerSheet> {
               const SizedBox(height: AppSpacing.s8),
             ],
             if (_error != null) ...[
-              Text(
-                _error!,
-                style: AppText.caption.copyWith(color: tokens.dangerText),
-              ),
+              AppErrorState(message: _error!),
               const SizedBox(height: AppSpacing.s8),
             ],
             AppButton(

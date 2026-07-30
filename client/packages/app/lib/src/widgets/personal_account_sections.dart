@@ -12,11 +12,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../api_failure.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../providers/sync_controller.dart';
 import '../providers/user_profiles.dart';
+import 'run_guarded.dart';
 import 'settings_section_header.dart';
 
 /// The account's devices, refetched when invalidated.
@@ -58,30 +60,76 @@ class DevicesSection extends ConsumerWidget {
               : Column(
                   children: [
                     for (final device in list)
-                      ListTile(
-                        leading: const Icon(AppIcons.account),
-                        title: Text(device.name),
-                        subtitle: Text(
-                          device.isCurrent ? 'This device' : 'Signed in',
-                          style: TextStyle(color: tokens.textSecondary),
-                        ),
-                        trailing: device.isCurrent
-                            ? null
-                            : TextButton(
-                                onPressed: () async {
-                                  await ref
-                                      .read(apiProvider)
-                                      .removeDevice(device.id);
-                                  if (context.mounted) {
-                                    ref.invalidate(devicesProvider);
-                                  }
-                                },
-                                child: const Text('Sign out'),
-                              ),
-                      ),
+                      _DeviceRow(key: ValueKey(device.id), device: device),
                   ],
                 ),
         ),
+      ],
+    );
+  }
+}
+
+/// One signed-in device, with its own "sign out" failure: a revoke that
+/// cannot reach the server must say so on the row it was for, not vanish.
+class _DeviceRow extends ConsumerStatefulWidget {
+  const _DeviceRow({super.key, required this.device});
+
+  final api.Device device;
+
+  @override
+  ConsumerState<_DeviceRow> createState() => _DeviceRowState();
+}
+
+class _DeviceRowState extends ConsumerState<_DeviceRow>
+    with GuardedActionState<_DeviceRow> {
+  bool _busy = false;
+
+  Future<void> _signOut() async {
+    setState(() => _busy = true);
+    final ok = await guard(
+      whatFailed: 'sign out that device',
+      action: () => ref.read(apiProvider).removeDevice(widget.device.id),
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) ref.invalidate(devicesProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final device = widget.device;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ListTile(
+          leading: const Icon(AppIcons.account),
+          title: Text(device.name),
+          subtitle: Text(
+            device.isCurrent ? 'This device' : 'Signed in',
+            style: TextStyle(color: tokens.textSecondary),
+          ),
+          trailing: device.isCurrent
+              ? null
+              : TextButton(
+                  onPressed: _busy ? null : _signOut,
+                  child: const Text('Sign out'),
+                ),
+        ),
+        if (actionError != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s16,
+              0,
+              AppSpacing.s16,
+              AppSpacing.s8,
+            ),
+            child: AppErrorState(
+              message: actionError!,
+              onDismiss: clearActionError,
+            ),
+          ),
       ],
     );
   }
@@ -184,7 +232,7 @@ class _BlockedRow extends ConsumerWidget {
     } on api.ApiException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not unblock that user. ${e.message}')),
+        SnackBar(content: Text(describeApiFailure('unblock that user', e))),
       );
     }
   }

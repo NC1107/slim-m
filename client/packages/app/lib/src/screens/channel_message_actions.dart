@@ -21,25 +21,21 @@ import '../providers/message_extras.dart';
 import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/run_guarded.dart';
 import '../widgets/safety_actions.dart';
 
-/// Runs [action], and on a refusal from the server says so in [failure]'s
-/// words followed by the server's own.
+/// Runs [action], and on a refusal from the server says so.
 ///
 /// The mounted check is not decoration: every one of these awaits a network
 /// round trip, and a user who leaves the channel meanwhile takes the element
 /// this would otherwise reach through with them.
 Future<void> _reporting(
   BuildContext context,
-  String failure,
+  String whatFailed,
   Future<void> Function() action,
 ) async {
-  try {
-    await action();
-  } on api.ApiException catch (e) {
-    if (!context.mounted) return;
-    _say(context, '$failure ${e.message}');
-  }
+  final failure = await runGuarded(whatFailed: whatFailed, action: action);
+  if (failure != null && context.mounted) _say(context, failure);
 }
 
 void _say(BuildContext context, String text) =>
@@ -109,7 +105,7 @@ Future<void> submitMessageEdit(
   if (content == message.content) return;
   await _reporting(
     context,
-    'Could not save the edit.',
+    'save the edit',
     () => editMessageAction(ref, message, content),
   );
 }
@@ -131,7 +127,7 @@ Future<void> confirmAndDeleteMessage(
   if (!confirmed || !context.mounted) return;
   await _reporting(
     context,
-    'Could not delete the message.',
+    'delete the message',
     () => deleteMessageAction(ref, message),
   );
 }
@@ -147,7 +143,7 @@ Future<void> toggleMessagePin(
   final controller = ref.read(pinsControllerProvider(channelId).notifier);
   await _reporting(
     context,
-    'Could not update the pin.',
+    'update the pin',
     () => pinned ? controller.unpin(message.id) : controller.pin(message.id),
   );
 }

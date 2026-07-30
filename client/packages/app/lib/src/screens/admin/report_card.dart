@@ -27,6 +27,7 @@ import '../../providers/providers.dart';
 import '../../providers/reports_controller.dart';
 import '../../providers/user_profiles.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/run_guarded.dart';
 
 class ReportCard extends ConsumerStatefulWidget {
   const ReportCard({super.key, required this.report});
@@ -37,7 +38,8 @@ class ReportCard extends ConsumerStatefulWidget {
   ConsumerState<ReportCard> createState() => _ReportCardState();
 }
 
-class _ReportCardState extends ConsumerState<ReportCard> {
+class _ReportCardState extends ConsumerState<ReportCard>
+    with GuardedActionState<ReportCard> {
   bool _busy = false;
 
   @override
@@ -82,20 +84,17 @@ class _ReportCardState extends ConsumerState<ReportCard> {
     if (!confirmed || !mounted) return;
 
     setState(() => _busy = true);
-    try {
-      await ref
-          .read(apiProvider)
-          .resolveReport(reportId: widget.report.id, resolution: resolution);
-      if (context.mounted) {
+    await guard(
+      whatFailed: 'close the report',
+      action: () async {
+        await ref
+            .read(apiProvider)
+            .resolveReport(reportId: widget.report.id, resolution: resolution);
         await ref.read(reportsControllerProvider.notifier).refresh();
-      }
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not close the report. ${e.message}')),
-      );
-    }
+      },
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
   }
 
   @override
@@ -175,6 +174,10 @@ class _ReportCardState extends ConsumerState<ReportCard> {
               ),
             ],
           ),
+          if (actionError != null) ...[
+            const SizedBox(height: AppSpacing.s8),
+            AppErrorState(message: actionError!, onDismiss: clearActionError),
+          ],
         ],
       ),
     );

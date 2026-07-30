@@ -96,12 +96,9 @@ class _MediaCapabilitySectionState
           const SizedBox(height: AppSpacing.s12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-            child: AppCallout(
-              tone: AppCalloutTone.warn,
-              icon: AppIcons.unknown,
-              child: Text(
-                'Could not tell what this device supports. $_failure',
-              ),
+            child: AppErrorState(
+              message: 'Could not tell what this device supports.',
+              detail: '$_failure',
             ),
           ),
         ],

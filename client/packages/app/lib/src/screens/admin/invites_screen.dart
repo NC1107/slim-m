@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../../api_failure.dart';
 import '../../format.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
@@ -79,6 +80,7 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
   bool _submitting = false;
   String? _roleGrant;
   api.Invite? _created;
+  String? _error;
 
   @override
   void dispose() {
@@ -87,7 +89,10 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
   }
 
   Future<void> _create() async {
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
     final maxUses = int.tryParse(_maxUses.text.trim());
     final duration = _expiryOptions[_expiryIndex].$2;
     final expiresAt = duration == null
@@ -112,10 +117,10 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
       });
     } on api.ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not create the invite. ${e.message}')),
-      );
+      setState(() {
+        _submitting = false;
+        _error = describeApiFailure('create the invite', e);
+      });
     }
   }
 
@@ -153,6 +158,10 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
             selected: _roleGrant,
             onChanged: (id) => setState(() => _roleGrant = id),
           ),
+          if (_error != null) ...[
+            const SizedBox(height: AppSpacing.s12),
+            AppErrorState(message: _error!),
+          ],
           const SizedBox(height: AppSpacing.s12),
           AppButton(
             label: _submitting ? 'Creating...' : 'Create invite',

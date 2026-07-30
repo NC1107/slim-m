@@ -15,6 +15,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../../api_failure.dart';
 import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
@@ -123,7 +124,7 @@ class _ChannelOverwritesScreenState
     } on api.ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not set the overwrite. ${e.message}')),
+        SnackBar(content: Text(describeApiFailure('set the overwrite', e))),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -158,7 +159,7 @@ class _ChannelOverwritesScreenState
     } on api.ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not clear the overwrite. ${e.message}')),
+        SnackBar(content: Text(describeApiFailure('clear the overwrite', e))),
       );
     } finally {
       if (mounted) setState(() => _busy = false);

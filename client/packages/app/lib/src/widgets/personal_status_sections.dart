@@ -10,8 +10,8 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/presence_controller.dart';
-import '../providers/providers.dart';
 import '../providers/push_controller.dart';
+import 'presence_menu.dart' show applyPresenceVisibility;
 import 'settings_section_header.dart';
 import 'settings_select_row.dart';
 
@@ -45,20 +45,8 @@ class PresenceSection extends ConsumerWidget {
             for (final option in _options)
               SettingsChoice(value: option.$1, label: option.$2),
           ],
-          onChanged: (visibility) async {
-            ref.read(presenceVisibilityDisplayProvider.notifier).state =
-                visibility;
-            try {
-              await ref.read(apiProvider).setPresenceVisibility(visibility);
-            } on api.ApiException catch (e) {
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Could not update presence. ${e.message}'),
-                ),
-              );
-            }
-          },
+          onChanged: (visibility) =>
+              applyPresenceVisibility(context, ref, visibility),
         ),
       ],
     );

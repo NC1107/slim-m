@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../api_failure.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
 
@@ -66,7 +67,9 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
       Navigator.of(context).pop();
       router.go(Routes.channel(created.id));
     } on api.ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (mounted) {
+        setState(() => _error = describeApiFailure('create the channel', e));
+      }
     } finally {
       // Any escape, not just ApiException, must not wedge "Creating..." on.
       if (mounted) setState(() => _submitting = false);
@@ -120,10 +123,7 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
             ),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.s8),
-              Text(
-                _error!,
-                style: AppText.caption.copyWith(color: tokens.dangerText),
-              ),
+              AppErrorState(message: _error!),
             ],
             const SizedBox(height: AppSpacing.s12),
             AppButton(

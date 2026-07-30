@@ -150,14 +150,7 @@ class _JoinPreview extends ConsumerWidget {
                     if (error != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.s12),
-                        child: Text(
-                          error,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: tokens.dangerText,
-                            fontSize: 13,
-                          ),
-                        ),
+                        child: AppErrorState(message: error),
                       ),
                     // No button for a failure a retry cannot fix, rather than one that only invites the same failure again.
                     if (canRetry)
@@ -387,10 +380,7 @@ class _InCall extends ConsumerWidget {
               if (voice.error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.s16),
-                  child: Text(
-                    voice.error!,
-                    style: TextStyle(color: tokens.dangerText, fontSize: 13),
-                  ),
+                  child: AppErrorState(message: voice.error!),
                 ),
             ],
           ),
