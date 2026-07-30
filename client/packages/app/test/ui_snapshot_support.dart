@@ -5,7 +5,6 @@
 /// Kept out of the test file so the matrix there stays a list of sizes.
 library;
 
-import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -16,8 +15,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/message_extras.dart';
@@ -36,6 +33,11 @@ import 'package:slimm_app/src/screens/sign_in_screen.dart';
 import 'package:slimm_app/src/screens/space_settings_screen.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
+
+import 'ui_snapshot_fixture_data.dart';
+
+export 'ui_snapshot_fixture_data.dart'
+    show fixtureChannels, fixtureClient, fixtureMessages;
 
 /// Where PNGs land. Gitignored: these are for looking at, not for diffing.
 const snapshotDir = 'build/ui-snapshots';
@@ -119,99 +121,6 @@ class _NoopSyncController extends SyncController {
   Future<void> start() async {}
 }
 
-/// Answers the reads the shell makes on its way up: the caller, the member
-/// list, pins and a window of messages.
-MockClient fixtureClient() => MockClient((request) async {
-  final path = request.url.path;
-  // 404 like a real server: the catch-all `[]` renders as a blank disc.
-  if (path.endsWith('/avatar')) return http.Response('', 404);
-
-  final Object body = switch (path) {
-    '/me' => {
-      'id': 'user-nick',
-      'username': 'nick',
-      'display_name': 'Nick',
-      'created_at': 0,
-      'permissions': -1,
-    },
-    _ when path.endsWith('/members') => [
-      {
-        'id': 'user-nick',
-        'username': 'nick',
-        'display_name': 'Nick',
-        'created_at': 0,
-        'roles': ['admin'],
-      },
-      {
-        'id': 'user-ada',
-        'username': 'ada',
-        'display_name': 'Ada Lovelace',
-        'created_at': 0,
-        'roles': <String>[],
-      },
-    ],
-    // A list is the right empty answer for the collection reads; the
-    // read marker decodes a shape and type-errors on one.
-    _ when path.endsWith('/read') => const {'last_read_seq': 3, 'unread': 0},
-    _ when path.endsWith('/voice/roster') => const {'participants': <Object>[]},
-    '/space/settings' => const {'join_policy': 'invite'},
-    _ => const <Object>[],
-  };
-  return http.Response(
-    jsonEncode(body),
-    200,
-    headers: {'content-type': 'application/json'},
-  );
-});
-
-const fixtureChannels = [
-  api.Channel(id: 'c-general', name: 'general', kind: 'text', createdAt: 0),
-  api.Channel(
-    id: 'c-design',
-    name: 'design',
-    kind: 'text',
-    createdAt: 0,
-    topic: 'tokens, type and the shell',
-  ),
-  api.Channel(id: 'c-main', name: 'main', kind: 'voice', createdAt: 0),
-];
-
-api.Message _message(
-  int seq,
-  String author,
-  String content, {
-  List<api.ReactionSummary> reactions = const [],
-}) => api.Message(
-  id: 'm-$seq',
-  channelId: 'c-general',
-  authorId: author,
-  authorDisplayName: author == 'user-nick' ? 'Nick' : 'Ada Lovelace',
-  seq: seq,
-  content: content,
-  createdAt: 1753600000000 + seq * 60000,
-  editedAt: null,
-  reactions: reactions,
-);
-
-final fixtureMessages = [
-  _message(1, 'user-ada', 'The rail rows line up again at every width.'),
-  _message(
-    2,
-    'user-nick',
-    'Reactions render in colour now, not outlines.',
-    reactions: const [
-      api.ReactionSummary(emoji: '\u{1F389}', count: 2, reacted: true),
-      api.ReactionSummary(emoji: '\u{2764}\u{FE0F}', count: 1, reacted: false),
-    ],
-  ),
-  _message(
-    3,
-    'user-ada',
-    'Long enough to wrap on a phone and prove the composer still clears '
-        'the home indicator underneath it.',
-  ),
-];
-
 /// A container wired like the app's, with the network and database swapped.
 ///
 /// [extraOverrides] layers on top for a test that needs one more provider
@@ -252,14 +161,29 @@ Future<({ProviderContainer container, SlimmDatabase db})> fixtureContainer({
   return (container: container, db: db);
 }
 
+/// Whether the real app reaches [location] by pushing it over the channel
+/// shell, rather than it being a destination of its own.
+///
+/// Every settings and administration route is reached this way: a member
+/// opens one from inside the app, never cold. [fixtureRouter] starts there
+/// at the channel shell instead, and `ui_snapshot_test.dart` pushes the real
+/// target on top of it after the first frame, so [modalPage]'s
+/// `Navigator.of(context).canPop()` reads true exactly as it would in the
+/// app - floating shadow, scrim and all - rather than the "opened cold"
+/// presentation a bare `initialLocation` at the route itself would produce.
+bool isModalFixtureRoute(String location) => location.startsWith('/settings');
+
 /// The shell, on the real routes, at [location].
 ///
-/// The settings and admin routes use the app's own [modalPage], so a desktop
-/// render shows the real cold-open presentation (the centred panel over the
-/// app background) and a phone render the full-screen one; onboarding and
-/// sign-in stand alone, exactly as the real router mounts them.
+/// The settings and admin routes use the app's own [modalPage]; see
+/// [isModalFixtureRoute] for how this router is primed so a desktop render
+/// shows the real floating presentation rather than the cold-open one.
+/// Onboarding and sign-in stand alone, exactly as the real router mounts
+/// them.
 GoRouter fixtureRouter(String location) => GoRouter(
-  initialLocation: location,
+  initialLocation: isModalFixtureRoute(location)
+      ? '/channels/c-general'
+      : location,
   routes: [
     GoRoute(
       path: '/join',
