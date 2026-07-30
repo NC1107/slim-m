@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.1](https://github.com/NC1107/slim-m/compare/client-v0.13.0...client-v0.13.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* **client:** make five admin/onboarding screens say what is true ([#175](https://github.com/NC1107/slim-m/issues/175)) ([03ac7c9](https://github.com/NC1107/slim-m/commit/03ac7c997f91aaf24d79fbcf95351316d5ab1fc2))
+* **client:** page the member roster instead of truncating at 50 ([#181](https://github.com/NC1107/slim-m/issues/181)) ([33a99b4](https://github.com/NC1107/slim-m/commit/33a99b4b7164b32d6e57df9d269d29e5404d3076))
+
 ## [0.13.0](https://github.com/NC1107/slim-m/compare/client-v0.12.0...client-v0.13.0) (2026-07-30)
 
 
