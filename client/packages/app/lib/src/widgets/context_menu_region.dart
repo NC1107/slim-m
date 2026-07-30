@@ -8,6 +8,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'context_menu_focus.dart';
+
 /// Wraps [child] so a right-click or long-press opens an [AppMenu] built by
 /// [itemsBuilder], anchored to this region. [itemsBuilder] receives a
 /// `close` callback each item's `onTap` should call before acting, matching
@@ -51,17 +53,23 @@ class _ContextMenuRegionState extends State<ContextMenuRegion> {
             offset: const Offset(24, 12),
             child: TapRegion(
               onTapOutside: (_) => _setOpen(false),
-              child: AppMenu(
-                width: 200,
-                children: widget.itemsBuilder(() => _setOpen(false)),
+              child: ContextMenuKeyboardScope(
+                onDismiss: () => _setOpen(false),
+                child: AppMenu(
+                  width: 200,
+                  children: widget.itemsBuilder(() => _setOpen(false)),
+                ),
               ),
             ),
           ),
         ),
-        child: GestureDetector(
-          onSecondaryTapDown: (_) => _setOpen(true),
-          onLongPress: () => _setOpen(true),
-          child: widget.child,
+        child: ContextMenuFocus(
+          onOpen: () => _setOpen(true),
+          child: GestureDetector(
+            onSecondaryTapDown: (_) => _setOpen(true),
+            onLongPress: () => _setOpen(true),
+            child: widget.child,
+          ),
         ),
       ),
     );
