@@ -7,6 +7,12 @@
 /// different verb. Two copies of a safety action is two places for the copy to
 /// stop matching what actually happens, and the block half had already drifted:
 /// it promised messages were hidden while nothing filtered any.
+///
+/// Every function here takes a [ProviderContainer], not a [WidgetRef]: the
+/// caller dismisses the surface these are offered from before the request
+/// answers (a popover pops, then a dialog is awaited), and a `WidgetRef` tied
+/// to that surface's element throws once it is disposed. A container has no
+/// such lifetime, so it is what a caller must capture before dismissing.
 library;
 
 import 'package:flutter/material.dart';
@@ -26,7 +32,7 @@ void _say(BuildContext context, String text) =>
 /// and is the only difference between the two callers.
 Future<void> fileReport(
   BuildContext context,
-  WidgetRef ref, {
+  ProviderContainer container, {
   required api.ReportSubject subject,
   required String subjectId,
   required String subjectLabel,
@@ -34,7 +40,7 @@ Future<void> fileReport(
   final reason = await promptReportReason(context, subjectLabel: subjectLabel);
   if (reason == null || !context.mounted) return;
   try {
-    await ref
+    await container
         .read(apiProvider)
         .report(subject: subject, subjectId: subjectId, reason: reason);
     if (!context.mounted) return;
@@ -54,11 +60,11 @@ Future<void> fileReport(
 /// be undone.
 Future<void> blockUser(
   BuildContext context,
-  WidgetRef ref,
+  ProviderContainer container,
   String userId,
 ) async {
   try {
-    await ref.read(blocksProvider.notifier).block(userId);
+    await container.read(blocksProvider.notifier).block(userId);
     if (!context.mounted) return;
     _say(context, 'Blocked. You will not see what they post.');
   } on api.ApiException catch (e) {
@@ -70,11 +76,11 @@ Future<void> blockUser(
 /// Unblocks [userId], reporting a failure rather than swallowing it.
 Future<void> unblockUser(
   BuildContext context,
-  WidgetRef ref,
+  ProviderContainer container,
   String userId,
 ) async {
   try {
-    await ref.read(blocksProvider.notifier).unblock(userId);
+    await container.read(blocksProvider.notifier).unblock(userId);
     if (!context.mounted) return;
     _say(context, 'Unblocked.');
   } on api.ApiException catch (e) {
