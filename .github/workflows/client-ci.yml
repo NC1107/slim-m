@@ -16,9 +16,11 @@ on:
 permissions:
   contents: read
 
+# Never on main: a release gate reads these very check runs, so cancelling one
+# blocks a publish that had nothing wrong with it.
 concurrency:
   group: client-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   analyze-format-test:
