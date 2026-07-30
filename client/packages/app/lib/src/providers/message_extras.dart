@@ -19,6 +19,24 @@
 /// overwrites, so that omission can only ever fail to add new information -
 /// it can never erase a better answer this cache already has cached from a
 /// REST fetch.
+///
+/// Nothing prunes one entry at a time, deliberately. Every consumer selects
+/// the one id it is about, and there is no reachability answer to prune
+/// against, since search, pins, the command palette and the transcript's own
+/// paged window all render extras for messages outside any one channel's
+/// visible rows. An over-eager prune shows a message with its reactions
+/// missing until some later fetch happens to include it again, which is
+/// worse than the memory.
+///
+/// That memory is real, not free: each entry retains a reaction list, an
+/// attachment list and a poll, and history pagination
+/// (`providers/channel_history.dart`) can now pull thousands of messages
+/// through [MessageExtrasController.applyMessages] in one session. [clear] is
+/// the one point this does get dropped in bulk, on sign-out
+/// (`SyncController._endSession`), for the same reason the message store
+/// itself is wiped there: the local database is one file for the whole app,
+/// and whoever signs in next on this device must not still find a stranger's
+/// reactions cached.
 library;
 
 import 'dart:async';
@@ -84,10 +102,29 @@ class MessageExtrasController
   /// Merges in whatever [message] carries. See the file doc comment for why
   /// a merge, never an overwrite, is what makes this safe to call from a
   /// live socket frame that may have omitted all three fields.
-  void applyMessage(api.Message message) {
-    final existing = state[message.id];
-    _set(
-      message.id,
+  void applyMessage(api.Message message) =>
+      _set(message.id, _merged(message, state[message.id]));
+
+  /// For a REST fetch's whole page at once (search, catch-up, a channel screen
+  /// hydrating its visible window on open, or a page of older history).
+  ///
+  /// One state write for the whole page, deliberately: this used to call
+  /// [applyMessage] in a loop, so hydrating a 50-message window published 50
+  /// successive whole-map copies and rebuilt every listener 50 times for one
+  /// fetch.
+  void applyMessages(Iterable<api.Message> messages) {
+    final next = {...state};
+    var changed = false;
+    for (final message in messages) {
+      next[message.id] = _merged(message, next[message.id]);
+      changed = true;
+    }
+    if (changed) state = next;
+  }
+
+  /// Whatever [message] carries, over whatever is already known. See the file
+  /// doc comment for why this can only ever add information.
+  MessageExtras _merged(api.Message message, MessageExtras? existing) =>
       MessageExtras(
         reactions: message.reactions.isNotEmpty
             ? message.reactions
@@ -96,17 +133,7 @@ class MessageExtrasController
             ? message.attachments
             : existing?.attachments ?? const [],
         poll: message.poll ?? existing?.poll,
-      ),
-    );
-  }
-
-  /// For a REST fetch's whole page at once (search, catch-up, or a channel
-  /// screen hydrating its visible window on open).
-  void applyMessages(Iterable<api.Message> messages) {
-    for (final message in messages) {
-      applyMessage(message);
-    }
-  }
+      );
 
   /// Replaces the cached tallies from a broadcast, carrying `reacted` over from
   /// what this client already knew: it is per-viewer and never broadcast (see
@@ -246,6 +273,13 @@ class MessageExtrasController
 
   void _set(String id, MessageExtras extras) {
     state = {...state, id: extras};
+  }
+
+  /// Drops every cached entry. See the file doc comment for why sign-out is
+  /// the one point this runs.
+  void clear() {
+    if (state.isEmpty) return;
+    state = const {};
   }
 
   @override

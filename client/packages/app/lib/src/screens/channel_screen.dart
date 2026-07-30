@@ -19,6 +19,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../ids.dart';
 import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
+import '../providers/channel_history.dart';
 import '../providers/channel_search_controller.dart';
 import '../providers/emoji_catalog_provider.dart';
 import '../providers/member_presence.dart';
@@ -35,6 +36,7 @@ import '../widgets/jump_to_latest_button.dart';
 import '../widgets/message_context_menu.dart';
 import '../widgets/message_transcript.dart';
 import 'channel_message_actions.dart';
+import 'channel_read_marker.dart';
 
 export '../ids.dart' show newMessageId;
 
@@ -60,14 +62,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// most one at a time: starting a new edit implicitly cancels another.
   String? _editingId;
 
-  /// The highest seq this state has already asked the store and server to
-  /// mark read, per channel. Keyed by channel because this state outlives a
-  /// channel switch: [ConversationPane] builds this widget with no key, so
-  /// navigating between channels reuses the same [State] rather than a fresh
-  /// one. Without the guard, every rebuild of an already-read channel (a
-  /// reaction landing, a typing indicator, anything) would re-fire both
-  /// calls for a seq that is already recorded as read.
-  final Map<String, int> _markedReadSeq = {};
+  late final ReadMarker _readMarker = ReadMarker(ref);
 
   /// The channel's newest delivered seq and last-read marker as of the most
   /// recent build, cached for [_onScrollChanged]: scrolling never rebuilds
@@ -99,8 +94,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   @override
   void didUpdateWidget(ChannelScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // This State outlives a channel switch (see [_markedReadSeq]), so the
-    // field would otherwise still hold the previous channel's query.
+    // This State outlives a channel switch (see [ReadMarker]), so the field
+    // would otherwise still hold the previous channel's query.
     if (oldWidget.channelId != widget.channelId) _searchController.clear();
   }
 
@@ -209,41 +204,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   void _toggleSearch() =>
       ref.read(channelSearchProvider(widget.channelId).notifier).toggle();
 
-  /// Advances the read marker to `seq`, the newest delivered message in the
-  /// channel ([VisibleTranscript.newestSeq]).
-  ///
-  /// Pending sends are excluded there: they carry seq 0 until the server
-  /// acknowledges them, so treating one as "read" would either no-op or,
-  /// once the real send lands with its assigned seq, immediately look
-  /// unread again for a message the user already sees on screen. A blocked
-  /// author's message counts, for the reason that field records.
-  ///
-  /// The local write and the network call are both monotonic and idempotent
-  /// (`MessageStore.setReadMarker`, the server's `PUT .../read`), so a
-  /// redundant call is harmless; [_markedReadSeq] exists only to keep a busy
-  /// channel from re-sending the same seq on every unrelated rebuild.
-  ///
-  /// Callers are responsible for the scroll gate: this only knows the seq to
-  /// advance to, never whether the viewport is actually showing it, since
-  /// both `build` and [_onScrollChanged] call it under their own check.
-  void _markReadUpToLatest(int seq, int lastReadSeq) {
-    if (seq == 0) return;
-    if (seq <= lastReadSeq) return;
-    if ((_markedReadSeq[widget.channelId] ?? 0) >= seq) return;
-    _markedReadSeq[widget.channelId] = seq;
-    unawaited(_markRead(widget.channelId, seq));
-  }
-
-  Future<void> _markRead(String channelId, int seq) async {
-    final store = await ref.read(storeProvider.future);
-    await store.setReadMarker(channelId, seq);
-    try {
-      await ref.read(apiProvider).markRead(channelId: channelId, seq: seq);
-    } on api.ApiException {
-      // Best-effort: the local marker already advanced, so the UI is correct,
-      // and the next message or reconnect gives the server another chance.
-    }
-  }
+  void _markReadUpToLatest(int seq, int lastReadSeq) =>
+      _readMarker.advance(widget.channelId, seq: seq, lastReadSeq: lastReadSeq);
 
   void _scrollToLatest() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -300,7 +262,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         );
     final customEmoji = ref.watch(customEmojiIndexProvider);
     final blocked = ref.watch(blocksProvider.select((state) => state.ids));
-    final extrasById = ref.watch(messageExtrasProvider);
+    final history = ref.watch(channelHistoryProvider(widget.channelId));
+    final paging = ref.read(channelHistoryProvider(widget.channelId).notifier);
     final syncStatus = ref.watch(syncControllerProvider);
     final myId = ref.watch(meProvider).valueOrNull?.id;
     final myPermissions = ref.watch(myPermissionsProvider);
@@ -360,12 +323,18 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                       : Stack(
                           children: [
                             StreamBuilder<List<Message>>(
-                              stream: store.watchChannel(widget.channelId),
+                              stream: store.watchChannel(
+                                widget.channelId,
+                                limit: history.window,
+                              ),
                               builder: (context, snapshot) {
+                                final rows = snapshot.data ?? const <Message>[];
                                 final transcript = visibleTranscript(
-                                  snapshot.data ?? const <Message>[],
+                                  rows,
                                   blocked,
                                 );
+                                final oldest = oldestDeliveredSeq(rows);
+                                paging.syncOldest(oldest);
                                 _latestSeq = transcript.newestSeq;
                                 _lastReadSeq = lastReadSeq;
                                 // Gated on the viewport: scrolled into history, this rebuild is a message arriving somewhere unread.
@@ -388,7 +357,16 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   editingId: _editingId,
                                   knownUsernames: knownUsernames,
                                   customEmoji: customEmoji,
-                                  extrasById: extrasById,
+                                  // A channel with nothing delivered has no history to page, so its oldest loaded row is vacuously its first.
+                                  history: history.copyWith(
+                                    atStart:
+                                        history.atStart ||
+                                        (oldest == null &&
+                                            syncStatus == SyncStatus.live),
+                                  ),
+                                  onLoadOlder: () =>
+                                      unawaited(paging.loadOlder()),
+                                  onRetryOlder: () => unawaited(paging.retry()),
                                   actionsFor: (message) => _actionsFor(
                                     message,
                                     myId: myId,

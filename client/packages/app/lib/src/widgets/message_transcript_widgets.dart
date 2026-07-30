@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The two presentational pieces the transcript composes but that carry no
-/// list logic of their own: the start-of-channel header, and the one-shot
-/// entrance a freshly arrived message rides in on.
+/// The presentational pieces the transcript composes but that carry no list
+/// logic of their own: the start-of-channel header, what stands in its place
+/// while there is still history above, what an empty list means, the one-shot
+/// entrance a freshly arrived message rides in on, and the per-row extras
+/// scope.
 ///
 /// Split out of `message_transcript.dart` to keep that file to the reversed
 /// scroll and the grouping, unread and day rules that decide what each row
@@ -9,8 +11,11 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/message_extras.dart';
+import '../providers/sync_controller.dart';
 import '../routing/breakpoints.dart';
 
 /// The block at the very top of a channel's history: a mark, the channel's
@@ -62,6 +67,77 @@ class ChannelStartHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// What sits above the oldest loaded message while the channel's real start
+/// has not been reached: a neutral note that there is more, or the failure of
+/// the page that was meant to fetch it.
+///
+/// It stands exactly where [ChannelStartHeader] would, which is the point.
+/// Announcing the start of a conversation above history nobody has fetched is
+/// a claim the client cannot make, and a blank gap there reads as the same
+/// claim more quietly.
+class HistoryTopAffordance extends StatelessWidget {
+  const HistoryTopAffordance({
+    super.key,
+    required this.failed,
+    required this.loading,
+    this.onRetry,
+  });
+
+  final bool failed;
+
+  /// Whether a page is actually in flight right now. Not the opposite of
+  /// [failed]: once a filtered-empty view stops driving the automatic
+  /// trigger (see `message_transcript.dart`'s own note on that), this sits
+  /// idle - between pages, or waiting on a scroll that has not come again -
+  /// and the copy has to say so rather than claim a fetch that is not
+  /// running.
+  final bool loading;
+
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final gutter = LayoutClass.of(context) == LayoutClass.compact
+        ? AppSizes.paneGutterCompact
+        : AppSizes.paneGutter;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        gutter,
+        AppSpacing.s16,
+        gutter,
+        AppSpacing.s8,
+      ),
+      child: failed
+          ? AppErrorState(
+              message: 'Could not load earlier messages.',
+              onRetry: onRetry,
+            )
+          : loading
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: AppSpacing.s8),
+                Text(
+                  'Loading earlier messages...',
+                  style: AppText.caption.copyWith(color: tokens.textSecondary),
+                ),
+              ],
+            )
+          : Text(
+              'There is more history above.',
+              textAlign: TextAlign.center,
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
     );
   }
 }
@@ -124,5 +200,78 @@ class _MessageEntranceState extends State<MessageEntrance>
         ),
       );
     },
+  );
+}
+
+/// What an empty message list means depends on whether catch-up has actually
+/// run: a channel can look empty because it is, or because sync has not
+/// reached it yet, and those read as opposite things to the person waiting.
+class EmptyMessages extends StatelessWidget {
+  const EmptyMessages({super.key, required this.syncStatus});
+
+  final SyncStatus syncStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return switch (syncStatus) {
+      SyncStatus.connecting => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            Text(
+              'Catching up on messages...',
+              style: TextStyle(color: tokens.textSecondary),
+            ),
+          ],
+        ),
+      ),
+      SyncStatus.offline => Center(
+        child: Text(
+          'Offline. Messages will appear once reconnected.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: tokens.textSecondary),
+        ),
+      ),
+      SyncStatus.live => Center(
+        child: Text(
+          'No messages yet.',
+          style: TextStyle(color: tokens.textSecondary),
+        ),
+      ),
+    };
+  }
+}
+
+/// One row's reactions, attachments and poll, watched for that message id
+/// alone.
+///
+/// The screen used to watch [messageExtrasProvider] whole and hand the map
+/// down, so one reaction anywhere rebuilt the entire transcript, and opening a
+/// channel did that once per hydrated message. Selecting by id means a change
+/// reaches the one row it is about.
+class MessageRowExtras extends ConsumerWidget {
+  const MessageRowExtras({
+    super.key,
+    required this.messageId,
+    required this.builder,
+  });
+
+  final String messageId;
+  final Widget Function(MessageExtras extras) builder;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => builder(
+    ref.watch(
+      messageExtrasProvider.select(
+        (extras) => extras[messageId] ?? MessageExtras.empty,
+      ),
+    ),
   );
 }

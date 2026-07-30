@@ -13,7 +13,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import '../providers/message_extras.dart';
+import '../providers/channel_history.dart';
 import '../providers/sync_controller.dart';
 import 'message_context_menu.dart';
 import 'message_row.dart';
@@ -36,7 +36,9 @@ class MessageTranscript extends StatefulWidget {
     required this.editingId,
     required this.knownUsernames,
     required this.customEmoji,
-    required this.extrasById,
+    required this.history,
+    required this.onLoadOlder,
+    required this.onRetryOlder,
     required this.actionsFor,
     required this.onRetry,
     required this.onDiscard,
@@ -67,7 +69,17 @@ class MessageTranscript extends StatefulWidget {
 
   final Set<String> knownUsernames;
   final Map<String, String> customEmoji;
-  final Map<String, MessageExtras> extrasById;
+
+  /// How much of the channel is loaded. Only [ChannelHistory.atStart] lets the
+  /// start-of-channel header render; anything else puts a loading affordance
+  /// in its place, because the oldest loaded row is not known to be the first.
+  final ChannelHistory history;
+
+  /// Fired whenever the oldest end of the list comes into view, which the
+  /// reverse below puts at the maximum scroll extent rather than the minimum.
+  final VoidCallback onLoadOlder;
+  final VoidCallback onRetryOlder;
+
   final MessageActionsFor actionsFor;
 
   final void Function(Message message) onRetry;
@@ -95,15 +107,84 @@ class _MessageTranscriptState extends State<MessageTranscript> {
   final Set<String> _seen = {};
   bool _hydrated = false;
 
+  /// How close to the oldest end still counts as having reached it, so a page
+  /// starts before the reader hits a hard stop.
+  static const double _loadOlderSlop = 240;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void didUpdateWidget(MessageTranscript oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.scrollController == widget.scrollController) return;
+    oldWidget.scrollController.removeListener(_onScroll);
+    widget.scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  /// The list is reversed, so the oldest message sits at the *maximum* extent;
+  /// the minimum is the newest, which is where `_scrollToLatest` goes.
+  void _onScroll() {
+    final controller = widget.scrollController;
+    if (!controller.hasClients) return;
+    final position = controller.position;
+    if (position.maxScrollExtent - position.pixels > _loadOlderSlop) return;
+    widget.onLoadOlder();
+  }
+
+  /// A list shorter than its viewport never scrolls, so nothing would ever
+  /// ask for the page that would prove where the channel starts.
+  ///
+  /// Called only once [build] is about to lay out a real, populated list.
+  /// Every loaded row can be filtered from view (a channel whose visible tail
+  /// is entirely a blocked author, say), and an empty transcript then renders
+  /// as a bare [SingleChildScrollView] whose `maxScrollExtent` is always zero
+  /// - indistinguishable, to [_onScroll], from a genuine scroll to the end.
+  /// Gating on there being an actual list is a structural fact about what is
+  /// on screen, not a threshold: a counter would still fire this once before
+  /// it could trip, and forgets, the moment it resets, why it should not fire
+  /// again the next time every row is filtered.
+  ///
+  /// Whether the ask is worth making is [ChannelHistoryController.loadOlder]'s
+  /// decision alone; scheduling nothing once the start is known only saves the
+  /// callback.
+  void _checkAfterLayout() {
+    if (widget.history.atStart) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onScroll();
+    });
+  }
+
+  /// The start header only when the oldest loaded row is known to be the
+  /// channel's first, and only where such a header belongs at all.
+  Widget? _topSlot() {
+    if (!widget.history.atStart) {
+      return HistoryTopAffordance(
+        failed: widget.history.failed,
+        loading: widget.history.loading,
+        onRetry: widget.onRetryOlder,
+      );
+    }
+    if (widget.channelName == null) return null;
+    return ChannelStartHeader(
+      name: widget.channelName!,
+      topic: widget.channelTopic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final messages = widget.messages;
-    final start = widget.channelName == null
-        ? null
-        : ChannelStartHeader(
-            name: widget.channelName!,
-            topic: widget.channelTopic,
-          );
+    final start = _topSlot();
 
     if (messages.isEmpty) {
       // A brand-new channel is welcomed at the top; connecting and offline still say what they are.
@@ -116,6 +197,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
       return EmptyMessages(syncStatus: widget.syncStatus);
     }
 
+    _checkAfterLayout();
     final newestId = messages.last.id;
     final animateNewest = _hydrated && !_seen.contains(newestId);
     // Everything on screen counts as seen, so a recycle never replays.
@@ -135,33 +217,36 @@ class _MessageTranscriptState extends State<MessageTranscript> {
         final index = messages.length - 1 - i;
         final message = messages[index];
         final previous = index == 0 ? null : messages[index - 1];
-        final extras = widget.extrasById[message.id] ?? MessageExtras.empty;
         final newDay = isNewDay(message, previous);
-        final row = MessageRow(
+        final row = MessageRowExtras(
           // By message, not by slot: an arrival shifts every index by one.
           key: ValueKey(message.id),
-          message: message,
-          // A new day breaks a group so a continuation across midnight regains its avatar and header.
-          grouped: isGrouped(message, previous) && !newDay,
-          showNewDivider: startsUnread(message, previous, widget.lastReadSeq),
-          dayLabel: newDay ? formatMessageDay(message.createdAt) : null,
-          knownUsernames: widget.knownUsernames,
-          customEmoji: widget.customEmoji,
-          onRetry: () => widget.onRetry(message),
-          onDiscard: () => widget.onDiscard(message),
-          onEditFailed: widget.onEditFailed == null
-              ? null
-              : () => widget.onEditFailed!(message),
-          onPickReaction: (emoji) => widget.onPickReaction(message, emoji),
-          onReactionTap: (reaction) => widget.onReactionTap(message, reaction),
-          onVote: (option) => widget.onVote(message, option),
-          reactions: extras.reactions,
-          attachments: extras.attachments,
-          poll: extras.poll,
-          editing: message.id == widget.editingId,
-          onSubmitEdit: (content) => widget.onSubmitEdit(message, content),
-          onCancelEdit: widget.onCancelEdit,
-          actions: widget.actionsFor(message),
+          messageId: message.id,
+          builder: (extras) => MessageRow(
+            message: message,
+            // A new day breaks a group so a continuation across midnight regains its avatar and header.
+            grouped: isGrouped(message, previous) && !newDay,
+            showNewDivider: startsUnread(message, previous, widget.lastReadSeq),
+            dayLabel: newDay ? formatMessageDay(message.createdAt) : null,
+            knownUsernames: widget.knownUsernames,
+            customEmoji: widget.customEmoji,
+            onRetry: () => widget.onRetry(message),
+            onDiscard: () => widget.onDiscard(message),
+            onEditFailed: widget.onEditFailed == null
+                ? null
+                : () => widget.onEditFailed!(message),
+            onPickReaction: (emoji) => widget.onPickReaction(message, emoji),
+            onReactionTap: (reaction) =>
+                widget.onReactionTap(message, reaction),
+            onVote: (option) => widget.onVote(message, option),
+            reactions: extras.reactions,
+            attachments: extras.attachments,
+            poll: extras.poll,
+            editing: message.id == widget.editingId,
+            onSubmitEdit: (content) => widget.onSubmitEdit(message, content),
+            onCancelEdit: widget.onCancelEdit,
+            actions: widget.actionsFor(message),
+          ),
         );
         if (i != 0) return row;
         return MessageEntrance(
@@ -171,52 +256,6 @@ class _MessageTranscriptState extends State<MessageTranscript> {
         );
       },
     );
-  }
-}
-
-/// What an empty message list means depends on whether catch-up has actually
-/// run: a channel can look empty because it is, or because sync has not
-/// reached it yet, and those read as opposite things to the person waiting.
-class EmptyMessages extends StatelessWidget {
-  const EmptyMessages({super.key, required this.syncStatus});
-
-  final SyncStatus syncStatus;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return switch (syncStatus) {
-      SyncStatus.connecting => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const SizedBox(height: AppSpacing.s12),
-            Text(
-              'Catching up on messages...',
-              style: TextStyle(color: tokens.textSecondary),
-            ),
-          ],
-        ),
-      ),
-      SyncStatus.offline => Center(
-        child: Text(
-          'Offline. Messages will appear once reconnected.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: tokens.textSecondary),
-        ),
-      ),
-      SyncStatus.live => Center(
-        child: Text(
-          'No messages yet.',
-          style: TextStyle(color: tokens.textSecondary),
-        ),
-      ),
-    };
   }
 }
 
