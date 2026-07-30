@@ -20,17 +20,41 @@ class MessageStore {
 
   // --- Reads ---
 
-  /// Watches a channel's messages, oldest first, as the UI renders them.
-  /// Pending sends sort last because they have no server order yet.
+  /// Watches the newest [limit] messages in a channel, oldest first, as the UI
+  /// renders them, with pending sends after every delivered one.
+  ///
+  /// The window is the *newest* rows, which took a correction: this ordered
+  /// `seq` ascending under the same limit, so it returned the oldest 200. Local
+  /// rows are never pruned and history pagination does not exist, so once a
+  /// channel passed 200 cached messages the transcript was pinned to the first
+  /// 200 ever synced and every later arrival was invisible until a sign-out.
+  /// The read marker froze with it, since the screen takes the newest row it is
+  /// given as the newest there is. `database.dart`'s index is
+  /// `(channel_id, seq DESC)` under a comment saying reads scan newest-first,
+  /// and this read was the one that did not.
+  ///
+  /// Pending sorts last, which is what the schema always claimed and the
+  /// ordering never delivered: a local-only row carries `seq` 0, which is the
+  /// *lowest* value, so ascending put an unsent message at the top of the
+  /// transcript rather than the bottom - permanently, for a failed one, since
+  /// `markFailed` leaves the zero in place. The first ordering term is what
+  /// fixes that, and it has to come before the limit rather than after it in
+  /// Dart, or a channel holding 200 delivered rows would cut the sender's own
+  /// unsent message off the end.
   Stream<List<Message>> watchChannel(String channelId, {int limit = 200}) {
     final query = db.select(db.messages)
       ..where((m) => m.channelId.equals(channelId))
       ..orderBy([
-        (m) => OrderingTerm(expression: m.seq),
-        (m) => OrderingTerm(expression: m.createdAt),
+        // Pending first here, so the reverse below puts them last.
+        (m) => OrderingTerm(
+              expression: m.seq.equals(0),
+              mode: OrderingMode.desc,
+            ),
+        (m) => OrderingTerm(expression: m.seq, mode: OrderingMode.desc),
+        (m) => OrderingTerm(expression: m.createdAt, mode: OrderingMode.desc),
       ])
       ..limit(limit);
-    return query.watch();
+    return query.watch().map((rows) => rows.reversed.toList(growable: false));
   }
 
   Stream<List<Channel>> watchChannels() {
