@@ -211,7 +211,11 @@ async fn authorize(
 ) -> Option<ServerFrame> {
     // Ahead of the channel-scoped match below; see the note on this function.
     if let Event::PresenceChanged(target_id) = event {
-        let status = signals::presence_status(store, hub, ctx.user_id, target_id).await?;
+        // A gone account and a store blip both mean silence here, unlike below.
+        let Ok(Some(status)) = signals::presence_status(store, hub, ctx.user_id, target_id).await
+        else {
+            return None;
+        };
         return Some(ServerFrame::PresenceChanged {
             user_id: target_id.to_string(),
             status: status.as_str().to_owned(),
@@ -307,11 +311,20 @@ async fn authorize(
     // one choke point for exactly this reason, and a typing frame bypassed it:
     // a hidden user's keystrokes announced them. Dropped here, per viewer,
     // through the same function every other presence surface uses.
-    if let Event::TypingStarted { user_id, .. } | Event::TypingStopped { user_id, .. } = event
-        && signals::presence_status(store, hub, ctx.user_id, user_id).await
-            == Some(crate::presence::Status::Offline)
-    {
-        return None;
+    //
+    // Unlike the `PresenceChanged` branch above, this one must fail closed on
+    // a store blip rather than let it through: withholding a status change
+    // just loses an update, but withholding this gate leaks one. So only a
+    // confirmed non-offline status clears it; `Ok(None)` (account gone) and
+    // `Err` (could not tell) both drop the frame, same as a real `Offline`.
+    if let Event::TypingStarted { user_id, .. } | Event::TypingStopped { user_id, .. } = event {
+        let confirmed_visible = matches!(
+            signals::presence_status(store, hub, ctx.user_id, user_id).await,
+            Ok(Some(status)) if status != crate::presence::Status::Offline
+        );
+        if !confirmed_visible {
+            return None;
+        }
     }
 
     Some(match event {

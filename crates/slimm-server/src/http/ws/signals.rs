@@ -40,24 +40,31 @@ impl Drop for PresenceGuard {
     }
 }
 
-/// Resolves what `viewer` may be told about `target`'s live presence. `None`
-/// only if `target`'s account is gone: a fan-out racing an account deletion
-/// should not synthesize presence for it.
+/// Resolves what `viewer` may be told about `target`'s live presence.
+///
+/// `Ok(None)` only if `target`'s account is gone: a fan-out racing an account
+/// deletion should not synthesize presence for it. `Err` means the store
+/// could not answer at all, and is kept distinct from `Ok(None)` on purpose:
+/// a caller with something to protect (see `authorize`'s typing branch in
+/// `super`) must be able to fail closed on a blip without that blip reading
+/// as an ordinary "account gone" answer.
 pub(super) async fn presence_status(
     store: &Store,
     hub: &Hub,
     viewer: UserId,
     target: UserId,
-) -> Option<Status> {
-    let visibility = store.presence_visibility(target).await.ok().flatten()?;
+) -> anyhow::Result<Option<Status>> {
+    let Some(visibility) = store.presence_visibility(target).await? else {
+        return Ok(None);
+    };
     let tracker = hub.presence();
-    Some(presence::status_for(
+    Ok(Some(presence::status_for(
         viewer,
         target,
         visibility,
         tracker.is_connected(target),
         tracker.is_idle(target),
-    ))
+    )))
 }
 
 /// Accepts a typing refresh from `ctx`'s user for `channel_id`, if the rate
