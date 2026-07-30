@@ -5,7 +5,45 @@ Thirty-three specialist reviews over the whole stack, every one put through a
 second reviewer whose job was to knock the findings down.
 528 findings survived that; 98 did not.
 
-Nothing here is fixed. This is the written-down state of the project.
+This was the written-down state of the project on the day it was written.
+Much of it has since been closed; see the status below before working from any
+report here, and correct that section rather than leaving it to rot, because
+this document's whole purpose is stopping re-discovery.
+
+## Status, 2026-07-30
+
+Each report ends with the three its author would do first. All fifteen of those
+are closed except where noted, and the security report's full set is closed.
+
+| Report | The three to do first | State |
+| --- | --- | --- |
+| Security | all sixteen findings, not three | closed: #145, #147-#153, #155 |
+| Server code | role-removal containment; publish the missing events then cache permissions; the rate-limit extractor | closed: #149, #161 then #165, #145 |
+| Screens | report card identity; pin `primary` and `ListTileTheme`; the snapshot fixture | closed: #157, #162, #166 |
+| Client code | the message path and item keys; dismiss-then-act; the failure-reporting migration | closed: #154, #159, #167 (with #160) |
+| Process | gate the tag-push publish path; the `SlimmApi` reachability gate; the stale documentation | closed: #158, #169, #164 |
+
+Also closed from the wider set: the WebSocket frame set is documented and gated
+(#163), and `Hub`'s duplicated constructor and the healthcheck's `Config`
+bypass (#171).
+
+**Deliberately still open**, with the reason rather than by omission:
+
+- **The `messages_fts` rowid rebuild** (server report, medium). Latent, and the
+  fix is a full table rebuild on real message data while the live instance
+  auto-updates from `latest`, so it wants a person watching the deploy. See
+  CLAUDE.md's owner list.
+- **Seven unreachable `SlimmApi` methods.** The gate that stops an eighth is in
+  (#169); the seven themselves are allowlisted with dated reasons, and two of
+  them are the whole of the account-recovery owner decision, which has no UI at
+  either end.
+
+Several findings turned out to be **already fixed when checked**: the
+server-identity tick reads the pinned fingerprint and has a `mismatch` state,
+`listUsers` has callers, and both Phase 4 items the process report lists (the
+voice join roster and `MediaCapabilities.probeAll`) were closed on 2026-07-28.
+That is the same drift this audit's own process report is about, and it is why
+this section exists.
 
 ## The five reports
 
