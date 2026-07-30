@@ -22,17 +22,19 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use tokio::sync::OwnedSemaphorePermit;
 use tokio::sync::broadcast::error::RecvError;
 
 use super::AppState;
 use super::PROTOCOL_VERSION;
+use super::channels::ChannelDto;
 use super::messages::{AttachmentDto, MessageDto};
 use crate::hub::{Event, Hub};
 use crate::permissions::Permissions;
 use crate::store::{SessionContext, Store};
+use frames::{ClientFrame, PollOptionCountDto, ReactionCountDto, ServerFrame};
 
+mod frames;
 mod signals;
 
 /// How long a freshly connected socket has to send its `hello` before it is
@@ -65,100 +67,6 @@ async fn connect(ws: WebSocketUpgrade, State(state): State<AppState>) -> Respons
     ws.max_message_size(MAX_FRAME_BYTES)
         .max_frame_size(MAX_FRAME_BYTES)
         .on_upgrade(move |socket| serve(socket, state, permit))
-}
-
-// --- Envelope ---
-
-#[derive(Serialize)]
-#[serde(tag = "type")]
-enum ServerFrame {
-    #[serde(rename = "hello")]
-    Hello { protocol: u32 },
-    #[serde(rename = "message.created")]
-    MessageCreated {
-        channel_id: String,
-        seq: i64,
-        message: MessageDto,
-    },
-    #[serde(rename = "message.edited")]
-    MessageEdited {
-        channel_id: String,
-        seq: i64,
-        message: MessageDto,
-    },
-    #[serde(rename = "message.deleted")]
-    MessageDeleted {
-        channel_id: String,
-        message_id: String,
-    },
-    #[serde(rename = "reactions.changed")]
-    ReactionsChanged {
-        channel_id: String,
-        message_id: String,
-        reactions: Vec<ReactionCountDto>,
-    },
-    #[serde(rename = "message.pinned")]
-    MessagePinned {
-        channel_id: String,
-        message_id: String,
-        pinned_by: Option<String>,
-        pinned_at: i64,
-    },
-    #[serde(rename = "message.unpinned")]
-    MessageUnpinned {
-        channel_id: String,
-        message_id: String,
-    },
-    #[serde(rename = "poll.voted")]
-    PollVoted {
-        channel_id: String,
-        message_id: String,
-        options: Vec<PollOptionCountDto>,
-    },
-    #[serde(rename = "presence.changed")]
-    PresenceChanged { user_id: String, status: String },
-    #[serde(rename = "member.timeout")]
-    MemberTimeoutChanged { user_id: String, until: Option<i64> },
-    #[serde(rename = "member.removed")]
-    MemberRemoved { user_id: String },
-    #[serde(rename = "typing.started")]
-    TypingStarted { channel_id: String, user_id: String },
-    #[serde(rename = "typing.stopped")]
-    TypingStopped { channel_id: String, user_id: String },
-    #[serde(rename = "pong")]
-    Pong,
-    #[serde(rename = "error")]
-    Error { message: String },
-}
-
-/// One emoji and how many people used it. Public counts only: what the asking
-/// user reacted with is per viewer and never broadcast.
-#[derive(Serialize)]
-pub(crate) struct ReactionCountDto {
-    emoji: String,
-    count: i64,
-}
-
-/// One poll option and its current public vote count. Never carries who cast
-/// a vote, only the option and its tally.
-#[derive(Serialize)]
-pub(crate) struct PollOptionCountDto {
-    position: i64,
-    votes: i64,
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type")]
-enum ClientFrame {
-    #[serde(rename = "hello")]
-    Hello { ticket: String, protocol: u32 },
-    #[serde(rename = "ping")]
-    Ping,
-    /// A typing refresh. Rate-limited and authorized like any other channel
-    /// event (view plus send); see [`signals::handle_typing`]. There is no
-    /// explicit "stop" frame: the state lapses on its own without a refresh.
-    #[serde(rename = "typing")]
-    Typing { channel_id: String },
 }
 
 // --- Connection ---
@@ -315,7 +223,29 @@ async fn authorize(
                 user_id: user_id.to_string(),
             });
         }
+        Event::RoleChanged { role_id } => {
+            return Some(ServerFrame::RoleChanged {
+                role_id: role_id.to_string(),
+            });
+        }
+        Event::MemberRoleChanged { user_id, role_id } => {
+            return Some(ServerFrame::MemberRoleChanged {
+                user_id: user_id.to_string(),
+                role_id: role_id.to_string(),
+            });
+        }
         _ => {}
+    }
+
+    // Special-cased; see `Event::ChannelDeleted`'s doc comment for why.
+    if let Event::ChannelDeleted { channel_id } = event {
+        let viewed = store
+            .viewed_channel_before_delete(ctx.user_id, channel_id)
+            .await
+            .unwrap_or(false);
+        return viewed.then(|| ServerFrame::ChannelDeleted {
+            channel_id: channel_id.to_string(),
+        });
     }
 
     let channel_id = match &event {
@@ -328,18 +258,28 @@ async fn authorize(
         Event::TypingStarted { channel_id, .. } | Event::TypingStopped { channel_id, .. } => {
             *channel_id
         }
-        // Control events are handled in the loop, never here. The
-        // deployment-wide ones already returned above.
+        Event::ChannelCreated(channel) | Event::ChannelUpdated(channel) => channel.id,
+        Event::OverwriteChanged { channel_id, .. } => *channel_id,
+        // Control events are handled in the loop; the rest already returned above.
         Event::SessionRevoked(_)
         | Event::PresenceChanged(_)
         | Event::MemberTimeoutChanged { .. }
-        | Event::MemberRemoved(_) => return None,
+        | Event::MemberRemoved(_)
+        | Event::RoleChanged { .. }
+        | Event::MemberRoleChanged { .. }
+        | Event::ChannelDeleted { .. } => return None,
     };
+    // The one event whose subject may have just lost this very view.
+    let held_it_before = matches!(
+        &event,
+        Event::OverwriteChanged { previously_visible_to, .. }
+            if previously_visible_to.contains(&ctx.user_id)
+    );
     let visible = store
         .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
         .await
         .unwrap_or(false);
-    if !visible {
+    if !visible && !held_it_before {
         return None;
     }
 
@@ -444,11 +384,23 @@ async fn authorize(
             channel_id: channel_id.to_string(),
             user_id: user_id.to_string(),
         },
-        // The deployment-wide events already returned above; unreachable here.
+        Event::ChannelCreated(channel) => ServerFrame::ChannelCreated {
+            channel: ChannelDto::from(channel),
+        },
+        Event::ChannelUpdated(channel) => ServerFrame::ChannelUpdated {
+            channel: ChannelDto::from(channel),
+        },
+        Event::OverwriteChanged { channel_id, .. } => ServerFrame::OverwriteChanged {
+            channel_id: channel_id.to_string(),
+        },
+        // The deployment-wide and channel-deletion cases already returned above.
         Event::SessionRevoked(_)
         | Event::PresenceChanged(_)
         | Event::MemberTimeoutChanged { .. }
-        | Event::MemberRemoved(_) => return None,
+        | Event::MemberRemoved(_)
+        | Event::RoleChanged { .. }
+        | Event::MemberRoleChanged { .. }
+        | Event::ChannelDeleted { .. } => return None,
     })
 }
 

@@ -191,6 +191,17 @@ class SyncController extends StateNotifier<SyncStatus> {
         /// account's own delete looping back) never left the local store
         /// and stayed visible until the next full resync.
         await store.discard(messageId);
+      case ChannelCreated(:final channel):
+      case ChannelUpdated(:final channel):
+        await store.upsertChannels([channel]);
+      case ChannelDeleted(:final channelId):
+        // A channel already known to be gone; no round trip needed for that.
+        await store.removeChannel(channelId);
+      case OverwriteChanged():
+      case RoleChanged():
+      case MemberRoleChanged():
+        // None say which channel changed; a refresh finds whichever did.
+        await _channelRefresher.refreshOnce(api, store);
       case ErrorEvent(:final needsResync) when needsResync:
         // The server closed a connection that fell behind; a restart re-runs catch-up.
         unawaited(start());

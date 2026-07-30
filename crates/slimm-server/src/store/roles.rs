@@ -97,6 +97,22 @@ impl Store {
     /// a permissions change can remove an administrator, and checking the
     /// broader condition stays correct even when the bit arrives folded into a
     /// larger change.
+    /// Who holds a role, for a caller that has to notify them about something
+    /// their membership decides.
+    ///
+    /// Bounded by the role's own membership rather than by the deployment, and
+    /// the only caller is the overwrite handler, which needs the set *before*
+    /// it writes; see [`crate::http::overwrites`].
+    pub async fn members_with_role(&self, role_id: RoleId) -> anyhow::Result<Vec<UserId>> {
+        let rows = sqlx::query!(
+            r#"SELECT user_id AS "user_id!: UserId" FROM member_roles WHERE role_id = ?"#,
+            role_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|r| r.user_id).collect())
+    }
+
     pub async fn update_role(
         &self,
         role_id: RoleId,

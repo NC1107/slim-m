@@ -157,3 +157,62 @@ class TypingStopped extends ServerEvent {
   final String channelId;
   final String userId;
 }
+
+/// A role was created, renamed, had its permission bits changed, or was
+/// deleted. Never carries the name or the bits: those are gated behind
+/// MANAGE_ROLES over `GET /roles`, and this frame reaches every connection
+/// regardless of whether it holds that. There is nothing to apply from the
+/// id alone; a receiver re-asks what changed (its own permissions and
+/// channel list, and its role list if it manages roles).
+class RoleChanged extends ServerEvent {
+  const RoleChanged({required this.roleId});
+
+  final String roleId;
+}
+
+/// A role was granted to or revoked from a member. Carries both ids, which
+/// is no more than `GET /members` already publishes for any caller.
+class MemberRoleChanged extends ServerEvent {
+  const MemberRoleChanged({required this.userId, required this.roleId});
+
+  final String userId;
+  final String roleId;
+}
+
+/// A channel was created, reaching a connection under the same
+/// current-permission check [MessageCreated] already uses.
+class ChannelCreated extends ServerEvent {
+  const ChannelCreated(this.channel);
+
+  final Channel channel;
+}
+
+/// A channel was renamed or had its topic replaced. Never changes what the
+/// channel's permission model allows, so the same current-permission check
+/// used for [ChannelCreated] is exact here too.
+class ChannelUpdated extends ServerEvent {
+  const ChannelUpdated(this.channel);
+
+  final Channel channel;
+}
+
+/// A channel was soft-deleted. Gated on having been able to view it a moment
+/// before, not on the ordinary current-permission check, which always
+/// answers "no such channel" the instant this fires and so would reach
+/// nobody.
+class ChannelDeleted extends ServerEvent {
+  const ChannelDeleted({required this.channelId});
+
+  final String channelId;
+}
+
+/// A permission overwrite was set or cleared for one role or one member in
+/// this channel. Never carries the allow/deny mask, the same privileged
+/// detail [RoleChanged] withholds. A viewer who gains access from this exact
+/// change is told; one it revokes is a known, narrow gap (see the server's
+/// own notes on `http::ws::authorize`).
+class OverwriteChanged extends ServerEvent {
+  const OverwriteChanged({required this.channelId});
+
+  final String channelId;
+}

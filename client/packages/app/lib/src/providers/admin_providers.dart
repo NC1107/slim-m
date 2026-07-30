@@ -14,9 +14,12 @@
 /// of theirs.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import 'live_events.dart';
 import 'providers.dart';
 
 /// The caller's own base (deployment-level) permission bitmask, or 0 while
@@ -42,6 +45,20 @@ final removedMembersProvider =
 final rolesProvider = FutureProvider.autoDispose<List<api.Role>>(
   (ref) => ref.watch(apiProvider).listRoles(),
 );
+
+/// Refetches [rolesProvider] and [meProvider] when a role's own definition
+/// changes or a member's assignment does: either can change what a role
+/// means for whoever is looking at this screen right now, and the caller's
+/// own permissions besides. Watched by [RolesScreen] to stay live while open.
+final roleChangeWatcherProvider = Provider.autoDispose<void>((ref) {
+  final sub = ref.read(liveEventsProvider).listen((event) {
+    if (event is api.RoleChanged || event is api.MemberRoleChanged) {
+      ref.invalidate(rolesProvider);
+      ref.invalidate(meProvider);
+    }
+  });
+  ref.onDispose(() => unawaited(sub.cancel()));
+});
 
 /// Every custom emoji in the deployment, oldest first.
 ///

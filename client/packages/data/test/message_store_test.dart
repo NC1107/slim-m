@@ -258,6 +258,32 @@ void main() {
     expect(channel.lastReadSeq, 5);
   });
 
+  test(
+      'replaceChannels prunes a channel the server no longer lists, '
+      'keeping cursor and read marker for the rest', () async {
+    await store.applyMessage(_message(id: 'm1', seq: 9));
+    await store.applyMessages([_message(id: 'm2', channelId: 'chan-2')]);
+    await store.setReadMarker('chan-1', 5);
+
+    // Drops chan-2 (a revoked view) and adds a channel never seen before.
+    await store.replaceChannels([
+      const api.Channel(
+          id: 'chan-1', name: 'general', kind: 'text', createdAt: 1),
+      const api.Channel(
+          id: 'chan-3', name: 'new-one', kind: 'text', createdAt: 3),
+    ]);
+
+    final channels = await store.watchChannels().first;
+    expect(channels.map((c) => c.id), unorderedEquals(['chan-1', 'chan-3']));
+    expect(await store.cursorFor('chan-1'), 9,
+        reason: 'a channel that stays keeps its cursor');
+    expect(channels.firstWhere((c) => c.id == 'chan-1').lastReadSeq, 5,
+        reason: 'and its read marker');
+    expect(await store.watchChannel('chan-2').first, isEmpty,
+        reason: 'the dropped channel loses its cached messages too, '
+            'not just its row');
+  });
+
   /// The window is the newest rows, not the oldest. This ordered `seq`
   /// ascending under the same limit, so past the limit the transcript was
   /// pinned to the first messages ever synced and every later arrival was

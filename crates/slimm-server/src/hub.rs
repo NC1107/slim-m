@@ -25,9 +25,9 @@ use std::time::Duration;
 
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, broadcast};
 
-use crate::ids::{ChannelId, MessageId, SessionId, UserId};
+use crate::ids::{ChannelId, MessageId, RoleId, SessionId, UserId};
 use crate::presence::PresenceTracker;
-use crate::store::{AttachmentSummary, Message};
+use crate::store::{AttachmentSummary, Channel, Message};
 use crate::typing::TypingTracker;
 
 /// How many events the channel buffers per subscriber before the slowest one
@@ -124,6 +124,68 @@ pub enum Event {
     TypingStopped {
         channel_id: ChannelId,
         user_id: UserId,
+    },
+    /// A role was created, renamed, had its permission bits changed, or was
+    /// deleted. Carries only the id, never the name or the bits: those are
+    /// gated behind MANAGE_ROLES over REST (`GET /roles`), and broadcasting
+    /// either here would hand every member a privileged answer this event has
+    /// no way to check them against. Deployment-wide like
+    /// [`Event::MemberTimeoutChanged`] for the same reason: a role's bits feed
+    /// every channel's evaluation at once, so there is no bounded per-channel
+    /// audience to compute instead. A receiving client cannot resolve what
+    /// changed, only that it should re-ask what it is now allowed to do.
+    RoleChanged { role_id: RoleId },
+    /// A role was granted to or revoked from a member. Carries both ids,
+    /// which leaks nothing beyond `GET /members` already does for any caller:
+    /// a member's held role ids are on their public profile. Broadcast rather
+    /// than gated on the receiver for the same reason [`Event::MemberRemoved`]
+    /// is: the fact itself is not privileged, only a role's bits are, and
+    /// those never travel here either.
+    MemberRoleChanged { user_id: UserId, role_id: RoleId },
+    /// A channel was created. Carries the full row, the way
+    /// [`Event::MessageCreated`] carries its message: a fresh channel has no
+    /// prior state to reconcile against, so whoever can view it right now is
+    /// exactly who should be told, the same channel-scoped check every
+    /// message event already uses.
+    ChannelCreated(Channel),
+    /// A channel was renamed or had its topic replaced. Never changes what a
+    /// channel's permission model allows, so the ordinary current-state
+    /// channel-scoped check is exact here too: nobody's view of the channel
+    /// changes, only its name or topic.
+    ChannelUpdated(Channel),
+    /// A channel was soft-deleted. Carries only the id: there is nothing left
+    /// to show once it is gone. Gated specially in `http::ws::authorize`
+    /// rather than through the ordinary channel-scoped check, which would
+    /// always answer "no such channel" the instant this fires and so would
+    /// never reach anyone - see
+    /// [`crate::store::Store::viewed_channel_before_delete`].
+    ChannelDeleted { channel_id: ChannelId },
+    /// A channel permission overwrite was set or cleared for one role or one
+    /// member. Carries only the channel id: the allow/deny mask is exactly
+    /// the kind of privileged detail [`Event::RoleChanged`] withholds, and for
+    /// the same reason. Gated by the ordinary current-state channel-scoped
+    /// check, so a viewer who gains access is told immediately; a viewer
+    /// whose access this exact change revokes is a known, accepted gap (see
+    /// the audit finding this closes), since telling them precisely would need
+    /// the same kind of pre-change snapshot [`Event::ChannelDeleted`] needed,
+    /// scaled to however many members a role-targeted overwrite can name.
+    OverwriteChanged {
+        channel_id: ChannelId,
+        /// Who could view the channel immediately *before* this overwrite was
+        /// written, among the members it affects.
+        ///
+        /// Carried because the ordinary per-viewer check answers the question
+        /// one instant too late: a connection whose view this very change
+        /// revoked now fails it, so gating on the current answer alone delivers
+        /// to everyone except the people the change was about - and their rail
+        /// keeps showing a channel they can no longer open, which is the whole
+        /// symptom this event exists to fix.
+        ///
+        /// It leaks nothing. Every id in it is somebody who could see the
+        /// channel a moment ago, and the frame carries only the channel id.
+        /// Bounded by the targeted role's membership, or by one for a member
+        /// overwrite.
+        previously_visible_to: Vec<UserId>,
     },
 }
 

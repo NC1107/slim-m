@@ -28,6 +28,7 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
+use crate::hub::Event;
 use crate::ids::{ChannelId, RoleId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
@@ -54,6 +55,7 @@ struct SetOverwriteRequest {
 }
 
 /// What `{kind}/{id}` resolved to.
+#[derive(Clone, Copy)]
 enum Target {
     Role(RoleId),
     Member(UserId),
@@ -127,6 +129,7 @@ async fn set(
         return Err(ApiError::Forbidden);
     }
 
+    let previously_visible_to = previously_visible_to(&state, channel_id, target).await?;
     match target {
         Target::Role(role_id) => {
             if state.store.role(role_id).await?.is_none() {
@@ -147,6 +150,10 @@ async fn set(
                 .await?;
         }
     }
+    state.hub.publish(Event::OverwriteChanged {
+        channel_id,
+        previously_visible_to,
+    });
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -183,6 +190,7 @@ async fn clear(
         return Err(ApiError::Forbidden);
     }
 
+    let previously_visible_to = previously_visible_to(&state, channel_id, target).await?;
     match target {
         Target::Role(role_id) => {
             state
@@ -197,5 +205,27 @@ async fn clear(
                 .await?
         }
     }
+    state.hub.publish(Event::OverwriteChanged {
+        channel_id,
+        previously_visible_to,
+    });
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Who this overwrite affects and could already view the channel, resolved
+/// before the write lands.
+///
+/// See [`Event::OverwriteChanged`] for why the event needs it: the ordinary
+/// per-viewer check runs after the change, so the people whose access it just
+/// removed are exactly the ones it would exclude.
+async fn previously_visible_to(
+    state: &AppState,
+    channel_id: ChannelId,
+    target: Target,
+) -> Result<Vec<UserId>, ApiError> {
+    let affected = match target {
+        Target::Member(user_id) => vec![user_id],
+        Target::Role(role_id) => state.store.members_with_role(role_id).await?,
+    };
+    Ok(state.store.viewers_among(channel_id, &affected).await?)
 }

@@ -261,8 +261,41 @@ impl Store {
         let Some(channel) = self.channel(channel_id).await? else {
             return Ok(Permissions::NONE);
         };
+        self.evaluate_channel_permissions(user_id, channel).await
+    }
 
-        // DMs skip the role and overwrite model; see the note on this function.
+    /// Whether `user_id` held VIEW_CHANNEL in `channel_id` immediately before
+    /// it was soft-deleted. [`Self::channel`] excludes a deleted row, so the
+    /// ordinary check always answers "no channel" once this fires; a delete
+    /// leaves roles and overwrites untouched, so evaluating them against the
+    /// pre-delete row is exact, not a snapshot. Never called for a DM:
+    /// `http::channels::delete` refuses to delete one.
+    pub async fn viewed_channel_before_delete(
+        &self,
+        user_id: UserId,
+        channel_id: ChannelId,
+    ) -> anyhow::Result<bool> {
+        let Some(channel) = self.channel_including_deleted(channel_id).await? else {
+            return Ok(false);
+        };
+        Ok(self
+            .evaluate_channel_permissions(user_id, channel)
+            .await?
+            .contains(Permissions::VIEW_CHANNEL))
+    }
+
+    /// The shared body of [`Self::granted_in_channel`] and
+    /// [`Self::viewed_channel_before_delete`] once a channel row is already in
+    /// hand, whether or not it is still live, so the overwrite-precedence
+    /// bucketing exists once here rather than a fourth copy alongside the two
+    /// `tests/permissions.rs` already tracks in `permissions_batch.rs`.
+    async fn evaluate_channel_permissions(
+        &self,
+        user_id: UserId,
+        channel: super::Channel,
+    ) -> anyhow::Result<Permissions> {
+        let channel_id = channel.id;
+        // DMs skip the role and overwrite model; see `granted_in_channel`'s note.
         if channel.kind == super::dms::DM_CHANNEL_KIND {
             return self.dm_permissions(user_id, channel_id).await;
         }

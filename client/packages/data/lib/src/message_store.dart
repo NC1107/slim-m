@@ -133,6 +133,26 @@ class MessageStore {
     });
   }
 
+  /// Replaces the whole known channel list with exactly what the server
+  /// returned, pruning any channel (and its cached messages) that dropped
+  /// out - a permission revoked live, or a delete this device did not
+  /// perform itself. [upsertChannels] must never gain this: a single-channel
+  /// call (a rename, a freshly created channel) would wipe every other row.
+  Future<void> replaceChannels(List<api.Channel> channels) async {
+    await db.transaction(() async {
+      await upsertChannels(channels);
+      final keep = channels.map((c) => c.id).toSet();
+      final stale = await (db.select(db.channels)
+            ..where((c) => c.id.isNotIn(keep)))
+          .get();
+      for (final row in stale) {
+        await (db.delete(db.messages)..where((m) => m.channelId.equals(row.id)))
+            .go();
+        await (db.delete(db.channels)..where((c) => c.id.equals(row.id))).go();
+      }
+    });
+  }
+
   /// Applies one message from the server, whichever route it arrived by.
   ///
   /// Idempotent and order-safe: re-applying the same message changes nothing,
@@ -196,7 +216,8 @@ class MessageStore {
   /// Drops a channel this account deleted server-side, along with its
   /// cached messages. [upsertChannels] only ever inserts or updates, so a
   /// channel removed on the server would otherwise sit in the local list
-  /// forever; this is the one path that actually forgets a row.
+  /// forever; this is the direct path for one already-known id.
+  /// [replaceChannels] is the other, for a full server refresh.
   Future<void> removeChannel(String channelId) async {
     await db.transaction(() async {
       await (db.delete(db.messages)
