@@ -153,13 +153,14 @@ Future<void> toggleMessagePin(
 }
 
 /// Files a report against a message, once the reporter has given a reason.
-Future<void> reportMessage(
-  WidgetRef ref,
-  BuildContext context,
-  Message message,
-) => fileReport(
+///
+/// [ref] is unused: `fileReport` takes a [ProviderContainer], derived from
+/// [context] below, because this row's context never gets popped out from
+/// under it the way the member popover's does. The parameter stays only so
+/// this keeps its call site's shape unchanged.
+Future<void> reportMessage(BuildContext context, Message message) => fileReport(
   context,
-  ref,
+  ProviderScope.containerOf(context, listen: false),
   subject: api.ReportSubject.message,
   subjectId: message.id,
   subjectLabel: 'this message',
@@ -167,12 +168,12 @@ Future<void> reportMessage(
 
 /// Blocks a message's author. A message with no live author has nobody to
 /// block, so it is not offered one.
-Future<void> blockMessageAuthor(
-  WidgetRef ref,
-  BuildContext context,
-  Message message,
-) async {
+Future<void> blockMessageAuthor(BuildContext context, Message message) async {
   final authorId = message.authorId;
   if (authorId == null) return;
-  await blockUser(context, ref, authorId);
+  await blockUser(
+    context,
+    ProviderScope.containerOf(context, listen: false),
+    authorId,
+  );
 }

@@ -66,11 +66,10 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
       Navigator.of(context).pop();
       router.go(Routes.channel(created.id));
     } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _submitting = false;
-      });
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      // Any escape, not just ApiException, must not wedge "Creating..." on.
+      if (mounted) setState(() => _submitting = false);
     }
   }
 

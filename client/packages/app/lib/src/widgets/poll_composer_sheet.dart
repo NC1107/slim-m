@@ -77,11 +77,10 @@ class _PollComposerSheetState extends ConsumerState<_PollComposerSheet> {
       ref.read(messageExtrasProvider.notifier).applyMessage(sent);
       if (mounted) Navigator.of(context).pop();
     } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _submitting = false;
-      });
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      // Any escape, not just ApiException, must not wedge "Sending..." on.
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
