@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.18.1](https://github.com/NC1107/slim-m/compare/server-v0.18.0...server-v0.18.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* bound the two reads that answered with everything ([#148](https://github.com/NC1107/slim-m/issues/148)) ([eb352cd](https://github.com/NC1107/slim-m/commit/eb352cd26a3c2578c14b0d9685442650b0f28f5d))
+* make blocking actually hide what it says it hides ([#147](https://github.com/NC1107/slim-m/issues/147)) ([7cf0618](https://github.com/NC1107/slim-m/commit/7cf0618b2f5b1ee4cda59b2df62a0c01611a1338))
+* name the subject of a report before asking to close it ([#157](https://github.com/NC1107/slim-m/issues/157)) ([4546722](https://github.com/NC1107/slim-m/commit/45467221e564cf122e3dc8a90ce4f1852e92f27f))
+* **server:** apply the target-level guard to role and voice moderation ([#149](https://github.com/NC1107/slim-m/issues/149)) ([316744a](https://github.com/NC1107/slim-m/commit/316744a61cf3e6017e9e1807e46f825a892c20e0))
+* **server:** authorize an attachment reference, not just its existence ([#150](https://github.com/NC1107/slim-m/issues/150)) ([3b19c60](https://github.com/NC1107/slim-m/commit/3b19c602e24b0cea80a42e867ff430344798c708))
+* **server:** bound the unauthenticated request surface ([#145](https://github.com/NC1107/slim-m/issues/145)) ([db5bbe7](https://github.com/NC1107/slim-m/commit/db5bbe70fd17253e04a57c0791be080bac1ef2ee))
+* **server:** publish the role, overwrite and channel events nothing published ([#161](https://github.com/NC1107/slim-m/issues/161)) ([bef83ee](https://github.com/NC1107/slim-m/commit/bef83ee1411fd6e97f365f8d688878a2ecf28b97))
+* **server:** set the two ceilings nobody had set ([#151](https://github.com/NC1107/slim-m/issues/151)) ([3649000](https://github.com/NC1107/slim-m/commit/3649000510e3ccf39b5f434c19ce9d3b20727bbf))
+
 ## [0.18.0](https://github.com/NC1107/slim-m/compare/server-v0.17.0...server-v0.18.0) (2026-07-29)
 
 
