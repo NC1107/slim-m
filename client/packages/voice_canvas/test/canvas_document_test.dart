@@ -70,6 +70,25 @@ void main() {
     expect(ids, ['early', 'late']);
   });
 
+  /// This cannot exercise the actual web defect (dart2js truncating
+  /// `1 << 40` to 0): the whole suite runs on the Dart VM, where a 40-bit
+  /// shift is exact either way, so a fixed and an unfixed constant read
+  /// identically here. What this pins is the invariant that has to hold
+  /// regardless of platform or representation: a stroke drawn locally
+  /// paints above everything already confirmed while its commit is still
+  /// in flight.
+  test('a locally drafted stroke paints above already-confirmed ink', () {
+    final document = CanvasDocument()..setViewport(const Size(800, 600));
+    document
+      ..applyPlaced(stroke('confirmed', zIndex: 1))
+      ..applyPlaced(stroke('local', x: 20, zIndex: provisionalLocalZIndex))
+      ..refresh();
+
+    final ids =
+        document.paintOrder.map((slot) => document.strokeAt(slot).id).toList();
+    expect(ids, ['confirmed', 'local']);
+  });
+
   test('the camera is clamped to the bounded world and the zoom range', () {
     final document = CanvasDocument()..setViewport(const Size(800, 600));
     document.setCamera(const Camera(x: 1e12, y: -1e12, zoom: 400));

@@ -50,7 +50,7 @@ extension SlimmApiCanvas on SlimmApi {
   /// safe. [x] and [y] are the top-left corner in world coordinates and [w]
   /// and [h] the extents, neither over 8192.
   ///
-  /// [props] is kind-specific and opaque to the server, capped at 8 KiB
+  /// [props] is kind-specific and opaque to the server, capped at 4 KiB
   /// serialized. A stroke's `points` are relative to [x] and [y].
   Future<CanvasObject> placeCanvasObject(
     String channelId, {

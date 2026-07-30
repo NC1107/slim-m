@@ -71,6 +71,11 @@ class _Fixture {
   final List<Map<String, dynamic>> posted = [];
   List<Map<String, dynamic>> objects = [];
 
+  /// Every `GET .../canvas/objects` the pane sent, in order. A count rather
+  /// than a bare int so a test can tell "one, twice as many as needed" from
+  /// "the same fetch racing itself and never stopping".
+  int viewportGets = 0;
+
   ProviderContainer container() => ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
@@ -101,6 +106,7 @@ class _Fixture {
                 headers: {'content-type': 'application/json'},
               );
             }
+            viewportGets++;
             if (viewportStatus != 200) {
               return http.Response(
                 jsonEncode({'error': 'no'}),
@@ -237,6 +243,58 @@ void main() {
 
     expect(find.byType(AppCallout), findsOneWidget);
   });
+
+  /// Opening the canvas used to fire three requests: one against the
+  /// degenerate viewport `initState` fetched before layout, and two more
+  /// racing a stale read of `_fetched` inside the fetch's own repaint.
+  testWidgets('opening the canvas issues exactly one viewport request', (
+    tester,
+  ) async {
+    final fixture = _Fixture()..objects = [_object('a')];
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+
+    await _pump(tester, container);
+    // Long enough for a wrongly-scheduled debounce to fire, so this cannot pass merely because the clock never advanced far enough to expose one.
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(fixture.viewportGets, 1);
+  });
+
+  /// The unbounded loop: a truncated page resets `_fetched` to null, and
+  /// reading that stale null from inside the fetch's own repaint rescheduled
+  /// another fetch for the same, unmoved viewport every 150ms - forever,
+  /// since a still-truncated answer can never make `_fetched` non-null.
+  testWidgets(
+    'a truncated region does not refetch on its own once the camera settles',
+    (tester) async {
+      final fixture = _Fixture(hasMore: true)..objects = [_object('a')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+
+      await _pump(tester, container);
+      // One legitimate follow-up settles here: the truncated callout appearing shrinks CanvasSurface's own viewport, a real (if minor) size change that alone earns one refetch.
+      await tester.pump(const Duration(seconds: 1));
+      final settled = fixture.viewportGets;
+
+      // Long enough that the old 150ms self-reschedule would have fired a dozen further times with the camera never moving again.
+      await tester.pump(const Duration(seconds: 2));
+      expect(fixture.viewportGets, settled);
+
+      // A live frame also reaches refresh() and must not restart the loop.
+      fixture.events.add(
+        api.CanvasObjectPlaced(
+          channelId: 'c1',
+          object: api.CanvasObject.fromJson(_object('live')),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(fixture.viewportGets, settled);
+    },
+  );
 
   /// The reachability guard. The canvas has no route, so nothing generic can
   /// see it: this is what fails if the header's affordance is ever dropped and

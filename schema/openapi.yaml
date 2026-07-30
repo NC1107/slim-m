@@ -2257,7 +2257,7 @@ paths:
         0004).
 
 
-        `props` is kind-specific and opaque to the server, capped at 8 KiB
+        `props` is kind-specific and opaque to the server, capped at 4 KiB
         serialized. For a `stroke` it carries `points` (a flat
         `[x0,y0,x1,y1,...]` array *relative to* `x` and `y`, in world units),
         `width`, and `color`. A client splits a long stroke into several
@@ -3548,7 +3548,7 @@ components:
         props:
           type: object
           description: >-
-            Kind-specific fields, opaque to the server, at most 8 KiB
+            Kind-specific fields, opaque to the server, at most 4 KiB
             serialized. A stroke carries `points`, `width` and `color`.
 
     CanvasViewport:

@@ -55,17 +55,21 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   Timer? _panDebounce;
 
   Rect? _fetched;
+
+  /// The view [_onCameraMoved] last examined, regardless of what it decided
+  /// to do about it. See that method's doc for why this exists.
+  Rect? _lastCameraView;
   bool _loading = true;
   String? _error;
   bool _truncated = false;
-  int _localZ = 1 << 40;
+  int _localZ = provisionalLocalZIndex;
 
   @override
   void initState() {
     super.initState();
     _live = ref.read(liveEventsProvider).listen(_onEvent);
+    // No fetch here: CanvasSurface's first setViewport call reaches _onCameraMoved below and fetches the real region, not a wasted one against a zero viewport.
     _document.addListener(_onCameraMoved);
-    unawaited(_fetch());
   }
 
   @override
@@ -105,8 +109,22 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   }
 
   /// A pan re-reads once the camera has settled, never per frame.
+  ///
+  /// [CanvasDocument]'s listenable fires on any content change too - a fetch
+  /// landing, a live frame, a locally drawn stroke - since [CanvasDocument]'s
+  /// `refresh()` and a real camera move both end in the same
+  /// `notifyListeners()`. Reading [_lastCameraView] is what tells those
+  /// apart: a content-only notification reports the same world view as last
+  /// examined, so it returns before touching [_fetched] at all. Without that
+  /// guard a still-truncated region never becomes "covered", so every one of
+  /// those content notifications re-read a null [_fetched] and rescheduled a
+  /// fetch for the unmoved viewport - forever, since the answer stays
+  /// truncated for the same reason each time.
   void _onCameraMoved() {
     final view = _document.worldView;
+    if (view == _lastCameraView) return;
+    final isFirstView = _lastCameraView == null;
+    _lastCameraView = view;
     final fetched = _fetched;
     if (fetched != null &&
         fetched.contains(view.topLeft) &&
@@ -114,6 +132,10 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       return;
     }
     _panDebounce?.cancel();
+    if (isFirstView) {
+      unawaited(_fetch());
+      return;
+    }
     _panDebounce = Timer(
       const Duration(milliseconds: 150),
       () => unawaited(_fetch()),
@@ -151,7 +173,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
         final input = _toStroke(object);
         if (input != null) _document.applyPlaced(input);
       }
-      _document.refresh();
+      // Set before refresh(), not after: refresh() reaches _onCameraMoved synchronously and must see this fetch's own answer, not the value from before it ran.
       setState(() {
         _loading = false;
         _error = null;
@@ -159,6 +181,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
         // A truncated page is not coverage: recording it would let the next pan skip what this read never returned.
         _fetched = page.hasMore ? null : region;
       });
+      _document.refresh();
     } on api.ForbiddenException {
       if (mounted) {
         setState(() {

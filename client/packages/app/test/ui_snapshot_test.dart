@@ -20,6 +20,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/main.dart' show appChromeBuilder;
+import 'package:slimm_app/src/screens/canvas/canvas_pane.dart'
+    show canvasOpenProvider;
 import 'package:slimm_design_system/design_system.dart';
 
 import 'ui_snapshot_support.dart';
@@ -146,57 +148,122 @@ const _surfaces = <String, ({String route, List<String> viewports})>{
   ),
 };
 
+/// The canvas replaces the whole conversation body, header included, at
+/// every width. That is only reachable by forcing `canvasOpenProvider`
+/// open, which the shared render below has no way to do for a plain
+/// [_surfaces] entry, so these get their own small table and loop.
+///
+/// The compact bracket is what a stacked-header regression needs: the outer
+/// app bar there is a second widget entirely (`HomeShell`'s own `Scaffold`,
+/// not `ConversationPane`), so no other breakpoint proves it stays
+/// suppressed.
+const _canvasSurfaces =
+    <String, ({String route, String channelId, List<String> viewports})>{
+      'canvas': (
+        route: '/channels/c-general',
+        channelId: 'c-general',
+        viewports: [..._phoneAndDesktop, ..._compactBracket],
+      ),
+      'canvas-voice': (
+        route: '/channels/c-main',
+        channelId: 'c-main',
+        viewports: [..._compactBracket, 'expanded-999', 'expanded-1000'],
+      ),
+    };
+
+/// Builds the router at [route], pumps two frames to settle on-mount
+/// animations, writes the snapshot and asserts no overflow. Shared by both
+/// loops in [main] so the canvas surfaces below render exactly the way the
+/// rest of the matrix does.
+Future<void> _renderSurface(
+  WidgetTester tester,
+  String route,
+  String viewportName,
+  String theme,
+  String snapshotName, {
+  List<Override> overrides = const [],
+}) async {
+  tester.view.physicalSize = _viewports[viewportName]!;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+
+  final fixture = await fixtureContainer(extraOverrides: overrides);
+  final router = fixtureRouter(route);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: fixture.container,
+      child: RepaintBoundary(
+        key: snapshotBoundary,
+        child: MaterialApp.router(
+          debugShowCheckedModeBanner: false,
+          theme: theme == 'dark'
+              ? buildTheme(Brightness.dark, AppTokens.dark)
+              : buildTheme(Brightness.light, AppTokens.light),
+          routerConfig: router,
+          // The same wrapper main.dart ships, so density matches the app.
+          builder: appChromeBuilder,
+        ),
+      ),
+    ),
+  );
+  if (isModalFixtureRoute(route)) {
+    // Settle at the base first, then push: see isModalFixtureRoute's doc.
+    await tester.pump();
+    unawaited(router.push(route));
+  }
+  // Two pumps settle on-mount entrance animations (a ticker's first frame is its own t=0) without pumpAndSettle, which would hang on the states that show a perpetual spinner.
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 350));
+
+  await writeSnapshot(tester, snapshotName);
+
+  // pumpWidget already rethrows an overflow as a test failure, so reaching
+  // here with no exception is the assertion.
+  expect(tester.takeException(), isNull);
+
+  await teardownFixture(tester, fixture.container, fixture.db);
+}
+
 void main() {
   setUpAll(loadRealFonts);
 
   for (final theme in const ['dark', 'light']) {
     for (final surface in _surfaces.entries) {
       for (final viewportName in surface.value.viewports) {
-        final viewport = _viewports[viewportName]!;
-        testWidgets('${surface.key} at $viewportName ($theme) fits its viewport', (
-          tester,
-        ) async {
-          tester.view.physicalSize = viewport;
-          tester.view.devicePixelRatio = 1.0;
-          addTearDown(tester.view.reset);
+        testWidgets(
+          '${surface.key} at $viewportName ($theme) fits its viewport',
+          (tester) async {
+            await _renderSurface(
+              tester,
+              surface.value.route,
+              viewportName,
+              theme,
+              '${surface.key}-$viewportName-$theme',
+            );
+          },
+        );
+      }
+    }
 
-          final fixture = await fixtureContainer();
-          final route = surface.value.route;
-          final router = fixtureRouter(route);
-          await tester.pumpWidget(
-            UncontrolledProviderScope(
-              container: fixture.container,
-              child: RepaintBoundary(
-                key: snapshotBoundary,
-                child: MaterialApp.router(
-                  debugShowCheckedModeBanner: false,
-                  theme: theme == 'dark'
-                      ? buildTheme(Brightness.dark, AppTokens.dark)
-                      : buildTheme(Brightness.light, AppTokens.light),
-                  routerConfig: router,
-                  // The same wrapper main.dart ships, so density matches the app.
-                  builder: appChromeBuilder,
+    for (final surface in _canvasSurfaces.entries) {
+      for (final viewportName in surface.value.viewports) {
+        testWidgets(
+          '${surface.key} at $viewportName ($theme) fits its viewport',
+          (tester) async {
+            await _renderSurface(
+              tester,
+              surface.value.route,
+              viewportName,
+              theme,
+              '${surface.key}-$viewportName-$theme',
+              overrides: [
+                canvasOpenProvider.overrideWith(
+                  (ref) => surface.value.channelId,
                 ),
-              ),
-            ),
-          );
-          if (isModalFixtureRoute(route)) {
-            // Settle at the base first, then push: see isModalFixtureRoute's doc.
-            await tester.pump();
-            unawaited(router.push(route));
-          }
-          // Two pumps settle on-mount entrance animations (a ticker's first frame is its own t=0) without pumpAndSettle, which would hang on the states that show a perpetual spinner.
-          await tester.pump();
-          await tester.pump(const Duration(milliseconds: 350));
-
-          await writeSnapshot(tester, '${surface.key}-$viewportName-$theme');
-
-          // pumpWidget already rethrows an overflow as a test failure, so
-          // reaching here with no exception is the assertion.
-          expect(tester.takeException(), isNull);
-
-          await teardownFixture(tester, fixture.container, fixture.db);
-        });
+              ],
+            );
+          },
+        );
       }
     }
   }

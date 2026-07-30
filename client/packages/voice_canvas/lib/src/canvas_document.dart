@@ -24,6 +24,20 @@ const double worldLimit = 5000000.0;
 /// `MAX_OBJECT_EXTENT`. A stroke is a mark, not a region.
 const double maxObjectExtent = 8192.0;
 
+/// The z-index a locally drawn stroke is given before the server's own
+/// answer confirms it, so it paints above everything already known while
+/// its commit is still in flight.
+///
+/// Written as a decimal literal rather than `1 << 40`: dart2js's bitwise
+/// shift truncates to 32 bits (`JSInt._shlPositive` returns 0 past a shift
+/// of 31), so on the web the shift silently evaluated to 0 - at or below
+/// every real server z-index, since the first one issued is 1 - and a
+/// freshly drawn stroke rendered underneath existing ink instead of above
+/// it. A literal this size has no such limit: dart2js represents an
+/// integer up to 2^53 as an exact double, and only the shift operators are
+/// unsafe, not the value itself.
+const int provisionalLocalZIndex = 1099511627776; // 2^40
+
 /// Zoom is clamped rather than free.
 ///
 /// The floor is not a taste call. The Phase 5 server spike measured the
