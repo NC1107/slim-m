@@ -9,12 +9,20 @@
 #   other does not, so a route cannot be added, removed, or renamed without the
 #   matching edit here.
 # - Response bodies, against the server that sends them.
-#   crates/slimm-server/tests/response_contract/ drives every operationId below
+#   crates/slimm-server/tests/response_contract/ drives the operationIds below
 #   for real and validates the answer against the response schema written here:
 #   status code, content type, fields, types, enums and nullability. Both
 #   directions fail - a field promised here that the server omits, and a field
 #   the server sends that nothing here documents - and an operation the test
-#   never drives fails too, so coverage cannot quietly lapse.
+#   never drives fails too, so coverage cannot quietly lapse. Three operations
+#   are exempt by name in that test's UNCOVERED list, each with its reason;
+#   a stale entry there fails in both directions, so the exemptions cannot
+#   quietly grow either.
+# - The WebSocket frame set, by crates/slimm-server/tests/ws_frame_contract.rs,
+#   which compares ServerFrame.oneOf against the frames ws/frames.rs really
+#   serialises and fails on drift in either direction. Frame *bodies* are not
+#   checked against a live socket the way response bodies are; connectWebSocket
+#   is one of the response contract's three exemptions.
 # - Additive-only evolution, by the oasdiff breaking-change gate in schema-ci.
 # - Valid OpenAPI, by redocly lint.
 #
@@ -3938,7 +3946,13 @@ components:
         - $ref: "#/components/schemas/MessageCreated"
         - $ref: "#/components/schemas/MessageEdited"
         - $ref: "#/components/schemas/MessageDeleted"
+        - $ref: "#/components/schemas/ReactionsChanged"
+        - $ref: "#/components/schemas/MessagePinned"
+        - $ref: "#/components/schemas/MessageUnpinned"
+        - $ref: "#/components/schemas/PollVoted"
         - $ref: "#/components/schemas/PresenceChanged"
+        - $ref: "#/components/schemas/MemberTimeout"
+        - $ref: "#/components/schemas/MemberRemoved"
         - $ref: "#/components/schemas/TypingStarted"
         - $ref: "#/components/schemas/TypingStopped"
         - $ref: "#/components/schemas/RoleChanged"
@@ -4007,6 +4021,116 @@ components:
           type: string
           format: uuid
 
+    ReactionsChanged:
+      type: object
+      required: [type, channel_id, message_id, reactions]
+      description: >
+        The full public tally for one message, replacing whatever the client
+        held rather than describing a delta. Resolved per receiving connection
+        the way PresenceChanged's status is: a reactor the viewer has blocked
+        is excluded from the counts, and an emoji whose only reactors are
+        blocked is absent rather than present at zero. Carries no reactor ids
+        at all, so what the viewer themselves reacted with is not derivable
+        from this frame and has to come from a read.
+      properties:
+        type:
+          type: string
+          enum: [reactions.changed]
+        channel_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        reactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReactionCount"
+
+    ReactionCount:
+      type: object
+      required: [emoji, count]
+      description: One emoji and how many people used it. Public counts only.
+      properties:
+        emoji:
+          type: string
+        count:
+          type: integer
+          format: int64
+
+    MessagePinned:
+      type: object
+      required: [type, channel_id, message_id, pinned_at]
+      description: >
+        `pinned_by` is null when the account that pinned it has since been
+        anonymized, which is not the same as nobody having pinned it.
+      properties:
+        type:
+          type: string
+          enum: [message.pinned]
+        channel_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        pinned_by:
+          type: [string, "null"]
+          format: uuid
+        pinned_at:
+          type: integer
+          format: int64
+
+    MessageUnpinned:
+      type: object
+      required: [type, channel_id, message_id]
+      properties:
+        type:
+          type: string
+          enum: [message.unpinned]
+        channel_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+
+    PollVoted:
+      type: object
+      required: [type, channel_id, message_id, options]
+      description: >
+        The whole option set with current tallies, not the one option that
+        moved, so a client that missed a frame still converges.
+      properties:
+        type:
+          type: string
+          enum: [poll.voted]
+        channel_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/PollOptionCount"
+
+    PollOptionCount:
+      type: object
+      required: [position, votes]
+      description: >
+        One option and its public tally. Never carries who voted, which is
+        what keeps a poll from becoming a public record of how each member
+        answered.
+      properties:
+        position:
+          type: integer
+          format: int64
+        votes:
+          type: integer
+          format: int64
+
     PresenceChanged:
       type: object
       required: [type, user_id, status]
@@ -4023,6 +4147,41 @@ components:
         status:
           type: string
           enum: [online, away, dnd, offline]
+
+    MemberTimeout:
+      type: object
+      required: [type, user_id]
+      description: >
+        A member was timed out or had one lifted. `until` is the epoch
+        milliseconds it lapses at, and null means lifted. Broadcast to every
+        connection rather than to the subject alone, because a timeout is a
+        subtraction from what that member may do in every channel and other
+        clients render it on the member row.
+      properties:
+        type:
+          type: string
+          enum: [member.timeout]
+        user_id:
+          type: string
+          format: uuid
+        until:
+          type: [integer, "null"]
+          format: int64
+
+    MemberRemoved:
+      type: object
+      required: [type, user_id]
+      description: >
+        A member was removed from the Space. Their authored content stays,
+        so this is not an account deletion and a client should not treat it
+        as one; what it means is that the account can no longer sign in.
+      properties:
+        type:
+          type: string
+          enum: [member.removed]
+        user_id:
+          type: string
+          format: uuid
 
     TypingStarted:
       type: object
