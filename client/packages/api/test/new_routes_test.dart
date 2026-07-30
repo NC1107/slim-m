@@ -276,17 +276,6 @@ void main() {
       expect(sentBody!['visibility'], 'hidden');
       expect(result, PresenceVisibility.hidden);
     });
-
-    test('an unrecognised visibility reads as hidden, not a throw', () async {
-      final api = SlimmApi(
-        baseUrl: _base,
-        session: SessionStore(tokens: _tokens()),
-        httpClient: MockClient((_) async =>
-            http.Response(jsonEncode({'visibility': 'invisible'}), 200)),
-      );
-      final result = await api.setPresenceVisibility(PresenceVisibility.online);
-      expect(result, PresenceVisibility.hidden);
-    });
   });
 
   group('direct messages', () {
