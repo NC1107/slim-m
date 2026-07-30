@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 [package]
 name = "slimm-server"
-version = "0.18.2"
+version = "0.18.3"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

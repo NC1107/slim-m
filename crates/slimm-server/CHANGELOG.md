@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.3](https://github.com/NC1107/slim-m/compare/server-v0.18.2...server-v0.18.3) (2026-07-30)
+
+
+### Bug Fixes
+
+* **server:** answer a retried poll send after its message was deleted ([#174](https://github.com/NC1107/slim-m/issues/174)) ([b0d3892](https://github.com/NC1107/slim-m/commit/b0d3892b2d00d58c4e2f2b8b9b8e08623fcd05d7))
+* **server:** make password recovery revoke sessions atomically ([#178](https://github.com/NC1107/slim-m/issues/178)) ([f2d73e7](https://github.com/NC1107/slim-m/commit/f2d73e7e0434bcf1f09529c13af082a0ffcf4438))
+
 ## [0.18.2](https://github.com/NC1107/slim-m/compare/server-v0.18.1...server-v0.18.2) (2026-07-30)
 
 
