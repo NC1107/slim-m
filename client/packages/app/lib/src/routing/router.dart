@@ -143,6 +143,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: ':channelId',
                 pageBuilder: (context, state) {
                   final channelId = state.pathParameters['channelId']!;
+                  // Generously over a uuid's 36; see client_transport.dart.
+                  if (channelId.length > 128) {
+                    return fadeThroughPage(
+                      context,
+                      const NoChannelSelected(),
+                      key: const ValueKey('no-channel'),
+                    );
+                  }
                   return fadeThroughPage(
                     context,
                     ConversationPane(channelId: channelId),
