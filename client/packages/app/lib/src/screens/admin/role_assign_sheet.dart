@@ -13,6 +13,8 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../api_failure.dart';
+import '../../permissions.dart';
+import '../../providers/admin_providers.dart';
 import '../../providers/member_presence.dart' show membersProvider;
 import '../../providers/providers.dart';
 
@@ -55,6 +57,9 @@ class _RoleAssignSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final members = ref.watch(membersProvider);
+    final mine = ref.watch(myPermissionsProvider);
+    // Mirrors the server's refusal, so the toggle cannot spring back.
+    final grantable = mine.hasPermission(role.permissions);
 
     return SizedBox(
       height: MediaQuery.of(context).size.height * 0.7,
@@ -92,16 +97,17 @@ class _RoleAssignSheet extends ConsumerWidget {
                 itemBuilder: (context, i) {
                   final member = list[i];
                   final has = member.roleIds.contains(role.id);
-                  return ListTile(
+                  return AppListRow(
                     leading: const Icon(AppIcons.account),
-                    title: Text(member.displayName),
-                    subtitle: Text(
-                      '@${member.username}',
-                      style: TextStyle(color: tokens.textSecondary),
-                    ),
+                    label: member.displayName,
+                    meta: grantable
+                        ? null
+                        : 'Needs permissions you do not hold',
                     trailing: AppToggle(
                       value: has,
-                      onChanged: (v) => _toggle(ref, context, member, v),
+                      onChanged: grantable
+                          ? (v) => _toggle(ref, context, member, v)
+                          : null,
                       semanticLabel:
                           'Assign ${role.name} to ${member.displayName}',
                     ),

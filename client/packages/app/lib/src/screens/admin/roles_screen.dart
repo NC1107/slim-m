@@ -143,11 +143,19 @@ class _RoleCardState extends ConsumerState<_RoleCard>
                   ],
                 ),
               ),
-              AppIconButton(
-                icon: AppIcons.assignRole,
-                semanticLabel: 'Assign ${role.name} to members',
-                onPressed: () => showRoleAssignSheet(context, role),
-              ),
+              if (!role.isEveryone)
+                AppIconButton(
+                  icon: AppIcons.assignRole,
+                  semanticLabel: 'Assign ${role.name} to members',
+                  onPressed: () => showRoleAssignSheet(context, role),
+                )
+              else
+                // Everyone holds this role already; assigning it is a no-op.
+                SizedBox(
+                  width: AppTouchTargets.of(context)
+                      ? AppSizes.rowTouch
+                      : AppSizes.rowPointer,
+                ),
               AppIconButton(
                 icon: AppIcons.edit,
                 semanticLabel: 'Edit ${role.name}',
