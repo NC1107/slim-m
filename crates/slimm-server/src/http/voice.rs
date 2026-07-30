@@ -26,6 +26,7 @@ use serde::Serialize;
 
 use super::AppState;
 use super::error::ApiError;
+use super::escalation::escalation_guard;
 use super::extract::{Authed, enforce};
 use super::messages::parse_uuid;
 use crate::ids::{ChannelId, UserId};
@@ -194,7 +195,14 @@ async fn roster(
 ///
 /// Gated on `KICK_MEMBERS` in that channel, evaluated per channel rather than
 /// deployment-wide, so a moderator's rights follow the same shape as every
-/// other channel action here.
+/// other channel action here. That per-channel scope is why the escalation
+/// check below reads `granted_permissions_in_channel` rather than
+/// [`crate::store::Store::granted_base_permissions`]: a caller who holds
+/// `KICK_MEMBERS` only through a channel overwrite may still hold nothing
+/// deployment-wide, and comparing against the wrong scope would compare
+/// against permissions that were never the ones granting this act. No
+/// self-check, unlike [`super::members::authorize`]: kicking yourself out of
+/// a room you are in is harmless, so nothing here refuses it.
 ///
 /// Idempotent: removing somebody who is not in the room succeeds. The SFU is
 /// the authority on who is connected, and a client that retries after a
@@ -224,6 +232,16 @@ async fn kick(
     if !permissions.contains(Permissions::VIEW_CHANNEL.union(Permissions::KICK_MEMBERS)) {
         return Err(ApiError::Forbidden);
     }
+
+    let caller_granted = state
+        .store
+        .granted_permissions_in_channel(ctx.user_id, channel_id)
+        .await?;
+    let target_granted = state
+        .store
+        .granted_permissions_in_channel(target, channel_id)
+        .await?;
+    escalation_guard(caller_granted, target_granted)?;
 
     match state.voice.remove_participant(channel_id, target).await {
         Ok(()) => Ok(StatusCode::NO_CONTENT),

@@ -103,6 +103,7 @@ async fn upload(
     if body.len() as u64 > state.media.max_attachment_bytes() {
         return Err(ApiError::BadRequest("attachment is too large"));
     }
+    room_for(&state, body.len() as i64).await?;
     // Decided from the bytes only - see the module doc for why this is the
     // whole security boundary here.
     let content_type = media::sniff_content_type(&body)
@@ -125,7 +126,7 @@ async fn upload(
         })?;
     state
         .store
-        .store_attachment(&sha256, size, content_type, &filename)
+        .store_attachment(&sha256, size, content_type, &filename, Some(ctx.user_id))
         .await?;
 
     Ok((
@@ -246,4 +247,28 @@ pub(crate) fn serve(bytes: Vec<u8>, content_type: &str, filename: &str) -> Respo
         HeaderValue::from_static(IMMUTABLE_CACHE),
     );
     response
+}
+
+/// Refuses the upload if storing `incoming` bytes would put the deployment over
+/// `SLIMM_MAX_TOTAL_ATTACHMENT_BYTES`.
+///
+/// Checked before the bytes are written, never after, so a refusal leaves
+/// nothing on disk to reclaim - the same ordering the per-upload size limit
+/// above it uses.
+///
+/// Two things it deliberately is not. It is not a reservation: two uploads
+/// racing the last few bytes can both pass and land slightly over, which costs
+/// at most one attachment's worth and is the right trade against serialising
+/// every upload behind a write lock. And it is not a quota per account, which
+/// would need a policy answer about who gets how much that nobody has asked
+/// for; this is the disk, and the disk is shared.
+pub(super) async fn room_for(state: &AppState, incoming: i64) -> Result<(), ApiError> {
+    let Some(ceiling) = state.media.max_total_attachment_bytes() else {
+        return Ok(());
+    };
+    let held = state.store.total_attachment_bytes().await?;
+    if held.saturating_add(incoming) as u64 > ceiling {
+        return Err(ApiError::InsufficientStorage);
+    }
+    Ok(())
 }

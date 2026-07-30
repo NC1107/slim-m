@@ -63,6 +63,31 @@ Three smaller traps this hit:
 - **Both hygiene gates enumerate `git ls-files`, so untracked new files are invisible to them.** A local run before the first commit passes and CI then fails on the same tree. Stage before trusting either gate.
 - **`scripts/check-comment-cap.sh` was counting Rust `//!` module docs as plain comments**, though its own header exempts them: the awk matched `//` followed by anything that is not `/`. Nothing caught it because the allowlist had been calibrated against the wrong number. Fixed, and the allowlist regenerated at the true counts, which cleared 46 files outright and lowered 98.
 
+## The two ceilings nobody had set (2026-07-30)
+
+Findings 13 and 16, and the last of the sixteen.
+
+**There are two upload paths to bound, not three, and the audit's own count was off.**
+Avatars never enter the `attachments` table: `write_avatar` goes to its own directory, one file per account overwritten in place, so the total is already bounded by the member count times `AVATAR_MAX_BYTES` and no upload can grow it - and the `SUM(size)` the ceiling checks cannot see them anyway.
+Emoji *does* go through `store_attachment`, so it counts, though it was already bounded at 500 x 1 MiB behind MANAGE_SERVER.
+The unbounded vector is `POST /attachments` behind deployment-wide ATTACH_FILES, which is granted broadly by design.
+
+**`SLIMM_MAX_TOTAL_ATTACHMENT_BYTES` defaults to no ceiling, and that is a decision rather than an omission.**
+The right number is the size of the operator's disk; a guess would either refuse a legitimate upload on a large volume or do nothing on a small one.
+The shipped compose stack sets 2 GiB, the same way it sets `SLIMM_TRUST_PROXY_HOPS`, so a self-host that follows the guide gets one without having to know it exists.
+It lives on `Media` rather than `AppState`, because that is where the per-upload limit read out of `Config` already sits and because `AppState` is built by hand in dozens of test files that have no opinion about storage.
+
+**Past the ceiling it is a 507, deliberately not the 413 an over-large single file gets.**
+An operator reading a user's screenshot has to be able to tell "make it smaller" from "the volume is full", because only one of those is theirs to fix.
+The check runs before any bytes are written, so a refusal leaves nothing to reclaim; it is explicitly not a reservation, so two uploads racing the last few bytes can both pass and land slightly over, which costs one attachment and is the right trade against serialising every upload behind a write lock.
+
+**The orphan grace window went from a day to two hours.**
+Generous in the wrong direction: a compose flow takes seconds, and at the upload class's sustained rate one account can write over a gigabyte an hour of bytes nothing references, so a day of grace meant tens of gigabytes were ineligible for reclamation before the sweep was allowed to look.
+
+**A cap that had been there all along was resting on nothing.**
+Mutating the shared `validate_reason`'s length check killed the new moderation test and nothing in `tests/safety.rs`, which is how it came out that the report reason's own 2000-character cap had never had a test.
+It has one now, and the validator is one function called from the report intake and both moderation verbs, with `required` the only difference - a report must say why, a timeout need not.
+
 ## Read bounds: what a list may answer with (2026-07-30)
 
 Two read surfaces answered with as much as a deployment happened to hold.

@@ -39,10 +39,11 @@ impl From<anyhow::Error> for DeleteAccountError {
 impl Store {
     /// Deletes an account end to end. Personal data (devices, sessions, tokens,
     /// reactions, read state, role memberships, member channel overwrites, reset
-    /// codes) is purged; content left in shared scopes (messages, canvas) is kept
-    /// but its authorship is cleared; and the user row is tombstoned and
-    /// anonymized so the username frees up and login is impossible. Returns the
-    /// sessions that were revoked so the caller can close their live sockets.
+    /// codes, attachment uploader records) is purged; content left in shared
+    /// scopes (messages, canvas) is kept but its authorship is cleared; and the
+    /// user row is tombstoned and anonymized so the username frees up and login
+    /// is impossible. Returns the sessions that were revoked so the caller can
+    /// close their live sockets.
     ///
     /// Concurrency: the first statement is a write, so the transaction takes the
     /// write lock immediately (no stale-snapshot race) and a login racing this
@@ -131,6 +132,12 @@ impl Store {
         sqlx::query!("DELETE FROM member_roles WHERE user_id = ?", user_id)
             .execute(&mut *tx)
             .await?;
+        sqlx::query!(
+            "DELETE FROM attachment_uploaders WHERE uploaded_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
         sqlx::query!(
             "DELETE FROM channel_overwrites WHERE target_type = 'member' AND target_id = ?",
             user_id

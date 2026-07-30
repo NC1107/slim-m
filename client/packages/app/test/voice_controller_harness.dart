@@ -196,7 +196,14 @@ class FakeSession implements VoiceSession {
 }
 
 /// Answers the token endpoint however the test asks, and nothing else.
-http.Client voiceApi({int status = 200, bool canPublish = true}) {
+///
+/// [sfuUrl] defaults to a wss address, the only shape the server's own
+/// config validation and most tests need; the plain-ws suite overrides it.
+http.Client voiceApi({
+  int status = 200,
+  bool canPublish = true,
+  String sfuUrl = 'wss://sfu.example.com',
+}) {
   return MockClient((request) async {
     if (!request.url.path.endsWith('/voice/token')) {
       return http.Response('{}', 404);
@@ -212,7 +219,7 @@ http.Client voiceApi({int status = 200, bool canPublish = true}) {
     }
     return http.Response(
       jsonEncode({
-        'url': 'wss://sfu.example.com',
+        'url': sfuUrl,
         'room': 'channel-1',
         'token': 'jwt',
         'expires_at': 0,

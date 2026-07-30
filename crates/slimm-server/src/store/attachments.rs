@@ -19,7 +19,8 @@
 use sqlx::QueryBuilder;
 
 use super::{Store, now_ms};
-use crate::ids::{ChannelId, MessageId};
+use crate::ids::{ChannelId, MessageId, UserId};
+use crate::permissions::Permissions;
 
 /// Most attachments one message may carry. Without a cap the join table (and
 /// the per-send linking work, and the permission check on fetch) is an
@@ -62,6 +63,12 @@ impl From<sqlx::Error> for LinkError {
     }
 }
 
+impl From<anyhow::Error> for LinkError {
+    fn from(err: anyhow::Error) -> Self {
+        LinkError::Internal(err)
+    }
+}
+
 impl Store {
     /// Records a freshly uploaded attachment's metadata. Idempotent by
     /// content hash: uploading bytes that already exist leaves the original
@@ -81,14 +88,23 @@ impl Store {
     /// column default in place is not a plain `ALTER TABLE`, so that default
     /// is left as 0002 wrote it rather than migrated away, and simply never
     /// relied upon.
+    ///
+    /// `uploader` records this caller in `attachment_uploaders`, the table
+    /// [`link_attachments`] reads to decide who may reference these bytes in
+    /// a message. `None` for the bulk emoji import, which no account
+    /// performed. The two inserts share one transaction so a crash between
+    /// them can never leave an `attachments` row nobody is recorded as being
+    /// able to link.
     pub async fn store_attachment(
         &self,
         sha256: &[u8],
         size: i64,
         content_type: &str,
         filename: &str,
+        uploader: Option<UserId>,
     ) -> anyhow::Result<()> {
         let now = now_ms();
+        let mut tx = self.pool.begin().await?;
         sqlx::query!(
             "INSERT INTO attachments (sha256, size, content_type, key_version, is_encrypted, filename, created_at)
              VALUES (?, ?, ?, 0, 0, ?, ?)
@@ -99,8 +115,20 @@ impl Store {
             filename,
             now
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+        if let Some(uploader) = uploader {
+            sqlx::query!(
+                "INSERT OR IGNORE INTO attachment_uploaders (sha256, uploaded_by, uploaded_at)
+                 VALUES (?, ?, ?)",
+                sha256,
+                uploader,
+                now
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
         Ok(())
     }
 
@@ -234,6 +262,22 @@ impl Store {
             .map(|r| crate::media::to_hex(&r.sha256))
             .collect())
     }
+
+    /// Bytes currently held in stored attachments, custom emoji included, since
+    /// both are rows in this table.
+    ///
+    /// Summed rather than tracked in a counter: a counter is a second source of
+    /// truth the orphan sweep, account deletion and every failed write would
+    /// each have to remember to keep in step, and the table this scans is
+    /// bounded by the very ceiling the sum is checked against.
+    pub async fn total_attachment_bytes(&self) -> anyhow::Result<i64> {
+        let total = sqlx::query_scalar!(
+            r#"SELECT COALESCE(SUM(size), 0) AS "total!: i64" FROM attachments"#
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(total)
+    }
 }
 
 /// Links already-uploaded attachments to a message inside the caller's
@@ -241,6 +285,9 @@ impl Store {
 /// like `invites::spend_invite`: composed into `Store::send_message`'s own
 /// transaction rather than exposed as its own `Store` method, since it only
 /// ever makes sense as part of that larger write.
+///
+/// Authorization is [`may_link`]'s job and runs before the write lock is
+/// taken; this is the existence half only.
 ///
 /// The existence check and the insert are one statement
 /// (`INSERT ... SELECT ... WHERE EXISTS`), so there is no separate
@@ -269,6 +316,59 @@ pub(super) async fn link_attachments(
         }
     }
     Ok(())
+}
+
+/// Whether `author_id` may attach `sha256` to a message: they uploaded it
+/// themselves, or they can currently view some channel that already has it.
+///
+/// Existence alone used to be the whole check, which let anyone who learned an
+/// attachment id (the content's own sha256) attach that content to a message in
+/// any channel they could post in, uploaded or not, viewable or not. The common
+/// case - the sender uploaded their own file - is one `EXISTS` against
+/// `attachment_uploaders`. A miss falls back to the same shape
+/// `http/attachments.rs`'s fetch handler already uses: any channel that still
+/// has a live message referencing these bytes, checked for VIEW_CHANNEL, which
+/// is what lets forwarding something you can already see keep working.
+///
+/// Returns a plain `bool` on purpose. A refusal has to be indistinguishable
+/// from "never uploaded", or the oracle this closes simply moves into whatever
+/// maps a richer error to a status, so there is nothing more specific here for a
+/// caller to leak.
+///
+/// Called by [`Store::send_message`] *before* it takes the write lock, never
+/// from inside the transaction. Every read in that transaction runs on `tx`
+/// deliberately (see that function's own note on BEGIN IMMEDIATE); reaching the
+/// pool for a second connection while holding the writer is how eight
+/// concurrent sends stall each other on an eight-connection pool. The residual
+/// is a caller whose view access is revoked between this check and the insert
+/// microseconds later, which is not an escalation: they held it when they
+/// started the send.
+pub(super) async fn may_link(
+    store: &Store,
+    author_id: UserId,
+    sha256: &[u8],
+) -> Result<bool, LinkError> {
+    let uploaded = sqlx::query_scalar!(
+        r#"SELECT 1 AS "one!: i64" FROM attachment_uploaders
+           WHERE sha256 = ? AND uploaded_by = ?"#,
+        sha256,
+        author_id
+    )
+    .fetch_optional(&store.pool)
+    .await?
+    .is_some();
+    if uploaded {
+        return Ok(true);
+    }
+    for channel_id in store.channels_referencing_attachment(sha256).await? {
+        if store
+            .has_permission(author_id, channel_id, Permissions::VIEW_CHANNEL)
+            .await?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Removes a message's attachment links, returning the hex ids of any

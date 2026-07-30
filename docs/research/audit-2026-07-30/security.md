@@ -271,6 +271,10 @@ Attaching the bytes to a message makes them permanent and exempt from the sweep 
 
 Shape: a deployment-wide byte ceiling checked before the write in the three upload paths, and a grace window a long way under 24 hours - the constant's own doc comment already calls it generous.
 
+**Closed 2026-07-30, PR #151**, in that shape with one correction to it: there are not three upload paths to bound, there are two.
+Avatars never enter the `attachments` table at all - `write_avatar` goes to its own directory, one file per account overwritten in place - so their total is already bounded by the member count times 2 MiB, no upload can grow it, and the `SUM(size)` the ceiling is checked against cannot see them. Counting them would need a second mechanism to bound something already bounded. Emoji does go through `store_attachment`, so it counts, though it was already bounded at 500 x 1 MiB behind MANAGE_SERVER; the unbounded vector is specifically `POST /attachments` behind deployment-wide ATTACH_FILES.
+`SLIMM_MAX_TOTAL_ATTACHMENT_BYTES` defaults to no ceiling, because the right number is the operator's disk and a guess would either refuse a legitimate upload on a large volume or do nothing on a small one; the shipped compose stack sets 2 GiB so a self-host following the guide gets one. Past it, a 507 rather than a 413, so a screenshot tells an operator whose problem it is. The grace window is two hours.
+
 ### 14. Unbounded reads and per-row permission evaluation - low to medium
 
 Four sites where the codebase's own established pattern was not applied.
@@ -319,6 +323,9 @@ The only bound is the module's 4 KiB body limit; neither the store nor the handl
 `http/safety.rs:26` caps the report reason at 2000 chars.
 Both routes need KICK_MEMBERS or BAN_MEMBERS, so there is no attacker here.
 The value is consistency in a codebase that caps every other free-text field explicitly (message 4000, poll question 300, topic 256, search 200, display name 64, push token 1024), and a length contract a client rendering a removal list can design against.
+
+**Closed 2026-07-30, PR #151.** One shared `validate_reason` at the same 2000, called from the report intake and both moderation verbs, with `required` the only thing that differs - a report must say why, a timeout need not.
+Worth recording what writing it exposed: mutating the length check killed only the new moderation test and nothing in `tests/safety.rs`, so the report reason's own cap had been there all along with no test behind it. There is one now.
 
 ## What I would do first
 

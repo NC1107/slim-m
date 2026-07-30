@@ -139,6 +139,13 @@ impl Store {
         content: &str,
         attachment_ids: &[Vec<u8>],
     ) -> Result<Sent, SendError> {
+        // Authorized before the write lock, never inside it; see `may_link`.
+        for sha256 in attachment_ids {
+            if !super::attachments::may_link(self, author_id, sha256).await? {
+                return Err(SendError::AttachmentNotFound);
+            }
+        }
+
         // BEGIN IMMEDIATE, never deferred; see the note on this function.
         let mut tx = self.begin_write().await?;
 

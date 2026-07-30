@@ -48,6 +48,78 @@ void main() {
     expect(controller.state.error, isNull);
   });
 
+  test('a plain-ws SFU on a public address is refused, not joined', () async {
+    final session = FakeSession();
+    final controller = harness.controllerWith(
+      session,
+      voiceApi(sfuUrl: 'ws://sfu.example.com'),
+    );
+
+    await controller.join('channel-1');
+
+    expect(controller.state.state, VoiceSessionState.failed);
+    expect(controller.state.error, contains('SLIMM_LIVEKIT_URL'));
+    expect(
+      controller.state.retryable,
+      isFalse,
+      reason: 'a misconfigured scheme fails identically on every retry',
+    );
+    expect(
+      session.askedForMicrophoneOnJoin,
+      isNull,
+      reason: 'the session must never be asked to join an insecure SFU',
+    );
+  });
+
+  test('a plain-ws SFU on a LAN address still joins', () async {
+    final session = FakeSession();
+    final controller = harness.controllerWith(
+      session,
+      voiceApi(sfuUrl: 'ws://10.0.0.100:7880'),
+    );
+
+    await controller.join('channel-1');
+
+    expect(controller.state.error, isNull);
+    expect(session.askedForMicrophoneOnJoin, isTrue);
+  });
+
+  test('a wss SFU joins normally', () async {
+    final session = FakeSession();
+    final controller = harness.controllerWith(
+      session,
+      voiceApi(sfuUrl: 'wss://sfu.example.com'),
+    );
+
+    await controller.join('channel-1');
+
+    expect(controller.state.error, isNull);
+    expect(session.askedForMicrophoneOnJoin, isTrue);
+  });
+
+  /// `SLIMM_LIVEKIT_URL` takes four schemes, not two - `voice/mod.rs`'s
+  /// `http_url_for` accepts `wss`, `ws`, `https` and `http`, because LiveKit
+  /// serves signalling on both pairs. Checking only for `wss` would refuse a
+  /// perfectly secure deployment, which is a worse failure than the one this
+  /// exists to prevent.
+  test('an https SFU joins, and a plain-http public one is refused', () async {
+    final secure = FakeSession();
+    await harness
+        .controllerWith(secure, voiceApi(sfuUrl: 'https://sfu.example.com'))
+        .join('channel-1');
+    expect(secure.askedForMicrophoneOnJoin, isTrue);
+
+    final plain = FakeSession();
+    final controller = harness.controllerWith(
+      plain,
+      voiceApi(sfuUrl: 'http://sfu.example.com'),
+    );
+    await controller.join('channel-1');
+    expect(controller.state.state, VoiceSessionState.failed);
+    expect(controller.state.retryable, isFalse);
+    expect(plain.askedForMicrophoneOnJoin, isNull);
+  });
+
   test(
     'a server with no voice says so, and is not a retryable failure',
     () async {

@@ -1,0 +1,214 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Voice kick, the actor-versus-target half: `voice.rs`'s `kick` handler is
+//! the one KICK_MEMBERS consumer with no level check before this pass, and
+//! it needs its own per-channel escalation guard rather than the
+//! deployment-wide one `members.rs` already carries. Split into its own file
+//! because `tests/voice.rs` was already past the file-size budget.
+
+use axum::Router;
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use slimm_server::auth::Auth;
+use slimm_server::config::Config;
+use slimm_server::db;
+use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
+use slimm_server::permissions::Permissions;
+use slimm_server::push::PushSender;
+use slimm_server::ratelimit::RateLimiter;
+use slimm_server::store::Store;
+use slimm_server::voice::VoiceService;
+use tower::ServiceExt;
+
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-voice-kick-escalation-test");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    (Store::new(pool), guard)
+}
+
+fn app(store: Store, voice: VoiceService) -> Router {
+    http::router(AppState {
+        store,
+        auth: Auth::new(2).unwrap(),
+        hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice,
+        media: slimm_server::media::Media::for_tests(),
+    })
+}
+
+fn request(method: &str, uri: &str, token: Option<&str>) -> Request<Body> {
+    let mut builder = Request::builder().method(method).uri(uri);
+    if let Some(token) = token {
+        builder = builder.header("authorization", format!("Bearer {token}"));
+    }
+    builder.body(Body::empty()).unwrap()
+}
+
+/// A loopback address nothing can be listening on: connecting to it fails
+/// fast and locally, unlike a real unreachable hostname which needs a DNS
+/// lookup first. `tests/voice_roster.rs` uses the same trick for the same
+/// reason, and its own comment records why a privileged port beats a freed
+/// ephemeral one (a race with whichever mock service this suite starts next).
+fn unreachable_voice() -> VoiceService {
+    VoiceService::for_test(
+        "http://127.0.0.1:1",
+        "APItestkey",
+        "a-test-secret-of-at-least-32-characters",
+    )
+}
+
+/// A moderator whose KICK_MEMBERS comes only from a channel overwrite, not
+/// from a deployment-wide role, cannot use it to eject someone above their
+/// level. The per-channel grant this route reads is exactly as bounded as
+/// the deployment-wide one `members.rs` already guards, and comparing
+/// against the wrong scope (the caller's deployment-wide permissions rather
+/// than this channel's) is exactly the mistake that would have missed it.
+#[tokio::test]
+async fn kicking_above_your_level_via_a_channel_overwrite_is_refused() {
+    let (store, _guard) = new_store().await;
+    // alice registers first and claims the deployment as its administrator.
+    let alice = store
+        .create_account("alice", "alice", "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(alice.id).await.unwrap();
+    let channel = store.create_channel("mod-lounge", "voice").await.unwrap();
+
+    let bob = store
+        .create_account("bob", "bob", "not-a-real-hash")
+        .await
+        .unwrap();
+    let bob_token = store
+        .open_session(bob.id, "cli")
+        .await
+        .unwrap()
+        .access_token;
+    store
+        .set_member_overwrite(
+            channel.id,
+            bob.id,
+            Permissions::VIEW_CHANNEL.union(Permissions::KICK_MEMBERS),
+            Permissions::NONE,
+        )
+        .await
+        .unwrap();
+
+    let app = app(store.clone(), unreachable_voice());
+    let response = app
+        .oneshot(request(
+            "POST",
+            &format!(
+                "/channels/{}/voice/participants/{}/kick",
+                channel.id, alice.id
+            ),
+            Some(&bob_token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::FORBIDDEN,
+        "a channel overwrite must not out-rank a deployment administrator"
+    );
+}
+
+/// Positive control: an administrator kicking a member with no special
+/// rights is not caught by the guard above. The SFU is deliberately
+/// unreachable here, so the outcome asserted is the authorization decision
+/// (past `escalation_guard`) rather than a success no test fixture can
+/// produce; `voice_roster.rs` reads the same 503 the same way.
+#[tokio::test]
+async fn an_administrator_can_still_kick_a_lower_privileged_participant() {
+    let (store, _guard) = new_store().await;
+    let alice = store
+        .create_account("alice", "alice", "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(alice.id).await.unwrap();
+    let alice_token = store
+        .open_session(alice.id, "cli")
+        .await
+        .unwrap()
+        .access_token;
+    let channel = store.create_channel("general", "voice").await.unwrap();
+    let bob = store
+        .create_account("bob", "bob", "not-a-real-hash")
+        .await
+        .unwrap();
+
+    let app = app(store.clone(), unreachable_voice());
+    let response = app
+        .oneshot(request(
+            "POST",
+            &format!(
+                "/channels/{}/voice/participants/{}/kick",
+                channel.id, bob.id
+            ),
+            Some(&alice_token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::SERVICE_UNAVAILABLE,
+        "authorized and past the guard; the unreachable SFU is what answers next"
+    );
+}
+
+/// Control: kicking yourself still passes the guard, proving
+/// `members.rs`'s self-refusal was not imported where it does not belong -
+/// a self-kick is harmless, unlike self-removal from the Space.
+#[tokio::test]
+async fn kicking_yourself_is_not_refused_by_the_escalation_guard() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL
+                .union(Permissions::CONNECT)
+                .union(Permissions::KICK_MEMBERS),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let alice = store
+        .create_account("alice", "alice", "not-a-real-hash")
+        .await
+        .unwrap();
+    // A no-op: "everyone" above already claimed the deployment.
+    store.bootstrap_deployment(alice.id).await.unwrap();
+    let token = store
+        .open_session(alice.id, "cli")
+        .await
+        .unwrap()
+        .access_token;
+
+    let app = app(store.clone(), unreachable_voice());
+    let response = app
+        .oneshot(request(
+            "POST",
+            &format!(
+                "/channels/{}/voice/participants/{}/kick",
+                channel.id, alice.id
+            ),
+            Some(&token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::SERVICE_UNAVAILABLE,
+        "authorized and past the guard; the unreachable SFU is what answers next"
+    );
+}
