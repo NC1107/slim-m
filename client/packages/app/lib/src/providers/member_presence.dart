@@ -16,10 +16,42 @@ import 'live_events.dart';
 import 'presence_controller.dart';
 import 'providers.dart';
 
-/// The deployment's members. Real endpoint, real data.
-final membersProvider = FutureProvider.autoDispose<List<api.UserProfile>>(
-  (ref) => ref.watch(apiProvider).listMembers(),
-);
+/// The server's own per-page ceiling (`MEMBERS_MAX_LIMIT` in
+/// `crates/slimm-server/src/http/users.rs`), requested explicitly on every
+/// page: the server's default without an explicit limit is a much smaller
+/// 50, and asking for the max up front costs the fewest round trips.
+const _memberPageLimit = 200;
+
+/// A defensive stop on how many pages [membersProvider] will follow. Pages
+/// this size in the low hundreds already cover the largest deployment this
+/// product targets, so reaching it means the server broke its own "a page
+/// shorter than requested is the last one" contract; paging then stops and
+/// returns whatever was already fetched, silently short of the full roster,
+/// rather than looping forever.
+const _maxMemberPages = 500;
+
+/// The deployment's members, real endpoint, real data, paged to completion.
+/// A single request never returns more than [_memberPageLimit] rows, so
+/// anything past the first page needs a follow-up keyed on the last id
+/// already seen; a page shorter than [_memberPageLimit] is the contract's
+/// own signal that there is no next one.
+final membersProvider = FutureProvider.autoDispose<List<api.UserProfile>>((
+  ref,
+) async {
+  final client = ref.watch(apiProvider);
+  final members = <api.UserProfile>[];
+  String? after;
+  for (var page = 0; page < _maxMemberPages; page++) {
+    final batch = await client.listMembers(
+      after: after,
+      limit: _memberPageLimit,
+    );
+    members.addAll(batch);
+    if (batch.length < _memberPageLimit) return members;
+    after = batch.last.id;
+  }
+  return members;
+});
 
 /// Seeds live presence for the resolved member list. A trigger, not a data
 /// source in its own right: `AppMemberPane` watches this purely to start it,
@@ -34,11 +66,6 @@ final presenceSeedProvider = FutureProvider.autoDispose<void>((ref) async {
       .refresh(members.map((m) => m.id));
 });
 
-/// Mirrors `MEMBERS_MAX_LIMIT` in `crates/slimm-server/src/http/users.rs`.
-/// Below it, an unknown id means a stale cache; at or above it, an unknown
-/// id is normal (a member off this page), so it must not force a refetch.
-const _memberPageCeiling = 200;
-
 /// Coalesces a burst of joins (or one join's presence-then-message pair)
 /// into a single refetch rather than one per event.
 const _rosterKeepAliveDebounce = Duration(milliseconds: 500);
@@ -48,8 +75,14 @@ const _rosterKeepAliveDebounce = Duration(milliseconds: 500);
 /// a join from what one already produces on the live socket - a presence
 /// frame, or, failing that, the author id on a first message - and
 /// invalidates the cached roster so the pane catches up without a reload.
+/// [membersProvider] now pages to the whole roster, so an id truly absent
+/// from it is either someone who just joined or someone who never will be
+/// there (removed, anonymized, or a race before their account commits);
+/// [_refetchedIds] bounds it to one refetch per id so the latter case
+/// cannot re-invalidate forever on their own later activity.
 final memberRosterKeepAliveProvider = Provider.autoDispose<void>((ref) {
   Timer? debounce;
+  final refetchedIds = <String>{};
   final sub = ref.read(liveEventsProvider).listen((event) {
     final candidateId = switch (event) {
       api.PresenceChanged(:final userId) => userId,
@@ -59,9 +92,9 @@ final memberRosterKeepAliveProvider = Provider.autoDispose<void>((ref) {
     if (candidateId == null) return;
 
     final members = ref.read(membersProvider).valueOrNull;
-    // No cached roster yet, or a full page: neither says the id is a stale gap.
-    if (members == null || members.length >= _memberPageCeiling) return;
+    if (members == null) return;
     if (members.any((m) => m.id == candidateId)) return;
+    if (!refetchedIds.add(candidateId)) return;
 
     debounce?.cancel();
     debounce = Timer(_rosterKeepAliveDebounce, () {
