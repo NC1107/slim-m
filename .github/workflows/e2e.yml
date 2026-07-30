@@ -27,9 +27,10 @@ on:
 permissions:
   contents: read
 
+# Queued, not cancelled: a merge burst would otherwise leave no verdict at all.
 concurrency:
   group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   SQLX_OFFLINE: "true"
