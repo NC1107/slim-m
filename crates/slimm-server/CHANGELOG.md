@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.2](https://github.com/NC1107/slim-m/compare/server-v0.18.1...server-v0.18.2) (2026-07-30)
+
+
+### Performance Improvements
+
+* **ws:** cache VIEW_CHANNEL per connection, invalidated by the events ([#165](https://github.com/NC1107/slim-m/issues/165)) ([f794765](https://github.com/NC1107/slim-m/commit/f794765d61863a6814d1af26d2e287138de7b41b))
+
 ## [0.18.1](https://github.com/NC1107/slim-m/compare/server-v0.18.0...server-v0.18.1) (2026-07-30)
 
 
