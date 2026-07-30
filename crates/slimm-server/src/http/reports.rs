@@ -54,6 +54,9 @@ struct ReportDto {
     /// since edited or deleted it. Absent from every route below the
     /// MANAGE_MESSAGES bar.
     snapshot: Option<String>,
+    /// Who wrote the reported message. Null for a report about a user, for a
+    /// message since hard-deleted, and once the author is anonymized.
+    subject_author_id: Option<String>,
     created_at: i64,
 }
 
@@ -67,6 +70,7 @@ impl From<Report> for ReportDto {
             channel_id: report.channel_id.map(|id| id.to_string()),
             reason: report.reason,
             snapshot: report.snapshot,
+            subject_author_id: report.subject_author_id.map(|id| id.to_string()),
             created_at: report.created_at,
         }
     }
