@@ -72,11 +72,16 @@ impl From<Report> for ReportDto {
     }
 }
 
-/// One page of the queue. `after` is the `created_at` of the last report the
-/// caller already holds, exclusive.
+/// One page of the queue. The cursor is the `created_at` and `id` of the last
+/// report the caller already holds, exclusive and composite: `created_at` is
+/// milliseconds, so two reports can share one, and a cursor on the timestamp
+/// alone would skip every remaining member of a tied group that a page boundary
+/// fell inside. Both or neither - an `after` without an `after_id` is refused
+/// rather than silently read as the ambiguous form.
 #[derive(Deserialize)]
 struct ListParams {
     after: Option<i64>,
+    after_id: Option<String>,
     limit: Option<i64>,
 }
 
@@ -95,34 +100,59 @@ struct ResolveReportRequest {
 /// reported there. Reports with no channel are deployment-wide (a report about
 /// a user rather than a message) and stay on the base check alone.
 ///
-/// That filter runs after the page is read, so a page can come back holding
-/// fewer than `limit` reports, or none at all, while more remain. A caller
-/// paging through should keep going while a *full* page arrives rather than
-/// stopping at the first short one - which is also why the page is read
-/// bounded rather than the whole queue being read and then filtered, since the
-/// visibility check is what costs, at several indexed queries per report.
+/// That exclusion is resolved once, into the set of channels the caller cannot
+/// moderate, and applied in the `WHERE` rather than to the page after it is
+/// read. Both orders answer the same, but filtering after a `LIMIT` makes a
+/// short page ambiguous - a caller cannot tell it from the end of the queue -
+/// so a moderator denied MANAGE_MESSAGES in one busy channel would silently
+/// stop paging with reports they may read still ahead of them. It also drops
+/// what the audit filed this route for: the per-report evaluation, several
+/// indexed queries each, is now four queries for the whole page.
 async fn list(
     AuthedLimited(ctx): AuthedLimited<READ>,
     Query(params): Query<ListParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ReportDto>>, ApiError> {
     require_manage_messages(&state, ctx.user_id).await?;
-    let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
-    let reports = state.store.list_open_reports(params.after, limit).await?;
-
-    // Re-checked per channel, not just deployment-wide; see the note on this
-    // function.
-    let mut visible = Vec::with_capacity(reports.len());
-    for report in reports {
-        let allowed = match report.channel_id {
-            None => true,
-            Some(channel_id) => report_visible_in(&state, ctx.user_id, channel_id).await,
-        };
-        if allowed {
-            visible.push(ReportDto::from(report));
+    let after = match (params.after, params.after_id.as_deref()) {
+        (Some(created_at), Some(id)) => Some((created_at, parse_uuid(id)?)),
+        (None, None) => None,
+        _ => {
+            return Err(ApiError::BadRequest(
+                "after and after_id go together or not at all",
+            ));
         }
-    }
-    Ok(Json(visible))
+    };
+    let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+
+    let hidden = hidden_channels(&state, ctx.user_id).await?;
+    let reports = state.store.list_open_reports(after, &hidden, limit).await?;
+    Ok(Json(reports.into_iter().map(ReportDto::from).collect()))
+}
+
+/// The live non-DM channels this caller may not read reports from: everything
+/// [`crate::store::Store::list_channels`] returns, minus what they can moderate.
+///
+/// The complement rather than the allowed set, because the three kinds of report
+/// that are *not* about a live non-DM channel - one with no channel, one about a
+/// DM, one about a since-deleted channel - must stay visible on the caller's
+/// deployment-wide bit alone, and none of them appears in `list_channels`. An
+/// allowed-set predicate would hide all three. This is the batched form of what
+/// [`report_visible_in`] answers for one report, which [`resolve`] still needs.
+async fn hidden_channels(state: &AppState, user_id: UserId) -> Result<Vec<ChannelId>, ApiError> {
+    let all = state.store.list_channels().await?;
+    let moderatable: std::collections::HashSet<ChannelId> = state
+        .store
+        .channels_where(user_id, Permissions::MANAGE_MESSAGES)
+        .await?
+        .into_iter()
+        .map(|channel| channel.id)
+        .collect();
+    Ok(all
+        .into_iter()
+        .map(|channel| channel.id)
+        .filter(|id| !moderatable.contains(id))
+        .collect())
 }
 
 /// Closes a report as resolved or dismissed. The claim is a conditional

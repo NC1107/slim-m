@@ -74,10 +74,16 @@ That keeps the set small enough that every reader can have all of it, which is t
 `/reports` is genuinely paged instead, forward on `created_at`, because its ceiling is reporters times subjects and a moderator has to work through a backlog.
 Re-pinning an already-pinned message does not count against the ceiling, or a retry would break at exactly the moment the set is full.
 
-**The report queue's filter runs after the page is read, and every layer says so.**
-Visibility is re-checked channel by channel, several indexed queries each, so a page can arrive holding fewer entries than `limit`, or none, while more remain.
-A caller pages while a *full page* arrives rather than stopping at the first short one - that sentence is in the handler's doc comment, in `schema/openapi.yaml`, in `SlimmApiModeration.listOpenReports` and in `reports_controller.dart`, because it is the one thing about this endpoint a reader will get wrong.
-The alternative was returning the cursor in the body, which would have meant changing a documented response from an array to an object, and the wire is additive-only.
+**The report queue filters before the limit, not after it, and that ordering is the whole design.**
+The first attempt at this paged the query and left the per-channel visibility check where it was, on the page after it was read.
+That is wrong in a way that is easy to miss and was caught by an adversarial review rather than by any test: a post-filtered page can come back short, and a caller cannot tell that from the end of the queue, so a moderator denied MANAGE_MESSAGES in one busy channel silently stopped paging with readable reports still ahead of them - and a first window that was entirely restricted read as an empty queue.
+Excluding those channels in the `WHERE` makes a short page mean exactly one thing.
+It also drops what the finding was really about: the per-report evaluation, several indexed queries each, became four queries for the whole page, through `channels_where` (which is `visible_channels` generalised past the VIEW_CHANNEL it was written for).
+The predicate is the *complement* - live non-DM channels the caller cannot moderate - because a report with no channel, one about a DM and one about a since-deleted channel must all stay visible on the deployment-wide bit alone, and none of the three appears in `list_channels`; an allowed-set predicate would hide all three.
+
+**The cursor is composite, `(created_at, id)`, and half a cursor is a 400.**
+`created_at` is milliseconds, so reports can share one, and a timestamp-only cursor excluded the whole tied value rather than just the rows already delivered - so every remaining member of a group a page boundary fell inside was skipped for good.
+An earlier doc comment here claimed closing that needed "a composite cursor the response has no additive room to carry", which conflated the response with the request: the response cannot become an object (the wire is additive-only), but a second query parameter is exactly as additive as the first.
 
 **`GET /presence` was in the audit's pagination table and did not belong there.**
 It already capped its batch at 100 and documented that in the schema.

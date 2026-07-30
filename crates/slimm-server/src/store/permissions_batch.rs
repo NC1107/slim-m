@@ -173,15 +173,28 @@ impl Store {
         Ok(viewers)
     }
 
-    /// The channels this user can view, in rail order: [`Store::list_channels`]
-    /// filtered by VIEW_CHANNEL with the caller's role context loaded once.
+    /// The channels this user can view, in rail order.
+    pub async fn visible_channels(&self, user_id: UserId) -> anyhow::Result<Vec<super::Channel>> {
+        self.channels_where(user_id, Permissions::VIEW_CHANNEL)
+            .await
+    }
+
+    /// [`Store::list_channels`] filtered by `needed`, with the caller's role
+    /// context loaded once. DMs and deleted channels are outside it, because
+    /// they are outside `list_channels`.
     ///
-    /// The handler used to ask [`Self::has_permission`] per channel, which
+    /// The rail handler used to ask [`Self::has_permission`] per channel, which
     /// re-fetched the channel row it already held and the same role context
     /// every iteration - 1 + 4C queries for C channels on a request every
     /// client fires at startup. This is four queries however many channels
-    /// exist, evaluated by the same pure [`evaluate`].
-    pub async fn visible_channels(&self, user_id: UserId) -> anyhow::Result<Vec<super::Channel>> {
+    /// exist, evaluated by the same pure [`evaluate`]. The moderation queue
+    /// asks the same question about MANAGE_MESSAGES, which is why the
+    /// permission is a parameter rather than the VIEW_CHANNEL this started as.
+    pub async fn channels_where(
+        &self,
+        user_id: UserId,
+        needed: Permissions,
+    ) -> anyhow::Result<Vec<super::Channel>> {
         let channels = self.list_channels().await?;
         if channels.is_empty() {
             return Ok(channels);
@@ -254,7 +267,7 @@ impl Store {
                     member_overwrite,
                 )
                 .remove(timeout_deny)
-                .contains(Permissions::VIEW_CHANNEL)
+                .contains(needed)
             })
             .collect())
     }

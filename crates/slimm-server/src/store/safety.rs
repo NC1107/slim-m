@@ -5,6 +5,7 @@
 //! person, and per-user blocking. There is no automated content or media
 //! scanning anywhere, by decision, so nothing here inspects message content.
 
+use sqlx::QueryBuilder;
 use uuid::Uuid;
 
 use super::{Store, now_ms};
@@ -293,43 +294,78 @@ impl Store {
         Ok(count)
     }
 
-    /// One page of the moderation queue: open reports, oldest first, starting
-    /// after `after` when one is given.
+    /// One page of the moderation queue: open reports, oldest first.
     ///
-    /// Bounded because the caller pays per report, not per request: the queue
-    /// handler re-checks visibility channel by channel, which is several
-    /// indexed queries each, and the queue's length is set by how many reports
-    /// members have filed rather than by anything an operator chose.
+    /// Bounded, and filtered *before* the limit rather than after it. That
+    /// ordering is the whole design here. A report carries the reported content
+    /// verbatim, so the queue is filtered per channel; doing that after a
+    /// `LIMIT` means a page can come back holding fewer entries than asked for,
+    /// and a caller has no way to tell that from the end of the queue - so a
+    /// moderator denied MANAGE_MESSAGES in one busy channel silently stops
+    /// paging while reports they may read sit past the window. Excluding those
+    /// channels in the `WHERE` makes a short page mean exactly one thing.
     ///
-    /// The cursor is a `created_at`, not an id, and is exclusive. `created_at`
-    /// is milliseconds, so two reports filed in the same millisecond could in
-    /// principle straddle a page boundary and one be skipped; the id tiebreak
-    /// in the ordering makes the page itself stable, and closing that last gap
-    /// would need a composite cursor the response has no additive room to
-    /// carry. Reports are filed by people pressing a button, not in bulk.
+    /// `hidden_channels` is that exclusion, resolved once by the caller through
+    /// [`Store::channels_where`] rather than a permission evaluation per row.
+    /// It holds live non-DM channels the caller cannot moderate. A report with
+    /// no channel, one about a DM, and one about a since-deleted channel are all
+    /// outside it and stay visible on the caller's deployment-wide bit alone,
+    /// which is what [`Store::channel_scopes_moderation`] answers per report.
+    ///
+    /// The cursor is composite - `(created_at, id)`, exclusive - and matches the
+    /// ordering. A `created_at` alone cannot page correctly: it is milliseconds,
+    /// so two reports can share one, and a boundary inside a tied group would
+    /// skip every remaining member of it permanently rather than just one.
     pub async fn list_open_reports(
         &self,
-        after: Option<i64>,
+        after: Option<(i64, Uuid)>,
+        hidden_channels: &[ChannelId],
         limit: i64,
     ) -> anyhow::Result<Vec<Report>> {
-        let after = after.unwrap_or(i64::MIN);
-        let rows = sqlx::query_as!(
-            Report,
-            r#"SELECT id AS "id!: Uuid", reporter_id AS "reporter_id: UserId",
-                      subject_kind AS "subject_kind!", subject_id AS "subject_id!: Uuid",
-                      channel_id AS "channel_id: ChannelId", reason AS "reason!",
-                      snapshot, created_at AS "created_at!",
-                      resolved_at, resolved_by AS "resolved_by: UserId", resolution
-               FROM reports
-               WHERE resolved_at IS NULL AND created_at > ?
-               ORDER BY created_at, id
-               LIMIT ?"#,
-            after,
-            limit
-        )
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(rows)
+        let mut builder = QueryBuilder::new(
+            r#"SELECT id, reporter_id, subject_kind, subject_id, channel_id, reason,
+                      snapshot, created_at, resolved_at, resolved_by, resolution
+               FROM reports WHERE resolved_at IS NULL"#,
+        );
+        if let Some((created_at, id)) = after {
+            builder.push(" AND (created_at > ");
+            builder.push_bind(created_at);
+            builder.push(" OR (created_at = ");
+            builder.push_bind(created_at);
+            builder.push(" AND id > ");
+            builder.push_bind(id);
+            builder.push("))");
+        }
+        if !hidden_channels.is_empty() {
+            builder.push(" AND (channel_id IS NULL OR channel_id NOT IN (");
+            let mut separated = builder.separated(", ");
+            for channel_id in hidden_channels {
+                separated.push_bind(*channel_id);
+            }
+            builder.push("))");
+        }
+        builder.push(" ORDER BY created_at, id LIMIT ");
+        builder.push_bind(limit);
+
+        use sqlx::Row;
+        let rows = builder.build().fetch_all(&self.pool).await?;
+        rows.into_iter()
+            .map(|row| {
+                Ok(Report {
+                    id: row.try_get("id")?,
+                    reporter_id: row.try_get("reporter_id")?,
+                    subject_kind: row.try_get("subject_kind")?,
+                    subject_id: row.try_get("subject_id")?,
+                    channel_id: row.try_get("channel_id")?,
+                    reason: row.try_get("reason")?,
+                    snapshot: row.try_get("snapshot")?,
+                    created_at: row.try_get("created_at")?,
+                    resolved_at: row.try_get("resolved_at")?,
+                    resolved_by: row.try_get("resolved_by")?,
+                    resolution: row.try_get("resolution")?,
+                })
+            })
+            .collect()
     }
 
     /// The channel an open report is about, if it is about a message at all.

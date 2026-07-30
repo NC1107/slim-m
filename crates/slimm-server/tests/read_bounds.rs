@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The two read surfaces that answered with as much as a deployment happened
-//! to hold, and the write-time ceiling that replaced paging for one of them.
+//! The pin set's write-time ceiling, and the DM narrowing in the batched
+//! viewer check.
 //!
 //! Neither was reachable without a permission, so neither is a way in from
 //! outside. What they are is a cost that scales with how much members have
 //! done rather than with anything an operator chose, which is the same shape as
 //! the unauthenticated bounds in `resource_bounds.rs` one privilege level up.
+//! The moderation queue's half is in `report_paging.rs`.
 //!
-//! Its own file rather than added to `pins.rs` (433 lines) or `reports.rs`
-//! (373): both are past the review budget already.
+//! Its own file rather than added to `pins.rs` (433 lines): that one is past the
+//! review budget already.
 
 use axum::Router;
 use axum::body::Body;
@@ -94,83 +95,7 @@ async fn message(store: &Store, channel: ChannelId, author: UserId, body: &str) 
         .id
 }
 
-// --- The moderation queue ---
-
-/// The queue answered with every open report in the deployment, and the handler
-/// then re-checks visibility channel by channel at several indexed queries
-/// each. It answers one page now, and pages forward on `created_at`.
-#[tokio::test]
-async fn the_report_queue_answers_a_page_and_pages_forward() {
-    let (store, _guard) = new_store("slimm-bounds-reports").await;
-    let (moderator, token, channel) = admin(&store, "root").await;
-    let reporter = store.create_user("bob", "Bob").await.unwrap();
-
-    // One report per subject: the store allows only one open report per pair.
-    for index in 0..7 {
-        let subject = message(&store, channel, moderator, &format!("m{index}")).await;
-        store
-            .file_report(
-                reporter.id,
-                slimm_server::store::ReportSubject::Message(subject),
-                "not ok",
-            )
-            .await
-            .unwrap();
-    }
-
-    let first = json_array(&app(store.clone()), "/reports?limit=3", &token).await;
-    assert_eq!(first.len(), 3, "a limit must bound the page");
-
-    let last_seen = first.last().unwrap()["created_at"].as_i64().unwrap();
-    let next = json_array(
-        &app(store.clone()),
-        &format!("/reports?limit=3&after={last_seen}"),
-        &token,
-    )
-    .await;
-    assert!(
-        !next.is_empty(),
-        "the cursor must reach the rest of the queue"
-    );
-    let first_ids: Vec<&str> = first.iter().map(|r| r["id"].as_str().unwrap()).collect();
-    for report in &next {
-        assert!(
-            !first_ids.contains(&report["id"].as_str().unwrap()),
-            "a page must not repeat the previous one"
-        );
-    }
-}
-
-/// A caller asking for everything gets a page, not everything. Without the
-/// clamp the limit is the caller's to choose, which is the same unbounded read
-/// with an extra step.
-#[tokio::test]
-async fn an_absurd_report_limit_is_clamped() {
-    let (store, _guard) = new_store("slimm-bounds-report-limit").await;
-    let (moderator, token, channel) = admin(&store, "root").await;
-    let reporter = store.create_user("bob", "Bob").await.unwrap();
-    for index in 0..4 {
-        let subject = message(&store, channel, moderator, &format!("m{index}")).await;
-        store
-            .file_report(
-                reporter.id,
-                slimm_server::store::ReportSubject::Message(subject),
-                "not ok",
-            )
-            .await
-            .unwrap();
-    }
-
-    let all = json_array(&app(store.clone()), "/reports?limit=999999", &token).await;
-    assert_eq!(all.len(), 4, "the clamp is a ceiling, not a floor");
-
-    let zero = json_array(&app(store.clone()), "/reports?limit=0", &token).await;
-    assert_eq!(
-        zero.len(),
-        1,
-        "a limit under one clamps up, never to nothing"
-    );
-}
+// --- Pins ---
 
 // --- Pins ---
 
@@ -262,20 +187,6 @@ async fn a_dm_viewer_check_ignores_candidates_outside_the_pair() {
             .viewers_among(dm.id, &strangers_only)
             .await
             .unwrap()
-            .is_empty()
-    );
-}
-
-/// A nonexistent id is not a report about anybody, so a bad cursor is not a way
-/// to read past the page - it just yields nothing.
-#[tokio::test]
-async fn a_cursor_past_the_end_yields_nothing() {
-    let (store, _guard) = new_store("slimm-bounds-cursor-end").await;
-    let (_moderator, token, _channel) = admin(&store, "root").await;
-    let uri = format!("/reports?after={}", i64::MAX);
-    assert!(
-        json_array(&app(store.clone()), &uri, &token)
-            .await
             .is_empty()
     );
 }

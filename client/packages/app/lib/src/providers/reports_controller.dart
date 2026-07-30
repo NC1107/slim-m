@@ -7,10 +7,13 @@
 /// members had filed. The queue is a work list that can outgrow a screen either
 /// way, so the client pages rather than the server answering with all of it.
 ///
-/// The one subtlety, which the server's own doc comment shares: the visibility
-/// filter runs after the page is read, so a page can arrive holding fewer
-/// entries than asked for, or none, while more remain. "More to load" is
-/// therefore whether the *page* was full, never whether the list grew.
+/// Channels the caller cannot moderate are excluded server-side *before* the
+/// limit, which is what lets "more to load" simply be "the page came back
+/// full". An earlier pass filtered after the limit, and then a short page meant
+/// either "some of that window was restricted" or "the queue ended" with
+/// nothing in the response telling them apart - so a moderator denied
+/// MANAGE_MESSAGES in one busy channel stopped paging early, and a wholly
+/// restricted first window read as an empty queue.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,10 +35,14 @@ class ReportsState {
 
   final List<api.Report> reports;
   final bool loading;
+
+  /// The last failure, kept beside [reports] rather than instead of them: a
+  /// failed "load more" must not throw away the pages already on screen.
   final String? error;
 
   /// Whether the last page came back full, which is the only thing that says
-  /// more may follow.
+  /// more may follow. Preserved across a failure, or a single network blip
+  /// would read as the end of the queue.
   final bool more;
 }
 
@@ -45,6 +52,10 @@ class ReportsController extends StateNotifier<ReportsState> {
   }
 
   final Ref _ref;
+
+  /// Bumped by every call that starts a load, so a response that arrives after
+  /// a newer one was started is dropped instead of overwriting it.
+  int _generation = 0;
 
   /// Starts the queue again from the top.
   Future<void> refresh() async {
@@ -56,26 +67,38 @@ class ReportsController extends StateNotifier<ReportsState> {
   Future<void> loadMore() async {
     if (state.loading || !state.more || state.reports.isEmpty) return;
     state = ReportsState(reports: state.reports, loading: true, more: true);
-    await _load(after: state.reports.last.createdAt, onto: state.reports);
+    final last = state.reports.last;
+    await _load(after: last, onto: state.reports);
   }
 
   Future<void> _load({
-    required int? after,
+    required api.Report? after,
     required List<api.Report> onto,
   }) async {
+    final generation = ++_generation;
+    final more = state.more;
     try {
       final page = await _ref
           .read(apiProvider)
-          .listOpenReports(after: after, limit: reportsPageSize);
-      if (!mounted) return;
+          .listOpenReports(
+            after: after?.createdAt,
+            afterId: after?.id,
+            limit: reportsPageSize,
+          );
+      if (!mounted || generation != _generation) return;
       state = ReportsState(
         reports: [...onto, ...page],
         loading: false,
         more: page.length >= reportsPageSize,
       );
     } on api.ApiException catch (e) {
-      if (!mounted) return;
-      state = ReportsState(reports: onto, loading: false, error: e.message);
+      if (!mounted || generation != _generation) return;
+      state = ReportsState(
+        reports: onto,
+        loading: false,
+        error: e.message,
+        more: more,
+      );
     }
   }
 }

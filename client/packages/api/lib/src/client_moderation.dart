@@ -8,14 +8,22 @@ extension SlimmApiModeration on SlimmApi {
   /// One page of the open moderation queue, oldest first. Requires
   /// MANAGE_MESSAGES.
   ///
-  /// Pass the `createdAt` of the last report already held as [after] to page
-  /// forward. Visibility is re-checked per channel server-side after the page
-  /// is read, so a page can come back holding fewer entries than [limit], or
-  /// none, while more remain: keep paging while a *full* page arrives rather
-  /// than stopping at the first short one.
-  Future<List<Report>> listOpenReports({int? after, int? limit}) async {
+  /// The cursor is composite and exclusive: pass the `createdAt` *and* `id` of
+  /// the last report already held. Both or neither - `createdAt` is
+  /// milliseconds, so reports can share one, and a timestamp-only cursor skips
+  /// every remaining member of a tied group a page boundary falls inside.
+  ///
+  /// Channels the caller cannot moderate are excluded server-side before the
+  /// limit, not after it, so a short page means the end of the queue and
+  /// nothing else.
+  Future<List<Report>> listOpenReports({
+    int? after,
+    String? afterId,
+    int? limit,
+  }) async {
     final query = <String, String>{
       if (after != null) 'after': '$after',
+      if (afterId != null) 'after_id': afterId,
       if (limit != null) 'limit': '$limit',
     };
     final json = await _send(

@@ -33,11 +33,12 @@ class ReportsScreen extends ConsumerWidget {
       scrollable: false,
       padding: EdgeInsets.zero,
       child: AppAsyncView<List<api.Report>>(
+        // Only when there is nothing to show instead; see _LoadMoreRow.
         value: AppAsyncState(
           data: reports.loading && reports.reports.isEmpty
               ? null
               : reports.reports,
-          error: reports.error,
+          error: reports.reports.isEmpty ? reports.error : null,
         ),
         errorMessage: 'Could not load reports.',
         onRetry: controller.refresh,
@@ -46,11 +47,14 @@ class ReportsScreen extends ConsumerWidget {
         data: (context, list) => ListView.separated(
           padding: const EdgeInsets.all(AppSpacing.s16),
           // One trailing row when the last page came back full; see the controller.
-          itemCount: reports.more ? list.length + 1 : list.length,
+          itemCount: reports.more || reports.error != null
+              ? list.length + 1
+              : list.length,
           separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s12),
           itemBuilder: (context, i) => i == list.length
               ? _LoadMoreRow(
                   loading: reports.loading,
+                  error: reports.error,
                   onTap: controller.loadMore,
                 )
               : _ReportCard(report: list[i]),
@@ -164,24 +168,45 @@ class _ReportCardState extends ConsumerState<_ReportCard> {
 }
 
 /// The end of a full page: more reports may follow, and only asking finds out.
+///
+/// Carries the failure of the last attempt too, inline and next to its retry,
+/// rather than letting it replace the pages already on screen.
 class _LoadMoreRow extends StatelessWidget {
-  const _LoadMoreRow({required this.loading, required this.onTap});
+  const _LoadMoreRow({
+    required this.loading,
+    required this.error,
+    required this.onTap,
+  });
 
   final bool loading;
+  final String? error;
   final Future<void> Function() onTap;
 
   @override
   Widget build(BuildContext context) {
+    if (loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.s8),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    if (error case final message?) {
+      return AppErrorState(
+        message: 'Could not load more reports.',
+        detail: message,
+        onRetry: () => unawaited(onTap()),
+      );
+    }
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.s8),
-        child: loading
-            ? const CircularProgressIndicator()
-            : AppButton(
-                label: 'Load more',
-                variant: AppButtonVariant.secondary,
-                onPressed: () => unawaited(onTap()),
-              ),
+        child: AppButton(
+          label: 'Load more',
+          variant: AppButtonVariant.secondary,
+          onPressed: () => unawaited(onTap()),
+        ),
       ),
     );
   }
