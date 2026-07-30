@@ -55,8 +55,10 @@ jobs:
           python-version: "3.14"
 
       # The harness's only third-party import; the rest of scripts/lib is stdlib.
+      # Pinned and wheel-only so no sdist setup script runs, same reason the
+      # actions above are pinned to commit shas.
       - name: python dependencies
-        run: pip install websocket-client
+        run: "pip install --only-binary :all: websocket-client==1.9.0"
 
       # Deterministic resolve, the same reason client-ci does this before building.
       - name: resolve workspace dependencies
