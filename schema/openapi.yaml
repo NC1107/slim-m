@@ -3134,6 +3134,16 @@ components:
           description: >
             The reported content as it stood at filing time; the author may
             have since edited or deleted it. Absent for a user report.
+        subject_author_id:
+          type: [string, "null"]
+          format: uuid
+          description: >
+            Who wrote the reported message. Null for a report about a user
+            (there is no message), for a message since hard-deleted, and once
+            the author's account has been anonymized. Joined at read time
+            rather than stored: a report names a message id, and the
+            authorship of that id does not change - only its content does,
+            which is what `snapshot` is for.
         created_at:
           type: integer
           format: int64
