@@ -170,10 +170,8 @@ pub async fn import_emoji(dir: &std::path::Path) -> anyhow::Result<()> {
 /// Connects to the local server and confirms `/healthz` returns 200. Used by the
 /// container image's healthcheck, since distroless has no shell.
 pub async fn healthcheck() -> anyhow::Result<()> {
-    let port: u16 = std::env::var("SLIMM_PORT")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(8080);
+    // Through Config, so the probe cannot disagree with what the server bound.
+    let port = config::Config::from_env()?.port;
 
     let mut stream = TcpStream::connect(("127.0.0.1", port)).await?;
     stream

@@ -256,14 +256,15 @@ impl Hub {
 
     /// Builds a hub with a non-default typing TTL, so a test can wait out the
     /// self-expiry in milliseconds instead of the production few seconds.
+    ///
+    /// Delegates rather than repeating the body, the way `TypingTracker`'s own
+    /// pair already does: a field added to one and not the other is the whole
+    /// failure mode of a duplicated constructor, and this hub has grown a
+    /// field since the copy was made.
     pub fn with_typing_ttl(ttl: Duration) -> Self {
-        let (sender, _receiver) = broadcast::channel(CHANNEL_CAPACITY);
         Self {
-            sender,
-            slots: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
-            presence: PresenceTracker::new(),
             typing: TypingTracker::with_ttl(ttl),
-            permissions_epoch: Arc::new(AtomicU64::new(0)),
+            ..Self::new()
         }
     }
 
