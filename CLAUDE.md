@@ -888,12 +888,13 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 
 ## Open items that need the owner
 
-- **Rebuild `messages` on an explicit rowid alias, with somebody watching the deploy (2026-07-30).**
-  `messages_fts` uses `content_rowid='rowid'` and `messages` has `PRIMARY KEY (channel_id, seq)` with no `INTEGER PRIMARY KEY`, so VACUUM is free to renumber underneath the index.
-  That is the exact licence `0015_canvas_rtree.sql` refused for the R-Tree and then did not extend to FTS, and `VACUUM INTO` is the Phase 9 backup mechanism, so the first place it lands is a backup nobody reads until a restore.
-  It is latent rather than live: nothing runs VACUUM today, and because messages are only soft-deleted the rowid sequence is gapless, so a VACUUM would in practice reassign the same numbers.
-  **Deliberately not done autonomously**, which is the part worth recording. The fix is a full table rebuild (STRICT tables cannot `ALTER` into a rowid alias) on a table holding real messages, with foreign keys and FTS triggers hanging off it, and the live instance auto-updates from `latest` through Watchtower - so merging it runs a data migration on the owner's own Space unattended.
-  The cost of waiting is that the rebuild gets more expensive as the table grows; the cost of not waiting is a silent wrong-rows migration nobody is watching. Do it before the Phase 9 backup work is written, with a person present.
+- ~~**Rebuild `messages` on an explicit rowid alias, with somebody watching the deploy.**~~
+  Done 2026-07-30, once the owner authorised it: migration `0024_messages_rowid_alias.sql` gives `messages` an `fts_rowid INTEGER PRIMARY KEY` and re-keys `messages_fts` on it.
+  Two things in the entry that stood here were wrong and are worth recording rather than deleting, because both were reasons to defer that did not survive being checked.
+  It claimed the danger was latent because "messages are only soft-deleted, so the rowid sequence is gapless".
+  The gapless part is true (nothing hard-deletes `messages`, `channels` or `users`, so no cascade reaches it) but it is not why it was latent: SQLite only takes the renumbering branch for a table with no indices at all, and `messages` carries four, so a plain VACUUM leaves its rowids alone regardless of gaps. `VACUUM INTO` never renumbers at all, which the earlier note had backwards.
+  So this was never a repair, it was withdrawing a licence SQLite reserves and does not currently exercise, which is the same argument `0015_canvas_rtree.sql` made for the R-Tree.
+
 - **Deploy the invite gate.** The live instance at `https://slim.npc-server.top` still accepts anonymous registration and will until it runs a build containing the gate. Watchtower tracks `latest`, so cutting a release is what closes it; nothing else needs doing on the host.
 - **Watch the next release PR.** `release-please-config.json` gained the `cargo-workspace` plugin so a version bump also updates `Cargo.lock`, which the new `--locked` builds require. That is the one change in the audit pass that could not be verified locally, and its failure mode is a red release PR, not a bad release.
 - **`bump-minor-pre-major` is why the server stays on 0.x.** PR #42 landed as `feat!` (registration genuinely changed behaviour for a claimed deployment), and release-please read the breaking marker on a 0.x project as "go to 1.0.0" and opened exactly that PR. It was closed unmerged. The flag makes a breaking change bump the minor while under 1.0, so that reads 0.9.0 instead. 1.0 is a Phase 9 deliverable and the product is not even named yet (owner decision 9), so nothing should reach it by accident.
