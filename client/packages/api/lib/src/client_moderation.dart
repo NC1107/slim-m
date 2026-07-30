@@ -18,10 +18,11 @@ extension SlimmApiModeration on SlimmApi {
       if (after != null) 'after': '$after',
       if (limit != null) 'limit': '$limit',
     };
-    final path = query.isEmpty
-        ? '/reports'
-        : '/reports?${Uri(queryParameters: query).query}';
-    final json = await _send('GET', path);
+    final json = await _send(
+      'GET',
+      '/reports',
+      query: query.isEmpty ? null : query,
+    );
     return (json as List<dynamic>)
         .map((r) => Report.fromJson(r as Map<String, dynamic>))
         .toList(growable: false);
