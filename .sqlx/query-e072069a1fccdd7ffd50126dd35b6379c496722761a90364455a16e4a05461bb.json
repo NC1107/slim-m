@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT m.id AS \"id!: MessageId\", m.channel_id AS \"channel_id!: ChannelId\",\n                      m.author_id AS \"author_id: UserId\",\n                      u.display_name AS \"author_display_name?: String\",\n                      m.seq AS \"seq!: Seq\",\n                      m.content AS \"content!\", m.created_at AS \"created_at!\", m.edited_at\n               FROM messages_fts\n               JOIN messages m ON m.rowid = messages_fts.rowid\n               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL\n               WHERE messages_fts MATCH ?\n                 AND m.channel_id = ?\n                 AND m.deleted_at IS NULL\n                 AND m.seq < ?\n               ORDER BY m.seq DESC\n               LIMIT ?",
+  "query": "SELECT m.id AS \"id!: MessageId\", m.channel_id AS \"channel_id!: ChannelId\",\n                      m.author_id AS \"author_id: UserId\",\n                      u.display_name AS \"author_display_name?: String\",\n                      m.seq AS \"seq!: Seq\",\n                      m.content AS \"content!\", m.created_at AS \"created_at!\", m.edited_at\n               FROM messages_fts\n               JOIN messages m ON m.fts_rowid = messages_fts.rowid\n               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL\n               WHERE messages_fts MATCH ?\n                 AND m.channel_id = ?\n                 AND m.deleted_at IS NULL\n                 AND m.seq < ?\n               ORDER BY m.seq DESC\n               LIMIT ?",
   "describe": {
     "columns": [
       {
@@ -58,5 +58,5 @@
       true
     ]
   },
-  "hash": "41be97f9c017ae21d053e6b46c712dc024e6d14d2f5e54526093663e2e1a7511"
+  "hash": "e072069a1fccdd7ffd50126dd35b6379c496722761a90364455a16e4a05461bb"
 }

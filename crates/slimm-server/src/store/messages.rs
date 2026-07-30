@@ -360,7 +360,7 @@ impl Store {
                       m.seq AS "seq!: Seq",
                       m.content AS "content!", m.created_at AS "created_at!", m.edited_at
                FROM messages_fts
-               JOIN messages m ON m.rowid = messages_fts.rowid
+               JOIN messages m ON m.fts_rowid = messages_fts.rowid
                LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
                WHERE messages_fts MATCH ?
                  AND m.channel_id = ?
