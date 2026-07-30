@@ -5,8 +5,9 @@ part of 'client.dart';
 ///
 /// Every typed method in every other part of [SlimmApi] is a wrapper over
 /// [SlimmApi._send] or [SlimmApi._fetchBytes], which is why the one-shot
-/// refresh-and-replay and the status-to-exception mapping are written once,
-/// here, rather than per endpoint.
+/// refresh-and-replay, the status-to-exception mapping, and turning a path
+/// built from a wire-supplied value into a safe request [Uri] are all
+/// written once, here, rather than per endpoint.
 extension SlimmApiTransport on SlimmApi {
   Future<Object?> _send(
     String method,
@@ -18,7 +19,7 @@ extension SlimmApiTransport on SlimmApi {
     bool expectNoContent = false,
     bool isRetry = false,
   }) async {
-    final uri = baseUrl.replace(path: path, queryParameters: query);
+    final uri = _requestUri(path, query);
     final request = http.Request(method, uri);
     if (bytes != null) {
       // An upload (an attachment or an avatar): the request body is the raw
@@ -73,7 +74,8 @@ extension SlimmApiTransport on SlimmApi {
         return jsonDecode(response.body) as Object;
       } catch (e) {
         throw TransportException(
-            'could not decode the reply to $method $path: $e');
+          'could not decode the reply to $method $path: $e',
+        );
       }
     }
     throw _errorFor(response);
@@ -84,7 +86,7 @@ extension SlimmApiTransport on SlimmApi {
   /// refresh-and-retry and error mapping, without a JSON decode that would
   /// only fail on a body that was never JSON to begin with.
   Future<FetchedBytes> _fetchBytes(String path, {bool isRetry = false}) async {
-    final uri = baseUrl.replace(path: path);
+    final uri = _requestUri(path, null);
     final request = http.Request('GET', uri);
     final token = session.tokens?.accessToken;
     if (token == null) {
@@ -114,6 +116,30 @@ extension SlimmApiTransport on SlimmApi {
     throw _errorFor(response);
   }
 
+  /// Turns an already-interpolated [path] (e.g.
+  /// `/messages/$messageId/reactions/$emoji`) into a request [Uri] without
+  /// letting a wire-supplied value decide which resource it reaches.
+  ///
+  /// [Uri.replace]'s `path` parameter resolves `.`/`..` segments per RFC
+  /// 3986, including a percent-encoded pair (`%2e%2e` reads the same as
+  /// `..`), so a value this file did not choose - an emoji string, say -
+  /// can walk the request off the endpoint that built it. Splitting on the
+  /// literal `/` this file wrote and handing the pieces to `pathSegments`
+  /// closes that for every segment: each piece is then one opaque value,
+  /// so an embedded `/`, `%`, or non-ASCII byte in it can never introduce a
+  /// new separator. `pathSegments` still resolves a piece that is *exactly*
+  /// `.` or `..` the same way `path` does, so [_withoutDotSegment] escapes
+  /// only those two literal values; every other segment renders exactly as
+  /// `pathSegments` already renders it today.
+  Uri _requestUri(String path, Map<String, String>? query) {
+    final parts = path.split('/');
+    final segments =
+        (parts.isNotEmpty && parts.first.isEmpty ? parts.skip(1) : parts)
+            .map(_withoutDotSegment)
+            .toList(growable: false);
+    return baseUrl.replace(pathSegments: segments, queryParameters: query);
+  }
+
   ApiException _errorFor(http.Response response) {
     var reason = 'request failed';
     try {
@@ -137,3 +163,11 @@ extension SlimmApiTransport on SlimmApi {
     };
   }
 }
+
+/// `.` and `..` are the only two path segments [Uri] resolves away per RFC
+/// 3986, even when a segment arrives through `pathSegments` rather than a
+/// raw `path` string; escaping just their dots leaves every other segment
+/// exactly as `pathSegments` already renders it.
+String _withoutDotSegment(String segment) => (segment == '.' || segment == '..')
+    ? segment.replaceAll('.', '%2E')
+    : segment;
