@@ -30,6 +30,7 @@ use super::error::ApiError;
 use super::escalation::escalation_guard;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
+use super::safety::validate_reason;
 use crate::hub::Event;
 use crate::ids::UserId;
 use crate::permissions::Permissions;
@@ -132,14 +133,10 @@ async fn apply_timeout(
         .ok_or(ApiError::BadRequest("duration is longer than 28 days"))?;
     let until = now_ms() + duration_ms;
 
-    let reason = req
-        .reason
-        .as_deref()
-        .map(str::trim)
-        .filter(|r| !r.is_empty());
+    let reason = validate_reason(req.reason.as_deref(), false)?;
     state
         .store
-        .set_member_timeout(target, until, reason, ctx.user_id)
+        .set_member_timeout(target, until, reason.as_deref(), ctx.user_id)
         .await?;
     state.hub.publish(Event::MemberTimeoutChanged {
         user_id: target,
@@ -191,14 +188,10 @@ async fn remove_member(
     let target = UserId(parse_uuid(&user_id)?);
     authorize(&state, ctx.user_id, target, Permissions::BAN_MEMBERS).await?;
 
-    let reason = req
-        .reason
-        .as_deref()
-        .map(str::trim)
-        .filter(|r| !r.is_empty());
+    let reason = validate_reason(req.reason.as_deref(), false)?;
     let revoked = match state
         .store
-        .remove_from_space(target, ctx.user_id, reason)
+        .remove_from_space(target, ctx.user_id, reason.as_deref())
         .await
     {
         Ok(revoked) => revoked,

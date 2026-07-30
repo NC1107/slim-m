@@ -202,6 +202,37 @@ A file that did not fit leaves nothing behind: both the limit and the name are c
 The command exits non-zero if any file in the directory did not end up as an emoji, so a script notices, and the report above it says which files and why.
 A pack folder with a `README` or a `LICENSE` in it will therefore exit non-zero on a run that was otherwise fine, with those files named as the reason.
 
+## Storage, and the ceiling you should set
+
+Attachments and custom emoji are files under the media volume, not rows in the database.
+There is no per-account quota and there is no ceiling unless you set one:
+
+```
+SLIMM_MAX_TOTAL_ATTACHMENT_BYTES=2147483648
+```
+
+That is 2 GiB, which the `.env.example` in this directory ships with.
+Set it from the volume you actually gave the stack, leaving room for the database to grow.
+
+The default is no ceiling, and that is deliberate rather than an oversight: the right number is the size of your disk, and a guess would either refuse a legitimate upload on a large volume or do nothing on a small one.
+Leaving it unset is a supported choice if you would rather watch the volume yourself.
+
+Two things worth knowing about what it does and does not cover.
+
+**It counts attachments and custom emoji, not avatars.**
+An avatar is one file per account, overwritten in place, so the total is already bounded by your member count times 2 MiB and no upload can grow it.
+They are not rows in the table the ceiling sums, so counting them would need a second mechanism to bound something already bounded.
+
+**Past the ceiling an upload is refused with 507, not 413.**
+That distinction exists so a screenshot tells you whose problem it is: a 413 means the sender's file is over the per-upload limit and they should send a smaller one, and a 507 means the volume is full and it is yours.
+The refusal happens before any bytes are written, so nothing is left behind to clean up.
+
+An uploaded file that never gets attached to a message is reclaimed by a sweep that runs hourly, two hours after the upload.
+A deployment sitting at its ceiling therefore recovers as that sweep works through the backlog, and refuses uploads until it does.
+
+Related, and stated elsewhere in this file but worth repeating here: **Litestream replicates the database only.**
+A restore gives you messages and their attachment references, not these bytes. Back the media volume up separately.
+
 ## Rate limiting, and the one setting you need behind a proxy
 
 The server limits requests per caller with token buckets.

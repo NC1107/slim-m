@@ -262,6 +262,22 @@ impl Store {
             .map(|r| crate::media::to_hex(&r.sha256))
             .collect())
     }
+
+    /// Bytes currently held in stored attachments, custom emoji included, since
+    /// both are rows in this table.
+    ///
+    /// Summed rather than tracked in a counter: a counter is a second source of
+    /// truth the orphan sweep, account deletion and every failed write would
+    /// each have to remember to keep in step, and the table this scans is
+    /// bounded by the very ceiling the sum is checked against.
+    pub async fn total_attachment_bytes(&self) -> anyhow::Result<i64> {
+        let total = sqlx::query_scalar!(
+            r#"SELECT COALESCE(SUM(size), 0) AS "total!: i64" FROM attachments"#
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(total)
+    }
 }
 
 /// Links already-uploaded attachments to a message inside the caller's

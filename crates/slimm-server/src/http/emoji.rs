@@ -96,6 +96,7 @@ async fn upload(
     enforce(&state, &parts, Some(&ctx), Class::Upload)?;
     require_manage_server(&state, &ctx).await?;
 
+    super::attachments::room_for(&state, body.len() as i64).await?;
     let created = emoji::add_emoji(
         &state.store,
         &state.media,
