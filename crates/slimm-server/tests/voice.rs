@@ -371,6 +371,8 @@ async fn kicking_needs_kick_members_in_that_channel() {
     );
 }
 
+// See tests/voice_kick_escalation.rs: kick above your own level, per channel.
+
 /// A text-only deployment answers plainly enough for a client to hide the
 /// control, rather than failing as though something went wrong.
 #[tokio::test]

@@ -12,6 +12,15 @@
 //! deployment always keeps at least one administrator, lives in
 //! [`crate::store::roles`] because it has to see every caller at once, not
 //! just this request's.
+//!
+//! A role is also revocable, patchable and deletable, and those three used to
+//! carry none of the above: a MANAGE_ROLES holder could strip ADMINISTRATOR
+//! from a role no `grantable` check ever ran against, because nothing looked
+//! at what the role already held before the write, only at what the request
+//! asked for. `unassign` is phrased symmetrically with `assign` - the same
+//! [`super::escalation::escalation_guard`] call, before revoking rather than
+//! granting - and `update`/`delete` run it against the role's own current
+//! bits, since a role has no user to check instead.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
@@ -22,6 +31,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
+use super::escalation::escalation_guard;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
 use crate::ids::{RoleId, UserId};
@@ -130,6 +140,14 @@ async fn update(
         return Err(ApiError::BadRequest("nothing to update"));
     }
 
+    // Read before the write, against granted permissions; see `escalation`.
+    if let Some(current) = state.store.role(role_id).await? {
+        escalation_guard(
+            caller_granted(&state, ctx.user_id).await?,
+            current.permissions,
+        )?;
+    }
+
     match state.store.update_role(role_id, name, permissions).await {
         Ok(Some(role)) => Ok(Json(role.into())),
         Ok(None) => Err(ApiError::NotFound("role not found")),
@@ -151,6 +169,14 @@ async fn delete(
     require_manage_roles(&state, ctx.user_id).await?;
     let role_id = RoleId(parse_uuid(&role_id)?);
 
+    // Read before the mutating write; see `update`'s identical note.
+    if let Some(current) = state.store.role(role_id).await? {
+        escalation_guard(
+            caller_granted(&state, ctx.user_id).await?,
+            current.permissions,
+        )?;
+    }
+
     match state.store.delete_role(role_id).await {
         Ok(Some(())) => Ok(StatusCode::NO_CONTENT),
         Ok(None) => Err(ApiError::NotFound("role not found")),
@@ -170,7 +196,7 @@ async fn assign(
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    let caller_permissions = require_manage_roles(&state, ctx.user_id).await?;
+    require_manage_roles(&state, ctx.user_id).await?;
     let user_id = UserId(parse_uuid(&user_id)?);
     let role_id = RoleId(parse_uuid(&role_id)?);
 
@@ -179,9 +205,7 @@ async fn assign(
         .role(role_id)
         .await?
         .ok_or(ApiError::NotFound("role not found"))?;
-    if !caller_permissions.contains(role.permissions) {
-        return Err(ApiError::Forbidden);
-    }
+    escalation_guard(caller_granted(&state, ctx.user_id).await?, role.permissions)?;
 
     state.store.assign_role(user_id, role_id).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -189,6 +213,11 @@ async fn assign(
 
 /// Revokes a role from a member. Idempotent, and refused if it would leave
 /// the deployment with no administrator.
+///
+/// Phrased symmetrically with [`assign`]: the same guard, against the same
+/// role bits, before revoking rather than granting. A missing role skips the
+/// check rather than 404ing, matching this route's existing idempotency -
+/// there is nothing to revoke and so nothing to escalate.
 async fn unassign(
     Authed(ctx): Authed,
     parts: Parts,
@@ -200,6 +229,10 @@ async fn unassign(
     let user_id = UserId(parse_uuid(&user_id)?);
     let role_id = RoleId(parse_uuid(&role_id)?);
 
+    if let Some(role) = state.store.role(role_id).await? {
+        escalation_guard(caller_granted(&state, ctx.user_id).await?, role.permissions)?;
+    }
+
     match state.store.unassign_role(user_id, role_id).await {
         Ok(()) => Ok(StatusCode::NO_CONTENT),
         Err(guard_err) => Err(role_guard_error(guard_err)),
@@ -209,8 +242,27 @@ async fn unassign(
 // --- Shared checks ---
 
 /// Requires MANAGE_ROLES at the deployment level and returns the caller's
-/// full base permission set, so the handler can reuse it for the escalation
-/// check without a second lookup.
+/// full base permission set, so `grantable` can reuse it without a second
+/// lookup.
+///
+/// This is the *effective* set, which is what a verb gate wants: a moderator
+/// under a subtraction should not be managing roles while it is in force.
+/// The level comparison is a different question and reads
+/// [`caller_granted`] instead - the same split
+/// [`super::members::authorize`] makes, and for the same reason.
+/// The caller's granted (unmasked) permissions, for
+/// [`escalation_guard`]'s side of the comparison only.
+///
+/// Separate from [`require_manage_roles`] deliberately, so the two questions
+/// stay two questions: whether the caller may act at all is effective, and
+/// whether they may act on *this* is granted. Reading the effective set here
+/// would be identical today, since nothing in `TIMEOUT_DENY` touches a
+/// role-management bit - and would silently become a hole the moment something
+/// did.
+async fn caller_granted(state: &AppState, user_id: UserId) -> Result<Permissions, ApiError> {
+    Ok(state.store.granted_base_permissions(user_id).await?)
+}
+
 async fn require_manage_roles(state: &AppState, user_id: UserId) -> Result<Permissions, ApiError> {
     let permissions = state.store.base_permissions(user_id).await?;
     if !permissions.contains(Permissions::MANAGE_ROLES) {

@@ -31,6 +31,7 @@ mod channels;
 mod dms;
 mod emoji;
 mod error;
+mod escalation;
 mod extract;
 mod invites;
 mod members;

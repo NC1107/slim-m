@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
+use super::escalation::escalation_guard;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
@@ -282,10 +283,7 @@ async fn authorize(
 
     let caller_granted = state.store.granted_base_permissions(caller).await?;
     let target_granted = state.store.granted_base_permissions(target).await?;
-    if !caller_granted.contains(target_granted) {
-        return Err(ApiError::Forbidden);
-    }
-    Ok(())
+    escalation_guard(caller_granted, target_granted)
 }
 
 /// Drops a member from every voice room, best effort.
