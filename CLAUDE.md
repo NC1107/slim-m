@@ -63,6 +63,44 @@ Three smaller traps this hit:
 - **Both hygiene gates enumerate `git ls-files`, so untracked new files are invisible to them.** A local run before the first commit passes and CI then fails on the same tree. Stage before trusting either gate.
 - **`scripts/check-comment-cap.sh` was counting Rust `//!` module docs as plain comments**, though its own header exempts them: the awk matched `//` followed by anything that is not `/`. Nothing caught it because the allowlist had been calibrated against the wrong number. Fixed, and the allowlist regenerated at the true counts, which cleared 46 files outright and lowered 98.
 
+## Blocking, and the two halves of it a client cannot do (2026-07-30)
+
+The 2026-07-30 audit's only finding where the product stated a protection that did not exist.
+`blocksProvider` had three references, all inside `personal_account_sections.dart`, and it was `autoDispose`, so the block list was alive only while the settings pane listing it was mounted.
+Outside that pane nothing filtered anything, while a successful block answered "Blocked. Their messages are hidden for you."
+The server delegated on purpose - `store/safety.rs` said "the client filters with this rather than the server stripping messages" - to a client that did not filter.
+
+**The filter is at read time, never at fetch time, and that is the load-bearing choice.**
+A blocked author's messages still arrive and still land in the local database; they are dropped where they would become UI.
+Filtering `/sync` instead would mean they never arrive, and since `/sync` filters purely by `seq`, only a full channel reset could ever bring them back - so "unblocking restores their messages" would become false.
+`visibleChannelMessagesProvider` is the one stream `ChannelScreen` can get at, so the filter is a property of the data rather than a `where` clause somebody has to remember per render site.
+`blocksProvider` is session-warm (not `autoDispose`), watched at the shell so it loads with the app, and it empties on sign-out - the local database is one file for the whole app, so a block set outliving a sign-out would silently hide messages from whoever signed in next on the device.
+
+**Read state must keep counting a blocked author.**
+Their message is hidden, not unreceived.
+`VisibleTranscript.newestSeq` is computed before the filter for exactly this reason: a marker advancing only past what is shown leaves a channel lit as unread forever the moment a blocked person has the last word, with nothing in the API able to clear it.
+
+**Two surfaces are out of the client's reach and are handled server-side, per viewer.**
+Reaction counts carry no reactor ids on the wire, by design, so there is nothing client-side to match on; `reactions_for_messages` already took the viewer, so excluding blocked reactors is one predicate, and an emoji whose only reactors are blocked is absent rather than sitting at zero.
+Push reaches the device before any filter runs, and a phone buzzing for a message the app then hides is worse than no filtering, since it reports exactly when the blocked person spoke; `push::message_recipients` is a named function now rather than three steps inside a fire-and-forget task, because it is the whole security decision and a task reporting to nothing but the log cannot be tested.
+Both stay view choices rather than moderation actions: nothing is removed for anybody else and the blocked user is never told.
+Migration 0022 indexes `user_blocks(blocked_id)`, since the reverse lookup runs on the message write path.
+
+**A `StreamProvider` body must return the stream, not `yield*` it.**
+Cancelling an `async*` generator that delegates to a drift query stream deadlocks a widget test: drift defers a cancelled stream's cleanup onto a zero-duration timer, and the fake clock only advances on the next pump, which never comes.
+The symptom is the test hanging until the harness kills it and flutter_tools crashing with "Cannot close sink while adding stream", which names nothing relevant.
+Mapping the stream directly has none of that and is shorter.
+
+Also done here: report and block existed twice, once per subject kind, with byte-identical copy in `member_actions.dart` and `channel_message_actions.dart`; they are one implementation in `widgets/safety_actions.dart` with two call sites now.
+The blocked list rendered raw 36-character uuids where names belong (it reads as corruption, and two of them cannot be told apart) and resolves through `userProfileProvider`.
+`unblockUser` threw out of an async `onPressed` with no `try`, so a failure reached nobody.
+The member popover offers Unblock rather than Block for somebody already blocked, since offering Block again reads as the block having failed.
+And the copy says only what is true: messages, reactions and typing go, notifications stop, and the person stays in the member list.
+
+Known rough edge, left deliberately (2026-07-30): an existing DM with somebody you then block stays in the rail and opens as an empty transcript with no explanation.
+It is already frozen server-side (`store/dms.rs` denies SEND, ADD_REACTIONS and ATTACH_FILES in both directions), so nothing new can arrive; what is missing is the client saying so instead of rendering a blank channel.
+Presence and the member row are also unfiltered on purpose - hiding somebody from the roster would make the member count wrong and take away the row the unblock lives on.
+
 ## The nine-specialist audit, and seeing a shared screen (2026-07-29)
 
 Nine parallel specialist reviews (five code, four screenshot) over the running product; the consolidated report with everything found, fixed, and deliberately deferred is [docs/research/nine-specialist-audit-2026-07-29.md](docs/research/nine-specialist-audit-2026-07-29.md).
@@ -385,7 +423,7 @@ Confirmed bugs from this pass, in the order found:
 
 Confirmed but not fixed, still real:
 
-- **No UI ever called `SlimmApi.report` or `blockUser`.** The endpoints, wire model, and an admin triage screen all existed with zero call sites in `packages/app`. A concurrent, unrelated change landed in this same working tree while this pass was running and closed it (`report_dialog.dart`, `context_menu_region.dart`, wired into both the message context menu and the member row); it was not this pass's work, so it is not itemised above, but a future contributor should know the gap this pass found is already closed. Its own regression test (`message_row_test.dart`) was missing a `pumpAndSettle` between closing the menu and reopening it for the second tap, which failed the gate deterministically rather than flakily; fixed in the same run, no app code changed.
+- ~~**No UI ever called `SlimmApi.report` or `blockUser`.**~~ Closed, but read the blocking section below before trusting the closure: wiring the call up was not the same as blocking working, and it took until 2026-07-30 to notice. The endpoints, wire model, and an admin triage screen all existed with zero call sites in `packages/app`. A concurrent, unrelated change landed in this same working tree while this pass was running and closed it (`report_dialog.dart`, `context_menu_region.dart`, wired into both the message context menu and the member row); it was not this pass's work, so it is not itemised above, but a future contributor should know the gap this pass found is already closed. Its own regression test (`message_row_test.dart`) was missing a `pumpAndSettle` between closing the menu and reopening it for the second tap, which failed the gate deterministically rather than flakily; fixed in the same run, no app code changed.
 - ~~**`ContextMenuRegion` repeats the same missing-`Positioned` mistake.**~~ Stale, checked 2026-07-28: the `overlayChildBuilder` in `context_menu_region.dart` wraps its follower in `Positioned` and carries a comment saying why.
 - ~~**The server-menu chevron opens a blank, full-viewport overlay.**~~ Stale, checked 2026-07-28 by opening it on a live web build: the Space menu opens correctly and its items are reachable.
 - **A context menu is unreachable by keyboard, though not by a screen reader.** `ContextMenuRegion` and `MessageContextMenuRegion` open on `onSecondaryTapDown` or `onLongPress` only. An earlier version of this note claimed that left them with no semantic action either; that was wrong, checked 2026-07-28: `GestureDetector` publishes `SemanticsAction.longPress` for its own `onLongPress`, so VoiceOver and TalkBack have always been able to open these, and `context_menu_reachability_test.dart` now guards that, since it is a side effect of one widget choice and a `Listener` or `excludeFromSemantics` would remove it silently. What is genuinely missing is the keyboard: the rows do not take focus and no key opens the menu, so report, block, edit, delete and pin have no keyboard route. The e2e harness cannot drive them either, for a different reason - it dispatches DOM events rather than semantic actions - so `scripts/lib/e2e_admin.py` covers report and block at the API and says so.

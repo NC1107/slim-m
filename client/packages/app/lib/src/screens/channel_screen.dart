@@ -18,6 +18,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../ids.dart';
 import '../providers/admin_providers.dart';
+import '../providers/blocks_controller.dart';
 import '../providers/channel_search_controller.dart';
 import '../providers/emoji_catalog_provider.dart';
 import '../providers/member_presence.dart';
@@ -183,27 +184,21 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   void _toggleSearch() =>
       ref.read(channelSearchProvider(widget.channelId).notifier).toggle();
 
-  /// Advances the read marker to the newest message actually rendered.
+  /// Advances the read marker to `seq`, the newest delivered message in the
+  /// channel ([VisibleTranscript.newestSeq]).
   ///
-  /// Pending sends are skipped: they carry seq 0 until the server
+  /// Pending sends are excluded there: they carry seq 0 until the server
   /// acknowledges them, so treating one as "read" would either no-op or,
   /// once the real send lands with its assigned seq, immediately look
-  /// unread again for a message the user already sees on screen.
+  /// unread again for a message the user already sees on screen. A blocked
+  /// author's message counts, for the reason that field records.
   ///
   /// The local write and the network call are both monotonic and idempotent
   /// (`MessageStore.setReadMarker`, the server's `PUT .../read`), so a
   /// redundant call is harmless; [_markedReadSeq] exists only to keep a busy
   /// channel from re-sending the same seq on every unrelated rebuild.
-  void _markReadUpToLatest(List<Message> messages, int lastReadSeq) {
-    Message? newest;
-    for (final message in messages.reversed) {
-      if (!message.pending) {
-        newest = message;
-        break;
-      }
-    }
-    if (newest == null) return;
-    final seq = newest.seq;
+  void _markReadUpToLatest(int seq, int lastReadSeq) {
+    if (seq == 0) return;
     if (seq <= lastReadSeq) return;
     if ((_markedReadSeq[widget.channelId] ?? 0) >= seq) return;
     _markedReadSeq[widget.channelId] = seq;
@@ -254,6 +249,11 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
           orElse: () => const <String>{},
         );
     final customEmoji = ref.watch(customEmojiIndexProvider);
+    final transcript =
+        ref
+            .watch(visibleChannelMessagesProvider(widget.channelId))
+            .valueOrNull ??
+        const VisibleTranscript(messages: [], newestSeq: 0);
     final extrasById = ref.watch(messageExtrasProvider);
     final syncStatus = ref.watch(syncControllerProvider);
     final myId = ref.watch(meProvider).valueOrNull?.id;
@@ -277,6 +277,11 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               .cast<Channel?>()
               .firstOrNull;
           final channelName = channel?.name ?? '';
+          final lastReadSeq = channel?.lastReadSeq ?? 0;
+          // Not while search stands in: the newest message is not on screen.
+          if (search.query == null) {
+            _markReadUpToLatest(transcript.newestSeq, lastReadSeq);
+          }
 
           return Column(
             children: [
@@ -310,52 +315,43 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                           forbidden: search.forbidden,
                           onRetry: () => _search(search.query!),
                         )
-                      : StreamBuilder<List<Message>>(
-                          stream: store.watchChannel(widget.channelId),
-                          builder: (context, snapshot) {
-                            final messages = snapshot.data ?? const <Message>[];
-                            final lastReadSeq = channel?.lastReadSeq ?? 0;
-                            _markReadUpToLatest(messages, lastReadSeq);
-                            return MessageTranscript(
-                              messages: messages,
-                              syncStatus: syncStatus,
-                              // Only a real named channel gets the header; a DM's name is a person, and voice never reaches here.
-                              channelName: channel?.kind == 'text'
-                                  ? channelName
-                                  : null,
-                              channelTopic: channel?.topic,
-                              scrollController: _scroll,
-                              lastReadSeq: lastReadSeq,
-                              editingId: _editingId,
-                              knownUsernames: knownUsernames,
-                              customEmoji: customEmoji,
-                              extrasById: extrasById,
-                              actionsFor: (message) => _actionsFor(
-                                message,
-                                myId: myId,
-                                myPermissions: myPermissions,
-                                pinnedIds: pinnedIds,
-                              ),
-                              onRetry: (m) => unawaited(retryMessage(ref, m)),
-                              onDiscard: (m) =>
-                                  unawaited(discardMessage(ref, m)),
-                              // Failed text lands back in the composer to fix
-                              // and resend; the failed row is then discarded,
-                              // so nothing the user wrote is ever lost.
-                              onEditFailed: (m) {
-                                _composer.text = m.content;
-                                unawaited(discardMessage(ref, m));
-                              },
-                              onPickReaction: (m, emoji) =>
-                                  unawaited(_pickReaction(m, emoji)),
-                              onReactionTap: (m, reaction) =>
-                                  unawaited(_toggleReaction(m, reaction)),
-                              onVote: (m, option) =>
-                                  unawaited(castVote(ref, m.id, option)),
-                              onSubmitEdit: _submitEdit,
-                              onCancelEdit: _cancelEdit,
-                            );
+                      : MessageTranscript(
+                          messages: transcript.messages,
+                          syncStatus: syncStatus,
+                          // Only a real named channel gets the header; a DM's name is a person, and voice never reaches here.
+                          channelName: channel?.kind == 'text'
+                              ? channelName
+                              : null,
+                          channelTopic: channel?.topic,
+                          scrollController: _scroll,
+                          lastReadSeq: lastReadSeq,
+                          editingId: _editingId,
+                          knownUsernames: knownUsernames,
+                          customEmoji: customEmoji,
+                          extrasById: extrasById,
+                          actionsFor: (message) => _actionsFor(
+                            message,
+                            myId: myId,
+                            myPermissions: myPermissions,
+                            pinnedIds: pinnedIds,
+                          ),
+                          onRetry: (m) => unawaited(retryMessage(ref, m)),
+                          onDiscard: (m) => unawaited(discardMessage(ref, m)),
+                          // Failed text lands back in the composer to fix
+                          // and resend; the failed row is then discarded,
+                          // so nothing the user wrote is ever lost.
+                          onEditFailed: (m) {
+                            _composer.text = m.content;
+                            unawaited(discardMessage(ref, m));
                           },
+                          onPickReaction: (m, emoji) =>
+                              unawaited(_pickReaction(m, emoji)),
+                          onReactionTap: (m, reaction) =>
+                              unawaited(_toggleReaction(m, reaction)),
+                          onVote: (m, option) =>
+                              unawaited(castVote(ref, m.id, option)),
+                          onSubmitEdit: _submitEdit,
+                          onCancelEdit: _cancelEdit,
                         ),
                 ),
               ),

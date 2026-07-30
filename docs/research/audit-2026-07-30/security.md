@@ -25,6 +25,7 @@ It also fires by accident when a small group signs in together.
 The limiter's own fail-closed `MAX_BUCKETS` path and the Argon2 semaphore both sit behind this key, so nothing downstream mitigates it.
 
 Shape: a real per-IP limit in the shipped proxy config, plus an explicit opt-in trust decision in the shape the relay already uses (`RELAY_TRUST_PROXY`), defaulting off so a directly-exposed server keeps the safe peer-address behaviour.
+**Closed 2026-07-30, PR #145**, with one correction to the shape above: Caddy has no built-in `rate_limit` directive, so "a real per-IP limit in the shipped proxy config" is not available without a third-party module and a custom build, and the fix had to be server-side. `SLIMM_TRUST_PROXY_HOPS` defaults to 0, and a non-zero value reads `X-Forwarded-For` from the right, which is what a client-supplied prefix cannot reach.
 
 ### 2. The HTTP surface has no request timeout and no connection cap - high
 
@@ -44,6 +45,7 @@ Disk is still protected (the write happens after both gates, and `DefaultBodyLim
 What is not protected is memory and bandwidth for a caller who is over budget or holds no ATTACH_FILES bit at all.
 
 Shape: give the HTTP surface the bounds the socket surface already has, and move the upload charge into a `FromRequestParts` extractor so it runs before the body is read - the trick `RateLimited<C>` already uses.
+**Closed 2026-07-30, PR #145**, both halves, plus the eight uncharged routes: `AuthedLimited<C>` declares the class in the signature so "charges nothing" is visible to a reviewer, and `class_of` is exhaustive so a new class cannot silently inherit a looser budget.
 
 ## Safety features that do not do what the UI says they do
 
@@ -65,6 +67,7 @@ The harmed party is the user who blocked someone, and the mechanism is that they
 This is worse than an unimplemented feature: the capability handshake advertises the deployment as offering block, and `docs/ROADMAP.md:117` records the Phase 2 criterion as met, so nothing in the project's own record would catch it.
 
 Shape: a block-list provider that outlives the settings pane, filtering at read time where server content becomes UI, and if any surface is deliberately left unfiltered, saying so in the copy instead of the blanket claim.
+**Closed 2026-07-30, PR #146**, in that shape, with two additions the shape did not anticipate. Reaction tallies and push cannot be filtered client-side at all - the wire carries a reaction count with no reactor ids, by design, and a notification is on the device before any filter runs - so both are filtered server-side per viewer, which keeps them view choices rather than moderation actions. And read state has to keep counting a blocked author, or a channel whose newest message came from one stays lit as unread forever. Presence and the member row are the surfaces left deliberately unfiltered, and the copy now names them.
 
 ### 4. Sign-in shows a tick for any server that returns an identity object, which is not what the widget says the tick means - medium
 
@@ -298,6 +301,8 @@ Every attempt with a garbage code costs 19 MiB and one of only four Argon2 permi
 `register` in the neighbouring module deliberately gets this right and says so in its doc comment (`auth.rs:99`), so the ordering rule already exists in this codebase and this route does not follow it.
 Low on its own - the code is 256 bits, the acquire timeout bounds permit hold time, and the Password bucket throttles it - but that bucket is global behind the shipped proxy, so finding 1 and this one together mean a handful of requests can saturate the permits legitimate logins need.
 There is no timing argument against reordering, since the endpoint answers unknown, expired and used identically anyway.
+
+**Closed 2026-07-30, PR #145**, with one correction: there *is* a timing argument, just not a blocking one. A live code now answers visibly slower than a dead one, where before both paid the hash. That distinguisher is acceptable because a code is 256 bits, so anybody who can read it already had to guess a live code, and `recovery.rs` says so rather than glossing it. The answer itself stays uniform across unknown, expired and used.
 
 ### 16. Moderation reason fields carry no length cap while the report reason does - low
 
