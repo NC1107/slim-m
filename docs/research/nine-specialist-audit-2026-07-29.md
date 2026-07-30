@@ -85,7 +85,9 @@ What was real, and fixed:
 - Channel-row kebabs reveal on hover or focus with a pointer (semantics stay present while invisible - the first attempt dropped them and a test caught it); touch keeps them visible.
 
 Its gap list, corrected: the fingerprint step, DM conversation view, message context menu, search, pins sheet and polls all exist - the captures simply cannot reach interaction states.
-Genuinely still open from it: member profile popover, per-participant volume, timeout/kick moderation actions on member rows, edit history, saved items, low-bandwidth mode.
+Genuinely still open from it: ~~member profile popover, per-participant volume, timeout/kick moderation actions on member rows~~, edit history, saved items, low-bandwidth mode.
+All three struck through shipped 2026-07-29: `member_profile.dart`, `member_profile_sections.dart` and `member_actions.dart` (server PR #136, client PR #138) wire timeout and removal into the popover, and per-participant volume is `rtc/lib/src/audio_gain.dart`, consumed at `member_profile_sections.dart` behind a per-platform support guard.
+Caught by the 2026-07-30 audit rather than by anything here, which is the one document whose entire job is stopping re-discovery, so it is the worst place a stale entry could hide.
 One reconcile note for the owner: custom emoji is built here while that reviewer's plan doc has it declined; their doc should be updated rather than the feature questioned.
 
 ## Round four: the motion and feedback spec (same day)

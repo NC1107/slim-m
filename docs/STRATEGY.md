@@ -31,7 +31,11 @@ The third anchor is honest security scoping: v1 is transport-encrypted (TLS 1.3)
 
 Event identity and total order are two jobs handled by two fields: a client-generatable UUIDv7 is the stable identity that powers optimistic local echo and retry idempotency, and a server-assigned, per-scope, strictly monotonic 64-bit sequence number is the authoritative order and the sync cursor.
 Snowflake-style bit-packed IDs are rejected because their entire value is coordinating multiple uncoordinated writers, a problem this single-writer design does not have.
-The wire protocol is schema-first JSON: one OpenAPI plus JSON Schema source of record generates both the Dart and Rust types, CI fails on any drift, and version-skew rules are additive-only, so a fleet of independently upgraded self-hosted servers stays compatible with one official client while every frame stays readable on the wire.
+The wire protocol is schema-first JSON: `schema/openapi.yaml` is the single source of record (there is no separate JSON Schema file; the WebSocket envelope lives inside the same OpenAPI document), and version-skew rules are additive-only, so a fleet of independently upgraded self-hosted servers stays compatible with one official client while every frame stays readable on the wire.
+Corrected 2026-07-30: this sentence used to also say the schema "generates both the Dart and Rust types, CI fails on any drift."
+No types are generated from it.
+The Rust DTOs and the Dart models are both hand-written; CI gates the route surface (a route cannot be added, removed or renamed without a matching schema edit) and, Rust-side only, response bodies against what the schema documents, plus additive-only evolution and valid OpenAPI.
+Request bodies and the Dart models are not checked against the schema on either side; `schema/openapi.yaml`'s own header has said this precisely since the phase 3 audit, and this paragraph had not been brought in line with it.
 
 This strategy resolves every critical and major finding raised by the adversarial reviews.
 The most consequential resolutions: the per-stream sequence counter is keyed by stream so a channel's messages and its canvas ops are two independent ordered scopes rather than colliding on one counter; backpressure is traffic-class aware so a busy multi-user drawing session cannot close a slow client mid-stroke; the push-worthiness check is gated on a client-reported foreground/background signal so a suspended iOS app is never silently left un-notified; account deletion transfers group ownership and tombstones content rather than merely deactivating; the production docker-compose runs LiveKit with a resolved port strategy so voice actually works as documented; and the invite-based account model gains a mandatory in-app account-deletion verb, report, block, moderation tooling, and an 18+ rating to pass App Store and Play review.
@@ -226,7 +230,11 @@ A per-scope sequence has no meaning across scopes, so a future global activity f
 ### Protocol and Sync
 
 Decision: schema-first JSON over both HTTP and WebSocket for the v1 control plane.
-One source of record (OpenAPI for the REST resource surface, JSON Schema for the WebSocket event envelope and payloads) generates both the Dart client types and the Rust server types, and CI fails on any drift between the schema and the committed generated code.
+One source of record, `schema/openapi.yaml`, documents both the REST resource surface and the WebSocket event envelope and payloads.
+Corrected 2026-07-30: this used to say the schema "generates both the Dart client types and the Rust server types, and CI fails on any drift between the schema and the committed generated code."
+Neither is generated; both are hand-written.
+CI gates the route surface, additive-only evolution and valid OpenAPI on both sides, and response bodies against the schema on the Rust side only; request bodies and the Dart models are unchecked.
+See `schema/openapi.yaml`'s own header and `client/packages/api/lib/src/models.dart`'s.
 The WebSocket event stream uses a small typed envelope: a discriminated `type`, a protocol version, and the per-scope `seq`.
 permessage-deflate is enabled on the socket, and a compact binary encoding is reserved as a documented, additive, per-message-type escape hatch for hot paths that measurement later proves need it, with the client's decode layer already dispatching on the envelope discriminant before assuming JSON.
 See [research/realtime-sync.md](research/realtime-sync.md) and [research/stack-decision.md](research/stack-decision.md).
@@ -429,7 +437,9 @@ Accepted risks: a monorepo can grow unbounded scope over years unless path-gated
 
 ### CI/CD and Releases
 
-Decision: one `ci.yml` on every PR with path-filtered per-language jobs, a schema codegen job that regenerates Rust and Dart types and fails on any diff, and format, lint, and test jobs per language; the relay repository runs its own equivalent Go pipeline independently.
+Decision: one `ci.yml` on every PR with path-filtered per-language jobs, and format, lint, and test jobs per language; the relay repository runs its own equivalent Go pipeline independently.
+Corrected 2026-07-30: this used to also name "a schema codegen job that regenerates Rust and Dart types and fails on any diff."
+No such job exists in any CI workflow: the schema gates that do exist are the route-surface contract test and `schema-ci.yml`'s response-contract, oasdiff and redocly-lint jobs, none of which generate code.
 See [research/devops.md](research/devops.md).
 Because SQLite is embedded, Rust integration tests need no external database container or wait-for-healthy step, a CI simplification the stack buys for free.
 
@@ -452,7 +462,11 @@ The Fedora spike validates that GPU hardware video decode works inside the Flatp
 
 iOS: fastlane match stores certificates in a separate encrypted private repo and fastlane pilot uploads to TestFlight with an App Store Connect API key, on GitHub-hosted macOS runners; every client-package release produces a TestFlight build, while day-to-day PR CI keeps iOS builds behind manual dispatch because macOS runner availability and feedback latency, not dollar cost, are the real constraint (Actions minutes are free for public repos).
 
-Supply chain and release safety: every third-party action is pinned to a full commit SHA; every published artifact (images, Flatpak, rpm) is signed with cosign in keyless mode plus SLSA provenance via attest-build-provenance, with a conventional GPG signature and SHA256SUMS alongside for the audience that does not verify cosign; SBOMs come from Buildx's native flags; cargo audit and cargo deny gate Rust, osv-scanner covers Dart, govulncheck covers the relay, and Dependabot keeps all three current; reviewer-gated GitHub Environments protect every job holding GHCR, TestFlight, signing, or match credentials.
+Supply chain and release safety: every third-party action is pinned to a full commit SHA; every published artifact (images, Flatpak, rpm) is signed with cosign in keyless mode plus SLSA provenance via attest-build-provenance, with a conventional GPG signature and SHA256SUMS alongside for the audience that does not verify cosign; SBOMs come from Buildx's native flags; reviewer-gated GitHub Environments protect every job holding GHCR, TestFlight, signing, or match credentials.
+Corrected 2026-07-30: this paragraph used to continue in the present tense, "cargo audit and cargo deny gate Rust, osv-scanner covers Dart, govulncheck covers the relay, and Dependabot keeps all three current," as though all four scanners and Dependabot were wired.
+None of that is built: `deny.toml` runs `cargo-deny check licenses` only, with no `[advisories]` table, so it does not gate a Rust CVE; there is no cargo-audit step anywhere; there is no osv-scanner step for the Dart tree; the relay's own `.github/workflows/ci.yml` runs gofmt, vet, build and test with no govulncheck or golangci-lint step, despite `docs/research/devops.md` describing both; and neither repository has a `.github/dependabot.yml`.
+`docs/ci.md` already says half of this honestly: advisories and bans are deliberately not configured in `deny.toml`, and it names `cargo audit` and `osv-scanner` as the tools this paragraph promises while noting neither is wired yet, without naming this paragraph as the claim needing the same correction.
+The gap is a documented deferral, not an oversight: a per-PR advisory gate would turn every unrelated pull request red the moment a CVE is published against an unrelated dependency, so the shape of the eventual fix is a scheduled advisory job plus a Dependabot config, not a fourth per-PR check.
 Binary and image size is an explicit brief requirement, so CI measures image and artifact size against a tracked baseline with a regression gate, versioned alongside the other performance baselines.
 The official instance deploys via an explicit deploy step gated on the release-PR merge, not a watchtower auto-update from a floating tag, for controlled verifiable rollouts; self-host docs offer optional opt-in watchtower.
 
