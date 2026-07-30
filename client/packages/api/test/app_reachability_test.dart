@@ -32,9 +32,6 @@ import 'package:test/test.dart';
 /// Each of these is a real gap rather than a decision, except the first. They
 /// are listed so the gap is visible and counted, not so it is forgiven.
 const Map<String, String> _allowlist = {
-  'canvasViewport':
-      'the Voice Canvas is Phase 6 and has no client surface at all yet; the '
-          'endpoint and the spike that sized it landed ahead of the UI on purpose',
   'issueResetCode':
       'no admin UI issues a reset code. With resetPassword below, these two '
           'are the whole of the owner decision that self-hosted recovery is an '

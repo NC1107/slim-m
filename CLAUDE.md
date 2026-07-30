@@ -12,6 +12,62 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The canvas, first visible slice: one shared pen (2026-07-30)
+
+The signature feature had a viewport read, an R-Tree, a spatial index, a permission bit and a spike, and no way for a person to reach any of it.
+This is the slice that spends all of them: `POST /channels/{channelId}/canvas/objects`, one hub event, and a pane you open from any channel header.
+Read this before touching the canvas, the socket's permission cache, or the viewport read.
+
+**The entry point is the channel header, not the in-call view, and that was the first thing the plan got wrong.**
+The strategy says joining voice opens voice and the canvas as one screen, and the obvious reading is to mount the canvas inside `_InCall`.
+That requires a configured SFU, a voice channel, and somebody actually in the call - and a fresh self-host has none of the three: `store/bootstrap.rs` seeds exactly one `text` channel and `SLIMM_LIVEKIT_URL` is optional.
+So the HTTP route would have worked on every deployment while the feature was invisible on most of them, which is the same shape as `Routes.settings`, `markRead` and `report`/`blockUser`.
+`CanvasOpenButton` is in `ChannelHeader`, `CompactChannelAppBar` and the wide voice header, and `ConversationPane` swaps the whole body for `CanvasPane`.
+There is no route, so `route_reachability_test.dart` cannot see it: `canvas_pane_test.dart` carries the reachability check instead, and it fails if the header affordance is dropped.
+
+**Three ceilings, and each bounds a different thing that could not be walked back.**
+This slice ships no removal path at all - no erase, no `MANAGE_CANVAS`, no sweep - behind a bit `@everyone` holds by default, so an unbounded write here would be permanent.
+`MAX_PROPS_BYTES` (4 KiB) bounds one object and is sized against the hub's 1024-slot broadcast ring rather than against any drawing.
+`MAX_OBJECT_EXTENT` (8192) bounds the area one object claims: an object legally spanning the world is written into *every cell* of the client's uniform grid, 95 million buckets at a 1024px cell, which hangs whoever opens the canvas next rather than slowing a frame.
+`MAX_OBJECTS_PER_CHANNEL` (20,000) bounds the canvas, refused inside the same transaction that counts, the `MAX_PINS_PER_CHANNEL` shape.
+A `DefaultBodyLimit` on the route refuses an over-large body at the byte level before serde builds a `Value` several times its wire size, which is the layer the three raw-upload routes already needed.
+
+**The viewport read was truncating the newest ink, and nothing could have noticed until something wrote.**
+`ORDER BY o.z_index, o.seq LIMIT ?` with `z_index` seeded from `seq` keeps the *oldest* page.
+The pane's recovery from a reconnect is a cold refetch, so a busy region would have answered with everything except what had just been drawn, and `has_more`'s advice to zoom in does not help because the same ordering holds inside the smaller region.
+It reads `DESC` and reverses in Rust now, so the answer is the newest N in paint order; the handler drops its over-read row from the front for the same reason.
+
+**Never send `previous` from a client that tracks more than one fetched rectangle.**
+The delta's hold-back predicate is a single rectangle, so a client with several fetched regions can only pass their bounding box - which claims coverage of space it never fetched, and every old object in the gap is excluded from that read and from every later one with nothing to backfill it.
+`CanvasPane` therefore always cold-fetches the padded viewport and leans on id dedupe, which is free because place is idempotent by id.
+A truncated page is also deliberately *not* recorded as fetched, or the next pan skips a region the read never returned.
+
+**Paint order is the server's, and the client was about to throw it away.**
+`UniformGrid.query` emits slots in cell order on the grid branch and slot order on the linear one, and it switches between them on zoom, so painting the raw cull re-layers overlapping ink as somebody zooms across the adaptive threshold.
+`CanvasDocument.paintOrder` sorts the culled slots by `z_index`; locally drawn strokes take a provisional index above everything and are corrected from the server's answer.
+
+**A stroke is split by encoded bytes, never by a point count.**
+Dart emits shortest-round-trip doubles, so 512 coordinates run from four characters to seventeen and a "256-point" stroke straddles any byte ceiling.
+Over it the server answers 400 and ink already on the drawer's own screen disappears, which is the worst failure this surface has.
+`splitStroke` quantises to two decimals, measures the encoded JSON, and repeats the previous segment's last point so a split leaves no seam.
+Note the mutation test for this only bites at a *smaller* budget: at the shipped 3500 a 256-point cap happens to land near the ceiling and passes by luck.
+
+**`ViewCache` is `PermissionCache` now, and it holds a set rather than a bit.**
+A canvas frame is gated on `VIEW_CHANNEL` *and* `USE_CANVAS`, matching the read route, or a member an overwrite denied the canvas is handed over the socket exactly what `GET /canvas/objects` refuses them.
+Caching the set costs nothing over caching the bit (`has_permission` is `permissions_in_channel().contains`, the same five queries), and the earlier doc's argument against it rested on event-keyed invalidation, which the epoch already replaced.
+`tests/canvas_live.rs` is what fails if it goes back to a bool, and it also asserts an idle text-only connection survives a 60-stroke burst on the shared broadcast ring.
+
+**This is the first caller of the direct timeout check `store/timeouts.rs` promised.**
+`TIMEOUT_DENY` spares `USE_CANVAS` because that one bit means view *and* draw, so subtracting it would blank the canvas rather than make it read-only; the write path asks about the timeout itself.
+Worth knowing before slice three: the only reason ephemeral ink over the SFU data channel is not already a way around this is that `TIMEOUT_DENY` removes `CONNECT`, so a timed-out member cannot mint a token at all - `can_publish_data` is derived from `USE_CANVAS`.
+
+**One latent 500 fixed on the way past.**
+`canvas_objects.id` is `UNIQUE` across live and dead rows, and the idempotency lookup filtered `deleted_at IS NULL`, so replaying the id of a removed object fell through to the insert and surfaced the constraint violation as a 500.
+Nothing in this slice deletes, which is exactly why it would have shipped unnoticed and appeared as a defect introduced by slice two.
+The lookup is deployment-wide rather than channel-scoped, which is the one unauthorized read in the write path; accepted and written down rather than closed, because ids are UUIDv7 and the only ones a caller can name came from a viewport read they were allowed to make.
+
+Deliberately not in this slice, and each for a stated reason: erase, clear and undo (all removals, and a soft delete does not advance `seq`, so they ship with the op stream or not at all); move, resize and z-order (`UniformGrid` has no `remove` and a rebuild costs 1.3ms); images and GIFs; camera bubbles and screen-share tiles (the two Phase 5 deliverables with no spike evidence); ephemeral in-flight preview frames, so remote ink appears on pointer-up rather than as it is drawn; multi-user cursors; `canvas_ops`; `MANAGE_CANVAS`; splitting `USE_CANVAS` into view and draw; and a tool dock, since a one-item picker is a control that cannot change anything.
+
 ## Moderating a member: timeouts, removal, and per-participant volume (2026-07-29)
 
 The four sections the member profile popover rendered as absent, built out.

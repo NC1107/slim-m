@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The per-connection VIEW_CHANNEL cache must never outlive the answer.
+//! The per-connection permission cache must never outlive the answer.
 //!
-//! `http/ws/view_cache.rs` stops `authorize` re-deriving the same permission
+//! `http/ws/permission_cache.rs` stops `authorize` re-deriving the same permission
 //! five queries at a time for every message in a busy channel. The whole risk
 //! it introduces points one way: a stale `true` keeps delivering a channel to
 //! somebody whose view was just revoked, which is the leak the socket exists
@@ -183,7 +183,7 @@ async fn send_message(state: &AppState, token: &str, channel_id: &str, body: &st
 /// The one that matters: a member overwrite denying VIEW_CHANNEL has to stop
 /// the *next* message, not the one after the cache happens to expire.
 ///
-/// Without `ViewCache::observe` running ahead of `authorize`, bob's warm
+/// Without the epoch moving inside `publish`, bob's warm
 /// `true` survives the revocation for the whole TTL and the second message
 /// reaches somebody who can no longer read the channel over REST.
 #[tokio::test]

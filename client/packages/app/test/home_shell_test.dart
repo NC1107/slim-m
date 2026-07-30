@@ -22,12 +22,14 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
+import 'package:slimm_app/src/screens/canvas/canvas_pane.dart';
 import 'package:slimm_app/src/screens/home_shell.dart';
 import 'package:slimm_app/src/widgets/channel_search.dart';
 import 'package:slimm_app/src/widgets/member_pane.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 /// Stands in for the real [SyncController], which opens a websocket to a
 /// server that does not exist here. `start` is called from the base
@@ -46,15 +48,24 @@ class _NoopSyncController extends SyncController {
 /// error state would still prove reachability, but it would also hide a
 /// widget that only builds on success.
 MockClient _quietClient() => MockClient((request) async {
-  final body = request.url.path == '/me'
-      ? {
-          'id': 'bob',
-          'username': 'bob',
-          'display_name': 'Bob',
-          'created_at': 0,
-          'permissions': 0,
-        }
-      : const <Object>[];
+  final path = request.url.path;
+  final Object body = switch (path) {
+    '/me' => {
+      'id': 'bob',
+      'username': 'bob',
+      'display_name': 'Bob',
+      'created_at': 0,
+      'permissions': 0,
+    },
+    // A list is the right empty answer for most reads; the canvas viewport and the voice roster each decode a shape, and the fake catch-all's `[]` fails those casts.
+    _ when path.endsWith('/canvas/objects') => const {
+      'objects': <Object>[],
+      'has_more': false,
+      'latest_seq': 0,
+    },
+    _ when path.endsWith('/voice/roster') => const {'participants': <Object>[]},
+    _ => const <Object>[],
+  };
   return http.Response(
     jsonEncode(body),
     200,
@@ -190,6 +201,23 @@ Future<({ProviderContainer container, SlimmDatabase db})> _pumpCompactChannel(
     ),
   ]);
   await _pumpAtWidth(tester, setup.container, 500, location: '/channels/c1');
+  return setup;
+}
+
+/// A shell with one channel of [kind] open at [width], the canvas already
+/// open for it before the first frame - "mounted with the provider set",
+/// not opened by a later tap.
+Future<({ProviderContainer container, SlimmDatabase db})> _pumpCanvasOpen(
+  WidgetTester tester, {
+  required double width,
+  required String kind,
+}) async {
+  final setup = _setup(httpClient: _quietClient(), signedIn: true);
+  await MessageStore(setup.db).upsertChannels([
+    api.Channel(id: 'c1', name: 'general', kind: kind, createdAt: 0),
+  ]);
+  setup.container.read(canvasOpenProvider.notifier).state = 'c1';
+  await _pumpAtWidth(tester, setup.container, width, location: '/channels/c1');
   return setup;
 }
 
@@ -329,4 +357,53 @@ void main() {
 
     await _teardown(tester, setup.container, setup.db);
   });
+
+  /// The reachability guard `canvas_pane_test.dart` names only asserts that
+  /// tapping the header flips a provider - nothing there ever mounts a real
+  /// `ConversationPane`, so deleting `home_shell.dart`'s `canvasOpen` wiring
+  /// left every test in that file green. This mounts the real thing with the
+  /// provider already set and checks the canvas body itself is on screen,
+  /// not the state that is supposed to produce it.
+  testWidgets(
+    'the canvas provider actually swaps in the canvas body, not just its own state',
+    (tester) async {
+      final setup = await _pumpCanvasOpen(tester, width: 1400, kind: 'text');
+
+      expect(find.byType(CanvasSurface), findsOneWidget);
+
+      await _teardown(tester, setup.container, setup.db);
+    },
+  );
+
+  /// At compact width the outer header is the Scaffold's own app bar, built
+  /// by `HomeShell` rather than `ConversationPane`, and it used to keep
+  /// showing above the canvas: `CanvasBar`'s "Close canvas" is meant to be
+  /// the only close affordance here, not a second one sitting above it.
+  testWidgets('the compact app bar does not stack above the canvas', (
+    tester,
+  ) async {
+    final setup = await _pumpCanvasOpen(tester, width: 500, kind: 'text');
+
+    expect(find.byType(CanvasSurface), findsOneWidget);
+    expect(find.bySemanticsLabel('Close canvas'), findsOneWidget);
+    expect(find.bySemanticsLabel('Open canvas'), findsNothing);
+
+    await _teardown(tester, setup.container, setup.db);
+  });
+
+  /// A voice channel wraps its body in a header of its own at any width both
+  /// panes show, and that header used to keep showing above the canvas too:
+  /// same duplication as the compact case, a different outer widget.
+  testWidgets(
+    'a voice channel does not stack its own header above the canvas',
+    (tester) async {
+      final setup = await _pumpCanvasOpen(tester, width: 1400, kind: 'voice');
+
+      expect(find.byType(CanvasSurface), findsOneWidget);
+      expect(find.bySemanticsLabel('Close canvas'), findsOneWidget);
+      expect(find.bySemanticsLabel('Open canvas'), findsNothing);
+
+      await _teardown(tester, setup.container, setup.db);
+    },
+  );
 }

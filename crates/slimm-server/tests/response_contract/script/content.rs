@@ -90,8 +90,21 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
     c.bare("deleteRole", "DELETE", &format!("/roles/{role}"), root)
         .await;
 
-    // Empty on purpose: nothing writes a canvas object over HTTP yet, so what
-    // this checks is the envelope the client decodes before anyone has drawn.
+    c.json(
+        "placeCanvasObject",
+        "POST",
+        &format!("/channels/{channel}/canvas/objects"),
+        root,
+        json!({
+            "id": Uuid::now_v7().to_string(),
+            "kind": "stroke",
+            "x": 100.0, "y": 100.0, "w": 40.0, "h": 20.0,
+            "props": { "points": [0.0, 0.0, 40.0, 20.0], "width": 3.0, "color": "annotation" },
+        }),
+    )
+    .await;
+    // Placed first, so the read below covers a non-empty page rather than only
+    // the envelope a client decodes before anybody has drawn.
     c.get(
         "listCanvasViewport",
         &format!("/channels/{channel}/canvas/objects?min_x=0&min_y=0&max_x=1920&max_y=1080"),

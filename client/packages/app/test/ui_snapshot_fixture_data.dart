@@ -169,6 +169,11 @@ MockClient fixtureClient() => MockClient((request) async {
     // A list is the right empty answer for most reads; the read marker decodes a shape.
     _ when path.endsWith('/read') => const {'last_read_seq': 3, 'unread': 0},
     _ when path.endsWith('/voice/roster') => const {'participants': <Object>[]},
+    _ when path.endsWith('/canvas/objects') => const {
+      'objects': <Object>[],
+      'has_more': false,
+      'latest_seq': 0,
+    },
     '/space/settings' => const {'join_policy': 'invite'},
     _ => const <Object>[],
   };

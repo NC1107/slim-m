@@ -2223,6 +2223,73 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: placeCanvasObject
+      tags: [canvas]
+      summary: Place one object on a channel's canvas.
+      description: >
+        Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel,
+        and is additionally refused while the caller is timed out. A timeout
+        does not subtract `USE_CANVAS` (that one bit means view *and* draw, so
+        subtracting it would blank the canvas rather than make it read-only),
+        so this route checks the timeout itself: a timed-out member keeps
+        seeing the canvas and cannot add to it.
+
+
+        `id` is a client-generated UUIDv7 and is the idempotency key, the same
+        way a message id is. Replaying it answers with the stored row, its
+        original `seq` intact, writes nothing, and broadcasts nothing. The same
+        id in another channel, or one belonging to an object that has since
+        been removed, is a 409.
+
+
+        `x` and `y` are the object's top-left corner in world coordinates and
+        `w` and `h` are its extents, all inside the bounded world of plus or
+        minus 5,000,000. Neither extent may exceed 8,192: an object is a mark,
+        not a region, and one legally spanning the world would be indexed into
+        every cell of a client's spatial grid.
+
+
+        `kind` is `stroke`. It is an allowlist rather than free text, because
+        the kind decides how every client renders a row and an unknown one is a
+        row nobody can draw and nobody can remove. There is no `window` kind: a
+        window is a behaviour of an object rather than an object (decision
+        0004).
+
+
+        `props` is kind-specific and opaque to the server, capped at 4 KiB
+        serialized. For a `stroke` it carries `points` (a flat
+        `[x0,y0,x1,y1,...]` array *relative to* `x` and `y`, in world units),
+        `width`, and `color`. A client splits a long stroke into several
+        objects on this byte budget rather than on a point count.
+
+
+        A 409 also means the channel's canvas is full: a canvas holds at most
+        20,000 live objects, refused in the same transaction that counts them,
+        because this slice ships no way to remove one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CanvasObjectPlacement"
+      responses:
+        "201":
+          description: The stored object, freshly placed or replayed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CanvasObject"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /channels/{channelId}/voice/token:
     post:
@@ -2636,6 +2703,14 @@ components:
             $ref: "#/components/schemas/Error"
     Conflict:
       description: The request collided with existing state.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PayloadTooLarge:
+      description: >
+        The request body is over the route's own limit, refused at the byte
+        level before it is parsed.
       content:
         application/json:
           schema:
@@ -3407,7 +3482,7 @@ components:
           description: Client-generated UUIDv7; also the idempotency key.
         kind:
           type: string
-          description: What the object is - a stroke, an image, a gif, a window.
+          description: What the object is. Only `stroke` exists so far.
         z_index:
           type: integer
           format: int64
@@ -3444,6 +3519,37 @@ components:
         created_at:
           type: integer
           format: int64
+
+    CanvasObjectPlacement:
+      type: object
+      required: [id, kind, x, y, w, h, props]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Client-generated UUIDv7; also the idempotency key.
+        kind:
+          type: string
+          enum: [stroke]
+        x:
+          type: number
+          format: double
+        y:
+          type: number
+          format: double
+        w:
+          type: number
+          format: double
+          description: Width, at most 8192.
+        h:
+          type: number
+          format: double
+          description: Height, at most 8192.
+        props:
+          type: object
+          description: >-
+            Kind-specific fields, opaque to the server, at most 4 KiB
+            serialized. A stroke carries `points`, `width` and `color`.
 
     CanvasViewport:
       type: object
@@ -3961,8 +4067,30 @@ components:
         - $ref: "#/components/schemas/ChannelUpdated"
         - $ref: "#/components/schemas/ChannelDeleted"
         - $ref: "#/components/schemas/OverwriteChanged"
+        - $ref: "#/components/schemas/CanvasObjectPlaced"
         - $ref: "#/components/schemas/ServerPong"
         - $ref: "#/components/schemas/ServerError"
+
+    CanvasObjectPlaced:
+      type: object
+      required: [type, channel_id, seq, object]
+      description: >-
+        An object was placed on a channel's canvas. Delivered only to
+        connections holding both `VIEW_CHANNEL` and `USE_CANVAS` in that
+        channel, matching what the viewport read requires, and only for a fresh
+        write - an idempotent replay broadcasts nothing.
+      properties:
+        type:
+          type: string
+          enum: [canvas.object.placed]
+        channel_id:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          format: int64
+        object:
+          $ref: "#/components/schemas/CanvasObject"
 
     ServerHello:
       type: object

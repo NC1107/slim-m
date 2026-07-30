@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/pins_controller.dart';
+import '../screens/canvas/canvas_open_button.dart';
 import '../routing/breakpoints.dart';
 import 'member_pane.dart';
 import 'pinned_messages_sheet.dart';
@@ -95,6 +96,8 @@ class ChannelHeader extends ConsumerWidget {
           ),
           _PinPill(channelId: channelId),
           const SizedBox(width: AppSpacing.s8),
+          CanvasOpenButton(channelId: channelId),
+          const SizedBox(width: AppSpacing.s4),
           AppIconButton(
             icon: AppIcons.search,
             semanticLabel: 'Search messages',

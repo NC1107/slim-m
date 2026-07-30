@@ -35,6 +35,7 @@ export 'src/client.dart'
         JoinPolicy;
 export 'src/events.dart'
     show
+        CanvasObjectPlaced,
         ChannelCreated,
         ChannelDeleted,
         ChannelUpdated,

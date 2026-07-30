@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT channel_id AS \"channel_id!: ChannelId\", id AS \"id!: CanvasObjectId\",\n                  kind AS \"kind!\", z_index AS \"z_index!: i64\",\n                  x AS \"x!: f64\", y AS \"y!: f64\", w AS \"w!: f64\", h AS \"h!: f64\",\n                  props AS \"props!\", author_id AS \"author_id: UserId\",\n                  seq AS \"seq!: Seq\", created_at AS \"created_at!: i64\"\n           FROM canvas_objects WHERE id = ? AND deleted_at IS NULL",
+  "query": "SELECT channel_id AS \"channel_id!: ChannelId\", id AS \"id!: CanvasObjectId\",\n                  kind AS \"kind!\", z_index AS \"z_index!: i64\",\n                  x AS \"x!: f64\", y AS \"y!: f64\", w AS \"w!: f64\", h AS \"h!: f64\",\n                  props AS \"props!\", author_id AS \"author_id: UserId\",\n                  seq AS \"seq!: Seq\", created_at AS \"created_at!: i64\",\n                  deleted_at AS \"deleted_at: i64\"\n           FROM canvas_objects WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -62,6 +62,11 @@
         "name": "created_at!: i64",
         "ordinal": 11,
         "type_info": "Integer"
+      },
+      {
+        "name": "deleted_at: i64",
+        "ordinal": 12,
+        "type_info": "Integer"
       }
     ],
     "parameters": {
@@ -79,8 +84,9 @@
       false,
       true,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "6581489047cd0599c738b8766b6ce32b711d8e842fa185fb88e6d35da1f05c7e"
+  "hash": "b2dfb4d18b96b45ed33da5681334ac1a4099b93fe1fb3b11fce44cd1c9c4185c"
 }

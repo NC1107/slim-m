@@ -28,7 +28,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, broadcast};
 
 use crate::ids::{ChannelId, MessageId, RoleId, SessionId, UserId};
 use crate::presence::PresenceTracker;
-use crate::store::{AttachmentSummary, Channel, Message};
+use crate::store::{AttachmentSummary, CanvasObject, Channel, Message};
 use crate::typing::TypingTracker;
 
 /// How many events the channel buffers per subscriber before the slowest one
@@ -188,6 +188,20 @@ pub enum Event {
         /// overwrite.
         previously_visible_to: Vec<UserId>,
     },
+    /// An object was placed on a channel's canvas.
+    ///
+    /// Carries the whole row for the same reason [`Event::MessageCreated`]
+    /// does: a brand new object has no prior state to reconcile against, and
+    /// an id-only frame would cost every connected viewer one viewport read
+    /// per stroke. It is bounded by the write route's props ceiling, which is
+    /// sized against [`CHANNEL_CAPACITY`] rather than against any one drawing.
+    ///
+    /// Published only for a fresh write. An idempotent replay answers from the
+    /// stored row and publishes nothing, so a retry cannot fan a duplicate out.
+    CanvasObjectPlaced {
+        channel_id: ChannelId,
+        object: CanvasObject,
+    },
 }
 
 /// A cloneable handle to the broadcast channel and the connection limiter,
@@ -232,6 +246,7 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::TypingStarted { .. }
         | Event::TypingStopped { .. }
         | Event::PresenceChanged(_)
+        | Event::CanvasObjectPlaced { .. }
         | Event::SessionRevoked(_) => false,
     }
 }

@@ -18,6 +18,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/channel_search_controller.dart';
 import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
+import '../screens/canvas/canvas_open_button.dart';
 import 'pinned_messages_sheet.dart';
 
 /// The compact conversation app bar: back, the channel's name and topic, and
@@ -82,6 +83,7 @@ class CompactChannelAppBar extends ConsumerWidget
       actions: [
         if (!isVoice) _SearchAction(channelId: channelId),
         if (!isVoice) _PinsAction(channelId: channelId),
+        CanvasOpenButton(channelId: channelId),
         const _MembersAction(),
         const SizedBox(width: AppSpacing.s8),
       ],

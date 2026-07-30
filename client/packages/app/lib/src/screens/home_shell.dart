@@ -23,6 +23,8 @@ import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/voice_strip_indicator.dart';
+import 'canvas/canvas_open_button.dart';
+import 'canvas/canvas_pane.dart';
 import 'channel_screen.dart';
 import 'voice_screen.dart';
 
@@ -41,6 +43,9 @@ class HomeShell extends ConsumerWidget {
     final selected = selectedChannelId(context);
     // With the shell, or the first surface to consult it filters against none.
     ref.watch(blocksProvider);
+    // CanvasBar is the only header while open (ConversationPane's doc); the compact app bar below would otherwise stack a second one above it.
+    final canvasOpen =
+        selected != null && ref.watch(canvasOpenProvider) == selected;
     // Never below expanded width, whatever the header toggle says: it can only
     // hide the pane, not summon room for it that is not there.
     final showMembers =
@@ -112,10 +117,12 @@ class HomeShell extends ConsumerWidget {
           voice.channelId != selected;
       // Compact: the conversation replaces the list, with a way back.
       scaffold = Scaffold(
-        appBar: CompactChannelAppBar(
-          channelId: selected,
-          onBack: () => context.go(Routes.channels),
-        ),
+        appBar: canvasOpen
+            ? null
+            : CompactChannelAppBar(
+                channelId: selected,
+                onBack: () => context.go(Routes.channels),
+              ),
         // The roster slides in from the right instead of docking beside the
         // conversation, which is the only pane there is at this width.
         endDrawer: const Drawer(
@@ -166,7 +173,10 @@ class NoChannelSelected extends StatelessWidget {
 /// member-pane toggle) at any width that shows it. At compact width there is
 /// no room for one, and [CompactChannelAppBar] carries the same four
 /// affordances instead. Voice channels have no header of their own either
-/// way, so this still supplies a minimal one at wide layouts, as before.
+/// way, so this still supplies a minimal one at wide layouts, as before. The
+/// canvas replaces all of that: [HomeShell] omits [CompactChannelAppBar]
+/// while it is open, and [_VoiceConversationHeader] below is skipped the same
+/// way, so [CanvasBar] is the only header at every width.
 class ConversationPane extends ConsumerWidget {
   const ConversationPane({required this.channelId, super.key});
 
@@ -188,11 +198,14 @@ class ConversationPane extends ConsumerWidget {
               .cast<Channel?>()
               .firstOrNull;
           final isVoice = channel?.kind == 'voice';
-          final body = isVoice
+          final canvasOpen = ref.watch(canvasOpenProvider) == channelId;
+          final body = canvasOpen
+              ? CanvasPane(channelId: channelId)
+              : isVoice
               ? VoiceScreen(channelId: channelId)
               : ChannelScreen(channelId: channelId);
 
-          if (!layout.showsBothPanes || !isVoice) return body;
+          if (!layout.showsBothPanes || !isVoice || canvasOpen) return body;
           return Column(
             children: [
               _VoiceConversationHeader(channelId: channelId),
@@ -219,8 +232,12 @@ class _VoiceConversationHeader extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
       ),
-      alignment: Alignment.centerLeft,
-      child: _ChannelTitle(channelId: channelId),
+      child: Row(
+        children: [
+          Expanded(child: _ChannelTitle(channelId: channelId)),
+          CanvasOpenButton(channelId: channelId),
+        ],
+      ),
     );
   }
 }

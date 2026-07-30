@@ -134,6 +134,15 @@ sealed class ServerEvent {
         ChannelDeleted(channelId: decoded['channel_id'] as String),
       'overwrite.changed' when decoded['channel_id'] is String =>
         OverwriteChanged(channelId: decoded['channel_id'] as String),
+      'canvas.object.placed'
+          when decoded['channel_id'] is String &&
+              decoded['object'] is Map<String, dynamic> =>
+        CanvasObjectPlaced(
+          channelId: decoded['channel_id'] as String,
+          object: CanvasObject.fromJson(
+            decoded['object'] as Map<String, dynamic>,
+          ),
+        ),
       'pong' => const PongEvent(),
       'error' => ErrorEvent(decoded['message'] as String? ?? 'unknown'),
       _ => null,

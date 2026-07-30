@@ -216,3 +216,15 @@ class OverwriteChanged extends ServerEvent {
 
   final String channelId;
 }
+
+/// An object was placed on a channel's canvas.
+///
+/// Carries the whole row, so a live stroke needs no viewport read to render.
+/// It reports arrivals only: nothing here can report a removal, because a soft
+/// delete does not advance an object's seq (see [SlimmApiCanvas.canvasViewport]).
+class CanvasObjectPlaced extends ServerEvent {
+  const CanvasObjectPlaced({required this.channelId, required this.object});
+
+  final String channelId;
+  final CanvasObject object;
+}

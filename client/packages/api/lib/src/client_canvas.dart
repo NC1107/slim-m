@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 part of 'client.dart';
 
-/// Reading a region of a channel's canvas, the `canvas` tag.
+/// Reading a region of a channel's canvas and placing objects on it, the
+/// `canvas` tag.
 extension SlimmApiCanvas on SlimmApi {
   /// Every live object intersecting [region], in paint order.
   ///
@@ -39,5 +40,41 @@ extension SlimmApiCanvas on SlimmApi {
       query: query,
     );
     return CanvasViewport.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Places one object, idempotent by [id].
+  ///
+  /// [id] is a client-generated UUIDv7 and is the idempotency key, exactly as
+  /// a message id is: replaying it answers with the stored row, its original
+  /// seq intact, and broadcasts nothing, so a retry after a lost response is
+  /// safe. [x] and [y] are the top-left corner in world coordinates and [w]
+  /// and [h] the extents, neither over 8192.
+  ///
+  /// [props] is kind-specific and opaque to the server, capped at 4 KiB
+  /// serialized. A stroke's `points` are relative to [x] and [y].
+  Future<CanvasObject> placeCanvasObject(
+    String channelId, {
+    required String id,
+    required String kind,
+    required double x,
+    required double y,
+    required double w,
+    required double h,
+    required Map<String, dynamic> props,
+  }) async {
+    final json = await _send(
+      'POST',
+      '/channels/$channelId/canvas/objects',
+      body: {
+        'id': id,
+        'kind': kind,
+        'x': x,
+        'y': y,
+        'w': w,
+        'h': h,
+        'props': props,
+      },
+    );
+    return CanvasObject.fromJson(json as Map<String, dynamic>);
   }
 }
