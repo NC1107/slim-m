@@ -125,7 +125,7 @@ async fn upload(
         })?;
     state
         .store
-        .store_attachment(&sha256, size, content_type, &filename)
+        .store_attachment(&sha256, size, content_type, &filename, Some(ctx.user_id))
         .await?;
 
     Ok((

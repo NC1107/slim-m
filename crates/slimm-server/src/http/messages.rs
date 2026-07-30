@@ -464,9 +464,10 @@ fn validate_content(content: &str, empty_ok: bool) -> Result<&str, ApiError> {
 }
 
 /// Parses and bounds a send's attachment id list. Each id must be a
-/// well-formed 32-byte sha256 in hex; whether it actually names something
-/// uploaded is checked later, inside the same transaction as the insert
-/// ([`crate::store::Store::send_message`]).
+/// well-formed 32-byte sha256 in hex. Whether the sender uploaded it, or can
+/// currently view a channel that already has it, is checked by
+/// [`crate::store::Store::send_message`], and answers exactly as a
+/// never-uploaded id does.
 fn parse_attachment_ids(raw: &[String]) -> Result<Vec<Vec<u8>>, ApiError> {
     if raw.len() > MAX_ATTACHMENTS_PER_MESSAGE {
         return Err(ApiError::BadRequest("too many attachments"));

@@ -122,7 +122,7 @@ async fn hitting_the_cap_reports_what_was_left_out_and_keeps_the_rest() {
     let seed = png(b"seed");
     let sha = Sha256::digest(&seed).to_vec();
     store
-        .store_attachment(&sha, seed.len() as i64, "image/png", "seed.img")
+        .store_attachment(&sha, seed.len() as i64, "image/png", "seed.img", None)
         .await
         .expect("seed the attachment row");
     for index in 0..MAX_CUSTOM_EMOJI - 1 {

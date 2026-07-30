@@ -87,7 +87,7 @@ async fn an_emoji_refused_at_the_cap_leaves_no_bytes_and_no_row() {
     let seed = png(b"seed");
     let seed_sha = Sha256::digest(&seed).to_vec();
     store
-        .store_attachment(&seed_sha, seed.len() as i64, "image/png", "seed.img")
+        .store_attachment(&seed_sha, seed.len() as i64, "image/png", "seed.img", None)
         .await
         .expect("seed the attachment row");
     for index in 0..MAX_CUSTOM_EMOJI {

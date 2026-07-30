@@ -383,7 +383,7 @@ async fn a_live_frame_carries_the_attachment_the_message_was_sent_with() {
     let channel = store.create_channel("general", "text").await.unwrap();
     let state = state_for(&store);
 
-    let (alice_access, _alice_ticket, _alice) = user_ticket(&store, "alice").await;
+    let (alice_access, _alice_ticket, alice_id) = user_ticket(&store, "alice").await;
     let (_bob_access, bob_ticket, _bob) = user_ticket(&store, "bob").await;
 
     // Stored directly: this test is about the fan-out, not the upload route.
@@ -391,7 +391,13 @@ async fn a_live_frame_carries_the_attachment_the_message_was_sent_with() {
     // 32 bytes: the id is a sha256, and a short one is refused as malformed.
     let bytes = [0x11u8; 32];
     store
-        .store_attachment(&bytes, bytes.len() as i64, "image/png", "shot.png")
+        .store_attachment(
+            &bytes,
+            bytes.len() as i64,
+            "image/png",
+            "shot.png",
+            Some(alice_id),
+        )
         .await
         .unwrap();
     let attachment_id: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
