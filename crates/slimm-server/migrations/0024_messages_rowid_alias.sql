@@ -9,11 +9,23 @@
 -- table without an INTEGER PRIMARY KEY. The fts5 shadow tables are carried
 -- across unchanged, so every index entry would come to point at a different
 -- message: search answering with the wrong rows, silently, with no error
--- anywhere and `PRAGMA integrity_check` clean. `VACUUM INTO` is how the backup
--- copy is taken, so the first place it lands is a backup nobody reads until a
--- restore. 0015_canvas_rtree.sql refused exactly this licence for the R-Tree
--- and gave `canvas_objects` an `rt_id INTEGER PRIMARY KEY`; this is the same
--- withdrawal, on the older and much larger table.
+-- anywhere and `PRAGMA integrity_check` clean.
+--
+-- Being exact about the risk, because the first draft of this header was not.
+-- SQLite *reserves* that licence; it does not currently exercise it here. In
+-- the bundled 3.46.0, vacuum.c takes the renumbering `OP_NewRowid` branch only
+-- for a destination table with no indices at all, and only under a plain
+-- VACUUM; `messages` carries four, so it takes `OP_Rowid` and the values
+-- survive. `VACUUM INTO` never renumbers at all, which the earlier text had
+-- backwards. Measured: a plain VACUUM over a gapped sequence on this schema
+-- left the rowids alone.
+--
+-- So nothing is broken today, and this is not a repair. It is the withdrawal
+-- of a licence, so that a correctness property stops depending on which
+-- branch a vacuum implementation happens to take. 0015_canvas_rtree.sql made
+-- exactly that argument for the R-Tree and gave `canvas_objects` an
+-- `rt_id INTEGER PRIMARY KEY`; this is the same withdrawal, on the older and
+-- much larger table.
 --
 -- `fts_rowid INTEGER PRIMARY KEY` is an alias for the rowid, which withdraws
 -- the licence at no storage or query cost. Naming it in `content_rowid` is the
@@ -112,6 +124,17 @@
 -- while it runs; afterwards the main file keeps the freed pages and stays
 -- around 40% larger until an operator VACUUMs, which this cannot do for them
 -- because VACUUM refuses to run inside a transaction.
+--
+-- If `preexisting_foreign_key_orphans` fires, the deployment cannot start: the
+-- migration rolls back, and a container tracking `latest` restarts and fails
+-- the same way until somebody intervenes. That is the correct refusal - an
+-- orphan means the database already disagrees with its own schema, and a
+-- rebuild would bake that in - but it needs an escape, so: pin the previous
+-- image (`SLIMM_VERSION` in the compose `.env`), then against a copy of the
+-- database run `PRAGMA foreign_key_check` to see which rows point nowhere,
+-- delete those rows, and unpin. Nothing here can do that automatically,
+-- because which of an orphan's two sides is the wrong one is not a question
+-- SQL can answer.
 
 DROP TABLE IF EXISTS messages_rebuild_guard_orphans;
 DROP TABLE IF EXISTS messages_rebuild_guard_messages;
@@ -319,11 +342,13 @@ CREATE TABLE messages_rebuild_guard_index (
     triggers  INTEGER NOT NULL CONSTRAINT messages_triggers_missing CHECK (triggers = 5),
     indexes   INTEGER NOT NULL CONSTRAINT messages_indexes_missing CHECK (indexes = 2),
     alias     INTEGER NOT NULL CONSTRAINT messages_rowid_alias_missing CHECK (alias = 1),
+    aliased   INTEGER NOT NULL CONSTRAINT messages_rowid_not_aliased CHECK (aliased = 0),
+    unindexed INTEGER NOT NULL CONSTRAINT fts_rows_missing_from_index CHECK (unindexed = 0),
     keyed_on  INTEGER NOT NULL CONSTRAINT fts_content_rowid_wrong CHECK (keyed_on = 1)
 ) STRICT;
 
 INSERT INTO messages_rebuild_guard_index
-    (documents, triggers, indexes, alias, keyed_on)
+    (documents, triggers, indexes, alias, aliased, unindexed, keyed_on)
 VALUES (
     (SELECT count(*) FROM messages_fts_docsize)
         - (SELECT count(*) FROM messages WHERE is_encrypted = 0),
@@ -334,6 +359,11 @@ VALUES (
           AND name IN ('messages_channel_live', 'messages_author')),
     (SELECT count(*) FROM pragma_table_info('messages')
         WHERE name = 'fts_rowid' AND type = 'INTEGER' AND pk = 1),
+    -- pragma_table_info reads the same for WITHOUT ROWID, which has no rowid.
+    (SELECT count(*) FROM messages WHERE rowid IS NOT fts_rowid),
+    -- Counting documents cannot see which rowids they are; this can.
+    (SELECT count(*) FROM messages m WHERE m.is_encrypted = 0
+        AND NOT EXISTS (SELECT 1 FROM messages_fts_docsize d WHERE d.id = m.fts_rowid)),
     (SELECT count(*) FROM sqlite_master
         WHERE name = 'messages_fts' AND instr(sql, 'content_rowid=''fts_rowid''') > 0)
 );
