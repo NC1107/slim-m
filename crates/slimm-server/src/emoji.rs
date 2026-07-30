@@ -156,7 +156,13 @@ pub async fn add_emoji(
         .await
         .map_err(|err| AddError::Storage(err.into()))?;
     store
-        .store_attachment(&sha256, size, content_type, &format!("{name}.img"))
+        .store_attachment(
+            &sha256,
+            size,
+            content_type,
+            &format!("{name}.img"),
+            uploader,
+        )
         .await
         .map_err(AddError::Storage)?;
 

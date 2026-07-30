@@ -63,7 +63,7 @@ async fn an_aged_unattached_upload_is_swept() {
 
     let orphan = [0xAAu8; 32];
     store
-        .store_attachment(&orphan, 8, "image/png", "orphan.png")
+        .store_attachment(&orphan, 8, "image/png", "orphan.png", None)
         .await
         .unwrap();
     age_attachments(&pool).await;
@@ -88,11 +88,11 @@ async fn an_emoji_does_not_stop_the_sweep_and_its_bytes_survive() {
     let emoji_bytes = [0x11u8; 32];
     let orphan = [0x22u8; 32];
     store
-        .store_attachment(&emoji_bytes, 8, "image/png", "party.png")
+        .store_attachment(&emoji_bytes, 8, "image/png", "party.png", None)
         .await
         .unwrap();
     store
-        .store_attachment(&orphan, 8, "image/png", "orphan.png")
+        .store_attachment(&orphan, 8, "image/png", "orphan.png", None)
         .await
         .unwrap();
     store
@@ -138,7 +138,7 @@ async fn removing_the_emoji_releases_its_bytes_to_the_next_sweep() {
 
     let emoji_bytes = [0x33u8; 32];
     store
-        .store_attachment(&emoji_bytes, 8, "image/png", "party.png")
+        .store_attachment(&emoji_bytes, 8, "image/png", "party.png", None)
         .await
         .unwrap();
     let id = EmojiId::generate();
@@ -174,17 +174,17 @@ async fn deleting_a_message_whose_image_is_also_an_emoji_still_works() {
     let store = Store::new(pool.clone());
 
     let shared = [0x33u8; 32];
-    store
-        .store_attachment(&shared, 8, "image/png", "shared.png")
-        .await
-        .unwrap();
-
     let channel = store.create_channel("general", "text").await.unwrap();
     let author = store
         .create_account("alice", "Alice", "hash")
         .await
         .expect("an author")
         .id;
+    store
+        .store_attachment(&shared, 8, "image/png", "shared.png", Some(author))
+        .await
+        .unwrap();
+
     let message = MessageId::generate();
     store
         .send_message(

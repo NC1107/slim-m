@@ -14,7 +14,7 @@ use slimm_server::ids::MessageId;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::{OpenError, RefreshOutcome, Store};
+use slimm_server::store::{OpenError, RefreshOutcome, SendError, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -147,6 +147,56 @@ async fn delete_account_purges_member_channel_overwrites() {
             .has_permission(account.id, channel.id, Permissions::VIEW_CHANNEL)
             .await
             .unwrap()
+    );
+}
+
+/// The uploader rows a deletion is supposed to purge are private database
+/// state with no public read path, so the proof is behavioral: linking bytes
+/// alice genuinely uploaded works while her account exists, and stops
+/// working the moment it is deleted, with nothing else in reach to grant her
+/// the right back (no role, no view access to a channel that has it).
+#[tokio::test]
+async fn delete_account_removes_attachment_uploader_rows() {
+    let (store, _guard) = new_store().await;
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let alice = store
+        .create_account("alice", "Alice", "hash")
+        .await
+        .unwrap();
+
+    let sha256 = vec![0x42u8; 32];
+    store
+        .store_attachment(&sha256, 8, "image/png", "photo.png", Some(alice.id))
+        .await
+        .unwrap();
+
+    // While the account exists, having uploaded the bytes is enough to link them.
+    store
+        .send_message(
+            channel.id,
+            alice.id,
+            MessageId::generate(),
+            "before",
+            std::slice::from_ref(&sha256),
+        )
+        .await
+        .expect("alice can link bytes she uploaded");
+
+    store.delete_account(alice.id).await.unwrap();
+
+    // Nothing left grants the right back; see this test's doc comment.
+    let result = store
+        .send_message(
+            channel.id,
+            alice.id,
+            MessageId::generate(),
+            "after",
+            std::slice::from_ref(&sha256),
+        )
+        .await;
+    assert!(
+        matches!(result, Err(SendError::AttachmentNotFound)),
+        "expected AttachmentNotFound, got {result:?}"
     );
 }
 
