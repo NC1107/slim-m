@@ -4,6 +4,7 @@
 /// happens, matching `confirm_dialog.dart`'s contract.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show SocketException;
 
@@ -163,6 +164,128 @@ void main() {
     expect(posts.single.$2, {'max_uses': 5});
     expect(find.text('fresh-code'), findsOneWidget);
   });
+
+  testWidgets('an empty "Uses allowed" still creates an unlimited invite', (
+    tester,
+  ) async {
+    final posts = <Map<String, dynamic>>[];
+    await _pump(tester, (request) {
+      if (request.method == 'GET' && request.url.path == '/invites') {
+        return http.Response(
+          '[]',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      if (request.method == 'POST' && request.url.path == '/invites') {
+        posts.add(jsonDecode(request.body) as Map<String, dynamic>);
+        return http.Response(
+          _inviteJson('fresh-code'),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      return http.Response(
+        '{}',
+        404,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    // Blank is the deliberate way to ask for unlimited; it must still work.
+    await tester.tap(find.text('Create invite'));
+    await tester.pumpAndSettle();
+
+    expect(posts, hasLength(1));
+    expect(posts.single, isEmpty, reason: 'no max_uses key means unlimited');
+    expect(find.text('fresh-code'), findsOneWidget);
+  });
+
+  testWidgets(
+    'a typo in "Uses allowed" is refused rather than becoming unlimited',
+    (tester) async {
+      var posted = false;
+      await _pump(tester, (request) {
+        if (request.method == 'GET' && request.url.path == '/invites') {
+          return http.Response(
+            '[]',
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'POST' && request.url.path == '/invites') {
+          posted = true;
+          return http.Response(
+            _inviteJson('fresh-code'),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(
+          '{}',
+          404,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      // Digits alone reach the field; an int too long to parse is what remains.
+      await tester.enterText(find.byType(TextField).first, '9' * 25);
+      await tester.pump();
+      expect(
+        find.text('Enter a number, or leave blank for unlimited.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Create invite'));
+      await tester.pumpAndSettle();
+
+      expect(posted, isFalse);
+      expect(find.text('fresh-code'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a create that fails outside ApiException still clears the busy flag',
+    (tester) async {
+      await _pump(tester, (request) {
+        if (request.method == 'GET' && request.url.path == '/invites') {
+          return http.Response(
+            '[]',
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'POST' && request.url.path == '/invites') {
+          // A body missing required fields makes fromJson throw a bare TypeError.
+          return http.Response(
+            '{}',
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(
+          '{}',
+          404,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      // This type deliberately escapes uncaught; a zone catches it here instead.
+      Object? escaped;
+      await runZonedGuarded(() async {
+        await tester.tap(find.text('Create invite'));
+        await tester.pump();
+        await tester.pump();
+      }, (error, stack) => escaped = error);
+
+      expect(escaped, isA<TypeError>());
+      expect(find.text('Creating...'), findsNothing);
+      expect(find.text('Create invite'), findsOneWidget);
+
+      final button = tester.widget<AppButton>(find.byType(AppButton));
+      expect(button.disabled, isFalse);
+    },
+  );
 
   /// The create card used to render `e.message` in a `SnackBar`, so a
   /// dropped connection surfaced its own Dart exception string.

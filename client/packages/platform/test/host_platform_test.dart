@@ -11,6 +11,7 @@ library;
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -27,6 +28,34 @@ void main() {
       if (Platform.isLinux || Platform.isMacOS || Platform.isWindows) {
         expect(isIOSHost, isFalse);
         expect(isAndroidHost, isFalse);
+      }
+    });
+  });
+
+  group('deviceDisplayName', () {
+    // Guards the bug: every device used to read the literal string 'desktop'.
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    test('two different platforms produce two different device names', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final android = deviceDisplayName;
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      final mac = deviceDisplayName;
+
+      expect(android, isNot(mac));
+    });
+
+    test('the same platform is stable across calls', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+
+      expect(deviceDisplayName, deviceDisplayName);
+    });
+
+    test('never the literal string every device used to share', () {
+      for (final platform in TargetPlatform.values) {
+        debugDefaultTargetPlatformOverride = platform;
+        expect(deviceDisplayName, isNot('desktop'));
+        expect(deviceDisplayName, isNotEmpty);
       }
     });
   });

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
 
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
@@ -236,14 +237,14 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               ? _username.text.trim()
               : _displayName.text.trim(),
           password: _password.text,
-          deviceName: 'desktop',
+          deviceName: deviceDisplayName,
           inviteCode: invite,
         );
       } else {
         await api.login(
           username: _username.text.trim(),
           password: _password.text,
-          deviceName: 'desktop',
+          deviceName: deviceDisplayName,
         );
         // An existing account can still spend a code, for the role it grants.
         if (invite != null) {

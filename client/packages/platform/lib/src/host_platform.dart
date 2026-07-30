@@ -15,10 +15,46 @@ library;
 
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 
 /// True only for a native iOS build.
 bool get isIOSHost => !kIsWeb && Platform.isIOS;
 
 /// True only for a native Android build.
 bool get isAndroidHost => !kIsWeb && Platform.isAndroid;
+
+/// A short, human-recognisable name for this device, sent as `device_name`
+/// on sign-in and registration so the Devices list in settings can tell one
+/// session from another - the reason to revoke a session you don't recognise
+/// is gone the moment every row reads alike.
+///
+/// Reads [defaultTargetPlatform] rather than [Platform]: it answers on web
+/// too, where `dart:io`'s stub would throw exactly as it does for
+/// [isIOSHost] above.
+/// The host name is folded in only where this build can read one without
+/// throwing, and that is the only thing added: no serial, build fingerprint,
+/// or user agent, nothing past what tells two rows apart.
+String get deviceDisplayName {
+  final platform = switch (defaultTargetPlatform) {
+    TargetPlatform.iOS => 'iOS',
+    TargetPlatform.android => 'Android',
+    TargetPlatform.macOS => 'Mac',
+    TargetPlatform.windows => 'Windows',
+    TargetPlatform.linux => 'Linux',
+    TargetPlatform.fuchsia => 'Fuchsia',
+  };
+  final host = kIsWeb ? null : _hostNameOrNull();
+  return host == null ? platform : '$platform ($host)';
+}
+
+/// `Platform.localHostname` is unsupported on some embedders; a name this
+/// build cannot read is worth losing, not worth crashing sign-in over.
+String? _hostNameOrNull() {
+  try {
+    final name = Platform.localHostname.trim();
+    return name.isEmpty ? null : name;
+  } catch (_) {
+    return null;
+  }
+}
