@@ -25,6 +25,33 @@ use crate::store::{Device, ReportError, ReportSubject};
 const BODY_LIMIT: usize = 8 * 1024;
 const MAX_REASON_CHARS: usize = 2000;
 
+/// Trims a caller-supplied reason and bounds its length.
+///
+/// Shared with the moderation verbs in [`super::members`], which had no cap at
+/// all: only the module's 4 KiB body limit stood between a timeout or a removal
+/// reason and `GET /members/removed` handing it back verbatim for every removal
+/// in force. Neither route is reachable without KICK_MEMBERS or BAN_MEMBERS, so
+/// there is no attacker here; what there is, is a length contract a client
+/// rendering that list can design against, and consistency with every other
+/// free-text field in this API - message 4000, poll question 300, topic 256,
+/// search 200, display name 64, push token 1024, all capped explicitly.
+///
+/// `required` is what differs: a report must say why, a timeout need not.
+pub(super) fn validate_reason(
+    reason: Option<&str>,
+    required: bool,
+) -> Result<Option<String>, ApiError> {
+    let trimmed = reason.map(str::trim).filter(|value| !value.is_empty());
+    match trimmed {
+        None if required => Err(ApiError::BadRequest("a reason is required")),
+        None => Ok(None),
+        Some(value) if value.chars().count() > MAX_REASON_CHARS => {
+            Err(ApiError::BadRequest("that reason is too long"))
+        }
+        Some(value) => Ok(Some(value.to_owned())),
+    }
+}
+
 /// The device, block, and report routes.
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -162,13 +189,8 @@ async fn file_report(
     // subject id per request faster than a moderator was allowed to clear it.
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
 
-    let reason = req.reason.trim();
-    if reason.is_empty() {
-        return Err(ApiError::BadRequest("a reason is required"));
-    }
-    if reason.chars().count() > MAX_REASON_CHARS {
-        return Err(ApiError::BadRequest("that reason is too long"));
-    }
+    let reason = validate_reason(Some(&req.reason), true)?
+        .expect("a required reason is Some or the call above returned");
 
     let id = parse_uuid(&req.subject_id)?;
     let subject = match req.subject_kind.as_str() {
@@ -207,7 +229,7 @@ async fn file_report(
         }
     }
 
-    match state.store.file_report(ctx.user_id, subject, reason).await {
+    match state.store.file_report(ctx.user_id, subject, &reason).await {
         Ok(id) => Ok(Json(ReportFiled { id: id.to_string() })),
         Err(ReportError::AlreadyOpen) => Err(ApiError::Conflict("you already reported that")),
         Err(ReportError::NotFound) => Err(ApiError::NotFound("that was not found")),

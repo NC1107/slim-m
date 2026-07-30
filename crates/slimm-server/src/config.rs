@@ -61,6 +61,25 @@ pub struct Config {
     #[serde(default = "default_attachment_max_bytes")]
     pub attachment_max_bytes: u64,
 
+    /// Most bytes the deployment will hold in stored attachments and custom
+    /// emoji together, or `None` for no ceiling.
+    ///
+    /// `None` is the default because the right number is the operator's disk,
+    /// not ours, and a guess would either refuse a legitimate upload on a large
+    /// volume or do nothing on a small one. The shipped compose stack sets a
+    /// concrete value, the same way it does for `SLIMM_TRUST_PROXY_HOPS`, so a
+    /// self-host that follows the guide gets one without having to know it
+    /// exists.
+    ///
+    /// Avatars are deliberately outside it. They live in their own directory,
+    /// one file per account overwritten in place, so their total is bounded by
+    /// the member count times `AVATAR_MAX_BYTES` and no upload can grow it -
+    /// and they are not rows in `attachments`, so the sum this is checked
+    /// against cannot see them anyway. Counting them would need a second
+    /// mechanism to bound something that is already bounded.
+    #[serde(default)]
+    pub max_total_attachment_bytes: Option<u64>,
+
     /// Browser origins allowed to call this deployment cross-origin, comma
     /// separated, for example `https://app.example.com,http://localhost:8099`.
     ///
@@ -124,6 +143,7 @@ impl Default for Config {
             livekit_api_secret: None,
             attachments_dir: default_attachments_dir(),
             attachment_max_bytes: default_attachment_max_bytes(),
+            max_total_attachment_bytes: None,
             cors_allowed_origins: None,
             trust_proxy_hops: 0,
         }

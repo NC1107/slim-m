@@ -35,6 +35,7 @@ services:
       # peer is trusted instead, which behind any proxy puts every
       # unauthenticated caller in one rate-limit bucket; deploy/README.md.
       SLIMM_TRUST_PROXY_HOPS: ${SLIMM_TRUST_PROXY_HOPS:-1}
+      SLIMM_MAX_TOTAL_ATTACHMENT_BYTES: ${SLIMM_MAX_TOTAL_ATTACHMENT_BYTES:-}
       # Unset means no SFU and 501 for every voice request. The URL is the one
       # clients reach from outside, not the internal name; deploy/README.md.
       SLIMM_LIVEKIT_URL: wss://${LIVEKIT_DOMAIN:?set LIVEKIT_DOMAIN in .env}

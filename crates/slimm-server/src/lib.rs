@@ -39,7 +39,8 @@ pub async fn run() -> anyhow::Result<()> {
 
     let store = store::Store::new(pool);
     spawn_token_sweep(store.clone());
-    let media = media::Media::new(config.attachments_dir.clone(), config.attachment_max_bytes)?;
+    let media = media::Media::new(config.attachments_dir.clone(), config.attachment_max_bytes)?
+        .with_total_ceiling(config.max_total_attachment_bytes);
     spawn_attachment_sweep(store.clone(), media.clone());
     let auth = auth::Auth::new(config.hash_concurrency)?;
     let hub = hub::Hub::new();
@@ -150,7 +151,8 @@ pub async fn import_emoji(dir: &std::path::Path) -> anyhow::Result<()> {
     let config = config::Config::from_env()?;
     let pool = db::connect(&config).await?;
     let store = store::Store::new(pool);
-    let media = media::Media::new(config.attachments_dir.clone(), config.attachment_max_bytes)?;
+    let media = media::Media::new(config.attachments_dir.clone(), config.attachment_max_bytes)?
+        .with_total_ceiling(config.max_total_attachment_bytes);
 
     let report = emoji::import::import_directory(&store, &media, dir).await?;
     print!("{report}");

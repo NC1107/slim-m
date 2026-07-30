@@ -36,6 +36,14 @@ pub(crate) enum ApiError {
     NotConfigured(&'static str),
     Unavailable,
     PayloadTooLarge,
+    /// The deployment has no room left for what this would store.
+    ///
+    /// Deliberately not [`ApiError::PayloadTooLarge`], which already means "your
+    /// file is over the per-upload limit". An operator reading a user's
+    /// screenshot needs to tell "make it smaller" apart from "the volume is
+    /// full", and the two have different fixes: one is the sender's, the other
+    /// is the operator's.
+    InsufficientStorage,
     Internal,
 }
 
@@ -64,6 +72,10 @@ impl IntoResponse for ApiError {
             ApiError::PayloadTooLarge => (
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "request body exceeds the size limit".into(),
+            ),
+            ApiError::InsufficientStorage => (
+                StatusCode::INSUFFICIENT_STORAGE,
+                "this deployment has no storage left for new uploads".into(),
             ),
             ApiError::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal error".into()),
         };

@@ -1665,6 +1665,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
 
   /attachments/{attachmentId}:
     parameters:
@@ -2513,6 +2515,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
   /emoji/{emoji_id}:
     delete:
       operationId: deleteCustomEmoji
@@ -2624,6 +2628,18 @@ components:
             $ref: "#/components/schemas/Error"
     Conflict:
       description: The request collided with existing state.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InsufficientStorage:
+      description: >
+        The deployment has no room left for what this would store, against
+        `SLIMM_MAX_TOTAL_ATTACHMENT_BYTES`. Distinct from a 413, which means the
+        single upload is over the per-file limit: one is the sender's to fix by
+        sending something smaller, the other is the operator's. Nothing is
+        written, so a retry after the operator raises the ceiling or the orphan
+        sweep reclaims space succeeds unchanged.
       content:
         application/json:
           schema:

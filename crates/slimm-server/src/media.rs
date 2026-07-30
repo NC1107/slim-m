@@ -160,6 +160,11 @@ pub struct Media {
     attachments_dir: PathBuf,
     avatars_dir: PathBuf,
     max_attachment_bytes: u64,
+    /// The deployment-wide ceiling, or `None` for no ceiling. Carried here
+    /// rather than on `AppState` because this is where the other size limit
+    /// read out of `Config` already lives, and because `AppState` is built by
+    /// hand in dozens of test files that have no opinion about it.
+    max_total_attachment_bytes: Option<u64>,
     /// Set only by [`Media::for_tests`]; always `None` in a real deployment,
     /// whose media root outlives the process on purpose.
     temp_root: Option<Arc<TempRoot>>,
@@ -194,6 +199,7 @@ impl Media {
             attachments_dir,
             avatars_dir,
             max_attachment_bytes,
+            max_total_attachment_bytes: None,
             temp_root: None,
         })
     }
@@ -212,6 +218,17 @@ impl Media {
 
     pub fn max_attachment_bytes(&self) -> u64 {
         self.max_attachment_bytes
+    }
+
+    /// Sets the deployment-wide ceiling, consuming and returning self so
+    /// `main` can build this in one expression.
+    pub fn with_total_ceiling(mut self, ceiling: Option<u64>) -> Self {
+        self.max_total_attachment_bytes = ceiling;
+        self
+    }
+
+    pub fn max_total_attachment_bytes(&self) -> Option<u64> {
+        self.max_total_attachment_bytes
     }
 
     fn attachment_path(&self, sha256_hex: &str) -> PathBuf {
