@@ -14,7 +14,7 @@ See the [roadmap](docs/ROADMAP.md) for phases and exit criteria.
 
 ```
 crates/slimm-server   Rust home server (Axum + embedded SQLite via sqlx)
-schema/               OpenAPI + JSON Schema, the single source of record for the wire protocol
+schema/               OpenAPI (openapi.yaml), the single source of record for the wire protocol - hand-written types on both sides, not generated from it
 client/               Flutter client (Dart pub workspace of small packages)
 docker/               Production container image for the server
 docs/                 Brief, strategy, roadmap, decisions, and research
