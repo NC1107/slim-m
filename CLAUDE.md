@@ -88,6 +88,31 @@ Generous in the wrong direction: a compose flow takes seconds, and at the upload
 Mutating the shared `validate_reason`'s length check killed the new moderation test and nothing in `tests/safety.rs`, which is how it came out that the report reason's own 2000-character cap had never had a test.
 It has one now, and the validator is one function called from the report intake and both moderation verbs, with `required` the only difference - a report must say why, a timeout need not.
 
+## Caching a permission on the socket, and why events are the wrong key (2026-07-30)
+
+The last half of the audit's fan-out finding, and the one place today's work got something wrong and had to be fixed before merging.
+Read this before touching `http/ws/view_cache.rs` or `Hub::publish`.
+
+**Invalidating a cached permission as the events arrive is wrong, and it looks right.**
+The first version of `ViewCache` ran `observe(&event)` ahead of `authorize`, dropping whatever each event could have changed.
+`hub.rs`'s own module doc already said why that cannot hold: delivery order across concurrent writers is best-effort, so a connection can be handed a `message.created` published by one request before the `overwrite.changed` published by another that had already committed.
+The worse half is queue depth - a connection lagging behind its backlog only invalidates when it *reaches* the revocation, so it keeps serving the pre-revocation answer for everything still ahead of it, however long ago the write landed.
+That is a message delivered to somebody who can no longer read the channel over REST, which is the one thing the socket exists to prevent.
+An adversarial review found it; no test did, and the three live tests all passed because they serialise the write and the read.
+
+**The fix is that invalidation must be keyed on the write, not on the reader's place in the stream.**
+`Hub::publish` bumps a shared `permissions_epoch` *before* the send, and an entry is only reused while the epoch it was taken at still stands.
+So the invalidation is immediate and global the moment the writing request reaches its publish call, and depends on nothing about delivery.
+`observe` is deleted rather than kept alongside: two overlapping mechanisms are worse than one, and the epoch subsumes it.
+The residual is the gap between a handler's commit and its `publish` call, which carries no await in any handler that publishes one of these, so nothing can be scheduled inside it.
+
+**The five-second TTL is not belt-and-braces, it covers a different hole.**
+The epoch only moves for events that are *published*, and says nothing about a route that writes permissions and publishes nothing - which is exactly what `roles.rs`, `overwrites.rs` and `channels.rs` did until PR #161, and what invite redemption still does (`store/invites.rs` grants a role with no event).
+`moves_permissions` keeps an exhaustive match so a new `Event` variant cannot compile until somebody classifies it, but no match can see a write that never became an event.
+
+Measured, on one connection over 25 messages: the fan-out side goes from 25 permission resolutions to 1, each of which was five queries.
+A read error is never cached, so one blip fails closed for its own event rather than silencing a channel for the window.
+
 ## Read bounds: what a list may answer with (2026-07-30)
 
 Two read surfaces answered with as much as a deployment happened to hold.
@@ -863,6 +888,12 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 
 ## Open items that need the owner
 
+- **Rebuild `messages` on an explicit rowid alias, with somebody watching the deploy (2026-07-30).**
+  `messages_fts` uses `content_rowid='rowid'` and `messages` has `PRIMARY KEY (channel_id, seq)` with no `INTEGER PRIMARY KEY`, so VACUUM is free to renumber underneath the index.
+  That is the exact licence `0015_canvas_rtree.sql` refused for the R-Tree and then did not extend to FTS, and `VACUUM INTO` is the Phase 9 backup mechanism, so the first place it lands is a backup nobody reads until a restore.
+  It is latent rather than live: nothing runs VACUUM today, and because messages are only soft-deleted the rowid sequence is gapless, so a VACUUM would in practice reassign the same numbers.
+  **Deliberately not done autonomously**, which is the part worth recording. The fix is a full table rebuild (STRICT tables cannot `ALTER` into a rowid alias) on a table holding real messages, with foreign keys and FTS triggers hanging off it, and the live instance auto-updates from `latest` through Watchtower - so merging it runs a data migration on the owner's own Space unattended.
+  The cost of waiting is that the rebuild gets more expensive as the table grows; the cost of not waiting is a silent wrong-rows migration nobody is watching. Do it before the Phase 9 backup work is written, with a person present.
 - **Deploy the invite gate.** The live instance at `https://slim.npc-server.top` still accepts anonymous registration and will until it runs a build containing the gate. Watchtower tracks `latest`, so cutting a release is what closes it; nothing else needs doing on the host.
 - **Watch the next release PR.** `release-please-config.json` gained the `cargo-workspace` plugin so a version bump also updates `Cargo.lock`, which the new `--locked` builds require. That is the one change in the audit pass that could not be verified locally, and its failure mode is a red release PR, not a bad release.
 - **`bump-minor-pre-major` is why the server stays on 0.x.** PR #42 landed as `feat!` (registration genuinely changed behaviour for a claimed deployment), and release-please read the breaking marker on a 0.x project as "go to 1.0.0" and opened exactly that PR. It was closed unmerged. The flag makes a breaking change bump the minor while under 1.0, so that reads 0.9.0 instead. 1.0 is a Phase 9 deliverable and the product is not even named yet (owner decision 9), so nothing should reach it by accident.
