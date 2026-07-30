@@ -19,7 +19,9 @@ SPACE_MENU = "Space menu"
 SPACE_SETTINGS = "Space settings"
 PERSONAL_SETTINGS = "Personal settings"
 
-# Personal settings
+# Personal settings. Nav entries first: a control needs its own pane selected.
+ACCOUNT_PANE = "Account & presence"
+APPEARANCE_PANE = "Appearance"
 UPLOAD_PHOTO = "Upload photo"
 CROP_TITLE = "Crop your picture"
 USE_PICTURE = "Use picture"

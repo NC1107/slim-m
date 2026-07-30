@@ -37,6 +37,7 @@ def personal_settings_reachable(client):
 def change_theme(client):
     """A preference that persists is a preference that was actually stored."""
     _open_personal(client)
+    client.click(L.APPEARANCE_PANE, settle=2)
     client.click(L.THEME, settle=2)
     client.wait_for('Dark')
     client.click('Dark', settle=2)
@@ -47,6 +48,7 @@ def change_theme(client):
 def change_status(client):
     """Presence is a real server-side state, not a local badge."""
     _open_personal(client)
+    client.click(L.ACCOUNT_PANE, settle=2)
     client.click(L.STATUS, settle=2)
     client.wait_for('Do not disturb')
     client.click('Do not disturb', settle=3)
