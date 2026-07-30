@@ -413,7 +413,7 @@ impl Store {
 /// Like [`fetch_message`] but sees a deleted row too, for the send
 /// idempotency probe: a retried id must match whether or not the first send's
 /// message has since been deleted.
-async fn fetch_message_including_deleted<'e, E>(
+pub(super) async fn fetch_message_including_deleted<'e, E>(
     executor: E,
     id: MessageId,
 ) -> anyhow::Result<Option<Message>>
