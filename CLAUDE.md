@@ -86,6 +86,18 @@ Push reaches the device before any filter runs, and a phone buzzing for a messag
 Both stay view choices rather than moderation actions: nothing is removed for anybody else and the blocked user is never told.
 Migration 0022 indexes `user_blocks(blocked_id)`, since the reverse lookup runs on the message write path.
 
+**Three defects in the first version of this were found by an adversarial review, not by any test, and the worst one was created by the fix itself.**
+Recording them because each is a shape that will recur.
+
+- **Changing what a shared function means to one caller changed it for every caller.** `reactions_for_messages` gained a `viewer` parameter's teeth, and `http/reactions.rs`'s `publish` had been passing `UserId::generate()` with a comment saying any id yields the same public counts. That was true before and false after: the broadcast started fanning one *unfiltered* tally to everybody, and the client replaces its cached tally with whatever a frame says, so a single reaction from a blocked person put their count back on screen. `Event::ReactionsChanged` carries ids only now and the tally is derived per receiving connection, exactly as `PresenceChanged`'s status already was. `tests/blocking_live.rs` drives a real socket for it, because `blocking_reach.rs` drives the store and the store was right.
+- **A second implementation of the same feature does not get fixed by fixing the first.** `command_palette.dart` runs its own message search beside `channelSearchProvider` and renders the body and the author's name; it went unfiltered. Its message-search path also turned out to have *no* test at all, because the palette harness started at `/channels` with nothing selected and the palette only searches when a channel is.
+- **`sessionProvider.changes` fires on every access-token rotation, not just sign-in.** Refetching the block list on each one made routine rotation a race against an in-flight block: a `GET /blocks` sent before the block landed and answering after it silently unblocked somebody the app had just confirmed. The listener compares the *user id* now, and a generation counter drops any answer a newer state has superseded.
+
+**Gating the transcript on the block list having loaded was tried and reverted.**
+It is the obvious way to stop a launch painting a blocked author for a frame, and it costs more than it buys: it couples every channel's first paint to an unrelated network call, and an empty stream standing in meanwhile stops `pumpAndSettle` ever settling, which hung several existing shell tests.
+The residual is recorded in `blocks_controller.dart` with the real answer named - a block set persisted beside the session, known synchronously at launch, with the fetch only correcting it.
+Search, pins and typing filter against whatever is known for the same reason, so all four surfaces behave alike.
+
 **A `StreamProvider` body must return the stream, not `yield*` it.**
 Cancelling an `async*` generator that delegates to a drift query stream deadlocks a widget test: drift defers a cancelled stream's cleanup onto a zero-duration timer, and the fake clock only advances on the next pump, which never comes.
 The symptom is the test hanging until the harness kills it and flutter_tools crashing with "Cannot close sink while adding stream", which names nothing relevant.

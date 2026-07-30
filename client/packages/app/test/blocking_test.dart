@@ -102,7 +102,9 @@ Future<({ProviderContainer container, List<int> markReadSeqs})> _wire(
           httpClient: MockClient((request) async {
             if (request.url.path == '/blocks') {
               if (blocksFail) return http.Response('nope', 500);
-              return _json(blocked);
+              // Keyed on the token, so a second account's list is its own.
+              final own = request.headers['authorization'] == 'Bearer access';
+              return _json(own ? blocked : const <String>[]);
             }
             if (request.method == 'PUT' &&
                 request.url.path == '/channels/c1/read') {
@@ -230,7 +232,87 @@ void main() {
     expect(
       wired.container.read(blocksProvider).settled,
       isTrue,
-      reason: 'a failure settles too, or nothing downstream ever renders',
+      reason: 'a failure settles too, so the settings pane can say so',
+    );
+    expect(
+      find.text('from a pest'),
+      findsOneWidget,
+      reason:
+          'and nothing is filtered, which is the right one of the two: a '
+          'transcript held empty behind an unreachable block list is worse '
+          'than an unfiltered one',
+    );
+    await _unmount(tester);
+  });
+
+  /// A token rotation is not a new account. The session stream fires on every
+  /// automatic access-token refresh, and refetching on those made routine
+  /// rotation a race against an in-flight block: a `GET /blocks` sent before
+  /// the block landed and answering after it would silently unblock somebody
+  /// the app had just confirmed as blocked.
+  testWidgets('a token rotation does not refetch or clobber the block set', (
+    tester,
+  ) async {
+    final wired = await _wire(tester, blocked: const []);
+    final controller = wired.container.read(blocksProvider.notifier);
+    final session = wired.container.read(sessionProvider);
+
+    await controller.block('pest');
+    expect(wired.container.read(blocksProvider).ids, contains('pest'));
+
+    // Same account, new access token: exactly what a refresh publishes.
+    session.set(
+      const api.TokenPair(
+        userId: 'me',
+        accessToken: 'access-2',
+        refreshToken: 'refresh-2',
+        accessExpiresAt: 0,
+      ),
+    );
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+
+    expect(
+      wired.container.read(blocksProvider).ids,
+      contains('pest'),
+      reason: 'the rotation must not have refetched over the block',
+    );
+    expect(find.text('from a pest'), findsNothing);
+    await _unmount(tester);
+  });
+
+  /// A different account signing in on the same device does refetch, and starts
+  /// from nothing rather than inheriting the previous account's set.
+  testWidgets('a different account signing in replaces the block set', (
+    tester,
+  ) async {
+    final wired = await _wire(tester, blocked: ['pest']);
+    expect(wired.container.read(blocksProvider).ids, contains('pest'));
+
+    wired.container
+        .read(sessionProvider)
+        .set(
+          const api.TokenPair(
+            userId: 'someone-else',
+            accessToken: 'access-2',
+            refreshToken: 'refresh-2',
+            accessExpiresAt: 0,
+          ),
+        );
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+
+    expect(
+      wired.container.read(blocksProvider).ids,
+      isEmpty,
+      reason: 'the new account gets its own list, not the previous one\'s',
+    );
+    expect(
+      find.text('from a pest'),
+      findsOneWidget,
+      reason: 'and nothing is hidden from them on the old account\'s behalf',
     );
     await _unmount(tester);
   });

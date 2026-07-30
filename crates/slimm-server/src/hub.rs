@@ -67,13 +67,15 @@ pub enum Event {
         channel_id: ChannelId,
         message_id: MessageId,
     },
-    /// A message's reactions changed. Carries the whole public summary rather
-    /// than a delta, so a client that missed a frame cannot drift; the
-    /// per-viewer "did I react" flag is deliberately not broadcast.
+    /// A message's reactions changed. Carries the ids only: the tally itself is
+    /// per viewer, since a reactor the receiver has blocked is not counted for
+    /// them, so it is derived per receiving connection at send time the way
+    /// [`Event::PresenceChanged`]'s status is. A precomputed tally here would be
+    /// one global answer fanned out to everybody, which is exactly what made a
+    /// live reaction undo a block.
     ReactionsChanged {
         channel_id: ChannelId,
         message_id: MessageId,
-        reactions: Vec<(String, i64)>,
     },
     /// A message was pinned in a channel.
     MessagePinned {

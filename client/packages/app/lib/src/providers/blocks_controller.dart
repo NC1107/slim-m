@@ -54,29 +54,63 @@ class BlocksState {
 
 class BlocksController extends StateNotifier<BlocksState> {
   BlocksController(this._ref) : super(const BlocksState()) {
-    // Emptied on sign-out, or the next account on this device inherits it.
-    _sub = _ref.read(sessionProvider).changes.listen((tokens) {
-      if (tokens == null) {
-        state = const BlocksState();
-      } else {
-        unawaited(refresh());
-      }
-    });
+    _account = _ref.read(sessionProvider).tokens?.userId;
+    _sub = _ref.read(sessionProvider).changes.listen(_onSessionChanged);
     unawaited(refresh());
   }
 
   final Ref _ref;
   late final StreamSubscription<api.TokenPair?> _sub;
 
+  /// Whose block list is held, so a session change that is only a token
+  /// rotation is told apart from a different account signing in.
+  String? _account;
+
+  /// Bumped by every load, so a response that arrives after a newer state was
+  /// set is dropped rather than overwriting it.
+  int _generation = 0;
+
+  /// Sign-out empties the set: the local database is one file for the whole
+  /// app, so a block list outliving a sign-out would hide messages from
+  /// whoever signs in next on this device.
+  ///
+  /// A non-null change is only refetched when the *account* changed. The
+  /// session stream also fires on every automatic access-token rotation, and
+  /// refetching on those turned routine rotation into a race against an
+  /// in-flight block: a `GET /blocks` sent before the block landed, answering
+  /// after it, would overwrite the set and silently unblock somebody the app
+  /// had just confirmed as blocked.
+  void _onSessionChanged(api.TokenPair? tokens) {
+    if (tokens == null) {
+      _generation++;
+      _account = null;
+      state = const BlocksState();
+      return;
+    }
+    if (tokens.userId == _account) return;
+    _account = tokens.userId;
+    _generation++;
+    state = const BlocksState();
+    unawaited(refresh());
+  }
+
   /// Reads the list back from the server, replacing what is held.
+  ///
+  /// Catches everything, not just [api.ApiException]: this runs unawaited from
+  /// the constructor and from a session change, so anything that escapes it
+  /// reaches no caller at all. An answer in a shape this client cannot parse is
+  /// a list that could not be read, which is the same state as a refused one -
+  /// and it must not take the app down on the way.
   Future<void> refresh() async {
+    final generation = ++_generation;
     try {
       final ids = await _ref.read(apiProvider).listBlocks();
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       state = BlocksState(ids: ids.toSet(), settled: true);
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      state = BlocksState(ids: state.ids, settled: true, error: e.message);
+    } catch (error) {
+      if (!mounted || generation != _generation) return;
+      final message = error is api.ApiException ? error.message : '$error';
+      state = BlocksState(ids: state.ids, settled: true, error: message);
     }
   }
 
@@ -98,6 +132,8 @@ class BlocksController extends StateNotifier<BlocksState> {
     } else {
       after.remove(userId);
     }
+    // Bumped, or an in-flight refresh answers after this and reinstates it.
+    _generation++;
     state = BlocksState(ids: after, settled: state.settled);
     final client = _ref.read(apiProvider);
     try {
@@ -107,6 +143,10 @@ class BlocksController extends StateNotifier<BlocksState> {
         await client.unblockUser(userId);
       }
     } on api.ApiException {
+      if (mounted) state = BlocksState(ids: before, settled: state.settled);
+      rethrow;
+    } catch (_) {
+      // Not only ApiException: an unreverted change asserts a block never taken.
       if (mounted) state = BlocksState(ids: before, settled: state.settled);
       rethrow;
     }
@@ -151,6 +191,16 @@ class VisibleTranscript {
 /// Watching the block set re-subscribes on a block or an unblock, which is what
 /// makes both take effect on the open channel without a refetch.
 ///
+/// KNOWN GAP, deliberately left: this filters against whatever is known, so a
+/// launch can paint a blocked author's message for the frames between the local
+/// store answering (fast, on disk) and `GET /blocks` answering (a round trip).
+/// Holding the transcript back until the block set settled was tried and
+/// reverted: it couples the first paint of every channel to an unrelated network
+/// call, and an empty stream standing in meanwhile stops `pumpAndSettle` ever
+/// settling. The real answer is a block set persisted beside the session, so it
+/// is known synchronously at launch and the fetch only corrects it - which is
+/// its own change, with its own sign-out handling to get right.
+///
 /// It returns the store's own stream mapped, never an `async*` body delegating to
 /// it with `yield*`. Cancelling that shape deadlocks a widget test: drift defers
 /// a cancelled query stream's cleanup onto a zero-duration timer, and the fake
@@ -158,12 +208,8 @@ class VisibleTranscript {
 final visibleChannelMessagesProvider = StreamProvider.autoDispose
     .family<VisibleTranscript, String>((ref, channelId) {
       final store = ref.watch(storeProvider).valueOrNull;
-      final blocks = ref.watch(blocksProvider);
-      // Held until settled, or a launch paints a blocked author for one frame.
-      if (store == null || !blocks.settled) {
-        return const Stream<VisibleTranscript>.empty();
-      }
-      final blocked = blocks.ids;
+      if (store == null) return const Stream<VisibleTranscript>.empty();
+      final blocked = ref.watch(blocksProvider.select((state) => state.ids));
       return store.watchChannel(channelId).map((rows) {
         var newestSeq = 0;
         for (final message in rows) {

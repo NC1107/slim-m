@@ -94,7 +94,7 @@ async fn add(
         Err(ReactError::Internal(e)) => return Err(e.into()),
     }
 
-    publish(&state, channel_id, message_id).await;
+    publish(&state, channel_id, message_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -112,38 +112,24 @@ async fn remove(
         .store
         .remove_reaction(message_id, ctx.user_id, &emoji)
         .await?;
-    publish(&state, channel_id, message_id).await;
+    publish(&state, channel_id, message_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
 /// Tells live connections the message's reactions changed.
 ///
-/// The event carries the whole summary set rather than a delta, because a
-/// client that missed an earlier frame would otherwise apply a delta to a state
-/// it does not have and drift. The set is small and this is not a hot path.
+/// The frame carries only the ids. The tally is per viewer - a reactor the
+/// receiver has blocked is not counted for them - so it is derived per
+/// receiving connection in `ws.rs`, the same shape `presence.changed` uses for
+/// a status. Computing it once here and fanning it out would be one global
+/// answer for everybody, which is what let a live reaction quietly undo a
+/// block: the client replaces its cached tally with whatever a frame says.
 ///
-/// `reacted` is deliberately absent from the broadcast: it differs per viewer,
-/// and one connection must never be told what another user reacted with beyond
-/// the public count. Each client re-derives its own toggled state.
-async fn publish(state: &AppState, channel_id: crate::ids::ChannelId, message_id: MessageId) {
-    // The viewer only decides the per-viewer `reacted` flag, which is dropped
-    // below, so any id yields the same public counts.
-    match state
-        .store
-        .reactions_for_message(message_id, crate::ids::UserId::generate())
-        .await
-    {
-        Ok(summaries) => {
-            state.hub.publish(Event::ReactionsChanged {
-                channel_id,
-                message_id,
-                reactions: summaries.into_iter().map(|s| (s.emoji, s.count)).collect(),
-            });
-        }
-        Err(err) => {
-            // The write already succeeded, so a failed fan-out only leaves
-            // live clients stale until their next fetch.
-            tracing::warn!(error = %err, "reactions: could not load summaries to publish");
-        }
-    }
+/// `reacted` is likewise absent from the wire and derived per client, so one
+/// connection is never told what another user reacted with beyond the count.
+fn publish(state: &AppState, channel_id: crate::ids::ChannelId, message_id: MessageId) {
+    state.hub.publish(Event::ReactionsChanged {
+        channel_id,
+        message_id,
+    });
 }

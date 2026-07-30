@@ -212,7 +212,8 @@ void main() {
               baseUrl: Uri.parse('http://localhost:8080'),
               session: ref.watch(sessionProvider),
               httpClient: MockClient((request) async {
-                fetchCount++;
+                // Refetches of the pin list, not every request the app makes.
+                if (request.url.path.endsWith('/pins')) fetchCount++;
                 return http.Response(
                   '[]',
                   200,
