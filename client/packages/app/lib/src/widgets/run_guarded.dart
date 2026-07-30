@@ -37,6 +37,15 @@ Future<String?> runGuarded({
   }
 }
 
+/// The shape of [GuardedActionState.guard], for a helper that needs to run a
+/// request but has no state of its own to hold the failure in - the caller's
+/// mixin is what ends up rendering it.
+typedef Guard =
+    Future<bool> Function({
+      required String whatFailed,
+      required Future<void> Function() action,
+    });
+
 /// Holds the last failure from [runGuarded] for a widget that renders it.
 ///
 /// A mixin rather than a base class so it composes with the `ConsumerState`

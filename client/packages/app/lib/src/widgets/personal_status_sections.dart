@@ -11,26 +11,30 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/presence_controller.dart';
 import '../providers/push_controller.dart';
-import 'presence_menu.dart' show applyPresenceVisibility;
+import 'presence_menu.dart' show applyPresenceVisibility, presenceOptions;
+import 'run_guarded.dart';
 import 'settings_section_header.dart';
 import 'settings_select_row.dart';
 
 /// Sets the caller's own visibility preference via `PATCH /presence`. See
 /// [presenceVisibilityDisplayProvider] for why the selected segment is a
 /// local echo of the last choice rather than a value read back from the
-/// server: there is no endpoint that returns it.
-class PresenceSection extends ConsumerWidget {
+/// server: there is no endpoint that returns it, so a null [selected] is
+/// rendered as its own "Unknown" rather than asserting one of the choices.
+class PresenceSection extends ConsumerStatefulWidget {
   const PresenceSection({super.key});
 
-  static const _options = [
-    (api.PresenceVisibility.online, 'Online'),
-    (api.PresenceVisibility.away, 'Away'),
-    (api.PresenceVisibility.dnd, 'Do not disturb'),
-    (api.PresenceVisibility.hidden, 'Appear offline'),
-  ];
+  @override
+  ConsumerState<PresenceSection> createState() => _PresenceSectionState();
+}
+
+class _PresenceSectionState extends ConsumerState<PresenceSection>
+    with GuardedActionState<PresenceSection> {
+  Future<void> _set(api.PresenceVisibility visibility) =>
+      applyPresenceVisibility(ref, visibility, guard: guard);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final selected = ref.watch(presenceVisibilityDisplayProvider);
 
     return Column(
@@ -40,14 +44,26 @@ class PresenceSection extends ConsumerWidget {
         SettingsSelectRow<api.PresenceVisibility>(
           label: 'Status',
           sheetTitle: 'Presence',
-          value: selected ?? _options.first.$1,
+          value: selected,
           choices: [
-            for (final option in _options)
-              SettingsChoice(value: option.$1, label: option.$2),
+            for (final (visibility, label, _) in presenceOptions)
+              SettingsChoice(value: visibility, label: label),
           ],
-          onChanged: (visibility) =>
-              applyPresenceVisibility(context, ref, visibility),
+          onChanged: _set,
         ),
+        if (actionError != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s16,
+              0,
+              AppSpacing.s16,
+              AppSpacing.s8,
+            ),
+            child: AppErrorState(
+              message: actionError!,
+              onDismiss: clearActionError,
+            ),
+          ),
       ],
     );
   }

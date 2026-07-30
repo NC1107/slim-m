@@ -92,6 +92,27 @@ void main() {
     });
   });
 
+  group('decode cap', () {
+    testWidgets('never decodes past the tile size it is drawn at', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        _app([
+          customEmojiImageProvider.overrideWith((ref, id) async => _png),
+        ], const CustomEmojiImage(emojiId: 'e-party_parrot', size: 24)),
+      );
+      await tester.pumpAndSettle();
+
+      final image = tester.widget<Image>(find.byType(Image));
+      final resized = image.image as ResizeImage;
+      // 24dp at 2x, or a custom emoji upload decodes at its own full size.
+      expect(resized.width, 48);
+      expect(resized.height, 48);
+    });
+  });
+
   group('provider lifetime', () {
     testWidgets('the emoji index outlives the last widget watching it, so a '
         'transcript scrolling a row out does not refetch the set', (

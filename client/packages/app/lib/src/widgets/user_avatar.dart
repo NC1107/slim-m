@@ -10,6 +10,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/avatar_bytes.dart';
 import '../providers/user_profiles.dart';
+import 'image_decode.dart';
 
 /// For a caller that already holds a full profile (or `Me`) and so knows
 /// [userId] and [avatarUpdatedAt] outright: a member row, the caller's own
@@ -50,7 +51,16 @@ class UserAvatar extends ConsumerWidget {
       final bytes = ref
           .watch(avatarBytesProvider((userId: id, updatedAt: avatarUpdatedAt)))
           .valueOrNull;
-      if (bytes != null) image = MemoryImage(bytes);
+      if (bytes != null) {
+        // Never decodes past the pixels this avatar is ever drawn at.
+        final edge = decodeEdge(context, size);
+        image = ResizeImage(
+          MemoryImage(bytes),
+          width: edge,
+          height: edge,
+          policy: ResizeImagePolicy.fit,
+        );
+      }
     }
     return AppAvatar(
       name: name,

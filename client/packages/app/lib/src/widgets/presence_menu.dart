@@ -13,9 +13,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../api_failure.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
+import 'run_guarded.dart';
 import 'user_avatar.dart';
 
 /// Every visibility a caller may choose, each with the label it is offered
@@ -47,27 +47,33 @@ const presenceOptions = <(api.PresenceVisibility, String, AppPresence)>[
   return (option.$2.toLowerCase(), option.$3);
 }
 
-/// Sets the caller's own visibility.
+/// Sets the caller's own visibility, and puts the echo back if the server
+/// refuses it.
 ///
 /// The local echo is set first so the menu and the footer update on the tap
 /// rather than on the round trip; see [presenceVisibilityDisplayProvider] for
-/// why that echo exists at all. A failure is surfaced rather than swallowed,
-/// because a silently unchanged appear-offline is the one outcome here a user
-/// must never be left believing.
-Future<void> applyPresenceVisibility(
-  BuildContext context,
+/// why that echo exists at all. A rejected change must not leave it asserting
+/// a visibility the server never applied - a stale "appear offline" is still
+/// hidden, but a stale "online" is exactly the lie this feature exists to
+/// prevent.
+///
+/// [guard] is the caller's own [GuardedActionState.guard], so the failure
+/// lands in whichever surface is already set up to render it as
+/// [AppErrorState] rather than this having an opinion of its own.
+Future<bool> applyPresenceVisibility(
   WidgetRef ref,
-  api.PresenceVisibility visibility,
-) async {
-  ref.read(presenceVisibilityDisplayProvider.notifier).state = visibility;
-  try {
-    await ref.read(apiProvider).setPresenceVisibility(visibility);
-  } on api.ApiException catch (e) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(describeApiFailure('update your status', e))),
-    );
-  }
+  api.PresenceVisibility visibility, {
+  required Guard guard,
+}) async {
+  final notifier = ref.read(presenceVisibilityDisplayProvider.notifier);
+  final previous = notifier.state;
+  notifier.state = visibility;
+  final ok = await guard(
+    whatFailed: 'update your status',
+    action: () => ref.read(apiProvider).setPresenceVisibility(visibility),
+  );
+  if (!ok) notifier.state = previous;
+  return ok;
 }
 
 /// The rail footer's avatar, as a tap target that opens the status menu
@@ -83,9 +89,18 @@ class PresenceMenuButton extends ConsumerStatefulWidget {
   ConsumerState<PresenceMenuButton> createState() => _PresenceMenuButtonState();
 }
 
-class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton> {
+class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
+    with GuardedActionState<PresenceMenuButton> {
   final _controller = OverlayPortalController();
   final _link = LayerLink();
+
+  /// Applies [visibility] and closes the menu once the server has agreed to
+  /// it. A refusal leaves the menu open with [actionError] rendered inline,
+  /// rather than closing over a change that never happened.
+  Future<void> _select(api.PresenceVisibility visibility) async {
+    final ok = await applyPresenceVisibility(ref, visibility, guard: guard);
+    if (ok && mounted) _controller.hide();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -161,12 +176,15 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton> {
                     status: presence,
                     backgroundColor: tokens.surfaceRaised,
                   ),
-                  onTap: () {
-                    _controller.hide();
-                    unawaited(
-                      applyPresenceVisibility(context, ref, visibility),
-                    );
-                  },
+                  onTap: () => unawaited(_select(visibility)),
+                ),
+              if (actionError != null)
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.s8),
+                  child: AppErrorState(
+                    message: actionError!,
+                    onDismiss: clearActionError,
+                  ),
                 ),
             ],
           ),

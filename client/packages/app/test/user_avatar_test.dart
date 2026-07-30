@@ -69,6 +69,8 @@ void main() {
   testWidgets('a known userId with resolved bytes renders through Image', (
     tester,
   ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final bytes = Uint8List.fromList(const [1, 2, 3, 4]);
     await tester.pumpWidget(
       _harness(
@@ -95,7 +97,43 @@ void main() {
     /// in. What matters here is that the right bytes actually reached the
     /// widget, which the assertion above already establishes.
     final image = tester.widget<Image>(find.byType(Image));
-    expect((image.image as MemoryImage).bytes, bytes);
+    final resized = image.image as ResizeImage;
+    expect((resized.imageProvider as MemoryImage).bytes, bytes);
+    // A 40dp avatar at 1x decodes at 40 real pixels, not a photo's own size.
+    expect(resized.width, 40);
+    expect(resized.height, 40);
+  });
+
+  testWidgets('the decode cap scales with the device pixel ratio', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final bytes = Uint8List.fromList(const [1, 2, 3, 4]);
+    await tester.pumpWidget(
+      _harness(
+        const UserAvatar(
+          name: 'Priya Shah',
+          userId: 'u1',
+          avatarUpdatedAt: 42,
+          size: 40,
+        ),
+        overrides: _apiOverrides(
+          (request) async => http.Response.bytes(
+            bytes,
+            200,
+            headers: {'content-type': 'image/png'},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final resized =
+        tester.widget<Image>(find.byType(Image)).image as ResizeImage;
+    // A 3x screen must decode at 3x the logical size, or it looks soft there.
+    expect(resized.width, 120);
+    expect(resized.height, 120);
   });
 
   testWidgets('a 404 (no avatar on the server) still falls back to initials', (
@@ -151,7 +189,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final image = tester.widget<Image>(find.byType(Image));
-    expect((image.image as MemoryImage).bytes, bytes);
+    final resized = image.image as ResizeImage;
+    expect((resized.imageProvider as MemoryImage).bytes, bytes);
   });
 
   testWidgets('a null author id (a deleted account) never triggers a lookup', (
