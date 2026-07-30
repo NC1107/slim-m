@@ -48,8 +48,7 @@ class Report {
   factory Report.fromJson(Map<String, dynamic> json) => Report(
         id: json['id'] as String,
         reporterId: json['reporter_id'] as String?,
-        subjectKind:
-            ReportSubject.values.byName(json['subject_kind'] as String),
+        subjectKind: ReportSubject.parse(json['subject_kind'] as String),
         subjectId: json['subject_id'] as String,
         channelId: json['channel_id'] as String?,
         reason: json['reason'] as String,

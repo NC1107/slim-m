@@ -67,6 +67,29 @@ void main() {
       expect(current.pushEnabled, isFalse);
     });
 
+    test('an unrecognised presence status reads as offline, not a throw', () {
+      final status = PresenceStatus.fromJson({
+        'user_id': 'user-1',
+        'status': 'busy',
+      });
+      expect(status.status, PresenceState.offline);
+    });
+
+    test('an unrecognised report subject reads as user, not a throw', () {
+      final report = Report.fromJson({
+        'id': 'r1',
+        'reporter_id': 'user-1',
+        'subject_kind': 'canvas_object',
+        'subject_id': 'obj-1',
+        'channel_id': null,
+        'reason': 'spam',
+        'snapshot': null,
+        'subject_author_id': null,
+        'created_at': 1,
+      });
+      expect(report.subjectKind, ReportSubject.user);
+    });
+
     test('token and ticket toString never leak the secret', () {
       expect(_tokens(access: 'super-secret').toString(),
           isNot(contains('super-secret')));
