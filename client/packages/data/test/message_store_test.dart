@@ -2,6 +2,7 @@
 /// Tests for the local store's two invariants: writes are idempotent by message
 /// id, and a stale copy can never overwrite a newer one. Both delivery routes
 /// (live push and catch-up) rely on those holding under any interleaving.
+library;
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';

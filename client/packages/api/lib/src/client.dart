@@ -65,11 +65,10 @@ class SessionStore {
 /// than once (which the server would read as reuse and revoke the session).
 class SlimmApi {
   SlimmApi({
-    required Uri baseUrl,
+    required this.baseUrl,
     SessionStore? session,
     http.Client? httpClient,
-  })  : baseUrl = baseUrl,
-        session = session ?? SessionStore(),
+  })  : session = session ?? SessionStore(),
         _http = httpClient ?? http.Client();
 
   final Uri baseUrl;

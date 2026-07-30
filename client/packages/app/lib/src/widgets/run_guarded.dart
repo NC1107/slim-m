@@ -36,8 +36,10 @@ Future<String?> runGuarded({
     return 'Could not $whatFailed. ${e.message}';
   } on api.ConflictException catch (e) {
     return 'Could not $whatFailed. ${e.message}';
-  } on api.UnauthorizedException {
+  } on api.ForbiddenException {
     return 'Could not $whatFailed: you are not allowed to do that.';
+  } on api.UnauthorizedException {
+    return 'Could not $whatFailed: you are signed out. Sign in and try again.';
   } on api.RateLimitedException {
     return 'Could not $whatFailed: too many requests just now. '
         'Wait a moment and try again.';
