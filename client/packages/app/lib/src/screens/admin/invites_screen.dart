@@ -88,12 +88,26 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
     super.dispose();
   }
 
+  /// Null while the field parses cleanly: empty (deliberately unlimited) or
+  /// a whole number. Anything else must block submission rather than let
+  /// [int.tryParse]'s null quietly become "unlimited" too.
+  String? get _maxUsesError {
+    final text = _maxUses.text.trim();
+    if (text.isEmpty || int.tryParse(text) != null) return null;
+    return 'Enter a number, or leave blank for unlimited.';
+  }
+
   Future<void> _create() async {
+    if (_maxUsesError != null) {
+      setState(() {});
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
     });
-    final maxUses = int.tryParse(_maxUses.text.trim());
+    final maxUsesText = _maxUses.text.trim();
+    final maxUses = maxUsesText.isEmpty ? null : int.tryParse(maxUsesText);
     final duration = _expiryOptions[_expiryIndex].$2;
     final expiresAt = duration == null
         ? null
@@ -110,17 +124,15 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
       if (!mounted) return;
       setState(() {
         _created = invite;
-        _submitting = false;
         _maxUses.clear();
         _expiryIndex = 0;
         _roleGrant = null;
       });
     } on api.ApiException catch (e) {
       if (!mounted) return;
-      setState(() {
-        _submitting = false;
-        _error = describeApiFailure('create the invite', e);
-      });
+      setState(() => _error = describeApiFailure('create the invite', e));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -143,6 +155,9 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
             placeholder: 'Uses allowed (blank for unlimited)',
             semanticLabel: 'Uses allowed',
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            errorText: _maxUsesError,
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: AppSpacing.s12),
           AppSegmentedControl.inline(

@@ -12,6 +12,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show TextInputFormatter;
 
 import '../../app_metrics.dart';
 import '../../app_tokens.dart';
@@ -35,6 +36,7 @@ class AppInput extends StatefulWidget {
     this.autofocus = false,
     this.keyboardType,
     this.textInputAction,
+    this.inputFormatters,
     this.onChanged,
     this.onSubmitted,
     this.semanticLabel,
@@ -67,6 +69,11 @@ class AppInput extends StatefulWidget {
   final bool autofocus;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
+
+  /// Rejects a keystroke before it ever becomes a character in the field,
+  /// which is the only place a caller can refuse "not a digit" outright
+  /// rather than accepting it and parsing the mistake out later.
+  final List<TextInputFormatter>? inputFormatters;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final String? semanticLabel;
@@ -151,6 +158,7 @@ class _AppInputState extends State<AppInput> {
               autofocus: widget.autofocus,
               keyboardType: widget.keyboardType,
               textInputAction: widget.textInputAction,
+              inputFormatters: widget.inputFormatters,
               onChanged: widget.onChanged,
               onSubmitted: widget.onSubmitted,
               style: textStyle,
