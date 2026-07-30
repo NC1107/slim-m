@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.2](https://github.com/NC1107/slim-m/compare/client-v0.13.1...client-v0.13.2) (2026-07-30)
+
+
+### Bug Fixes
+
+* **api:** give wire enums a tolerant parse instead of values.byName ([#185](https://github.com/NC1107/slim-m/issues/185)) ([aaedfee](https://github.com/NC1107/slim-m/commit/aaedfee9d711d53d74cd729d6e7df09a4a303eb0))
+
 ## [0.13.1](https://github.com/NC1107/slim-m/compare/client-v0.13.0...client-v0.13.1) (2026-07-30)
 
 
