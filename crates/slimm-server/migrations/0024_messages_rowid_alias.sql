@@ -181,12 +181,13 @@ CREATE TABLE messages_rebuild_poll_options AS
 CREATE TABLE messages_rebuild_poll_votes AS
     SELECT message_id, user_id, position, voted_at FROM poll_votes;
 
-DELETE FROM poll_votes;
-DELETE FROM poll_options;
-DELETE FROM polls;
-DELETE FROM pinned_messages;
-DELETE FROM message_attachments;
-DELETE FROM reactions;
+-- Whole-table on purpose, rows already saved above and restored below.
+DELETE FROM poll_votes; -- NOSONAR
+DELETE FROM poll_options; -- NOSONAR
+DELETE FROM polls; -- NOSONAR
+DELETE FROM pinned_messages; -- NOSONAR
+DELETE FROM message_attachments; -- NOSONAR
+DELETE FROM reactions; -- NOSONAR
 
 DROP TABLE messages;
 
