@@ -83,11 +83,14 @@ jobs:
           E2E_REBUILD: "1"
         run: bash scripts/e2e.sh
 
-      - name: upload screenshots
+      # Screenshots alone did not explain the first red run; these two did.
+      - name: upload the evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: e2e-shots
-          path: ${{ env.E2E_WORK }}/shots
+          name: e2e-evidence
+          path: |
+            ${{ env.E2E_WORK }}/shots
+            ${{ env.E2E_WORK }}/server.log
           if-no-files-found: warn
           retention-days: 14

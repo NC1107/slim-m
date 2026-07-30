@@ -22,6 +22,8 @@ TIMEOUT = 90
 _MOUSE = "Input.dispatchMouseEvent"
 # A private directory when unset, rather than a guessable shared one.
 SHOTS = os.environ.get("E2E_SHOTS") or tempfile.mkdtemp(prefix="e2e-")
+# Enough to carry a launch's worth of failures without holding a whole run.
+LOG_LINES = 200
 
 
 class Client:
@@ -32,6 +34,7 @@ class Client:
         self.port = port
         self._ws = None
         self._id = 0
+        self._log = []
 
     def _connect(self):
         from websocket import create_connection
@@ -41,6 +44,8 @@ class Client:
         page = next(t for t in targets if t["type"] == "page")
         self._ws = create_connection(page["webSocketDebuggerUrl"],
                                      suppress_origin=True, timeout=30)
+        for domain in ("Log", "Runtime"):
+            self.send(f"{domain}.enable")
 
     def send(self, method, params=None):
         if self._ws is None:
@@ -52,6 +57,38 @@ class Client:
             msg = json.loads(self._ws.recv())
             if msg.get("id") == self._id:
                 return msg
+            self._note(msg)
+
+    def _note(self, msg):
+        """Keep whatever the browser said, for the moment a scenario gives up.
+
+        A missing runtime asset is the case this exists for: the fetch fails,
+        the app renders one generic sentence, and from the harness the only
+        symptom is a label that never appears. The 404 lands here and nowhere
+        else, so a failed run says what went wrong rather than only where.
+        """
+        method = msg.get("method")
+        params = msg.get("params") or {}
+        if method == "Log.entryAdded":
+            entry = params.get("entry") or {}
+            line = " ".join(str(entry.get(k) or "")
+                            for k in ("level", "text", "url")).strip()
+        elif method == "Runtime.consoleAPICalled":
+            args = " ".join(str(a.get("value", a.get("description", "")))
+                            for a in params.get("args") or [])
+            line = f"{params.get('type')} {args}".strip()
+        else:
+            return
+        self._log.append(line)
+        del self._log[:-LOG_LINES]
+
+    def _write_log(self, tag):
+        if not self._log:
+            return
+        path = os.path.join(SHOTS, f"{self.name}-{tag}.log")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(self._log) + "\n")
+        print(f"    console {path}")
 
     def ev(self, expr):
         r = self.send("Runtime.evaluate",
@@ -209,6 +246,7 @@ class Client:
     def shot(self, tag):
         os.makedirs(SHOTS, mode=0o700, exist_ok=True)
         r = self.send("Page.captureScreenshot", {"format": "png"})
+        self._write_log(tag)
         data = (r.get("result", {}).get("result", {}).get("data")
                 or r.get("result", {}).get("data"))
         if not data:
