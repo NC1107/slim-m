@@ -28,7 +28,7 @@ extension SlimmApiPresence on SlimmApi {
       '/presence',
       body: {'visibility': visibility.wire},
     );
-    return PresenceVisibility.values.byName(
+    return PresenceVisibility.parse(
       (json as Map<String, dynamic>)['visibility'] as String,
     );
   }

@@ -14,6 +14,18 @@ enum PresenceState {
   away,
   dnd,
   offline;
+
+  /// An unrecognised value reads as [offline]: the same reading a caller
+  /// already gets for someone who chose to appear hidden, so a server
+  /// growing this enum can never make an unfamiliar status read as more
+  /// present, or more distinctive, than the one state this client is already
+  /// built to under-report.
+  static PresenceState parse(String value) => switch (value) {
+        'online' => PresenceState.online,
+        'away' => PresenceState.away,
+        'dnd' => PresenceState.dnd,
+        _ => PresenceState.offline,
+      };
 }
 
 /// The caller's own visibility preference. [hidden] is the appear-offline
@@ -26,6 +38,17 @@ enum PresenceVisibility {
   hidden;
 
   String get wire => name;
+
+  /// An unrecognised value reads as [hidden]. This is the caller's own
+  /// choice echoed back, and defaulting toward a more public state on a
+  /// value this client cannot decode risks telling someone they are visible
+  /// when they are not - the one misreading this app must never produce.
+  static PresenceVisibility parse(String value) => switch (value) {
+        'online' => PresenceVisibility.online,
+        'away' => PresenceVisibility.away,
+        'dnd' => PresenceVisibility.dnd,
+        _ => PresenceVisibility.hidden,
+      };
 }
 
 /// One user's presence, as told to the asking caller.
@@ -37,6 +60,6 @@ class PresenceStatus {
 
   factory PresenceStatus.fromJson(Map<String, dynamic> json) => PresenceStatus(
         userId: json['user_id'] as String,
-        status: PresenceState.values.byName(json['status'] as String),
+        status: PresenceState.parse(json['status'] as String),
       );
 }

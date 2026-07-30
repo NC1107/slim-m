@@ -335,4 +335,13 @@ enum ReportSubject {
   user;
 
   String get wire => name;
+
+  /// An unrecognised value reads as [user]: it is the more generic subject,
+  /// so a future kind this client has never heard of does not get rendered
+  /// as reported message content - an author and a snapshot - that may not
+  /// exist for whatever that new kind turns out to be.
+  static ReportSubject parse(String value) => switch (value) {
+        'message' => ReportSubject.message,
+        _ => ReportSubject.user,
+      };
 }
