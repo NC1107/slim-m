@@ -61,7 +61,6 @@ client/packages/app/lib/src/widgets/fullscreen_image_viewer.dart 3
 client/packages/app/lib/src/widgets/join_policy_row.dart 1
 client/packages/app/lib/src/widgets/manage_channel_sheet.dart 3
 client/packages/app/lib/src/widgets/member_pane.dart 1
-client/packages/app/lib/src/widgets/message_context_menu.dart 2
 client/packages/app/lib/src/widgets/message_edit_field.dart 2
 client/packages/app/lib/src/widgets/message_row.dart 2
 client/packages/app/lib/src/widgets/message_row_identity.dart 1

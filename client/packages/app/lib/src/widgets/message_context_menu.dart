@@ -4,14 +4,14 @@
 /// each is allowed.
 library;
 
-import 'dart:math' as math;
-
 import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'context_menu_focus.dart';
 import 'hover_reveal.dart';
+import 'message_context_menu_layout.dart';
 
 /// Where the menu's top-left sits relative to the row's own top-left, from
 /// the design.
@@ -70,6 +70,15 @@ class MessageActions {
 /// This is the only add-reaction affordance a finger has: the picker button
 /// beside a message is revealed by a [MouseRegion] that touch never fires, so
 /// [onAddReaction] is what makes reacting reachable at all on a phone.
+///
+/// A keyboard reaches the same menu through [ContextMenuFocus], which makes
+/// the row a tab stop and binds the platform's context-menu keys.
+///
+/// The row tints across a hold, showing visible progress toward the threshold
+/// instead of a dead finger (motion spec 10). It runs over the framework's own
+/// long-press timeout rather than the spec's 350ms, because the gesture stays
+/// a [GestureDetector] (the thing that publishes `SemanticsAction.longPress`)
+/// and the tint has to end when the gesture it tracks does.
 class MessageContextMenuRegion extends StatefulWidget {
   const MessageContextMenuRegion({
     super.key,
@@ -161,7 +170,7 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
       controller: _controller,
       overlayChildBuilder: (context) => Positioned.fill(
         child: CustomSingleChildLayout(
-          delegate: _MenuLayout(
+          delegate: MessageMenuLayout(
             anchor: _anchor,
             padding:
                 MediaQuery.paddingOf(context) +
@@ -169,126 +178,97 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
           ),
           child: TapRegion(
             onTapOutside: (_) => _setOpen(false),
-            // Scrolls rather than overflowing where the whole menu cannot fit,
-            // which a landscape phone at a large text scale reaches.
-            child: SingleChildScrollView(
-              child: AppMenu(
-                width: 200,
-                children: [
-                  AppMenuItem(
-                    label: 'Add reaction',
-                    leading: AppIcons.smile,
-                    onTap: () => _run(widget.onAddReaction),
-                  ),
-                  const AppMenuDivider(),
-                  AppMenuItem(
-                    label: 'Copy text',
-                    leading: AppIcons.copy,
-                    onTap: () => _run(
-                      () => Clipboard.setData(
-                        ClipboardData(text: widget.content),
-                      ),
-                    ),
-                  ),
-                  if (actions.canEdit)
+            child: ContextMenuKeyboardScope(
+              onDismiss: () => _setOpen(false),
+              // Scrolls rather than overflowing where the whole menu cannot fit, which a landscape phone at a large text scale reaches.
+              child: SingleChildScrollView(
+                child: AppMenu(
+                  width: 200,
+                  children: [
                     AppMenuItem(
-                      label: 'Edit',
-                      leading: AppIcons.edit,
-                      onTap: () => _run(actions.onEdit),
+                      label: 'Add reaction',
+                      leading: AppIcons.smile,
+                      onTap: () => _run(widget.onAddReaction),
                     ),
-                  if (actions.canManagePins)
-                    AppMenuItem(
-                      label: actions.pinned ? 'Unpin' : 'Pin',
-                      leading: AppIcons.pin,
-                      onTap: () => _run(actions.onTogglePin),
-                    ),
-                  if (actions.canReport || actions.canBlockAuthor) ...[
                     const AppMenuDivider(),
-                    if (actions.canReport)
-                      AppMenuItem(
-                        label: 'Report message',
-                        leading: AppIcons.report,
-                        onTap: () => _run(actions.onReport),
+                    AppMenuItem(
+                      label: 'Copy text',
+                      leading: AppIcons.copy,
+                      onTap: () => _run(
+                        () => Clipboard.setData(
+                          ClipboardData(text: widget.content),
+                        ),
                       ),
-                    if (actions.canBlockAuthor)
+                    ),
+                    if (actions.canEdit)
                       AppMenuItem(
-                        label: 'Block user',
-                        leading: AppIcons.revoke,
+                        label: 'Edit',
+                        leading: AppIcons.edit,
+                        onTap: () => _run(actions.onEdit),
+                      ),
+                    if (actions.canManagePins)
+                      AppMenuItem(
+                        label: actions.pinned ? 'Unpin' : 'Pin',
+                        leading: AppIcons.pin,
+                        onTap: () => _run(actions.onTogglePin),
+                      ),
+                    if (actions.canReport || actions.canBlockAuthor) ...[
+                      const AppMenuDivider(),
+                      if (actions.canReport)
+                        AppMenuItem(
+                          label: 'Report message',
+                          leading: AppIcons.report,
+                          onTap: () => _run(actions.onReport),
+                        ),
+                      if (actions.canBlockAuthor)
+                        AppMenuItem(
+                          label: 'Block user',
+                          leading: AppIcons.revoke,
+                          tone: AppMenuItemTone.danger,
+                          onTap: () => _run(actions.onBlockAuthor),
+                        ),
+                    ],
+                    if (actions.canDelete) ...[
+                      const AppMenuDivider(),
+                      AppMenuItem(
+                        label: 'Delete',
+                        leading: AppIcons.delete,
                         tone: AppMenuItemTone.danger,
-                        onTap: () => _run(actions.onBlockAuthor),
+                        onTap: () => _run(actions.onDelete),
                       ),
+                    ],
                   ],
-                  if (actions.canDelete) ...[
-                    const AppMenuDivider(),
-                    AppMenuItem(
-                      label: 'Delete',
-                      leading: AppIcons.delete,
-                      tone: AppMenuItemTone.danger,
-                      onTap: () => _run(actions.onDelete),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
           ),
         ),
       ),
-      child: GestureDetector(
-        onSecondaryTapDown: (_) => _setOpen(true),
-        // The tint below deepens across the hold, so a long press shows
-        // visible progress toward its threshold instead of a dead finger
-        // (motion spec 10). GestureDetector rather than a raw recognizer on
-        // purpose: it is what publishes SemanticsAction.longPress, which
-        // context_menu_reachability_test guards; the tint runs over the
-        // framework's own threshold rather than the spec's 350ms for the
-        // same reason.
-        onLongPressDown: (_) => setState(() => _holding = true),
-        onLongPressCancel: () => setState(() => _holding = false),
-        onLongPress: () {
-          setState(() => _holding = false);
-          _setOpen(true, pinRow: false);
-        },
-        child: AnimatedContainer(
-          duration: _holding
-              ? AppMotion.reduced(context, kLongPressTimeout)
-              : AppMotion.reduced(context, AppMotion.fast),
-          curve: Curves.linear,
-          color: _holding
-              ? Theme.of(
-                  context,
-                ).extension<AppTokens>()!.accentSoft.withValues(alpha: 0.5)
-              : Colors.transparent,
-          child: widget.child,
+      child: ContextMenuFocus(
+        onOpen: () => _setOpen(true),
+        child: GestureDetector(
+          onSecondaryTapDown: (_) => _setOpen(true),
+          // GestureDetector, never a raw recognizer: it is what publishes SemanticsAction.longPress, which context_menu_reachability_test guards.
+          onLongPressDown: (_) => setState(() => _holding = true),
+          onLongPressCancel: () => setState(() => _holding = false),
+          onLongPress: () {
+            setState(() => _holding = false);
+            _setOpen(true, pinRow: false);
+          },
+          child: AnimatedContainer(
+            duration: _holding
+                ? AppMotion.reduced(context, kLongPressTimeout)
+                : AppMotion.reduced(context, AppMotion.fast),
+            curve: Curves.linear,
+            color: _holding
+                ? Theme.of(
+                    context,
+                  ).extension<AppTokens>()!.accentSoft.withValues(alpha: 0.5)
+                : Colors.transparent,
+            child: widget.child,
+          ),
         ),
       ),
     );
   }
-}
-
-/// Places the menu at its anchor, sliding it back inside the viewport rather
-/// than letting it run off an edge: a long-press on a message low on a phone
-/// screen otherwise puts Delete past the bottom of the display.
-class _MenuLayout extends SingleChildLayoutDelegate {
-  const _MenuLayout({required this.anchor, required this.padding});
-
-  final Offset anchor;
-  final EdgeInsets padding;
-
-  @override
-  BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
-      BoxConstraints.loose(constraints.biggest).deflate(padding);
-
-  @override
-  Offset getPositionForChild(Size size, Size childSize) {
-    final maxX = size.width - padding.right - childSize.width;
-    final maxY = size.height - padding.bottom - childSize.height;
-    return Offset(
-      anchor.dx.clamp(padding.left, math.max(padding.left, maxX)),
-      anchor.dy.clamp(padding.top, math.max(padding.top, maxY)),
-    );
-  }
-
-  @override
-  bool shouldRelayout(_MenuLayout oldDelegate) =>
-      anchor != oldDelegate.anchor || padding != oldDelegate.padding;
 }
