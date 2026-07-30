@@ -12,6 +12,7 @@ import 'package:slimm_rtc/rtc.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../providers/blocks_controller.dart';
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/breakpoints.dart';
@@ -37,6 +38,8 @@ class HomeShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final layout = LayoutClass.of(context);
     final selected = selectedChannelId(context);
+    // With the shell, or the first surface to consult it filters against none.
+    ref.watch(blocksProvider);
     // Never below expanded width, whatever the header toggle says: it can only
     // hide the pane, not summon room for it that is not there.
     final showMembers =

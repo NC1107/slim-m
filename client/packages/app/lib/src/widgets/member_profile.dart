@@ -28,6 +28,7 @@ import 'package:slimm_rtc/rtc.dart';
 
 import '../permissions.dart';
 import '../providers/admin_providers.dart';
+import '../providers/blocks_controller.dart';
 import '../providers/dms.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
@@ -375,12 +376,20 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
           leading: AppIcons.report,
           onTap: () => run(() => reportMember(host, ref, profile)),
         ),
-        AppMenuItem(
-          label: 'Block',
-          leading: AppIcons.revoke,
-          tone: AppMenuItemTone.danger,
-          onTap: () => run(() => blockMember(host, ref, profile)),
-        ),
+        // Offering Block again to a blocked member reads as the block failing.
+        if (ref.watch(blocksProvider).contains(profile.id))
+          AppMenuItem(
+            label: 'Unblock',
+            leading: AppIcons.revoke,
+            onTap: () => run(() => unblockMember(host, ref, profile)),
+          )
+        else
+          AppMenuItem(
+            label: 'Block',
+            leading: AppIcons.revoke,
+            tone: AppMenuItemTone.danger,
+            onTap: () => run(() => blockMember(host, ref, profile)),
+          ),
       ],
 
       if (actionError != null)

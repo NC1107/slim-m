@@ -119,6 +119,58 @@ What it had none of was a rate-limit charge, which puts it with the uncharged-ro
 The cost really was negligible (candidates are a self-host's push-registered users), which is exactly why nothing caught it, and why the fix is to narrow the candidates to the pair first so the claim becomes true rather than to reword it.
 `channel_viewer_ids` is deleted rather than documented, and `live_user_ids` with it: that was its only caller, and its doc comment existed to explain a path nothing took.
 
+## Blocking, and the two halves of it a client cannot do (2026-07-30)
+
+The 2026-07-30 audit's only finding where the product stated a protection that did not exist.
+`blocksProvider` had three references, all inside `personal_account_sections.dart`, and it was `autoDispose`, so the block list was alive only while the settings pane listing it was mounted.
+Outside that pane nothing filtered anything, while a successful block answered "Blocked. Their messages are hidden for you."
+The server delegated on purpose - `store/safety.rs` said "the client filters with this rather than the server stripping messages" - to a client that did not filter.
+
+**The filter is at read time, never at fetch time, and that is the load-bearing choice.**
+A blocked author's messages still arrive and still land in the local database; they are dropped where they would become UI.
+Filtering `/sync` instead would mean they never arrive, and since `/sync` filters purely by `seq`, only a full channel reset could ever bring them back - so "unblocking restores their messages" would become false.
+`visibleChannelMessagesProvider` is the one stream `ChannelScreen` can get at, so the filter is a property of the data rather than a `where` clause somebody has to remember per render site.
+`blocksProvider` is session-warm (not `autoDispose`), watched at the shell so it loads with the app, and it empties on sign-out - the local database is one file for the whole app, so a block set outliving a sign-out would silently hide messages from whoever signed in next on the device.
+
+**Read state must keep counting a blocked author.**
+Their message is hidden, not unreceived.
+`VisibleTranscript.newestSeq` is computed before the filter for exactly this reason: a marker advancing only past what is shown leaves a channel lit as unread forever the moment a blocked person has the last word, with nothing in the API able to clear it.
+
+**Two surfaces are out of the client's reach and are handled server-side, per viewer.**
+Reaction counts carry no reactor ids on the wire, by design, so there is nothing client-side to match on; `reactions_for_messages` already took the viewer, so excluding blocked reactors is one predicate, and an emoji whose only reactors are blocked is absent rather than sitting at zero.
+Push reaches the device before any filter runs, and a phone buzzing for a message the app then hides is worse than no filtering, since it reports exactly when the blocked person spoke; `push::message_recipients` is a named function now rather than three steps inside a fire-and-forget task, because it is the whole security decision and a task reporting to nothing but the log cannot be tested.
+Both stay view choices rather than moderation actions: nothing is removed for anybody else and the blocked user is never told.
+Migration 0022 indexes `user_blocks(blocked_id)`, since the reverse lookup runs on the message write path.
+
+**Three defects in the first version of this were found by an adversarial review, not by any test, and the worst one was created by the fix itself.**
+Recording them because each is a shape that will recur.
+
+- **Changing what a shared function means to one caller changed it for every caller.** `reactions_for_messages` gained a `viewer` parameter's teeth, and `http/reactions.rs`'s `publish` had been passing `UserId::generate()` with a comment saying any id yields the same public counts. That was true before and false after: the broadcast started fanning one *unfiltered* tally to everybody, and the client replaces its cached tally with whatever a frame says, so a single reaction from a blocked person put their count back on screen. `Event::ReactionsChanged` carries ids only now and the tally is derived per receiving connection, exactly as `PresenceChanged`'s status already was. `tests/blocking_live.rs` drives a real socket for it, because `blocking_reach.rs` drives the store and the store was right.
+- **A second implementation of the same feature does not get fixed by fixing the first.** `command_palette.dart` runs its own message search beside `channelSearchProvider` and renders the body and the author's name; it went unfiltered. Its message-search path also turned out to have *no* test at all, because the palette harness started at `/channels` with nothing selected and the palette only searches when a channel is.
+- **`sessionProvider.changes` fires on every access-token rotation, not just sign-in.** Refetching the block list on each one made routine rotation a race against an in-flight block: a `GET /blocks` sent before the block landed and answering after it silently unblocked somebody the app had just confirmed. The listener compares the *user id* now, and a generation counter drops any answer a newer state has superseded.
+
+**Gating the transcript on the block list having loaded was tried and reverted.**
+It is the obvious way to stop a launch painting a blocked author for a frame, and it costs more than it buys: it couples every channel's first paint to an unrelated network call, and an empty stream standing in meanwhile stops `pumpAndSettle` ever settling, which hung several existing shell tests.
+The residual is recorded in `blocks_controller.dart` with the real answer named - a block set persisted beside the session, known synchronously at launch, with the fetch only correcting it.
+Search, pins and typing filter against whatever is known for the same reason, so all four surfaces behave alike.
+
+**Do not put a drift query stream behind a `StreamProvider` a screen watches.**
+Two shapes of this were tried and both hang a widget test, with the same useless symptom: the test never completes, flutter_tools crashes with "Cannot close sink while adding stream", and from CI it is indistinguishable from a slow job.
+An `async*` body that `yield*`s the stream deadlocks on cancellation, because drift defers a cancelled stream's cleanup onto a zero-duration timer the fake clock only advances on the next pump, which never comes.
+Returning the mapped stream directly fixes that one and then hits the other: a `StreamProvider.autoDispose.family` watched from a `ConsumerState.build` thrashes create-and-dispose against that same deferred cleanup, and `pumpAndSettle` never settles - which took out `home_shell_test` and `router_recovery_test`, neither of which has anything to do with the feature.
+The transcript keeps its own long-lived `StreamBuilder` on `watchChannel` and hands the rows to a pure `visibleTranscript` function.
+That gives up one thing worth naming: filtering is no longer a property of the only stream a screen can reach, so a second transcript surface has to call the function rather than getting it for free.
+
+Also done here: report and block existed twice, once per subject kind, with byte-identical copy in `member_actions.dart` and `channel_message_actions.dart`; they are one implementation in `widgets/safety_actions.dart` with two call sites now.
+The blocked list rendered raw 36-character uuids where names belong (it reads as corruption, and two of them cannot be told apart) and resolves through `userProfileProvider`.
+`unblockUser` threw out of an async `onPressed` with no `try`, so a failure reached nobody.
+The member popover offers Unblock rather than Block for somebody already blocked, since offering Block again reads as the block having failed.
+And the copy says only what is true: messages, reactions and typing go, notifications stop, and the person stays in the member list.
+
+Known rough edge, left deliberately (2026-07-30): an existing DM with somebody you then block stays in the rail and opens as an empty transcript with no explanation.
+It is already frozen server-side (`store/dms.rs` denies SEND, ADD_REACTIONS and ATTACH_FILES in both directions), so nothing new can arrive; what is missing is the client saying so instead of rendering a blank channel.
+Presence and the member row are also unfiltered on purpose - hiding somebody from the roster would make the member count wrong and take away the row the unblock lives on.
+
 ## The nine-specialist audit, and seeing a shared screen (2026-07-29)
 
 Nine parallel specialist reviews (five code, four screenshot) over the running product; the consolidated report with everything found, fixed, and deliberately deferred is [docs/research/nine-specialist-audit-2026-07-29.md](docs/research/nine-specialist-audit-2026-07-29.md).
@@ -441,7 +493,7 @@ Confirmed bugs from this pass, in the order found:
 
 Confirmed but not fixed, still real:
 
-- **No UI ever called `SlimmApi.report` or `blockUser`.** The endpoints, wire model, and an admin triage screen all existed with zero call sites in `packages/app`. A concurrent, unrelated change landed in this same working tree while this pass was running and closed it (`report_dialog.dart`, `context_menu_region.dart`, wired into both the message context menu and the member row); it was not this pass's work, so it is not itemised above, but a future contributor should know the gap this pass found is already closed. Its own regression test (`message_row_test.dart`) was missing a `pumpAndSettle` between closing the menu and reopening it for the second tap, which failed the gate deterministically rather than flakily; fixed in the same run, no app code changed.
+- ~~**No UI ever called `SlimmApi.report` or `blockUser`.**~~ Closed, but read the blocking section below before trusting the closure: wiring the call up was not the same as blocking working, and it took until 2026-07-30 to notice. The endpoints, wire model, and an admin triage screen all existed with zero call sites in `packages/app`. A concurrent, unrelated change landed in this same working tree while this pass was running and closed it (`report_dialog.dart`, `context_menu_region.dart`, wired into both the message context menu and the member row); it was not this pass's work, so it is not itemised above, but a future contributor should know the gap this pass found is already closed. Its own regression test (`message_row_test.dart`) was missing a `pumpAndSettle` between closing the menu and reopening it for the second tap, which failed the gate deterministically rather than flakily; fixed in the same run, no app code changed.
 - ~~**`ContextMenuRegion` repeats the same missing-`Positioned` mistake.**~~ Stale, checked 2026-07-28: the `overlayChildBuilder` in `context_menu_region.dart` wraps its follower in `Positioned` and carries a comment saying why.
 - ~~**The server-menu chevron opens a blank, full-viewport overlay.**~~ Stale, checked 2026-07-28 by opening it on a live web build: the Space menu opens correctly and its items are reachable.
 - **A context menu is unreachable by keyboard, though not by a screen reader.** `ContextMenuRegion` and `MessageContextMenuRegion` open on `onSecondaryTapDown` or `onLongPress` only. An earlier version of this note claimed that left them with no semantic action either; that was wrong, checked 2026-07-28: `GestureDetector` publishes `SemanticsAction.longPress` for its own `onLongPress`, so VoiceOver and TalkBack have always been able to open these, and `context_menu_reachability_test.dart` now guards that, since it is a side effect of one widget choice and a `Listener` or `excludeFromSemantics` would remove it silently. What is genuinely missing is the keyboard: the rows do not take focus and no key opens the menu, so report, block, edit, delete and pin have no keyboard route. The e2e harness cannot drive them either, for a different reason - it dispatches DOM events rather than semantic actions - so `scripts/lib/e2e_admin.py` covers report and block at the API and says so.

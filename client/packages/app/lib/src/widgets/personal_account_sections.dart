@@ -12,19 +12,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/blocks_controller.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../providers/sync_controller.dart';
+import '../providers/user_profiles.dart';
 import 'settings_section_header.dart';
 
 /// The account's devices, refetched when invalidated.
 final devicesProvider = FutureProvider.autoDispose<List<api.Device>>(
   (ref) => ref.watch(apiProvider).listDevices(),
-);
-
-/// The users this account has blocked.
-final blocksProvider = FutureProvider.autoDispose<List<String>>(
-  (ref) => ref.watch(apiProvider).listBlocks(),
 );
 
 class DevicesSection extends ConsumerWidget {
@@ -90,6 +87,11 @@ class DevicesSection extends ConsumerWidget {
   }
 }
 
+/// The blocked list, and the one place a block can be undone.
+///
+/// Says what blocking really does rather than the old blanket promise: messages,
+/// reactions and typing are hidden and no notification arrives, and the person
+/// is still in the member list, which is where the row that offers this lives.
 class BlockedSection extends ConsumerWidget {
   const BlockedSection({super.key});
 
@@ -103,46 +105,88 @@ class BlockedSection extends ConsumerWidget {
       children: [
         const SettingsSectionHeader(
           'Blocked',
-          description: 'They are not told. Unblocking restores their messages.',
+          description:
+              'They are not told. You stop seeing their messages, reactions '
+              'and typing, and stop being notified about them. They stay in '
+              'the member list. Unblocking restores everything.',
         ),
-        blocks.when(
-          loading: () => const Padding(
+        if (!blocks.settled)
+          const Padding(
             padding: EdgeInsets.all(AppSpacing.s16),
             child: LinearProgressIndicator(),
-          ),
-          error: (e, _) => Padding(
+          )
+        else if (blocks.error case final error?)
+          Padding(
             padding: const EdgeInsets.all(AppSpacing.s16),
-            child: Text('Could not load the block list.'),
+            child: AppErrorState(
+              message: 'Could not load the block list.',
+              detail: error,
+              onRetry: () => ref.read(blocksProvider.notifier).refresh(),
+            ),
+          )
+        else if (blocks.ids.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s16,
+              vertical: AppSpacing.s8,
+            ),
+            child: Text(
+              'Nobody is blocked.',
+              style: TextStyle(color: tokens.textSecondary),
+            ),
+          )
+        else
+          Column(
+            children: [
+              for (final userId in blocks.ids) _BlockedRow(userId: userId),
+            ],
           ),
-          data: (list) => list.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s16,
-                    vertical: AppSpacing.s8,
-                  ),
-                  child: Text(
-                    'Nobody is blocked.',
-                    style: TextStyle(color: tokens.textSecondary),
-                  ),
-                )
-              : Column(
-                  children: [
-                    for (final userId in list)
-                      ListTile(
-                        title: Text(userId),
-                        trailing: TextButton(
-                          onPressed: () async {
-                            await ref.read(apiProvider).unblockUser(userId);
-                            if (context.mounted) ref.invalidate(blocksProvider);
-                          },
-                          child: const Text('Unblock'),
-                        ),
-                      ),
-                  ],
-                ),
-        ),
       ],
     );
+  }
+}
+
+/// One blocked person, by name.
+///
+/// The id is resolved through the same profile fetch every message author goes
+/// through. It used to render the raw 36-character uuid, which reads as
+/// corruption rather than as a person somebody chose to block, and gives no way
+/// to tell two of them apart.
+class _BlockedRow extends ConsumerWidget {
+  const _BlockedRow({required this.userId});
+
+  final String userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(userProfileProvider(userId));
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    // A deleted account resolves to null, and its id is all there is left of it.
+    final name =
+        profile.valueOrNull?.displayName ?? profile.valueOrNull?.username;
+
+    return ListTile(
+      leading: const Icon(AppIcons.account),
+      title: Text(name ?? 'Deleted account'),
+      subtitle: name == null
+          ? Text(userId, style: TextStyle(color: tokens.textSecondary))
+          : null,
+      trailing: TextButton(
+        onPressed: () => _unblock(context, ref),
+        child: const Text('Unblock'),
+      ),
+    );
+  }
+
+  Future<void> _unblock(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(blocksProvider.notifier).unblock(userId);
+    } on api.ApiException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not unblock that user. ${e.message}')),
+      );
+    }
   }
 }
 

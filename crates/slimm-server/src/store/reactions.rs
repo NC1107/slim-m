@@ -161,6 +161,15 @@ impl Store {
     /// Returns only messages that actually have reactions, so the caller must
     /// treat a missing id as "no reactions" rather than expecting one entry per
     /// input.
+    ///
+    /// A reactor the `viewer` has blocked is not counted, and an emoji whose
+    /// only reactors are blocked is absent rather than sitting at zero. This is
+    /// the one part of blocking a client cannot do for itself: the wire carries
+    /// a count and a `reacted` flag, never the reactor ids, deliberately, so
+    /// there is nothing for a client-side filter to match on. Excluding them
+    /// here is still the viewer's own view rather than a moderation action -
+    /// the reaction is untouched for everybody else, and the reactor is never
+    /// told.
     pub async fn reactions_for_messages(
         &self,
         message_ids: &[MessageId],
@@ -185,6 +194,9 @@ impl Store {
         for id in message_ids {
             separated.push_bind(*id);
         }
+        builder
+            .push(") AND user_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ");
+        builder.push_bind(viewer);
         builder.push(") GROUP BY message_id, emoji ORDER BY first_at ASC");
 
         let rows = builder.build().fetch_all(&self.pool).await?;

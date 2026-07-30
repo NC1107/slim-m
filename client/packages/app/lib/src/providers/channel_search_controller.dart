@@ -11,6 +11,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import 'blocks_controller.dart';
 import 'providers.dart';
 
 /// Hits come straight from the server (`api.Message`), never the local store's
@@ -66,10 +67,15 @@ class ChannelSearchController extends StateNotifier<ChannelSearchState> {
     }
     state = ChannelSearchState(open: true, query: trimmed, loading: true);
     try {
-      final results = await _ref
+      final hits = await _ref
           .read(apiProvider)
           .searchMessages(_channelId, q: trimmed);
       if (!mounted) return;
+      // Search reads the transcript by another route; it hides the same authors.
+      final blocks = _ref.read(blocksProvider);
+      final results = hits
+          .where((message) => !blocks.contains(message.authorId))
+          .toList(growable: false);
       state = ChannelSearchState(open: true, query: trimmed, results: results);
     } on api.ForbiddenException {
       if (!mounted) return;

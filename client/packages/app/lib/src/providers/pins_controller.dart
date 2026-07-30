@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import 'blocks_controller.dart';
 import 'live_events.dart';
 import 'providers.dart';
 
@@ -65,10 +66,13 @@ class PinsController extends StateNotifier<PinsState> {
     // `state` afterwards throws an unhandled StateError. Matches
     // channel_search_controller, which guards the identical pattern.
     try {
-      final pinned = await _ref
-          .read(apiProvider)
-          .listPinnedMessages(_channelId);
+      final all = await _ref.read(apiProvider).listPinnedMessages(_channelId);
       if (!mounted) return;
+      // Somebody else's pin must not be a way around the viewer's own filter.
+      final blocks = _ref.read(blocksProvider);
+      final pinned = all
+          .where((pin) => !blocks.contains(pin.message.authorId))
+          .toList(growable: false);
       state = PinsState(pinned: pinned);
     } on api.ForbiddenException {
       if (!mounted) return;

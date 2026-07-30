@@ -198,9 +198,19 @@ impl Store {
         Ok(())
     }
 
-    /// Who this user has blocked. The client filters with this rather than the
-    /// server stripping messages, so blocking stays a client-side view choice
-    /// and the transcript other members see is unaffected.
+    /// Who this user has blocked, for the client to filter its own read
+    /// surfaces with. Blocking is one viewer's view choice, never a moderation
+    /// action, so the transcript every other member sees is unaffected and the
+    /// blocked user is never told.
+    ///
+    /// The client is the right place for most of it: keeping a blocked author's
+    /// messages in the local database and hiding them at read time is what
+    /// makes unblocking instant and complete, where filtering them out of
+    /// `/sync` would mean they never arrive and only a reset could recover
+    /// them. Two things it cannot do for itself are handled server-side beside
+    /// this - reaction counts, which carry no reactor ids by design
+    /// ([`Store::reactions_for_messages`]), and push, which reaches the device
+    /// before any filter runs ([`Store::blockers_of`]).
     pub async fn blocked_users(&self, blocker: UserId) -> anyhow::Result<Vec<UserId>> {
         let rows = sqlx::query!(
             r#"SELECT blocked_id AS "blocked_id!: UserId"
@@ -210,6 +220,30 @@ impl Store {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows.into_iter().map(|r| r.blocked_id).collect())
+    }
+
+    /// Who has blocked this user, the reverse direction of
+    /// [`Store::blocked_users`].
+    ///
+    /// Push fan-out needs it: a notification is delivered before any client-side
+    /// filter can run, so without this the loudest surface in the product is the
+    /// one blocking does not cover. A phone buzzing for a message the app then
+    /// hides is worse than not filtering at all, because it tells the reader
+    /// exactly when the person they blocked spoke.
+    ///
+    /// Unbounded on purpose rather than taking a candidate list: the number of
+    /// people who have blocked any one member is small in the deployments this
+    /// is built for, and the alternative is a second query shape to keep in step
+    /// with this one. Migration 0022 indexes the column it filters on.
+    pub async fn blockers_of(&self, blocked: UserId) -> anyhow::Result<Vec<UserId>> {
+        let rows = sqlx::query!(
+            r#"SELECT blocker_id AS "blocker_id!: UserId"
+               FROM user_blocks WHERE blocked_id = ?"#,
+            blocked
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|r| r.blocker_id).collect())
     }
 
     pub async fn has_blocked(&self, blocker: UserId, blocked: UserId) -> anyhow::Result<bool> {

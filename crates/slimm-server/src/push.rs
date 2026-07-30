@@ -33,6 +33,7 @@
 //! make it slower.
 
 mod envelope;
+mod recipients;
 mod relay;
 
 use std::collections::{HashMap, HashSet};
@@ -44,6 +45,8 @@ use url::{Host, Url};
 use crate::config::Config;
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 use crate::store::{Store, now_ms};
+
+pub use recipients::message_recipients;
 
 /// How long a burst of messages in one channel collapses into a single wake.
 /// Leading-edge: the first message in a burst fires immediately and the rest
@@ -172,14 +175,8 @@ impl PushSender {
 /// logs and returns rather than propagating: there is no caller left to
 /// report to, only the process log.
 ///
-/// The recipient set is built from who could receive a push at all, then
-/// filtered by view permission, rather than evaluating permissions for every
-/// live user and then asking which of them have a device. Both orders give the
-/// same recipients, but this one costs a single indexed query on a deployment
-/// where nobody has registered for push, instead of a full permission
-/// evaluation per user on every message sent. The view check itself is not an
-/// optimization to skip: a recipient who cannot see the channel must never be
-/// told a message landed in it.
+/// The recipient rule lives in [`message_recipients`], including why the author
+/// and anybody who blocked them are dropped.
 ///
 /// The debounce is decided once per recipient, even when they have several
 /// registered devices, so a second device is never mistaken for a second burst
@@ -209,25 +206,10 @@ async fn deliver(
     message_id: MessageId,
     seq: Seq,
 ) {
-    // Push registrations first, permissions second; see the note on this
-    // function for why that order.
-    let candidates = match store.users_with_push_devices().await {
-        Ok(candidates) => candidates,
-        Err(err) => {
-            tracing::warn!(error = %err, %channel_id, "push: failed to resolve push candidates");
-            return;
-        }
-    };
-
-    // Not an optimization to skip (see the note on this function); batched, since per-candidate checks multiplied the write path by the member count.
-    let candidates: Vec<UserId> = candidates
-        .into_iter()
-        .filter(|user_id| *user_id != author_id)
-        .collect();
-    let recipients = match store.viewers_among(channel_id, &candidates).await {
+    let recipients = match message_recipients(&store, channel_id, author_id).await {
         Ok(recipients) => recipients,
         Err(err) => {
-            tracing::warn!(error = %err, %channel_id, "push: failed to check recipients' view permission");
+            tracing::warn!(error = %err, %channel_id, "push: failed to resolve recipients");
             return;
         }
     };
