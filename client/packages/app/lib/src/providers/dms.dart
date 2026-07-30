@@ -33,9 +33,19 @@ api.Channel channelFromDm(api.DmConversation dm) => api.Channel(
 /// Opens (or returns) the DM with [userId] and gets it into the local store,
 /// so the screen this navigates to has a name and kind to render
 /// immediately rather than waiting on the next reconnect's channel refresh.
-Future<String> openDirectMessage(WidgetRef ref, String userId) async {
-  final conversation = await ref.read(apiProvider).openDirectMessage(userId);
-  final store = await ref.read(storeProvider.future);
+///
+/// Takes a [ProviderContainer] rather than a [WidgetRef]: a caller that
+/// dismisses its own surface before this answers (the member popover's
+/// "Message" row) needs a handle that outlives that surface, and a container
+/// is exactly that.
+Future<String> openDirectMessage(
+  ProviderContainer container,
+  String userId,
+) async {
+  final conversation = await container
+      .read(apiProvider)
+      .openDirectMessage(userId);
+  final store = await container.read(storeProvider.future);
   await store.upsertChannels([channelFromDm(conversation)]);
   return conversation.channelId;
 }

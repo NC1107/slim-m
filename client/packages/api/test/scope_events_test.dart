@@ -4,6 +4,7 @@
 /// `ChannelUpdated`, `ChannelDeleted`, `OverwriteChanged`): the client half of
 /// the 2026-07-30 audit's fan-out finding, split out of `new_routes_test.dart`
 /// rather than added there so that file stays under its recorded budget.
+library;
 
 import 'dart:convert';
 

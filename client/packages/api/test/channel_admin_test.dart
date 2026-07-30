@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Tests for channel creation, rename/topic updates, and deletion: the
 /// `channels` tag beyond [SlimmApi.listChannels].
+library;
 
 import 'dart:convert';
 

@@ -3,6 +3,7 @@
 /// presence, direct messages, pins, polls, attachments and avatars, the
 /// invite-check community preview, the server identity on `Version`, and the
 /// WebSocket frames that ride along with all of it.
+library;
 
 import 'dart:convert';
 

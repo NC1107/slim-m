@@ -92,7 +92,8 @@ List<PaletteResultItem> buildMemberItems(
       leading: AppIcons.account,
       semanticLabel: 'Message ${member.displayName}',
       onSelect: (context, ref) async {
-        final channelId = await openDirectMessage(ref, member.id);
+        final container = ProviderScope.containerOf(context, listen: false);
+        final channelId = await openDirectMessage(container, member.id);
         if (context.mounted) context.go(Routes.channel(channelId));
       },
     ),

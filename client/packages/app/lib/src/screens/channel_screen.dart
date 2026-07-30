@@ -170,9 +170,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         ),
       ),
       canReport: canReportMessage(message, myId),
-      onReport: () => unawaited(reportMessage(ref, context, message)),
+      onReport: () => unawaited(reportMessage(context, message)),
       canBlockAuthor: canBlockMessageAuthor(message, myId),
-      onBlockAuthor: () => unawaited(blockMessageAuthor(ref, context, message)),
+      onBlockAuthor: () => unawaited(blockMessageAuthor(context, message)),
     );
   }
 

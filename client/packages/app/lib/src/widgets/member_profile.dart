@@ -236,7 +236,11 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     if (ok && mounted) ref.invalidate(membersProvider);
   }
 
-  Future<void> _remove(BuildContext host) async {
+  /// [container] must be captured before the popover is dismissed: this
+  /// awaits a confirmation dialog first, and by the time it answers `ref` is
+  /// tied to a disposed element, exactly the bug this whole file exists to
+  /// avoid.
+  Future<void> _remove(BuildContext host, ProviderContainer container) async {
     final name = widget.profile.displayName;
     final confirmed = await confirmDangerousAction(
       host,
@@ -252,10 +256,10 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     await runGuarded(
       whatFailed: 'remove $name',
       action: () =>
-          ref.read(apiProvider).removeMember(userId: widget.profile.id),
+          container.read(apiProvider).removeMember(userId: widget.profile.id),
     ).then((failure) {
       if (failure == null) {
-        ref.invalidate(membersProvider);
+        container.invalidate(membersProvider);
       } else if (host.mounted) {
         ScaffoldMessenger.of(
           host,
@@ -284,9 +288,11 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     final canManageRoles = !isSelf && mine.hasPermission(Perm.manageRoles);
     final showModeration = canTimeOut || canRemove || canManageRoles;
 
-    void run(Future<void> Function() action) {
+    // Captured before onDone, whose Navigator.pop disposes this element.
+    void run(Future<void> Function(ProviderContainer container) action) {
+      final container = ProviderScope.containerOf(context, listen: false);
       widget.onDone();
-      unawaited(action());
+      unawaited(action(container));
     }
 
     final rows = <Widget>[
@@ -324,8 +330,8 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
         AppMenuItem(
           label: 'Message',
           leading: AppIcons.send,
-          onTap: () => run(() async {
-            final channelId = await openDirectMessage(ref, profile.id);
+          onTap: () => run((container) async {
+            final channelId = await openDirectMessage(container, profile.id);
             if (host.mounted) host.go(Routes.channel(channelId));
           }),
         ),
@@ -363,8 +369,12 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
             leading: AppIcons.signOut,
             tone: AppMenuItemTone.danger,
             onTap: () {
+              final container = ProviderScope.containerOf(
+                context,
+                listen: false,
+              );
               widget.onDone();
-              unawaited(_remove(host));
+              unawaited(_remove(host, container));
             },
           ),
       ],
@@ -374,21 +384,24 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
         AppMenuItem(
           label: 'Report user',
           leading: AppIcons.report,
-          onTap: () => run(() => reportMember(host, ref, profile)),
+          onTap: () =>
+              run((container) => reportMember(host, container, profile)),
         ),
         // Offering Block again to a blocked member reads as the block failing.
         if (ref.watch(blocksProvider).contains(profile.id))
           AppMenuItem(
             label: 'Unblock',
             leading: AppIcons.revoke,
-            onTap: () => run(() => unblockMember(host, ref, profile)),
+            onTap: () =>
+                run((container) => unblockMember(host, container, profile)),
           )
         else
           AppMenuItem(
             label: 'Block',
             leading: AppIcons.revoke,
             tone: AppMenuItemTone.danger,
-            onTap: () => run(() => blockMember(host, ref, profile)),
+            onTap: () =>
+                run((container) => blockMember(host, container, profile)),
           ),
       ],
 

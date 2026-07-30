@@ -26,3 +26,43 @@ final userProfileProvider = FutureProvider.autoDispose
         return null;
       }
     });
+
+/// Resolves several ids in one round trip, for a caller that needs more than
+/// one at a time (a report card needs its reporter and, for a user report,
+/// its subject) and would otherwise cost one request per id.
+///
+/// A `Map` rather than a list of futures: an id present with a null value is
+/// a confirmed miss (matching [api.SlimmApiUsers.listUsers]'s own "absent
+/// means gone" contract), while an id absent from the map has simply not
+/// been resolved yet, which is what lets a caller tell "still loading" apart
+/// from "this account no longer exists".
+class BatchProfilesController
+    extends StateNotifier<Map<String, api.UserProfile?>> {
+  BatchProfilesController(this._ref) : super(const {});
+
+  final Ref _ref;
+
+  /// Fetches whichever of [ids] are not already known. Best-effort: a failed
+  /// call leaves those ids unresolved rather than wrongly reading a network
+  /// error as "account deleted".
+  Future<void> resolve(Iterable<String> ids) async {
+    final missing = ids.where((id) => !state.containsKey(id)).toSet();
+    if (missing.isEmpty) return;
+    try {
+      final found = await _ref.read(apiProvider).listUsers(missing.toList());
+      final byId = {for (final profile in found) profile.id: profile};
+      state = {...state, for (final id in missing) id: byId[id]};
+    } on api.ApiException {
+      // Left unresolved; whoever asked can retry on the next build.
+    }
+  }
+}
+
+/// Kept for the screen's lifetime (not `autoDispose`): a moderation queue
+/// commonly repeats a reporter across several reports, and losing this
+/// between rebuilds would re-fetch a profile the caller already has.
+final batchProfilesControllerProvider =
+    StateNotifierProvider<
+      BatchProfilesController,
+      Map<String, api.UserProfile?>
+    >((ref) => BatchProfilesController(ref));

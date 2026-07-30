@@ -17,6 +17,7 @@ class Report {
     required this.channelId,
     required this.reason,
     required this.snapshot,
+    required this.subjectAuthorId,
     required this.createdAt,
   });
 
@@ -35,6 +36,12 @@ class Report {
   /// report; the author may have since edited or deleted it.
   final String? snapshot;
 
+  /// Who wrote the reported message. Null for a user report (there is no
+  /// message), for a message since hard-deleted, and once the author's account
+  /// has been anonymized - the same three cases `authorId` is null on a
+  /// [Message].
+  final String? subjectAuthorId;
+
   /// Unix milliseconds.
   final int createdAt;
 
@@ -47,6 +54,7 @@ class Report {
         channelId: json['channel_id'] as String?,
         reason: json['reason'] as String,
         snapshot: json['snapshot'] as String?,
+        subjectAuthorId: json['subject_author_id'] as String?,
         createdAt: json['created_at'] as int,
       );
 }

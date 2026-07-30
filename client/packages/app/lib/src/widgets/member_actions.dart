@@ -18,13 +18,17 @@ import 'package:slimm_api/api.dart' as api;
 import 'safety_actions.dart';
 
 /// Files a report against a member, from the row's context menu.
+///
+/// Takes a [ProviderContainer] rather than a [WidgetRef] for the same reason
+/// `safety_actions.dart` does: the caller dismisses the popover this is
+/// offered from before the request answers.
 Future<void> reportMember(
   BuildContext context,
-  WidgetRef ref,
+  ProviderContainer container,
   api.UserProfile profile,
 ) => fileReport(
   context,
-  ref,
+  container,
   subject: api.ReportSubject.user,
   subjectId: profile.id,
   subjectLabel: 'this member',
@@ -33,13 +37,13 @@ Future<void> reportMember(
 /// Blocks a member from the row's context menu.
 Future<void> blockMember(
   BuildContext context,
-  WidgetRef ref,
+  ProviderContainer container,
   api.UserProfile profile,
-) => blockUser(context, ref, profile.id);
+) => blockUser(context, container, profile.id);
 
 /// Unblocks a member from the row's context menu.
 Future<void> unblockMember(
   BuildContext context,
-  WidgetRef ref,
+  ProviderContainer container,
   api.UserProfile profile,
-) => unblockUser(context, ref, profile.id);
+) => unblockUser(context, container, profile.id);

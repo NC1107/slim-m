@@ -12,12 +12,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../../format.dart';
-import '../../providers/providers.dart';
 import '../../providers/reports_controller.dart';
 import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
-import '../../widgets/confirm_dialog.dart';
+import 'report_card.dart';
 
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
@@ -57,111 +55,9 @@ class ReportsScreen extends ConsumerWidget {
                   error: reports.error,
                   onTap: controller.loadMore,
                 )
-              : _ReportCard(report: list[i]),
+              // Keyed by id, or a shortened page hands the next report the previous card's busy state.
+              : ReportCard(key: ValueKey(list[i].id), report: list[i]),
         ),
-      ),
-    );
-  }
-}
-
-class _ReportCard extends ConsumerStatefulWidget {
-  const _ReportCard({required this.report});
-
-  final api.Report report;
-
-  @override
-  ConsumerState<_ReportCard> createState() => _ReportCardState();
-}
-
-class _ReportCardState extends ConsumerState<_ReportCard> {
-  bool _busy = false;
-
-  Future<void> _resolve(api.ReportResolution resolution) async {
-    final verb = resolution == api.ReportResolution.resolved
-        ? 'Resolve'
-        : 'Dismiss';
-    final confirmed = await confirmDangerousAction(
-      context,
-      title: '$verb this report?',
-      message: resolution == api.ReportResolution.resolved
-          ? 'This marks it handled and removes it from the queue. It cannot '
-                'be reopened from here.'
-          : 'This closes it with no action taken and removes it from the '
-                'queue. It cannot be reopened from here.',
-      confirmLabel: verb,
-    );
-    if (!confirmed || !mounted) return;
-
-    setState(() => _busy = true);
-    try {
-      await ref
-          .read(apiProvider)
-          .resolveReport(reportId: widget.report.id, resolution: resolution);
-      if (context.mounted) {
-        await ref.read(reportsControllerProvider.notifier).refresh();
-      }
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not close the report. ${e.message}')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final report = widget.report;
-
-    return AppCard(
-      title: report.subjectKind == api.ReportSubject.message
-          ? 'Reported message'
-          : 'Reported user',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(report.reason, style: TextStyle(color: tokens.textPrimary)),
-          if (report.snapshot != null) ...[
-            const SizedBox(height: AppSpacing.s8),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.s8),
-              decoration: BoxDecoration(
-                color: tokens.surfaceSunken,
-                borderRadius: BorderRadius.circular(AppRadii.control),
-              ),
-              child: Text(
-                report.snapshot!,
-                style: AppText.caption.copyWith(color: tokens.textSecondary),
-              ),
-            ),
-          ],
-          const SizedBox(height: AppSpacing.s8),
-          Text(
-            'Filed ${formatDateTime(report.createdAt)}',
-            style: AppText.caption.copyWith(color: tokens.textSecondary),
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              AppButton(
-                label: 'Dismiss',
-                icon: AppIcons.dismiss,
-                disabled: _busy,
-                onPressed: () => _resolve(api.ReportResolution.dismissed),
-              ),
-              const SizedBox(width: AppSpacing.s8),
-              AppButton(
-                label: 'Resolve',
-                icon: AppIcons.check,
-                variant: AppButtonVariant.primary,
-                disabled: _busy,
-                onPressed: () => _resolve(api.ReportResolution.resolved),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

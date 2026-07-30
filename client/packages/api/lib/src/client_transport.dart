@@ -8,6 +8,25 @@ part of 'client.dart';
 /// refresh-and-replay, the status-to-exception mapping, and turning a path
 /// built from a wire-supplied value into a safe request [Uri] are all
 /// written once, here, rather than per endpoint.
+/// How long an ordinary request may take before the caller stops waiting.
+///
+/// Above the server's own 30-second request timeout on purpose, so a server
+/// that is going to answer gets to, and this only fires when nothing is coming
+/// back at all. Without it there is no deadline anywhere: `http.Client` sets
+/// none on either backend, so a server that accepts a connection and never
+/// answers hangs its caller for the life of the process. The reachable case is
+/// a mobile network transition, and the visible one is a spinner whose
+/// `finally` never runs.
+const _requestDeadline = Duration(seconds: 45);
+
+/// The same, for a request whose body is the point: an upload, or an
+/// attachment or avatar fetch.
+///
+/// Longer because ten megabytes over a poor link legitimately takes minutes,
+/// and a deadline that kills a transfer which is making progress is worse than
+/// the hang it replaces.
+const _transferDeadline = Duration(minutes: 3);
+
 extension SlimmApiTransport on SlimmApi {
   Future<Object?> _send(
     String method,
@@ -38,12 +57,11 @@ extension SlimmApiTransport on SlimmApi {
       request.headers['authorization'] = 'Bearer $token';
     }
 
-    final http.Response response;
-    try {
-      response = await http.Response.fromStream(await _http.send(request));
-    } catch (e) {
-      throw TransportException('$method $path failed: $e');
-    }
+    final response = await _perform(
+      request,
+      '$method $path',
+      deadline: bytes == null ? _requestDeadline : _transferDeadline,
+    );
 
     // One automatic rotation, then replay. Only for authenticated calls, and
     // never twice for the same request.
@@ -86,20 +104,18 @@ extension SlimmApiTransport on SlimmApi {
   /// refresh-and-retry and error mapping, without a JSON decode that would
   /// only fail on a body that was never JSON to begin with.
   Future<FetchedBytes> _fetchBytes(String path, {bool isRetry = false}) async {
-    final uri = _requestUri(path, null);
-    final request = http.Request('GET', uri);
+    final request = http.Request('GET', _requestUri(path, null));
     final token = session.tokens?.accessToken;
     if (token == null) {
       throw const UnauthorizedException('not signed in');
     }
     request.headers['authorization'] = 'Bearer $token';
 
-    final http.Response response;
-    try {
-      response = await http.Response.fromStream(await _http.send(request));
-    } catch (e) {
-      throw TransportException('GET $path failed: $e');
-    }
+    final response = await _perform(
+      request,
+      'GET $path',
+      deadline: _transferDeadline,
+    );
 
     if (response.statusCode == 401 && !isRetry && session.tokens != null) {
       await refresh();
@@ -114,6 +130,48 @@ extension SlimmApiTransport on SlimmApi {
       );
     }
     throw _errorFor(response);
+  }
+
+  /// Sends [request] and reads its whole response under one [deadline],
+  /// mapping every failure to a [TransportException] so a caller's existing
+  /// `on ApiException` reaches it.
+  ///
+  /// The one place both entry points share, which is the point: a deadline
+  /// added to [_send] alone would have left the three byte-fetching routes
+  /// unbounded with nothing failing to say so, and `_fetchBytes` had been a
+  /// hand-copy of this since it was written.
+  ///
+  /// The deadline covers the round trip rather than each half, so a slow
+  /// response cannot be granted twice the budget by arriving in two stages.
+  /// It is composed with `.then` and never by wrapping the send in
+  /// `Future(() async { ... })`: that wrapper defers even *starting* the
+  /// request by an event-loop turn, which is invisible against a real clock
+  /// and moves every response a pump later under a widget test's fake one. It
+  /// broke a dozen unrelated tests, only some of the time, and the failure
+  /// names nothing relevant - the harness crashes with "Cannot add event while
+  /// adding stream" and the job never finishes.
+  /// What it does not do is cancel the request: `Future.timeout` abandons the
+  /// wait, and the socket is left to the client's own cleanup. That is the
+  /// difference between a caller that recovers and one that does not, which is
+  /// what this is for.
+  Future<http.Response> _perform(
+    http.Request request,
+    String label, {
+    required Duration deadline,
+  }) async {
+    try {
+      // Chained, never `Future(() async { ... })`; see the note on this method.
+      return await _http
+          .send(request)
+          .then(http.Response.fromStream)
+          .timeout(deadline);
+    } on TimeoutException {
+      throw TransportException(
+        '$label got no answer within ${deadline.inSeconds} seconds',
+      );
+    } catch (e) {
+      throw TransportException('$label failed: $e');
+    }
   }
 
   /// Turns an already-interpolated [path] (e.g.

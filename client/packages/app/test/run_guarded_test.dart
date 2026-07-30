@@ -54,12 +54,29 @@ void main() {
     );
   });
 
-  test('a refusal says it was a refusal, not a mystery', () async {
-    final failure = await runGuarded(
+  /// A refusal and a lapsed session are different problems with different
+  /// answers, and this used to say the wrong one for both: there was no
+  /// `ForbiddenException` clause at all, so a genuine denial fell through to
+  /// the vague default, while a 401 was told it was "not allowed" - which
+  /// sends somebody looking for a permission when what they need is to sign
+  /// in. This test pinned that inversion rather than catching it.
+  test('a refusal and a lapsed session say different things', () async {
+    final refused = await runGuarded(
+      whatFailed: 'delete the role',
+      action: () async => throw const api.ForbiddenException('nope'),
+    );
+    expect(refused, contains('not allowed'));
+
+    final signedOut = await runGuarded(
       whatFailed: 'delete the role',
       action: () async => throw const api.UnauthorizedException('nope'),
     );
-    expect(failure, contains('not allowed'));
+    expect(signedOut, contains('signed out'));
+    expect(
+      signedOut,
+      isNot(contains('not allowed')),
+      reason: 'the two must not be told apart only by which word came first',
+    );
   });
 
   test('every failure names the action it was', () async {

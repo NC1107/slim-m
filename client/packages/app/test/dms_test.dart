@@ -89,7 +89,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final channelId = await openDirectMessage(_FakeRef(container), 'user-2');
+      final channelId = await openDirectMessage(container, 'user-2');
       expect(channelId, 'dm-1');
 
       final store = await container.read(storeProvider.future);
@@ -98,22 +98,5 @@ void main() {
       expect(channels.single.name, 'Priya');
       expect(channels.single.kind, dmChannelKind);
     },
-  );
-}
-
-/// [openDirectMessage] takes a [WidgetRef], which only a widget tree can
-/// hand out; this reads through to a plain [ProviderContainer] instead, the
-/// same narrow surface (`read`) the function actually uses.
-class _FakeRef implements WidgetRef {
-  _FakeRef(this._container);
-
-  final ProviderContainer _container;
-
-  @override
-  T read<T>(ProviderListenable<T> provider) => _container.read(provider);
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError(
-    '${invocation.memberName} is not used by this test',
   );
 }
