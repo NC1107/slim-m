@@ -2,7 +2,8 @@
 name: release
 
 # Full release and publish pipeline. How a release is cut, why server and client
-# version independently, and what each job needs: docs/ci.md.
+# version independently, why every publish job requires this commit's own CI
+# to have passed, and what each job needs: docs/ci.md.
 
 on:
   push:
@@ -44,14 +45,45 @@ jobs:
           manifest-file: .release-please-manifest.json
           config-file: release-please-config.json
 
-  # One single-arch image per architecture, built on a NATIVE runner and pushed
-  # to GHCR by digest. No QEMU, and no stored key material. See docs/ci.md.
-  server-image:
+  # Requires server-ci, hygiene and the license gate to have passed on this
+  # exact commit before any server publish job runs. See docs/ci.md.
+  verify-server-ci:
     needs: [release-please]
     if: >-
       (needs.release-please.result == 'success' &&
        needs.release-please.outputs.server_released == 'true') ||
       startsWith(github.ref, 'refs/tags/server-v')
+    permissions:
+      checks: read
+      contents: read
+    uses: ./.github/workflows/verify-release-checks.yml
+    with:
+      required_checks: "check|hygiene|cargo dependency licenses"
+
+  # Requires client-ci, client-ios-ci, hygiene and the license gate to have
+  # passed on this exact commit before any client publish job runs.
+  verify-client-ci:
+    needs: [release-please]
+    if: >-
+      (needs.release-please.result == 'success' &&
+       needs.release-please.outputs.client_released == 'true') ||
+      startsWith(github.ref, 'refs/tags/client-v')
+    permissions:
+      checks: read
+      contents: read
+    uses: ./.github/workflows/verify-release-checks.yml
+    with:
+      required_checks: "analyze, format check, test|ios unit tests (callkit invariant)|hygiene|pub dependency licenses"
+
+  # One single-arch image per architecture, built on a NATIVE runner and pushed
+  # to GHCR by digest. No QEMU, and no stored key material. See docs/ci.md.
+  server-image:
+    needs: [release-please, verify-server-ci]
+    if: >-
+      ((needs.release-please.result == 'success' &&
+        needs.release-please.outputs.server_released == 'true') ||
+       startsWith(github.ref, 'refs/tags/server-v')) &&
+      needs.verify-server-ci.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -101,11 +133,12 @@ jobs:
   # Assembles the per-arch digests into one multi-arch manifest tag and
   # cosign-signs it keylessly over OIDC. Reviewer-gated.
   server-image-merge:
-    needs: [release-please, server-image]
+    needs: [release-please, server-image, verify-server-ci]
     if: >-
-      (needs.release-please.result == 'success' &&
-       needs.release-please.outputs.server_released == 'true') ||
-      startsWith(github.ref, 'refs/tags/server-v')
+      ((needs.release-please.result == 'success' &&
+        needs.release-please.outputs.server_released == 'true') ||
+       startsWith(github.ref, 'refs/tags/server-v')) &&
+      needs.verify-server-ci.result == 'success'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -166,11 +199,12 @@ jobs:
   # Static musl binaries for direct download, built per arch into artifacts and
   # aggregated by server-release-assets.
   server-binaries:
-    needs: [release-please]
+    needs: [release-please, verify-server-ci]
     if: >-
-      (needs.release-please.result == 'success' &&
-       needs.release-please.outputs.server_released == 'true') ||
-      startsWith(github.ref, 'refs/tags/server-v')
+      ((needs.release-please.result == 'success' &&
+        needs.release-please.outputs.server_released == 'true') ||
+       startsWith(github.ref, 'refs/tags/server-v')) &&
+      needs.verify-server-ci.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -225,11 +259,12 @@ jobs:
   # GPG-signable SHA256SUMS plus the raw binaries on the server GitHub Release.
   # The GPG secrets are optional; only the .asc is skipped. See docs/ci.md.
   server-release-assets:
-    needs: [release-please, server-binaries]
+    needs: [release-please, server-binaries, verify-server-ci]
     if: >-
-      (needs.release-please.result == 'success' &&
-       needs.release-please.outputs.server_released == 'true') ||
-      startsWith(github.ref, 'refs/tags/server-v')
+      ((needs.release-please.result == 'success' &&
+        needs.release-please.outputs.server_released == 'true') ||
+       startsWith(github.ref, 'refs/tags/server-v')) &&
+      needs.verify-server-ci.result == 'success'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -276,11 +311,12 @@ jobs:
   # The portable Linux tarball, always, plus whichever packaging formats have
   # their inputs in the repo. Each format gates on its own file. See docs/ci.md.
   linux-client:
-    needs: [release-please]
+    needs: [release-please, verify-client-ci]
     if: >-
-      (needs.release-please.result == 'success' &&
-       needs.release-please.outputs.client_released == 'true') ||
-      startsWith(github.ref, 'refs/tags/client-v')
+      ((needs.release-please.result == 'success' &&
+        needs.release-please.outputs.client_released == 'true') ||
+       startsWith(github.ref, 'refs/tags/client-v')) &&
+      needs.verify-client-ci.result == 'success'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -421,11 +457,12 @@ jobs:
   # Submits the Fedora package to COPR. Inert without COPR_CONFIG or the spec,
   # and best effort: the .rpm is on the release, so a failure only warns.
   copr:
-    needs: [release-please, linux-client]
+    needs: [release-please, linux-client, verify-client-ci]
     if: >-
-      (needs.release-please.result == 'success' &&
-       needs.release-please.outputs.client_released == 'true') ||
-      startsWith(github.ref, 'refs/tags/client-v')
+      ((needs.release-please.result == 'success' &&
+        needs.release-please.outputs.client_released == 'true') ||
+       startsWith(github.ref, 'refs/tags/client-v')) &&
+      needs.verify-client-ci.result == 'success'
     runs-on: ubuntu-latest
     container: fedora:latest
     environment: release
@@ -504,11 +541,12 @@ jobs:
   # Upload-signed apk and appbundle. Inert without its three secrets, and it
   # verifies the signer is the upload key, never debug. See docs/ci.md.
   android-client:
-    needs: [release-please]
+    needs: [release-please, verify-client-ci]
     if: >-
-      (needs.release-please.result == 'success' &&
-       needs.release-please.outputs.client_released == 'true') ||
-      startsWith(github.ref, 'refs/tags/client-v')
+      ((needs.release-please.result == 'success' &&
+        needs.release-please.outputs.client_released == 'true') ||
+       startsWith(github.ref, 'refs/tags/client-v')) &&
+      needs.verify-client-ci.result == 'success'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -644,11 +682,12 @@ jobs:
   # Signed ipa to TestFlight, reviewer-gated. Inert without its six secrets: it
   # warns and stops rather than faking an upload. See docs/ci.md.
   ios-testflight:
-    needs: [release-please]
+    needs: [release-please, verify-client-ci]
     if: >-
-      (needs.release-please.result == 'success' &&
-       needs.release-please.outputs.client_released == 'true') ||
-      startsWith(github.ref, 'refs/tags/client-v')
+      ((needs.release-please.result == 'success' &&
+        needs.release-please.outputs.client_released == 'true') ||
+       startsWith(github.ref, 'refs/tags/client-v')) &&
+      needs.verify-client-ci.result == 'success'
     runs-on: macos-latest
     environment: testflight
     permissions:

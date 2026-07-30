@@ -251,6 +251,24 @@ On a tag push it is a no-op so downstream jobs can still resolve it via `needs`.
 
 Server (AGPL-3.0-only) and client (Apache-2.0) are versioned and released independently, each with its own tag and its own set of jobs.
 
+### Gating publish on the commit's own CI
+
+Every publish job additionally requires `verify-server-ci` or `verify-client-ci` (`verify-release-checks.yml`, called twice) to have succeeded, on both trigger paths.
+Before this existed, the tag path published unconditionally: `git tag server-v9.9.9 <sha> && git push --tags` built, signed and shipped an image with fmt, clippy, `cargo test --all`, the openapi-vs-router contract test, the license gate and the hygiene gates never having run on that ref, straight to a production deployment that auto-updates from the moving `latest` tag.
+
+workflow_run cannot close this gap.
+It fires only when a named workflow completes for the event that triggered it, and none of `server-ci`, `client-ci`, `client-ios-ci`, `hygiene` or `licenses` trigger on a tag push at all, by design, so that a ref that already ran CI on `main` does not run it again.
+A tag push therefore raises no `workflow_run` event for any of them, which rules out the one mechanism that otherwise looks like the obvious fit.
+
+The gate instead polls `GET /repos/{owner}/{repo}/commits/{sha}/check-runs` for `github.sha` and requires each listed check-run name to show `status: completed` and `conclusion: success`, retrying for up to 30 minutes before failing on a timeout.
+A check run is attached to the commit rather than to the event that produced it, so this answers both paths uniformly: the SHA a tag points at is normally already on `main` and already carries the check runs its original push or PR produced, so re-pushing a tag to the same SHA still finds them and still republishes, which is the documented re-publish capability above.
+A required name **absent** from the response is treated the same as one that failed, never as a pass, so a commit that never went through CI at all (never pushed to `main`, never opened as a PR) times out and fails closed instead of silently succeeding on an empty result.
+
+`verify-server-ci` requires `check` (server-ci), `hygiene` and `cargo dependency licenses` (licenses).
+`verify-client-ci` requires `analyze, format check, test` (client-ci), `ios unit tests (callkit invariant)` (client-ios-ci), `hygiene` and `pub dependency licenses` (licenses).
+Those are exact check-run names (a job's `name:`, or its id when a job sets none), matched literally; renaming one of those jobs without updating the matching `required_checks` string silently reopens the gap this closes, since the renamed check is simply absent and the gate times out and fails rather than warns.
+`schema-ci` is not required: `tests/openapi_contract.rs` already runs inside `server-ci`'s `cargo test --all`, and `schema-ci`'s own job is a redocly lint of the document's syntax, not part of what either release actually ships.
+
 Every job that pushes to GHCR, signs, attaches release assets, or touches TestFlight runs under a reviewer-gated GitHub Environment and requests only the permissions it needs.
 Secrets are referenced by name only and never invented; jobs stay inert, showing a visible warning and producing no fake artifact, until the corresponding secrets and packaging inputs exist.
 
