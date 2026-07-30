@@ -27,11 +27,20 @@ import 'package:slimm_platform/platform.dart';
 
 /// Stands in for the real [SyncController]; see `channel_screen_test.dart`,
 /// which needs the same seam for the same reason.
+///
+/// Reports [_status] from `start` rather than leaving it at the base
+/// constructor's initial `offline`: the empty-transcript synthesis in
+/// `channel_screen.dart` only fires at [SyncStatus.live], and nothing else in
+/// this harness can ever move it there.
 class _NoopSyncController extends SyncController {
-  _NoopSyncController(super.ref);
+  _NoopSyncController(super.ref, this._status);
+
+  final SyncStatus _status;
 
   @override
-  Future<void> start() async {}
+  Future<void> start() async {
+    state = _status;
+  }
 }
 
 const _tokens = api.TokenPair(
@@ -41,11 +50,11 @@ const _tokens = api.TokenPair(
   accessExpiresAt: 0,
 );
 
-api.Message channelMessage(int seq) => api.Message(
+api.Message channelMessage(int seq, {String authorId = 'alice'}) => api.Message(
   id: 'm$seq',
   channelId: 'c1',
-  authorId: 'alice',
-  authorDisplayName: 'Alice',
+  authorId: authorId,
+  authorDisplayName: authorId,
   seq: seq,
   content: 'message $seq',
   createdAt: seq * 60000,
@@ -119,6 +128,15 @@ class HistoryHarness {
   /// at the top of the list with the page still in flight, which is the only
   /// moment a test can look at what stands above the oldest loaded row.
   void releaseOlderPages() => _gate?.complete();
+
+  /// The `before` cursor of every backwards page actually requested, in
+  /// order, ignoring the plain `listMessages(limit: 50)` hydration fetch that
+  /// carries none. What a test cares about when counting pages is this, not
+  /// [historyRequests] itself, which also carries that one non-paging call.
+  List<String?> get beforeCursors => historyRequests
+      .where((u) => u.queryParameters.containsKey('before'))
+      .map((u) => u.queryParameters['before'])
+      .toList();
 }
 
 /// Mounts the screen with [serverSeqs] existing server-side and only
@@ -130,12 +148,24 @@ class HistoryHarness {
 /// list out from under the reader, which moves the top back off screen before
 /// anything can be asserted about it. With [olderPagesFail] set, those same
 /// requests are refused.
+///
+/// [messageAuthorId] names who every message in the channel is from, seeded
+/// and server-side alike; [blockedUserIds] is who this viewer has blocked, so
+/// a test can put the two together and mount a channel that is entirely
+/// filtered from view. [syncStatus] is what [SyncController] reports once
+/// `start` runs, since nothing else in this harness can move it off `offline`.
+/// [storeFactory] swaps in a [MessageStore] subclass, for a test that needs
+/// the store itself to misbehave rather than the network.
 Future<HistoryHarness> mountChannel(
   WidgetTester tester, {
   required List<int> serverSeqs,
   required List<int> seededSeqs,
   bool holdOlderPages = false,
   bool olderPagesFail = false,
+  String messageAuthorId = 'alice',
+  List<String> blockedUserIds = const [],
+  SyncStatus syncStatus = SyncStatus.offline,
+  MessageStore Function(SlimmDatabase db)? storeFactory,
 }) async {
   tester.view.physicalSize = const Size(500, 800);
   tester.view.devicePixelRatio = 1;
@@ -143,11 +173,13 @@ Future<HistoryHarness> mountChannel(
 
   final db = SlimmDatabase(NativeDatabase.memory());
   addTearDown(db.close);
-  final store = MessageStore(db);
+  final store = (storeFactory ?? MessageStore.new)(db);
   await store.upsertChannels([
     const api.Channel(id: 'c1', name: 'general', kind: 'text', createdAt: 0),
   ]);
-  await store.applyMessages(seededSeqs.map(channelMessage));
+  await store.applyMessages(
+    seededSeqs.map((seq) => channelMessage(seq, authorId: messageAuthorId)),
+  );
 
   final requests = <Uri>[];
   final gate = holdOlderPages ? Completer<void>() : null;
@@ -156,14 +188,23 @@ Future<HistoryHarness> mountChannel(
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
       storeProvider.overrideWith((ref) async => store),
-      syncControllerProvider.overrideWith((ref) => _NoopSyncController(ref)),
+      syncControllerProvider.overrideWith(
+        (ref) => _NoopSyncController(ref, syncStatus),
+      ),
       apiProvider.overrideWith((ref) {
         final client = api.SlimmApi(
           baseUrl: Uri.parse('http://localhost:8080'),
           session: ref.watch(sessionProvider),
           httpClient: MockClient(
-            (request) =>
-                _answer(request, serverSeqs, requests, gate, olderPagesFail),
+            (request) => _answer(
+              request,
+              serverSeqs,
+              requests,
+              gate,
+              olderPagesFail,
+              messageAuthorId,
+              blockedUserIds,
+            ),
           ),
         );
         ref.onDispose(client.close);
@@ -199,6 +240,8 @@ Future<http.Response> _answer(
   List<Uri> requests,
   Completer<void>? gate,
   bool olderPagesFail,
+  String messageAuthorId,
+  List<String> blockedUserIds,
 ) async {
   final path = request.url.path;
   if (request.method == 'GET' && path == '/channels/c1/messages') {
@@ -212,9 +255,12 @@ Future<http.Response> _answer(
         headers: {'content-type': 'application/json'},
       );
     }
-    return _jsonBody(_page(request.url, serverSeqs));
+    return _jsonBody(_page(request.url, serverSeqs, messageAuthorId));
   }
   if (request.method == 'GET' && path == '/me') return _jsonBody(_meJson());
+  if (request.method == 'GET' && path == '/blocks') {
+    return _jsonBody(blockedUserIds);
+  }
   if (request.method == 'PUT' && path == '/channels/c1/read') {
     return _jsonBody({'last_read_seq': 0, 'unread': 0});
   }
@@ -224,13 +270,18 @@ Future<http.Response> _answer(
 
 /// The server's own contract: live messages with `seq` below `before`,
 /// newest first, at most `limit` of them.
-List<Map<String, dynamic>> _page(Uri url, List<int> serverSeqs) {
+List<Map<String, dynamic>> _page(
+  Uri url,
+  List<int> serverSeqs,
+  String authorId,
+) {
   final before = int.tryParse(url.queryParameters['before'] ?? '');
   final limit = int.tryParse(url.queryParameters['limit'] ?? '') ?? 50;
   final seqs = serverSeqs.where((s) => before == null || s < before).toList()
     ..sort((a, b) => b.compareTo(a));
   return [
-    for (final seq in seqs.take(limit)) _messageJson(channelMessage(seq)),
+    for (final seq in seqs.take(limit))
+      _messageJson(channelMessage(seq, authorId: authorId)),
   ];
 }
 

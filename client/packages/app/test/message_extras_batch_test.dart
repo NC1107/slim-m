@@ -63,6 +63,36 @@ void main() {
     expect(container.read(messageExtrasProvider), hasLength(50));
   });
 
+  test('clear drops everything cached, once, and is a no-op after', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    container.read(messageExtrasProvider.notifier).applyMessages([
+      for (var seq = 1; seq <= 5; seq++) channelMessage(seq),
+    ]);
+    expect(container.read(messageExtrasProvider), isNotEmpty);
+
+    var emissions = 0;
+    container.listen(messageExtrasProvider, (_, _) => emissions++);
+    container.read(messageExtrasProvider.notifier).clear();
+
+    expect(
+      container.read(messageExtrasProvider),
+      isEmpty,
+      reason:
+          'nothing else ever drops an entry, so this is the only thing that '
+          'stops a stranger\'s cached reactions answering for the next '
+          'account on the same device',
+    );
+
+    container.read(messageExtrasProvider.notifier).clear();
+    expect(
+      emissions,
+      1,
+      reason: 'an already-empty map has nothing left to clear',
+    );
+  });
+
   testWidgets('one message gaining a reaction does not rebuild the transcript', (
     tester,
   ) async {

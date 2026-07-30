@@ -11,8 +11,10 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/widgets/message_transcript_widgets.dart';
 import 'package:slimm_data/data.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 import 'channel_history_harness.dart';
 
@@ -215,4 +217,90 @@ void main() {
 
     await _unmount(tester);
   });
+
+  testWidgets('a genuinely empty, live channel is welcomed rather than shown a '
+      'permanent spinner', (tester) async {
+    await mountChannel(
+      tester,
+      serverSeqs: const [],
+      seededSeqs: const [],
+      syncStatus: SyncStatus.live,
+    );
+
+    expect(
+      find.byType(ChannelStartHeader),
+      findsOneWidget,
+      reason:
+          'nothing delivered means no history to page, so the oldest '
+          'loaded row is vacuously the channel first',
+    );
+    expect(find.byType(EmptyMessages), findsNothing);
+    expect(find.byType(HistoryTopAffordance), findsNothing);
+
+    await _unmount(tester);
+  });
+
+  testWidgets(
+    'a genuinely empty channel that has not caught up yet is not welcomed',
+    (tester) async {
+      await mountChannel(
+        tester,
+        serverSeqs: const [],
+        seededSeqs: const [],
+        syncStatus: SyncStatus.connecting,
+      );
+
+      expect(
+        find.byType(EmptyMessages),
+        findsOneWidget,
+        reason:
+            "an empty store proves nothing while sync has not run - it may "
+            'simply not have reached this channel yet',
+      );
+      expect(find.byType(ChannelStartHeader), findsNothing);
+
+      await _unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'the top-of-history affordance is idle when nothing is actually loading',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(
+            body: HistoryTopAffordance(failed: false, loading: false),
+          ),
+        ),
+      );
+
+      expect(find.text('Loading earlier messages...'), findsNothing);
+      expect(
+        find.text('There is more history above.'),
+        findsOneWidget,
+        reason:
+            'nothing is in flight, and the spinner used to run whenever the '
+            'start was merely unknown rather than when a page really was',
+      );
+    },
+  );
+
+  testWidgets(
+    'the top-of-history affordance shows a spinner while a page is really '
+    'in flight',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(
+            body: HistoryTopAffordance(failed: false, loading: true),
+          ),
+        ),
+      );
+
+      expect(find.text('Loading earlier messages...'), findsOneWidget);
+      expect(find.text('There is more history above.'), findsNothing);
+    },
+  );
 }

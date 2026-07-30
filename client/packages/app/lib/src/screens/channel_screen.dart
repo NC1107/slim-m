@@ -334,6 +334,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   blocked,
                                 );
                                 final oldest = oldestDeliveredSeq(rows);
+                                paging.syncOldest(oldest);
                                 _latestSeq = transcript.newestSeq;
                                 _lastReadSeq = lastReadSeq;
                                 // Gated on the viewport: scrolled into history, this rebuild is a message arriving somewhere unread.
@@ -364,9 +365,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                             syncStatus == SyncStatus.live),
                                   ),
                                   onLoadOlder: () =>
-                                      unawaited(paging.loadOlder(oldest)),
-                                  onRetryOlder: () =>
-                                      unawaited(paging.retry(oldest)),
+                                      unawaited(paging.loadOlder()),
+                                  onRetryOlder: () => unawaited(paging.retry()),
                                   actionsFor: (message) => _actionsFor(
                                     message,
                                     myId: myId,

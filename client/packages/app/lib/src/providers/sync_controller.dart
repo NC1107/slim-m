@@ -9,7 +9,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_data/data.dart';
 
+import 'channel_history.dart';
 import 'channel_refresher.dart';
+import 'message_extras.dart';
 import 'providers.dart';
 
 /// How the connection is doing, for the UI to show honestly rather than
@@ -269,8 +271,13 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// Best-effort. A database that will not open or clear must not leave
   /// somebody stuck signed in, so the failure is swallowed; the session is
   /// already gone by the time this runs.
+  ///
+  /// [channelHistoryProvider] and [messageExtrasProvider] are reset alongside
+  /// the database for the same reason; see their own doc comments.
   Future<void> _endSession() async {
     await stop();
+    _ref.invalidate(channelHistoryProvider);
+    _ref.read(messageExtrasProvider.notifier).clear();
     try {
       final store = await _ref.read(storeProvider.future);
       await store.clear();

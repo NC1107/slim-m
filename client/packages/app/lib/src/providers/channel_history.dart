@@ -17,6 +17,7 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// `listMessages` is an extension method, so this import is load-bearing.
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 
@@ -81,31 +82,58 @@ class ChannelHistoryController extends StateNotifier<ChannelHistory> {
   final Ref _ref;
   final String _channelId;
 
-  /// Fetches the page of messages immediately older than [oldestLoadedSeq]
+  /// The seq to page backwards from next, tracked here rather than trusted
+  /// fresh from the caller on every call.
+  ///
+  /// [loadOlder] updates this itself the instant a page lands, in the same
+  /// breath as the `state` write below - so a scroll landing between that
+  /// page's store write and the transcript's own rebuild (a separate,
+  /// independently-timed stream) reads the cursor the fetch just left behind,
+  /// not the value that was current before it. [syncOldest] only ever moves
+  /// this further into the past, which is what makes that safe: a rebuild
+  /// still running on pre-fetch data can only report a newer boundary than
+  /// what [loadOlder] already confirmed, never an older one, so it can never
+  /// undo that fetch's own progress.
+  int? _oldest;
+
+  /// Tells the controller what the transcript currently shows as its oldest
+  /// delivered row. Safe to call from a build method: unlike everything else
+  /// here, it never touches [state], so it cannot trip the "modified a
+  /// provider while the widget tree was building" guard.
+  void syncOldest(int? oldest) {
+    if (oldest == null) return;
+    if (_oldest == null || oldest < _oldest!) _oldest = oldest;
+  }
+
+  /// Fetches the page of messages immediately older than the tracked cursor
   /// and prepends it to the local store.
   ///
   /// Safe to call on every scroll frame: it is a no-op once the start has
   /// been reached, while a page is in flight, and after a failure. A null or
-  /// zero [oldestLoadedSeq] means nothing delivered is loaded yet, so there is
-  /// no keyset to page from.
-  Future<void> loadOlder(int? oldestLoadedSeq) async {
+  /// zero cursor means nothing delivered is loaded yet, so there is no keyset
+  /// to page from.
+  Future<void> loadOlder() async {
     if (state.atStart || state.loading || state.failed) return;
-    if (oldestLoadedSeq == null || oldestLoadedSeq <= 0) return;
+    final oldest = _oldest;
+    if (oldest == null || oldest <= 0) return;
     state = state.copyWith(loading: true);
     try {
       final older = await _ref
           .read(apiProvider)
-          .listMessages(_channelId, before: oldestLoadedSeq, limit: _pageSize);
+          .listMessages(_channelId, before: oldest, limit: _pageSize);
       final store = await _ref.read(storeProvider.future);
       await store.applyMessages(older);
       if (!mounted) return;
       _ref.read(messageExtrasProvider.notifier).applyMessages(older);
+      // Newest first is the server's own contract, so the last entry is oldest.
+      if (older.isNotEmpty) _oldest = older.last.seq;
       state = state.copyWith(
         loading: false,
         atStart: older.length < _pageSize,
         window: state.window + older.length,
       );
-    } on api.ApiException {
+    } catch (_) {
+      // Not only ApiException: the store write above can fail too, and either must not wedge loading.
       if (!mounted) return;
       state = state.copyWith(loading: false, failed: true);
     }
@@ -113,17 +141,24 @@ class ChannelHistoryController extends StateNotifier<ChannelHistory> {
 
   /// Clears a failed page and asks again, from the retry the top of the list
   /// offers.
-  Future<void> retry(int? oldestLoadedSeq) async {
+  Future<void> retry() async {
     if (!state.failed) return;
     state = state.copyWith(failed: false);
-    await loadOlder(oldestLoadedSeq);
+    await loadOlder();
   }
 }
 
 /// Per channel and deliberately not `autoDispose`: what has been paged in is
-/// a property of the channel, not of the screen currently showing it, and
-/// dropping it on a channel switch would re-announce the start of a
-/// conversation that had already been proved to have more above it.
+/// a property of the channel as seen by this account through this local
+/// store, not of the screen currently showing it, so switching channels must
+/// not re-announce a start already proved to have more above it.
+///
+/// That scoping is exactly why it must not survive a sign-out: the local
+/// store is one file for the whole app, so whoever signs in next on this
+/// device would otherwise inherit a stranger's paging state along with it.
+/// `SyncController._endSession` invalidates every instance of this family in
+/// the same breath it clears the database, so a fresh account starts with
+/// nothing paged in either.
 final channelHistoryProvider =
     StateNotifierProvider.family<
       ChannelHistoryController,

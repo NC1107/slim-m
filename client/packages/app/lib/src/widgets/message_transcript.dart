@@ -144,6 +144,16 @@ class _MessageTranscriptState extends State<MessageTranscript> {
   /// A list shorter than its viewport never scrolls, so nothing would ever
   /// ask for the page that would prove where the channel starts.
   ///
+  /// Called only once [build] is about to lay out a real, populated list.
+  /// Every loaded row can be filtered from view (a channel whose visible tail
+  /// is entirely a blocked author, say), and an empty transcript then renders
+  /// as a bare [SingleChildScrollView] whose `maxScrollExtent` is always zero
+  /// - indistinguishable, to [_onScroll], from a genuine scroll to the end.
+  /// Gating on there being an actual list is a structural fact about what is
+  /// on screen, not a threshold: a counter would still fire this once before
+  /// it could trip, and forgets, the moment it resets, why it should not fire
+  /// again the next time every row is filtered.
+  ///
   /// Whether the ask is worth making is [ChannelHistoryController.loadOlder]'s
   /// decision alone; scheduling nothing once the start is known only saves the
   /// callback.
@@ -160,6 +170,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
     if (!widget.history.atStart) {
       return HistoryTopAffordance(
         failed: widget.history.failed,
+        loading: widget.history.loading,
         onRetry: widget.onRetryOlder,
       );
     }
@@ -172,7 +183,6 @@ class _MessageTranscriptState extends State<MessageTranscript> {
 
   @override
   Widget build(BuildContext context) {
-    _checkAfterLayout();
     final messages = widget.messages;
     final start = _topSlot();
 
@@ -187,6 +197,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
       return EmptyMessages(syncStatus: widget.syncStatus);
     }
 
+    _checkAfterLayout();
     final newestId = messages.last.id;
     final animateNewest = _hydrated && !_seen.contains(newestId);
     // Everything on screen counts as seen, so a recycle never replays.

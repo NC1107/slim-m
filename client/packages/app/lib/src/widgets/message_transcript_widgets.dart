@@ -80,9 +80,23 @@ class ChannelStartHeader extends StatelessWidget {
 /// a claim the client cannot make, and a blank gap there reads as the same
 /// claim more quietly.
 class HistoryTopAffordance extends StatelessWidget {
-  const HistoryTopAffordance({super.key, required this.failed, this.onRetry});
+  const HistoryTopAffordance({
+    super.key,
+    required this.failed,
+    required this.loading,
+    this.onRetry,
+  });
 
   final bool failed;
+
+  /// Whether a page is actually in flight right now. Not the opposite of
+  /// [failed]: once a filtered-empty view stops driving the automatic
+  /// trigger (see `message_transcript.dart`'s own note on that), this sits
+  /// idle - between pages, or waiting on a scroll that has not come again -
+  /// and the copy has to say so rather than claim a fetch that is not
+  /// running.
+  final bool loading;
+
   final VoidCallback? onRetry;
 
   @override
@@ -103,7 +117,8 @@ class HistoryTopAffordance extends StatelessWidget {
               message: 'Could not load earlier messages.',
               onRetry: onRetry,
             )
-          : Row(
+          : loading
+          ? Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const SizedBox(
@@ -117,6 +132,11 @@ class HistoryTopAffordance extends StatelessWidget {
                   style: AppText.caption.copyWith(color: tokens.textSecondary),
                 ),
               ],
+            )
+          : Text(
+              'There is more history above.',
+              textAlign: TextAlign.center,
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
     );
   }
