@@ -21,7 +21,7 @@ import '../providers/message_extras.dart';
 import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
 import '../widgets/confirm_dialog.dart';
-import '../widgets/report_dialog.dart';
+import '../widgets/safety_actions.dart';
 
 /// Runs [action], and on a refusal from the server says so in [failure]'s
 /// words followed by the server's own.
@@ -157,24 +157,13 @@ Future<void> reportMessage(
   WidgetRef ref,
   BuildContext context,
   Message message,
-) async {
-  final reason = await promptReportReason(
-    context,
-    subjectLabel: 'this message',
-  );
-  if (reason == null || !context.mounted) return;
-  await _reporting(context, 'Could not file the report.', () async {
-    await ref
-        .read(apiProvider)
-        .report(
-          subject: api.ReportSubject.message,
-          subjectId: message.id,
-          reason: reason,
-        );
-    if (!context.mounted) return;
-    _say(context, 'Report filed. A moderator will review it.');
-  });
-}
+) => fileReport(
+  context,
+  ref,
+  subject: api.ReportSubject.message,
+  subjectId: message.id,
+  subjectLabel: 'this message',
+);
 
 /// Blocks a message's author. A message with no live author has nobody to
 /// block, so it is not offered one.
@@ -185,9 +174,5 @@ Future<void> blockMessageAuthor(
 ) async {
   final authorId = message.authorId;
   if (authorId == null) return;
-  await _reporting(context, 'Could not block that user.', () async {
-    await ref.read(apiProvider).blockUser(authorId);
-    if (!context.mounted) return;
-    _say(context, 'Blocked. Their messages are hidden for you.');
-  });
+  await blockUser(context, ref, authorId);
 }

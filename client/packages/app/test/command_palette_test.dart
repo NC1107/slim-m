@@ -46,10 +46,20 @@ api.UserProfile _profile(String id, String name) => api.UserProfile(
   createdAt: 0,
 );
 
-/// Everything but `/dms/*` throws, matching the rest of this test suite's
-/// convention of an otherwise-always-failing client so an unexpected call
-/// surfaces immediately instead of returning something plausible-looking.
-http.Client _fakeClient() => MockClient((request) async {
+/// Everything but `/dms/*`, `/blocks` and the message search throws, matching
+/// the rest of this test suite's convention of an otherwise-always-failing
+/// client so an unexpected call surfaces immediately instead of returning
+/// something plausible-looking.
+http.Client _fakeClient({
+  List<String> blocked = const [],
+  List<Map<String, dynamic>> hits = const [],
+}) => MockClient((request) async {
+  if (request.url.path == '/blocks') {
+    return http.Response(jsonEncode(blocked), 200);
+  }
+  if (request.url.path.endsWith('/messages/search')) {
+    return http.Response(jsonEncode(hits), 200);
+  }
   if (request.method == 'POST' && request.url.path == '/dms/other') {
     return http.Response(
       jsonEncode({
@@ -71,6 +81,8 @@ http.Client _fakeClient() => MockClient((request) async {
 
 ({ProviderContainer container, SlimmDatabase db}) _setup({
   int permissions = 0,
+  List<String> blocked = const [],
+  List<Map<String, dynamic>> hits = const [],
 }) {
   final db = SlimmDatabase(NativeDatabase.memory());
   final container = ProviderContainer(
@@ -81,7 +93,7 @@ http.Client _fakeClient() => MockClient((request) async {
         final client = api.SlimmApi(
           baseUrl: Uri.parse('http://localhost:8080'),
           session: ref.watch(sessionProvider),
-          httpClient: _fakeClient(),
+          httpClient: _fakeClient(blocked: blocked, hits: hits),
         );
         ref.onDispose(client.close);
         return client;
@@ -107,8 +119,10 @@ Future<void> _teardown(
   await db.close();
 }
 
-GoRouter _testRouter() => GoRouter(
-  initialLocation: '/channels',
+/// [initial] lets a test start inside a channel: the palette only searches
+/// messages when one is selected, which is why that path had no coverage.
+GoRouter _testRouter({String initial = '/channels'}) => GoRouter(
+  initialLocation: initial,
   routes: [
     GoRoute(
       path: '/channels',
@@ -133,7 +147,11 @@ GoRouter _testRouter() => GoRouter(
   ],
 );
 
-Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
+Future<void> _pump(
+  WidgetTester tester,
+  ProviderContainer container, {
+  String initial = '/channels',
+}) async {
   tester.view.physicalSize = const Size(1400, 900);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -143,7 +161,7 @@ Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
       container: container,
       child: MaterialApp.router(
         theme: buildTheme(Brightness.light, AppTokens.light),
-        routerConfig: _testRouter(),
+        routerConfig: _testRouter(initial: initial),
       ),
     ),
   );
@@ -334,6 +352,60 @@ void main() {
     await _pressCtrlK(tester);
 
     expect(find.text('Open Space settings'), findsNothing);
+
+    await _teardown(tester, setup.container, setup.db);
+  });
+
+  /// The palette runs its own message search, separate from
+  /// `channelSearchProvider`, and renders both the body and the author's name.
+  /// It went unfiltered when blocking was wired up everywhere else, so pressing
+  /// Ctrl+K and typing a word a blocked person had used showed it in full.
+  testWidgets('a blocked author is absent from the palette message results', (
+    tester,
+  ) async {
+    final setup = _setup(
+      blocked: ['pest'],
+      hits: [
+        {
+          'id': 'm1',
+          'channel_id': 'c1',
+          'author_id': 'pest',
+          'author_display_name': 'Pest',
+          'seq': 1,
+          'content': 'from a pest',
+          'created_at': 0,
+          'edited_at': null,
+        },
+        {
+          'id': 'm2',
+          'channel_id': 'c1',
+          'author_id': 'other',
+          'author_display_name': 'Ren',
+          'seq': 2,
+          'content': 'from a friend',
+          'created_at': 0,
+          'edited_at': null,
+        },
+      ],
+    );
+    await MessageStore(setup.db).upsertChannels(const [
+      api.Channel(id: 'ch1', name: 'general', kind: 'text', createdAt: 0),
+    ]);
+    await _pump(tester, setup.container, initial: '/channels/ch1');
+    await _pressCtrlK(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('command-palette-input')),
+      'from',
+    );
+    await tester.pumpAndSettle();
+
+    expect(_inPalette('from a friend'), findsOneWidget);
+    expect(
+      _inPalette('from a pest'),
+      findsNothing,
+      reason: 'a second search path is still a search path',
+    );
 
     await _teardown(tester, setup.container, setup.db);
   });

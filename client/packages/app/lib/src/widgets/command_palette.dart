@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
 import '../providers/admin_providers.dart';
+import '../providers/blocks_controller.dart';
 import '../routing/modal_page.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
@@ -103,7 +104,13 @@ class _CommandPaletteContentState
           .read(apiProvider)
           .searchMessages(channelId, q: query, limit: paletteResultLimit);
       if (!mounted || generation != _searchGeneration) return;
-      setState(() => _messageResults = results);
+      // A second search path beside `channelSearchProvider`, filtered alike.
+      final blocks = ref.read(blocksProvider);
+      setState(
+        () => _messageResults = results
+            .where((message) => !blocks.contains(message.authorId))
+            .toList(growable: false),
+      );
     } on api.ApiException {
       if (!mounted || generation != _searchGeneration) return;
       setState(() => _messageResults = const []);

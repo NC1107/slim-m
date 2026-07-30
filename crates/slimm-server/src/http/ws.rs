@@ -385,13 +385,19 @@ async fn authorize(
         Event::ReactionsChanged {
             channel_id,
             message_id,
-            reactions,
         } => ServerFrame::ReactionsChanged {
             channel_id: channel_id.to_string(),
             message_id: message_id.to_string(),
-            reactions: reactions
+            // Per viewer: see the event's own doc comment for why.
+            reactions: store
+                .reactions_for_message(message_id, ctx.user_id)
+                .await
+                .ok()?
                 .into_iter()
-                .map(|(emoji, count)| ReactionCountDto { emoji, count })
+                .map(|summary| ReactionCountDto {
+                    emoji: summary.emoji,
+                    count: summary.count,
+                })
                 .collect(),
         },
         Event::MessagePinned {

@@ -6,8 +6,10 @@
 library;
 
 /// A server's long-lived identity, pinned by a client on first connect and
-/// compared on every one after so a later machine-in-the-middle changes the
-/// fingerprint visibly instead of silently.
+/// meant to be compared on every one after, so a later machine-in-the-middle
+/// changes the fingerprint visibly instead of silently. The client is the
+/// half that has to hold up its end: it must bind that comparison to every
+/// explicit connect, not merely to the address being typed.
 ///
 /// This protects nothing about the very first connection: a client with
 /// nothing pinned yet cannot tell a faithful server from an attacker's own

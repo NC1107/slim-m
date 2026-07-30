@@ -11,6 +11,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import 'blocks_controller.dart';
 import 'live_events.dart';
 import 'sync_controller.dart';
 
@@ -30,8 +31,10 @@ class TypingController extends StateNotifier<Set<String>> {
   TypingController(this._ref, this._channelId) : super(const {}) {
     _sub = _ref.read(liveEventsProvider).listen((event) {
       switch (event) {
+        // A blocked user never enters the set rather than being filtered out.
         case api.TypingStarted(:final channelId, :final userId)
-            when channelId == _channelId:
+            when channelId == _channelId &&
+                !_ref.read(blocksProvider).contains(userId):
           state = {...state, userId};
         case api.TypingStopped(:final channelId, :final userId)
             when channelId == _channelId:

@@ -138,6 +138,8 @@ class _MessageTranscriptState extends State<MessageTranscript> {
         final extras = widget.extrasById[message.id] ?? MessageExtras.empty;
         final newDay = isNewDay(message, previous);
         final row = MessageRow(
+          // By message, not by slot: an arrival shifts every index by one.
+          key: ValueKey(message.id),
           message: message,
           // A new day breaks a group so a continuation across midnight regains its avatar and header.
           grouped: isGrouped(message, previous) && !newDay,

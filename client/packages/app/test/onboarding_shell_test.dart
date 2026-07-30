@@ -154,4 +154,61 @@ void main() {
       expect(find.byType(OnboardingStepper), findsOneWidget);
     });
   });
+
+  group('ServerIdentityChip', () {
+    Future<void> pump(WidgetTester tester, ServerIdentityStatus status) {
+      return tester.pumpWidget(
+        _harness(
+          Scaffold(
+            body: ServerIdentityChip(
+              spaceName: 'My Space',
+              host: 'chat.example',
+              status: status,
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('confirmed shows the tick, labelled for a screen reader', (
+      tester,
+    ) async {
+      await pump(tester, ServerIdentityStatus.confirmed);
+
+      expect(find.byIcon(AppIcons.check), findsOneWidget);
+      expect(find.byIcon(AppIcons.danger), findsNothing);
+      expect(
+        find.bySemanticsLabel(RegExp('confirmed', caseSensitive: false)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('unknown shows neither glyph, but still carries a label', (
+      tester,
+    ) async {
+      await pump(tester, ServerIdentityStatus.unknown);
+
+      expect(find.byIcon(AppIcons.check), findsNothing);
+      expect(find.byIcon(AppIcons.danger), findsNothing);
+      expect(
+        find.bySemanticsLabel(RegExp('not yet confirmed')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'mismatch is the danger glyph, never the same as a confirmed tick',
+      (tester) async {
+        await pump(tester, ServerIdentityStatus.mismatch);
+
+        expect(find.byIcon(AppIcons.danger), findsOneWidget);
+        expect(
+          find.byIcon(AppIcons.check),
+          findsNothing,
+          reason: 'a mismatch must never render as the same tick as success',
+        );
+        expect(find.bySemanticsLabel(RegExp('does not match')), findsOneWidget);
+      },
+    );
+  });
 }

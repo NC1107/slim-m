@@ -279,24 +279,44 @@ class _Pip extends StatelessWidget {
   }
 }
 
-/// The Space a form is about: its initials, its name and its host, with a tick
-/// once its identity has been confirmed.
+/// How a server's identity compares against whatever this app already
+/// pinned for that address. Three states, not a boolean, because "no pin
+/// exists yet" and "the pin does not match" are opposite risk levels and
+/// must never share one rendering.
+enum ServerIdentityStatus {
+  /// The fetched key matches the pin. The tick is about this, and only
+  /// this: reaching a server says who answered, not that it is the one
+  /// trusted last time.
+  confirmed,
+
+  /// Nothing is pinned yet, or the server is too old to report an identity
+  /// at all (`Version.identity == null`). Neither is a safety claim in
+  /// either direction, so this renders as quietly as an unasked question.
+  unknown,
+
+  /// The fetched key does not match the pin. Must read louder than
+  /// [unknown] and never as a neutral absence of information: this is the
+  /// one state trust-on-first-use exists to make visible.
+  mismatch,
+}
+
+/// The Space a form is about: its initials, its name and its host, with a
+/// glyph for how its identity compares against what this app already
+/// pinned.
 ///
-/// Shown only once `/version` has answered, because until then the only honest
-/// thing to say about a typed address is nothing. The tick is about the pinned
-/// fingerprint rather than about reachability - reaching a server says who
-/// answered, not that it is the one you trusted last time.
+/// Shown only once `/version` has answered, because until then the only
+/// honest thing to say about a typed address is nothing.
 class ServerIdentityChip extends StatelessWidget {
   const ServerIdentityChip({
     super.key,
     required this.spaceName,
     required this.host,
-    this.confirmed = false,
+    this.status = ServerIdentityStatus.unknown,
   });
 
   final String spaceName;
   final String host;
-  final bool confirmed;
+  final ServerIdentityStatus status;
 
   @override
   Widget build(BuildContext context) {
@@ -348,9 +368,48 @@ class ServerIdentityChip extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (confirmed)
-            Icon(AppIcons.check, size: AppSizes.icon16, color: tokens.accent),
+          const SizedBox(width: AppSpacing.s8),
+          _IdentityStatusGlyph(status: status),
         ],
+      ),
+    );
+  }
+}
+
+/// The tick, its louder mismatch counterpart, or nothing - always with a
+/// semantic label, so what a sighted user reads from colour and shape a
+/// screen reader gets from words instead.
+class _IdentityStatusGlyph extends StatelessWidget {
+  const _IdentityStatusGlyph({required this.status});
+
+  final ServerIdentityStatus status;
+
+  static const _labels = {
+    ServerIdentityStatus.confirmed:
+        'Identity confirmed: matches the key this app pinned before.',
+    ServerIdentityStatus.unknown: 'Identity not yet confirmed.',
+    ServerIdentityStatus.mismatch:
+        "Identity does not match the key this app pinned before. This "
+        'server may not be the one trusted last time.',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final (icon, color) = switch (status) {
+      ServerIdentityStatus.confirmed => (AppIcons.check, tokens.accent),
+      ServerIdentityStatus.unknown => (null, null),
+      ServerIdentityStatus.mismatch => (AppIcons.danger, tokens.dangerText),
+    };
+
+    return Semantics(
+      label: _labels[status],
+      child: SizedBox(
+        width: AppSizes.icon16,
+        height: AppSizes.icon16,
+        child: icon == null
+            ? null
+            : Icon(icon, size: AppSizes.icon16, color: color),
       ),
     );
   }
