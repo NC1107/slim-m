@@ -81,12 +81,32 @@ async fn issue(
 /// account that cannot currently sign in. Rate limited on the same tight
 /// budget as login, since a code is a guessable-length secret an attacker
 /// would otherwise be free to grind.
+///
+/// The code is checked before the password is hashed, the way `register`'s
+/// invite gate is, so a garbage code costs one indexed lookup instead of a
+/// 19 MiB Argon2id run and one of only four hashing permits. Without that
+/// ordering a handful of requests can hold every permit that a legitimate
+/// login needs.
+///
+/// This does trade one thing away and it is worth naming rather than glossing:
+/// a valid code now takes visibly longer to answer than an invalid one, where
+/// before both paid the hash. That is a real distinguisher, and it is an
+/// acceptable one - a code is 256 bits, so anybody who can tell a live code
+/// from a dead one by timing already had to guess a live code to do it, and at
+/// that point the oracle tells them nothing they did not just prove. The answer
+/// itself stays uniform across unknown, expired and already-used.
 async fn reset(
     _limited: RateLimited<PASSWORD>,
     State(state): State<AppState>,
     Json(req): Json<ResetRequest>,
 ) -> Result<StatusCode, ApiError> {
     validate_password(&req.new_password)?;
+
+    // Advisory and racy; consume_reset_code re-checks and alone spends a code.
+    if !state.store.reset_code_is_live(&req.code).await? {
+        return Err(ApiError::BadRequest("that reset code cannot be used"));
+    }
+
     let hash = state.auth.hash_password(req.new_password).await?;
 
     match state.store.consume_reset_code(&req.code, &hash).await {

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, PASSWORD, REFRESH, RateLimited, enforce};
+use super::extract::{Authed, AuthedLimited, Json, PASSWORD, REFRESH, RateLimited, WRITE, enforce};
 use crate::hub::Event;
 use crate::ratelimit::Class;
 use crate::store::DeleteAccountError;
@@ -220,7 +220,7 @@ async fn ws_ticket(
 }
 
 async fn logout(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<WRITE>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
     state.store.revoke_session(ctx.session_id).await?;
@@ -233,7 +233,7 @@ async fn logout(
 /// Deletes the caller's own account: purge personal data, anonymize authored
 /// content, tombstone the user, and revoke every session (closing live sockets).
 async fn delete_account(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<WRITE>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
     let revoked = match state.store.delete_account(ctx.user_id).await {

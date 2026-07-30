@@ -43,7 +43,7 @@ pub async fn run() -> anyhow::Result<()> {
     spawn_attachment_sweep(store.clone(), media.clone());
     let auth = auth::Auth::new(config.hash_concurrency)?;
     let hub = hub::Hub::new();
-    let limiter = ratelimit::RateLimiter::new();
+    let limiter = ratelimit::RateLimiter::with_trusted_hops(config.trust_proxy_hops);
     let push = push::PushSender::new(&config)?;
     let voice = voice::VoiceService::new(&config)?;
     let app = cors.apply(http::router(http::AppState {

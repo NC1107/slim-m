@@ -202,6 +202,37 @@ A file that did not fit leaves nothing behind: both the limit and the name are c
 The command exits non-zero if any file in the directory did not end up as an emoji, so a script notices, and the report above it says which files and why.
 A pack folder with a `README` or a `LICENSE` in it will therefore exit non-zero on a run that was otherwise fine, with those files named as the reason.
 
+## Rate limiting, and the one setting you need behind a proxy
+
+The server limits requests per caller with token buckets.
+An authenticated caller is keyed by account, so a limit follows them across devices and networks rather than being shed by reconnecting.
+Everyone else is keyed by address.
+
+That second half is where a reverse proxy causes a problem, and it is worth understanding before you decide.
+The server sees the TCP peer, and behind a proxy the peer is always the proxy, so without any configuration **every unauthenticated caller in the world shares one bucket**.
+The password bucket is a burst of five and then one attempt every six seconds, so a single client making one request a second keeps it permanently empty and nobody can sign in.
+It also fires by accident when several of you sign in together.
+
+The fix is to tell the server how many proxies you run:
+
+```
+SLIMM_TRUST_PROXY_HOPS=1
+```
+
+Behind the Caddy in this directory that is `1`.
+Add one for each additional proxy in front of it - a CDN in front of Caddy makes it `2`.
+
+**Leave it unset if the server is exposed directly**, and do not guess.
+The two ways of getting it wrong are not equally bad.
+Too low keys every unauthenticated caller together, which is the problem above: annoying, and self-inflicted only.
+Too high reads an address the *client* chose, so any caller can mint themselves an unlimited number of buckets, and the limit stops existing.
+That is why the default is zero and why this is not inferred: nothing in a request distinguishes a proxy you run from one you do not.
+
+The header is read from the right, which is what makes a correct setting safe.
+A proxy appends the address it saw, so the rightmost entry is the one your own proxy wrote; a caller can prepend as much as they like and never reach it.
+
+Caddy has no built-in per-IP rate limiting, so this cannot be solved in the Caddyfile instead - that needs a third-party module and a custom Caddy build.
+
 ## Moderating a member, and what "remove from Space" really is
 
 Two tools sit between deleting a message and deleting an account.

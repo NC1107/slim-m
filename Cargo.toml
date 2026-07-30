@@ -14,7 +14,7 @@ repository = "https://github.com/NC1107/slim-m"
 [workspace.dependencies]
 axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net", "io-util", "sync", "time"] }
-tower-http = { version = "0.6", features = ["trace", "cors"] }
+tower-http = { version = "0.6", features = ["trace", "cors", "timeout"] }
 # Splitting a WebSocket into independent read and write halves (StreamExt/SinkExt).
 futures-util = "0.3"
 tracing = "0.1"

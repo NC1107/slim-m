@@ -25,7 +25,7 @@ use serde_json::Value;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, Query};
+use super::extract::{AuthedLimited, Json, Query, READ};
 use super::messages::parse_uuid;
 use crate::ids::ChannelId;
 use crate::permissions::Permissions;
@@ -108,7 +108,7 @@ struct ViewportDto {
 // --- Handler ---
 
 async fn viewport(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<READ>,
     Path(channel_id): Path<String>,
     Query(params): Query<ViewportParams>,
     State(state): State<AppState>,

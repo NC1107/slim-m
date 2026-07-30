@@ -20,7 +20,7 @@ use serde::Deserialize;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, Query};
+use super::extract::{AuthedLimited, Json, Query, READ};
 use super::messages::{MessageDto, parse_uuid, with_reactions};
 use crate::ids::ChannelId;
 use crate::permissions::Permissions;
@@ -50,7 +50,7 @@ struct SearchParams {
 /// cannot search here" and "no such channel" identically, revealing neither,
 /// exactly like listing.
 async fn search(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<READ>,
     Path(channel_id): Path<String>,
     Query(params): Query<SearchParams>,
     State(state): State<AppState>,

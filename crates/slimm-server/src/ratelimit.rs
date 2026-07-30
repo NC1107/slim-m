@@ -39,6 +39,15 @@ pub enum Class {
     /// refresh from re-fanning-out, so this exists to bound the cost of a
     /// misbehaving one.
     Typing,
+    /// Unauthenticated metadata reads that disclose nothing worth guessing at:
+    /// `/version` and its capability list.
+    ///
+    /// Loose on purpose. The sign-in screen probes `/version` as somebody types
+    /// a server address, so a tight budget here would refuse a legitimate user
+    /// mid-keystroke; what this bounds is a flood, not a guess. `InviteCheck`
+    /// stays tight because a hit there discloses real deployment metadata and
+    /// this does not.
+    Read,
     /// Checking an invite code before signup. Unauthenticated, and a valid
     /// code now discloses real deployment metadata rather than a bare
     /// boolean, which raises what a successful guess is worth; tight for the
@@ -62,6 +71,7 @@ impl Class {
             Class::Ticket => (10.0, 1.0),
             Class::Write => (30.0, 5.0),
             Class::Typing => (10.0, 2.0),
+            Class::Read => (20.0, 2.0),
             Class::InviteCheck => (10.0, 1.0 / 10.0),
             Class::Upload => (10.0, 1.0 / 20.0),
         }
@@ -90,6 +100,7 @@ struct State {
 #[derive(Clone)]
 pub struct RateLimiter {
     state: Arc<Mutex<State>>,
+    trusted_hops: usize,
 }
 
 impl Default for RateLimiter {
@@ -100,12 +111,36 @@ impl Default for RateLimiter {
 
 impl RateLimiter {
     pub fn new() -> Self {
+        Self::with_trusted_hops(0)
+    }
+
+    /// A limiter that trusts `hops` proxies in front of it when keying an
+    /// unauthenticated caller. Zero, the default, trusts none and keys on the
+    /// TCP peer; see [`RateLimiter::trusted_hops`].
+    pub fn with_trusted_hops(trusted_hops: usize) -> Self {
         Self {
             state: Arc::new(Mutex::new(State {
                 buckets: HashMap::new(),
                 last_sweep: Instant::now(),
             })),
+            trusted_hops,
         }
+    }
+
+    /// How many proxies in front of this server may be believed about who the
+    /// caller is.
+    ///
+    /// Zero means the TCP peer is the only thing believed, which is right for a
+    /// directly-exposed server and is what a forwarded header cannot be trusted
+    /// for: anyone may send one. Non-zero is an operator asserting they control
+    /// that many hops, which makes the address that many places from the *right*
+    /// of `X-Forwarded-For` as trustworthy as the peer - a caller can prepend
+    /// anything they like to that header and never reach the slot.
+    ///
+    /// It has to be configurable rather than inferred because nothing in a
+    /// request distinguishes a proxy the operator runs from one they do not.
+    pub fn trusted_hops(&self) -> usize {
+        self.trusted_hops
     }
 
     /// Takes one token for `key` in `class`, returning false if the caller is
