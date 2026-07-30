@@ -16,6 +16,7 @@ use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
+use sqlx::SqlitePool;
 use tokio::net::TcpListener;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
@@ -47,6 +48,21 @@ fn state_for(store: &Store, hub: Hub) -> AppState {
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
     }
+}
+
+/// Like [`new_store`], but also hands back the raw pool so a test can reach
+/// past the `Store` seam and break a single query for real, rather than the
+/// whole database (see `a_store_error_resolving_presence_withholds_typing`).
+async fn new_store_with_pool() -> (Store, SqlitePool, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-typing-test");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    (Store::new(pool.clone()), pool, guard)
 }
 
 async fn user_ticket(store: &Store, name: &str) -> (String, slimm_server::ids::UserId) {
@@ -380,6 +396,50 @@ async fn a_hidden_user_typing_is_not_announced() {
     let addr = serve(state.clone()).await;
     let mut alice_ws = connect(addr, &alice_ticket).await;
     let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    send_typing(&mut alice_ws, &channel.id.to_string()).await;
+
+    assert_nothing_of_type(&mut bob_ws, "typing.started", &channel.id.to_string()).await;
+}
+
+/// A typing signal must not announce someone whose presence the store failed
+/// to resolve, not just someone genuinely hidden: `presence_status` used to
+/// collapse a real store error into the same `None` as "no such column",
+/// which the typing gate read as "not offline" and let through.
+///
+/// The `presence_visibility` column is renamed out from under the query
+/// rather than closing the whole pool: closing the pool also fails the
+/// sender's own permission check before anything fans out, which would pass
+/// this test for the wrong reason. Renaming only the one column this store
+/// method reads leaves every other query, including that permission check,
+/// working exactly as before.
+#[tokio::test]
+async fn a_store_error_resolving_presence_withholds_typing() {
+    let (store, pool, _guard) = new_store_with_pool().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let state = state_for(&store, Hub::new());
+
+    let (alice_ticket, _alice_id) = user_ticket(&store, "alice").await;
+    let (bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
+
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    sqlx::query(
+        "ALTER TABLE users RENAME COLUMN presence_visibility TO presence_visibility_broken",
+    )
+    .execute(&pool)
+    .await
+    .expect("break the column the store queries by name");
 
     send_typing(&mut alice_ws, &channel.id.to_string()).await;
 
