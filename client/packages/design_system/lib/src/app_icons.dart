@@ -52,6 +52,9 @@ abstract final class AppIcons {
   static const IconData customEmoji = LucideIcons.sticker300;
   static const IconData imageMissing = LucideIcons.imageOff300;
 
+  /// A picked image, once there is one to replace rather than choose fresh.
+  static const IconData image = LucideIcons.image300;
+
   /// A staleness cue distinct from [pending]: the same glyph, a different
   /// role (an expiring device or invite rather than an in-flight send), kept
   /// as its own name so the two are never conflated at a call site.

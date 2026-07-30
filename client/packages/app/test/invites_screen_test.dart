@@ -25,14 +25,23 @@ const _tokens = TokenPair(
   accessExpiresAt: 0,
 );
 
-String _inviteJson(String code, {bool revoked = false}) => jsonEncode({
+String _inviteJson(
+  String code, {
+  bool revoked = false,
+  int? maxUses,
+  int uses = 0,
+  int? expiresAt,
+  bool usable = true,
+  String? roleGrant,
+}) => jsonEncode({
   'code': code,
-  'max_uses': null,
-  'uses': 0,
-  'expires_at': null,
+  'max_uses': maxUses,
+  'uses': uses,
+  'expires_at': expiresAt,
   'created_at': 0,
   'revoked': revoked,
-  'usable': !revoked,
+  'usable': usable,
+  'role_grant': roleGrant,
 });
 
 Future<ProviderContainer> _pump(
@@ -190,4 +199,112 @@ void main() {
       );
     },
   );
+
+  testWidgets('a fully used invite reads as such, not as expired', (
+    tester,
+  ) async {
+    await _pump(tester, (request) {
+      if (request.method == 'GET' && request.url.path == '/invites') {
+        return http.Response(
+          '[${_inviteJson('AB12CD34EF', maxUses: 10, uses: 10, usable: false)}]',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      return http.Response(
+        '{}',
+        404,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    expect(find.text('10/10 uses · Never expires'), findsOneWidget);
+    expect(
+      find.text('FULLY USED'),
+      findsOneWidget,
+      reason:
+          'a spent code needs its own label; "10/10 uses" sitting under '
+          '"EXPIRED" tells an admin the wrong thing is wrong',
+    );
+    expect(find.text('EXPIRED'), findsNothing);
+  });
+
+  testWidgets('a genuinely expired invite is labelled that way', (
+    tester,
+  ) async {
+    await _pump(tester, (request) {
+      if (request.method == 'GET' && request.url.path == '/invites') {
+        return http.Response(
+          '[${_inviteJson('GH56IJ78KL', expiresAt: 1, usable: false)}]',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      return http.Response(
+        '{}',
+        404,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    expect(find.text('EXPIRED'), findsOneWidget);
+    expect(find.text('FULLY USED'), findsNothing);
+  });
+
+  testWidgets('the role an invite grants is named, not hidden', (tester) async {
+    await _pump(tester, (request) {
+      if (request.method == 'GET' && request.url.path == '/invites') {
+        return http.Response(
+          '[${_inviteJson('MN90OP12QR', roleGrant: 'role-1')}]',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      if (request.method == 'GET' && request.url.path == '/roles') {
+        return http.Response(
+          jsonEncode([
+            {
+              'id': 'role-1',
+              'name': 'Moderators',
+              'permissions': 0,
+              'is_everyone': false,
+              'created_at': 0,
+            },
+          ]),
+          200,
+        );
+      }
+      return http.Response(
+        '{}',
+        404,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    expect(find.textContaining('Moderators'), findsOneWidget);
+  });
+
+  testWidgets('an existing code can be copied without revoking it', (
+    tester,
+  ) async {
+    await _pump(tester, (request) {
+      if (request.method == 'GET' && request.url.path == '/invites') {
+        return http.Response(
+          '[${_inviteJson('welcome-123')}]',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      return http.Response(
+        '{}',
+        404,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    await tester.tap(find.byIcon(AppIcons.copy));
+    await tester.pump();
+
+    expect(find.text('Invite code copied.'), findsOneWidget);
+  });
 }
