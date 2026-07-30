@@ -23,6 +23,8 @@ import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/voice_strip_indicator.dart';
+import 'canvas/canvas_open_button.dart';
+import 'canvas/canvas_pane.dart';
 import 'channel_screen.dart';
 import 'voice_screen.dart';
 
@@ -188,7 +190,11 @@ class ConversationPane extends ConsumerWidget {
               .cast<Channel?>()
               .firstOrNull;
           final isVoice = channel?.kind == 'voice';
-          final body = isVoice
+          final canvasOpen = ref.watch(canvasOpenProvider) == channelId;
+          // It carries its own close affordance: a text channel's header lives inside `ChannelScreen` and goes with it.
+          final body = canvasOpen
+              ? CanvasPane(channelId: channelId)
+              : isVoice
               ? VoiceScreen(channelId: channelId)
               : ChannelScreen(channelId: channelId);
 
@@ -219,8 +225,12 @@ class _VoiceConversationHeader extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
       ),
-      alignment: Alignment.centerLeft,
-      child: _ChannelTitle(channelId: channelId),
+      child: Row(
+        children: [
+          Expanded(child: _ChannelTitle(channelId: channelId)),
+          CanvasOpenButton(channelId: channelId),
+        ],
+      ),
     );
   }
 }

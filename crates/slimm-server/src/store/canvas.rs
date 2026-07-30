@@ -31,6 +31,25 @@ use crate::ids::{CanvasObjectId, ChannelId, Seq, UserId};
 /// decision), and an object outside it could never be reached by panning.
 pub const WORLD_LIMIT: f64 = 5_000_000.0;
 
+/// Longest side one object may declare.
+///
+/// The world alone is not a bound worth having here: a single object legally
+/// spanning it is written into every cell of the client's uniform grid, which
+/// at a 1024px cell is 95 million buckets and hangs whoever opens the canvas
+/// next. Nothing this slice can draw is wider than a few screens, and the
+/// ceiling has to be on the server or the row is still there for every other
+/// client build.
+pub const MAX_OBJECT_EXTENT: f64 = 8_192.0;
+
+/// Most live objects one channel's canvas may hold.
+///
+/// A canvas is a broadly-granted unbounded write with no removal path in this
+/// slice, which is the one combination that cannot be walked back, so the
+/// ceiling is refused inside the same transaction that counts - the shape
+/// `MAX_PINS_PER_CHANNEL` already uses. It also keeps a whole-canvas read
+/// inside what the viewport limit can answer.
+pub const MAX_OBJECTS_PER_CHANNEL: i64 = 20_000;
+
 /// A placed canvas object.
 #[derive(Debug, Clone)]
 pub struct CanvasObject {
@@ -67,14 +86,30 @@ pub struct ViewportQuery {
     pub limit: i64,
 }
 
+/// The outcome of a placement: the stored row, and whether this call is what
+/// wrote it.
+///
+/// `fresh` is what the write handler gates its fan-out on. Without it an
+/// idempotent replay - a retry after a lost response, which the client's
+/// commit queue will produce under a 429 - would publish a second frame for an
+/// object every viewer already holds.
+#[derive(Debug)]
+pub struct Placement {
+    pub object: CanvasObject,
+    pub fresh: bool,
+}
+
 /// Why placing an object failed.
 #[derive(Debug)]
 pub enum PlaceError {
-    /// This id already belongs to an object in another channel.
+    /// This id already belongs to an object in another channel, or to one
+    /// that has since been removed.
     IdConflict,
-    /// The object's bounds are not finite, have negative extent, or fall
-    /// outside the bounded world.
+    /// The object's bounds are not finite, have negative extent, exceed
+    /// [`MAX_OBJECT_EXTENT`], or fall outside the bounded world.
     OutOfBounds,
+    /// This channel's canvas already holds [`MAX_OBJECTS_PER_CHANNEL`].
+    ChannelFull,
     Internal(anyhow::Error),
 }
 
@@ -102,6 +137,8 @@ fn valid_bounds(x: f64, y: f64, w: f64, h: f64) -> bool {
     [x, y, w, h].iter().all(|v| v.is_finite())
         && w >= 0.0
         && h >= 0.0
+        && w <= MAX_OBJECT_EXTENT
+        && h <= MAX_OBJECT_EXTENT
         && x >= -WORLD_LIMIT
         && y >= -WORLD_LIMIT
         && x + w <= WORLD_LIMIT
@@ -120,7 +157,7 @@ impl Store {
         kind: &str,
         bounds: (f64, f64, f64, f64),
         props: &str,
-    ) -> Result<CanvasObject, PlaceError> {
+    ) -> Result<Placement, PlaceError> {
         let (x, y, w, h) = bounds;
         if !valid_bounds(x, y, w, h) {
             return Err(PlaceError::OutOfBounds);
@@ -131,10 +168,26 @@ impl Store {
         let mut tx = self.begin_write().await?;
         if let Some(existing) = fetch_object(&mut tx, id).await? {
             tx.commit().await?;
-            return match existing.0 == channel_id {
-                true => Ok(existing.1),
-                false => Err(PlaceError::IdConflict),
+            return match (existing.0 == channel_id, existing.1) {
+                (true, false) => Ok(Placement {
+                    object: existing.2,
+                    fresh: false,
+                }),
+                // A removed row keeps the id, so falling through would be a UNIQUE violation reported as a 500.
+                _ => Err(PlaceError::IdConflict),
             };
+        }
+
+        let live = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) AS "count!: i64" FROM canvas_objects
+               WHERE channel_id = ? AND deleted_at IS NULL"#,
+            channel_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        if live >= MAX_OBJECTS_PER_CHANNEL {
+            tx.commit().await?;
+            return Err(PlaceError::ChannelFull);
         }
 
         let seq = sqlx::query_scalar!(
@@ -174,18 +227,21 @@ impl Store {
         .await?;
         tx.commit().await?;
 
-        Ok(CanvasObject {
-            id,
-            kind: kind.to_owned(),
-            z_index: seq,
-            x,
-            y,
-            w,
-            h,
-            props: props.to_owned(),
-            author_id: Some(author_id),
-            seq: Seq(seq),
-            created_at: now,
+        Ok(Placement {
+            object: CanvasObject {
+                id,
+                kind: kind.to_owned(),
+                z_index: seq,
+                x,
+                y,
+                w,
+                h,
+                props: props.to_owned(),
+                author_id: Some(author_id),
+                seq: Seq(seq),
+                created_at: now,
+            },
+            fresh: true,
         })
     }
 
@@ -231,6 +287,13 @@ impl Store {
 
     /// The channel's live objects intersecting `view`, z-ordered, held back to
     /// what the caller does not already have when `previous` is given.
+    ///
+    /// The `LIMIT` is applied to the *newest* objects and the page is then
+    /// reversed back into paint order, so a region holding more than the limit
+    /// answers with the most recent ink rather than the oldest. Ordered
+    /// ascending, the truncation went the other way: `z_index` is seeded from
+    /// `seq`, so a busy region would have answered a reconnecting client with
+    /// a fixed prefix of old strokes and never with what had just been drawn.
     pub async fn viewport_objects(
         &self,
         channel_id: ChannelId,
@@ -265,7 +328,7 @@ impl Store {
                  AND (? = 0 OR o.seq > ?
                       OR NOT (o.x <= ? AND o.x + o.w >= ?
                               AND o.y <= ? AND o.y + o.h >= ?))
-               ORDER BY o.z_index, o.seq
+               ORDER BY o.z_index DESC, o.seq DESC
                LIMIT ?"#,
             key,
             key,
@@ -288,7 +351,7 @@ impl Store {
         )
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows)
+        Ok(rows.into_iter().rev().collect())
     }
 
     /// The channel's highest assigned canvas sequence, which a client keeps as
@@ -305,19 +368,31 @@ impl Store {
     }
 }
 
-/// Fetches one live object and the channel it belongs to, for the idempotency
-/// check on placement.
+/// Fetches one object, the channel it belongs to and whether it is removed,
+/// for the idempotency check on placement.
+///
+/// Removed rows are included deliberately: `canvas_objects.id` is `UNIQUE`
+/// over live and dead rows alike, so a lookup that filtered them out would let
+/// a replay of a since-removed id fall through to the insert and surface the
+/// constraint violation as a 500.
+///
+/// It looks the id up across the deployment rather than within the caller's
+/// channel, which is the one unauthorized read in the write path: somebody
+/// holding `USE_CANVAS` anywhere can learn whether an id exists somewhere.
+/// Accepted rather than closed, because ids are UUIDv7 and the only ones a
+/// caller can name are ones a viewport read already handed them.
 async fn fetch_object(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     id: CanvasObjectId,
-) -> anyhow::Result<Option<(ChannelId, CanvasObject)>> {
+) -> anyhow::Result<Option<(ChannelId, bool, CanvasObject)>> {
     let row = sqlx::query!(
         r#"SELECT channel_id AS "channel_id!: ChannelId", id AS "id!: CanvasObjectId",
                   kind AS "kind!", z_index AS "z_index!: i64",
                   x AS "x!: f64", y AS "y!: f64", w AS "w!: f64", h AS "h!: f64",
                   props AS "props!", author_id AS "author_id: UserId",
-                  seq AS "seq!: Seq", created_at AS "created_at!: i64"
-           FROM canvas_objects WHERE id = ? AND deleted_at IS NULL"#,
+                  seq AS "seq!: Seq", created_at AS "created_at!: i64",
+                  deleted_at AS "deleted_at: i64"
+           FROM canvas_objects WHERE id = ?"#,
         id
     )
     .fetch_optional(&mut **tx)
@@ -325,6 +400,7 @@ async fn fetch_object(
     Ok(row.map(|r| {
         (
             r.channel_id,
+            r.deleted_at.is_some(),
             CanvasObject {
                 id: r.id,
                 kind: r.kind,

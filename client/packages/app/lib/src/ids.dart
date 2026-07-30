@@ -9,7 +9,14 @@ import 'dart:math';
 ///
 /// Shared by the ordinary send path and the poll composer, both of which
 /// need a client-generated id before the server has ever seen the message.
-String newMessageId() {
+String newMessageId() => _uuidV7();
+
+/// The same generator for a canvas object, which is idempotent by id the same
+/// way a message send is. Named separately so a call site says which stream it
+/// belongs to.
+String newCanvasObjectId() => _uuidV7();
+
+String _uuidV7() {
   final now = DateTime.now().millisecondsSinceEpoch;
   final random = Random.secure();
   final bytes = <int>[

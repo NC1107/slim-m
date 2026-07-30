@@ -43,7 +43,10 @@ mod users;
 pub use account_deletion::DeleteAccountError;
 pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
 pub use bootstrap::Bootstrap;
-pub use canvas::{CanvasObject, PlaceError, Rect, ViewportQuery, WORLD_LIMIT};
+pub use canvas::{
+    CanvasObject, MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL, PlaceError, Placement, Rect,
+    ViewportQuery, WORLD_LIMIT,
+};
 pub use channels::DeleteChannelError;
 pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};

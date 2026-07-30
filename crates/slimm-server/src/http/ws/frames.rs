@@ -8,6 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::http::canvas::CanvasObjectDto;
 use crate::http::channels::ChannelDto;
 use crate::http::messages::MessageDto;
 
@@ -79,6 +80,12 @@ pub(super) enum ServerFrame {
     ChannelDeleted { channel_id: String },
     #[serde(rename = "overwrite.changed")]
     OverwriteChanged { channel_id: String },
+    #[serde(rename = "canvas.object.placed")]
+    CanvasObjectPlaced {
+        channel_id: String,
+        seq: i64,
+        object: CanvasObjectDto,
+    },
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]

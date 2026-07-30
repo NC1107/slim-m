@@ -1,0 +1,110 @@
+// SPDX-License-Identifier: Apache-2.0
+/// The Phase 5 rebuild gate, run against the shipped surface rather than
+/// against a benchmark fixture.
+///
+/// `canvas_scene_test.dart` proves the shape in isolation. This proves the
+/// real widget kept it: a camera move must repaint and rebuild nothing, and
+/// the painters must be the same objects frame after frame.
+library;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_voice_canvas/voice_canvas.dart';
+
+void main() {
+  testWidgets('twenty camera moves rebuild no widget in the surface', (
+    tester,
+  ) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          onStroke: (_) {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final before =
+        tester.widgetList<CustomPaint>(find.byType(CustomPaint)).toList();
+    expect(before, isNotEmpty);
+
+    for (var i = 0; i < 20; i++) {
+      document.setCamera(Camera(x: i.toDouble(), y: 0, zoom: 1));
+      await tester.pump();
+    }
+
+    final after =
+        tester.widgetList<CustomPaint>(find.byType(CustomPaint)).toList();
+    expect(after.length, before.length);
+    for (var i = 0; i < before.length; i++) {
+      expect(
+        identical(before[i], after[i]),
+        isTrue,
+        reason: 'a rebuild would have constructed a new CustomPaint widget',
+      );
+    }
+  });
+
+  testWidgets('a drag becomes one stroke in world coordinates', (tester) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    List<Offset>? committed;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          onStroke: (points) => committed = points,
+        ),
+      ),
+    );
+    await tester.pump();
+    document.setCamera(const Camera(x: 100, y: 50, zoom: 1));
+    await tester.pump();
+
+    final gesture = await tester.startGesture(const Offset(20, 20));
+    await gesture.moveTo(const Offset(60, 40));
+    await gesture.moveTo(const Offset(120, 90));
+    await gesture.up();
+    await tester.pump();
+
+    expect(committed, isNotNull);
+    expect(committed!.first, const Offset(120, 70));
+    expect(committed!.last, const Offset(220, 140));
+  });
+
+  /// A timed-out member keeps seeing the canvas and cannot add to it, which is
+  /// exactly the behaviour `USE_CANVAS` cannot express on its own.
+  testWidgets('a disabled surface still pans and never commits ink', (
+    tester,
+  ) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    var strokes = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          enabled: false,
+          onStroke: (_) => strokes++,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final gesture = await tester.startGesture(const Offset(20, 20));
+    await gesture.moveTo(const Offset(80, 80));
+    await gesture.up();
+    await tester.pump();
+
+    expect(strokes, 0);
+  });
+}

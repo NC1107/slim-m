@@ -18,14 +18,15 @@
 //! `canvas_ops` stream, which Phase 6 materializes this table from.
 
 use axum::Router;
-use axum::extract::{Path, State};
+use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::routing::get;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::AppState;
+use super::canvas_write::{MAX_BODY_BYTES, place};
 use super::error::ApiError;
-use super::extract::{AuthedLimited, Json, Query, READ};
+use super::extract::{AuthedLimited, CANVAS, Json, Query};
 use super::messages::parse_uuid;
 use crate::ids::ChannelId;
 use crate::permissions::Permissions;
@@ -39,7 +40,13 @@ const MAX_LIMIT: i64 = 2000;
 
 /// The canvas routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
-    Router::new().route("/channels/{channel_id}/canvas/objects", get(viewport))
+    Router::new().route(
+        "/channels/{channel_id}/canvas/objects",
+        get(viewport)
+            .post(place)
+            // Refused at the byte level, before serde builds a `Value` several times its wire size.
+            .layer(DefaultBodyLimit::max(MAX_BODY_BYTES)),
+    )
 }
 
 // --- Wire types ---
@@ -59,7 +66,7 @@ struct ViewportParams {
 }
 
 #[derive(Serialize)]
-struct CanvasObjectDto {
+pub(crate) struct CanvasObjectDto {
     id: String,
     kind: String,
     z_index: i64,
@@ -108,7 +115,7 @@ struct ViewportDto {
 // --- Handler ---
 
 async fn viewport(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<CANVAS>,
     Path(channel_id): Path<String>,
     Query(params): Query<ViewportParams>,
     State(state): State<AppState>,
@@ -162,7 +169,10 @@ async fn viewport(
     let latest_seq = state.store.latest_canvas_seq(channel_id).await?;
     let mut objects = state.store.viewport_objects(channel_id, &query).await?;
     let has_more = objects.len() as i64 > limit;
-    objects.truncate(limit as usize);
+    // From the front: the store reads newest-first and reverses, so the extra row is the oldest.
+    if has_more {
+        objects.drain(0..(objects.len() - limit as usize));
+    }
 
     Ok(Json(ViewportDto {
         objects: objects.into_iter().map(CanvasObjectDto::from).collect(),

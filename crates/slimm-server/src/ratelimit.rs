@@ -60,6 +60,17 @@ pub enum Class {
     /// compose flow (a handful of files with one message, occasionally) while
     /// still bounding a sustained flood to a trickle.
     Upload,
+    /// Canvas reads and writes.
+    ///
+    /// Its own class because both halves are gesture-driven at a rate `Write`
+    /// and `Read` were never sized for: a short dash commits an object, and a
+    /// pan re-reads the region as soon as the camera settles. A 429 on either
+    /// is ink that was already on the drawer's own screen going missing, or a
+    /// canvas that stops updating, so the budget is looser than `Write`'s
+    /// while still refusing a tight loop. What bounds the *cost* rather than
+    /// the rate is elsewhere: the per-object props ceiling, the per-channel
+    /// object ceiling, and the viewport limit.
+    Canvas,
 }
 
 impl Class {
@@ -74,6 +85,7 @@ impl Class {
             Class::Read => (20.0, 2.0),
             Class::InviteCheck => (10.0, 1.0 / 10.0),
             Class::Upload => (10.0, 1.0 / 20.0),
+            Class::Canvas => (60.0, 10.0),
         }
     }
 }

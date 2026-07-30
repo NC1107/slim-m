@@ -27,17 +27,18 @@ use tokio::sync::broadcast::error::RecvError;
 
 use super::AppState;
 use super::PROTOCOL_VERSION;
+use super::canvas::CanvasObjectDto;
 use super::channels::ChannelDto;
 use super::messages::{AttachmentDto, MessageDto};
 use crate::hub::{Event, Hub};
 use crate::permissions::Permissions;
 use crate::store::{SessionContext, Store};
 use frames::{ClientFrame, PollOptionCountDto, ReactionCountDto, ServerFrame};
-use view_cache::ViewCache;
+use permission_cache::PermissionCache;
 
 mod frames;
+mod permission_cache;
 mod signals;
-mod view_cache;
 
 /// How long a freshly connected socket has to send its `hello` before it is
 /// dropped, so unauthenticated sockets cannot linger.
@@ -85,8 +86,8 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
     // handshake is buffered rather than missed.
     let mut events = state.hub.subscribe();
 
-    // Per connection, and dropped with it; see `view_cache`.
-    let mut view_cache = ViewCache::new();
+    // Per connection, and dropped with it; see `permission_cache`.
+    let mut cache = PermissionCache::new();
 
     // Guarantees the matching disconnect however this function returns; see
     // `signals::PresenceGuard`.
@@ -147,7 +148,7 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                     }
                     Ok(event) => {
                         if let Some(frame) =
-                            authorize(&state.store, &state.hub, &ctx, &mut view_cache, event).await
+                            authorize(&state.store, &state.hub, &ctx, &mut cache, event).await
                             && send_frame(&mut sink, &frame).await.is_err()
                         {
                             break;
@@ -206,7 +207,7 @@ async fn authorize(
     store: &Store,
     hub: &Hub,
     ctx: &SessionContext,
-    view_cache: &mut ViewCache,
+    cache: &mut PermissionCache,
     event: Event,
 ) -> Option<ServerFrame> {
     // Ahead of the channel-scoped match below; see the note on this function.
@@ -271,6 +272,7 @@ async fn authorize(
         }
         Event::ChannelCreated(channel) | Event::ChannelUpdated(channel) => channel.id,
         Event::OverwriteChanged { channel_id, .. } => *channel_id,
+        Event::CanvasObjectPlaced { channel_id, .. } => *channel_id,
         // Control events are handled in the loop; the rest already returned above.
         Event::SessionRevoked(_)
         | Event::PresenceChanged(_)
@@ -286,23 +288,27 @@ async fn authorize(
         Event::OverwriteChanged { previously_visible_to, .. }
             if previously_visible_to.contains(&ctx.user_id)
     );
-    // Read before the query, never after; see `ViewCache::insert`.
+    // Read before the query, never after; see `PermissionCache::insert`.
     let epoch = hub.permissions_epoch();
-    let visible = match view_cache.get(channel_id, Instant::now(), epoch) {
+    let permissions = match cache.get(channel_id, Instant::now(), epoch) {
         Some(cached) => cached,
-        None => match store
-            .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
-            .await
-        {
+        None => match store.permissions_in_channel(ctx.user_id, channel_id).await {
             Ok(answer) => {
-                view_cache.insert(channel_id, answer, Instant::now(), epoch);
+                cache.insert(channel_id, answer, Instant::now(), epoch);
                 answer
             }
             // Fails closed for this event only; a blip must not be remembered.
-            Err(_) => false,
+            Err(_) => Permissions::NONE,
         },
     };
+    let visible = permissions.contains(Permissions::VIEW_CHANNEL);
     if !visible && !held_it_before {
+        return None;
+    }
+    // The one surface gated on a second bit, as its own read route is; without this a denial is void here.
+    if matches!(event, Event::CanvasObjectPlaced { .. })
+        && !permissions.contains(Permissions::USE_CANVAS)
+    {
         return None;
     }
 
@@ -424,6 +430,11 @@ async fn authorize(
         },
         Event::OverwriteChanged { channel_id, .. } => ServerFrame::OverwriteChanged {
             channel_id: channel_id.to_string(),
+        },
+        Event::CanvasObjectPlaced { channel_id, object } => ServerFrame::CanvasObjectPlaced {
+            channel_id: channel_id.to_string(),
+            seq: object.seq.0,
+            object: CanvasObjectDto::from(object),
         },
         // The deployment-wide and channel-deletion cases already returned above.
         Event::SessionRevoked(_)
