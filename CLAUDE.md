@@ -63,6 +63,42 @@ Three smaller traps this hit:
 - **Both hygiene gates enumerate `git ls-files`, so untracked new files are invisible to them.** A local run before the first commit passes and CI then fails on the same tree. Stage before trusting either gate.
 - **`scripts/check-comment-cap.sh` was counting Rust `//!` module docs as plain comments**, though its own header exempts them: the awk matched `//` followed by anything that is not `/`. Nothing caught it because the allowlist had been calibrated against the wrong number. Fixed, and the allowlist regenerated at the true counts, which cleared 46 files outright and lowered 98.
 
+## What a gitignored build input costs on a fresh checkout (2026-07-30)
+
+The e2e workflow's first real run on a GitHub runner failed nine scenarios, and the same commit passed locally twice.
+Read this before touching `scripts/e2e.sh` or adding anything to `.gitignore` that a build reads.
+
+**`sqlite3.wasm` and `drift_worker.js` are gitignored, and nothing automated ever fetched them.**
+`client/packages/app/tool/fetch_web_assets.sh` existed and `web/README.md` said to run it before `flutter build web`, which is a note to a person rather than a step in anything.
+Every checkout on this box had them from the day someone ran that script by hand; a runner's checkout never did.
+The web build succeeds without them (they are static files copied into `build/web`, not compile inputs), so the only symptom is at runtime.
+`scripts/e2e.sh` runs the fetch itself now.
+
+**One missing file killed exactly two things, and they looked like different bugs.**
+`WasmDatabase.open` throws when it 404s, so `storeProvider` errors, and the channel rail renders "Could not load channels." while `SyncController` never starts, so the connection bar reads "Offline, retrying."
+Everything served straight off REST kept working - sign-in, the member pane with both members and the admin badge, settings, avatar upload, role creation - which is precisely why the run read as a messaging regression.
+Nine scenarios failed and every one of them failed as a label that never appeared, because that is the only symptom a browser gives a script.
+
+**Reproduced before it was fixed, not inferred.** Running the harness in a fresh worktree (assets absent, the runner's state) fails at the same scenario with the same message and a byte-for-byte equivalent screenshot.
+
+**A readiness check has to name the thing that was not ready.**
+The script waited on `/healthz` and then `sleep 2` for the static server, so a build that served nothing the app needed passed both.
+It now asks the running origin for `main.dart.js`, `flutter_bootstrap.js`, `sqlite3.wasm` and `drift_worker.js` and refuses by name, which turns twelve minutes of cascading timeouts into a refusal in the first few seconds.
+
+**The check earned its place on its first run, against a second defect nobody knew about.**
+`flutter build web` copies `web/` into `build/web` once and does not re-sync a file that appears in `web/` later, even on a full rebuild that recompiles everything else.
+So fetching the two binaries into a tree that had already been built left them out of the served bundle, with `✓ Built build/web` printed and no warning of any kind.
+`E2E_REBUILD` removes `build/web` before building now, which is what that flag was always taken to mean.
+
+**`python3 -m http.server` discards its own bind failure**, so a stale server left on port 8356 answers instead and the run screenshots a build it did not compile.
+There was one on this box, over a day old; it would have hidden the reproduction.
+The script refuses to start when the port is already answering, and that refusal immediately found where the stale ones come from: the static server ran inside `( ... ) &`, so `WEB_PID` was the subshell and teardown killed the wrapper while orphaning the server.
+It runs as `--directory` with no subshell now, so the pid the trap holds is the process it means.
+
+**Nothing was capturing what the browser said.**
+`Client` buffers `Log.entryAdded` and `Runtime.consoleAPICalled` now and writes them beside each failure screenshot, and the workflow uploads the server log with them.
+The two 404s were the whole answer and were the one thing no artifact held.
+
 ## The two ceilings nobody had set (2026-07-30)
 
 Findings 13 and 16, and the last of the sixteen.

@@ -236,7 +236,10 @@ Browser automation can be flaky for reasons that have nothing to do with the cha
 Nothing in this workflow blocks a merge or a release: `verify-release-checks.yml`'s required-check list (see the `release` section below) does not name it.
 Promote it once real runs on `main` show it green and stable, which takes more than one run to judge given the class of flakiness a real browser and a real SFU can introduce; add its job to branch protection, and to `required_checks` in `verify-release-checks.yml` if it should also gate a release.
 
-Screenshots (`E2E_SHOTS`, one per interesting moment, plus one at the point any scenario gives up) upload as the `e2e-shots` artifact on every run, not only on failure, since a passing run's screenshots are still useful evidence.
+Screenshots (`E2E_SHOTS`, one per interesting moment, plus one at the point any scenario gives up) upload as the `e2e-evidence` artifact on every run, not only on failure, since a passing run's screenshots are still useful evidence.
+The browser's own console log goes up beside each failure screenshot, and the server's log with them.
+That is not padding: the first real run on a runner (30565517095) failed nine scenarios and the screenshots could show only that a channel list was empty, while what settled it was a pair of 404s nothing was capturing. See `docs/e2e.md`.
+
 See `docs/e2e.md` for what the harness actually covers and what it does not.
 
 ## push-relay-contract

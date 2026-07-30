@@ -16,7 +16,16 @@ It needs docker, flutter, cargo, python3 with `websocket-client`, and a system
 Chrome.
 Screenshots land in `/tmp/e2e/shots`, one per interesting moment, and are
 worth looking at after a failure: the harness writes one at the point it gives
-up as well.
+up as well, with the browser's console log beside it under the same name.
+
+Two of the files the web build needs at runtime are gitignored binaries, so the
+script fetches them itself (`client/packages/app/tool/fetch_web_assets.sh`, a
+no-op once they are present) and then checks the running static server actually
+answers for each of them.
+That check is worth its lines: without `sqlite3.wasm` the app signs in, loads
+the member pane, and renders nothing but "Could not load channels." with sync
+stuck offline, which reaches the harness only as a channel row that never
+appears. See "Reading a red run" below.
 
 It also runs in CI now, as `.github/workflows/e2e.yml`: on every push to `main`, on a nightly schedule, and by hand through `workflow_dispatch`.
 It is advisory rather than required while it proves itself out; see `docs/ci.md` for the trigger reasoning and the promotion path.
@@ -127,6 +136,41 @@ Permissions are checked at the API deliberately rather than reluctantly.
 Hiding a button is not access control; refusing the request is, and each body
 sent is one an administrator would succeed with, so the only thing left to
 explain a refusal is the caller.
+
+## Reading a red run
+
+Every scenario that needs a rendered channel fails the same way - a label that
+never appeared - whatever the real cause was, because a browser gives a script
+no other symptom.
+So the first red run on a GitHub runner (30565517095) came back as nine
+failures cascading from the first messaging one, and the screenshot showed a
+signed-in client with a full member pane, an empty rail reading "Could not load
+channels.", and the connection bar reading "Offline, retrying."
+
+That is one cause, not two: the rail renders from the local database and sync
+cannot start without it, so both die together when `WasmDatabase.open` throws.
+It threw because `sqlite3.wasm` and `drift_worker.js` are gitignored and had
+never been fetched on that runner, while every checkout here has had them since
+before the workflow existed.
+Sign-in, `/users` and the settings screens all kept working throughout, which is
+why the run looked like a messaging bug rather than a missing file.
+
+Three things came out of that and are worth knowing when the next one goes red:
+
+- The harness fetches those two files and refuses to run if the served origin
+  does not answer for them, so this particular failure is now a named refusal in
+  the first few seconds rather than nine timeouts twelve minutes in. That check
+  caught a second thing on its first run: `flutter build web` copies `web/` into
+  `build/web` once and never re-syncs a file that turns up in `web/` afterwards,
+  so `E2E_REBUILD` removes `build/web` before building.
+- It refuses to start if something is already listening on the web port. A
+  second server answers with a build this run did not compile, which is exactly
+  what would have hidden the fault from a local reproduction. That refusal found
+  where the stale ones came from: the static server ran inside a subshell, so
+  teardown killed the wrapper and orphaned the server. It has no subshell now.
+- The browser's own log is written beside each failure screenshot, and the
+  workflow uploads the server log with them. The 404s were the whole answer here
+  and nothing was capturing them.
 
 ## What it found
 

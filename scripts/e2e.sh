@@ -51,7 +51,7 @@ need() {
   local tool="$1"
   command -v "$tool" >/dev/null || { echo "missing: $tool"; exit 1; }
 }
-need docker; need flutter; need cargo; need python3
+need docker; need flutter; need cargo; need python3; need curl
 CHROME="$(command -v google-chrome-stable || command -v google-chrome || true)"
 [[ -n "$CHROME" ]] || { echo "missing: google-chrome-stable"; exit 1; }
 python3 -c "import websocket" 2>/dev/null || {
@@ -93,12 +93,34 @@ echo "  voice channel $VOICE_CHANNEL_NAME ($VOICE_ROOM)"
 
 echo "== web build =="
 WEB_DIR="$ROOT/client/packages/app/build/web"
+# The two gitignored binaries drift needs at runtime; absent, no local database.
+bash "$ROOT/client/packages/app/tool/fetch_web_assets.sh"
 if [[ ! -f "$WEB_DIR/main.dart.js" || -n "${E2E_REBUILD:-}" ]]; then
+  # Flutter copies web/ into build/web once and never re-syncs a new file into it.
+  rm -rf "$WEB_DIR"
   ( cd "$ROOT/client/packages/app" && flutter build web --release )
 fi
-( cd "$WEB_DIR" && python3 -m http.server "$WEB_PORT" >/dev/null 2>&1 ) &
+
+# A server already on this port answers with a build this run did not compile.
+if curl -sf -o /dev/null "http://localhost:$WEB_PORT/" 2>/dev/null; then
+  echo "port $WEB_PORT is already serving something; stop that first"; exit 1
+fi
+# Not in a subshell: teardown killed the wrapper and orphaned the server itself.
+python3 -m http.server "$WEB_PORT" --directory "$WEB_DIR" >/dev/null 2>&1 &
 WEB_PID=$!
-sleep 2
+# Every file the app reaches for at runtime, not just the ones a build emits.
+for asset in main.dart.js flutter_bootstrap.js sqlite3.wasm drift_worker.js; do
+  served=0
+  for _ in $(seq 20); do
+    curl -sf -o /dev/null "http://localhost:$WEB_PORT/$asset" && { served=1; break; }
+    sleep 1
+  done
+  [[ $served -eq 1 ]] || {
+    echo "the web build does not serve $asset."
+    echo "see client/packages/app/web/README.md; the channel rail and sync both"
+    echo "fail with nothing but 'Could not load channels.' when it is missing."
+    exit 1; }
+done
 
 echo "== two browsers =="
 for pair in "9801:alice" "9802:bob"; do
