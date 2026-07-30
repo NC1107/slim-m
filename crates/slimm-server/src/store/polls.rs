@@ -139,7 +139,9 @@ impl Store {
         // Reads the message before deciding what to write; see Store::begin_write.
         let mut tx = self.begin_write().await?;
 
-        if let Some(existing) = fetch_live_message(&mut *tx, id).await? {
+        if let Some(existing) =
+            super::messages::fetch_message_including_deleted(&mut *tx, id).await?
+        {
             tx.commit().await?;
             if existing.channel_id == channel_id && existing.author_id == Some(author_id) {
                 return Ok(Sent {
@@ -409,36 +411,4 @@ async fn fetch_tally(
     .fetch_all(executor)
     .await?;
     Ok(rows.into_iter().map(|r| (r.position, r.votes)).collect())
-}
-
-/// Fetches a live (non-deleted) message by id, against any executor. Mirrors
-/// `messages::fetch_message` exactly, since a poll message's idempotency
-/// check must treat a soft-deleted id the same way an ordinary send does.
-async fn fetch_live_message<'e, E>(executor: E, id: MessageId) -> anyhow::Result<Option<Message>>
-where
-    E: sqlx::SqliteExecutor<'e>,
-{
-    let row = sqlx::query!(
-        r#"SELECT m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
-                  m.author_id AS "author_id: UserId",
-                  u.display_name AS "author_display_name?: String",
-                  m.seq AS "seq!: Seq", m.content AS "content!",
-                  m.created_at AS "created_at!", m.edited_at
-           FROM messages m
-           LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
-           WHERE m.id = ? AND m.deleted_at IS NULL"#,
-        id
-    )
-    .fetch_optional(executor)
-    .await?;
-    Ok(row.map(|r| Message {
-        id: r.id,
-        channel_id: r.channel_id,
-        author_id: r.author_id,
-        author_display_name: r.author_display_name,
-        seq: r.seq,
-        content: r.content,
-        created_at: r.created_at,
-        edited_at: r.edited_at,
-    }))
 }
