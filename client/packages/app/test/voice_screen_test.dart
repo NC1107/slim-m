@@ -190,6 +190,8 @@ void main() {
 
       expect(find.text('This Space has no voice configured.'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Join call'), findsNothing);
+      // The shared component, not a hand-rolled Text: the surface the report named as reaching raw exceptions full-screen.
+      expect(find.byType(AppErrorState), findsOneWidget);
     },
   );
 

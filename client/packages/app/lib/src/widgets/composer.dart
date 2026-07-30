@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../api_failure.dart';
 import '../providers/admin_providers.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
@@ -263,7 +264,7 @@ class _ComposerState extends ConsumerState<Composer> {
       if (!mounted) return;
       setState(() => _uploading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not attach the file. ${e.message}')),
+        SnackBar(content: Text(describeApiFailure('attach the file', e))),
       );
     }
   }

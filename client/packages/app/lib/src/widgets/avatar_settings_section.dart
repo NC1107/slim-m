@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../api_failure.dart';
 import '../providers/providers.dart';
 import 'avatar_crop_sheet.dart';
 import 'settings_section_header.dart';
@@ -56,7 +57,7 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
     } on api.ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not upload the avatar. ${e.message}')),
+        SnackBar(content: Text(describeApiFailure('upload the avatar', e))),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -71,7 +72,7 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
     } on api.ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not remove the avatar. ${e.message}')),
+        SnackBar(content: Text(describeApiFailure('remove the avatar', e))),
       );
     } finally {
       if (mounted) setState(() => _busy = false);

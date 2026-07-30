@@ -10,6 +10,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:io' show SocketException;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -152,6 +153,41 @@ void main() {
         controller.state.retryable,
         isFalse,
         reason: 'a permission denial will not change from clicking Join again',
+      );
+    },
+  );
+
+  /// The flagship regression this pass closes: `client_transport.dart` wraps
+  /// any dropped connection in a string carrying the method, the path and the
+  /// Dart exception, and that string used to reach this full-screen surface
+  /// verbatim. A lost connection while joining a call is the reachable case
+  /// (a mobile network transition), so this is the one the report named first.
+  test(
+    'a lost connection while joining renders a sentence, not the exception',
+    () async {
+      final session = FakeSession();
+      final client = MockClient((request) async {
+        throw const SocketException('connection refused');
+      });
+      final controller = harness.controllerWith(session, client);
+
+      await controller.join('channel-1');
+
+      expect(controller.state.state, VoiceSessionState.failed);
+      expect(
+        controller.state.error,
+        isNot(contains('SocketException')),
+        reason: 'a Dart exception string helps nobody and reads as a crash',
+      );
+      expect(controller.state.error, isNot(contains('/voice/token')));
+      expect(
+        controller.state.error,
+        contains('the server could not be reached'),
+      );
+      expect(
+        controller.state.retryable,
+        isTrue,
+        reason: 'a dropped connection might really succeed next time',
       );
     },
   );

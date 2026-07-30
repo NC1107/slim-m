@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../../api_failure.dart';
 import '../../providers/member_presence.dart' show membersProvider;
 import '../../providers/providers.dart';
 
@@ -45,9 +46,7 @@ class _RoleAssignSheet extends ConsumerWidget {
     } on api.ApiException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not update the assignment. ${e.message}'),
-        ),
+        SnackBar(content: Text(describeApiFailure('update the assignment', e))),
       );
     }
   }

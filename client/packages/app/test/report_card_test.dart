@@ -7,6 +7,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:io' show SocketException;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -183,6 +184,84 @@ void main() {
       expect(find.text('Deleted account'), findsOneWidget);
       expect(find.textContaining('a deleted account'), findsOneWidget);
       expect(find.textContaining('subject-gone'), findsNothing);
+    },
+  );
+
+  /// `report_card.dart` used to leave `_busy` true on the success path only,
+  /// clearing it inside the catch, and rendered `e.message` in a `SnackBar`
+  /// verbatim. Both are fixed by routing through `runGuarded`: a failure now
+  /// clears busy either way and shows a safe sentence that stays on the card.
+  testWidgets(
+    'a resolve that cannot reach the server clears busy and stays on the card',
+    (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((request) async {
+                if (request.method == 'GET' && request.url.path == '/reports') {
+                  return http.Response(
+                    '[${_reportJson(id: 'report-5', subjectKind: 'user', subjectId: 'u1')}]',
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }
+                if (request.method == 'GET' && request.url.path == '/users') {
+                  return http.Response(
+                    '[]',
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }
+                if (request.method == 'PATCH') {
+                  throw const SocketException('connection refused');
+                }
+                return http.Response('{}', 404);
+              }),
+            );
+            ref.onDispose(api.close);
+            return api;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const ReportsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(AppButton, 'Resolve'));
+      await tester.pumpAndSettle();
+      // Disambiguated from the card's own "Resolve" button, still mounted beneath the dialog.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(AppButton, 'Resolve'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byType(AppErrorState), findsOneWidget);
+      expect(find.textContaining('SocketException'), findsNothing);
+      expect(
+        tester
+            .widget<AppButton>(find.widgetWithText(AppButton, 'Resolve'))
+            .disabled,
+        isFalse,
+        reason: 'the busy flag must clear on failure, not only on success',
+      );
     },
   );
 

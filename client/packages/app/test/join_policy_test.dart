@@ -5,6 +5,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:io' show SocketException;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,6 +83,73 @@ void main() {
     // The wire value, not the label: the server only accepts these two.
     expect(patched, ['open']);
   });
+
+  /// `join_policy_row.dart:59` used to render `e.message` verbatim in a
+  /// `SnackBar`, seventeen lines below a comment stating the opposite rule.
+  /// A dropped connection is the case that mattered: `TransportException`'s
+  /// message is a method, a path and a Dart exception, none of which belong
+  /// in front of a user, and a `SnackBar` floats away rather than staying
+  /// on screen until the failure is dealt with.
+  testWidgets(
+    'a failed save shows a safe sentence inline, not a vanishing SnackBar',
+    (tester) async {
+      final client = MockClient((request) async {
+        if (request.method == 'GET') {
+          return http.Response(
+            jsonEncode({'join_policy': 'invite'}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        throw const SocketException('connection refused');
+      });
+
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final built = api.SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: client,
+            );
+            ref.onDispose(built.close);
+            return built;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.dark, AppTokens.dark),
+            home: const Scaffold(body: JoinPolicyRow()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Who can join'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Anyone with the address'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byType(AppErrorState), findsOneWidget);
+      expect(find.textContaining('SocketException'), findsNothing);
+      expect(
+        find.textContaining('the server could not be reached'),
+        findsOneWidget,
+      );
+
+      // A state, not a one-shot event: still there several frames later, with nothing having dismissed it.
+      await tester.pump(const Duration(seconds: 5));
+      expect(find.byType(AppErrorState), findsOneWidget);
+    },
+  );
 
   test('an unknown policy from a newer server reads as invite, not open', () {
     expect(api.JoinPolicy.parse('open'), api.JoinPolicy.open);

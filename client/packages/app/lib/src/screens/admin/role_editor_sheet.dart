@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../../api_failure.dart';
 import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
@@ -82,7 +83,10 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
     } on api.ApiException catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.message;
+        _error = describeApiFailure(
+          _isCreate ? 'create the role' : 'save the role',
+          e,
+        );
         _submitting = false;
       });
     }
@@ -137,10 +141,7 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
               ),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.s8),
-              Text(
-                _error!,
-                style: AppText.caption.copyWith(color: tokens.dangerText),
-              ),
+              AppErrorState(message: _error!),
             ],
             const SizedBox(height: AppSpacing.s12),
             AppButton(

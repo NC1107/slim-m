@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../../api_failure.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import 'emoji_name.dart';
@@ -110,7 +111,8 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
       // own reason separates them, so it is shown rather than paraphrased.
       _refuse('${emojiShortcode(name)} was refused: ${e.message}.');
     } on api.ApiException catch (e) {
-      _refuse('Could not add ${emojiShortcode(name)}. ${e.message}');
+      // Not the bare shortcode: its own trailing colon collides with the one some failure sentences end in.
+      _refuse(describeApiFailure('add the ${emojiShortcode(name)} emoji', e));
     }
   }
 

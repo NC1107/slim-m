@@ -131,9 +131,15 @@ void main() {
     await tester.tap(find.text('Check this device'));
     await tester.pumpAndSettle();
 
+    // The message is a fixed sentence; the raw exception is the mono detail below it, never what a user reads.
     expect(
-      find.textContaining('Could not tell what this device supports'),
+      find.text('Could not tell what this device supports.'),
       findsOneWidget,
+    );
+    expect(
+      find.textContaining('capability probe exploded'),
+      findsOneWidget,
+      reason: 'the raw failure still reaches the technical detail line',
     );
     expect(find.text('Microphone'), findsNothing);
     expect(find.textContaining('Not available'), findsNothing);

@@ -5,6 +5,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:io' show SocketException;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -153,4 +154,40 @@ void main() {
     expect(posts.single.$2, {'max_uses': 5});
     expect(find.text('fresh-code'), findsOneWidget);
   });
+
+  /// The create card used to render `e.message` in a `SnackBar`, so a
+  /// dropped connection surfaced its own Dart exception string.
+  testWidgets(
+    'a create that cannot reach the server shows a safe sentence inline',
+    (tester) async {
+      await _pump(tester, (request) {
+        if (request.method == 'GET' && request.url.path == '/invites') {
+          return http.Response(
+            '[]',
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'POST' && request.url.path == '/invites') {
+          throw const SocketException('connection refused');
+        }
+        return http.Response(
+          '{}',
+          404,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      await tester.tap(find.text('Create invite'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byType(AppErrorState), findsOneWidget);
+      expect(find.textContaining('SocketException'), findsNothing);
+      expect(
+        find.textContaining('the server could not be reached'),
+        findsOneWidget,
+      );
+    },
+  );
 }

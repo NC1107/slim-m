@@ -10,6 +10,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:io' show SocketException;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -56,11 +57,21 @@ Map<String, dynamic> _emojiJson(String id, String name) => {
 typedef Seen = ({String method, String path, String? name});
 
 class _Server {
-  _Server({this.emoji = const [], this.uploadStatus = 201, this.uploadBody});
+  _Server({
+    this.emoji = const [],
+    this.uploadStatus = 201,
+    this.uploadBody,
+    this.deleteThrows = false,
+  });
 
   List<Map<String, dynamic>> emoji;
   int uploadStatus;
   String? uploadBody;
+
+  /// Simulates a dropped connection rather than a server refusal, so the
+  /// row's failure exercises the same transport path a real network blip
+  /// would, not just a shaped 4xx body.
+  bool deleteThrows;
   final seen = <Seen>[];
 
   http.Client client() => MockClient((request) async {
@@ -71,6 +82,9 @@ class _Server {
       name: request.url.queryParameters['name'],
     ));
 
+    if (deleteThrows && request.method == 'DELETE') {
+      throw const SocketException('connection refused');
+    }
     if (path == '/emoji' && request.method == 'GET') {
       return http.Response(
         jsonEncode(emoji),
@@ -280,4 +294,46 @@ void main() {
     expect(deletes, hasLength(1));
     expect(deletes.single.path, '/emoji/emoji-1');
   });
+
+  /// A dropped connection while removing an emoji used to leave `_busy` true
+  /// forever (cleared only inside the catch) and, before this pass, showed
+  /// the raw `SocketException` string. This pins both: the row recovers, and
+  /// what it says is a plain sentence.
+  testWidgets(
+    'a failed removal shows a safe sentence and the row stays usable',
+    (tester) async {
+      final server = _Server(
+        emoji: [_emojiJson('emoji-1', 'party_parrot')],
+        deleteThrows: true,
+      );
+      await _pump(tester, server);
+
+      await tester.tap(find.byIcon(AppIcons.delete));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('SocketException'),
+        findsNothing,
+        reason: 'a Dart exception string helps nobody and reads as a crash',
+      );
+      expect(
+        find.text(
+          'Could not remove the :party_parrot: emoji: the server could '
+          'not be reached. Nothing was changed.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<AppIconButton>(
+              find.widgetWithIcon(AppIconButton, AppIcons.delete),
+            )
+            .onPressed,
+        isNotNull,
+        reason: 'the busy flag must clear on failure, not only on success',
+      );
+    },
+  );
 }

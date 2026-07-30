@@ -14,6 +14,7 @@ import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/run_guarded.dart';
 import 'role_assign_sheet.dart';
 import 'role_editor_sheet.dart';
 
@@ -64,7 +65,8 @@ class _RoleCard extends ConsumerStatefulWidget {
   ConsumerState<_RoleCard> createState() => _RoleCardState();
 }
 
-class _RoleCardState extends ConsumerState<_RoleCard> {
+class _RoleCardState extends ConsumerState<_RoleCard>
+    with GuardedActionState<_RoleCard> {
   bool _busy = false;
 
   Future<void> _delete() async {
@@ -79,16 +81,13 @@ class _RoleCardState extends ConsumerState<_RoleCard> {
     if (!confirmed || !mounted) return;
 
     setState(() => _busy = true);
-    try {
-      await ref.read(apiProvider).deleteRole(widget.role.id);
-      if (context.mounted) ref.invalidate(rolesProvider);
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete the role. ${e.message}')),
-      );
-    }
+    final ok = await guard(
+      whatFailed: 'delete the role',
+      action: () => ref.read(apiProvider).deleteRole(widget.role.id),
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) ref.invalidate(rolesProvider);
   }
 
   @override
@@ -100,70 +99,81 @@ class _RoleCardState extends ConsumerState<_RoleCard> {
         .length;
 
     return AppCard(
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Text(
-                        role.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: tokens.textPrimary),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            role.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: tokens.textPrimary),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.s8),
+                        if (role.isEveryone)
+                          const AppBadge(
+                            variant: AppBadgeVariant.tag,
+                            label: 'Everyone',
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.s4),
+                    Text(
+                      // Named, not counted, for the two counts that read as bugs:
+                      // "1 permission" on the most powerful role, "0" on a fresh one.
+                      role.permissions.hasPermission(Perm.administrator)
+                          ? 'Administrator, full access'
+                          : count == 0
+                          ? 'No permissions yet, edit to add some'
+                          : count == 1
+                          ? '1 permission'
+                          : '$count permissions',
+                      style: AppText.caption.copyWith(
+                        color: tokens.textSecondary,
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.s8),
-                    if (role.isEveryone)
-                      const AppBadge(
-                        variant: AppBadgeVariant.tag,
-                        label: 'Everyone',
-                      ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.s4),
-                Text(
-                  // Named, not counted, for the two counts that read as bugs:
-                  // "1 permission" on the most powerful role, "0" on a fresh one.
-                  role.permissions.hasPermission(Perm.administrator)
-                      ? 'Administrator, full access'
-                      : count == 0
-                      ? 'No permissions yet, edit to add some'
-                      : count == 1
-                      ? '1 permission'
-                      : '$count permissions',
-                  style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
+              AppIconButton(
+                icon: AppIcons.assignRole,
+                semanticLabel: 'Assign ${role.name} to members',
+                onPressed: () => showRoleAssignSheet(context, role),
+              ),
+              AppIconButton(
+                icon: AppIcons.edit,
+                semanticLabel: 'Edit ${role.name}',
+                onPressed: () => showRoleEditorSheet(context, role: role),
+              ),
+              if (!role.isEveryone)
+                AppIconButton(
+                  icon: AppIcons.delete,
+                  semanticLabel: 'Delete ${role.name}',
+                  variant: AppIconButtonVariant.danger,
+                  onPressed: _busy ? null : _delete,
+                )
+              else
+                // An empty slot the width of the button it stands in for, so
+                // the assign and edit columns land at the same x on every row.
+                SizedBox(
+                  width: AppTouchTargets.of(context)
+                      ? AppSizes.rowTouch
+                      : AppSizes.rowPointer,
                 ),
-              ],
-            ),
+            ],
           ),
-          AppIconButton(
-            icon: AppIcons.assignRole,
-            semanticLabel: 'Assign ${role.name} to members',
-            onPressed: () => showRoleAssignSheet(context, role),
-          ),
-          AppIconButton(
-            icon: AppIcons.edit,
-            semanticLabel: 'Edit ${role.name}',
-            onPressed: () => showRoleEditorSheet(context, role: role),
-          ),
-          if (!role.isEveryone)
-            AppIconButton(
-              icon: AppIcons.delete,
-              semanticLabel: 'Delete ${role.name}',
-              variant: AppIconButtonVariant.danger,
-              onPressed: _busy ? null : _delete,
-            )
-          else
-            // An empty slot the width of the button it stands in for, so the
-            // assign and edit columns land at the same x on every row.
-            SizedBox(
-              width: AppTouchTargets.of(context)
-                  ? AppSizes.rowTouch
-                  : AppSizes.rowPointer,
-            ),
+          if (actionError != null) ...[
+            const SizedBox(height: AppSpacing.s8),
+            AppErrorState(message: actionError!, onDismiss: clearActionError),
+          ],
         ],
       ),
     );

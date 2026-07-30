@@ -22,9 +22,23 @@ import 'package:slimm_api/api.dart' as api;
 import '../providers/blocks_controller.dart';
 import '../providers/providers.dart';
 import 'report_dialog.dart';
+import 'run_guarded.dart';
 
 void _say(BuildContext context, String text) =>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
+/// Runs [action]; on success shows [succeeded], on failure the sentence
+/// [runGuarded] turns the exception into for [whatFailed].
+Future<void> _tell(
+  BuildContext context,
+  String whatFailed,
+  String succeeded,
+  Future<void> Function() action,
+) async {
+  final failure = await runGuarded(whatFailed: whatFailed, action: action);
+  if (!context.mounted) return;
+  _say(context, failure ?? succeeded);
+}
 
 /// Files a report about [subjectId], once the reporter has given a reason.
 ///
@@ -39,16 +53,14 @@ Future<void> fileReport(
 }) async {
   final reason = await promptReportReason(context, subjectLabel: subjectLabel);
   if (reason == null || !context.mounted) return;
-  try {
-    await container
+  await _tell(
+    context,
+    'file the report',
+    'Report filed. A moderator will review it.',
+    () => container
         .read(apiProvider)
-        .report(subject: subject, subjectId: subjectId, reason: reason);
-    if (!context.mounted) return;
-    _say(context, 'Report filed. A moderator will review it.');
-  } on api.ApiException catch (e) {
-    if (!context.mounted) return;
-    _say(context, 'Could not file the report. ${e.message}');
-  }
+        .report(subject: subject, subjectId: subjectId, reason: reason),
+  );
 }
 
 /// Blocks [userId]; see `SlimmApi.blockUser` for why they are never told.
@@ -62,29 +74,21 @@ Future<void> blockUser(
   BuildContext context,
   ProviderContainer container,
   String userId,
-) async {
-  try {
-    await container.read(blocksProvider.notifier).block(userId);
-    if (!context.mounted) return;
-    _say(context, 'Blocked. You will not see what they post.');
-  } on api.ApiException catch (e) {
-    if (!context.mounted) return;
-    _say(context, 'Could not block that user. ${e.message}');
-  }
-}
+) => _tell(
+  context,
+  'block that user',
+  'Blocked. You will not see what they post.',
+  () => container.read(blocksProvider.notifier).block(userId),
+);
 
 /// Unblocks [userId], reporting a failure rather than swallowing it.
 Future<void> unblockUser(
   BuildContext context,
   ProviderContainer container,
   String userId,
-) async {
-  try {
-    await container.read(blocksProvider.notifier).unblock(userId);
-    if (!context.mounted) return;
-    _say(context, 'Unblocked.');
-  } on api.ApiException catch (e) {
-    if (!context.mounted) return;
-    _say(context, 'Could not unblock that user. ${e.message}');
-  }
-}
+) => _tell(
+  context,
+  'unblock that user',
+  'Unblocked.',
+  () => container.read(blocksProvider.notifier).unblock(userId),
+);
