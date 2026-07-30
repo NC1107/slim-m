@@ -80,7 +80,7 @@ pub struct Config {
     /// Set it to the number of proxies you actually run - 1 behind the Caddy in
     /// `deploy/` - and the address that many places from the right of that
     /// header is used instead. Counting from the right is what makes it safe;
-    /// see [`crate::http::extract::limit_key`].
+    /// see `http::extract::limit_key`.
     ///
     /// Getting it wrong is not equally bad in both directions. Too low keys
     /// every unauthenticated caller together, so one of them can hold a bucket

@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, Query, enforce};
+use super::extract::{Authed, AuthedLimited, Json, Query, READ, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::UserId;
@@ -60,7 +60,7 @@ struct VisibilityDto {
 /// or deleted) is simply absent from the result, the same contract
 /// [`super::users::list_users`] has for a profile.
 async fn list(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<READ>,
     Query(params): Query<ListPresenceParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<PresenceDto>>, ApiError> {

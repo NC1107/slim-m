@@ -14,17 +14,24 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::{get, put};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, enforce};
+use super::extract::{Authed, Json, Query, enforce};
 use super::messages::{MessageDto, parse_uuid, with_reactions};
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{PinError, PinnedMessage};
+use crate::store::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};
+
+/// A narrower page than the whole bounded set, for a caller that only wants
+/// the newest few. The set itself is capped at the pin rather than here.
+#[derive(Deserialize)]
+struct ListParams {
+    limit: Option<i64>,
+}
 
 /// The pin routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
@@ -86,6 +93,11 @@ async fn pin(
     {
         Ok(pin) => pin,
         Err(PinError::UnknownMessage) => return Err(ApiError::NotFound("message not found")),
+        Err(PinError::TooMany) => {
+            return Err(ApiError::BadRequest(
+                "this channel already has as many pinned messages as it can hold",
+            ));
+        }
         Err(PinError::Internal(e)) => return Err(e.into()),
     };
 
@@ -120,6 +132,7 @@ async fn unpin(
 async fn list(
     Authed(ctx): Authed,
     Path(channel_id): Path<String>,
+    Query(params): Query<ListParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<PinDto>>, ApiError> {
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
@@ -131,7 +144,10 @@ async fn list(
         return Err(ApiError::Forbidden);
     }
 
-    let pins = state.store.list_pinned_messages(channel_id).await?;
+    let mut pins = state.store.list_pinned_messages(channel_id).await?;
+    if let Some(limit) = params.limit {
+        pins.truncate(limit.clamp(1, MAX_PINS_PER_CHANNEL) as usize);
+    }
     // Batch-attached exactly as the plain message list does it, so a pin never
     // shows an empty reaction summary just for coming through this endpoint.
     let (messages, meta): (Vec<_>, Vec<_>) = pins

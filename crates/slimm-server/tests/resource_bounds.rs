@@ -211,7 +211,7 @@ async fn the_previously_uncharged_routes_are_charged_now() {
     let channel = store.list_channels().await.unwrap()[0].id;
     let app = app_with_hops(store, 0);
 
-    // Write's budget is a burst of 30, so a run well past it must be refused.
+    // Write's burst is 30 and Read's is 20, so a run well past both is refused.
     let cases: Vec<(&str, String, Option<Value>)> = vec![
         (
             "POST",
@@ -224,6 +224,9 @@ async fn the_previously_uncharged_routes_are_charged_now() {
             Some(json!({ "seq": 0 })),
         ),
         ("POST", "/invites".to_owned(), Some(json!({}))),
+        // Two reads that pay per item: the report queue and a presence batch.
+        ("GET", "/reports".to_owned(), None),
+        ("GET", "/presence?ids=".to_owned(), None),
     ];
 
     for (method, uri, body) in cases {
