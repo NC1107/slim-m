@@ -18,6 +18,10 @@ Screenshots land in `/tmp/e2e/shots`, one per interesting moment, and are
 worth looking at after a failure: the harness writes one at the point it gives
 up as well.
 
+It also runs in CI now, as `.github/workflows/e2e.yml`: on every push to `main`, on a nightly schedule, and by hand through `workflow_dispatch`.
+It is advisory rather than required while it proves itself out; see `docs/ci.md` for the trigger reasoning and the promotion path.
+Before that workflow existed this script ran nowhere and its failures went unnoticed for a real stretch of time, which is the reason it exists.
+
 ## What it checks, and against what
 
 Every scenario drives the UI the way a person would and then asks the **server**

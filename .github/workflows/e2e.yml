@@ -1,0 +1,90 @@
+# SPDX-License-Identifier: Apache-2.0
+name: e2e
+#
+# scripts/e2e.sh stands up a real LiveKit SFU, the release server binary and a
+# real web build, then drives two isolated headless browsers through
+# onboarding, messaging, moderation, screen share and a two-party voice call,
+# checking each scenario against the server or the SFU. See docs/e2e.md.
+#
+# Deliberately NOT run on pull_request: it is far too slow and heavy for that,
+# and the faster per-area workflows already gate a PR. It runs on push to main
+# so a real regression on the trunk still surfaces, on a nightly schedule so a
+# slower drift (a renamed label, a restructured screen) is caught within a
+# day, and on workflow_dispatch for an ad hoc run.
+#
+# Advisory rather than required, until it has proven stable: browser
+# automation can be flaky for reasons unrelated to the change under test, and
+# a red check nobody trusts teaches people to ignore CI. Promote it to a
+# required check once real runs on main show it green and stable; see
+# docs/ci.md.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SQLX_OFFLINE: "true"
+  E2E_WORK: /tmp/e2e
+
+jobs:
+  e2e:
+    name: the full stack, driven end to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      # The harness's only third-party import; the rest of scripts/lib is stdlib.
+      - name: python dependencies
+        run: pip install websocket-client
+
+      # Deterministic resolve, the same reason client-ci does this before building.
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
+
+      - name: chrome is present
+        run: |
+          if command -v google-chrome-stable >/dev/null 2>&1; then
+            google-chrome-stable --version
+          elif command -v google-chrome >/dev/null 2>&1; then
+            google-chrome --version
+          else
+            echo "::error::no google-chrome-stable or google-chrome on this runner"
+            exit 1
+          fi
+
+      # E2E_REBUILD=1: a cached web build silently screenshots stale code.
+      - name: run the harness
+        env:
+          E2E_REBUILD: "1"
+        run: bash scripts/e2e.sh
+
+      - name: upload screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: e2e-shots
+          path: ${{ env.E2E_WORK }}/shots
+          if-no-files-found: warn
+          retention-days: 14

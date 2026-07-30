@@ -19,6 +19,7 @@ Each section below is named for its workflow file.
 | `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main` | every Rust crate's and every pub package's license is in the one allowlist |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
 | `compose-smoke` | changes to the self-host stack, plus a weekly schedule | `docker compose up` on a fresh box produces a working deployment |
+| `e2e` | every push to `main`, a nightly schedule, and by hand | the whole product through two real headless browsers; advisory, not required |
 | `push-relay-contract` | changes to the server's push path | a server-generated envelope through the relay repo's real HTTP handler |
 | `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline |
 
@@ -210,6 +211,33 @@ The converse is checked too, so that check cannot be passing on an SFU that woul
 
 That validation call is plain HTTP on purpose, and it is the only correct choice there: it is a container-to-container call on a private compose network, to the port LiveKit serves unencrypted by design.
 TLS is Caddy's job one hop further out, and Caddy is not running on the runner because it has neither a domain nor a certificate to serve.
+
+## e2e
+
+`scripts/e2e.sh` is the most comprehensive check in the repository, and until this workflow it ran nowhere.
+`grep -rln e2e .github/workflows/` returned nothing, so it gated nothing and had been failing since the settings restructure in #142 with no signal at all, found only by running it by hand.
+A gate nobody runs is not a gate, which is the whole reason this workflow exists.
+
+It builds the release server binary from source, builds a real Flutter web bundle, and runs a LiveKit dev-mode SFU in Docker, all inside the one job.
+Nothing here is pulled pre-built, other than the pinned third-party actions and the LiveKit image itself.
+`E2E_REBUILD=1` is set explicitly so the web bundle is always built fresh from the checked-out commit.
+A cached build silently screenshots stale code instead, which has cost a confused debugging cycle before (see `CLAUDE.md`).
+Chrome is not installed by this workflow: `ubuntu-latest` ships Google Chrome already, and the harness's own prerequisite checks fail loudly and by name if a future runner image ever drops it.
+The only Python dependency beyond the standard library is `websocket-client`, since the harness drives Chrome directly over the DevTools Protocol rather than through Selenium or a browser driver.
+
+Not path-gated, on purpose, unlike every other workflow here: it runs on every push to `main` regardless of what changed.
+It is the one check that exercises the client, the server and the schema together, and a change confined to any one of those areas can still break a scenario the narrower, path-gated gates never see.
+It is also not run on pull requests at all: a full run is too slow and drives too much real infrastructure to pay for on every PR, and the faster per-area workflows already gate a PR on its own area.
+A nightly schedule and `workflow_dispatch` cover the gap that leaves.
+A slow drift, such as a renamed label or a restructured settings screen, is caught within a day instead of only whenever somebody happens to run the script by hand, and a person can still trigger a run on demand without waiting for either.
+
+**It is advisory, not required, until it has proven itself.**
+Browser automation can be flaky for reasons that have nothing to do with the change under test, and a red check nobody trusts teaches people to ignore CI rather than read it.
+Nothing in this workflow blocks a merge or a release: `verify-release-checks.yml`'s required-check list (see the `release` section below) does not name it.
+Promote it once real runs on `main` show it green and stable, which takes more than one run to judge given the class of flakiness a real browser and a real SFU can introduce; add its job to branch protection, and to `required_checks` in `verify-release-checks.yml` if it should also gate a release.
+
+Screenshots (`E2E_SHOTS`, one per interesting moment, plus one at the point any scenario gives up) upload as the `e2e-shots` artifact on every run, not only on failure, since a passing run's screenshots are still useful evidence.
+See `docs/e2e.md` for what the harness actually covers and what it does not.
 
 ## push-relay-contract
 
