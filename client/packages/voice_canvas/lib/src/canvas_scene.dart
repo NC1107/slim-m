@@ -24,7 +24,7 @@ class CanvasScene extends ChangeNotifier {
   double _bottom = 0;
   CullStrategy _strategy = CullStrategy.grid;
 
-  int get objectCount => _grid.length;
+  int get objectCount => _grid.liveLength;
 
   /// Slots the last cull kept, in index order.
   ///
@@ -40,6 +40,28 @@ class CanvasScene extends ChangeNotifier {
   /// notification rather than one per object.
   int add(double left, double top, double right, double bottom) =>
       _grid.insert(left, top, right, bottom);
+
+  /// Removes an object without notifying, matching [add]'s batching: a
+  /// caller removing several objects at once calls [recull] itself, once,
+  /// rather than paying a cull per removed object. `_grid` is private, so
+  /// this is the only way to publish a removal through the scene.
+  void remove(int slot) => _grid.remove(slot);
+
+  /// Empties the index for a document-wide reset, without notifying - the
+  /// same reason [add] and [remove] do not.
+  void reset() => _grid.reset();
+
+  /// Culls an arbitrary rectangle into the caller's own [CullResult], never
+  /// touching [visible] or repainting. Hit testing needs a cull that does
+  /// not disturb what is on screen.
+  CullStrategy queryRect(
+    double left,
+    double top,
+    double right,
+    double bottom,
+    CullResult out,
+  ) =>
+      _grid.query(left, top, right, bottom, out);
 
   /// Moves the camera and re-culls. The pan and zoom hot path.
   void setViewport(double left, double top, double right, double bottom) {

@@ -112,4 +112,111 @@ void main() {
     expect(identical(first, out.slots), isTrue);
     expect(out.slots, <int>[0]);
   });
+
+  /// The property this pins is the one the review caught: a NaN-parked box
+  /// makes the rejection test below all-false, which reads as "kept", so a
+  /// removed object would be culled back in on every future frame forever.
+  test('grid and linear culls agree on random worlds after removals', () {
+    final rng = Random(11);
+    for (var trial = 0; trial < 40; trial++) {
+      final cellSize = <double>[64, 256, 2048][trial % 3];
+      final grid = UniformGrid(cellSize: cellSize, capacity: 8);
+      final slots = <int>[];
+      for (var i = 0; i < 300; i++) {
+        final x = -8000 + rng.nextDouble() * 16000;
+        final y = -8000 + rng.nextDouble() * 16000;
+        final w = 1 + rng.nextDouble() * cellSize * 4;
+        final h = 1 + rng.nextDouble() * cellSize * 4;
+        slots.add(grid.insert(x, y, x + w, y + h));
+      }
+      slots.shuffle(rng);
+      final removed = slots.take(90).toSet();
+      for (final slot in removed) {
+        grid.remove(slot);
+      }
+
+      final cx = -8000 + rng.nextDouble() * 16000;
+      final cy = -8000 + rng.nextDouble() * 16000;
+      final vw = 10 + rng.nextDouble() * 6000;
+      final vh = 10 + rng.nextDouble() * 6000;
+
+      final viaGrid = CullResult();
+      final viaLinear = CullResult();
+      grid.queryGrid(cx, cy, cx + vw, cy + vh, viaGrid);
+      grid.queryLinear(cx, cy, cx + vw, cy + vh, viaLinear);
+
+      expect(viaGrid.slots.toSet(), viaLinear.slots.toSet(),
+          reason: 'trial $trial');
+      expect(
+        viaGrid.slots.toSet().intersection(removed),
+        isEmpty,
+        reason: 'a removed slot must never be culled back in, trial $trial',
+      );
+    }
+  });
+
+  test('remove is idempotent', () {
+    final grid = UniformGrid(cellSize: 100);
+    final a = grid.insert(0, 0, 10, 10);
+    grid.insert(200, 200, 210, 210);
+    expect(grid.liveLength, 2);
+
+    grid.remove(a);
+    expect(grid.liveLength, 1);
+
+    grid.remove(a);
+    expect(
+      grid.liveLength,
+      1,
+      reason: 'removing an already-removed slot must not double count',
+    );
+  });
+
+  test(
+      'a removed slot is emitted by neither cull branch, '
+      'on either side of the adaptive threshold', () {
+    final grid = UniformGrid(cellSize: 100, capacity: 8);
+    final slots = <int>[
+      for (var i = 0; i < 40; i++) grid.insert(i * 50.0, 0, i * 50.0 + 10, 10),
+    ];
+    final target = slots[10];
+    final entriesBefore = grid.bucketEntries;
+
+    grid.remove(target);
+    expect(
+      grid.bucketEntries,
+      entriesBefore - 1,
+      reason: 'the slot must actually leave the bucket it was inserted into',
+    );
+
+    final gridOut = CullResult();
+    final strategySmall = grid.query(-10, -10, 1010, 20, gridOut);
+    expect(strategySmall, CullStrategy.grid);
+    expect(gridOut.slots, isNot(contains(target)));
+
+    final linearOut = CullResult();
+    final strategyLarge = grid.query(-1e7, -1e7, 1e7, 1e7, linearOut);
+    expect(strategyLarge, CullStrategy.linear);
+    expect(linearOut.slots, isNot(contains(target)));
+  });
+
+  test('the adaptive threshold compares against _count, not liveLength', () {
+    final grid = UniformGrid(cellSize: 1, capacity: 128);
+    final slots = <int>[
+      for (var i = 0; i < 100; i++) grid.insert(0, 0, 0.1, 0.1),
+    ];
+    for (var i = 0; i < 90; i++) {
+      grid.remove(slots[i]);
+    }
+    expect(grid.liveLength, 10);
+
+    final out = CullResult();
+    final strategy = grid.query(0, 0, 49, 0.5, out);
+    expect(
+      strategy,
+      CullStrategy.grid,
+      reason: 'span (50) sits under length (100); using liveLength (10) '
+          'would wrongly pick linear',
+    );
+  });
 }

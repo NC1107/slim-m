@@ -13,6 +13,12 @@ import 'canvas_painters.dart';
 /// A pen stroke the surface has finished and wants committed.
 typedef StrokeCommitted = void Function(List<Offset> worldPoints);
 
+/// Which gesture a single pointer draws.
+///
+/// Two tools is a toggle, not a dock: a picker over one item is a control
+/// that cannot change anything.
+enum CanvasTool { pen, eraser }
+
 /// The canvas itself.
 ///
 /// Input is a raw [Listener] rather than a gesture recogniser for drawing:
@@ -28,6 +34,8 @@ class CanvasSurface extends StatefulWidget {
     required this.ink,
     required this.gridLine,
     required this.onStroke,
+    this.onErase,
+    this.tool = CanvasTool.pen,
     this.strokeWidth = 3,
     this.enabled = true,
   });
@@ -37,6 +45,16 @@ class CanvasSurface extends StatefulWidget {
   final Color gridLine;
   final StrokeCommitted onStroke;
   final double strokeWidth;
+
+  /// Which gesture a pointer draws. Resolving a world point to an object is
+  /// the caller's job, over [onErase], so this widget stays free of any
+  /// notion of hit testing or permission.
+  final CanvasTool tool;
+
+  /// Fires once per pointer-down and again on every move while [tool] is
+  /// [CanvasTool.eraser], so a drag can wipe through several objects the way
+  /// a moderator clearing a defaced region expects.
+  final ValueChanged<Offset>? onErase;
 
   /// False freezes the pen and leaves pan and zoom alone, which is what a
   /// timed-out member gets: they keep seeing the canvas and cannot add to it.
@@ -86,16 +104,25 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
       return;
     }
     if (!widget.enabled) return;
+    if (widget.tool == CanvasTool.eraser) {
+      widget.onErase?.call(_toWorld(event.localPosition));
+      return;
+    }
     _draft.begin(event.localPosition);
   }
 
   void _move(PointerMoveEvent event) {
     if (_pointers != 1 || !widget.enabled) return;
+    if (widget.tool == CanvasTool.eraser) {
+      widget.onErase?.call(_toWorld(event.localPosition));
+      return;
+    }
     _draft.extend(event.localPosition);
   }
 
   void _up(PointerEvent event) {
     _pointers = (_pointers - 1).clamp(0, 10);
+    if (widget.tool == CanvasTool.eraser) return;
     if (_draft.isEmpty) return;
     final screen = _draft.take();
     if (screen.length < 2) return;
