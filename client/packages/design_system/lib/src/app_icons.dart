@@ -71,6 +71,7 @@ abstract final class AppIcons {
   static const IconData speaker = LucideIcons.volume2300;
   static const IconData speakerOff = LucideIcons.volumeX300;
   static const IconData camera = LucideIcons.video300;
+  static const IconData cameraOff = LucideIcons.videoOff300;
   static const IconData screenShare = LucideIcons.monitorUp300;
   static const IconData leaveCall = LucideIcons.phoneOff300;
   static const IconData canvas = LucideIcons.pencilRuler300;

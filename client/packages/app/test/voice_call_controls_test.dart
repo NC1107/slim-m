@@ -85,6 +85,7 @@ class _InertSession implements VoiceSession {
     required String url,
     required String token,
     bool microphoneEnabled = true,
+    bool cameraEnabled = false,
   }) async {}
 
   @override

@@ -49,6 +49,44 @@ void main() {
     expect(controller.state.error, isNull);
   });
 
+  test(
+    'the camera stays off by default and is a pre-toggle, not a live call',
+    () async {
+      final session = FakeSession();
+      final controller = harness.controllerWith(session, voiceApi());
+
+      expect(controller.state.cameraEnabled, isFalse);
+      await controller.join('channel-1');
+
+      expect(session.askedForCameraOnJoin, isFalse);
+    },
+  );
+
+  test('a camera pre-toggle set before joining reaches the session', () async {
+    final session = FakeSession();
+    final controller = harness.controllerWith(session, voiceApi());
+
+    controller.setCameraPreference(true);
+    await controller.join('channel-1');
+
+    expect(controller.state.cameraEnabled, isTrue);
+    expect(session.askedForCameraOnJoin, isTrue);
+  });
+
+  test('a listen-only token never asks for a camera either', () async {
+    final session = FakeSession();
+    final controller = harness.controllerWith(
+      session,
+      voiceApi(canPublish: false),
+    );
+
+    controller.setCameraPreference(true);
+    await controller.join('channel-1');
+
+    // Same reasoning as the microphone: a forbidden track only reports.
+    expect(session.askedForCameraOnJoin, isFalse);
+  });
+
   test('a plain-ws SFU on a public address is refused, not joined', () async {
     final session = FakeSession();
     final controller = harness.controllerWith(

@@ -269,6 +269,40 @@ void main() {
     expect(avatar.top, greaterThanOrEqualTo(0.0));
   });
 
+  testWidgets(
+    'the header edit affordance renames the account and the header updates',
+    (tester) async {
+      final requests = <Uri>[];
+      final container = _signedInContainer(requests);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_screen(container));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Self'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Edit display name'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit display name'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'Renamed');
+      await tester.pump();
+      await tester.tap(find.text('Save name'));
+      await tester.pumpAndSettle();
+
+      expect(
+        requests.where((u) => u.path == '/me'),
+        isNotEmpty,
+        reason: 'both the initial GET and the PATCH land on /me',
+      );
+      expect(
+        find.text('Edit display name'),
+        findsNothing,
+        reason: 'a successful save closes the sheet',
+      );
+    },
+  );
+
   testWidgets('picking a presence option sends it and updates the display', (
     tester,
   ) async {

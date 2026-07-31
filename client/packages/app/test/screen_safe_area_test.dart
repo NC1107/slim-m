@@ -143,6 +143,7 @@ class _FakeSession implements VoiceSession {
     required String url,
     required String token,
     bool microphoneEnabled = true,
+    bool cameraEnabled = false,
   }) async {
     _state = VoiceSessionState.connected;
     _states.add(_state);

@@ -11,12 +11,14 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../api_failure.dart';
 import '../diagnostics/debug_log.dart';
 import '../server_scheme_policy.dart' show isLocalAddress;
 import 'providers.dart';
+import 'voice_call_heartbeat.dart';
 
 /// Refuses a plaintext SFU address unless it is on a LAN.
 ///
@@ -62,6 +64,7 @@ class VoiceState {
     this.state = VoiceSessionState.idle,
     this.participants = const [],
     this.microphoneEnabled = true,
+    this.cameraEnabled = false,
     this.screenSharing = false,
     this.awaitingBroadcast = false,
     this.canPublish = true,
@@ -80,6 +83,11 @@ class VoiceState {
   /// What the user has asked for, which is not always what they got: a token
   /// without SPEAK cannot open a microphone however the toggle is set.
   final bool microphoneEnabled;
+
+  /// The camera pre-toggle: applied once, on the next [VoiceController.join],
+  /// the same way [microphoneEnabled] is. There is no live in-call camera
+  /// toggle yet, only the choice made before joining.
+  final bool cameraEnabled;
   final bool screenSharing;
 
   /// iOS only: sharing has been asked for and the system is waiting on the
@@ -113,6 +121,7 @@ class VoiceState {
     VoiceSessionState? state,
     List<VoiceParticipant>? participants,
     bool? microphoneEnabled,
+    bool? cameraEnabled,
     bool? screenSharing,
     bool? awaitingBroadcast,
     bool? canPublish,
@@ -127,6 +136,7 @@ class VoiceState {
     state: state ?? this.state,
     participants: participants ?? this.participants,
     microphoneEnabled: microphoneEnabled ?? this.microphoneEnabled,
+    cameraEnabled: cameraEnabled ?? this.cameraEnabled,
     screenSharing: screenSharing ?? this.screenSharing,
     awaitingBroadcast: awaitingBroadcast ?? this.awaitingBroadcast,
     canPublish: canPublish ?? this.canPublish,
@@ -141,16 +151,23 @@ class VoiceController extends StateNotifier<VoiceState> {
   VoiceController(
     this._ref, {
     VoiceSession? session,
+    CallLifecycleChannel? callLifecycle,
     this.broadcastStartTimeout = const Duration(seconds: 30),
-    this.voiceHeartbeatInterval = const Duration(seconds: 15),
+    Duration voiceHeartbeatInterval = const Duration(seconds: 15),
   }) : _session = session ?? VoiceSession(),
+       _callLifecycle = callLifecycle ?? CallLifecycleChannel(),
+       _heartbeat = VoiceCallHeartbeat(_ref, interval: voiceHeartbeatInterval),
        super(const VoiceState()) {
+    _endCallRequests = _callLifecycle.endCallRequests.listen((_) {
+      unawaited(leave());
+    });
     _states = _session.states.listen((s) {
+      _reportCallLifecycle(s);
       // A drop the SFU decided on: the reason is the only thing that can tell
       // "you joined elsewhere" from "your network went".
       final dropped = _session.lastDisconnect;
       if (s == VoiceSessionState.failed && dropped != null) {
-        _stopHeartbeat();
+        _heartbeat.stop();
         _log('Call ended: ${dropped.name}', detail: dropped.message);
         state = state.copyWith(
           state: s,
@@ -162,10 +179,10 @@ class VoiceController extends StateNotifier<VoiceState> {
       switch (s) {
         case VoiceSessionState.connected:
           // Not gated on lifecycle: only termination may let this lapse.
-          _startHeartbeat(state.channelId);
+          _heartbeat.start(state.channelId);
         case VoiceSessionState.idle:
         case VoiceSessionState.failed:
-          _stopHeartbeat();
+          _heartbeat.stop();
         default:
           break;
       }
@@ -199,32 +216,50 @@ class VoiceController extends StateNotifier<VoiceState> {
   /// countdown; short enough that a build with no extension is not a mystery.
   final Duration broadcastStartTimeout;
 
-  /// How often a live call refreshes the server's proof it is still
-  /// connected. Independent of `AppLifecycleState` on purpose: a phone call
-  /// that stopped the moment you switched apps would be useless, so this
-  /// keeps ticking through backgrounding and only really stops when the
-  /// process does.
-  ///
-  /// This bounds how long a killed app's ghost lingers for *other*
-  /// participants and the server's own bookkeeping; see
-  /// `crates/slimm-server/src/voice/heartbeat.rs`. It does not, and cannot,
-  /// bound how this same client renders its own state on its own next
-  /// launch - that answer lives in `voiceRosterProvider`, which drops this
-  /// client's own identity from any roster it reads regardless of whether
-  /// the server has caught up yet.
-  final Duration voiceHeartbeatInterval;
-
   final Ref _ref;
   final VoiceSession _session;
+  final CallLifecycleChannel _callLifecycle;
+  final VoiceCallHeartbeat _heartbeat;
   late final StreamSubscription<VoiceSessionState> _states;
   late final StreamSubscription<List<VoiceParticipant>> _participants;
+  late final StreamSubscription<void> _endCallRequests;
   Timer? _broadcastDeadline;
-  Timer? _heartbeat;
+
+  /// Reports this call's start, connection and end to CallKit on iOS; a
+  /// no-op everywhere else. Keyed off [VoiceSession]'s own state transitions
+  /// rather than a second copy of the join/leave call sites, so every path
+  /// that reaches `connecting`, `connected`, `idle` or `failed` - including
+  /// an SFU-initiated drop - reports the same way.
+  void _reportCallLifecycle(VoiceSessionState s) {
+    switch (s) {
+      case VoiceSessionState.connecting:
+        final channelId = state.channelId;
+        if (channelId == null) return;
+        unawaited(
+          _callLifecycle.callStarted(
+            callId: channelId,
+            displayName: 'Voice call',
+          ),
+        );
+      case VoiceSessionState.connected:
+        unawaited(_callLifecycle.callConnected());
+      case VoiceSessionState.idle:
+      case VoiceSessionState.failed:
+        unawaited(_callLifecycle.callEnded());
+    }
+  }
 
   /// Sets the microphone preference before joining. Has no effect on a live
   /// call; use [toggleMicrophone] for that.
   void setMicrophonePreference(bool enabled) {
     state = state.copyWith(microphoneEnabled: enabled);
+  }
+
+  /// Sets the camera preference before joining, applied once on the next
+  /// [join] exactly the way [setMicrophonePreference] is. There is no live
+  /// in-call equivalent yet: this is a pre-toggle, not a call control.
+  void setCameraPreference(bool enabled) {
+    state = state.copyWith(cameraEnabled: enabled);
   }
 
   Future<void> join(String channelId) async {
@@ -244,9 +279,10 @@ class VoiceController extends StateNotifier<VoiceState> {
       await _session.join(
         url: token.url,
         token: token.token,
-        // Asking for a microphone a token cannot publish just produces a
-        // failure to report; not asking is the honest thing.
+        // Asking for a microphone or camera a token cannot publish just
+        // produces a failure to report; not asking is the honest thing.
         microphoneEnabled: state.microphoneEnabled && token.canPublish,
+        cameraEnabled: state.cameraEnabled && token.canPublish,
       );
       if (_session.state == VoiceSessionState.failed) {
         state = state.copyWith(
@@ -278,48 +314,11 @@ class VoiceController extends StateNotifier<VoiceState> {
   Future<void> leave() async {
     _cancelBroadcastDeadline();
     final channelId = state.channelId;
-    _stopHeartbeat();
+    _heartbeat.stop();
     await _session.leave();
     // Best-effort and fire-and-forget: this client already disconnected.
-    if (channelId != null) unawaited(_forgetHeartbeat(channelId));
+    if (channelId != null) unawaited(_heartbeat.forget(channelId));
     state = const VoiceState();
-  }
-
-  /// Starts refreshing the server's proof that this call is still live, if
-  /// it is not running already. Guarded rather than assumed single-fire: no
-  /// transition in this client re-emits `connected` after `join`'s own, but
-  /// the check costs nothing and removes the assumption that this stays true
-  /// forever from something that would otherwise double the interval the
-  /// moment it stopped holding.
-  void _startHeartbeat(String? channelId) {
-    if (_heartbeat != null || channelId == null) return;
-    unawaited(_sendHeartbeat(channelId));
-    _heartbeat = Timer.periodic(
-      voiceHeartbeatInterval,
-      (_) => unawaited(_sendHeartbeat(channelId)),
-    );
-  }
-
-  Future<void> _sendHeartbeat(String channelId) async {
-    try {
-      await _ref.read(apiProvider).sendVoiceHeartbeat(channelId);
-    } catch (e) {
-      // Best-effort, but a run of failures is worth seeing in diagnostics.
-      _log('Voice heartbeat failed', detail: e);
-    }
-  }
-
-  Future<void> _forgetHeartbeat(String channelId) async {
-    try {
-      await _ref.read(apiProvider).forgetVoiceHeartbeat(channelId);
-    } catch (e) {
-      _log('Could not tell the server this call was left', detail: e);
-    }
-  }
-
-  void _stopHeartbeat() {
-    _heartbeat?.cancel();
-    _heartbeat = null;
   }
 
   Future<void> toggleMicrophone() async {
@@ -466,10 +465,12 @@ class VoiceController extends StateNotifier<VoiceState> {
   @override
   void dispose() {
     _cancelBroadcastDeadline();
-    _stopHeartbeat();
+    _heartbeat.stop();
     unawaited(_states.cancel());
     unawaited(_participants.cancel());
+    unawaited(_endCallRequests.cancel());
     unawaited(_session.dispose());
+    _callLifecycle.dispose();
     super.dispose();
   }
 }
