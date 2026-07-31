@@ -24,6 +24,8 @@ mod channels;
 mod dms;
 mod emoji;
 mod invites;
+mod message_ops;
+mod message_search;
 mod messages;
 mod permissions;
 mod permissions_batch;
@@ -59,7 +61,9 @@ pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};
 pub use emoji::{CreateEmojiError, CustomEmoji, MAX_CUSTOM_EMOJI};
 pub use invites::{Invite, InviteCheck, InviteMetadata, RedeemError};
-pub use messages::{MessageDeletion, SearchError, SendError, Sent};
+pub use message_ops::{MessageOpEntry, MessageOpKind, MessageOpsPage};
+pub use message_search::SearchError;
+pub use messages::{Edited, MessageDeletion, SendError, Sent};
 pub use pins::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};
 pub use polls::{
     CreatePollError, MAX_OPTION_CHARS, MAX_OPTIONS, MAX_QUESTION_CHARS, MIN_OPTIONS, Poll,

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT content AS \"content!: String\", channel_id AS \"channel_id!: ChannelId\"\n               FROM messages WHERE id = ? AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "content!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "channel_id!: ChannelId",
+        "ordinal": 1,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "8bd237e4227a31ff30a82350cd59f9be3710833d98305da97d8d223ddb454093"
+}

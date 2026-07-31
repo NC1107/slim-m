@@ -343,7 +343,7 @@ async fn reporting_a_message_keeps_a_snapshot_and_resists_flooding() {
     // The snapshot survives the author deleting or editing the content, which is
     // the whole reason it is stored.
     store
-        .edit_message(message.id, "innocuous now")
+        .edit_message(message.id, "innocuous now", alice.id)
         .await
         .unwrap();
     assert_eq!(

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT next_seq - 1 AS \"seq!: i64\" FROM channel_seq_counters\n               WHERE channel_id = ? AND stream = 'message_op'",
+  "describe": {
+    "columns": [
+      {
+        "name": "seq!: i64",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "9d3ab2fcc08384456a594ef587257a9bf35a991aed2e605ff0c451c1bfda1373"
+}

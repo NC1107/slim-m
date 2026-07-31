@@ -4,7 +4,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{MessageId, Seq};
-use slimm_server::store::Store;
+use slimm_server::store::{Edited, Store};
 
 mod support;
 
@@ -117,17 +117,25 @@ async fn edit_and_keyset_pagination() {
     assert_eq!(next[1].seq, Seq(1));
 
     // Edit stamps edited_at and changes the content.
-    let edited = s.edit_message(page[0].id, "edited").await.unwrap().unwrap();
+    let Edited::Edited {
+        message: edited, ..
+    } = s
+        .edit_message(page[0].id, "edited", author.id)
+        .await
+        .unwrap()
+    else {
+        panic!("a real content change must report itself as an edit");
+    };
     assert_eq!(edited.content, "edited");
     assert!(edited.edited_at.is_some());
 
-    // Editing something that does not exist is a clean None.
-    assert!(
-        s.edit_message(MessageId::generate(), "x")
+    // Editing something that does not exist is a clean Gone.
+    assert!(matches!(
+        s.edit_message(MessageId::generate(), "x", author.id)
             .await
-            .unwrap()
-            .is_none()
-    );
+            .unwrap(),
+        Edited::Gone
+    ));
 }
 
 #[tokio::test]

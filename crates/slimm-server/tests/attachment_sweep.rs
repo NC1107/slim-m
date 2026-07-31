@@ -204,7 +204,7 @@ async fn deleting_a_message_whose_image_is_also_an_emoji_still_works() {
         .expect("the emoji reuses the message's bytes");
 
     let deletion = store
-        .delete_message(message)
+        .delete_message(message, author)
         .await
         .expect("an emoji sharing the bytes must not fail the delete");
 

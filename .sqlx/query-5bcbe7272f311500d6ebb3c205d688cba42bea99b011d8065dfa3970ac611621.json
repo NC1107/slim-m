@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO message_ops (channel_id, seq, message_id, kind, actor_id, created_at)\n           VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "5bcbe7272f311500d6ebb3c205d688cba42bea99b011d8065dfa3970ac611621"
+}

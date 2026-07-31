@@ -26,7 +26,7 @@ use crate::ids::{ChannelId, MessageId, UserId};
 use crate::media;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{AttachmentSummary, MAX_ATTACHMENTS_PER_MESSAGE, Message};
+use crate::store::{AttachmentSummary, Edited, MAX_ATTACHMENTS_PER_MESSAGE, Message};
 
 /// Message bodies carry one text field; cap it generously but bounded.
 const MESSAGE_BODY_LIMIT: usize = 64 * 1024;
@@ -321,7 +321,7 @@ async fn delete(
         return Err(ApiError::Forbidden);
     }
 
-    let outcome = state.store.delete_message(message_id).await?;
+    let outcome = state.store.delete_message(message_id, ctx.user_id).await?;
     if outcome.deleted {
         state.hub.publish(Event::MessageDeleted {
             channel_id,
@@ -392,12 +392,19 @@ async fn edit(
     // An edit carries no attachment list, so it can never be the case that a
     // file is left standing in for the text being cleared.
     let content = validate_content(&req.content, false)?;
-    let updated = state
+    let updated = match state
         .store
-        .edit_message(message_id, content)
+        .edit_message(message_id, content, ctx.user_id)
         .await?
-        .ok_or(ApiError::NotFound("message not found"))?;
-    state.hub.publish(Event::MessageEdited(updated.clone()));
+    {
+        Edited::Gone => return Err(ApiError::NotFound("message not found")),
+        // No op row was written, so nothing changed for anybody to be told about.
+        Edited::Unchanged(message) => message,
+        Edited::Edited { message, .. } => {
+            state.hub.publish(Event::MessageEdited(message.clone()));
+            message
+        }
+    };
     Ok(Json(updated.into()))
 }
 
