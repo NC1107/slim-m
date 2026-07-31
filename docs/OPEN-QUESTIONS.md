@@ -132,3 +132,30 @@ The reason this cannot be deferred indefinitely: 1 is the only one the current s
 The longer the canvas is used, the more expensive the other two become.
 
 *Question:* which of the three, or something else? The `save/export` half is a separate feature in every model and does not need answering at the same time.
+
+## 12. Making an autonomous run actually span a week needs one decision from you
+
+The standing instruction was to iterate for a week with no interference.
+A single session cannot span a week, and the in-session scheduler (`CronCreate`) is session-only: it dies the moment the session ends, so it does not either.
+
+The mechanism to do it properly exists and was verified on 2026-07-31: `claude` is on PATH at `~/.local/bin/claude` and takes `-p` for non-interactive runs, so a system crontab entry could resume the loop daily.
+
+**It was not set up, deliberately.** An unattended run needs `--allow-dangerously-skip-permissions`, since nobody is there to approve tool calls, and that produces this chain:
+
+> cron -> agent with permission checks disabled -> merges to `main` -> Watchtower deploys `latest` -> the live instance at `slim.npc-server.top`
+
+plus TestFlight and Play builds from any `client-v*` tag it cuts.
+For seven days, unobserved.
+
+Every individual link is already how this project works and is your own deliberate setup.
+What is new is removing the human from the loop *and* the permission prompts at the same time, which is different from an observed session where each step is seen as it happens.
+The blast radius if a run goes wrong is your live deployment and your store builds, and neither is quick to walk back.
+
+*Question, and it is a one-word answer:*
+
+- **Yes** - and the crontab line is roughly `23 9 * * * claude -p "<the loop prompt>" --allow-dangerously-skip-permissions >> ~/.cache/slimm-autorun.log 2>&1`, with the loop prompt already written (it is the `CronCreate` job from that session).
+- **Yes, but not to production** - the same thing with the release PRs left unmerged, so a person still cuts every release. This is the middle option and is probably the right one: the work still happens daily, and the only thing waiting on you is the button that ships it.
+- **No** - and the honest consequence is that "for a week" means "resume it when you next open a session", which is what happens today.
+
+The middle option is the recommendation.
+It keeps the deploy decision human while losing almost nothing, since merging a standing release PR takes seconds and is the one step where a bad change becomes irreversible.
