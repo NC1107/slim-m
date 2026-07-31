@@ -761,6 +761,8 @@ Known residuals, deliberately shipped:
 
 ## Push credentials and identifiers
 
+See [docs/phase3-notes.md](docs/phase3-notes.md) for how these credentials were verified as working rather than merely present: the proof each one is a live, authorised credential (a 400 on the field it should fail on, never a 401 or 403), and the two relay bugs found while checking (dead-token pruning missing a whole error shape, and a backfill migration that then deleted every token binding it was meant to protect).
+
 Bundle id `top.npcserver.slimm` on both platforms, following the existing `top.npcserver.checkin` convention.
 A hyphenated form is legal on iOS but not in an Android `applicationId`, which is why the obvious `top.npc-server.slimm` was rejected.
 The bundle id is deliberately not tied to the product name: the App Store display name is a separate field and stays free to change.
