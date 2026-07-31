@@ -251,6 +251,34 @@ mod tests {
         assert!(!result.contains(SEND));
     }
 
+    /// A bit omitted from `ALL` is a bit administrators do not hold, that the
+    /// API refuses to grant, and that nothing else here would catch.
+    #[test]
+    fn all_is_the_union_of_every_named_permission() {
+        let named = [
+            Permissions::ADMINISTRATOR,
+            Permissions::VIEW_CHANNEL,
+            Permissions::SEND_MESSAGES,
+            Permissions::MANAGE_MESSAGES,
+            Permissions::MANAGE_CHANNELS,
+            Permissions::MANAGE_ROLES,
+            Permissions::KICK_MEMBERS,
+            Permissions::BAN_MEMBERS,
+            Permissions::CREATE_INVITE,
+            Permissions::ADD_REACTIONS,
+            Permissions::ATTACH_FILES,
+            Permissions::CONNECT,
+            Permissions::SPEAK,
+            Permissions::USE_CANVAS,
+            Permissions::MANAGE_CANVAS,
+            Permissions::MANAGE_SERVER,
+        ];
+        let union = named
+            .into_iter()
+            .fold(Permissions::NONE, Permissions::union);
+        assert_eq!(union, Permissions::ALL);
+    }
+
     #[test]
     fn contains_and_intersects_are_distinct() {
         let set = VIEW.union(SEND);

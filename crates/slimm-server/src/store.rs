@@ -19,6 +19,7 @@ mod attachments;
 mod bootstrap;
 mod canvas;
 mod canvas_ops;
+mod canvas_ops_write;
 mod channels;
 mod dms;
 mod emoji;
@@ -52,6 +53,7 @@ pub use canvas::{
 pub use canvas_ops::{
     CANVAS_OP_GAP, CANVAS_OP_PAGE_BYTES, CanvasOpBody, CanvasOpEntry, CanvasOpsPage,
 };
+pub use canvas_ops_write::{CanvasOpRequest, MAX_REMOVE_IDS_PER_OP, SubmitOpError, SubmittedOp};
 pub use channels::DeleteChannelError;
 pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};

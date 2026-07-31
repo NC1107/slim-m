@@ -138,6 +138,40 @@ fn place_request(channel: ChannelId, token: &str) -> Request<Body> {
         .unwrap()
 }
 
+fn remove_request(channel: ChannelId, token: &str, object_id: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(format!("/channels/{channel}/canvas/ops"))
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "id": Uuid::now_v7().to_string(),
+                "kind": "remove",
+                "object_ids": [object_id],
+            })
+            .to_string(),
+        ))
+        .unwrap()
+}
+
+fn clear_request(channel: ChannelId, token: &str, before_seq: i64) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(format!("/channels/{channel}/canvas/ops"))
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "id": Uuid::now_v7().to_string(),
+                "kind": "clear",
+                "before_seq": before_seq,
+            })
+            .to_string(),
+        ))
+        .unwrap()
+}
+
 /// The load-bearing one. Carol holds `VIEW_CHANNEL` and is denied `USE_CANVAS`
 /// by a member overwrite, so she reads the channel and must never be handed a
 /// canvas frame; a cache that only remembers the view bit delivers to her.
@@ -257,4 +291,107 @@ async fn a_canvas_burst_does_not_disconnect_a_text_only_connection() {
         }
     }
     assert_eq!(seen, 60);
+}
+
+/// The same load-bearing property as the placement test above, for the two
+/// new frames: a member an overwrite denies `USE_CANVAS` must receive
+/// neither a removal nor a clear, exactly as she receives no placement.
+#[tokio::test]
+async fn a_removal_and_a_clear_need_both_bits_and_a_denied_member_never_sees_either() {
+    let (store, _guard) = new_store().await;
+    let state = state_for(&store);
+    let (alice_access, alice_ticket, alice) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+
+    let (_carol_access, carol_ticket, carol) = user_ticket(&store, "carol").await;
+    store
+        .set_member_overwrite(channel, carol, Permissions::NONE, Permissions::USE_CANVAS)
+        .await
+        .unwrap();
+
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut carol_ws = connect(addr, &carol_ticket).await;
+
+    let placed = http::router(state.clone())
+        .oneshot(place_request(channel, &alice_access))
+        .await
+        .unwrap();
+    assert_eq!(placed.status(), StatusCode::CREATED);
+    let bytes = axum::body::to_bytes(placed.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let placed: Value = serde_json::from_slice(&bytes).unwrap();
+    let object_id = placed["id"].as_str().unwrap().to_owned();
+    assert_eq!(
+        read_frame(&mut alice_ws).await["type"],
+        "canvas.object.placed"
+    );
+
+    let removed = http::router(state.clone())
+        .oneshot(remove_request(channel, &alice_access, &object_id))
+        .await
+        .unwrap();
+    assert_eq!(removed.status(), StatusCode::CREATED);
+    let frame = read_frame(&mut alice_ws).await;
+    assert_eq!(frame["type"], "canvas.objects.removed");
+    assert_eq!(frame["channel_id"], channel.to_string());
+    assert_eq!(frame["object_ids"], json!([object_id]));
+
+    let cleared = http::router(state.clone())
+        .oneshot(clear_request(channel, &alice_access, 1))
+        .await
+        .unwrap();
+    assert_eq!(cleared.status(), StatusCode::CREATED);
+    // Nothing is below seq 1 yet, so this is an affected-0 no-op; place a second object to clear for real.
+    let placed_again = http::router(state.clone())
+        .oneshot(place_request(channel, &alice_access))
+        .await
+        .unwrap();
+    assert_eq!(placed_again.status(), StatusCode::CREATED);
+    assert_eq!(
+        read_frame(&mut alice_ws).await["type"],
+        "canvas.object.placed"
+    );
+
+    let cleared = http::router(state.clone())
+        .oneshot(clear_request(channel, &alice_access, 100))
+        .await
+        .unwrap();
+    assert_eq!(cleared.status(), StatusCode::CREATED);
+    let frame = read_frame(&mut alice_ws).await;
+    assert_eq!(frame["type"], "canvas.cleared");
+    assert_eq!(frame["before_seq"], 100);
+
+    let carol_next =
+        tokio::time::timeout(Duration::from_millis(300), read_frame(&mut carol_ws)).await;
+    assert!(
+        carol_next.is_err(),
+        "carol is denied USE_CANVAS and must receive neither a removal nor a clear",
+    );
+}
+
+/// An affected-0 op is a real state transition that never happened, so it
+/// must not fan a frame out to anybody, the same guarantee an idempotent
+/// replay already gets.
+#[tokio::test]
+async fn an_op_that_changes_nothing_publishes_no_frame() {
+    let (store, _guard) = new_store().await;
+    let state = state_for(&store);
+    let (alice_access, alice_ticket, alice) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+
+    let response = http::router(state.clone())
+        .oneshot(clear_request(channel, &alice_access, 0))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let next = tokio::time::timeout(Duration::from_millis(300), read_frame(&mut alice_ws)).await;
+    assert!(next.is_err(), "an affected-0 clear must publish nothing");
 }

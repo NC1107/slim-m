@@ -14,8 +14,12 @@
 //! Three ceilings apply and each bounds a different thing: `MAX_PROPS_BYTES`
 //! bounds one object, [`crate::store::MAX_OBJECT_EXTENT`] bounds the area one
 //! object claims, and [`crate::store::MAX_OBJECTS_PER_CHANNEL`] bounds the
-//! canvas. The last matters most, because this slice ships no removal path at
-//! all, so an unbounded write here could not be walked back.
+//! canvas.
+//!
+//! [`PlaceError::Removed`] exists because `super::canvas_ops_write` gave this
+//! surface a removal path: replaying the id of an object a moderator erased
+//! is now a distinct 409 from `IdConflict`, since an honest retry racing an
+//! erase deserves a truthful answer, not "id taken".
 //!
 //! What the server does not validate is the inside of `props`. It stays
 //! opaque, the way the read's degrade-to-`{}` already assumes; a schema per
@@ -136,6 +140,9 @@ pub(super) async fn place(
         Err(PlaceError::ChannelFull) => return Err(ApiError::Conflict("this canvas is full")),
         Err(PlaceError::IdConflict) => {
             return Err(ApiError::Conflict("canvas object id already used"));
+        }
+        Err(PlaceError::Removed) => {
+            return Err(ApiError::Conflict("that object was removed"));
         }
         Err(PlaceError::Internal(err)) => return Err(err.into()),
     };

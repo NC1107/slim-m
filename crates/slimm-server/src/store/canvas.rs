@@ -104,9 +104,12 @@ pub struct Placement {
 /// Why placing an object failed.
 #[derive(Debug)]
 pub enum PlaceError {
-    /// This id already belongs to an object in another channel, or to one
-    /// that has since been removed.
+    /// This id already belongs to an object in another channel.
     IdConflict,
+    /// This id belongs to an object in this same channel that has since been
+    /// removed, distinct from [`PlaceError::IdConflict`] so a retry racing an
+    /// erase gets an honest answer rather than "id taken".
+    Removed,
     /// The object's bounds are not finite, have negative extent, exceed
     /// [`MAX_OBJECT_EXTENT`], or fall outside the bounded world.
     OutOfBounds,
@@ -175,8 +178,9 @@ impl Store {
                     object: existing.2,
                     fresh: false,
                 }),
+                (true, true) => Err(PlaceError::Removed),
                 // A removed row keeps the id, so falling through would be a UNIQUE violation reported as a 500.
-                _ => Err(PlaceError::IdConflict),
+                (false, _) => Err(PlaceError::IdConflict),
             };
         }
 

@@ -86,6 +86,20 @@ pub(super) enum ServerFrame {
         seq: i64,
         object: CanvasObjectDto,
     },
+    #[serde(rename = "canvas.objects.removed")]
+    CanvasObjectsRemoved {
+        channel_id: String,
+        seq: i64,
+        op_id: String,
+        object_ids: Vec<String>,
+    },
+    #[serde(rename = "canvas.cleared")]
+    CanvasCleared {
+        channel_id: String,
+        seq: i64,
+        op_id: String,
+        before_seq: i64,
+    },
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]

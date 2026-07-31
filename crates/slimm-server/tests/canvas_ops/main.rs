@@ -11,3 +11,4 @@ mod fixtures;
 mod http_gate;
 #[path = "../support/mod.rs"]
 mod support;
+mod write;
