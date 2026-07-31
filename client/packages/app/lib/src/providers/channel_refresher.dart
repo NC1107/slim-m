@@ -32,9 +32,21 @@ class ChannelRefresher {
   /// `MessageStore.clear()` wipes the local marker on every sign-out; without
   /// this, a reinstall or a second device shows every channel unread
   /// forever, however recently it was actually read elsewhere.
-  Future<void> refresh(SlimmApi api, MessageStore store) async {
+  /// [isCurrent] is checked immediately before every write, never only on
+  /// entry. Three network round trips happen first, and a sign-out landing in
+  /// any of those windows clears the store; without this the answer to a
+  /// request made by the account signing out lands in the database afterwards
+  /// and the next person on the device reads the previous account's channel
+  /// list. The caller owns the definition of current, because only it knows
+  /// what supersedes it.
+  Future<void> refresh(
+    SlimmApi api,
+    MessageStore store, {
+    required bool Function() isCurrent,
+  }) async {
     final channels = await api.listChannels();
     final dms = await api.listDirectMessages();
+    if (!isCurrent()) return;
     final selfId = api.session.tokens?.userId;
     final all = [
       ...channels,
@@ -48,6 +60,7 @@ class ChannelRefresher {
       all.map((channel) async {
         try {
           final read = await api.readState(channel.id);
+          if (!isCurrent()) return;
           await store.setReadMarker(channel.id, read.lastReadSeq);
         } on ApiException {
           // Best-effort: the next refresh retries; until then it just reads as unread.
@@ -58,9 +71,22 @@ class ChannelRefresher {
 
   /// [refresh], but a concurrent caller joins the one already running
   /// instead of starting a second.
-  Future<void> refreshOnce(SlimmApi api, MessageStore store) {
-    return _inFlight ??= refresh(api, store).whenComplete(() {
-      _inFlight = null;
-    });
+  Future<void> refreshOnce(
+    SlimmApi api,
+    MessageStore store, {
+    required bool Function() isCurrent,
+  }) {
+    return _inFlight ??= refresh(api, store, isCurrent: isCurrent).whenComplete(
+      () {
+        _inFlight = null;
+      },
+    );
   }
+
+  /// Stops a later caller joining a refresh started before it, without
+  /// cancelling that refresh: its own [isCurrent] is what stops its writes.
+  /// Sharing across that boundary would hand a caller from the new session a
+  /// future guarded by the old one's predicate, which aborts, so the work it
+  /// asked for silently never happens.
+  void discardInFlight() => _inFlight = null;
 }

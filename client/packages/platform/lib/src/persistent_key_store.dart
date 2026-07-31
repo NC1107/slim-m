@@ -123,7 +123,7 @@ class FileKeyStore implements KeyStore {
   /// to remember here, or one transient failure (a directory the OS could
   /// not create just then, a locked file) would disable storage for the
   /// rest of the process with no way back. The same reasoning is why
-  /// view_cache.rs never caches a read error server-side.
+  /// http/ws/permission_cache.rs never caches a read error server-side.
   Future<File> _secretsFile() {
     return (_file ??= _open()).catchError((Object error, StackTrace stack) {
       _file = null;

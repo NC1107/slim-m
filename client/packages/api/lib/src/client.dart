@@ -41,9 +41,10 @@ class SessionStore {
   TokenPair? _tokens;
   final Future<void> Function(TokenPair?)? _onChange;
 
-  /// Chains every [_onChange] call behind the last, the same reason
-  /// [_persistSession] in providers.dart used to chain its own: a slow write
-  /// must not finish after a faster later one and leave a stale value stored.
+  /// Chains every [_onChange] call behind the last, so a slow write cannot
+  /// finish after a faster later one and leave a stale value stored: without
+  /// it, a rotation overtaking the sign-out that superseded it persists a
+  /// token for a session that has ended.
   Future<void> _pending = Future<void>.value();
 
   final _changes = StreamController<TokenPair?>.broadcast();
@@ -77,6 +78,11 @@ class SessionStore {
   /// a process death between that response and the new token reaching disk
   /// replays the old, now-spent one on the next launch and gets read as
   /// reuse. Awaiting this closes that window down to the write itself.
+  ///
+  /// It never completes before the write does, so anything awaiting it
+  /// inherits the key store's worst case and must bound its own wait. A
+  /// failed write is fine and resolves normally; only a hung one is a
+  /// problem, and every 401 retry funnels through that same rotation.
   Future<void> get settled => _pending;
 
   Future<void> dispose() => _changes.close();

@@ -166,4 +166,86 @@ void main() {
           'the stale run must not declare itself live after being superseded',
     );
   });
+
+  test('a channel listing that lands after sign-out is not written back into '
+      'the store the sign-out just cleared', () async {
+    final db = SlimmDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final store = MessageStore(db);
+    await store.upsertChannels([
+      const Channel(id: 'chan-1', name: 'general', kind: 'text', createdAt: 1),
+    ]);
+
+    final dmsGate = Completer<void>();
+
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        storeProvider.overrideWith((ref) async => store),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: ref.watch(serverUrlProvider),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((request) async {
+              if (request.method == 'GET' && request.url.path == '/channels') {
+                return _json([
+                  {
+                    'id': 'chan-1',
+                    'name': 'general',
+                    'kind': 'text',
+                    'created_at': 1,
+                  },
+                ]);
+              }
+              if (request.method == 'GET' && request.url.path == '/dms') {
+                // Held open so the sign-out lands inside the refresh, before its writes.
+                await dmsGate.future;
+                return _json(<Object>[]);
+              }
+              if (request.url.path.endsWith('/read')) {
+                return _json({'last_read_seq': 1, 'unread': 0});
+              }
+              if (request.method == 'POST' && request.url.path == '/sync') {
+                return _json({'scopes': <Object>[]});
+              }
+              if (request.method == 'POST' &&
+                  request.url.path == '/auth/logout') {
+                return http.Response('', 204);
+              }
+              return http.Response('not found', 404);
+            }),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    container.read(syncControllerProvider.notifier);
+    container.read(sessionProvider).set(_tokens);
+
+    // Let start() reach GET /dms, where the refresh now blocks.
+    await pumpEventQueue();
+
+    await container.read(apiProvider).logout();
+    await pumpEventQueue();
+    expect(
+      await store.hasChannel('chan-1'),
+      isFalse,
+      reason:
+          'sign-out must have cleared the store before the race is meaningful',
+    );
+
+    dmsGate.complete();
+    await pumpEventQueue();
+
+    expect(
+      await store.hasChannel('chan-1'),
+      isFalse,
+      reason:
+          'the channel listing fetched for the account signing out must not '
+          'be written into the store the next account will read',
+    );
+  });
 }

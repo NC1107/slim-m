@@ -53,6 +53,7 @@ void main() {
               if (request.url.path == '/channels') {
                 return http.Response('[]', 200);
               }
+
               final auth = request.headers['authorization'];
               final id = auth == 'Bearer access-a' ? 'user-a' : 'user-b';
               return http.Response(
@@ -87,6 +88,21 @@ void main() {
 
     await container.read(apiProvider).logout();
     await pumpEventQueue();
+
+    /// Asserted on the state rather than on `.value` or on a request count.
+    /// An invalidated [FutureProvider] carries its previous data through the
+    /// reload, so `.value` still answers with the departed account either
+    /// way; and a signed-out client refuses the read before sending it, so
+    /// no request is made to count. What does change is that the provider
+    /// stops being settled data somebody can go on rendering.
+    expect(
+      container.read(meProvider),
+      isNot(isA<AsyncData<Me>>()),
+      reason:
+          'sign-out must unsettle the caller\'s own identity, or a watcher '
+          'outliving it goes on being served the departed account\'s '
+          'profile as though it were still current',
+    );
 
     container.read(sessionProvider).set(tokensB);
     await pumpEventQueue();

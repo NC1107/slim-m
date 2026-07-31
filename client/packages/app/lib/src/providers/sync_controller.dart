@@ -65,10 +65,13 @@ class SyncController extends StateNotifier<SyncStatus> {
   int _attempt = 0;
   final _channelRefresher = ChannelRefresher();
 
-  /// Bumped by every [stop] and every fresh [start], so a run superseded
-  /// mid-flight (a sign-out landing during catch-up, or a second start
-  /// racing the first) notices at its next checkpoint rather than finishing
-  /// and writing stale data into a store a newer run already cleared.
+  /// Bumped by every [stop], every fresh [start] and [dispose], so a run
+  /// superseded mid-flight (a sign-out landing during catch-up, or a second
+  /// start racing the first) notices at its next checkpoint rather than
+  /// finishing and writing stale data into a store a newer run already
+  /// cleared. Every await in this class that is followed by a write has to
+  /// re-check it, including the ones inside [ChannelRefresher], which is why
+  /// that takes the predicate rather than being trusted to finish quickly.
   int _generation = 0;
 
   /// Every event this session receives, broadcast to whoever else wants one
@@ -107,11 +110,15 @@ class SyncController extends StateNotifier<SyncStatus> {
       final store = await _ref.read(storeProvider.future);
       if (generation != _generation) return;
 
-      await _channelRefresher.refresh(api, store);
+      await _channelRefresher.refresh(
+        api,
+        store,
+        isCurrent: () => generation == _generation,
+      );
       if (generation != _generation) return;
       await _catchUp(generation, api, store);
       if (generation != _generation) return;
-      await _attach(api, store);
+      await _attach(generation, api, store);
       if (generation != _generation) return;
 
       _attempt = 0;
@@ -180,21 +187,33 @@ class SyncController extends StateNotifier<SyncStatus> {
 
   /// Attaches the live socket. Its closure schedules a full restart, so the
   /// next connection catches up before trusting live events again.
-  Future<void> _attach(SlimmApi api, MessageStore store) async {
+  ///
+  /// [generation] is checked after the ticket mint and the connect, because
+  /// both are network round trips: a [stop] landing inside either used to
+  /// return from [start] having already assigned a socket the superseding
+  /// [_teardown] had run too early to see, leaving it live and applying
+  /// frames with nothing left holding a handle to close it.
+  Future<void> _attach(int generation, SlimmApi api, MessageStore store) async {
     final ticket = await api.webSocketTicket();
     final connection = await EventConnection.connect(
       url: api.webSocketUrl,
       ticket: ticket.ticket,
     );
+    if (generation != _generation) {
+      await connection.close();
+      return;
+    }
     _connection = connection;
 
     _events = connection.events.listen(
       (event) async {
+        if (generation != _generation) return;
+
         /// Broadcast first and unconditionally: a listener that only cares
         /// about, say, ReactionsChanged must not depend on this switch ever
         /// learning about that event type.
         _liveEvents.add(event);
-        await _applyServerEvent(api, store, event);
+        await _applyServerEvent(generation, api, store, event);
       },
       onError: (_) => _onDropped(),
       onDone: _onDropped,
@@ -204,17 +223,20 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// How one frame from the socket changes local state. A method of its own
   /// so [applyServerEventForTest] can drive it without a real socket.
   Future<void> _applyServerEvent(
+    int generation,
     SlimmApi api,
     MessageStore store,
     ServerEvent event,
   ) async {
+    bool isCurrent() => generation == _generation;
     switch (event) {
       case MessageCreated(:final message):
       case MessageEdited(:final message):
         // A DM's first message is a channel never fetched; materialise it first or this no-ops.
         if (!await store.hasChannel(message.channelId)) {
-          await _channelRefresher.refreshOnce(api, store);
+          await _channelRefresher.refreshOnce(api, store, isCurrent: isCurrent);
         }
+        if (!isCurrent()) return;
         await store.applyMessage(message);
       case MessageDeleted(:final messageId):
 
@@ -233,7 +255,7 @@ class SyncController extends StateNotifier<SyncStatus> {
       case RoleChanged():
       case MemberRoleChanged():
         // None say which channel changed; a refresh finds whichever did.
-        await _channelRefresher.refreshOnce(api, store);
+        await _channelRefresher.refreshOnce(api, store, isCurrent: isCurrent);
       case ErrorEvent(:final needsResync) when needsResync:
         // The server closed a connection that fell behind; a restart re-runs catch-up.
         unawaited(start());
@@ -248,7 +270,7 @@ class SyncController extends StateNotifier<SyncStatus> {
   Future<void> applyServerEventForTest(ServerEvent event) async {
     final api = _ref.read(apiProvider);
     final store = await _ref.read(storeProvider.future);
-    await _applyServerEvent(api, store, event);
+    await _applyServerEvent(_generation, api, store, event);
   }
 
   void _onDropped() {
@@ -285,6 +307,7 @@ class SyncController extends StateNotifier<SyncStatus> {
   Future<void> stop() async {
     // Supersedes any in-flight start(), even one paused mid-catch-up on a network call.
     _generation++;
+    _channelRefresher.discardInFlight();
     _retry?.cancel();
     await _teardown();
     state = SyncStatus.offline;
