@@ -64,15 +64,18 @@ tile is not a published track.
 The run ends by reporting how many documented API paths it actually touched,
 counted from what the harness and both browsers requested rather than from a
 list kept by hand, since a hand-kept list overstates coverage the moment a
-scenario changes. A full run currently reaches **36 of 59** documented paths.
+scenario changes. A full run currently reaches **36 of 62** documented paths
+(confirmed against a live CI run rather than assumed; the schema has grown
+since this number was first written, the harness's own reach has not).
 
 What it does not reach divides into three: routes that need a second
 deployment or real hardware (push, the relay lifecycle, account recovery),
-routes for features that are not built yet (the canvas), and routes that are
-simply not covered yet (per-channel overwrites, assigning a role to a member,
-kicking someone from a call, revoking one device, custom emoji, redeeming a
-second invite). The last group is the honest backlog; the run prints it every
-time so it cannot quietly grow.
+routes for a feature the harness does not yet drive (the Voice Canvas, whose
+read and write routes both exist now but have no scenario here), and routes
+that are simply not covered yet (per-channel overwrites, assigning a role to
+a member, kicking someone from a call, revoking one device, custom emoji,
+redeeming a second invite). The last group is the honest backlog; the run
+prints it every time so it cannot quietly grow.
 
 ## Layout
 
