@@ -60,7 +60,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::CanvasCleared { .. }
         | Event::CanvasObjectsRestored { .. } => Some(Permissions::USE_CANVAS),
         Event::MessageCreated { .. }
-        | Event::MessageEdited(_)
+        | Event::MessageEdited { .. }
         | Event::MessageDeleted { .. }
         | Event::ReactionsChanged { .. }
         | Event::MessagePinned { .. }
@@ -153,7 +153,9 @@ pub(super) async fn authorize(
     }
 
     let channel_id = match &event {
-        Event::MessageCreated { message, .. } | Event::MessageEdited(message) => message.channel_id,
+        Event::MessageCreated { message, .. } | Event::MessageEdited { message, .. } => {
+            message.channel_id
+        }
         Event::MessageDeleted { channel_id, .. } => *channel_id,
         Event::ReactionsChanged { channel_id, .. } => *channel_id,
         Event::MessagePinned { channel_id, .. } => *channel_id,
@@ -243,17 +245,20 @@ pub(super) async fn authorize(
                 message: dto,
             }
         }
-        Event::MessageEdited(message) => ServerFrame::MessageEdited {
+        Event::MessageEdited { message, op_seq } => ServerFrame::MessageEdited {
             channel_id: message.channel_id.to_string(),
             seq: message.seq.0,
+            op_seq: Some(op_seq),
             message: MessageDto::from(message),
         },
         Event::MessageDeleted {
             channel_id,
             message_id,
+            op_seq,
         } => ServerFrame::MessageDeleted {
             channel_id: channel_id.to_string(),
             message_id: message_id.to_string(),
+            op_seq,
         },
         // A separate store read past the view check; see `Authorization::Unknown`.
         Event::ReactionsChanged {

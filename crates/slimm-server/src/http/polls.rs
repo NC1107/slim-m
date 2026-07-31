@@ -96,13 +96,13 @@ impl From<StorePoll> for PollDto {
 }
 
 /// Batch-attaches poll data to already-built message DTOs. Called from
-/// [`super::messages::with_reactions`] so every consumer of that shared
+/// [`super::message_enrich::with_reactions`] so every consumer of that shared
 /// enrichment (list, search, sync, and the pinned-message list) renders a
 /// poll inline without each needing its own call site or database round trip.
 ///
 /// `ids` and `dtos` must be the same length and in the same order, which
 /// holds because both are built from the same source list of messages in
-/// [`super::messages::with_reactions`].
+/// [`super::message_enrich::with_reactions`].
 pub(crate) async fn attach_polls(
     state: &AppState,
     viewer: UserId,
