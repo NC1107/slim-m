@@ -61,10 +61,7 @@ jobs:
           IFS='|' read -r -a required <<< "$REQUIRED_CHECKS"
           started=$(date +%s)
           deadline=$(( started + 1800 ))
-          # A check run is created when its workflow starts, which on both paths
-          # is at or before this one. A name still absent past this is far more
-          # likely a typo in required_checks than a slow queue, and waiting the
-          # full deadline for that reports the wrong cause.
+          # Absent-and-nothing-running is a typo; absent-while-running is a queue.
           creation_grace=300
           while :; do
             if ! runs=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" \
@@ -95,8 +92,10 @@ jobs:
               exit 0
             fi
             now=$(date +%s)
-            if [ "${#missing[@]}" -gt 0 ] && [ $(( now - started )) -ge "$creation_grace" ]; then
-              echo "::error::no check run named ${missing[*]} exists on ${SHA}; either it never ran or required_checks names it wrongly"
+            if [ "${#missing[@]}" -gt 0 ] && [ $(( now - started )) -ge "$creation_grace" ] \
+              && [ "$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${SHA}&per_page=100" \
+                    --jq '[.workflow_runs[] | select(.status != "completed")] | length' 2>/dev/null || echo 1)" = "0" ]; then
+              echo "::error::no check run named ${missing[*]} exists on ${SHA} and nothing is still running for it; either it never ran or required_checks names it wrongly"
               exit 1
             fi
             if [ "$now" -ge "$deadline" ]; then
