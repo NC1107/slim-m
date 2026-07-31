@@ -78,6 +78,29 @@ And `messages.rs` sat at exactly 500 lines - the hard ceiling - so #237 had to s
 Author display names never reconcile either: `messages.authorDisplayName` is denormalised into every row, no event carries a profile change, and a keyset sync cannot reach rows behind its own cursor - the same debt shape on a different column.
 `message_ops` grows without a sweep, and the trail it keeps (who deleted what, with `created_at`) is durable, anonymised on account deletion, and readable from SQL and nowhere else.
 
+## A release can succeed and still ship no store build (2026-07-31)
+
+Found because the owner said "not seeing the ios build", which was the only available symptom.
+Read this before merging several PRs in quick succession, and before trusting that a green release means a build exists.
+
+**A cancelled required check reads as a failure, and the release still looks perfect.**
+`client-ios-ci` takes roughly 13 minutes on a macOS runner, and its concurrency group was `client-ios-ci-${{ github.ref }}` with `cancel-in-progress: true`.
+On main that group is identical for every push, so each merge cancelled the previous commit's still-running iOS check.
+`verify-release-checks` treats `cancelled` as a failure rather than as "not finished", so client 0.17.0's release run failed with `ios unit tests (callkit invariant):cancelled` and `ios-testflight` was skipped by its `needs` gate.
+
+The tag was cut, the GitHub release was published, and the changelog was correct.
+**The only evidence anywhere was a build that never reached the phone.**
+Three iOS runs were cancelled this way in one evening; 0.17.1 survived only because merging stopped long enough for it to finish.
+
+**The fix was already in the repo, applied to one workflow out of four.**
+`client-ci` carried `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`; `client-ios-ci`, `hygiene` and `licenses` did not, and all four are required checks for the release gate.
+Cancelling is right on a PR branch, where a new push supersedes the old work, and wrong on main, where any commit may be the one a release depends on.
+Worth noticing as a shape: a lesson learned once and applied to a single file is a lesson that will be relearned.
+
+**Still true after the fix, and deliberately not changed:** `verify-release-checks` treats `cancelled` as a hard failure.
+Nothing should cancel those checks on main now, so the path should be unreachable, but if it ever is again the symptom is once more a silently missing store build rather than a red release.
+Whether it should re-run and keep waiting instead is a trade about how long a release may block, and it is in `docs/OPEN-QUESTIONS.md` rather than decided here.
+
 ## The one-flag iOS screen share fix did not survive a real device (2026-07-31)
 
 The 2026-07-29 entry below ("iOS screen share was starting the broadcast twice") shipped `useiOSBroadcastExtension: true` in `captureOptionsFor` and called it fixed, with a caveat that it still needed a device.
