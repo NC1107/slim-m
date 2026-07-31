@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.5](https://github.com/NC1107/slim-m/compare/server-v0.18.4...server-v0.18.5) (2026-07-31)
+
+
+### Bug Fixes
+
+* **canvas:** a web z-index truncation, an unbounded refetch loop, and stacked headers ([#198](https://github.com/NC1107/slim-m/issues/198)) ([5875cc4](https://github.com/NC1107/slim-m/commit/5875cc4d57e999dc5b9364204c829d2139a2be6d))
+
 ## [0.18.4](https://github.com/NC1107/slim-m/compare/server-v0.18.3...server-v0.18.4) (2026-07-30)
 
 
