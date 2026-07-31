@@ -80,8 +80,32 @@ enum CanvasOpBodyDto {
     },
 }
 
-impl From<CanvasOpEntry> for CanvasOpDto {
-    fn from(entry: CanvasOpEntry) -> Self {
+impl CanvasOpDto {
+    /// Builds one op's wire form, disclosing the actor only where the live
+    /// path already would.
+    ///
+    /// [`Event::CanvasObjectsRemoved`] omits the actor deliberately, "so a
+    /// moderation act does not name its moderator to the whole channel", and
+    /// this feed handed the same channel exactly what that withholds - and
+    /// more reliably, since a live frame is ephemeral and this is a durable
+    /// read anybody with `USE_CANVAS` can make at any time.
+    ///
+    /// A `place` keeps its actor, because it is not a moderation act and the
+    /// same id is already public: `CanvasObject.author_id` is on the viewport
+    /// read and documented in the schema, so withholding it here would hide
+    /// nothing while making two reads of the same fact disagree.
+    ///
+    /// `moderates` is the caller's own `MANAGE_CANVAS`, so a moderator still
+    /// sees the full trail. That is the point of keeping the ops table
+    /// uncompacted: the record of who removed what has to survive somewhere,
+    /// it just must not be readable by the whole channel.
+    fn from_entry(entry: CanvasOpEntry, moderates: bool) -> Self {
+        let is_moderation = !matches!(entry.body, CanvasOpBody::Place(_));
+        let actor_id = if is_moderation && !moderates {
+            None
+        } else {
+            entry.actor_id.map(|id| id.to_string())
+        };
         let body = match entry.body {
             CanvasOpBody::Place(object) => CanvasOpBodyDto::Place {
                 object: object.map(CanvasObjectDto::from),
@@ -101,7 +125,7 @@ impl From<CanvasOpEntry> for CanvasOpDto {
         Self {
             seq: entry.seq,
             id: entry.id.to_string(),
-            actor_id: entry.actor_id.map(|id| id.to_string()),
+            actor_id,
             created_at: entry.created_at,
             body,
         }
@@ -135,13 +159,18 @@ pub(super) async fn list_ops(
         return Err(ApiError::BadRequest("after_seq must not be negative"));
     }
     let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+    let moderates = permissions.contains(Permissions::MANAGE_CANVAS);
 
     let page = state
         .store
         .list_canvas_ops(channel_id, params.after_seq, limit)
         .await?;
     Ok(Json(CanvasOpsPageDto {
-        ops: page.ops.into_iter().map(CanvasOpDto::from).collect(),
+        ops: page
+            .ops
+            .into_iter()
+            .map(|op| CanvasOpDto::from_entry(op, moderates))
+            .collect(),
         latest_seq: page.latest_seq,
         has_more: page.has_more,
         reset: page.reset,
