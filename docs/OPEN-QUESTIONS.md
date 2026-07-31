@@ -159,3 +159,18 @@ The blast radius if a run goes wrong is your live deployment and your store buil
 
 The middle option is the recommendation.
 It keeps the deploy decision human while losing almost nothing, since merging a standing release PR takes seconds and is the one step where a bad change becomes irreversible.
+
+## 13. Should a release wait for a cancelled check, or fail?
+
+`verify-release-checks` treats a **cancelled** required check as a failure.
+
+That is what silently skipped the iOS build for client 0.17.0 on 2026-07-31: merges in quick succession cancelled the in-flight iOS check, the release gate read the cancellation as failure, and `ios-testflight` was skipped while the tag, the GitHub release and the changelog all looked perfectly correct.
+
+#249 fixed the cause - the four release-gating workflows no longer cancel each other on main - so this path should now be unreachable.
+The behaviour on the day it *is* reachable again is still the same, though, and the symptom is again a store build that quietly never arrives rather than a red release anybody would notice.
+
+*Question:* should it re-run the cancelled check and keep waiting, or keep failing fast?
+
+Waiting means a release can block for as long as the check takes (the iOS one is about 13 minutes) and could in principle loop.
+Failing fast means the release is wrong in the one way nobody sees.
+Recorded rather than chosen, because it is a trade about how long you are willing for a release to hang rather than a correctness question.
