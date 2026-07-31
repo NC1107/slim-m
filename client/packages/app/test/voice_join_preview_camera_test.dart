@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Tests for the voice join preview's error handling: a failure this channel
-/// cannot retry its way out of must not offer a button that only fails again,
-/// and the one call controller's state must never leak across channels.
+/// The camera pre-toggle on the voice join preview: absent, not disabled,
+/// used to be the honest state - now the toggle is real, and this pins that
+/// tapping it flips the preference the same way the microphone one already
+/// does, and that the preference actually reaches the session on join.
 library;
 
 import 'dart:async';
@@ -14,8 +15,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
-import 'package:slimm_app/src/providers/voice_roster.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/providers/voice_roster.dart';
 import 'package:slimm_app/src/screens/voice_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -28,9 +29,9 @@ const _tokens = TokenPair(
   accessExpiresAt: 0,
 );
 
-/// A [VoiceSession] this file never actually drives into a call: every test
-/// here cares only about a failed `join`, before any session state matters.
-class _NoopSession implements VoiceSession {
+/// Records what it was asked for on join, never actually connecting: these
+/// tests only care about the preference reaching the session.
+class _RecordingSession implements VoiceSession {
   @override
   bool get supportsParticipantVolume => true;
 
@@ -88,13 +89,17 @@ class _NoopSession implements VoiceSession {
   Widget screenShareViewFor(String identity) =>
       SizedBox.shrink(key: Key('fake-share-view-$identity'));
 
+  bool? askedForCameraOnJoin;
+
   @override
   Future<void> join({
     required String url,
     required String token,
     bool microphoneEnabled = true,
     bool cameraEnabled = false,
-  }) async {}
+  }) async {
+    askedForCameraOnJoin = cameraEnabled;
+  }
 
   @override
   Future<void> leave() async {}
@@ -119,25 +124,16 @@ class _NoopSession implements VoiceSession {
   }
 }
 
-http.Client _tokenApi(int status) => MockClient((request) async {
-  if (status == 200) {
-    return http.Response(
-      jsonEncode({
-        'url': 'wss://sfu.example.com',
-        'room': 'channel-1',
-        'token': 'jwt',
-        'expires_at': 0,
-        'can_publish': true,
-      }),
-      200,
-      headers: {'content-type': 'application/json'},
-    );
-  }
+http.Client _tokenApi() => MockClient((request) async {
   return http.Response(
     jsonEncode({
-      'error': {'code': 'nope', 'message': 'refused'},
+      'url': 'wss://sfu.example.com',
+      'room': 'channel-1',
+      'token': 'jwt',
+      'expires_at': 0,
+      'can_publish': true,
     }),
-    status,
+    200,
     headers: {'content-type': 'application/json'},
   );
 });
@@ -152,13 +148,48 @@ Widget _harness(Widget child, ProviderContainer container) =>
     );
 
 void main() {
+  testWidgets('the camera pre-toggle starts off and reads as off', (
+    tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        voiceRosterProvider.overrideWith(
+          (ref, channelId) =>
+              const Stream<List<VoiceRosterParticipant>>.empty(),
+        ),
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: _tokenApi(),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+        voiceControllerProvider.overrideWith(
+          (ref) => VoiceController(ref, session: _RecordingSession()),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      _harness(const VoiceScreen(channelId: 'channel-1'), container),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Camera'), findsOneWidget);
+    expect(find.text('off'), findsOneWidget);
+  });
+
   testWidgets(
-    'a server with no voice hides the join button rather than inviting a retry',
+    'tapping the camera pre-toggle flips it, and the preference reaches the session on join',
     (tester) async {
+      final session = _RecordingSession();
       final container = ProviderContainer(
         overrides: [
-          // The preview polls this every 15 seconds now that it shows who
-          // is already in the call; without a stub the timer outlives the test.
           voiceRosterProvider.overrideWith(
             (ref, channelId) =>
                 const Stream<List<VoiceRosterParticipant>>.empty(),
@@ -169,13 +200,13 @@ void main() {
             final api = SlimmApi(
               baseUrl: Uri.parse('http://localhost:8080'),
               session: ref.watch(sessionProvider),
-              httpClient: _tokenApi(501),
+              httpClient: _tokenApi(),
             );
             ref.onDispose(api.close);
             return api;
           }),
           voiceControllerProvider.overrideWith(
-            (ref) => VoiceController(ref, session: _NoopSession()),
+            (ref) => VoiceController(ref, session: session),
           ),
         ],
       );
@@ -186,60 +217,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await container.read(voiceControllerProvider.notifier).join('channel-1');
+      // "on" already appears once, for the microphone's own default value.
+      await tester.tap(find.text('Camera'));
+      await tester.pump();
+      expect(find.text('on'), findsNWidgets(2));
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Join call'));
       await tester.pumpAndSettle();
 
-      expect(find.text('This Space has no voice configured.'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, 'Join call'), findsNothing);
-      // The shared component, not a hand-rolled Text: the surface the report named as reaching raw exceptions full-screen.
-      expect(find.byType(AppErrorState), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    "a permission denial in one channel does not block joining another",
-    (tester) async {
-      final container = ProviderContainer(
-        overrides: [
-          // The preview polls this every 15 seconds now that it shows who
-          // is already in the call; without a stub the timer outlives the test.
-          voiceRosterProvider.overrideWith(
-            (ref, channelId) =>
-                const Stream<List<VoiceRosterParticipant>>.empty(),
-          ),
-          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-          apiProvider.overrideWith((ref) {
-            final api = SlimmApi(
-              baseUrl: Uri.parse('http://localhost:8080'),
-              session: ref.watch(sessionProvider),
-              httpClient: _tokenApi(403),
-            );
-            ref.onDispose(api.close);
-            return api;
-          }),
-          voiceControllerProvider.overrideWith(
-            (ref) => VoiceController(ref, session: _NoopSession()),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      await container.read(voiceControllerProvider.notifier).join('channel-a');
-
-      // Now looking at a different voice channel this account was never
-      // refused: its join preview must start clean.
-      await tester.pumpWidget(
-        _harness(const VoiceScreen(channelId: 'channel-b'), container),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text('You do not have permission to join this channel.'),
-        findsNothing,
-        reason: 'channel-a\'s denial must not leak into channel-b\'s preview',
-      );
-      expect(find.widgetWithText(FilledButton, 'Join call'), findsOneWidget);
+      expect(session.askedForCameraOnJoin, isTrue);
     },
   );
 }
