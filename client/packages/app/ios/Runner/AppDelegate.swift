@@ -10,6 +10,7 @@ import UserNotifications
 
   private var pushChannel: FlutterMethodChannel?
   private var broadcastChannel: FlutterMethodChannel?
+  private let voiceCallChannel = VoiceCallChannel()
 
   // The token or a registration failure can each arrive before Dart has asked
   // for it (a fast relaunch) or long after (the user takes a while to decide
@@ -42,6 +43,8 @@ import UserNotifications
       BroadcastChannel.handle(call, result: result)
     }
     broadcastChannel = broadcast
+
+    voiceCallChannel.attach(to: messenger)
   }
 
   private func handlePushCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

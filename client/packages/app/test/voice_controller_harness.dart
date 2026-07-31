@@ -77,6 +77,7 @@ class FakeSession implements VoiceSession {
 
   VoiceSessionState _state = VoiceSessionState.idle;
   bool? askedForMicrophoneOnJoin;
+  bool? askedForCameraOnJoin;
   int leaveCalls = 0;
 
   @override
@@ -149,8 +150,10 @@ class FakeSession implements VoiceSession {
     required String url,
     required String token,
     bool microphoneEnabled = true,
+    bool cameraEnabled = false,
   }) async {
     askedForMicrophoneOnJoin = microphoneEnabled;
+    askedForCameraOnJoin = cameraEnabled;
     _state = joinOutcome;
   }
 
@@ -158,6 +161,8 @@ class FakeSession implements VoiceSession {
   Future<void> leave() async {
     leaveCalls++;
     _state = VoiceSessionState.idle;
+    // The real session emits this transition too, and a fake that did not was untested here.
+    _states.add(_state);
   }
 
   @override
@@ -262,6 +267,7 @@ class VoiceHarness {
     http.Client client, {
     Duration broadcastStartTimeout = const Duration(seconds: 30),
     Duration voiceHeartbeatInterval = const Duration(seconds: 15),
+    CallLifecycleChannel? callLifecycle,
   }) {
     final container = ProviderContainer(
       overrides: [
@@ -282,6 +288,7 @@ class VoiceHarness {
             session: session,
             broadcastStartTimeout: broadcastStartTimeout,
             voiceHeartbeatInterval: voiceHeartbeatInterval,
+            callLifecycle: callLifecycle,
           ),
         ),
       ],

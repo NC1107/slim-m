@@ -68,6 +68,7 @@ class VoiceParticipant {
     required this.isMuted,
     required this.isLocal,
     required this.isScreenSharing,
+    this.isCameraOn = false,
   });
 
   /// The server's user id. The token's `sub`, so it is trustworthy.
@@ -81,6 +82,12 @@ class VoiceParticipant {
   final bool isLocal;
   final bool isScreenSharing;
 
+  /// Whether this participant has a camera track published. There is no
+  /// viewer for it yet - see `voice_screen.dart`'s library doc - so this is
+  /// only ever rendered as a small badge, the same way [isScreenSharing] was
+  /// before its own viewer existed.
+  final bool isCameraOn;
+
   @override
   bool operator ==(Object other) =>
       other is VoiceParticipant &&
@@ -89,7 +96,8 @@ class VoiceParticipant {
       other.isSpeaking == isSpeaking &&
       other.isMuted == isMuted &&
       other.isLocal == isLocal &&
-      other.isScreenSharing == isScreenSharing;
+      other.isScreenSharing == isScreenSharing &&
+      other.isCameraOn == isCameraOn;
 
   @override
   int get hashCode => Object.hash(
@@ -99,5 +107,6 @@ class VoiceParticipant {
         isMuted,
         isLocal,
         isScreenSharing,
+        isCameraOn,
       );
 }

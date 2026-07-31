@@ -152,11 +152,16 @@ class VoiceSession {
     required String url,
     required String token,
     bool microphoneEnabled = true,
+    bool cameraEnabled = false,
   }) {
     final previous = _joining ?? Future<void>.value();
     final current = previous.catchError((_) {}).then(
           (_) => _join(
-              url: url, token: token, microphoneEnabled: microphoneEnabled),
+            url: url,
+            token: token,
+            microphoneEnabled: microphoneEnabled,
+            cameraEnabled: cameraEnabled,
+          ),
         );
     _joining = current.whenComplete(() {
       if (identical(_joining, current)) _joining = null;
@@ -168,6 +173,7 @@ class VoiceSession {
     required String url,
     required String token,
     required bool microphoneEnabled,
+    required bool cameraEnabled,
   }) async {
     if (_disposed) return;
     if (_room != null) await leave();
@@ -183,6 +189,9 @@ class VoiceSession {
       // can arrive muted, and a token without SPEAK must not fail the join.
       if (microphoneEnabled) {
         await _trySetMicrophone(true);
+      }
+      if (cameraEnabled) {
+        await _trySetCamera(true);
       }
       _refreshParticipants();
       _setState(VoiceSessionState.connected);
@@ -250,6 +259,24 @@ class VoiceSession {
     }
   }
 
+  /// Publishes (or stops) a camera track. Failure is swallowed exactly as
+  /// [_trySetMicrophone]'s is: a camera pre-toggle a device cannot honour
+  /// (permission denied, no hardware) must not fail the join, since a call
+  /// with no camera track is still a call.
+  Future<bool> _trySetCamera(bool enabled) async {
+    final room = _room;
+    if (room == null) return false;
+    try {
+      await room.localParticipant?.setCameraEnabled(enabled);
+      _refreshParticipants();
+      return true;
+    } catch (e) {
+      _lastError = e;
+      _refreshParticipants();
+      return false;
+    }
+  }
+
   /// Starts or stops sharing a screen, bounded by [quality].
   ///
   /// Reports what happened rather than what was asked for, because on iOS
@@ -290,6 +317,12 @@ class VoiceSession {
   static bool _isSharing(lk.Participant? p) =>
       p?.videoTrackPublications
           .any((t) => t.source == lk.TrackSource.screenShareVideo) ??
+      false;
+
+  /// Whether a camera track is published, the same track-presence check
+  /// [_isSharing] uses for a screen share.
+  static bool _hasCameraTrack(lk.Participant? p) =>
+      p?.videoTrackPublications.any((t) => t.source == lk.TrackSource.camera) ??
       false;
 
   /// The widget that renders [identity]'s shared screen, live.
@@ -407,6 +440,7 @@ class VoiceSession {
       isMuted: muted,
       isLocal: isLocal,
       isScreenSharing: _isSharing(p),
+      isCameraOn: _hasCameraTrack(p),
     );
   }
 

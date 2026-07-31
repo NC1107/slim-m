@@ -105,6 +105,22 @@ void main() {
     );
   });
 
+  test('a camera pre-toggle does not fail a join with nothing to publish to',
+      () async {
+    // Mirrors the microphone case: _EmptyRoom's localParticipant stays null,
+    // so there is nothing to publish a camera track to, and that must not
+    // fail the join - a call with no camera track is still a call.
+    final session = VoiceSession(roomFactory: _EmptyRoom.new);
+    addTearDown(session.dispose);
+
+    await session.join(
+      url: 'wss://a.invalid',
+      token: 't',
+      cameraEnabled: true,
+    );
+    expect(session.state, VoiceSessionState.connected);
+  });
+
   test('a failed join leaves nothing to clean up behind it', () async {
     final session = VoiceSession(
       roomFactory: () => _FailingRoom(StateError('unreachable')),
@@ -317,6 +333,28 @@ void main() {
         isScreenSharing: false,
       );
       expect(quiet, isNot(equals(talking)));
+    });
+
+    test('a camera coming on is a different participant', () {
+      const off = VoiceParticipant(
+        identity: 'u1',
+        name: 'alice',
+        isSpeaking: false,
+        isMuted: false,
+        isLocal: false,
+        isScreenSharing: false,
+      );
+      const on = VoiceParticipant(
+        identity: 'u1',
+        name: 'alice',
+        isSpeaking: false,
+        isMuted: false,
+        isLocal: false,
+        isScreenSharing: false,
+        isCameraOn: true,
+      );
+      expect(off, isNot(equals(on)));
+      expect(off.hashCode, isNot(equals(on.hashCode)));
     });
   });
 
