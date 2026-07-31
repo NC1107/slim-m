@@ -17,6 +17,15 @@ import PushKit
 /// bailing is what gets the app killed. So a payload that cannot be understood
 /// is reported as a call from an unknown caller and then immediately ended,
 /// which is visible for an instant and survivable, instead of silently fatal.
+///
+/// A call joined from this app's own UI (not an inbound VoIP push) is never
+/// reported to CXProvider at all: `handle` below only ever runs from
+/// `pushRegistry(_:didReceiveIncomingPushWith:...)`. That means such a call
+/// gets none of CallKit's background execution grant, which is the one
+/// compliant path this project uses (see `Info.plist`'s `UIBackgroundModes`
+/// comment). Tracked as https://github.com/NC1107/slim-m/issues/212 rather
+/// than built here, since it needs a Dart-to-native call lifecycle bridge
+/// this file does not have and a real device to verify.
 protocol CallReporting {
   func reportNewIncomingCall(
     with UUID: UUID,

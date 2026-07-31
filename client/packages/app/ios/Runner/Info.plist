@@ -91,6 +91,16 @@
 	     archive. Nothing in slim-m calls a location API. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>slim-m never asks for your location. This entry exists because DKImagePickerController (an image-attachment picker) links against Core Location for photo EXIF geotag handling; we never request or transmit location data.</string>
+	<!-- Deliberately never the `audio` background mode: `docs/research/
+	     appstore.md` and `appstore-review.md` (finding M5) treat it as an
+	     App Store 2.5.4 rejection risk when used to keep a call alive rather
+	     than for genuine continuous playback, which is exactly what a
+	     UI-joined call not reported to CallKit would be using it for. `voip`
+	     with a call actually reported to CallKit is the only compliant path
+	     (see https://github.com/NC1107/slim-m/issues/212, and
+	     `VoipCallHandler.swift`'s doc comment): CallKit itself is what
+	     grants background execution while it holds an active, reported
+	     call. -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>voip</string>

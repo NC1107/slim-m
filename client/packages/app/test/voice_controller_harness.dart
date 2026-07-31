@@ -201,15 +201,17 @@ class FakeSession implements VoiceSession {
 /// config validation and most tests need; the plain-ws suite overrides it.
 /// [onRequest], when given, is called with every request this client
 /// answers, so a test can count or inspect heartbeat calls without a second
-/// mock layered on top.
+/// mock layered on top. The whole request, not just the url: a POST
+/// heartbeat and the DELETE that forgets one on a clean leave share a path,
+/// and only the method tells them apart.
 http.Client voiceApi({
   int status = 200,
   bool canPublish = true,
   String sfuUrl = 'wss://sfu.example.com',
-  void Function(Uri url)? onRequest,
+  void Function(http.Request request)? onRequest,
 }) {
   return MockClient((request) async {
-    onRequest?.call(request.url);
+    onRequest?.call(request);
     if (request.url.path.endsWith('/voice/heartbeat')) {
       return http.Response('', 204);
     }

@@ -12,6 +12,46 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The killed-app ghost was never going to be fixed by a race the sweep always loses (2026-07-30)
+
+PR #205 shipped a heartbeat and a server-side sweep as though they closed the reported bug: force-quit the app mid-call, reopen it, and it showed the owner still on the call.
+Measured, they cannot close it: LiveKit's own reconnect grace reaps a killed connection in roughly 20-25 seconds, and the shipped constants (a 40s staleness threshold, a 10s sweep tick, a 15s client interval) put the sweep's earliest possible eviction at 25-50 seconds.
+The sweep never gets there first.
+Read this before touching `voice_roster.dart`, `voice/heartbeat.rs`, or the sign-out path.
+
+**The actual bug was never eviction speed - it was the roster answering with a stale self-entry and nothing filtering it out.**
+`voiceControllerProvider` is fresh, idle, in-memory state on every launch; it was never what rendered the owner as in-call.
+`voiceRosterProvider` is: `VoiceChannelRow` (the rail) and `_WhoIsHere` (the join preview) both render whoever `/voice/roster` answers with, including this same client's own identity for as long as the SFU or the sweep have not yet reaped it.
+A relaunch moments after being killed polls that roster and sees itself still listed.
+`voiceRosterProvider` now drops the caller's own id from every answer, unconditionally: this client's own presence in a call is `voiceControllerProvider`'s question to answer, never the roster's.
+`voice_roster_test.dart` and `channel_rail_voice_roster_test.dart` reproduce the exact shape (a roster answer naming the caller's own id, a fresh idle controller) and assert the UI does not claim the user is in a call.
+
+**The heartbeat and sweep are kept, honestly reframed as a backstop rather than the fix.**
+They bound how long *other* participants and the server's own bookkeeping carry a ghost, real value independent of the relaunch bug, and the sweep-to-eviction wiring had no test at all before this.
+`tests/voice_sweep.rs` drives `lib.rs`'s own `sweep_stale_voice_calls_at` (extracted so the test exercises the real production loop, not a copy that could drift from it) against a fake room service and asserts the `RemoveParticipant` call actually arrives.
+`STALE_AFTER` is now derived at compile time from a `CLIENT_HEARTBEAT_INTERVAL` constant mirroring the Dart interval, rather than the two being tied only by two doc comments agreeing by luck.
+A new `DELETE .../voice/heartbeat` (called from `VoiceController.leave()`, fire-and-forget) lets a clean hangup say so directly, closing the false-positive "removed a voice participant with no recent heartbeat" log line and wasted `RemoveParticipant` RPC every ordinary departure used to cause.
+The disconnect message a false-positive sweep would show was also wrong: `VoiceDisconnect.removed`'s copy read as a moderator's doing, when the same LiveKit reason also covers a stale-heartbeat sweep and a deleted room; it says only "You're no longer in this call" now.
+
+**Sign-out and account deletion never called `leave()` at all.**
+`voiceControllerProvider` is app-lifetime, not session-scoped, so a call left running through sign-out kept POSTing an authenticated heartbeat against a session that had just been cleared, every 401 swallowed silently for the rest of the process's life.
+Both paths leave the call first now, and `sign_out_leaves_call_test.dart` drives `SignOutRow.signOut` directly against a live fake call to prove it.
+
+**On iOS, the fix the first pass reached for would have made things worse.**
+Adding `UIBackgroundModes: audio` to grant background execution for the call looked like the obvious complement to the heartbeat, and is exactly what `docs/research/appstore.md` and the adversarial review (`appstore-review.md`, finding M5) already ruled out: `audio` used to keep a call alive rather than for genuine continuous playback is a named App Store 2.5.4 rejection risk, and reviewers reject it as a generic keep-alive.
+The compliant path this project already picked is `voip` plus an actually-reported CallKit call, and CallKit itself is what grants background execution while it holds one.
+The gap is that a call joined from this app's own UI is never reported to CallKit at all - `VoipCallHandler.swift`'s `reportNewIncomingCall` only ever runs from an inbound VoIP push - so it currently gets none of that grant regardless of background mode.
+Filed as [#212](https://github.com/NC1107/slim-m/issues/212) rather than built here: it needs a Dart-to-native call lifecycle bridge that does not exist yet, and real-device verification this environment cannot do.
+
+**Test fragility fixed along the way, and one review claim about it that did not survive checking.**
+`voice_call_heartbeat_test.dart` ran real `Timer.periodic`s at a few milliseconds against real wall-clock windows, schedulable flake on a loaded runner; it now drives everything through `fake_async`, which also let its loose bounds become exact counts.
+The review that drove this pass also claimed the trailing `controller.leave()` calls at the end of eight widget tests (there to clear the heartbeat timer a connected call now keeps running) would let an earlier failing `expect` report as a masked "pending timer" error instead of itself, and asked for `addTearDown` registered right after connecting instead.
+That fix was tried, and it broke a previously-passing test: `TestWidgetsFlutterBinding`'s pending-timer check (`_verifyInvariants`) runs immediately after the test body function returns, strictly *before* any `tearDown`/`addTearDown` callback executes, so moving the cleanup into `addTearDown` guarantees the timer is still pending when the check fires.
+Verified directly (a minimal `testWidgets` reproduction) that the masking claim itself does not hold either: a failing `expect` throws out of the test body before `_verifyInvariants` is ever reached, since that check is skipped entirely once an exception is already pending, so the real failure was always going to report as itself.
+The trailing `leave()` calls are back exactly where they were.
+
+**A `testWidgets` test that never calls `tester.pump()` before a `Timer.periodic` is created can hang for a fixed ~57s and then crash the test worker rather than fail cleanly.** `sign_out_leaves_call_test.dart` (new, driving a real `VoiceController` through `SignOutRow.signOut`) hit this: `join` then `emitState(connected)` then straight into an assertion, with no pump in between, reliably produced `Bad state: Cannot close sink while adding stream` at test-worker shutdown - a flutter_tools-level symptom, not a Dart exception in the test itself, so it gave no indication of where to look. Bisected by stripping the test down to the minimal repro (a `ProviderContainer`, no widget ever pumped) and adding one `tester.pump()` back at a time. One `await tester.pump()` right after the state transition that starts the heartbeat timer, before anything else runs, fixes it. The other widget tests touching `VoiceController` all happen to pump for an unrelated reason (they render a screen), which is why this had never surfaced before.
+
 ## The canvas, first visible slice: one shared pen (2026-07-30)
 
 The signature feature had a viewport read, an R-Tree, a spatial index, a permission bit and a spike, and no way for a person to reach any of it.

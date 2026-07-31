@@ -39,6 +39,20 @@ extension SlimmApiVoice on SlimmApi {
         expectNoContent: true,
       );
 
+  /// Tells the server this client left a channel's call cleanly, so its
+  /// heartbeat entry is dropped now rather than left for the server's sweep
+  /// to rediscover once it goes stale and call the SFU about a participant
+  /// who already disconnected on their own.
+  ///
+  /// Best-effort by the caller's own convention, same as [sendVoiceHeartbeat]:
+  /// if this never lands, the sweep still cleans up in time, just later and
+  /// with a wasted RPC on the server's side.
+  Future<void> forgetVoiceHeartbeat(String channelId) => _send(
+        'DELETE',
+        '/channels/$channelId/voice/heartbeat',
+        expectNoContent: true,
+      );
+
   /// Who is currently in a channel's voice room, whether or not this client
   /// has joined it.
   ///

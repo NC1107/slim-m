@@ -1,21 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Joining a channel's voice room, and seeing who else already has.
 //!
-//! Three routes, and almost all of each is the check in front: the token this
-//! hands back is a bearer credential the SFU trusts, so what a caller may do in
-//! a room is decided here, once, from their permissions in that channel.
+//! Most of these routes are almost entirely the check in front: the token
+//! this hands back is a bearer credential the SFU trusts, so what a caller
+//! may do in a room is decided here, once, from their permissions in that
+//! channel.
 //!
 //! Eviction is the other half of that. A minted token cannot be revoked, so its
 //! TTL bounds how long a removed participant could walk back in; removing them
 //! from the room is what makes a kick take effect now rather than in two
 //! minutes.
 //!
-//! The roster is the read-only third: `VIEW_CHANNEL` is the gate, the same bit
+//! The roster is read-only: `VIEW_CHANNEL` is the gate, the same bit
 //! that lets a member read a text channel's messages without also being able
 //! to send into it. A participant who chose to appear offline is dropped from
 //! every viewer's roster but their own, the same treatment [`crate::presence`]
 //! gives every other surface; see [`roster`]'s doc comment for why that is a
 //! deliberate call rather than an oversight.
+//!
+//! The heartbeat pair is the exception to "the check in front": `heartbeat`
+//! is gated the same way minting a token is, but `forget_heartbeat` is not
+//! gated at all beyond authentication, because forgetting a caller's own
+//! liveness marker exposes nothing about the channel it names.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -39,7 +45,10 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/channels/{channel_id}/voice/token", post(token))
         .route("/channels/{channel_id}/voice/roster", get(roster))
-        .route("/channels/{channel_id}/voice/heartbeat", post(heartbeat))
+        .route(
+            "/channels/{channel_id}/voice/heartbeat",
+            post(heartbeat).delete(forget_heartbeat),
+        )
         .route(
             "/channels/{channel_id}/voice/participants/{user_id}/kick",
             post(kick),
@@ -146,6 +155,30 @@ async fn heartbeat(
     }
 
     state.voice.record_heartbeat(ctx.user_id, channel_id);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Tells the server this caller left a channel's call cleanly, so its
+/// heartbeat entry is dropped now rather than left for the sweep to
+/// rediscover once it goes stale and call the SFU about a participant who
+/// already disconnected on their own.
+///
+/// No permission gate beyond authentication, unlike every other route in this
+/// file: forgetting one's own liveness marker cannot expose anything about a
+/// channel, so there is nothing here for a permission check to protect and a
+/// permission revoked mid-call must not be what blocks a client's own
+/// cleanup. Harmless, and answers the same way, on a deployment with no SFU
+/// configured or a channel that does not exist: there is never anything to
+/// forget either way.
+async fn forget_heartbeat(
+    Authed(ctx): Authed,
+    parts: Parts,
+    Path(channel_id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<StatusCode, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    state.voice.forget_heartbeat(ctx.user_id, channel_id);
     Ok(StatusCode::NO_CONTENT)
 }
 

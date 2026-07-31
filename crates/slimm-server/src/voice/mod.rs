@@ -251,6 +251,17 @@ impl VoiceService {
         self.heartbeats.record(user_id, channel_id);
     }
 
+    /// Drops `user_id`'s heartbeat entry for `channel_id` outright.
+    ///
+    /// Called when a client reports leaving a call cleanly: it has already
+    /// disconnected from the SFU on its own, so there is nothing left for the
+    /// sweep to usefully evict, only a wasted [`Self::remove_participant`]
+    /// call and a misleading "removed a voice participant with no recent
+    /// heartbeat" log line waiting to happen forty seconds later.
+    pub fn forget_heartbeat(&self, user_id: UserId, channel_id: ChannelId) {
+        self.heartbeats.forget(user_id, channel_id);
+    }
+
     /// Every `(user, channel)` call whose heartbeat has gone stale, handed
     /// back (and forgotten) for the caller to actually evict at the SFU.
     pub fn sweep_stale_calls(&self) -> Vec<(UserId, ChannelId)> {
@@ -261,6 +272,25 @@ impl VoiceService {
     /// test to confirm the HTTP handler actually reached [`Self::record_heartbeat`].
     pub fn has_heartbeat_for_test(&self, user_id: UserId, channel_id: ChannelId) -> bool {
         self.heartbeats.contains(user_id, channel_id)
+    }
+
+    /// [`Self::record_heartbeat`] with an explicit clock, so a test can put a
+    /// heartbeat moments from staleness without a real sleep.
+    pub fn record_heartbeat_at_for_test(
+        &self,
+        user_id: UserId,
+        channel_id: ChannelId,
+        now: std::time::Instant,
+    ) {
+        self.heartbeats.record_at(user_id, channel_id, now);
+    }
+
+    /// [`Self::sweep_stale_calls`] with an explicit clock. `lib.rs`'s own
+    /// sweep uses this too (passing the real clock), so a test can drive
+    /// exactly the code that runs in production rather than a copy of it
+    /// that could drift; a test is what wants a clock other than the real one.
+    pub fn sweep_stale_calls_at(&self, now: std::time::Instant) -> Vec<(UserId, ChannelId)> {
+        self.heartbeats.sweep_stale_at(HEARTBEAT_STALE_AFTER, now)
     }
 
     /// Removes a participant from a channel's room immediately.

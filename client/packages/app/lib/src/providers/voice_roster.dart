@@ -28,6 +28,17 @@ const voiceRosterPollInterval = Duration(seconds: 15);
 /// a checked, genuinely empty room; [AsyncLoading] means not known yet, and
 /// those two must not be rendered the same way.
 ///
+/// This client's own identity is dropped from every answer, always. Whether
+/// this client is in the call is `voiceControllerProvider`'s job, driven by
+/// the live session, never this roster's: the SFU only reaps a dead
+/// connection on its own schedule, and the heartbeat sweep (see
+/// `crates/slimm-server/src/voice/heartbeat.rs`) is a bounded backstop for
+/// that, not an instant one, so a client relaunched moments after being
+/// killed can poll this and still see the identity it just lost. Rendering
+/// that back as "you are in this call" is exactly the bug filtering it out
+/// here fixes; see `voice_roster_test.dart` and
+/// `channel_rail_voice_roster_test.dart`.
+///
 /// A channel with no voice configured closes the stream on its first answer
 /// rather than polling a server that will only ever say the same thing
 /// again, which is why [AsyncLoading] is also what a text-only deployment
@@ -43,7 +54,11 @@ final voiceRosterProvider = StreamProvider.autoDispose
       Future<void> tick(Timer? self) async {
         try {
           final roster = await client.voiceRoster(channelId);
-          if (!controller.isClosed) controller.add(roster);
+          final selfId = client.session.tokens?.userId;
+          final visible = selfId == null
+              ? roster
+              : roster.where((p) => p.userId != selfId).toList(growable: false);
+          if (!controller.isClosed) controller.add(visible);
         } on api.NotConfiguredException {
           self?.cancel();
           unawaited(controller.close());

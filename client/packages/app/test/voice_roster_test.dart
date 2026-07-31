@@ -140,6 +140,32 @@ void main() {
     },
   );
 
+  test("a fresh relaunch does not resurrect this client's own stale entry", () {
+    fakeAsync((async) {
+      final container = _containerWith(
+        MockClient(
+          (_) async => _roster([
+            // What the server still answers moments after a force-quit.
+            {'user_id': 'u-me', 'display_name': 'Me'},
+            {'user_id': 'u1', 'display_name': 'Alice'},
+          ]),
+        ),
+      );
+      final sub = container.listen(voiceRosterProvider('general'), (_, __) {});
+      async.flushMicrotasks();
+
+      final value = container.read(voiceRosterProvider('general')).value;
+      expect(
+        value?.map((p) => p.userId),
+        ['u1'],
+        reason:
+            'a client that never rejoined must not see itself listed as '
+            'though it were already in the call',
+      );
+      sub.close();
+    });
+  });
+
   test(
     'the poll interval, not the caller, governs how often the SFU is hit',
     () {

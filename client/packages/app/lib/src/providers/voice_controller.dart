@@ -203,9 +203,15 @@ class VoiceController extends StateNotifier<VoiceState> {
   /// connected. Independent of `AppLifecycleState` on purpose: a phone call
   /// that stopped the moment you switched apps would be useless, so this
   /// keeps ticking through backgrounding and only really stops when the
-  /// process does. See `crates/slimm-server/src/voice/heartbeat.rs` for the
-  /// bound this and the server's own staleness threshold together give a
-  /// terminated app's ghost participant.
+  /// process does.
+  ///
+  /// This bounds how long a killed app's ghost lingers for *other*
+  /// participants and the server's own bookkeeping; see
+  /// `crates/slimm-server/src/voice/heartbeat.rs`. It does not, and cannot,
+  /// bound how this same client renders its own state on its own next
+  /// launch - that answer lives in `voiceRosterProvider`, which drops this
+  /// client's own identity from any roster it reads regardless of whether
+  /// the server has caught up yet.
   final Duration voiceHeartbeatInterval;
 
   final Ref _ref;
@@ -271,14 +277,20 @@ class VoiceController extends StateNotifier<VoiceState> {
 
   Future<void> leave() async {
     _cancelBroadcastDeadline();
+    final channelId = state.channelId;
     _stopHeartbeat();
     await _session.leave();
+    // Best-effort and fire-and-forget: this client already disconnected.
+    if (channelId != null) unawaited(_forgetHeartbeat(channelId));
     state = const VoiceState();
   }
 
   /// Starts refreshing the server's proof that this call is still live, if
-  /// it is not running already. Idempotent so every `connected` transition
-  /// (including a mid-call reconnect) can call it without double-ticking.
+  /// it is not running already. Guarded rather than assumed single-fire: no
+  /// transition in this client re-emits `connected` after `join`'s own, but
+  /// the check costs nothing and removes the assumption that this stays true
+  /// forever from something that would otherwise double the interval the
+  /// moment it stopped holding.
   void _startHeartbeat(String? channelId) {
     if (_heartbeat != null || channelId == null) return;
     unawaited(_sendHeartbeat(channelId));
@@ -291,8 +303,17 @@ class VoiceController extends StateNotifier<VoiceState> {
   Future<void> _sendHeartbeat(String channelId) async {
     try {
       await _ref.read(apiProvider).sendVoiceHeartbeat(channelId);
-    } catch (_) {
-      // Best-effort: a missed beat only makes the server's own sweep notice sooner.
+    } catch (e) {
+      // Best-effort, but a run of failures is worth seeing in diagnostics.
+      _log('Voice heartbeat failed', detail: e);
+    }
+  }
+
+  Future<void> _forgetHeartbeat(String channelId) async {
+    try {
+      await _ref.read(apiProvider).forgetVoiceHeartbeat(channelId);
+    } catch (e) {
+      _log('Could not tell the server this call was left', detail: e);
     }
   }
 

@@ -24,11 +24,19 @@ use std::time::{Duration, Instant};
 
 use crate::ids::{ChannelId, UserId};
 
+/// Mirrors `voice_controller.dart`'s `voiceHeartbeatInterval` default. Kept as
+/// its own named constant, rather than a bare number folded into
+/// [`STALE_AFTER`], so that value is derived from this one at compile time
+/// instead of the two being tied only by two doc comments agreeing by luck.
+/// Still has to be updated by hand if the Dart default ever changes; deriving
+/// [`STALE_AFTER`] from it is what makes that the only number to change.
+const CLIENT_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
+
 /// How long a heartbeat may go unrefreshed before [`CallHeartbeats::sweep_stale`]
-/// gives it up. About 2.5x the client's own interval, so one dropped request
-/// under a flaky connection does not evict somebody still genuinely on the
-/// call; see `voice_controller.dart`'s `voiceHeartbeatInterval`.
-pub const STALE_AFTER: Duration = Duration::from_secs(40);
+/// gives it up. 8/3 of [`CLIENT_HEARTBEAT_INTERVAL`] (40s at the current
+/// 15s), so one dropped request under a flaky connection does not evict
+/// somebody still genuinely on the call.
+pub const STALE_AFTER: Duration = Duration::from_secs(CLIENT_HEARTBEAT_INTERVAL.as_secs() * 8 / 3);
 
 /// Tracks the last heartbeat seen for each `(user, channel)` voice session.
 #[derive(Clone, Default)]
@@ -166,6 +174,14 @@ mod tests {
         let past = start + STALE_AFTER + Duration::from_secs(1);
         assert_eq!(heartbeats.sweep_stale_at(STALE_AFTER, past).len(), 1);
         assert!(heartbeats.sweep_stale_at(STALE_AFTER, past).is_empty());
+    }
+
+    /// The derivation ties the two constants together, but not to any
+    /// particular ratio; this is what fails if the multiplier is ever
+    /// narrowed to something that no longer survives one missed beat.
+    #[test]
+    fn stale_after_leaves_real_margin_over_a_missed_client_beat() {
+        assert!(STALE_AFTER >= CLIENT_HEARTBEAT_INTERVAL * 2);
     }
 
     #[test]

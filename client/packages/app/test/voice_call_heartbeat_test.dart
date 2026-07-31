@@ -7,10 +7,19 @@
 /// connected, on an interval independent of the app's foreground state, so a
 /// heartbeat that stops arriving is what the server (`voice/heartbeat.rs`)
 /// treats as gone rather than waiting on the SFU's own reconnect grace.
+///
+/// Driven through `fake_async` rather than real wall-clock delays: a real
+/// `Timer.periodic` at a few milliseconds is schedulable flake on a loaded
+/// runner, and fake time makes every assertion below exact rather than
+/// merely probable.
 library;
 
+import 'dart:async';
+
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:slimm_rtc/rtc.dart';
 
 import 'voice_controller_harness.dart';
@@ -21,25 +30,33 @@ void main() {
 
   tearDown(harness.dispose);
 
-  Iterable<Uri> heartbeatsIn(List<Uri> requests) =>
-      requests.where((u) => u.path.endsWith('/voice/heartbeat'));
+  const interval = Duration(seconds: 15);
 
-  test(
-    'joining a call starts an immediate, then periodic, heartbeat',
-    () async {
-      final requests = <Uri>[];
+  Iterable<http.Request> heartbeatsIn(List<http.Request> requests) =>
+      requests.where(
+        (r) => r.method == 'POST' && r.url.path.endsWith('/voice/heartbeat'),
+      );
+
+  Iterable<http.Request> forgetsIn(List<http.Request> requests) =>
+      requests.where(
+        (r) => r.method == 'DELETE' && r.url.path.endsWith('/voice/heartbeat'),
+      );
+
+  test('joining a call starts an immediate, then periodic, heartbeat', () {
+    fakeAsync((async) {
+      final requests = <http.Request>[];
       final session = FakeSession();
       final controller = harness.controllerWith(
         session,
         voiceApi(onRequest: requests.add),
-        voiceHeartbeatInterval: const Duration(milliseconds: 15),
+        voiceHeartbeatInterval: interval,
       );
 
-      await controller.join('channel-1');
+      unawaited(controller.join('channel-1'));
+      async.flushMicrotasks();
       // Real room events drive this transition; the fake stands in for one.
       session.emitState(VoiceSessionState.connected);
-      // The first beat is fire-and-forget from that transition; let it land.
-      await Future<void>.delayed(Duration.zero);
+      async.flushMicrotasks();
       expect(
         heartbeatsIn(requests),
         isNotEmpty,
@@ -47,80 +64,101 @@ void main() {
       );
 
       final afterJoin = heartbeatsIn(requests).length;
-      await Future<void>.delayed(const Duration(milliseconds: 70));
+      async.elapse(interval * 2);
       expect(heartbeatsIn(requests).length, greaterThan(afterJoin));
-    },
-  );
-
-  test('leaving the call stops the heartbeat', () async {
-    final requests = <Uri>[];
-    final session = FakeSession();
-    final controller = harness.controllerWith(
-      session,
-      voiceApi(onRequest: requests.add),
-      voiceHeartbeatInterval: const Duration(milliseconds: 15),
-    );
-
-    await controller.join('channel-1');
-    session.emitState(VoiceSessionState.connected);
-    await Future<void>.delayed(Duration.zero);
-    await controller.leave();
-    final afterLeave = heartbeatsIn(requests).length;
-
-    await Future<void>.delayed(const Duration(milliseconds: 70));
-    expect(
-      heartbeatsIn(requests).length,
-      afterLeave,
-      reason: 'a clean leave must not keep proving a call that ended',
-    );
+    });
   });
 
-  test('a call the SFU drops stops the heartbeat', () async {
-    final requests = <Uri>[];
-    final session = FakeSession();
-    final controller = harness.controllerWith(
-      session,
-      voiceApi(onRequest: requests.add),
-      voiceHeartbeatInterval: const Duration(milliseconds: 15),
-    );
+  test('leaving the call stops the heartbeat and tells the server', () {
+    fakeAsync((async) {
+      final requests = <http.Request>[];
+      final session = FakeSession();
+      final controller = harness.controllerWith(
+        session,
+        voiceApi(onRequest: requests.add),
+        voiceHeartbeatInterval: interval,
+      );
 
-    await controller.join('channel-1');
-    session.emitState(VoiceSessionState.connected);
-    await Future<void>.delayed(Duration.zero);
-    session.dropWith(VoiceDisconnect.removed);
-    await Future<void>.delayed(Duration.zero);
-    final afterDrop = heartbeatsIn(requests).length;
+      unawaited(controller.join('channel-1'));
+      async.flushMicrotasks();
+      session.emitState(VoiceSessionState.connected);
+      async.flushMicrotasks();
+      unawaited(controller.leave());
+      async.flushMicrotasks();
 
-    await Future<void>.delayed(const Duration(milliseconds: 70));
-    expect(heartbeatsIn(requests).length, afterDrop);
+      expect(
+        forgetsIn(requests),
+        isNotEmpty,
+        reason:
+            'a clean leave must say so, or the server only finds out once '
+            'the entry goes stale and evicts a participant already gone',
+      );
+      final afterLeave = heartbeatsIn(requests).length;
+
+      async.elapse(interval * 2);
+      expect(
+        heartbeatsIn(requests).length,
+        afterLeave,
+        reason: 'a clean leave must not keep proving a call that ended',
+      );
+    });
   });
 
-  test('backgrounding the app does not pause the call heartbeat', () async {
-    addTearDown(
-      () => TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
-        AppLifecycleState.resumed,
-      ),
-    );
-    TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
-      AppLifecycleState.paused,
-    );
+  test('a call the SFU drops stops the heartbeat', () {
+    fakeAsync((async) {
+      final requests = <http.Request>[];
+      final session = FakeSession();
+      final controller = harness.controllerWith(
+        session,
+        voiceApi(onRequest: requests.add),
+        voiceHeartbeatInterval: interval,
+      );
 
-    final requests = <Uri>[];
-    final session = FakeSession();
-    final controller = harness.controllerWith(
-      session,
-      voiceApi(onRequest: requests.add),
-      voiceHeartbeatInterval: const Duration(milliseconds: 15),
-    );
+      unawaited(controller.join('channel-1'));
+      async.flushMicrotasks();
+      session.emitState(VoiceSessionState.connected);
+      async.flushMicrotasks();
+      session.dropWith(VoiceDisconnect.removed);
+      async.flushMicrotasks();
+      final afterDrop = heartbeatsIn(requests).length;
 
-    await controller.join('channel-1');
-    session.emitState(VoiceSessionState.connected);
-    await Future<void>.delayed(const Duration(milliseconds: 70));
+      async.elapse(interval * 2);
+      expect(heartbeatsIn(requests).length, afterDrop);
+    });
+  });
 
-    expect(
-      heartbeatsIn(requests).length,
-      greaterThanOrEqualTo(3),
-      reason: 'a real background call must keep proving it is alive',
-    );
+  test('backgrounding the app does not pause the call heartbeat', () {
+    fakeAsync((async) {
+      addTearDown(
+        () => TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
+        AppLifecycleState.paused,
+      );
+
+      final requests = <http.Request>[];
+      final session = FakeSession();
+      final controller = harness.controllerWith(
+        session,
+        voiceApi(onRequest: requests.add),
+        voiceHeartbeatInterval: interval,
+      );
+
+      unawaited(controller.join('channel-1'));
+      async.flushMicrotasks();
+      session.emitState(VoiceSessionState.connected);
+      async.flushMicrotasks();
+      async.elapse(interval * 2);
+
+      expect(
+        heartbeatsIn(requests).length,
+        3,
+        reason:
+            'a real background call must keep proving it is alive: one '
+            'immediate beat plus two periodic ticks over two full intervals',
+      );
+    });
   });
 }
