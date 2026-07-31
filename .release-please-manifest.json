@@ -1,4 +1,4 @@
 {
   "crates/slimm-server": "0.21.0",
-  "client": "0.17.0"
+  "client": "0.17.1"
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/NC1107/slim-m/compare/client-v0.17.0...client-v0.17.1) (2026-07-31)
+
+
+### Bug Fixes
+
+* **client:** shorten the direct messages empty state ([#243](https://github.com/NC1107/slim-m/issues/243)) ([bc2fdb5](https://github.com/NC1107/slim-m/commit/bc2fdb5aac9138f03524df98a3290c30393208bb))
+
 ## [0.17.0](https://github.com/NC1107/slim-m/compare/client-v0.16.0...client-v0.17.0) (2026-07-31)
 
 
