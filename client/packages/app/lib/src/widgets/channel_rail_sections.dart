@@ -112,7 +112,7 @@ class DirectMessagesSection extends StatelessWidget {
               vertical: AppSpacing.s4,
             ),
             child: Text(
-              'No other direct messages yet. Open one from a member in the list.',
+              'Start one from the member list.',
               style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
           )
