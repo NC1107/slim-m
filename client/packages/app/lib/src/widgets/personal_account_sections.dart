@@ -20,6 +20,7 @@ import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../providers/sync_controller.dart';
 import '../providers/user_profiles.dart';
+import '../providers/voice_controller.dart';
 import 'run_guarded.dart';
 import 'settings_section_header.dart';
 
@@ -340,13 +341,18 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
     );
     if (confirmed != true) return;
 
-    /// Both read before the request, and both restarted without consulting
-    /// [mounted]: what they undo is app-global, so navigating away from this
-    /// screen while the delete is in flight must not be what leaves sync
-    /// stopped and push unregistered for the rest of the process. Only the
-    /// error text is this widget's, and only that needs the guard.
+    /// All three read before the request, and sync and push restarted
+    /// without consulting [mounted]: what they undo is app-global, so
+    /// navigating away from this screen while the delete is in flight must
+    /// not be what leaves sync stopped and push unregistered for the rest of
+    /// the process. Only the error text is this widget's, and only that needs
+    /// the guard. The call is deliberately not rejoined on failure: being in
+    /// one is an active choice, not state to restore behind somebody's back.
+    final voice = ref.read(voiceControllerProvider.notifier);
     final sync = ref.read(syncControllerProvider.notifier);
     final push = ref.read(pushControllerProvider.notifier);
+    // Otherwise a live call keeps heartbeating a session about to be deleted.
+    await voice.leave();
     await sync.stop();
     await push.unregister();
     try {
@@ -379,7 +385,13 @@ class SignOutRow extends ConsumerWidget {
 
   /// Push is unregistered before the session goes, or this device keeps waking
   /// for an account that is no longer signed in on it.
+  ///
+  /// A live call is left first for the same reason: `voiceControllerProvider`
+  /// is app-lifetime, not scoped to a session, so nothing else would ever
+  /// stop it POSTing a heartbeat, on a cleared session, for the rest of the
+  /// process's life.
   static Future<void> signOut(WidgetRef ref) async {
+    await ref.read(voiceControllerProvider.notifier).leave();
     await ref.read(syncControllerProvider.notifier).stop();
     await ref.read(pushControllerProvider.notifier).unregister();
     try {

@@ -122,6 +122,44 @@ void main() {
     },
   );
 
+  testWidgets(
+    'a fresh relaunch does not render this device as already in the call '
+    'it was just killed out of',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          httpClient: MockClient((request) async {
+            if (request.url.path == _rosterPath) {
+              // The server has not reaped this client's own dead connection.
+              return http.Response(
+                jsonEncode({
+                  'participants': [
+                    {'user_id': 'u-me', 'display_name': 'Me'},
+                  ],
+                }),
+                200,
+              );
+            }
+            return http.Response('', 404);
+          }),
+          // A genuinely fresh launch: idle, not connected anywhere.
+          voice: const VoiceState(),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        _trailingCount(tester),
+        isNull,
+        reason:
+            'this device is not in the call; the roster reporting its '
+            'own stale entry must not be read as though it were',
+      );
+      expect(find.byType(AuthorAvatar), findsNothing);
+    },
+  );
+
   testWidgets('a genuinely empty room shows no count, same as an unknown one', (
     tester,
   ) async {

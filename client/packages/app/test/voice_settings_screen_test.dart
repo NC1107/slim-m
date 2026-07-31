@@ -253,6 +253,8 @@ void main() {
         )
         .tween;
     expect(tween.end, 82.0);
+    // Clears the heartbeat timer a connected call now keeps running.
+    await controller.leave();
   });
 
   testWidgets('picking a screen share quality persists it', (tester) async {

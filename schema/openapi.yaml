@@ -2343,6 +2343,80 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /channels/{channelId}/voice/heartbeat:
+    post:
+      operationId: sendVoiceHeartbeat
+      tags: [voice]
+      summary: Refresh proof that the caller is still on this channel's call.
+      description: >
+        Requires `VIEW_CHANNEL` and `CONNECT`, the same gate minting a token
+        needs: a heartbeat for a room the caller could not have joined proves
+        nothing.
+
+
+        A LiveKit room eventually reaps a connection that vanished without a
+        clean close on its own, but that timing is the SFU's, not this
+        server's to promise. A client still on the call sends this on a plain
+        interval, independent of whether the app is foregrounded, so a
+        genuinely backgrounded call is never mistaken for a dead one; a
+        terminated app simply stops, and once its last heartbeat is old
+        enough the server evicts it from the room itself rather than waiting
+        on the SFU's own default.
+
+
+        Idempotent: repeating it only pushes the deadline further out.
+
+
+        A 501 means this deployment has no SFU configured.
+      parameters:
+        - $ref: "#/components/parameters/ChannelId"
+      responses:
+        "204":
+          description: The heartbeat was recorded.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "501":
+          description: This deployment has no voice configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: forgetVoiceHeartbeat
+      tags: [voice]
+      summary: Tell the server this call was left cleanly.
+      description: >
+        No permission gate beyond authentication, unlike every other voice
+        route: forgetting a caller's own liveness marker exposes nothing
+        about the channel it names, so there is nothing here for a
+        permission check to protect and a permission revoked mid-call must
+        not be what blocks a client's own cleanup.
+
+
+        Meant to be sent once, right after leaving a call, so the server
+        drops the entry immediately rather than leaving it for the sweep to
+        rediscover once it goes stale and evict a participant who already
+        disconnected on their own. Idempotent, and answers the same way on a
+        deployment with no SFU configured or a channel that does not exist:
+        there is never anything to forget either way.
+      parameters:
+        - $ref: "#/components/parameters/ChannelId"
+      responses:
+        "204":
+          description: The heartbeat entry was dropped, or there was none to drop.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /channels/{channelId}/voice/roster:
     get:
       operationId: listVoiceRoster

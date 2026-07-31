@@ -6,7 +6,7 @@ part of 'client.dart';
 extension SlimmApiVoice on SlimmApi {
   /// Mints a join token for a channel's voice room.
   ///
-  /// Throws [NotImplementedException] when the deployment has no SFU, which is
+  /// Throws [NotConfiguredException] when the deployment has no SFU, which is
   /// a supported way to run text-only rather than a fault, so a caller should
   /// hide voice rather than retry.
   Future<VoiceToken> voiceToken(String channelId) async {
@@ -23,6 +23,33 @@ extension SlimmApiVoice on SlimmApi {
   Future<void> kickVoiceParticipant(String channelId, String userId) => _send(
         'POST',
         '/channels/$channelId/voice/participants/$userId/kick',
+        expectNoContent: true,
+      );
+
+  /// Refreshes proof that this client is still on a channel's call.
+  ///
+  /// Idempotent, and meant to be sent on a plain interval for as long as the
+  /// call is connected: a heartbeat that stops arriving is what the server
+  /// uses to bound how long a terminated app can leave a ghost participant
+  /// behind, rather than waiting on the SFU's own default. Throws
+  /// [NotConfiguredException] when the deployment has no SFU.
+  Future<void> sendVoiceHeartbeat(String channelId) => _send(
+        'POST',
+        '/channels/$channelId/voice/heartbeat',
+        expectNoContent: true,
+      );
+
+  /// Tells the server this client left a channel's call cleanly, so its
+  /// heartbeat entry is dropped now rather than left for the server's sweep
+  /// to rediscover once it goes stale and call the SFU about a participant
+  /// who already disconnected on their own.
+  ///
+  /// Best-effort by the caller's own convention, same as [sendVoiceHeartbeat]:
+  /// if this never lands, the sweep still cleans up in time, just later and
+  /// with a wasted RPC on the server's side.
+  Future<void> forgetVoiceHeartbeat(String channelId) => _send(
+        'DELETE',
+        '/channels/$channelId/voice/heartbeat',
         expectNoContent: true,
       );
 

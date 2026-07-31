@@ -32,7 +32,11 @@ enum VoiceDisconnect {
   /// allows one connection per identity and evicts the older one.
   replacedByOtherDevice,
 
-  /// A moderator removed this participant, or the room went away.
+  /// A moderator removed this participant, the room went away, or the
+  /// server's own liveness sweep decided this connection had gone stale.
+  /// One LiveKit reason covers all three, so the message below must not
+  /// claim it was a moderator specifically - that would be true for a kick
+  /// and false for the other two.
   removed,
 
   /// The connection dropped and reconnecting did not recover it.
@@ -45,7 +49,7 @@ enum VoiceDisconnect {
   String get message => switch (this) {
         replacedByOtherDevice =>
           'You joined this call from another device, so this one left it.',
-        removed => 'You were removed from the call.',
+        removed => "You're no longer in this call.",
         connectionLost => 'The call disconnected and could not reconnect.',
         unknown => 'The call ended unexpectedly.',
       };
