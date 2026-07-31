@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.21.0](https://github.com/NC1107/slim-m/compare/server-v0.20.0...server-v0.21.0) (2026-07-31)
+
+
+### Features
+
+* **server:** a message op stream for edits and deletes ([#235](https://github.com/NC1107/slim-m/issues/235)) ([b686736](https://github.com/NC1107/slim-m/commit/b68673696f196440296075554f6e40f2b981ae02))
+* **server:** carry message ops on /sync and the two live frames ([#237](https://github.com/NC1107/slim-m/issues/237)) ([16ecb5f](https://github.com/NC1107/slim-m/commit/16ecb5f369b94292237ffb3edc8e845a249cfd04))
+
+
+### Bug Fixes
+
+* **server:** withhold the canvas moderator's id from the ops feed ([#233](https://github.com/NC1107/slim-m/issues/233)) ([e2e9063](https://github.com/NC1107/slim-m/commit/e2e9063cb697b0167578af93039a4c7dd93d2655))
+
 ## [0.20.0](https://github.com/NC1107/slim-m/compare/server-v0.19.0...server-v0.20.0) (2026-07-31)
 
 
