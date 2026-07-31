@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/widgets/rail_call_summary.dart';
 import 'package:slimm_app/src/widgets/voice_strip_indicator.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -39,6 +40,8 @@ Future<void> _expectStrip(
   required VoiceState voice,
   required bool visible,
   Size size = const Size(390, 844),
+  // The rail folds a call elsewhere into RailCallSummary, not a second strip.
+  Type indicator = VoiceStripIndicator,
 }) async {
   final fixture = await fixtureContainer(
     extraOverrides: [
@@ -63,10 +66,7 @@ Future<void> _expectStrip(
   );
   await tester.pump(const Duration(milliseconds: 350));
 
-  expect(
-    find.byType(VoiceStripIndicator),
-    visible ? findsOneWidget : findsNothing,
-  );
+  expect(find.byType(indicator), visible ? findsOneWidget : findsNothing);
 
   await teardownFixture(tester, fixture.container, fixture.db);
 }
@@ -115,19 +115,21 @@ void main() {
   group('wide layout, rail beside the conversation', () {
     const wide = Size(1400, 880);
 
-    testWidgets('the rail shows the strip for a call elsewhere', (
-      tester,
-    ) async {
-      await _expectStrip(
-        tester,
-        '/channels/c-general',
-        voice: inMainCall,
-        visible: true,
-        size: wide,
-      );
-    });
+    testWidgets(
+      "the rail's footer folds in a call summary for a call elsewhere",
+      (tester) async {
+        await _expectStrip(
+          tester,
+          '/channels/c-general',
+          voice: inMainCall,
+          visible: true,
+          size: wide,
+          indicator: RailCallSummary,
+        );
+      },
+    );
 
-    testWidgets('the rail hides it while viewing the call itself', (
+    testWidgets('the footer hides the call summary while viewing it', (
       tester,
     ) async {
       await _expectStrip(
@@ -136,6 +138,7 @@ void main() {
         voice: inMainCall,
         visible: false,
         size: wide,
+        indicator: RailCallSummary,
       );
     });
   });

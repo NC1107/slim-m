@@ -129,14 +129,15 @@ class HomeShell extends ConsumerWidget {
           width: AppMemberPane.width,
           child: SafeArea(child: AppMemberPane()),
         ),
-        // No rail here either, so the connection bar mounts under the app bar.
-        body: Column(
-          children: [
-            const RailConnectionBar(),
-            Expanded(child: child),
-            if (showVoiceStrip)
-              const SafeArea(top: false, child: VoiceStripIndicator()),
-          ],
+        // No rail here, so the connection bar mounts under the app bar; one SafeArea wraps the whole column, so no child insets itself and opens a gap or a dead band.
+        body: SafeArea(
+          child: Column(
+            children: [
+              const RailConnectionBar(),
+              Expanded(child: child),
+              if (showVoiceStrip) const VoiceStripIndicator(),
+            ],
+          ),
         ),
       );
     } else {

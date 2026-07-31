@@ -10,15 +10,22 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
-import '../providers/admin_providers.dart';
 import '../providers/member_presence.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
 import '../providers/voice_controller.dart';
+import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import 'presence_menu.dart';
-import 'space_settings_section.dart';
+import 'rail_call_summary.dart';
+import 'space_menu_button.dart';
+
+/// Whether this rail has content beside it, so its own right edge is never
+/// the physical screen edge: true at every width the app shows it beside a
+/// conversation, false for the one compact case where it fills the screen.
+bool _railHasNeighbour(BuildContext context) =>
+    LayoutClass.of(context).showsBothPanes;
 
 /// The server's own identity, for the header's name line. Real endpoint;
 /// there is no separate per-deployment "workspace name" concept, so this is
@@ -44,6 +51,8 @@ class RailHeader extends ConsumerWidget {
       ),
       child: SafeArea(
         bottom: false,
+        // Right is only the physical edge when nothing sits beside the rail.
+        right: !_railHasNeighbour(context),
         child: SizedBox(
           height: 52,
           child: Padding(
@@ -78,73 +87,10 @@ class RailHeader extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const _SpaceMenuButton(),
+                const SpaceMenuButton(),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Hidden entirely for a caller holding none of [spaceSettingsReachable]'s
-/// gating bits: its one item today is Space settings, and a member who
-/// cannot reach that screen must not be offered a menu that opens onto it
-/// empty. A future item unrelated to permission would need this reconsidered.
-class _SpaceMenuButton extends ConsumerStatefulWidget {
-  const _SpaceMenuButton();
-
-  @override
-  ConsumerState<_SpaceMenuButton> createState() => _SpaceMenuButtonState();
-}
-
-class _SpaceMenuButtonState extends ConsumerState<_SpaceMenuButton> {
-  final _controller = OverlayPortalController();
-  final _link = LayerLink();
-
-  @override
-  Widget build(BuildContext context) {
-    final permissions = ref.watch(myPermissionsProvider);
-    if (!spaceSettingsReachable(permissions)) return const SizedBox.shrink();
-
-    return CompositedTransformTarget(
-      link: _link,
-      child: OverlayPortal(
-        controller: _controller,
-        // Positioned so the follower sizes to its content: an overlay child is
-        // otherwise laid out against the whole screen, which a Column fills.
-        overlayChildBuilder: (context) => Positioned(
-          left: 0,
-          top: 0,
-          child: CompositedTransformFollower(
-            link: _link,
-            showWhenUnlinked: false,
-            targetAnchor: Alignment.bottomRight,
-            followerAnchor: Alignment.topRight,
-            offset: const Offset(0, 4),
-            child: TapRegion(
-              onTapOutside: (_) => _controller.hide(),
-              child: AppMenu(
-                width: 200,
-                children: [
-                  AppMenuItem(
-                    label: 'Space settings',
-                    leading: AppIcons.settings,
-                    onTap: () {
-                      _controller.hide();
-                      context.push(Routes.spaceSettings);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        child: AppIconButton(
-          icon: AppIcons.chevronDown,
-          semanticLabel: 'Space menu',
-          onPressed: _controller.toggle,
         ),
       ),
     );
@@ -216,7 +162,14 @@ class RailConnectionBar extends ConsumerWidget {
 }
 
 class RailUserFooter extends ConsumerWidget {
-  const RailUserFooter({super.key});
+  const RailUserFooter({super.key, this.activeChannelId});
+
+  /// The channel currently shown beside or instead of this rail. A call
+  /// already live in that channel has its own full call UI, so the footer's
+  /// call-elsewhere row (name, duration, leave) is gated on this; mic and
+  /// deafen are not, since they control whichever call is live regardless of
+  /// which channel is on screen.
+  final String? activeChannelId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -227,6 +180,10 @@ class RailUserFooter extends ConsumerWidget {
     final voice = ref.watch(voiceControllerProvider);
     final voiceController = ref.read(voiceControllerProvider.notifier);
     final inCall = voice.state == VoiceSessionState.connected;
+    // A call in the channel already on screen has its own full call UI.
+    final callChannelId = voice.channelId;
+    final inCallElsewhere =
+        inCall && callChannelId != null && callChannelId != activeChannelId;
 
     // A disconnected device reports its connection instead of the chosen
     // status: claiming "online" while nothing is arriving would be a lie.
@@ -245,60 +202,82 @@ class RailUserFooter extends ConsumerWidget {
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 56,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 10, 0),
-            child: Row(
+        right: !_railHasNeighbour(context),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
+          // The call-elsewhere row grows the footer rather than sharing the identity row's width; see RailCallSummary's own doc for why.
+          child: AnimatedSize(
+            duration: AppMotion.reduced(context, AppMotion.base),
+            curve: AppMotion.entrance,
+            alignment: Alignment.topCenter,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                PresenceMenuButton(presence: presence),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        me.valueOrNull?.displayName ?? '',
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.ui.copyWith(
-                          color: tokens.textPrimary,
-                          fontWeight: AppWeights.medium,
-                          height: 1.25,
-                        ),
+                Row(
+                  children: [
+                    PresenceMenuButton(presence: presence),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            me.valueOrNull?.displayName ?? '',
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.ui.copyWith(
+                              color: tokens.textPrimary,
+                              fontWeight: AppWeights.medium,
+                              height: 1.25,
+                            ),
+                          ),
+                          Text(
+                            statusLabel,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.micro.copyWith(
+                              color: tokens.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        statusLabel,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.micro.copyWith(
-                          color: tokens.textSecondary,
-                        ),
-                      ),
-                    ],
+                    ),
+                    AppIconButton(
+                      icon: voice.microphoneEnabled
+                          ? AppIcons.mic
+                          : AppIcons.micOff,
+                      semanticLabel: voice.microphoneEnabled
+                          ? 'Mute'
+                          : 'Unmute',
+                      tooltip: inCall ? null : 'Not in a call',
+                      onPressed: inCall
+                          ? voiceController.toggleMicrophone
+                          : null,
+                    ),
+                    // Same icon either way, the toggle carried by `active`:
+                    // there is no dedicated "deafened" glyph in AppIcons.
+                    AppIconButton(
+                      icon: AppIcons.headphones,
+                      semanticLabel: voice.deafened ? 'Undeafen' : 'Deafen',
+                      active: voice.deafened,
+                      tooltip: inCall ? null : 'Not in a call',
+                      onPressed: inCall ? voiceController.toggleDeafen : null,
+                    ),
+                    AppIconButton(
+                      icon: AppIcons.settings,
+                      semanticLabel: 'Personal settings',
+                      onPressed: () => context.push(Routes.personalSettings),
+                    ),
+                  ],
+                ),
+                if (inCallElsewhere) ...[
+                  const SizedBox(height: 6),
+                  RailCallSummary(
+                    channelId: callChannelId,
+                    connectedAt: voice.connectedAt,
+                    screenSharing: voice.screenSharing,
+                    onLeave: voiceController.leave,
                   ),
-                ),
-                AppIconButton(
-                  icon: voice.microphoneEnabled
-                      ? AppIcons.mic
-                      : AppIcons.micOff,
-                  semanticLabel: voice.microphoneEnabled ? 'Mute' : 'Unmute',
-                  tooltip: inCall ? null : 'Not in a call',
-                  onPressed: inCall ? voiceController.toggleMicrophone : null,
-                ),
-                // Same icon either way, the toggle carried by `active`: there
-                // is no dedicated "deafened" glyph in AppIcons.
-                AppIconButton(
-                  icon: AppIcons.headphones,
-                  semanticLabel: voice.deafened ? 'Undeafen' : 'Deafen',
-                  active: voice.deafened,
-                  tooltip: inCall ? null : 'Not in a call',
-                  onPressed: inCall ? voiceController.toggleDeafen : null,
-                ),
-                AppIconButton(
-                  icon: AppIcons.settings,
-                  semanticLabel: 'Personal settings',
-                  onPressed: () => context.push(Routes.personalSettings),
-                ),
+                ],
               ],
             ),
           ),
