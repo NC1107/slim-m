@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The message write and read paths: send, edit, delete, list, and full-text
-//! search, all over embedded SQLite.
+//! The message write and read paths: send, edit, delete and list, over
+//! embedded SQLite. Full-text search is [`super::message_search`].
 //!
 //! Two invariants live here and are covered by tests:
 //!
@@ -20,6 +20,7 @@ use anyhow::Context;
 use sqlx::SqliteExecutor;
 
 use super::attachments::{LinkError, link_attachments, release_message_attachments};
+use super::message_ops::insert_message_op;
 use super::{Message, Store, now_ms};
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
@@ -80,33 +81,30 @@ pub struct MessageDeletion {
     /// delete the backing files, which is filesystem I/O kept outside the
     /// transaction that removed the rows.
     pub freed_attachments: Vec<String>,
+    /// The op stream seq this delete allocated, absent when it deleted
+    /// nothing. A 200 does not imply the cursor advanced.
+    pub op_seq: Option<i64>,
 }
 
-/// Why a full-text search failed.
-#[derive(Debug)]
-pub enum SearchError {
-    /// `q` is not valid FTS5 query syntax: an unterminated quote, a dangling
-    /// operator, or an unknown column filter. FTS5 has no separate parse step
-    /// sqlx can check ahead of time, so SQLite only reports this once the
-    /// statement runs, and that is where this is caught rather than in
-    /// up-front input validation.
-    InvalidQuery,
-    Internal(anyhow::Error),
-}
-
-impl From<sqlx::Error> for SearchError {
-    fn from(err: sqlx::Error) -> Self {
-        if let sqlx::Error::Database(ref db_err) = err {
-            let message = db_err.message();
-            if message.contains("fts5")
-                || message.contains("unterminated string")
-                || message.contains("no such column")
-            {
-                return SearchError::InvalidQuery;
-            }
-        }
-        SearchError::Internal(err.into())
-    }
+/// What one edit actually did.
+///
+/// Three ways rather than two, because "no such message" and "the content was
+/// already exactly this" need different answers from the caller: only a real
+/// change publishes an event, and only a real change allocates an op seq. An
+/// edit that changes nothing writing no op row is what keeps the op stream
+/// dense, which is what makes a client's `n + 1` a fact rather than a guess.
+#[derive(Debug, Clone)]
+pub enum Edited {
+    /// No live message with that id.
+    Gone,
+    /// The stored content was already byte-identical, so nothing was written:
+    /// no op row, no seq, and `edited_at` is left where it was. The caller
+    /// asked for a state and got it, so this is a 200 rather than an error.
+    Unchanged(Message),
+    Edited {
+        message: Message,
+        op_seq: i64,
+    },
 }
 
 impl Store {
@@ -227,21 +225,45 @@ impl Store {
         &self,
         id: MessageId,
         content: &str,
-    ) -> anyhow::Result<Option<Message>> {
+        actor_id: UserId,
+    ) -> anyhow::Result<Edited> {
+        let mut tx = self.begin_write().await?;
+        let existing = sqlx::query!(
+            r#"SELECT content AS "content!: String", channel_id AS "channel_id!: ChannelId"
+               FROM messages WHERE id = ? AND deleted_at IS NULL"#,
+            id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some(existing) = existing else {
+            tx.commit().await?;
+            return Ok(Edited::Gone);
+        };
+        if existing.content == content {
+            tx.commit().await?;
+            let message = fetch_message(&self.pool, id)
+                .await?
+                .context("a message read inside the transaction vanished after it")?;
+            return Ok(Edited::Unchanged(message));
+        }
+
         let now = now_ms();
-        let affected = sqlx::query!(
-            "UPDATE messages SET content = ?, edited_at = ? WHERE id = ? AND deleted_at IS NULL",
+        sqlx::query!(
+            "UPDATE messages SET content = ?, edited_at = ? WHERE id = ?",
             content,
             now,
             id
         )
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
-        if affected == 0 {
-            return Ok(None);
-        }
-        fetch_message(&self.pool, id).await
+        .execute(&mut *tx)
+        .await?;
+        let op_seq =
+            insert_message_op(&mut tx, existing.channel_id, id, "edit", actor_id, now).await?;
+        tx.commit().await?;
+
+        let message = fetch_message(&self.pool, id)
+            .await?
+            .context("a message this transaction just edited vanished after it")?;
+        Ok(Edited::Edited { message, op_seq })
     }
 
     /// Soft-deletes a message and releases its attachments. Returns whether
@@ -255,27 +277,33 @@ impl Store {
     /// that deleted it. Releasing the attachment links happens in the same
     /// transaction, so a message can never end up soft-deleted while still
     /// holding live attachment references.
-    pub async fn delete_message(&self, id: MessageId) -> anyhow::Result<MessageDeletion> {
+    pub async fn delete_message(
+        &self,
+        id: MessageId,
+        actor_id: UserId,
+    ) -> anyhow::Result<MessageDeletion> {
         let mut tx = self.begin_write().await?;
         let now = now_ms();
-        let affected = sqlx::query!(
-            "UPDATE messages SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+        let channel_id = sqlx::query_scalar!(
+            r#"UPDATE messages SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL
+               RETURNING channel_id AS "channel_id!: ChannelId""#,
             now,
             id
         )
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
-        if affected == 0 {
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some(channel_id) = channel_id else {
             tx.commit().await?;
             return Ok(MessageDeletion::default());
-        }
+        };
 
+        let op_seq = insert_message_op(&mut tx, channel_id, id, "delete", actor_id, now).await?;
         let freed_attachments = release_message_attachments(&mut tx, id).await?;
         tx.commit().await?;
         Ok(MessageDeletion {
             deleted: true,
             freed_attachments,
+            op_seq: Some(op_seq),
         })
     }
 
@@ -301,74 +329,6 @@ impl Store {
                WHERE m.channel_id = ? AND m.deleted_at IS NULL AND m.seq < ?
                ORDER BY m.seq DESC
                LIMIT ?"#,
-            channel_id,
-            before,
-            limit
-        )
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(rows)
-    }
-
-    /// Full-text searches one channel's live messages, newest match first,
-    /// keyset-paginated on `seq` exactly like [`Store::list_messages`].
-    ///
-    /// `query` reaches FTS5 close to as-is, so a caller may use its mini query
-    /// language (`AND`/`OR`/`NOT`, `"phrase"`, a trailing `*` prefix). That is
-    /// safe against leaking another channel: the index has exactly one column
-    /// (`content`), so a query string has no other column to pivot to, and
-    /// the channel and `deleted_at` restriction below are ordinary SQL
-    /// predicates the query text can never reach - never part of the `MATCH`
-    /// expression itself, so nothing in `query` can widen or redirect them.
-    ///
-    /// The FTS index is reindexed on every `UPDATE` to `messages`, including a
-    /// soft delete, and that trigger does not itself drop a deleted row (only
-    /// an encrypted one is excluded); this filters `deleted_at IS NULL`
-    /// explicitly rather than relying on the index to have dropped it.
-    ///
-    /// A malformed `query` must fail rather than come back empty, which is why
-    /// the body opens with a join-free probe against the index. The real query
-    /// joins to `messages` and filters by channel, and when that join has no
-    /// candidate rows (an empty or brand-new channel) SQLite's planner can
-    /// prove the whole result is empty without ever calling into FTS5's query
-    /// parser - so a bad query would slip through as a silent empty result.
-    /// The probe has nothing to join against, so FTS5 must parse `query` to
-    /// answer it at all, and a bad one fails there every time regardless of
-    /// how many rows exist.
-    pub async fn search_messages(
-        &self,
-        channel_id: ChannelId,
-        query: &str,
-        before_seq: Option<i64>,
-        limit: i64,
-    ) -> Result<Vec<Message>, SearchError> {
-        // Join-free probe so FTS5 must parse `query`; see the note on this
-        // function. Not removable as dead work.
-        sqlx::query_scalar!(
-            r#"SELECT 1 AS "one!: i64" FROM messages_fts WHERE messages_fts MATCH ? LIMIT 1"#,
-            query
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        let before = before_seq.unwrap_or(i64::MAX);
-        let rows = sqlx::query_as!(
-            Message,
-            r#"SELECT m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
-                      m.author_id AS "author_id: UserId",
-                      u.display_name AS "author_display_name?: String",
-                      m.seq AS "seq!: Seq",
-                      m.content AS "content!", m.created_at AS "created_at!", m.edited_at
-               FROM messages_fts
-               JOIN messages m ON m.fts_rowid = messages_fts.rowid
-               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
-               WHERE messages_fts MATCH ?
-                 AND m.channel_id = ?
-                 AND m.deleted_at IS NULL
-                 AND m.seq < ?
-               ORDER BY m.seq DESC
-               LIMIT ?"#,
-            query,
             channel_id,
             before,
             limit

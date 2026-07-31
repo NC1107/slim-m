@@ -25,6 +25,7 @@ use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
 use slimm_server::ids::MessageId;
+use slimm_server::ids::UserId;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
@@ -75,14 +76,15 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-/// Registers `username` and returns its access token.
-async fn register(store: &Store, username: &str) -> String {
+/// Registers `username` and returns its access token and its own id.
+async fn register(store: &Store, username: &str) -> (String, UserId) {
     let user = store.create_user(username, username).await.unwrap();
-    store
+    let token = store
         .open_session(user.id, "device")
         .await
         .unwrap()
-        .access_token
+        .access_token;
+    (token, user.id)
 }
 
 /// Without the fix this is a 500: the probe saw only live rows, so a retry
@@ -100,7 +102,7 @@ async fn a_retry_after_the_message_was_deleted_is_still_idempotent() {
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
     let app = app(store.clone());
-    let token = register(&store, "alice").await;
+    let (token, alice) = register(&store, "alice").await;
 
     let body = json!({
         "id": Uuid::now_v7().to_string(),
@@ -118,7 +120,7 @@ async fn a_retry_after_the_message_was_deleted_is_still_idempotent() {
     let message_id = json_body(first).await["id"].as_str().unwrap().to_owned();
 
     store
-        .delete_message(MessageId(Uuid::parse_str(&message_id).unwrap()))
+        .delete_message(MessageId(Uuid::parse_str(&message_id).unwrap()), alice)
         .await
         .unwrap();
 
@@ -150,8 +152,8 @@ async fn a_reused_id_from_another_author_is_still_refused() {
         .unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
     let app = app(store.clone());
-    let alice = register(&store, "alice").await;
-    let bob = register(&store, "bob").await;
+    let (alice, _) = register(&store, "alice").await;
+    let (bob, _) = register(&store, "bob").await;
 
     let body = json!({
         "id": Uuid::now_v7().to_string(),
