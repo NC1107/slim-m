@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.19.0](https://github.com/NC1107/slim-m/compare/server-v0.18.5...server-v0.19.0) (2026-07-31)
+
+
+### Features
+
+* a personal space, opened by DMing yourself ([#204](https://github.com/NC1107/slim-m/issues/204)) ([951d1b3](https://github.com/NC1107/slim-m/commit/951d1b341ebc3e7c1985211407ec05e9ce44e1f1))
+* **server:** the canvas op stream, its catch-up feed, and one snapshot for the viewport read ([#218](https://github.com/NC1107/slim-m/issues/218)) ([ba79c07](https://github.com/NC1107/slim-m/commit/ba79c07107fab29b0de531ae116dd7d4ecdd2e9c))
+
+
+### Bug Fixes
+
+* a relaunched client no longer shows itself as still on a call ([#205](https://github.com/NC1107/slim-m/issues/205)) ([2aa141d](https://github.com/NC1107/slim-m/commit/2aa141dafc3861be4cdae859a5c95237fdb8bde7))
+* **server:** four correctness findings in fan-out, presence, devices and member count ([#210](https://github.com/NC1107/slim-m/issues/210)) ([dbe65c3](https://github.com/NC1107/slim-m/commit/dbe65c3abe00b0eaca25fe7b49d0df312e9f9c8e))
+
 ## [0.18.5](https://github.com/NC1107/slim-m/compare/server-v0.18.4...server-v0.18.5) (2026-07-31)
 
 
