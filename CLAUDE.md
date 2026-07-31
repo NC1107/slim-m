@@ -12,6 +12,72 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## Reconciling an edit nobody was online for (2026-07-31)
+
+The project's oldest recorded correctness debt, closed across four PRs: #235 (the op stream), #236 (the client's cursor and models), #237 (the wire), #238 (applying them).
+Read this before touching `/sync`, `message_ops`, or `SyncController`'s catch-up.
+
+**The debt was structural, not a missing feature.**
+`messages.seq` is allocated once at creation and never moves, so a cursor over it can only ever report messages that did not exist last time.
+An edit changes content in place and a delete sets `deleted_at`, and neither is visible to a `seq > cursor` read at any later point, so a stale local copy stayed stale until something wiped the whole channel.
+
+**The spine is `canvas_ops` transplanted, and it transplants almost exactly.**
+`message_ops` is a second, independent sequence over the same channel, dense over the ops it carries, which is what makes `after_op_seq` a real cursor and `seq == cursor + 1` a legitimate gap detector rather than a guess.
+Density holds because every real mutation allocates exactly one seq and writes exactly one row in the same transaction.
+
+**Four places it deliberately diverges from the canvas, each for a reason worth keeping.**
+It rides `POST /sync` rather than taking its own route, which is the *opposite* of the canvas decision and for the opposite reason: the canvas cursor belongs to an open pane most clients never open, while the message cursor is already in `/sync` for exactly these channels and a per-channel route would make a reconnect N requests.
+There are no op ids, because there is no batch verb here and each of edit and delete is already exactly-once by its `WHERE ... AND deleted_at IS NULL` claim.
+The actor is stored and **never** put on the wire, closing rather than copying the contradiction the canvas shipped (see below).
+And there is no `create` op: `messages.seq` already is the ordering authority for creates, and a second authority over one fact is the seam the canvas's own module doc names as its worst residual.
+
+**The visible behaviour change is that a no-op edit stops being an edit.**
+An edit whose content is byte-identical writes no op row, allocates no seq, leaves `edited_at` alone and publishes nothing, where today it marked the message "(edited)".
+That is not tidiness: a seq allocated for a mutation nobody made is a hole no op row would ever carry, and the client's adjacency test would report a gap on every poll forever.
+`edit_message` answers three ways rather than two for this, and moved under `begin_write` since it now reads before it writes.
+
+**The nullability of the client's `opCursor` is the whole mechanism.**
+Null means "adopt whatever head the next response reports"; zero means "caught up with a stream that has never had an op".
+There is no in-band integer that could carry the first, and conflating them is what makes a future server-side sweep unrecoverable - the client would ask from 0 forever and a swept server could only answer reset.
+`resetChannel` clears it to null rather than lowering it to zero, in the method whose name makes that easiest to forget.
+
+**The one line that could have wiped every existing client's cache.**
+A scope whose request carries no `after_op_seq` is never evaluated for an op gap.
+That is what every older client sends and what a newer one sends before adopting a head, and evaluating the gap unconditionally would set `reset` for all of them on the first connect after deploy.
+It looks exactly like a simplification; `an_old_client_sending_no_op_cursor_gets_no_ops_and_no_reset` is what fails.
+
+**An op gap sets the existing `reset`, not a flag of its own**, because the client's recovery is identical whichever cursor could not be answered.
+Three triggers, evaluated per page: a gap past `OP_SNAPSHOT_GAP`, a cursor below the retained floor (unreachable today since nothing sweeps, shipped so a sweep needs no wire change), and **a cursor past the head**, which is what a Litestream restore produces and what a client stalls on silently and forever otherwise.
+
+**Within a page only the last edit naming a message carries content.**
+Content is the message's *current* text joined at read time, so a message edited 500 times would be 500 copies of one string.
+A collapsed op is blanked, never dropped: it keeps its seq and its row, so the cursor advances through it and the `+1` adjacency across a page boundary is untouched.
+
+**`SYNC_RESPONSE_BYTES` bounds both halves together**, since what a client holds is the sum.
+The message half never had a byte ceiling at all: 500 rows at 4000 characters was already an 8 MB response before ops existed.
+The first op is always admitted however little budget is left, or one over-large message stalls the cursor forever - a livelock rather than a slow sync.
+
+**An unknown op kind resets rather than being skipped.**
+Skipping advances the cursor past a change never made locally, leaving a stale copy nothing would ever correct, which is the exact failure the whole surface exists to prevent.
+`MessageUnknownOp` exists as a value for that reason, mirroring `CanvasUnknownOp`.
+
+**drift v7 wipes the message cache once, and the `from < 7` is load-bearing.**
+Edits and deletes from before the server had an op stream are unrecoverable by any mechanism, since no cursor reaches behind the first op ever written.
+A v3-to-v6 client has already taken v3's wipe, so scoping this one to v3's versions would leave every one of them stale forever; `migration_v7_test.dart` seeds **version 6** specifically for that.
+
+**A contradiction the canvas shipped, found and not copied.**
+`Event::CanvasObjectsRemoved`'s doc says the actor is "deliberately absent, so a moderation act does not name its moderator to the whole channel", and `GET /canvas/ops` handed the same channel exactly that - more reliably, since a live frame is ephemeral and a feed is durable and repeatable.
+Fixed in #233 (withheld from callers without `MANAGE_CANVAS`; a `place` keeps its actor, since `CanvasObject.author_id` already carries the id).
+`message_ops` never had the field on the wire, and `no_op_carries_an_actor_on_any_kind` asserts that against the **serialised keys** rather than the struct, so it fails for a field added anywhere in the chain.
+
+**Two things to know about testing this.**
+Mutating SQL under `SQLX_OFFLINE=true` fails to *compile* against the cache rather than failing a test, so a mutation that changes a query has to run with `DATABASE_URL` set or it reports a false kill.
+And `messages.rs` sat at exactly 500 lines - the hard ceiling - so #237 had to split the shared enrichment into `http/message_enrich.rs` to make room; that file has no headroom left either.
+
+**Still open, deliberately.** Reactions, pins and polls do not reconcile, which is correct only because none of them is persisted locally (the drift schema is `[Channels, Messages]`); the day one gains a table this debt reopens for it with none of the machinery reusable, since a reaction op is per-viewer and a pin op is not idempotent by message id.
+Author display names never reconcile either: `messages.authorDisplayName` is denormalised into every row, no event carries a profile change, and a keyset sync cannot reach rows behind its own cursor - the same debt shape on a different column.
+`message_ops` grows without a sweep, and the trail it keeps (who deleted what, with `created_at`) is durable, anonymised on account deletion, and readable from SQL and nowhere else.
+
 ## The one-flag iOS screen share fix did not survive a real device (2026-07-31)
 
 The 2026-07-29 entry below ("iOS screen share was starting the broadcast twice") shipped `useiOSBroadcastExtension: true` in `captureOptionsFor` and called it fixed, with a caveat that it still needed a device.
@@ -374,8 +440,9 @@ Verified end to end: the e2e's `bob-peer-sharing-screen.png` shows the sharer's 
 `viewers_among` (push fan-out: many candidates, one channel) and `visible_channels` (the rail: one caller, many channels) live in `store/permissions_batch.rs` and run the same pure `evaluate()` as `permissions_in_channel` after loading the role context and overwrites with a bounded number of queries.
 `tests/permissions.rs` carries an equivalence test for each, driving every precedence rule plus the ADMINISTRATOR bypass, DMs, and a nonexistent channel; any change to one path has to keep those green, and a new batched consumer should reuse these rather than looping `has_permission`.
 
-**Recorded correctness debt, still open:** message edits and deletes made while a client is offline never reconcile - edit does not advance `seq`, `/sync` filters purely by `seq`, and deleted rows are filtered out of deltas, so only a reset heals it.
-That needs a designed protocol answer (op watermark or tombstones in the sync response), not a patch.
+~~**Recorded correctness debt, still open:** message edits and deletes made while a client is offline never reconcile.~~
+Closed 2026-07-31 across #235, #236, #237 and #238; see "Reconciling an edit nobody was online for" above.
+The note was right that it needed a designed protocol answer rather than a patch, and the answer turned out to be the canvas op stream transplanted almost exactly.
 The per-socket WS fan-out permission cost is the other big recorded item: **five** queries per event per connection, not the four recorded here until 2026-07-30 - channel, two role queries, overwrites, timeout deny - and six on a typing frame, which also resolves presence.
 The safe fix is a per-connection visibility cache with real invalidation, and the events it would invalidate on now exist (2026-07-30): `roles.rs`, `overwrites.rs` and `channels.rs` published nothing at all until then, so a revoked channel view never reached a live client and there was nothing a cache could have listened to.
 The cache itself is still open and is the remaining half.
