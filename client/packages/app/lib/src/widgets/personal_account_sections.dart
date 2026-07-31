@@ -7,6 +7,8 @@
 /// leave is a trap.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
@@ -305,7 +307,8 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
   /// deletion is not safe to assume happened just because the request failed,
   /// and clearing it would orphan the account with no session left to retry
   /// from. The failure still has to reach the screen, or the user is stranded
-  /// with no idea why nothing updates any more.
+  /// with no idea why nothing updates any more; sync and push, stopped ahead
+  /// of the request, are restarted on that same failure for the same reason.
   Future<void> _confirmDeletion(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -337,11 +340,26 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
     );
     if (confirmed != true) return;
 
-    await ref.read(syncControllerProvider.notifier).stop();
-    await ref.read(pushControllerProvider.notifier).unregister();
+    /// Both read before the request, and both restarted without consulting
+    /// [mounted]: what they undo is app-global, so navigating away from this
+    /// screen while the delete is in flight must not be what leaves sync
+    /// stopped and push unregistered for the rest of the process. Only the
+    /// error text is this widget's, and only that needs the guard.
+    final sync = ref.read(syncControllerProvider.notifier);
+    final push = ref.read(pushControllerProvider.notifier);
+    await sync.stop();
+    await push.unregister();
     try {
       await ref.read(apiProvider).deleteAccount();
     } on api.ApiException catch (e) {
+      /// Not on a 401: there the session is already gone, cleared by the
+      /// refresh path before this catch runs, so restarting would race the
+      /// sign-out into an exponential retry loop against a signed-out
+      /// session and register push with no session to bind it to.
+      if (e is! api.UnauthorizedException) {
+        unawaited(sync.start());
+        unawaited(push.register());
+      }
       if (!mounted) return;
       setState(() => _deleteError = e.message);
     }

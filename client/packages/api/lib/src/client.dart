@@ -34,9 +34,18 @@ part 'client_voice.dart';
 /// in tests) can vary without the client knowing, and so a refresh performed by
 /// one call is visible to every other.
 class SessionStore {
-  SessionStore({TokenPair? tokens}) : _tokens = tokens;
+  SessionStore({TokenPair? tokens, Future<void> Function(TokenPair?)? onChange})
+      : _tokens = tokens,
+        _onChange = onChange;
 
   TokenPair? _tokens;
+  final Future<void> Function(TokenPair?)? _onChange;
+
+  /// Chains every [_onChange] call behind the last, so a slow write cannot
+  /// finish after a faster later one and leave a stale value stored: without
+  /// it, a rotation overtaking the sign-out that superseded it persists a
+  /// token for a session that has ended.
+  Future<void> _pending = Future<void>.value();
 
   final _changes = StreamController<TokenPair?>.broadcast();
 
@@ -46,12 +55,35 @@ class SessionStore {
   TokenPair? get tokens => _tokens;
   bool get isSignedIn => _tokens != null;
 
+  /// In-memory and announced immediately, same as always: nothing here
+  /// depends on [_onChange], so a slow or hung persist layer never delays a
+  /// live session from working. [settled] is the separate, explicit way to
+  /// wait for durability.
   void set(TokenPair? tokens) {
     _tokens = tokens;
     _changes.add(tokens);
+    if (_onChange case final onChange?) {
+      // Caught, or an uncaught error here would poison every later onChange (see FileKeyStore).
+      _pending = _pending.then((_) => onChange(tokens)).catchError((_) {});
+    }
   }
 
   void clear() => set(null);
+
+  /// Resolves once every [_onChange] triggered by [set] so far has settled,
+  /// whether it succeeded or failed.
+  ///
+  /// [SlimmApiAuth._refreshOnce] awaits this after rotating: the server has
+  /// already spent the old refresh token by the time a new one comes back, so
+  /// a process death between that response and the new token reaching disk
+  /// replays the old, now-spent one on the next launch and gets read as
+  /// reuse. Awaiting this closes that window down to the write itself.
+  ///
+  /// It never completes before the write does, so anything awaiting it
+  /// inherits the key store's worst case and must bound its own wait. A
+  /// failed write is fine and resolves normally; only a hung one is a
+  /// problem, and every 401 retry funnels through that same rotation.
+  Future<void> get settled => _pending;
 
   Future<void> dispose() => _changes.close();
 }

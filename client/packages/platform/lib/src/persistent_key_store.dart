@@ -119,7 +119,17 @@ class FileKeyStore implements KeyStore {
     return result;
   }
 
-  Future<File> _secretsFile() => _file ??= _open();
+  /// A rejected open must not be cached: an error is never the right thing
+  /// to remember here, or one transient failure (a directory the OS could
+  /// not create just then, a locked file) would disable storage for the
+  /// rest of the process with no way back. The same reasoning is why
+  /// http/ws/permission_cache.rs never caches a read error server-side.
+  Future<File> _secretsFile() {
+    return (_file ??= _open()).catchError((Object error, StackTrace stack) {
+      _file = null;
+      Error.throwWithStackTrace(error, stack);
+    });
+  }
 
   Future<File> _open() async {
     final dir = _directory ?? await getApplicationSupportDirectory();

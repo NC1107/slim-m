@@ -2,6 +2,7 @@
 /// Unit tests for parsing, error mapping, refresh behaviour, and event frames.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -256,6 +257,57 @@ void main() {
       expect(protectedCalls, greaterThan(3));
     });
 
+    test(
+        'a rotation does not resolve until the new token is durable, so a '
+        'caller relying on refresh() having finished can never see a rotated '
+        'token that is still only in memory', () async {
+      final persistGate = Completer<void>();
+      var persisted = false;
+      final session = SessionStore(
+        tokens: _tokens(),
+        onChange: (tokens) async {
+          await persistGate.future;
+          persisted = true;
+        },
+      );
+      final api = SlimmApi(
+        baseUrl: _base,
+        session: session,
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/auth/refresh') {
+            return http.Response(
+              jsonEncode({
+                'user_id': 'user-1',
+                'access_token': 'access-2',
+                'refresh_token': 'refresh-2',
+                'access_expires_at': 99,
+              }),
+              200,
+            );
+          }
+          return http.Response('[]', 200);
+        }),
+      );
+
+      final rotation = api.refresh();
+      var settledBeforeGate = false;
+      unawaited(rotation.then((_) => settledBeforeGate = persisted));
+
+      // Live in memory already (other in-flight calls must keep working), but refresh() still waits.
+      await Future<void>.delayed(Duration.zero);
+      expect(session.tokens!.accessToken, 'access-2');
+      expect(persisted, isFalse);
+
+      persistGate.complete();
+      await rotation;
+
+      expect(
+        settledBeforeGate,
+        isTrue,
+        reason: 'refresh() must not resolve before its own write lands',
+      );
+    });
+
     test('a rejected refresh ends the session rather than looping', () async {
       final api = SlimmApi(
         baseUrl: _base,
@@ -266,6 +318,34 @@ void main() {
       await expectLater(
           api.listChannels, throwsA(isA<UnauthorizedException>()));
       expect(api.session.isSignedIn, isFalse);
+    });
+  });
+
+  group('SessionStore.onChange', () {
+    test(
+        'a failed onChange does not disable it for later calls, the same '
+        'trap a cached rejected future is elsewhere in this codebase',
+        () async {
+      final seen = <TokenPair?>[];
+      final session = SessionStore(
+        tokens: _tokens(),
+        onChange: (tokens) async {
+          seen.add(tokens);
+          if (seen.length == 1) throw StateError('disk unavailable');
+        },
+      );
+
+      session.set(_tokens(access: 'access-2'));
+      await session.settled;
+      session.set(_tokens(access: 'access-3'));
+      await session.settled;
+
+      expect(
+        seen.map((t) => t?.accessToken),
+        ['access-2', 'access-3'],
+        reason: 'the second call must still run its onChange, not inherit '
+            'the first one\'s rejection',
+      );
     });
   });
 

@@ -44,6 +44,8 @@ class SyncController extends StateNotifier<SyncStatus> {
       if (signedIn == _lastSignedIn) return;
       _lastSignedIn = signedIn;
       if (signedIn) {
+        // A fresh sign-in reuses this process, so a stale cached identity must not survive it.
+        _ref.invalidate(meProvider);
         unawaited(start());
       } else {
         unawaited(_endSession());
@@ -62,6 +64,15 @@ class SyncController extends StateNotifier<SyncStatus> {
   bool _disposed = false;
   int _attempt = 0;
   final _channelRefresher = ChannelRefresher();
+
+  /// Bumped by every [stop], every fresh [start] and [dispose], so a run
+  /// superseded mid-flight (a sign-out landing during catch-up, or a second
+  /// start racing the first) notices at its next checkpoint rather than
+  /// finishing and writing stale data into a store a newer run already
+  /// cleared. Every await in this class that is followed by a write has to
+  /// re-check it, including the ones inside [ChannelRefresher], which is why
+  /// that takes the predicate rather than being trusted to finish quickly.
+  int _generation = 0;
 
   /// Every event this session receives, broadcast to whoever else wants one
   /// (presence, typing, reactions, pins, polls): a second, independent
@@ -82,24 +93,38 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// error to the person typing.
   void notifyTyping(String channelId) => _connection?.typing(channelId);
 
-  /// Starts, or restarts, synchronisation. Safe to call repeatedly.
+  /// Starts, or restarts, synchronisation. Safe to call repeatedly: a call
+  /// superseded by a later [start] or a [stop] before it reaches a given
+  /// checkpoint abandons itself there rather than finishing against a
+  /// session, or a store, that has since moved on.
   Future<void> start() async {
     if (_disposed) return;
+    final generation = ++_generation;
     _retry?.cancel();
     await _teardown();
+    if (generation != _generation) return;
     state = SyncStatus.connecting;
 
     try {
       final api = _ref.read(apiProvider);
       final store = await _ref.read(storeProvider.future);
+      if (generation != _generation) return;
 
-      await _channelRefresher.refresh(api, store);
-      await _catchUp(api, store);
-      await _attach(api, store);
+      await _channelRefresher.refresh(
+        api,
+        store,
+        isCurrent: () => generation == _generation,
+      );
+      if (generation != _generation) return;
+      await _catchUp(generation, api, store);
+      if (generation != _generation) return;
+      await _attach(generation, api, store);
+      if (generation != _generation) return;
 
       _attempt = 0;
       state = SyncStatus.live;
     } catch (_) {
+      if (generation != _generation) return;
       // A connectivity or auth problem here: both mean show offline and retry with backoff.
       state = SyncStatus.offline;
       _scheduleRetry();
@@ -107,17 +132,29 @@ class SyncController extends StateNotifier<SyncStatus> {
   }
 
   /// Catches every known scope up in one request, applying deltas in order.
-  Future<void> _catchUp(SlimmApi api, MessageStore store) async {
+  ///
+  /// [generation] is this call's [start], checked before every write: a
+  /// sign-out landing while the network round trip above is already in
+  /// flight must not let its answer, arriving after the store has been
+  /// cleared for the account signing out, write into it anyway.
+  Future<void> _catchUp(
+    int generation,
+    SlimmApi api,
+    MessageStore store,
+  ) async {
     final cursors = await store.allCursors();
     if (cursors.isEmpty) return;
 
     final deltas = await api.sync(cursors);
+    if (generation != _generation) return;
     var more = false;
     for (final delta in deltas) {
+      if (generation != _generation) return;
       if (delta.reset) {
         // The gap is too large to stream: local state is untrusted, so drop and refetch.
         await store.resetChannel(delta.channelId);
         final fresh = await api.listMessages(delta.channelId, limit: 50);
+        if (generation != _generation) return;
         await store.applyMessages(fresh);
         continue;
       }
@@ -140,9 +177,9 @@ class SyncController extends StateNotifier<SyncStatus> {
       unawaited(
         Future<void>.delayed(
           Duration.zero,
-          () => _catchUp(api, store),
+          () => _catchUp(generation, api, store),
         ).catchError((_) {
-          if (!_disposed) _onDropped();
+          if (!_disposed && generation == _generation) _onDropped();
         }),
       );
     }
@@ -150,21 +187,33 @@ class SyncController extends StateNotifier<SyncStatus> {
 
   /// Attaches the live socket. Its closure schedules a full restart, so the
   /// next connection catches up before trusting live events again.
-  Future<void> _attach(SlimmApi api, MessageStore store) async {
+  ///
+  /// [generation] is checked after the ticket mint and the connect, because
+  /// both are network round trips: a [stop] landing inside either used to
+  /// return from [start] having already assigned a socket the superseding
+  /// [_teardown] had run too early to see, leaving it live and applying
+  /// frames with nothing left holding a handle to close it.
+  Future<void> _attach(int generation, SlimmApi api, MessageStore store) async {
     final ticket = await api.webSocketTicket();
     final connection = await EventConnection.connect(
       url: api.webSocketUrl,
       ticket: ticket.ticket,
     );
+    if (generation != _generation) {
+      await connection.close();
+      return;
+    }
     _connection = connection;
 
     _events = connection.events.listen(
       (event) async {
+        if (generation != _generation) return;
+
         /// Broadcast first and unconditionally: a listener that only cares
         /// about, say, ReactionsChanged must not depend on this switch ever
         /// learning about that event type.
         _liveEvents.add(event);
-        await _applyServerEvent(api, store, event);
+        await _applyServerEvent(generation, api, store, event);
       },
       onError: (_) => _onDropped(),
       onDone: _onDropped,
@@ -174,17 +223,20 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// How one frame from the socket changes local state. A method of its own
   /// so [applyServerEventForTest] can drive it without a real socket.
   Future<void> _applyServerEvent(
+    int generation,
     SlimmApi api,
     MessageStore store,
     ServerEvent event,
   ) async {
+    bool isCurrent() => generation == _generation;
     switch (event) {
       case MessageCreated(:final message):
       case MessageEdited(:final message):
         // A DM's first message is a channel never fetched; materialise it first or this no-ops.
         if (!await store.hasChannel(message.channelId)) {
-          await _channelRefresher.refreshOnce(api, store);
+          await _channelRefresher.refreshOnce(api, store, isCurrent: isCurrent);
         }
+        if (!isCurrent()) return;
         await store.applyMessage(message);
       case MessageDeleted(:final messageId):
 
@@ -203,7 +255,7 @@ class SyncController extends StateNotifier<SyncStatus> {
       case RoleChanged():
       case MemberRoleChanged():
         // None say which channel changed; a refresh finds whichever did.
-        await _channelRefresher.refreshOnce(api, store);
+        await _channelRefresher.refreshOnce(api, store, isCurrent: isCurrent);
       case ErrorEvent(:final needsResync) when needsResync:
         // The server closed a connection that fell behind; a restart re-runs catch-up.
         unawaited(start());
@@ -218,7 +270,7 @@ class SyncController extends StateNotifier<SyncStatus> {
   Future<void> applyServerEventForTest(ServerEvent event) async {
     final api = _ref.read(apiProvider);
     final store = await _ref.read(storeProvider.future);
-    await _applyServerEvent(api, store, event);
+    await _applyServerEvent(_generation, api, store, event);
   }
 
   void _onDropped() {
@@ -253,6 +305,9 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// away for an account the user is still signed into. The wipe belongs to
   /// the session actually ending, which is [_endSession].
   Future<void> stop() async {
+    // Supersedes any in-flight start(), even one paused mid-catch-up on a network call.
+    _generation++;
+    _channelRefresher.discardInFlight();
     _retry?.cancel();
     await _teardown();
     state = SyncStatus.offline;
@@ -277,6 +332,7 @@ class SyncController extends StateNotifier<SyncStatus> {
   Future<void> _endSession() async {
     await stop();
     _ref.invalidate(channelHistoryProvider);
+    _ref.invalidate(meProvider);
     _ref.read(messageExtrasProvider.notifier).clear();
     try {
       final store = await _ref.read(storeProvider.future);
@@ -289,6 +345,7 @@ class SyncController extends StateNotifier<SyncStatus> {
   @override
   void dispose() {
     _disposed = true;
+    _generation++;
     unawaited(_sessionSubscription.cancel());
     _retry?.cancel();
     unawaited(_teardown());

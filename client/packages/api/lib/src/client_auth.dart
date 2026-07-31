@@ -72,6 +72,16 @@ extension SlimmApiAuth on SlimmApi {
     });
   }
 
+  /// How long a rotation waits for the new token to reach storage before
+  /// giving up on durability and returning anyway.
+  ///
+  /// Every 401 retry funnels through [refresh], so an unbounded wait here is
+  /// a wedged platform channel on one device turning into an app where no
+  /// request ever completes again. Past this the window the wait exists to
+  /// close is simply left open, which is what the behaviour was before the
+  /// wait existed at all.
+  static const Duration _persistDeadline = Duration(seconds: 5);
+
   Future<TokenPair> _refreshOnce() async {
     final current = session.tokens;
     if (current == null) {
@@ -86,6 +96,8 @@ extension SlimmApiAuth on SlimmApi {
       );
       final tokens = TokenPair.fromJson(json as Map<String, dynamic>);
       session.set(tokens);
+      // Bounded: a wedged key store must cost one slow rotation, never every later request.
+      await session.settled.timeout(_persistDeadline, onTimeout: () {});
       return tokens;
     } on UnauthorizedException {
       // The refresh token is spent, revoked, or the session is gone; the only
