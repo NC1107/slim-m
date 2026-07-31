@@ -35,6 +35,18 @@ pub(super) enum Authorization {
     Unknown,
 }
 
+/// How long to wait before the single retry of a failed permission read.
+///
+/// A store error here is not per-connection, it is per-*event*: every
+/// connection that event would have reached hits it in the same instant, and
+/// `Authorization::Unknown` closes each of them. The client's resync has no
+/// backoff, so all of them re-run `/sync`, mint a ticket and reconnect at
+/// once, against the database that just failed. This project has already seen
+/// SQLITE_BUSY under concurrent load, which is exactly the transient a second
+/// attempt turns back into a delivered frame. Short enough that a real
+/// outage still gives up promptly.
+const RESOLVE_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(25);
+
 /// Filters an event down to a wire frame, or the reason it is not delivered.
 ///
 /// Presence is handled up front rather than folded into the channel-scoped
@@ -137,14 +149,24 @@ pub(super) async fn authorize(
     let epoch = hub.permissions_epoch();
     let permissions = match cache.get(channel_id, Instant::now(), epoch) {
         Some(cached) => cached,
-        None => match store.permissions_in_channel(ctx.user_id, channel_id).await {
-            Ok(answer) => {
-                cache.insert(channel_id, answer, Instant::now(), epoch);
-                answer
+        None => {
+            let resolved = match store.permissions_in_channel(ctx.user_id, channel_id).await {
+                Ok(answer) => Ok(answer),
+                // Retried once: the alternative is every connection dropping together.
+                Err(_) => {
+                    tokio::time::sleep(RESOLVE_RETRY_DELAY).await;
+                    store.permissions_in_channel(ctx.user_id, channel_id).await
+                }
+            };
+            match resolved {
+                Ok(answer) => {
+                    cache.insert(channel_id, answer, Instant::now(), epoch);
+                    answer
+                }
+                // Unresolved rather than remembered; see `Authorization::Unknown`.
+                Err(_) => return Authorization::Unknown,
             }
-            // Unresolved rather than remembered; see `Authorization::Unknown`.
-            Err(_) => return Authorization::Unknown,
-        },
+        }
     };
     let visible = permissions.contains(Permissions::VIEW_CHANNEL);
     if !visible && !held_it_before {

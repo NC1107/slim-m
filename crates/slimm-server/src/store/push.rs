@@ -167,6 +167,13 @@ impl Store {
     /// outlives the session that made it, so without this a signed-out device
     /// (or a stale row left by an earlier login on the same physical device)
     /// would keep receiving push indefinitely.
+    ///
+    /// The liveness test is [`Store::list_devices`]'s, exactly, and the two
+    /// must not drift: this decides what buzzes and that decides what the
+    /// owner can see and revoke, so a device live for one and dead for the
+    /// other is either a phone notifying an account it can no longer open, or
+    /// a row in the settings list that nothing will ever reach.
+    /// `tests/device_liveness.rs` is what fails if they diverge.
     pub async fn push_targets(&self, user_ids: &[UserId]) -> anyhow::Result<Vec<PushTarget>> {
         if user_ids.is_empty() {
             return Ok(Vec::new());
@@ -179,11 +186,16 @@ impl Store {
              WHERE push_token_ref IS NOT NULL \
                AND push_public_key IS NOT NULL AND platform IS NOT NULL \
                AND EXISTS ( \
-                     SELECT 1 FROM sessions \
-                      WHERE sessions.device_id = devices.id AND sessions.revoked_at IS NULL \
-                   ) \
-               AND user_id IN (",
+                     SELECT 1 FROM sessions s \
+                     JOIN refresh_tokens r ON r.session_id = s.id \
+                      WHERE s.device_id = devices.id \
+                        AND s.revoked_at IS NULL \
+                        AND r.used_at IS NULL \
+                        AND r.revoked_at IS NULL \
+                        AND r.expires_at > ",
         );
+        builder.push_bind(now_ms());
+        builder.push(") AND user_id IN (");
         let mut separated = builder.separated(", ");
         for id in user_ids {
             separated.push_bind(*id);
@@ -220,15 +232,22 @@ impl Store {
     /// price of one indexed query plus a check per candidate, and a deployment
     /// where nobody registered for push does no permission work whatsoever.
     pub async fn users_with_push_devices(&self) -> anyhow::Result<Vec<UserId>> {
+        let now = now_ms();
         let rows = sqlx::query!(
             r#"SELECT DISTINCT user_id AS "user_id!: UserId"
                FROM devices
                WHERE push_token_ref IS NOT NULL
                  AND push_public_key IS NOT NULL AND platform IS NOT NULL
                  AND EXISTS (
-                       SELECT 1 FROM sessions
-                        WHERE sessions.device_id = devices.id AND sessions.revoked_at IS NULL
-                     )"#
+                       SELECT 1 FROM sessions s
+                       JOIN refresh_tokens r ON r.session_id = s.id
+                        WHERE s.device_id = devices.id
+                          AND s.revoked_at IS NULL
+                          AND r.used_at IS NULL
+                          AND r.revoked_at IS NULL
+                          AND r.expires_at > ?
+                     )"#,
+            now
         )
         .fetch_all(&self.pool)
         .await?;

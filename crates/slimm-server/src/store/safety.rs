@@ -35,13 +35,24 @@ impl Store {
     /// offering the same "sign out" action for a session that, for one of
     /// them, no longer exists to sign out of.
     ///
-    /// "Live" means a session that could still authenticate something: not
-    /// explicitly revoked (`sessions.revoked_at`), and whose current refresh
-    /// token - the one rotation has not yet spent (`used_at IS NULL`) or a
-    /// reuse-detected replay revoked - has not simply expired from disuse
-    /// either. A device whose owner walked away without ever tapping sign-out
-    /// still needs to disappear once that expiry passes, or the list never
-    /// reflects an abandoned device at all, only a deliberately removed one.
+    /// "Live" means a session that could still *rotate*: not explicitly
+    /// revoked (`sessions.revoked_at`), and whose current refresh token - the
+    /// one rotation has not yet spent (`used_at IS NULL`) or a reuse-detected
+    /// replay revoked - has not simply expired from disuse either. A device
+    /// whose owner walked away without ever tapping sign-out still needs to
+    /// disappear once that expiry passes, or the list never reflects an
+    /// abandoned device at all, only a deliberately removed one.
+    ///
+    /// Deliberately not the same question as [`Store::authenticate`], which
+    /// reads only `access_tokens.expires_at` and never looks at the session
+    /// row or the refresh token: a device can still be answering requests on
+    /// an unexpired access token while listed here as gone. That window is at
+    /// most one access-token lifetime and closes on its own.
+    ///
+    /// [`Store::push_targets`] must ask exactly this, or a device drops off
+    /// this list while still being notified and the owner is left with no
+    /// handle on something that keeps buzzing. `tests/device_liveness.rs`
+    /// fails if the two diverge.
     pub async fn list_devices(
         &self,
         user_id: UserId,
@@ -49,7 +60,7 @@ impl Store {
     ) -> anyhow::Result<Vec<Device>> {
         let now = now_ms();
         let rows = sqlx::query!(
-            r#"SELECT DISTINCT d.id AS "id!: DeviceId", d.name AS "name!",
+            r#"SELECT d.id AS "id!: DeviceId", d.name AS "name!",
                       d.created_at AS "created_at!", d.last_seen_at
                FROM devices d
                WHERE d.user_id = ?

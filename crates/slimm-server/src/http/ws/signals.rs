@@ -7,7 +7,7 @@
 use crate::hub::{Event, Hub};
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
-use crate::presence::{self, Status};
+use crate::presence::{self, Status, Visibility};
 use crate::ratelimit::{Class, RateLimiter};
 use crate::store::{SessionContext, Store};
 
@@ -25,11 +25,11 @@ impl PresenceGuard {
     /// Records a new live connection for `user_id` and publishes a change if
     /// this is their first (see [`crate::presence::PresenceTracker::connect`]).
     /// The returned guard must be held for the connection's whole lifetime.
-    pub(super) fn connect(hub: Hub, user_id: UserId) -> Self {
+    pub(super) fn connect(hub: Hub, store: Store, user_id: UserId) -> Self {
         if hub.presence().connect(user_id) {
             hub.publish(Event::PresenceChanged(user_id));
         }
-        let idle_watch = tokio::spawn(watch_idle(hub.clone(), user_id)).abort_handle();
+        let idle_watch = tokio::spawn(watch_idle(hub.clone(), store, user_id)).abort_handle();
         Self {
             hub,
             user_id,
@@ -59,17 +59,35 @@ impl Drop for PresenceGuard {
 /// A user with several live connections runs one of these per connection,
 /// all polling the one shared idle clock those connections share; a
 /// transition can be published more than once for the same instant, which
-/// costs a redundant re-derivation on every receiving connection and nothing
-/// more, the same trade `Hub::publish`'s own callers accept elsewhere.
-async fn watch_idle(hub: Hub, user_id: UserId) {
+/// costs one `presence_visibility` lookup plus a re-derivation per receiving
+/// connection, the same trade `Hub::publish`'s own callers accept elsewhere.
+///
+/// **Published only for [`Visibility::Online`], and that is a privacy
+/// property rather than an optimisation.** [`presence::status_for`] ignores
+/// `idle` entirely for the other three, so a frame here would carry no
+/// information any viewer is allowed to act on - but it would still be a
+/// frame, arriving exactly when a user who chose to appear offline went quiet
+/// and again when they came back. An observer timestamping frames learns
+/// their activity pattern from that alone, however correct the derived status
+/// is. Publishing on connect and disconnect is a narrower version of the same
+/// thing and predates this; widening it to every idle transition is what this
+/// avoids.
+async fn watch_idle(hub: Hub, store: Store, user_id: UserId) {
     let mut ticks = tokio::time::interval(hub.idle_poll_interval());
     ticks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut idle = false;
     loop {
         ticks.tick().await;
         let now_idle = hub.presence().is_idle(user_id);
-        if now_idle != idle {
-            idle = now_idle;
+        if now_idle == idle {
+            continue;
+        }
+        idle = now_idle;
+        // Read per transition, not once: visibility can change mid-connection.
+        if matches!(
+            store.presence_visibility(user_id).await,
+            Ok(Some(Visibility::Online))
+        ) {
             hub.publish(Event::PresenceChanged(user_id));
         }
     }
@@ -127,6 +145,9 @@ pub(super) async fn handle_typing(
         return;
     }
 
+    // Behind the limiter, so a typing flood cannot hammer the shared presence lock.
+    hub.presence().touch(ctx.user_id);
+
     // Same bar a send would clear; see the note on this function.
     let needed = Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES);
     match store.has_permission(ctx.user_id, channel_id, needed).await {
@@ -134,7 +155,6 @@ pub(super) async fn handle_typing(
         _ => return,
     }
 
-    // `super::serve` already touched the idle clock for this frame.
     let (generation, is_new) = hub.typing().start(channel_id, ctx.user_id);
     if is_new {
         hub.publish(Event::TypingStarted {

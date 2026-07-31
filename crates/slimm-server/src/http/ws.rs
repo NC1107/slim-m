@@ -93,7 +93,8 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
 
     // Guarantees the matching disconnect however this function returns; see
     // `signals::PresenceGuard`.
-    let _presence_guard = signals::PresenceGuard::connect(state.hub.clone(), ctx.user_id);
+    let _presence_guard =
+        signals::PresenceGuard::connect(state.hub.clone(), state.store.clone(), ctx.user_id);
 
     if send_frame(
         &mut sink,
@@ -112,10 +113,10 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
             incoming = stream.next() => {
                 match incoming {
                     Some(Ok(Message::Text(text))) => {
-                        // Any inbound frame is activity; see `presence::IDLE_TIMEOUT`.
-                        state.hub.presence().touch(ctx.user_id);
+                        // Touch after the parse, never before: it takes the shared presence lock and nothing rate-limits inbound frames.
                         match serde_json::from_str::<ClientFrame>(text.as_str()) {
                             Ok(ClientFrame::Ping) => {
+                                state.hub.presence().touch(ctx.user_id);
                                 if send_frame(&mut sink, &ServerFrame::Pong).await.is_err() {
                                     break;
                                 }

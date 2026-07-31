@@ -180,7 +180,7 @@ crates/slimm-server/src/http/roles.rs 1
 crates/slimm-server/src/http/safety.rs 4
 crates/slimm-server/src/http/sync.rs 3
 crates/slimm-server/src/http/users.rs 2
-crates/slimm-server/src/http/ws.rs 7
+crates/slimm-server/src/http/ws.rs 6
 crates/slimm-server/src/http/ws/frames.rs 2
 crates/slimm-server/src/http/ws/signals.rs 1
 crates/slimm-server/src/identity.rs 1
@@ -203,7 +203,6 @@ crates/slimm-server/src/store/push.rs 1
 crates/slimm-server/src/store/reactions.rs 4
 crates/slimm-server/src/store/recovery.rs 2
 crates/slimm-server/src/store/roles.rs 3
-crates/slimm-server/src/store/safety.rs 1
 crates/slimm-server/src/store/sessions.rs 9
 crates/slimm-server/src/store/users.rs 1
 crates/slimm-server/src/typing.rs 1
@@ -256,7 +255,7 @@ crates/slimm-server/tests/safety.rs 3
 crates/slimm-server/tests/token_sweep.rs 2
 crates/slimm-server/tests/typing.rs 6
 crates/slimm-server/tests/users.rs 1
-crates/slimm-server/tests/ws.rs 3
+crates/slimm-server/tests/ws.rs 1
 scripts/check-dart-licenses.py 1
 scripts/lib/e2e_api.py 1
 scripts/lib/e2e_fixtures.py 1

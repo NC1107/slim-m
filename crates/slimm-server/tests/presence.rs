@@ -354,3 +354,53 @@ async fn an_idle_transition_is_announced_to_another_viewer() {
         "another viewer must be told when a connected user goes idle, not just alice herself"
     );
 }
+
+/// The idle watcher must publish nothing at all for somebody appearing
+/// offline, not merely publish a frame that derives to "offline".
+///
+/// `status_for` ignores `idle` for every visibility except `Online`, so the
+/// derived status would have been right either way. What would not have been
+/// right is the frame's existence: it arrives exactly when a hidden user goes
+/// quiet and again when they return, so an observer timestamping frames reads
+/// their activity pattern off the timing alone. This is the same shape as the
+/// typing leak already closed elsewhere, and the status being correct is
+/// precisely what makes it easy to miss.
+#[tokio::test]
+async fn a_hidden_users_idle_transition_is_never_published() {
+    let (store, _guard) = new_store().await;
+    let hub = Hub::with_idle_poll_interval(Duration::from_millis(20));
+    let state = state_for(&store, hub.clone());
+    let (_alice_access, alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    let (_bob_access, bob_ticket, bob_id) = user_ticket(&store, "bob").await;
+    let alice_id_str = alice_id.to_string();
+
+    store
+        .set_presence_visibility(alice_id, presence::Visibility::Hidden)
+        .await
+        .unwrap();
+
+    let addr = serve(state.clone()).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+    let _ = next_presence_for(&mut bob_ws, &bob_id.to_string()).await;
+
+    let _alice_ws = connect(addr, &alice_ticket).await;
+    // Her connect still publishes, which predates the idle watcher and is its own question.
+    let _ = next_presence_for(&mut bob_ws, &alice_id_str).await;
+
+    let long_ago = Instant::now() - presence::IDLE_TIMEOUT - Duration::from_secs(1);
+    hub.presence().touch_at(alice_id, long_ago);
+
+    let leaked = tokio::time::timeout(Duration::from_millis(400), async {
+        loop {
+            let frame = read_frame(&mut bob_ws).await;
+            if frame["type"] == "presence.changed" && frame["user_id"] == alice_id_str.as_str() {
+                return frame;
+            }
+        }
+    })
+    .await;
+    assert!(
+        leaked.is_err(),
+        "a hidden user going idle must produce no frame at all; one arrived: {leaked:?}"
+    );
+}
