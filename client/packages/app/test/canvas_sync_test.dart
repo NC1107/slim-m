@@ -252,6 +252,46 @@ void main() {
     });
   });
 
+  test('an unenumerable restore defers to the feed without moving the cursor '
+      'past the one op that could clear those tombstones', () {
+    fakeAsync((async) {
+      final document = CanvasDocument();
+      var opsGets = 0;
+      final sync = CanvasSync(
+        channelId: 'c1',
+        client: fakeCanvasOpsApi((afterSeq) {
+          opsGets++;
+          return _json({
+            'ops': <Object>[],
+            'latest_seq': afterSeq,
+            'has_more': false,
+            'reset': false,
+          });
+        }),
+        document: document,
+        coldFetch: () async {},
+        forgetFetchedRegion: () {},
+      );
+      sync.seedFromViewport(5);
+      async.flushMicrotasks();
+      final baseline = opsGets;
+
+      sync.deferToFeed();
+      async.flushMicrotasks();
+
+      expect(opsGets, baseline + 1, reason: 'it must ask the feed');
+      expect(
+        sync.asOfSeq,
+        5,
+        reason:
+            'the cursor must not advance past the restore: the frame carried '
+            'no ids, so nothing cleared the tombstones, and a moved cursor '
+            'would mean no later frame or cold fetch ever brings those '
+            'objects back',
+      );
+    });
+  });
+
   test('catch-up applies place, remove, clear and restore in order and is '
       'idempotent when replayed from a stale cursor', () {
     fakeAsync((async) {
