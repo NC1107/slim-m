@@ -18,6 +18,7 @@ import '../providers/sync_controller.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'presence_menu.dart';
+import 'rail_call_summary.dart';
 import 'space_settings_section.dart';
 
 /// The server's own identity, for the header's name line. Real endpoint;
@@ -216,7 +217,12 @@ class RailConnectionBar extends ConsumerWidget {
 }
 
 class RailUserFooter extends ConsumerWidget {
-  const RailUserFooter({super.key});
+  const RailUserFooter({super.key, this.activeChannelId});
+
+  /// The channel currently shown beside or instead of this rail. A call
+  /// already live in that channel has its own full call UI, so this footer
+  /// must not repeat it - the second dock the design flattened away.
+  final String? activeChannelId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -227,6 +233,10 @@ class RailUserFooter extends ConsumerWidget {
     final voice = ref.watch(voiceControllerProvider);
     final voiceController = ref.read(voiceControllerProvider.notifier);
     final inCall = voice.state == VoiceSessionState.connected;
+    // A call in the channel already on screen has its own full call UI.
+    final callChannelId = voice.channelId;
+    final inCallElsewhere =
+        inCall && callChannelId != null && callChannelId != activeChannelId;
 
     // A disconnected device reports its connection instead of the chosen
     // status: claiming "online" while nothing is arriving would be a lie.
@@ -254,28 +264,34 @@ class RailUserFooter extends ConsumerWidget {
                 PresenceMenuButton(presence: presence),
                 const SizedBox(width: 9),
                 Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        me.valueOrNull?.displayName ?? '',
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.ui.copyWith(
-                          color: tokens.textPrimary,
-                          fontWeight: AppWeights.medium,
-                          height: 1.25,
+                  child: inCallElsewhere
+                      ? RailCallSummary(
+                          channelId: callChannelId,
+                          connectedAt: voice.connectedAt,
+                          screenSharing: voice.screenSharing,
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              me.valueOrNull?.displayName ?? '',
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.ui.copyWith(
+                                color: tokens.textPrimary,
+                                fontWeight: AppWeights.medium,
+                                height: 1.25,
+                              ),
+                            ),
+                            Text(
+                              statusLabel,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.micro.copyWith(
+                                color: tokens.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      Text(
-                        statusLabel,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.micro.copyWith(
-                          color: tokens.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
                 AppIconButton(
                   icon: voice.microphoneEnabled
@@ -294,6 +310,15 @@ class RailUserFooter extends ConsumerWidget {
                   tooltip: inCall ? null : 'Not in a call',
                   onPressed: inCall ? voiceController.toggleDeafen : null,
                 ),
+                // The standalone strip's other icon, folded into this row.
+                if (inCallElsewhere)
+                  AppIconButton(
+                    icon: AppIcons.leaveCall,
+                    semanticLabel: 'Leave call',
+                    tooltip: 'Leave call',
+                    variant: AppIconButtonVariant.danger,
+                    onPressed: voiceController.leave,
+                  ),
                 AppIconButton(
                   icon: AppIcons.settings,
                   semanticLabel: 'Personal settings',

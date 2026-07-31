@@ -16,6 +16,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/live_events.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
+import 'package:slimm_app/src/screens/canvas/canvas_bar.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane.dart';
 import 'package:slimm_app/src/widgets/channel_header.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -329,6 +330,47 @@ void main() {
     await tester.pump();
     expect(container.read(canvasOpenProvider), 'c1');
   });
+
+  /// CanvasBar is the pane's only header (no AppBar sits above it), so
+  /// nothing else consumes the notch or the home indicator for it.
+  testWidgets(
+    'the bar and the drawing surface clear the notch and home indicator',
+    (tester) async {
+      const topInset = 59.0;
+      const bottomInset = 34.0;
+      const dpr = 3.0;
+      const viewHeight = 932.0;
+      final fixture = _Fixture();
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+
+      tester.view.physicalSize = const Size(390 * dpr, viewHeight * dpr);
+      tester.view.devicePixelRatio = dpr;
+      tester.view.padding = FakeViewPadding(
+        top: topInset * dpr,
+        bottom: bottomInset * dpr,
+      );
+      tester.view.viewPadding = FakeViewPadding(
+        top: topInset * dpr,
+        bottom: bottomInset * dpr,
+      );
+      addTearDown(tester.view.reset);
+
+      await _pump(tester, container);
+
+      expect(
+        tester.getTopLeft(find.byType(CanvasBar)).dy,
+        greaterThanOrEqualTo(topInset),
+        reason: 'the bar painted under the status bar before this',
+      );
+      expect(
+        tester.getBottomLeft(find.byType(CanvasSurface)).dy,
+        lessThanOrEqualTo(viewHeight - bottomInset),
+        reason: 'a stroke could start under the home indicator before this',
+      );
+    },
+  );
 }
 
 void _noop() {}

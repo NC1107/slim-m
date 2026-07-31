@@ -255,55 +255,58 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    // No AppBar sits above CanvasBar, so this pane insets itself, or a stroke could start under the notch.
     return Container(
       color: tokens.surfaceBase,
-      child: Column(
-        children: [
-          CanvasBar(
-            channelId: widget.channelId,
-            onClose: () => ref.read(canvasOpenProvider.notifier).state = null,
-          ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.s12),
-              child: AppErrorState(
-                message: _error!,
-                onDismiss: () => setState(() => _error = null),
-              ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            CanvasBar(
+              channelId: widget.channelId,
+              onClose: () => ref.read(canvasOpenProvider.notifier).state = null,
             ),
-          if (_truncated)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.s12,
-                0,
-                AppSpacing.s12,
-                AppSpacing.s12,
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.s12),
+                child: AppErrorState(
+                  message: _error!,
+                  onDismiss: () => setState(() => _error = null),
+                ),
               ),
-              child: const AppCallout(
-                child: Text(
-                  'Some ink in this region is not shown. Zoom in to see it.',
+            if (_truncated)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.s12,
+                  0,
+                  AppSpacing.s12,
+                  AppSpacing.s12,
+                ),
+                child: const AppCallout(
+                  child: Text(
+                    'Some ink in this region is not shown. Zoom in to see it.',
+                  ),
+                ),
+              ),
+            Expanded(
+              child: ValueListenableBuilder<int>(
+                valueListenable: _document.objectCount,
+                builder: (context, count, child) => Semantics(
+                  container: true,
+                  label: _loading
+                      ? 'Canvas, loading'
+                      : 'Canvas, $count objects drawn',
+                  child: child,
+                ),
+                child: CanvasSurface(
+                  document: _document,
+                  ink: AppCanvasColors.annotation,
+                  gridLine: tokens.borderSubtle,
+                  onStroke: _onStroke,
                 ),
               ),
             ),
-          Expanded(
-            child: ValueListenableBuilder<int>(
-              valueListenable: _document.objectCount,
-              builder: (context, count, child) => Semantics(
-                container: true,
-                label: _loading
-                    ? 'Canvas, loading'
-                    : 'Canvas, $count objects drawn',
-                child: child,
-              ),
-              child: CanvasSurface(
-                document: _document,
-                ink: AppCanvasColors.annotation,
-                gridLine: tokens.borderSubtle,
-                onStroke: _onStroke,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

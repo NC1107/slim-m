@@ -61,10 +61,15 @@ class VoiceStripIndicator extends ConsumerWidget {
 }
 
 /// The channel a call is in, read from the local store rather than passed in:
-/// the strip renders from the rail and from the compact shell, and neither
-/// holds a channel name for a channel it is not currently showing.
-class _CallChannelName extends ConsumerWidget {
-  const _CallChannelName({required this.channelId, required this.style});
+/// callers include this strip, the compact shell, and the rail's own footer
+/// (`RailUserFooter`), and none of them holds a channel name for a channel
+/// they are not currently showing.
+class CallChannelName extends ConsumerWidget {
+  const CallChannelName({
+    super.key,
+    required this.channelId,
+    required this.style,
+  });
 
   final String? channelId;
   final TextStyle style;
@@ -110,7 +115,7 @@ class _Expanded extends StatelessWidget {
             Icon(AppIcons.voice, size: AppSizes.icon16, color: tokens.accent),
             const SizedBox(width: 6),
             Expanded(
-              child: _CallChannelName(
+              child: CallChannelName(
                 channelId: voice.channelId,
                 style: AppText.caption.copyWith(
                   color: tokens.textPrimary,
@@ -217,7 +222,7 @@ class _Compact extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _CallChannelName(
+              CallChannelName(
                 channelId: voice.channelId,
                 style: AppText.caption.copyWith(
                   color: tokens.textPrimary,
