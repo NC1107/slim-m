@@ -17,6 +17,7 @@ import traceback
 import e2e_admin
 import e2e_labels as L
 import e2e_messaging
+import e2e_reconcile
 import e2e_settings
 import e2e_coverage
 import e2e_sweep
@@ -91,6 +92,9 @@ def scenarios(a, b, admin, member, room_id):
          lambda: e2e_sweep.run_all(
              admin, admin.channel_named(L.TEXT_CHANNEL)["id"],
              member.me()["id"])),
+        ("reconcile: an edit and a delete while a client is away",
+         lambda: e2e_reconcile.survives_an_absence(
+             b, a, L.TEXT_CHANNEL, admin)),
         ("voice: two clients in one call", lambda: e2e_voice.join_call(
             a, b, room_id)),
         ("voice: sharing a screen", lambda: e2e_voice.share_screen(
