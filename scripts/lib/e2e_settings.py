@@ -56,8 +56,13 @@ def change_theme(client):
 
 
 def change_status(client, api):
-    """Presence is a real server-side state, not a local badge, and asking
-    the server about the same account's own id always answers truthfully."""
+    """Presence is a real server-side state, not a local badge.
+
+    `status_for` answers Offline for anyone with no live socket regardless of
+    their stored preference, so this also depends on the browser client's own
+    WebSocket staying up; the poll below only absorbs a reconnect, not an
+    account that dropped its last connection.
+    """
     _open_personal(client)
     client.click(L.ACCOUNT_PANE, settle=2)
     client.click(L.STATUS, settle=2)

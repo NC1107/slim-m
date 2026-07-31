@@ -94,25 +94,35 @@ Future<void> loadFontFamily(String family, List<String> paths) async {
   await loader.load();
 }
 
+/// `PUB_CACHE`, when set, names the cache root, not the `hosted/pub.dev`
+/// package directory beneath it, so both branches resolve to that same depth.
 String _pubCache() {
+  final override = Platform.environment['PUB_CACHE'];
+  if (override != null) return '$override/hosted/pub.dev';
   final home = Platform.environment['HOME'] ?? '';
-  return Platform.environment['PUB_CACHE'] ?? '$home/.pub-cache/hosted/pub.dev';
+  return '$home/.pub-cache/hosted/pub.dev';
 }
 
 /// Read from the lockfile rather than pinned here, so a bump does not
 /// silently drop back to square icons.
+///
+/// Throws rather than returning an empty version on a miss: a silent '' used
+/// to resolve to a directory named `lucide_icons_flutter-` that never exists,
+/// which read as a missing-font failure with no hint the version scan failed.
 String _lucideVersion() {
   final lock = File('../../pubspec.lock');
-  if (!lock.existsSync()) return '';
   final lines = lock.readAsLinesSync();
   for (var i = 0; i < lines.length; i++) {
     if (lines[i].trim() != 'lucide_icons_flutter:') continue;
-    for (var j = i; j < i + 8 && j < lines.length; j++) {
+    for (var j = i + 1; j < lines.length && lines[j].startsWith('    '); j++) {
       final match = RegExp(r'version:\s*"?([^"\s]+)"?').firstMatch(lines[j]);
       if (match != null) return match.group(1)!;
     }
+    break;
   }
-  return '';
+  throw StateError(
+    'lucide_icons_flutter has no version line in ../../pubspec.lock',
+  );
 }
 
 /// Real [SyncController] opens a socket to a server that is not there.

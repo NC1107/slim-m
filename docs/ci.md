@@ -86,6 +86,11 @@ It is a request property, so nothing is testable either way: the field is option
 
 ## hygiene
 
+### The e2e harness's own unit tests
+
+`scripts/lib/test_*.py` covers the harness's scenario logic (the read-state and sync assertions, the settings assertions) against stubs, with no server and no browser.
+`e2e.yml` runs the same discovery, but only on push to main, and only as an advisory check; this is the `pull_request` gate on it, so a regression in the harness itself fails a PR rather than a nightly run nobody is watching.
+
 ### iOS purpose strings
 
 App Store review rejects a binary whose linked SDKs reference a sensitive API without a purpose string, and it does it asynchronously.
@@ -339,9 +344,12 @@ It signs the manifest-list digest, which covers both arch images and every tag t
 `latest` is the rolling tag deployments track for auto-updates, since Watchtower polls a mutable tag.
 The version and sha tags stay alongside it, for pinning and for tracing an image back to its commit.
 
-`server-image-merge` moves `latest` only when the version it is about to publish is the newest one GHCR has ever seen for this image, compared with `sort -V` against every semver-shaped tag the registry already lists.
-Re-pushing an old `server-v*` tag (the documented re-publish capability above) still builds, signs and republishes that version's own tag, but `latest` is left pointing at whatever is genuinely newest, with a workflow warning naming what was skipped and why.
-Without this, republishing an old tag would silently roll every auto-updating deployment backwards to it.
+`server-image-merge` moves `latest` only when the version it is about to publish is the newest one GHCR has ever seen for this image, compared with `sort -V` against every semver-shaped tag the registry already lists (`scripts/decide-latest-tag.sh`).
+Re-pushing an old `server-v*` tag (the documented re-publish capability above) still builds, signs and republishes that version's own tag, but `latest` is left pointing at whatever is genuinely newest, with a `::warning::` annotation naming what was skipped and why.
+A tag listing GitHub cannot read (a rate limit, a permissions gap) fails the same way, closed: the step answers `false` and warns by name, rather than treating "could not tell" as "nothing published yet".
+This protects only tags cut at a commit that already contains this script: GitHub runs the workflow and the scripts it calls from the pushed ref, so a `server-v*` tag pointing at an older commit (every one that exists through 0.18.5) still republishes unconditionally, moving `latest` exactly as before this existed.
+Closing that needs something outside this file: a tag protection ruleset, or GHCR's own immutable-tag setting.
+Without this, republishing a newer-than-nothing-else tag would silently roll every auto-updating deployment backwards to it.
 
 ### server-binaries and server-release-assets
 
