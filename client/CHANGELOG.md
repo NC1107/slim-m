@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.15.0](https://github.com/NC1107/slim-m/compare/client-v0.14.0...client-v0.15.0) (2026-07-31)
+
+
+### Features
+
+* **client:** canvas op-stream reconciliation, no UI wired yet ([#222](https://github.com/NC1107/slim-m/issues/222)) ([8669a4c](https://github.com/NC1107/slim-m/commit/8669a4cf253f1ea4567c1d4fbed7b75dc904b832))
+* **voice_canvas:** grid removal, document tombstones, and an eraser hit test ([#217](https://github.com/NC1107/slim-m/issues/217)) ([eb63da0](https://github.com/NC1107/slim-m/commit/eb63da0ef9c959085fb7c07cf1b6cf2c85cc9265))
+
+
+### Bug Fixes
+
+* a relaunched client no longer shows itself as still on a call ([#205](https://github.com/NC1107/slim-m/issues/205)) ([2aa141d](https://github.com/NC1107/slim-m/commit/2aa141dafc3861be4cdae859a5c95237fdb8bde7))
+* **ci:** stop latest from rolling backwards, lock two more builds, and make the e2e checks honest ([#206](https://github.com/NC1107/slim-m/issues/206)) ([97a61af](https://github.com/NC1107/slim-m/commit/97a61af055970e173862441dcb7f6779a623fe11))
+* close five session and store lifecycle gaps ([#211](https://github.com/NC1107/slim-m/issues/211)) ([9736c8b](https://github.com/NC1107/slim-m/commit/9736c8b96bb67be15282362342806bd52f76ad58))
+* confirm channel overwrites, bind the shortcut table, and explain a blocked DM ([#213](https://github.com/NC1107/slim-m/issues/213)) ([5aad293](https://github.com/NC1107/slim-m/commit/5aad293f9c84a9a181a1c3356043bf15f3659d08))
+
 ## [0.14.0](https://github.com/NC1107/slim-m/compare/client-v0.13.3...client-v0.14.0) (2026-07-31)
 
 
