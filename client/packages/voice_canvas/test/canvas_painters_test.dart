@@ -1,0 +1,146 @@
+// SPDX-License-Identifier: Apache-2.0
+/// The draft stroke under the pointer must paint at the width and place it
+/// will keep once committed, or a stroke visibly changes size at pointer-up.
+///
+/// A stub [Canvas] tracks the actual affine transform `save`/`translate`/
+/// `scale`/`restore` build up, the way the real engine would, so what is
+/// asserted here is the on-screen result each painter reaches rather than the
+/// constructor arguments either was built with.
+library;
+
+import 'package:flutter/rendering.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_voice_canvas/src/canvas_document.dart';
+import 'package:slimm_voice_canvas/src/canvas_painters.dart';
+
+const _ink = Color(0xFFE86A5C);
+
+class _Transform {
+  const _Transform(this.tx, this.ty, this.scale);
+
+  final double tx;
+  final double ty;
+  final double scale;
+
+  Rect apply(Rect r) => Rect.fromLTRB(
+        tx + scale * r.left,
+        ty + scale * r.top,
+        tx + scale * r.right,
+        ty + scale * r.bottom,
+      );
+}
+
+/// Records what each painter actually reaches at `drawPath`, not what its
+/// constructor was handed: the device-space stroke width (raw `strokeWidth`
+/// times whatever `scale` was active) and the device-space path bounds.
+class _RecordingCanvas implements Canvas {
+  final List<double> deviceStrokeWidths = <double>[];
+  final List<Rect> deviceBounds = <Rect>[];
+  final List<_Transform> _stack = <_Transform>[const _Transform(0, 0, 1)];
+
+  _Transform get _current => _stack.last;
+
+  @override
+  void save() => _stack.add(_current);
+
+  @override
+  void restore() {
+    if (_stack.length > 1) _stack.removeLast();
+  }
+
+  @override
+  void translate(double dx, double dy) {
+    final c = _current;
+    _stack[_stack.length - 1] =
+        _Transform(c.tx + c.scale * dx, c.ty + c.scale * dy, c.scale);
+  }
+
+  @override
+  void scale(double sx, [double? sy]) {
+    final c = _current;
+    _stack[_stack.length - 1] = _Transform(c.tx, c.ty, c.scale * sx);
+  }
+
+  @override
+  void drawPath(Path path, Paint paint) {
+    deviceStrokeWidths.add(paint.strokeWidth * _current.scale);
+    deviceBounds.add(_current.apply(path.getBounds()));
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+/// A document holding one committed horizontal stroke, camera set last so the
+/// placed object is culled in before anything paints.
+CanvasDocument _documentWithCommittedStroke(double zoom) {
+  final document = CanvasDocument();
+  document.setViewport(const Size(400, 400));
+  document.applyPlaced(
+    const CanvasStrokeInput(
+      id: 'committed',
+      seq: 1,
+      zIndex: 1,
+      x: 0,
+      y: 50,
+      w: 100,
+      h: 1,
+      points: [0, 0, 100, 0],
+      width: 4,
+      colorKey: 'ink',
+    ),
+  );
+  document.setCamera(Camera(zoom: zoom));
+  return document;
+}
+
+DraftStroke _draftAlongTheSameLine() => DraftStroke()
+  ..begin(const Offset(0, 175))
+  ..extend(const Offset(350, 175));
+
+void main() {
+  test(
+      'a draft stroke reaches the same on-screen width as the committed '
+      'stroke once zoom is not 1', () {
+    const zoom = 3.5;
+    final document = _documentWithCommittedStroke(zoom);
+    addTearDown(document.dispose);
+
+    final committedCanvas = _RecordingCanvas();
+    StrokePainter(document: document, ink: _ink)
+        .paint(committedCanvas, const Size(400, 400));
+
+    final draft = _draftAlongTheSameLine();
+    addTearDown(draft.dispose);
+    final draftCanvas = _RecordingCanvas();
+    DraftPainter(draft: draft, document: document, ink: _ink, width: 4)
+        .paint(draftCanvas, const Size(400, 400));
+
+    expect(committedCanvas.deviceStrokeWidths, [4.0 * zoom]);
+    expect(
+      draftCanvas.deviceStrokeWidths,
+      committedCanvas.deviceStrokeWidths,
+      reason: 'the preview must land at the width the committed stroke will '
+          'have, or the stroke changes size the instant the pointer lifts',
+    );
+  });
+
+  test(
+      'a draft stroke lands at the same on-screen place and shape as the '
+      'committed stroke', () {
+    final document = _documentWithCommittedStroke(3.5);
+    addTearDown(document.dispose);
+
+    final committedCanvas = _RecordingCanvas();
+    StrokePainter(document: document, ink: _ink)
+        .paint(committedCanvas, const Size(400, 400));
+
+    final draft = _draftAlongTheSameLine();
+    addTearDown(draft.dispose);
+    final draftCanvas = _RecordingCanvas();
+    DraftPainter(draft: draft, document: document, ink: _ink, width: 4)
+        .paint(draftCanvas, const Size(400, 400));
+
+    expect(draftCanvas.deviceBounds, committedCanvas.deviceBounds);
+  });
+}
