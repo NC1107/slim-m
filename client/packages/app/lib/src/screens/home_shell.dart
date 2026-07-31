@@ -20,6 +20,7 @@ import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
+import '../widgets/channel_grouping.dart';
 import '../widgets/channel_rail.dart';
 import '../widgets/channel_rail_frame.dart';
 import '../widgets/command_palette.dart';

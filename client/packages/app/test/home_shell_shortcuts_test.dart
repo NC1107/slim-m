@@ -195,6 +195,10 @@ void main() {
     await _teardown(tester, setup.container, setup.db);
   });
 
+  /// Three channels, deliberately: with only two, wrapping next and wrapping
+  /// previous both land on the same one, so a next handler bound to previous
+  /// (or the reverse) would still pass. A third channel gives each direction
+  /// its own answer at every step.
   testWidgets('Ctrl+Tab moves to the next channel, wrapping at the end', (
     tester,
   ) async {
@@ -202,21 +206,26 @@ void main() {
     await MessageStore(setup.db).upsertChannels(const [
       api.Channel(id: 'c1', name: 'general', kind: 'text', createdAt: 0),
       api.Channel(id: 'c2', name: 'random', kind: 'text', createdAt: 1),
+      api.Channel(id: 'c3', name: 'off-topic', kind: 'text', createdAt: 2),
     ]);
     final router = _idRouter('/channels/c1');
     await _pump(tester, setup.container, router);
 
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-    await _settleCycle(tester);
+    Future<void> next() async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await _settleCycle(tester);
+    }
+
+    await next();
     expect(find.text('channel:c2'), findsOneWidget);
 
+    await next();
+    expect(find.text('channel:c3'), findsOneWidget);
+
     // Wraps: one more next from the last channel returns to the first.
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-    await _settleCycle(tester);
+    await next();
     expect(find.text('channel:c1'), findsOneWidget);
 
     await _teardown(tester, setup.container, setup.db);
@@ -229,22 +238,32 @@ void main() {
     await MessageStore(setup.db).upsertChannels(const [
       api.Channel(id: 'c1', name: 'general', kind: 'text', createdAt: 0),
       api.Channel(id: 'c2', name: 'random', kind: 'text', createdAt: 1),
+      api.Channel(id: 'c3', name: 'off-topic', kind: 'text', createdAt: 2),
     ]);
     final router = _idRouter('/channels/c1');
     await _pump(tester, setup.container, router);
 
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-    await _settleCycle(tester);
+    Future<void> previous() async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await _settleCycle(tester);
+    }
 
+    await previous();
     expect(
-      find.text('channel:c2'),
+      find.text('channel:c3'),
       findsOneWidget,
       reason: 'from the first channel, previous must wrap to the last',
     );
+
+    await previous();
+    expect(find.text('channel:c2'), findsOneWidget);
+
+    await previous();
+    expect(find.text('channel:c1'), findsOneWidget);
 
     await _teardown(tester, setup.container, setup.db);
   });

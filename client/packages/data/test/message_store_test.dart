@@ -259,6 +259,30 @@ void main() {
     expect(channel.lastReadSeq, 5);
   });
 
+  test('dmParticipantId round-trips and updates on a later upsert', () async {
+    await store.upsertChannels([
+      const api.Channel(
+        id: 'dm-1',
+        name: 'Alice',
+        kind: 'dm',
+        createdAt: 1,
+        dmParticipantId: 'alice',
+      ),
+    ]);
+
+    var channels = await store.watchChannels().first;
+    expect(channels.firstWhere((c) => c.id == 'dm-1').dmParticipantId, 'alice');
+
+    // A row cached before this column existed carries null until refreshed.
+    await store.upsertChannels([
+      const api.Channel(
+          id: 'chan-1', name: 'general', kind: 'text', createdAt: 1),
+    ]);
+    channels = await store.watchChannels().first;
+    expect(
+        channels.firstWhere((c) => c.id == 'chan-1').dmParticipantId, isNull);
+  });
+
   test(
       'replaceChannels prunes a channel the server no longer lists, '
       'keeping cursor and read marker for the rest', () async {

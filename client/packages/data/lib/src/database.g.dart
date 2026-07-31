@@ -59,9 +59,24 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("is_personal_space" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _dmParticipantIdMeta =
+      const VerificationMeta('dmParticipantId');
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, name, kind, createdAt, topic, cursor, lastReadSeq, isPersonalSpace];
+  late final GeneratedColumn<String> dmParticipantId = GeneratedColumn<String>(
+      'dm_participant_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        name,
+        kind,
+        createdAt,
+        topic,
+        cursor,
+        lastReadSeq,
+        isPersonalSpace,
+        dmParticipantId
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -115,6 +130,12 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           isPersonalSpace.isAcceptableOrUnknown(
               data['is_personal_space']!, _isPersonalSpaceMeta));
     }
+    if (data.containsKey('dm_participant_id')) {
+      context.handle(
+          _dmParticipantIdMeta,
+          dmParticipantId.isAcceptableOrUnknown(
+              data['dm_participant_id']!, _dmParticipantIdMeta));
+    }
     return context;
   }
 
@@ -140,6 +161,8 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           .read(DriftSqlType.int, data['${effectivePrefix}last_read_seq'])!,
       isPersonalSpace: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}is_personal_space'])!,
+      dmParticipantId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}dm_participant_id']),
     );
   }
 
@@ -168,6 +191,11 @@ class Channel extends DataClass implements Insertable<Channel> {
   /// `channelFromDm` from `dm.user.id == selfId` - never from `name`, which
   /// is a display string another member's own display name can collide with.
   final bool isPersonalSpace;
+
+  /// The other user in this DM, set only by `channelFromDm`. Null for a
+  /// non-DM channel, and for a DM row cached before this column existed
+  /// until the next channel refresh replaces it.
+  final String? dmParticipantId;
   const Channel(
       {required this.id,
       required this.name,
@@ -176,7 +204,8 @@ class Channel extends DataClass implements Insertable<Channel> {
       this.topic,
       required this.cursor,
       required this.lastReadSeq,
-      required this.isPersonalSpace});
+      required this.isPersonalSpace,
+      this.dmParticipantId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -190,6 +219,9 @@ class Channel extends DataClass implements Insertable<Channel> {
     map['cursor'] = Variable<int>(cursor);
     map['last_read_seq'] = Variable<int>(lastReadSeq);
     map['is_personal_space'] = Variable<bool>(isPersonalSpace);
+    if (!nullToAbsent || dmParticipantId != null) {
+      map['dm_participant_id'] = Variable<String>(dmParticipantId);
+    }
     return map;
   }
 
@@ -204,6 +236,9 @@ class Channel extends DataClass implements Insertable<Channel> {
       cursor: Value(cursor),
       lastReadSeq: Value(lastReadSeq),
       isPersonalSpace: Value(isPersonalSpace),
+      dmParticipantId: dmParticipantId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dmParticipantId),
     );
   }
 
@@ -219,6 +254,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       cursor: serializer.fromJson<int>(json['cursor']),
       lastReadSeq: serializer.fromJson<int>(json['lastReadSeq']),
       isPersonalSpace: serializer.fromJson<bool>(json['isPersonalSpace']),
+      dmParticipantId: serializer.fromJson<String?>(json['dmParticipantId']),
     );
   }
   @override
@@ -233,6 +269,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       'cursor': serializer.toJson<int>(cursor),
       'lastReadSeq': serializer.toJson<int>(lastReadSeq),
       'isPersonalSpace': serializer.toJson<bool>(isPersonalSpace),
+      'dmParticipantId': serializer.toJson<String?>(dmParticipantId),
     };
   }
 
@@ -244,7 +281,8 @@ class Channel extends DataClass implements Insertable<Channel> {
           Value<String?> topic = const Value.absent(),
           int? cursor,
           int? lastReadSeq,
-          bool? isPersonalSpace}) =>
+          bool? isPersonalSpace,
+          Value<String?> dmParticipantId = const Value.absent()}) =>
       Channel(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -254,6 +292,9 @@ class Channel extends DataClass implements Insertable<Channel> {
         cursor: cursor ?? this.cursor,
         lastReadSeq: lastReadSeq ?? this.lastReadSeq,
         isPersonalSpace: isPersonalSpace ?? this.isPersonalSpace,
+        dmParticipantId: dmParticipantId.present
+            ? dmParticipantId.value
+            : this.dmParticipantId,
       );
   Channel copyWithCompanion(ChannelsCompanion data) {
     return Channel(
@@ -268,6 +309,9 @@ class Channel extends DataClass implements Insertable<Channel> {
       isPersonalSpace: data.isPersonalSpace.present
           ? data.isPersonalSpace.value
           : this.isPersonalSpace,
+      dmParticipantId: data.dmParticipantId.present
+          ? data.dmParticipantId.value
+          : this.dmParticipantId,
     );
   }
 
@@ -281,14 +325,15 @@ class Channel extends DataClass implements Insertable<Channel> {
           ..write('topic: $topic, ')
           ..write('cursor: $cursor, ')
           ..write('lastReadSeq: $lastReadSeq, ')
-          ..write('isPersonalSpace: $isPersonalSpace')
+          ..write('isPersonalSpace: $isPersonalSpace, ')
+          ..write('dmParticipantId: $dmParticipantId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, name, kind, createdAt, topic, cursor, lastReadSeq, isPersonalSpace);
+  int get hashCode => Object.hash(id, name, kind, createdAt, topic, cursor,
+      lastReadSeq, isPersonalSpace, dmParticipantId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -300,7 +345,8 @@ class Channel extends DataClass implements Insertable<Channel> {
           other.topic == this.topic &&
           other.cursor == this.cursor &&
           other.lastReadSeq == this.lastReadSeq &&
-          other.isPersonalSpace == this.isPersonalSpace);
+          other.isPersonalSpace == this.isPersonalSpace &&
+          other.dmParticipantId == this.dmParticipantId);
 }
 
 class ChannelsCompanion extends UpdateCompanion<Channel> {
@@ -312,6 +358,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
   final Value<int> cursor;
   final Value<int> lastReadSeq;
   final Value<bool> isPersonalSpace;
+  final Value<String?> dmParticipantId;
   final Value<int> rowid;
   const ChannelsCompanion({
     this.id = const Value.absent(),
@@ -322,6 +369,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.cursor = const Value.absent(),
     this.lastReadSeq = const Value.absent(),
     this.isPersonalSpace = const Value.absent(),
+    this.dmParticipantId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChannelsCompanion.insert({
@@ -333,6 +381,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.cursor = const Value.absent(),
     this.lastReadSeq = const Value.absent(),
     this.isPersonalSpace = const Value.absent(),
+    this.dmParticipantId = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         name = Value(name),
@@ -347,6 +396,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     Expression<int>? cursor,
     Expression<int>? lastReadSeq,
     Expression<bool>? isPersonalSpace,
+    Expression<String>? dmParticipantId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -358,6 +408,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       if (cursor != null) 'cursor': cursor,
       if (lastReadSeq != null) 'last_read_seq': lastReadSeq,
       if (isPersonalSpace != null) 'is_personal_space': isPersonalSpace,
+      if (dmParticipantId != null) 'dm_participant_id': dmParticipantId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -371,6 +422,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       Value<int>? cursor,
       Value<int>? lastReadSeq,
       Value<bool>? isPersonalSpace,
+      Value<String?>? dmParticipantId,
       Value<int>? rowid}) {
     return ChannelsCompanion(
       id: id ?? this.id,
@@ -381,6 +433,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       cursor: cursor ?? this.cursor,
       lastReadSeq: lastReadSeq ?? this.lastReadSeq,
       isPersonalSpace: isPersonalSpace ?? this.isPersonalSpace,
+      dmParticipantId: dmParticipantId ?? this.dmParticipantId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -412,6 +465,9 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     if (isPersonalSpace.present) {
       map['is_personal_space'] = Variable<bool>(isPersonalSpace.value);
     }
+    if (dmParticipantId.present) {
+      map['dm_participant_id'] = Variable<String>(dmParticipantId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -429,6 +485,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
           ..write('cursor: $cursor, ')
           ..write('lastReadSeq: $lastReadSeq, ')
           ..write('isPersonalSpace: $isPersonalSpace, ')
+          ..write('dmParticipantId: $dmParticipantId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -980,6 +1037,7 @@ typedef $$ChannelsTableCreateCompanionBuilder = ChannelsCompanion Function({
   Value<int> cursor,
   Value<int> lastReadSeq,
   Value<bool> isPersonalSpace,
+  Value<String?> dmParticipantId,
   Value<int> rowid,
 });
 typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
@@ -991,6 +1049,7 @@ typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
   Value<int> cursor,
   Value<int> lastReadSeq,
   Value<bool> isPersonalSpace,
+  Value<String?> dmParticipantId,
   Value<int> rowid,
 });
 
@@ -1027,6 +1086,10 @@ class $$ChannelsTableFilterComposer
   ColumnFilters<bool> get isPersonalSpace => $composableBuilder(
       column: $table.isPersonalSpace,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get dmParticipantId => $composableBuilder(
+      column: $table.dmParticipantId,
+      builder: (column) => ColumnFilters(column));
 }
 
 class $$ChannelsTableOrderingComposer
@@ -1062,6 +1125,10 @@ class $$ChannelsTableOrderingComposer
   ColumnOrderings<bool> get isPersonalSpace => $composableBuilder(
       column: $table.isPersonalSpace,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get dmParticipantId => $composableBuilder(
+      column: $table.dmParticipantId,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$ChannelsTableAnnotationComposer
@@ -1096,6 +1163,9 @@ class $$ChannelsTableAnnotationComposer
 
   GeneratedColumn<bool> get isPersonalSpace => $composableBuilder(
       column: $table.isPersonalSpace, builder: (column) => column);
+
+  GeneratedColumn<String> get dmParticipantId => $composableBuilder(
+      column: $table.dmParticipantId, builder: (column) => column);
 }
 
 class $$ChannelsTableTableManager extends RootTableManager<
@@ -1129,6 +1199,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<int> cursor = const Value.absent(),
             Value<int> lastReadSeq = const Value.absent(),
             Value<bool> isPersonalSpace = const Value.absent(),
+            Value<String?> dmParticipantId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ChannelsCompanion(
@@ -1140,6 +1211,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             cursor: cursor,
             lastReadSeq: lastReadSeq,
             isPersonalSpace: isPersonalSpace,
+            dmParticipantId: dmParticipantId,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -1151,6 +1223,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<int> cursor = const Value.absent(),
             Value<int> lastReadSeq = const Value.absent(),
             Value<bool> isPersonalSpace = const Value.absent(),
+            Value<String?> dmParticipantId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ChannelsCompanion.insert(
@@ -1162,6 +1235,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             cursor: cursor,
             lastReadSeq: lastReadSeq,
             isPersonalSpace: isPersonalSpace,
+            dmParticipantId: dmParticipantId,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

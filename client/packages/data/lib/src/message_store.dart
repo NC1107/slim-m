@@ -129,6 +129,7 @@ class MessageStore {
             createdAt: channel.createdAt,
             topic: Value(channel.topic),
             isPersonalSpace: Value(channel.isPersonalSpace),
+            dmParticipantId: Value(channel.dmParticipantId),
           ),
           onConflict: DoUpdate(
             (_) => ChannelsCompanion.custom(
@@ -136,6 +137,7 @@ class MessageStore {
               kind: Variable(channel.kind),
               topic: Variable(channel.topic),
               isPersonalSpace: Variable(channel.isPersonalSpace),
+              dmParticipantId: Variable(channel.dmParticipantId),
             ),
           ),
         );

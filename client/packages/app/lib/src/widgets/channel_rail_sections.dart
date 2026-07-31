@@ -11,6 +11,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
+import 'channel_grouping.dart';
 import 'channel_rail_channel_rows.dart';
 import 'create_channel_sheet.dart';
 import 'personal_space_row.dart';
@@ -72,11 +73,13 @@ class _SectionLabel extends StatelessWidget {
 /// message someone.
 ///
 /// A DM with yourself - your personal space - is the one exception: it gets
-/// its own always-present [PersonalSpaceRow] rather than being something
-/// you find by searching your own name in the member list. The split below
+/// its own always-present [PersonalSpaceRow] rather than being something you
+/// find by searching your own name in the member list. [splitPersonalSpace]
 /// reads [Channel.isPersonalSpace], not [Channel.name]: another member can
 /// freely set their own display name to [personalSpaceName], and their DM
 /// must still render, and open, as an ordinary row rather than as this one.
+/// `orderedChannels` (`channel_grouping.dart`) calls the same function, so
+/// the next/previous-channel shortcuts cycle in the order shown here.
 class DirectMessagesSection extends StatelessWidget {
   const DirectMessagesSection({
     super.key,
@@ -90,15 +93,9 @@ class DirectMessagesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    Channel? personal;
-    final others = <Channel>[];
-    for (final channel in channels) {
-      if (channel.isPersonalSpace && personal == null) {
-        personal = channel;
-      } else {
-        others.add(channel);
-      }
-    }
+    final split = splitPersonalSpace(channels);
+    final personal = split.personal;
+    final others = split.others;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

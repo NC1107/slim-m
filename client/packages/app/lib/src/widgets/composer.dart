@@ -197,7 +197,11 @@ class _ComposerState extends ConsumerState<Composer> {
     }
     // Both accept; Enter would otherwise send the half-typed trigger.
     if (key == LogicalKeyboardKey.tab || key == LogicalKeyboardKey.enter) {
-      if (HardwareKeyboard.instance.isShiftPressed) {
+      final keyboard = HardwareKeyboard.instance;
+      // A held modifier is a global shortcut (Ctrl/Cmd+Tab cycles channels), not an accept.
+      if (keyboard.isShiftPressed ||
+          keyboard.isControlPressed ||
+          keyboard.isMetaPressed) {
         return KeyEventResult.ignored;
       }
       _accept(_suggestions[_selected]);

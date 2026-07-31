@@ -43,9 +43,9 @@ http.Response _emptyJsonList() => http.Response(
   headers: {'content-type': 'application/json'},
 );
 
-/// Pumps `ChannelScreen` for a DM already in the local store, with `GET
-/// /dms` naming [otherUserId] as its participant and `GET /blocks` naming
-/// [blockedIds] as blocked.
+/// Pumps `ChannelScreen` for a DM already in the local store, its row
+/// carrying [otherUserId] as the participant `channelFromDm` would have set,
+/// and `GET /blocks` naming [blockedIds] as blocked.
 Future<void> _pump(
   WidgetTester tester, {
   required String otherUserId,
@@ -59,7 +59,13 @@ Future<void> _pump(
   addTearDown(db.close);
   final store = MessageStore(db);
   await store.upsertChannels([
-    const api.Channel(id: 'dm-1', name: 'Alice', kind: 'dm', createdAt: 0),
+    api.Channel(
+      id: 'dm-1',
+      name: 'Alice',
+      kind: 'dm',
+      createdAt: 0,
+      dmParticipantId: otherUserId,
+    ),
   ]);
 
   final container = ProviderContainer(
@@ -89,25 +95,6 @@ Future<void> _pump(
             if (request.method == 'GET' && request.url.path == '/blocks') {
               return http.Response(
                 jsonEncode(blockedIds.toList()),
-                200,
-                headers: {'content-type': 'application/json'},
-              );
-            }
-            if (request.method == 'GET' && request.url.path == '/dms') {
-              return http.Response(
-                jsonEncode([
-                  {
-                    'channel_id': 'dm-1',
-                    'user': {
-                      'id': otherUserId,
-                      'username': otherUserId,
-                      'display_name': 'Alice',
-                      'created_at': 0,
-                    },
-                    'unread': 0,
-                    'created_at': 0,
-                  },
-                ]),
                 200,
                 headers: {'content-type': 'application/json'},
               );
