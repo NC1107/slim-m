@@ -31,7 +31,7 @@ permissions:
 
 concurrency:
   group: client-ios-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # The CallKit synchronous-report invariant is a termination risk, not a style
