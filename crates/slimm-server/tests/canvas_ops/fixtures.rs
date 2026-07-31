@@ -63,6 +63,18 @@ pub(crate) async fn register(store: &Store, username: &str) -> (String, UserId) 
     (tokens.access_token, account.id)
 }
 
+/// An ordinary member, distinct from the deployment-claiming administrator
+/// [`register`] creates: only `@everyone`'s bits, so `MANAGE_CANVAS` is
+/// absent unless a test grants it.
+pub(crate) async fn member(store: &Store, username: &str) -> (String, UserId) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
+        .await
+        .unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id)
+}
+
 pub(crate) async fn general(store: &Store) -> ChannelId {
     store.list_channels().await.unwrap()[0].id
 }
@@ -106,6 +118,43 @@ pub(crate) async fn post_object(
         status,
         serde_json::from_slice(&bytes).unwrap_or(Value::Null),
     )
+}
+
+pub(crate) async fn submit_op(
+    app: &Router,
+    channel: ChannelId,
+    token: &str,
+    body: Value,
+) -> (StatusCode, Value) {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/channels/{channel}/canvas/ops"))
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+pub(crate) fn remove(id: &str, object_ids: &[&str]) -> Value {
+    json!({ "id": id, "kind": "remove", "object_ids": object_ids })
+}
+
+pub(crate) fn clear(id: &str, before_seq: i64) -> Value {
+    json!({ "id": id, "kind": "clear", "before_seq": before_seq })
 }
 
 pub(crate) async fn get_ops(

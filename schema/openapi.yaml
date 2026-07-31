@@ -2369,6 +2369,61 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: submitCanvasOp
+      tags: [canvas]
+      summary: Remove objects from a channel's canvas, or clear it.
+      description: >
+        Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel.
+        `restore` is not accepted yet (a later slice); an unrecognised `kind`
+        is a 400, the same as an unrecognised placement kind.
+
+
+        `id` is a client-minted UUIDv7 and the op's own idempotency key, the
+        same shape `placeCanvasObject`'s `id` already is: a replayed id
+        returns the stored op with `fresh: false` and publishes nothing.
+
+
+        `remove` names between 1 and 64 object ids and erases whichever of
+        them are still live. Removing your own object needs nothing further;
+        removing anyone else's needs `MANAGE_CANVAS`. An id absent from this
+        channel, or belonging to another one, is a 404 - one answer for both,
+        so the route cannot be used to probe whether an id exists elsewhere.
+
+
+        `clear` needs `MANAGE_CANVAS` unconditionally and takes a required
+        `before_seq`: every live object placed at or below it is removed.
+        The fence is required, not optional, because a lost response retried
+        without one would wipe whatever was drawn in the interval.
+
+
+        Refused for neither kind is a timeout: a timeout freezes the pen, not
+        the eraser, so a timed-out member may still remove their own ink.
+        `affected` may be 0 - every named object already gone, or nothing at
+        or below `before_seq` - in which case no seq is allocated, no op is
+        written, and nothing is published; an op row exists only for a real
+        state transition.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CanvasOpRequest"
+      responses:
+        "201":
+          description: The op, written or replayed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CanvasOpResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /channels/{channelId}/voice/token:
     post:
@@ -3796,6 +3851,68 @@ components:
             alongside this; discard local canvas state and cold-fetch the
             viewport instead of trusting a partial answer.
 
+    CanvasOpRequest:
+      type: object
+      required: [id, kind]
+      description: >-
+        One mutation submitted to `submitCanvasOp`. Which of `object_ids` and
+        `before_seq` may be present depends on `kind`: a `remove` takes
+        `object_ids` and no `before_seq`; a `clear` takes `before_seq` and no
+        `object_ids`. `restore` is not accepted yet.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Client-minted UUIDv7; also the idempotency key.
+        kind:
+          type: string
+          enum: [remove, clear]
+        object_ids:
+          type: array
+          minItems: 1
+          maxItems: 64
+          items: { type: string, format: uuid }
+          description: The objects a `remove` erases, at most 64 per op.
+        before_seq:
+          type: integer
+          format: int64
+          minimum: 0
+          description: >-
+            Required for `clear`. Every live object placed at or below this
+            canvas `seq` is removed.
+
+    CanvasOpResult:
+      type: object
+      required: [op, fresh]
+      properties:
+        op:
+          type: object
+          required: [id, seq, kind, affected, created_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            seq:
+              type: integer
+              format: int64
+            kind:
+              type: string
+              enum: [remove, clear]
+            affected:
+              type: integer
+              format: int64
+              description: >-
+                How many objects this op actually changed. May be 0: every
+                named object was already gone, or nothing matched `before_seq`.
+            created_at:
+              type: integer
+              format: int64
+        fresh:
+          type: boolean
+          description: >-
+            Whether this call is what wrote the op. A replayed id answers
+            `false` with the originally stored op and publishes nothing.
+
     Message:
       type: object
       required: [id, channel_id, seq, content, created_at]
@@ -4292,6 +4409,8 @@ components:
         - $ref: "#/components/schemas/ChannelDeleted"
         - $ref: "#/components/schemas/OverwriteChanged"
         - $ref: "#/components/schemas/CanvasObjectPlaced"
+        - $ref: "#/components/schemas/CanvasObjectsRemoved"
+        - $ref: "#/components/schemas/CanvasCleared"
         - $ref: "#/components/schemas/ServerPong"
         - $ref: "#/components/schemas/ServerError"
 
@@ -4315,6 +4434,56 @@ components:
           format: int64
         object:
           $ref: "#/components/schemas/CanvasObject"
+
+    CanvasObjectsRemoved:
+      type: object
+      required: [type, channel_id, seq, op_id, object_ids]
+      description: >-
+        Objects were removed from a channel's canvas, gated the same way
+        `canvas.object.placed` is. Ids only, matching `message.deleted`: a
+        removal publishes an id rather than content, and the actor is
+        deliberately absent so a moderation act does not name its moderator
+        to the whole channel.
+      properties:
+        type:
+          type: string
+          enum: [canvas.objects.removed]
+        channel_id:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          format: int64
+        op_id:
+          type: string
+          format: uuid
+        object_ids:
+          type: array
+          items: { type: string, format: uuid }
+
+    CanvasCleared:
+      type: object
+      required: [type, channel_id, seq, op_id, before_seq]
+      description: >-
+        Every object placed at or below `before_seq` was removed at once.
+        Carries no ids: a clear can cover a channel's whole live ceiling, and
+        the hub's broadcast ring buffers only 1024 cloned events.
+      properties:
+        type:
+          type: string
+          enum: [canvas.cleared]
+        channel_id:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          format: int64
+        op_id:
+          type: string
+          format: uuid
+        before_seq:
+          type: integer
+          format: int64
 
     ServerHello:
       type: object

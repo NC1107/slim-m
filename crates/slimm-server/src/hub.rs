@@ -26,7 +26,9 @@ use std::time::Duration;
 
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, broadcast};
 
-use crate::ids::{ChannelId, MessageId, RoleId, SessionId, UserId};
+use crate::ids::{
+    CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
+};
 use crate::presence::PresenceTracker;
 use crate::store::{AttachmentSummary, CanvasObject, Channel, Message};
 use crate::typing::TypingTracker;
@@ -202,6 +204,30 @@ pub enum Event {
         channel_id: ChannelId,
         object: CanvasObject,
     },
+    /// Objects were removed from a channel's canvas.
+    ///
+    /// Ids only, the shape [`Event::MessageDeleted`] already uses: a removal
+    /// publishes an id rather than content, and the actor is deliberately
+    /// absent so a moderation act does not name its moderator to the whole
+    /// channel. Bounded at [`crate::store::MAX_REMOVE_IDS_PER_OP`], which is
+    /// what keeps this inside both the frame ceiling and the hub's ring.
+    CanvasObjectsRemoved {
+        channel_id: ChannelId,
+        seq: Seq,
+        op_id: CanvasOpId,
+        object_ids: Vec<CanvasObjectId>,
+    },
+    /// Every object placed at or below `before_seq` was cleared at once.
+    ///
+    /// Carries no ids: a clear can cover a channel's whole live ceiling, and
+    /// [`CHANNEL_CAPACITY`] buffers 1024 cloned events, so a 20,000-id frame
+    /// is exactly what the props ceiling exists to stop one object doing.
+    CanvasCleared {
+        channel_id: ChannelId,
+        seq: Seq,
+        op_id: CanvasOpId,
+        before_seq: Seq,
+    },
 }
 
 /// A cloneable handle to the broadcast channel and the connection limiter,
@@ -255,6 +281,8 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::TypingStopped { .. }
         | Event::PresenceChanged(_)
         | Event::CanvasObjectPlaced { .. }
+        | Event::CanvasObjectsRemoved { .. }
+        | Event::CanvasCleared { .. }
         | Event::SessionRevoked(_) => false,
     }
 }

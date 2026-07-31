@@ -27,6 +27,7 @@ mod attachments;
 mod auth;
 mod canvas;
 mod canvas_ops;
+mod canvas_ops_write;
 mod canvas_write;
 pub mod capability;
 mod channels;

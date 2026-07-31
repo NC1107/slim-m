@@ -326,9 +326,38 @@ async fn the_same_id_in_another_channel_is_a_conflict() {
     let object = id();
 
     let (first, _) = post(&app, channel, &token, stroke(&object)).await;
-    let (second, _) = post(&app, other.id, &token, stroke(&object)).await;
+    let (second, body) = post(&app, other.id, &token, stroke(&object)).await;
     assert_eq!(first, StatusCode::CREATED);
     assert_eq!(second, StatusCode::CONFLICT);
+    assert_eq!(body["error"], "canvas object id already used");
+}
+
+/// A retry racing an erase deserves an honest answer, not the same "id
+/// taken" a foreign-channel conflict gets: the two 409s must read
+/// differently, or a client cannot explain either to the person drawing.
+#[tokio::test]
+async fn replaying_the_id_of_a_removed_object_answers_a_distinct_conflict() {
+    let (store, _guard) = new_store().await;
+    let (token, _) = register(&store, "root").await;
+    let channel = general(&store).await;
+    let app = app(store.clone());
+    let object = id();
+
+    let (status, body) = post(&app, channel, &token, stroke(&object)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    let placed = body["id"].as_str().unwrap().parse::<Uuid>().unwrap();
+    store
+        .remove_canvas_object(slimm_server::ids::CanvasObjectId(placed))
+        .await
+        .unwrap();
+
+    let (status, body) = post(&app, channel, &token, stroke(&object)).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(body["error"], "that object was removed");
+    assert_ne!(
+        body["error"], "canvas object id already used",
+        "an erased-object retry must not read as a foreign-channel id conflict"
+    );
 }
 
 /// A removed row keeps its id (the column is UNIQUE across live and dead

@@ -26,6 +26,7 @@ use serde_json::Value;
 
 use super::AppState;
 use super::canvas_ops::list_ops;
+use super::canvas_ops_write::submit_op;
 use super::canvas_write::{MAX_BODY_BYTES, place};
 use super::error::ApiError;
 use super::extract::{AuthedLimited, CANVAS, Json, Query};
@@ -41,16 +42,22 @@ const DEFAULT_LIMIT: i64 = 500;
 const MAX_LIMIT: i64 = 2000;
 
 /// The canvas routes, mounted by [`super::router`].
+///
+/// The body limit is on the router rather than either route, so a `remove`
+/// or `clear` body is refused at the byte level the same way an over-large
+/// `place` already is, before serde ever builds a `Value` several times its
+/// wire size.
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route(
             "/channels/{channel_id}/canvas/objects",
-            get(viewport)
-                .post(place)
-                // Refused at the byte level, before serde builds a `Value` several times its wire size.
-                .layer(DefaultBodyLimit::max(MAX_BODY_BYTES)),
+            get(viewport).post(place),
         )
-        .route("/channels/{channel_id}/canvas/ops", get(list_ops))
+        .route(
+            "/channels/{channel_id}/canvas/ops",
+            get(list_ops).post(submit_op),
+        )
+        .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
 }
 
 // --- Wire types ---

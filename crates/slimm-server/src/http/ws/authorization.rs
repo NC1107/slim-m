@@ -47,6 +47,40 @@ pub(super) enum Authorization {
 /// outage still gives up promptly.
 const RESOLVE_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(25);
 
+/// The bit a frame needs beyond `VIEW_CHANNEL`, if any.
+///
+/// Exhaustive with no wildcard, so a new variant does not compile until
+/// somebody classifies it - the same discipline `moves_permissions`
+/// (`hub.rs`) already uses. Replaces a `matches!` naming one variant, which
+/// would have shipped the next canvas event gated on `VIEW_CHANNEL` alone.
+fn extra_bit(event: &Event) -> Option<Permissions> {
+    match event {
+        Event::CanvasObjectPlaced { .. }
+        | Event::CanvasObjectsRemoved { .. }
+        | Event::CanvasCleared { .. } => Some(Permissions::USE_CANVAS),
+        Event::MessageCreated { .. }
+        | Event::MessageEdited(_)
+        | Event::MessageDeleted { .. }
+        | Event::ReactionsChanged { .. }
+        | Event::MessagePinned { .. }
+        | Event::MessageUnpinned { .. }
+        | Event::PollVoted { .. }
+        | Event::TypingStarted { .. }
+        | Event::TypingStopped { .. }
+        | Event::ChannelCreated(_)
+        | Event::ChannelUpdated(_)
+        | Event::OverwriteChanged { .. }
+        // Handled earlier in `authorize` and never reach this call.
+        | Event::SessionRevoked(_)
+        | Event::PresenceChanged(_)
+        | Event::MemberTimeoutChanged { .. }
+        | Event::MemberRemoved(_)
+        | Event::RoleChanged { .. }
+        | Event::MemberRoleChanged { .. }
+        | Event::ChannelDeleted { .. } => None,
+    }
+}
+
 /// Filters an event down to a wire frame, or the reason it is not delivered.
 ///
 /// Presence is handled up front rather than folded into the channel-scoped
@@ -130,6 +164,8 @@ pub(super) async fn authorize(
         Event::ChannelCreated(channel) | Event::ChannelUpdated(channel) => channel.id,
         Event::OverwriteChanged { channel_id, .. } => *channel_id,
         Event::CanvasObjectPlaced { channel_id, .. } => *channel_id,
+        Event::CanvasObjectsRemoved { channel_id, .. } => *channel_id,
+        Event::CanvasCleared { channel_id, .. } => *channel_id,
         // Control events are handled in the loop; the rest already returned above.
         Event::SessionRevoked(_)
         | Event::PresenceChanged(_)
@@ -172,9 +208,9 @@ pub(super) async fn authorize(
     if !visible && !held_it_before {
         return Authorization::Withhold;
     }
-    // The one surface gated on a second bit, as its own read route is; without this a denial is void here.
-    if matches!(event, Event::CanvasObjectPlaced { .. })
-        && !permissions.contains(Permissions::USE_CANVAS)
+    // The canvas frames are gated on a second bit, as their own read routes are; without this a denial is void here.
+    if let Some(extra) = extra_bit(&event)
+        && !permissions.contains(extra)
     {
         return Authorization::Withhold;
     }
@@ -295,6 +331,28 @@ pub(super) async fn authorize(
             channel_id: channel_id.to_string(),
             seq: object.seq.0,
             object: CanvasObjectDto::from(object),
+        },
+        Event::CanvasObjectsRemoved {
+            channel_id,
+            seq,
+            op_id,
+            object_ids,
+        } => ServerFrame::CanvasObjectsRemoved {
+            channel_id: channel_id.to_string(),
+            seq: seq.0,
+            op_id: op_id.to_string(),
+            object_ids: object_ids.iter().map(ToString::to_string).collect(),
+        },
+        Event::CanvasCleared {
+            channel_id,
+            seq,
+            op_id,
+            before_seq,
+        } => ServerFrame::CanvasCleared {
+            channel_id: channel_id.to_string(),
+            seq: seq.0,
+            op_id: op_id.to_string(),
+            before_seq: before_seq.0,
         },
         // The deployment-wide and channel-deletion cases already returned above.
         Event::SessionRevoked(_)

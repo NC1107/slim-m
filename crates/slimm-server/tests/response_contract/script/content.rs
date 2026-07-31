@@ -90,6 +90,22 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
     c.bare("deleteRole", "DELETE", &format!("/roles/{role}"), root)
         .await;
 
+    let first_stroke = c
+        .json(
+            "placeCanvasObject",
+            "POST",
+            &format!("/channels/{channel}/canvas/objects"),
+            root,
+            json!({
+                "id": Uuid::now_v7().to_string(),
+                "kind": "stroke",
+                "x": 100.0, "y": 100.0, "w": 40.0, "h": 20.0,
+                "props": { "points": [0.0, 0.0, 40.0, 20.0], "width": 3.0, "color": "annotation" },
+            }),
+        )
+        .await;
+    let first_object_id = text(&first_stroke, "id");
+    // A second object, so removing the first below still leaves listCanvasViewport's page non-empty.
     c.json(
         "placeCanvasObject",
         "POST",
@@ -98,20 +114,31 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         json!({
             "id": Uuid::now_v7().to_string(),
             "kind": "stroke",
-            "x": 100.0, "y": 100.0, "w": 40.0, "h": 20.0,
+            "x": 200.0, "y": 200.0, "w": 40.0, "h": 20.0,
             "props": { "points": [0.0, 0.0, 40.0, 20.0], "width": 3.0, "color": "annotation" },
         }),
     )
     .await;
-    // Placed first, so the read below covers a non-empty page rather than only
-    // the envelope a client decodes before anybody has drawn.
+    c.json(
+        "submitCanvasOp",
+        "POST",
+        &format!("/channels/{channel}/canvas/ops"),
+        root,
+        json!({
+            "id": Uuid::now_v7().to_string(),
+            "kind": "remove",
+            "object_ids": [first_object_id],
+        }),
+    )
+    .await;
+    // Two placed and the first erased above, so this page still carries a live object.
     c.get(
         "listCanvasViewport",
         &format!("/channels/{channel}/canvas/objects?min_x=0&min_y=0&max_x=1920&max_y=1080"),
         root,
     )
     .await;
-    // Placed above and nothing has removed it, so the page carries a live `object`.
+    // Covers a dead `place` (`object` absent), a live `place`, and the `remove` op itself.
     c.get(
         "listCanvasOps",
         &format!("/channels/{channel}/canvas/ops?after_seq=0"),
