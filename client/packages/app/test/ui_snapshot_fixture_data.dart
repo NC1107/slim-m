@@ -174,6 +174,12 @@ MockClient fixtureClient() => MockClient((request) async {
       'has_more': false,
       'latest_seq': 0,
     },
+    _ when path.endsWith('/canvas/ops') => {
+      'ops': <Object>[],
+      'latest_seq': int.parse(request.url.queryParameters['after_seq'] ?? '0'),
+      'has_more': false,
+      'reset': false,
+    },
     '/space/settings' => const {'join_policy': 'invite'},
     _ => const <Object>[],
   };

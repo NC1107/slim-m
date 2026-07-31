@@ -28,8 +28,10 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 import '../../ids.dart';
 import '../../providers/providers.dart';
 import '../../providers/live_events.dart';
+import '../../providers/sync_controller.dart';
 import 'canvas_bar.dart';
 import 'canvas_commit_queue.dart';
+import 'canvas_sync.dart';
 
 /// The channel whose canvas is open, or null.
 ///
@@ -53,6 +55,8 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   StreamSubscription<api.ServerEvent>? _live;
   CanvasCommitQueue? _queue;
   Timer? _panDebounce;
+  late final CanvasSync _sync;
+  ProviderSubscription<SyncStatus>? _syncStatusSubscription;
 
   Rect? _fetched;
 
@@ -68,6 +72,20 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   void initState() {
     super.initState();
     _live = ref.read(liveEventsProvider).listen(_onEvent);
+    _sync = CanvasSync(
+      channelId: widget.channelId,
+      client: ref.read(apiProvider),
+      document: _document,
+      coldFetch: _fetch,
+      forgetFetchedRegion: () => _fetched = null,
+    );
+    // Registered once here, not in build: a listener re-attached per rebuild would fire a catch-up per rebuild, not per transition into live.
+    _syncStatusSubscription = ref.listenManual<SyncStatus>(
+      syncControllerProvider,
+      (previous, next) {
+        if (next == SyncStatus.live) unawaited(_sync.catchUp());
+      },
+    );
     // No fetch here: CanvasSurface's first setViewport call reaches _onCameraMoved below and fetches the real region, not a wasted one against a zero viewport.
     _document.addListener(_onCameraMoved);
   }
@@ -77,6 +95,8 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _panDebounce?.cancel();
     _queue?.close();
     unawaited(_live?.cancel());
+    _syncStatusSubscription?.close();
+    _sync.dispose();
     _document.removeListener(_onCameraMoved);
     _document.dispose();
     super.dispose();
@@ -95,13 +115,45 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   );
 
   void _onEvent(api.ServerEvent event) {
-    if (event is! api.CanvasObjectPlaced) return;
-    if (event.channelId != widget.channelId) return;
-    _apply(event.object);
+    switch (event) {
+      case api.CanvasObjectPlaced(:final channelId, :final object)
+          when channelId == widget.channelId:
+        _sync.applyLive(event.seq, () => _apply(object));
+      case api.CanvasObjectsRemoved(
+            :final channelId,
+            :final seq,
+            :final objectIds,
+          )
+          when channelId == widget.channelId:
+        _sync.applyLive(seq, () {
+          for (final id in objectIds) {
+            _document.removeObject(id);
+          }
+          _document.refresh();
+        });
+      case api.CanvasCleared(:final channelId, :final seq, :final beforeSeq)
+          when channelId == widget.channelId:
+        _sync.applyLive(seq, () {
+          _document.clearBelow(beforeSeq);
+          _document.refresh();
+        });
+      case api.CanvasObjectsRestored(
+            :final channelId,
+            :final seq,
+            :final objectIds,
+          )
+          when channelId == widget.channelId:
+        _sync.applyLive(seq, () {
+          _document.forgetRemoved(objectIds);
+          _fetched = null;
+        });
+      default:
+        break;
+    }
   }
 
   void _apply(api.CanvasObject object) {
-    final input = _toStroke(object);
+    final input = canvasStrokeInputFrom(object);
     if (input == null) return;
     _document
       ..applyPlaced(input)
@@ -170,7 +222,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           );
       if (!mounted) return;
       for (final object in page.objects) {
-        final input = _toStroke(object);
+        final input = canvasStrokeInputFrom(object);
         if (input != null) _document.applyPlaced(input);
       }
       // Set before refresh(), not after: refresh() reaches _onCameraMoved synchronously and must see this fetch's own answer, not the value from before it ran.
@@ -182,6 +234,8 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
         _fetched = page.hasMore ? null : region;
       });
       _document.refresh();
+      _sync.seedFromViewport(page.latestSeq);
+      await _sync.catchUp();
     } on api.ForbiddenException {
       if (mounted) {
         setState(() {
@@ -197,24 +251,6 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
         });
       }
     }
-  }
-
-  CanvasStrokeInput? _toStroke(api.CanvasObject object) {
-    if (object.kind != 'stroke') return null;
-    final raw = object.props['points'];
-    if (raw is! List) return null;
-    return CanvasStrokeInput(
-      id: object.id,
-      seq: object.seq,
-      zIndex: object.zIndex,
-      x: object.x,
-      y: object.y,
-      w: object.w,
-      h: object.h,
-      points: raw.whereType<num>().map((n) => n.toDouble()).toList(),
-      width: (object.props['width'] as num?)?.toDouble() ?? 3,
-      colorKey: object.props['color'] as String? ?? 'annotation',
-    );
   }
 
   void _onStroke(List<Offset> worldPoints) {

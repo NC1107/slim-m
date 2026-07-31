@@ -57,11 +57,17 @@ MockClient _quietClient() => MockClient((request) async {
       'created_at': 0,
       'permissions': 0,
     },
-    // A list is the right empty answer for most reads; the canvas viewport and the voice roster each decode a shape, and the fake catch-all's `[]` fails those casts.
+    // A list is the right empty answer for most reads; the canvas viewport, the canvas ops feed and the voice roster each decode a shape, and the fake catch-all's `[]` fails those casts.
     _ when path.endsWith('/canvas/objects') => const {
       'objects': <Object>[],
       'has_more': false,
       'latest_seq': 0,
+    },
+    _ when path.endsWith('/canvas/ops') => {
+      'ops': <Object>[],
+      'latest_seq': int.parse(request.url.queryParameters['after_seq'] ?? '0'),
+      'has_more': false,
+      'reset': false,
     },
     _ when path.endsWith('/voice/roster') => const {'participants': <Object>[]},
     _ => const <Object>[],
