@@ -49,7 +49,15 @@ class CanvasScene extends ChangeNotifier {
 
   /// Empties the index for a document-wide reset, without notifying - the
   /// same reason [add] and [remove] do not.
-  void reset() => _grid.reset();
+  ///
+  /// [_cull] is cleared too, not only the grid: it caches the last cull's
+  /// slots until the next one overwrites them, and after a reset those slots
+  /// may no longer be valid indices into anything, so [visible] must not go
+  /// on answering with them.
+  void reset() {
+    _grid.reset();
+    _cull.clear();
+  }
 
   /// Culls an arbitrary rectangle into the caller's own [CullResult], never
   /// touching [visible] or repainting. Hit testing needs a cull that does

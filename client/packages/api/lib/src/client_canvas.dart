@@ -77,4 +77,53 @@ extension SlimmApiCanvas on SlimmApi {
     );
     return CanvasObject.fromJson(json as Map<String, dynamic>);
   }
+
+  /// Submits a canvas mutation - `remove`, `clear`, or `restore` - idempotent
+  /// by [id] exactly as [placeCanvasObject] is: a replay answers with the
+  /// stored op, `fresh: false`, and publishes nothing.
+  ///
+  /// Exactly one of [objectIds] (`remove`), [beforeSeq] (`clear`) or
+  /// [targetOp] (`restore`) is meaningful for a given [kind]; the server
+  /// rejects any other combination with a 400.
+  Future<CanvasOpResult> submitCanvasOp(
+    String channelId, {
+    required String id,
+    required String kind,
+    List<String>? objectIds,
+    int? beforeSeq,
+    String? targetOp,
+  }) async {
+    final json = await _send(
+      'POST',
+      '/channels/$channelId/canvas/ops',
+      body: {
+        'id': id,
+        'kind': kind,
+        if (objectIds != null) 'object_ids': objectIds,
+        if (beforeSeq != null) 'before_seq': beforeSeq,
+        if (targetOp != null) 'target_op': targetOp,
+      },
+    );
+    return CanvasOpResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Pages the canvas op stream from [afterSeq] (exclusive): the catch-up
+  /// feed a client reconciling after a drop or a reconnect reads, rather
+  /// than a full viewport re-read.
+  Future<CanvasOpsPage> canvasOps(
+    String channelId, {
+    required int afterSeq,
+    int? limit,
+  }) async {
+    final query = <String, String>{
+      'after_seq': '$afterSeq',
+      if (limit != null) 'limit': '$limit',
+    };
+    final json = await _send(
+      'GET',
+      '/channels/$channelId/canvas/ops',
+      query: query,
+    );
+    return CanvasOpsPage.fromJson(json as Map<String, dynamic>);
+  }
 }

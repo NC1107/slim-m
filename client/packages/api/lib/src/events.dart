@@ -143,6 +143,39 @@ sealed class ServerEvent {
             decoded['object'] as Map<String, dynamic>,
           ),
         ),
+      'canvas.objects.removed'
+          when decoded['channel_id'] is String &&
+              decoded['seq'] is int &&
+              decoded['op_id'] is String &&
+              decoded['object_ids'] is List =>
+        CanvasObjectsRemoved(
+          channelId: decoded['channel_id'] as String,
+          seq: decoded['seq'] as int,
+          opId: decoded['op_id'] as String,
+          objectIds: (decoded['object_ids'] as List<dynamic>).cast<String>(),
+        ),
+      'canvas.cleared'
+          when decoded['channel_id'] is String &&
+              decoded['seq'] is int &&
+              decoded['op_id'] is String &&
+              decoded['before_seq'] is int =>
+        CanvasCleared(
+          channelId: decoded['channel_id'] as String,
+          seq: decoded['seq'] as int,
+          opId: decoded['op_id'] as String,
+          beforeSeq: decoded['before_seq'] as int,
+        ),
+      'canvas.objects.restored'
+          when decoded['channel_id'] is String &&
+              decoded['seq'] is int &&
+              decoded['op_id'] is String &&
+              decoded['object_ids'] is List =>
+        CanvasObjectsRestored(
+          channelId: decoded['channel_id'] as String,
+          seq: decoded['seq'] as int,
+          opId: decoded['op_id'] as String,
+          objectIds: (decoded['object_ids'] as List<dynamic>).cast<String>(),
+        ),
       'pong' => const PongEvent(),
       'error' => ErrorEvent(decoded['message'] as String? ?? 'unknown'),
       _ => null,

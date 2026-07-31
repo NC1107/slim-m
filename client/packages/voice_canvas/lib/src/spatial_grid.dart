@@ -23,7 +23,11 @@ class CullResult {
   /// which is the failure mode the adaptive path exists to dodge.
   int cellsVisited = 0;
 
-  void _reset() {
+  /// Empties this result, both at the start of a fresh query and for a
+  /// document-wide reset - after which the slots it last held may no longer
+  /// be valid indices at all, so they cannot be left cached until the next
+  /// query happens to overwrite them.
+  void clear() {
     slots.clear();
     candidates = 0;
     cellsVisited = 0;
@@ -170,7 +174,7 @@ class UniformGrid {
     double bottom,
     CullResult out,
   ) {
-    out._reset();
+    out.clear();
     final stamp = _nextStamp();
     final cx0 = (left / cellSize).floor();
     final cy0 = (top / cellSize).floor();
@@ -212,7 +216,7 @@ class UniformGrid {
     double bottom,
     CullResult out,
   ) {
-    out._reset();
+    out.clear();
     out.candidates = _count;
     for (var slot = 0; slot < _count; slot++) {
       final base = slot << 2;

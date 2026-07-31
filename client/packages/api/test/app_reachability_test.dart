@@ -54,6 +54,12 @@ const Map<String, String> _allowlist = {
   'health': 'a liveness probe. Onboarding deliberately probes /version instead, '
       'because that answers push_enabled, invite_required and capabilities in '
       'the same round trip, and /healthz answers none of them',
+  'submitCanvasOp':
+      'the canvas removal slice lands in ordered PRs on purpose: reconciliation '
+          '(canvas_sync.dart, consuming remove/clear/restore ops read back over '
+          'canvasOps) is built and tested before anything can write one, so the '
+          'eraser, undo and clear controls that would call this are still the '
+          'next PR (2026-07-31)',
 };
 
 /// Names that are not API surface, so their absence proves nothing.

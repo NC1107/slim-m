@@ -77,6 +77,11 @@ class _Fixture {
   /// "the same fetch racing itself and never stopping".
   int viewportGets = 0;
 
+  /// Every `GET .../canvas/ops` the pane sent: every viewport fetch runs a
+  /// catch-up afterward, so this file's own tests only need the default
+  /// answer below to keep paging correct - it is not itself under test here.
+  int opsGets = 0;
+
   ProviderContainer container() => ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
@@ -88,6 +93,19 @@ class _Fixture {
           baseUrl: Uri.parse('http://localhost:8080'),
           session: ref.watch(sessionProvider),
           httpClient: MockClient((request) async {
+            if (request.url.path.endsWith('/canvas/ops')) {
+              opsGets++;
+              // Echoes the cursor back as the latest seq, so this fixture never answers `reset` or reports a gap.
+              final afterSeq = int.parse(
+                request.url.queryParameters['after_seq']!,
+              );
+              return _json({
+                'ops': <Object>[],
+                'latest_seq': afterSeq,
+                'has_more': false,
+                'reset': false,
+              });
+            }
             if (!request.url.path.endsWith('/canvas/objects')) {
               return _json(<Object>[]);
             }

@@ -48,6 +48,20 @@ void main() {
     expect(stats.builds, 20, reason: 'this is the cost the spike rejects');
   });
 
+  test('reset clears the cached cull, not only the grid', () {
+    final scene = CanvasScene()..add(0, 0, 100, 100);
+    scene.setViewport(-10, -10, 200, 200);
+    expect(scene.visible, isNotEmpty);
+
+    scene.reset();
+    expect(
+      scene.visible,
+      isEmpty,
+      reason: 'a stale slot cached from before the reset is no longer a valid '
+          'index into anything the document holds',
+    );
+  });
+
   test('the published package never imports Riverpod', () {
     for (final file in _libSources()) {
       expect(

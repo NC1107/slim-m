@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Canvas objects, as a viewport read returns them.
+/// Canvas objects, as a viewport read returns them. The op stream that reads
+/// back removals, clears and restores is a sibling file, `models_canvas_ops.dart`.
 library;
 
 /// One object on a channel's canvas.

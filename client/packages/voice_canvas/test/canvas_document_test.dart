@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /// What the document promises the surface, and what the splitter promises the
-/// server.
+/// server. Removal, tombstones, restore and a hard reset are a sibling file,
+/// `canvas_document_removal_test.dart`.
 library;
 
 import 'dart:convert';
@@ -54,128 +55,6 @@ void main() {
       ..refresh();
     expect(document.paintOrder, hasLength(1));
     expect(document.objectCount.value, 1);
-  });
-
-  test('removeObject is idempotent and paint order stays correct', () {
-    final document = CanvasDocument()..setViewport(const Size(800, 600));
-    document
-      ..applyPlaced(stroke('a'))
-      ..applyPlaced(stroke('b', x: 20))
-      ..refresh();
-    expect(document.paintOrder, hasLength(2));
-
-    document
-      ..removeObject('a')
-      ..refresh();
-    expect(document.paintOrder, hasLength(1));
-    expect(document.objectCount.value, 1);
-
-    document
-      ..removeObject('a')
-      ..refresh();
-    expect(document.paintOrder, hasLength(1));
-    expect(
-      document.objectCount.value,
-      1,
-      reason: 'removing the same id twice must not double-decrement',
-    );
-  });
-
-  test('an id removed before ever being placed refuses a later resurrection',
-      () {
-    final document = CanvasDocument()..setViewport(const Size(800, 600));
-
-    // The removal frame lands first, for an id this document never held.
-    document.removeObject('ghost');
-    expect(document.objectCount.value, 0);
-
-    final result = document.applyPlaced(stroke('ghost'));
-    expect(result, isNull);
-    expect(
-      document.objectCount.value,
-      0,
-      reason: 'a tombstoned id must never be materialized',
-    );
-    expect(document.paintOrder, isEmpty);
-  });
-
-  test(
-      'a placed-then-removed id refuses resurrection once its tombstone '
-      'is evicted', () {
-    final document = CanvasDocument()..setViewport(const Size(800, 600));
-    document
-      ..applyPlaced(stroke('a'))
-      ..refresh();
-    expect(document.objectCount.value, 1);
-
-    document
-      ..removeObject('a')
-      ..refresh();
-    expect(document.objectCount.value, 0);
-
-    // Push 'a' out of the tombstone, isolating the known-id dead-slot guard.
-    for (var i = 0; i < maxRemovedIdsTracked; i++) {
-      document.removeObject('evict$i');
-    }
-
-    final result = document.applyPlaced(stroke('a'));
-    expect(result, isNull);
-    expect(document.objectCount.value, 0);
-  });
-
-  test('clearBelow spares a locally drawn stroke still carrying seq 0', () {
-    final document = CanvasDocument()..setViewport(const Size(800, 600));
-    document
-      ..applyPlaced(stroke('confirmed', seq: 5, zIndex: 5))
-      ..applyPlaced(
-          stroke('local', x: 20, seq: 0, zIndex: provisionalLocalZIndex))
-      ..refresh();
-    expect(document.paintOrder, hasLength(2));
-
-    document
-      ..clearBelow(10)
-      ..refresh();
-
-    final ids =
-        document.paintOrder.map((slot) => document.strokeAt(slot).id).toList();
-    expect(
-      ids,
-      ['local'],
-      reason: 'seq 0 must survive a clear, or ink vanishes as it is drawn',
-    );
-    expect(document.objectCount.value, 1);
-  });
-
-  test('a confirmed placement updates seq so a later clear can reach it', () {
-    final document = CanvasDocument()..setViewport(const Size(800, 600));
-    document
-      ..applyPlaced(stroke('a', seq: 0, zIndex: provisionalLocalZIndex))
-      ..refresh();
-
-    // The server confirms the same id with its real seq.
-    document
-      ..applyPlaced(stroke('a', seq: 7, zIndex: 7))
-      ..refresh();
-
-    document
-      ..clearBelow(10)
-      ..refresh();
-    expect(document.paintOrder, isEmpty);
-    expect(document.objectCount.value, 0);
-  });
-
-  test('_removedIds evicts FIFO past the tracked ceiling', () {
-    final document = CanvasDocument()..setViewport(const Size(800, 600));
-    for (var i = 0; i < maxRemovedIdsTracked; i++) {
-      document.removeObject('r$i');
-    }
-    // The oldest entry has not yet been evicted: one more removal push it out.
-    expect(document.applyPlaced(stroke('r0')), isNull);
-
-    document.removeObject('r$maxRemovedIdsTracked');
-    // Now the oldest ('r0') has been evicted and no longer refuses a place.
-    final result = document.applyPlaced(stroke('r0'));
-    expect(result, isNotNull);
   });
 
   /// The cull answers in cell order on one branch and slot order on the other

@@ -186,6 +186,38 @@ class CanvasDocument extends ChangeNotifier {
     }
   }
 
+  /// Drops ids from the removed-id tombstone set: a restore, which never
+  /// re-materializes a stroke locally since its payload was freed on
+  /// removal, so only makes a later fetch of the object able to land again.
+  ///
+  /// The stale `_slotById` entry has to go too, not only the tombstone:
+  /// `applyPlaced` refuses a duplicate naming a slot this document has since
+  /// freed regardless of whether the id is still tombstoned, so leaving it
+  /// behind would make a restored id un-placeable forever even after the
+  /// fetch this method exists to let land.
+  void forgetRemoved(Iterable<String> ids) {
+    final restored = ids.toSet();
+    if (restored.isEmpty) return;
+    _removedIds.removeAll(restored);
+    _removedOrder.removeWhere(restored.contains);
+    _slotById.removeWhere((id, _) => restored.contains(id));
+  }
+
+  /// Empties this document entirely: every stroke, the removed-id
+  /// tombstones, and the spatial index. Used only for a hard reset of the
+  /// whole canvas pane, never for an ordinary removal or clear - the camera
+  /// is deliberately untouched, so a reset does not also throw the person's
+  /// pan and zoom away.
+  void reset() {
+    _strokes.clear();
+    _slotById.clear();
+    _order.clear();
+    _removedIds.clear();
+    _removedOrder.clear();
+    scene.reset();
+    objectCount.value = 0;
+  }
+
   void _remember(String id) {
     if (!_removedIds.add(id)) return;
     _removedOrder.add(id);

@@ -227,4 +227,65 @@ class CanvasObjectPlaced extends ServerEvent {
 
   final String channelId;
   final CanvasObject object;
+
+  /// The op stream's own seq for this placement: a `place` op and its object
+  /// are written in the same transaction and asserted equal by the writer,
+  /// so the object's own [CanvasObject.seq] already carries it.
+  int get seq => object.seq;
+}
+
+/// Objects were removed from a channel's canvas.
+///
+/// Ids only, the shape [MessageDeleted] already uses: a removal publishes an
+/// id rather than content, and the actor is deliberately absent so a
+/// moderation act does not name its moderator to the whole channel.
+class CanvasObjectsRemoved extends ServerEvent {
+  const CanvasObjectsRemoved({
+    required this.channelId,
+    required this.seq,
+    required this.opId,
+    required this.objectIds,
+  });
+
+  final String channelId;
+  final int seq;
+  final String opId;
+  final List<String> objectIds;
+}
+
+/// Every object placed at or below [beforeSeq] was cleared at once.
+///
+/// Carries no ids: a clear can cover a channel's whole live ceiling, and a
+/// frame naming every one of them is exactly what the props ceiling exists
+/// to stop one object doing.
+class CanvasCleared extends ServerEvent {
+  const CanvasCleared({
+    required this.channelId,
+    required this.seq,
+    required this.opId,
+    required this.beforeSeq,
+  });
+
+  final String channelId;
+  final int seq;
+  final String opId;
+  final int beforeSeq;
+}
+
+/// A removal or a clear was undone.
+///
+/// Ids only; a receiver cannot resurrect them locally since the payload was
+/// freed on removal, so it drops the tombstone and refetches instead.
+class CanvasObjectsRestored extends ServerEvent {
+  const CanvasObjectsRestored({
+    required this.channelId,
+    required this.seq,
+    required this.opId,
+    required this.objectIds,
+  });
+
+  final String channelId;
+  final int seq;
+  final String opId;
+  final List<String> objectIds;
 }
