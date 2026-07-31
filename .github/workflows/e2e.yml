@@ -61,6 +61,11 @@ jobs:
       - name: python dependencies
         run: "pip install --only-binary :all: websocket-client==1.9.0"
 
+      # Fast, no server needed: catches a regression in scenario logic before the 60-minute stack below runs at all.
+      - name: unit tests for the harness's own scenario logic
+        working-directory: scripts/lib
+        run: python3 -m unittest discover -p 'test_*.py' -v
+
       # Deterministic resolve, the same reason client-ci does this before building.
       - name: resolve workspace dependencies
         working-directory: client

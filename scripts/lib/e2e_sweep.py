@@ -166,22 +166,39 @@ def channel_admin(api):
 
 
 def devices_and_read_state(api, channel_id):
+    """Marks the newest message read, then confirms the state agrees.
+
+    `after_seq` starts one below the latest rather than at 0: PER_SCOPE_LIMIT
+    (100) would otherwise cap what a busy channel answers, oldest-first,
+    before the newest message reached this page.
+    """
     devices = api.call("GET", "/devices")
     _did("GET /devices")
     rows = devices.get("devices", devices) if isinstance(devices, dict) \
         else devices
     assert rows, "the caller has no devices, but signed in with one"
 
-    latest = api.messages(channel_id)[-1]
+    latest = api.messages(channel_id)[0]  # newest-first: index 0, not -1.
     api.call("PUT", f"/channels/{channel_id}/read", {"seq": latest["seq"]})
     _did("PUT /channels/{id}/read")
-    assert api.call("GET", f"/channels/{channel_id}/read") is not None
+
+    read_state = api.call("GET", f"/channels/{channel_id}/read")
     _did("GET /channels/{id}/read")
+    assert read_state["last_read_seq"] == latest["seq"], \
+        f"marking read to {latest['seq']} did not stick: {read_state}"
+    assert read_state["unread"] == 0, \
+        f"nothing should be unread right after marking read: {read_state}"
+
+    after_seq = latest["seq"] - 1
     synced = api.call("POST", "/sync", {
-        "scopes": [{"channel_id": channel_id, "after_seq": 0}]})
+        "scopes": [{"channel_id": channel_id, "after_seq": after_seq}]})
     _did("POST /sync")
-    assert synced is not None, "sync answered nothing"
-    print(f"  {len(rows)} device(s) listed, read state and sync answered")
+    scope = next(s for s in synced["scopes"] if s["channel_id"] == channel_id)
+    ids = {m["id"] for m in scope["messages"]}
+    assert latest["id"] in ids, \
+        f"sync from {after_seq} did not carry the latest message: {scope}"
+    print(f"  {len(rows)} device(s) listed, read state advanced and sync "
+          f"carried {len(scope['messages'])} message(s)")
 
 
 def run_all(api, channel_id, other_id):
