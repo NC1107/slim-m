@@ -32,3 +32,27 @@ sudo dnf install slim-m-client
 
 That wires all of the above as package dependencies and puts slim-m in the application launcher.
 The COPR repository exists; the first package lands with the next tagged client release, so if `dnf install` finds nothing yet, this tarball is the current answer.
+
+### Upgrading, and why a new release can look missing for two days
+
+`sudo dnf upgrade slim-m-client` answering "Nothing to do" the day a release ships does not mean the repository is disabled or the build failed.
+
+dnf caches repository metadata, and the COPR-generated `.repo` file sets no `metadata_expire`, so dnf's default of **48 hours** applies.
+Until that lapses, dnf answers from a cache written before the new build existed and reports, correctly for what it knows, that there is nothing to do.
+
+`sudo dnf copr enable nc1107/slim-m` appears to fix it, which is misleading: it rewrites the `.repo` file, and that invalidates the cache as a side effect.
+The repository was enabled the whole time.
+
+Ask for fresh metadata instead:
+
+```
+sudo dnf upgrade --refresh slim-m-client
+```
+
+Or, to stop having to remember the flag, tell dnf to check this one repository more often:
+
+```
+sudo dnf config-manager setopt copr:copr.fedorainfracloud.org:nc1107:slim-m.metadata_expire=1h
+```
+
+The cost of the shorter window is one small metadata fetch per hour of use, against a release being invisible for up to two days.

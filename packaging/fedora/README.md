@@ -59,3 +59,27 @@ That file is deliberately untracked, so the short version, for anyone who is not
 - Chroots `fedora-43-x86_64`, `fedora-44-x86_64`, `fedora-rawhide-x86_64`, with "follow Fedora branching" on so a new Fedora release adds itself. That is exactly what `nc1107/sink` has enabled.
 - Leave "enable internet access during builds" off. The spec is written for a network-free buildroot and turning it on would hide a broken `Source0` instead of failing on it.
 - The API token is generated at <https://copr.fedorainfracloud.org/api/> and becomes the `COPR_CONFIG` GitHub secret verbatim, the whole `[copr-cli]` block.
+
+### Upgrading, and why a new release can look missing for two days
+
+`sudo dnf upgrade slim-m-client` answering "Nothing to do" the day a release ships does not mean the repository is disabled or the build failed.
+
+dnf caches repository metadata, and the COPR-generated `.repo` file sets no `metadata_expire`, so dnf's default of **48 hours** applies.
+Until that lapses, dnf answers from a cache written before the new build existed and reports, correctly for what it knows, that there is nothing to do.
+
+`sudo dnf copr enable nc1107/slim-m` appears to fix it, which is misleading: it rewrites the `.repo` file, and that invalidates the cache as a side effect.
+The repository was enabled the whole time.
+
+Ask for fresh metadata instead:
+
+```
+sudo dnf upgrade --refresh slim-m-client
+```
+
+Or, to stop having to remember the flag, tell dnf to check this one repository more often:
+
+```
+sudo dnf config-manager setopt copr:copr.fedorainfracloud.org:nc1107:slim-m.metadata_expire=1h
+```
+
+The cost of the shorter window is one small metadata fetch per hour of use, against a release being invisible for up to two days.
