@@ -44,7 +44,9 @@ class _EmptyRoom extends lk.Room {
 }
 
 /// Stands in for the iOS host. [available] is what the app reports about its
-/// broadcast extension.
+/// broadcast extension. The iOS hand-off itself has its own dedicated tests
+/// in `screen_share_control_test.dart`; these only need enough of the seam to
+/// prove `VoiceSession` wires it up.
 class _FakeBridge implements BroadcastBridge {
   _FakeBridge({this.available = true});
 
@@ -59,6 +61,12 @@ class _FakeBridge implements BroadcastBridge {
 
   @override
   Future<void> requestStop() async => stopRequests++;
+
+  @override
+  set autoPublishEnabled(bool enabled) {}
+
+  @override
+  Stream<bool> get broadcastingChanges => const Stream.empty();
 }
 
 void main() {
@@ -312,67 +320,21 @@ void main() {
     });
   });
 
-  group('screen share source', () {
-    test('the chosen screen reaches LiveKit as its device id', () {
-      final options = VoiceSession.captureOptionsFor(
-        ScreenShareQuality.balanced,
-        'screen-2',
-        isIOS: false,
-      );
+  // Capture-options and iOS hand-off tests live in
+  // screen_share_control_test.dart now, next to ScreenShareControl itself.
+  test(
+      'screen share sources are listed through the injected seam, never a global',
+      () async {
+    final session = VoiceSession(
+      roomFactory: _EmptyRoom.new,
+      desktopSources: _FakeSources(const [
+        ScreenShareSource(id: '1', name: 'Screen 1'),
+      ]),
+    );
+    addTearDown(session.dispose);
 
-      // LiveKit carries sourceId as deviceId, and it is the only field
-      // getDisplayMedia matches on: dropped, a desktop share cannot start.
-      expect(options.deviceId, 'screen-2');
-    });
-
-    test('no source named is left unset rather than defaulted', () {
-      final options = VoiceSession.captureOptionsFor(
-        ScreenShareQuality.balanced,
-        null,
-        isIOS: false,
-      );
-
-      expect(options.deviceId, isNull);
-    });
-
-    test('off iOS the flag is false and the real source id survives', () {
-      // A desktop share names its own screen; isIOS must never clobber it.
-      final options = VoiceSession.captureOptionsFor(
-        ScreenShareQuality.balanced,
-        'screen-2',
-        isIOS: false,
-      );
-
-      expect(options.useiOSBroadcastExtension, isFalse);
-      expect(options.deviceId, 'screen-2');
-    });
-
-    test('on iOS the flag is true and the device id is the broadcast hint', () {
-      // Without this exact hint LiveKit's second pass starts a broadcast of
-      // its own, "already broadcasting", instead of joining the running one.
-      final options = VoiceSession.captureOptionsFor(
-        ScreenShareQuality.balanced,
-        null,
-        isIOS: true,
-      );
-
-      expect(options.useiOSBroadcastExtension, isTrue);
-      expect(options.deviceId, 'broadcast-manual');
-    });
-
-    test('sources are listed through the injected seam, never a global',
-        () async {
-      final session = VoiceSession(
-        roomFactory: _EmptyRoom.new,
-        desktopSources: _FakeSources(const [
-          ScreenShareSource(id: '1', name: 'Screen 1'),
-        ]),
-      );
-      addTearDown(session.dispose);
-
-      expect(session.screenShareNeedsSource, isTrue);
-      expect((await session.screenShareSources()).single.id, '1');
-    });
+    expect(session.screenShareNeedsSource, isTrue);
+    expect((await session.screenShareSources()).single.id, '1');
   });
 }
 

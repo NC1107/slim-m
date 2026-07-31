@@ -23,6 +23,7 @@ import 'local_audio.dart';
 import 'broadcast_bridge.dart';
 import 'desktop_sources.dart';
 import 'screen_share.dart';
+import 'screen_share_control.dart';
 import 'screen_share_view.dart';
 import 'voice_models.dart';
 
@@ -42,7 +43,9 @@ class VoiceSession {
     DesktopSources? desktopSources,
   })  : _roomFactory = roomFactory ?? _defaultRoomFactory,
         _broadcast = broadcast ?? const MethodChannelBroadcastBridge(),
-        _desktopSources = desktopSources ?? const WebrtcDesktopSources();
+        _desktopSources = desktopSources ?? const WebrtcDesktopSources() {
+    _screenShare = ScreenShareControl(_broadcast);
+  }
 
   static lk.Room _defaultRoomFactory() => lk.Room(
         roomOptions: const lk.RoomOptions(
@@ -56,6 +59,7 @@ class VoiceSession {
   final RoomFactory _roomFactory;
   final BroadcastBridge _broadcast;
   final DesktopSources _desktopSources;
+  late final ScreenShareControl _screenShare;
 
   lk.Room? _room;
   // room.events.listen returns a cancel function rather than a
@@ -251,7 +255,9 @@ class VoiceSession {
   /// Reports what happened rather than what was asked for, because on iOS
   /// those differ: see [ScreenShareOutcome]. Stopping asks the platform to end
   /// any broadcast as well as dropping the track, so the two cannot get out of
-  /// step and leave a phone still recording with nothing published.
+  /// step and leave a phone still recording with nothing published. The
+  /// sequencing that makes iOS actually honour [quality] lives in
+  /// [ScreenShareControl]; this method only supplies it a room to act on.
   Future<ScreenShareOutcome> setScreenShareEnabled(
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
@@ -259,75 +265,25 @@ class VoiceSession {
   }) async {
     final room = _room;
     if (room == null) return ScreenShareOutcome.failed;
-    // Asked before the request, not after a wait: a build with no extension
-    // shows no picker, so waiting only turns a knowable no into a slow one.
-    if (enabled && !await _broadcast.isAvailable()) {
-      return ScreenShareOutcome.unsupported;
-    }
-    try {
-      await room.localParticipant?.setScreenShareEnabled(
-        enabled,
-        screenShareCaptureOptions:
-            enabled ? captureOptionsFor(quality, sourceId) : null,
-      );
-      if (!enabled) await _broadcast.requestStop();
-      _refreshParticipants();
-      if (!enabled) return ScreenShareOutcome.stopped;
-      return _isSharing(room.localParticipant)
-          ? ScreenShareOutcome.started
-          : ScreenShareOutcome.pendingBroadcast;
-    } catch (e) {
-      _lastError = e;
-      _refreshParticipants();
-      return ScreenShareOutcome.failed;
-    }
-  }
-
-  /// The capture options a share is published with.
-  ///
-  /// Extracted so the [sourceId] hand-off is assertable: it reaches LiveKit as
-  /// `deviceId`, and dropping it is what made a desktop share fail with
-  /// `source not found!` while every other setting looked right.
-  ///
-  /// [lk.ScreenShareCaptureOptions.useiOSBroadcastExtension] is the load-bearing
-  /// flag on iOS: LiveKit's `BroadcastManager` shows the system picker and,
-  /// once the ReplayKit extension is recording, re-publishes through this same
-  /// path, and without the flag that second pass starts its own broadcast
-  /// instead of joining the running one ("already broadcasting").
-  ///
-  /// [isIOS] is the platform seam, mirroring how [DesktopSources] is injected
-  /// on this class: null (the production default) asks the real platform, and
-  /// a test supplies its own so both branches are assertable. It stays a
-  /// parameter here rather than an instance field like [DesktopSources]
-  /// because `FakeSession` in `packages/app` `implements` this class, and this
-  /// method's return type is a LiveKit type nothing outside this package may
-  /// otherwise touch. The `broadcast-manual` device id is set here, on
-  /// [isIOS], rather than left to LiveKit's own downstream substitution, which
-  /// re-asks the real platform and so cannot be driven by a fake.
-  @visibleForTesting
-  static lk.ScreenShareCaptureOptions captureOptionsFor(
-    ScreenShareQuality quality,
-    String? sourceId, {
-    bool? isIOS,
-  }) {
-    final onIOS = isIOS ?? lk.lkPlatformIs(lk.PlatformType.iOS);
-    return lk.ScreenShareCaptureOptions(
-      useiOSBroadcastExtension: onIOS,
-      sourceId: onIOS ? _iosBroadcastManualDeviceId : sourceId,
-      maxFrameRate: quality.fps.toDouble(),
-      params: lk.VideoParameters(
-        dimensions: lk.VideoDimensions(quality.width, quality.height),
-        encoding: lk.VideoEncoding(
-          maxBitrate: quality.maxBitrate,
-          maxFramerate: quality.fps,
-        ),
-      ),
+    final outcome = await _screenShare.setEnabled(
+      enabled,
+      quality: quality,
+      sourceId: sourceId,
+      publish: (enabled, options) async {
+        await room.localParticipant?.setScreenShareEnabled(
+          enabled,
+          screenShareCaptureOptions: options,
+        );
+      },
+      isSharing: () => _isSharing(room.localParticipant),
+      onSettled: (error) {
+        if (error != null) _lastError = error;
+        _refreshParticipants();
+      },
     );
+    _refreshParticipants();
+    return outcome;
   }
-
-  /// LiveKit's own hint for the `BroadcastManager`'s second pass; see
-  /// [captureOptionsFor].
-  static const _iosBroadcastManualDeviceId = 'broadcast-manual';
 
   /// A published screen track is the only thing that means anybody can see a
   /// screen, so it is what both the roster and the outcome above read.
@@ -463,6 +419,7 @@ class VoiceSession {
   }
 
   Future<void> _teardown() async {
+    await _screenShare.dispose();
     _cancelEvents?.call();
     _cancelEvents = null;
     final room = _room;

@@ -12,5 +12,6 @@ export 'src/broadcast_bridge.dart';
 export 'src/desktop_sources.dart';
 export 'src/media_capabilities.dart';
 export 'src/screen_share.dart';
+export 'src/screen_share_control.dart';
 export 'src/voice_models.dart';
 export 'src/voice_session.dart';

@@ -12,6 +12,8 @@ library;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:livekit_client/src/managers/broadcast_manager.dart'
+    as lk_broadcast;
 import 'package:slimm_rtc/rtc.dart';
 
 /// The default bridge with the platform question answered yes.
@@ -121,6 +123,48 @@ void main() {
 
       await const MethodChannelBroadcastBridge().requestStop();
       expect(calls, isEmpty);
+    });
+  });
+
+  group('autoPublishEnabled', () {
+    // LiveKit's own singleton, so every test resets it rather than trusting the next file to.
+    tearDown(() => lk_broadcast.BroadcastManager().shouldPublishTrack = true);
+
+    test('sets LiveKit\'s own republish flag', () {
+      const _AsIfIOS().autoPublishEnabled = false;
+      expect(lk_broadcast.BroadcastManager().shouldPublishTrack, isFalse);
+
+      const _AsIfIOS().autoPublishEnabled = true;
+      expect(lk_broadcast.BroadcastManager().shouldPublishTrack, isTrue);
+    });
+
+    test('a platform that does not broadcast leaves the flag alone', () {
+      lk_broadcast.BroadcastManager().shouldPublishTrack = true;
+      const MethodChannelBroadcastBridge().autoPublishEnabled = false;
+
+      expect(lk_broadcast.BroadcastManager().shouldPublishTrack, isTrue,
+          reason: 'there is nothing to disarm off iOS');
+    });
+  });
+
+  group('broadcastingChanges', () {
+    test('a platform that does not broadcast never emits', () async {
+      final events = <bool>[];
+      final sub = const MethodChannelBroadcastBridge()
+          .broadcastingChanges
+          .listen(events.add);
+      addTearDown(sub.cancel);
+
+      await pumpEventQueue();
+      expect(events, isEmpty);
+    });
+
+    test(
+        'on iOS a subscription is safe to open and close with nothing '
+        'having happened yet', () async {
+      final sub = const _AsIfIOS().broadcastingChanges.listen((_) {});
+      await pumpEventQueue();
+      await sub.cancel();
     });
   });
 }

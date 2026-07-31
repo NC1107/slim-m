@@ -12,6 +12,31 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The one-flag iOS screen share fix did not survive a real device (2026-07-31)
+
+The 2026-07-29 entry below ("iOS screen share was starting the broadcast twice") shipped `useiOSBroadcastExtension: true` in `captureOptionsFor` and called it fixed, with a caveat that it still needed a device.
+On a real iPhone it did not work: the picker appears, the user taps Start Broadcast, sharing briefly shows as active, then iOS raises "Screen Recording has stopped due to: Recording interrupted by another application" - the same double-capture collision as before.
+Read this before touching `voice_session.dart`'s screen-share half, `broadcast_bridge.dart`, or `screen_share_control.dart`.
+
+**The flag was dead code on the one path that matters.** Traced through livekit_client 2.8.1's `local.dart`: our own call to `setScreenShareEnabled` never reaches the branch that publishes with our options at all.
+On iOS, if `BroadcastManager().isBroadcasting` is false, `local.dart:805` calls `requestActivation()` (shows the picker) and returns `null` - our capture options are simply discarded.
+Once the user starts the broadcast, `BroadcastManager`'s own listener (registered in `local.dart`'s constructor) calls `setScreenShareEnabled(isEnabled)` again with **no capture options at all**, which falls back to `room.roomOptions.defaultScreenShareCaptureOptions` - fixed at room construction, so `useiOSBroadcastExtension: true` set per-call was never the one that mattered.
+That default has `useiOSBroadcastExtension: false`, so flutter_webrtc starts its own in-app broadcast alongside the extension already recording: the exact collision the alert reports.
+
+**The fix takes publication into our own hands rather than trusting LiveKit's automatic republish.** `BroadcastManager.shouldPublishTrack` is LiveKit's own documented escape hatch for exactly this ("Set this to false to manually manage track publication when the broadcast starts"), and it is not exported from the package's public barrel, so `broadcast_bridge.dart` reaches it through a `src` import (`// ignore: implementation_imports`, explained in the file's own library doc).
+`ScreenShareControl` (`client/packages/rtc/lib/src/screen_share_control.dart`, new, split out of `voice_session.dart` for the file budget and because the sequence is a state machine worth testing on its own) sets `autoPublishEnabled = false` before the call that triggers `requestActivation()`, waits for `BroadcastBridge.broadcastingChanges` to report the broadcast actually starting, publishes itself with this call's own options, then restores `autoPublishEnabled` to `true`.
+The ordering of that last step is load-bearing: while disarmed, a native notification resolves to a harmless no-op (nothing is published yet); restoring it only after the deferred publish lands means any later notification resolves to `unmute()` on the publication this class just created, rather than a second, option-less publish clobbering it.
+
+**Do not set `RoomOptions.defaultScreenShareCaptureOptions` instead.** It is fixed at room construction, while `_ShareQualityDialog` (`voice_call_controls.dart`) asks the user to pick smooth/balanced/crisp immediately before every share; pinning it at construction would silently ignore that choice on iOS.
+
+**`VoiceController` needed no change at all.** It already derives `screenSharing`/`awaitingBroadcast` from `VoiceSession.participantChanges` rather than from `setScreenShareEnabled`'s own return value, and already carries a 30-second deadline for "the picker was shown and nothing came of it".
+The deferred publish this fix adds is exactly the thing that stream was always meant to eventually report; once it lands, `_refreshParticipants()` emits a participant flipped to `isScreenSharing: true` and the existing listener does the rest.
+
+**Tests drive the state machine directly, with no `lk.Room` at all.** `ScreenShareControl.setEnabled` takes room access as plain closures (`publish`, `isSharing`) rather than a `Room`, so `screen_share_control_test.dart` fakes a controllable `broadcastingChanges` stream and asserts both that `autoPublishEnabled` goes false before the first publish and that the deferred publish carries this call's own options, not `null`.
+Mutation-tested: deleting the `autoPublishEnabled = false` line fails four tests; having the deferred publish pass `null` instead of the real options fails the one test written for exactly that.
+
+**Still needs confirmation on a real device.** Nothing here can be verified without an iPhone and the broadcast extension actually running; this is reasoned from the LiveKit source and covered by unit tests, not by a device run.
+
 ## The killed-app ghost was never going to be fixed by a race the sweep always loses (2026-07-30)
 
 PR #205 shipped a heartbeat and a server-side sweep as though they closed the reported bug: force-quit the app mid-call, reopen it, and it showed the owner still on the call.
