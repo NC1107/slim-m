@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Submitting a canvas mutation: `remove` and `clear`, the two kinds this
-//! slice writes to the op stream `super::canvas_ops` only reads.
+//! Submitting a canvas mutation: `remove`, `clear`, and `restore`, the kinds
+//! this slice writes to the op stream `super::canvas_ops` only reads.
 //!
 //! A sibling of [`super::canvas_ops`] rather than part of it, the same split
 //! `super::canvas`/`super::canvas_write` already make: the read and write
@@ -12,8 +12,8 @@
 //! the defacement in place", which is backwards.
 //!
 //! `MANAGE_CANVAS` gets its only meaning here: removing another member's
-//! object, or clearing at all, needs it. Everyone else may only erase their
-//! own ink.
+//! object, clearing, or restoring an op you did not author, needs it.
+//! Everyone else may only erase, and undo, their own ink.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -35,6 +35,7 @@ pub(super) struct SubmitOpParams {
     kind: String,
     object_ids: Option<Vec<String>>,
     before_seq: Option<i64>,
+    target_op: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -84,11 +85,14 @@ pub(super) async fn submit_op(
     let outcome = match outcome {
         Ok(outcome) => outcome,
         Err(SubmitOpError::NotFound) => {
-            return Err(ApiError::NotFound(
-                "one of those canvas objects is not in this channel",
-            ));
+            return Err(ApiError::NotFound("that id is not in this channel"));
         }
         Err(SubmitOpError::NotAuthorized) => return Err(ApiError::Forbidden),
+        Err(SubmitOpError::ChannelFull) => {
+            return Err(ApiError::Conflict(
+                "restoring this would exceed the canvas's object ceiling",
+            ));
+        }
         Err(SubmitOpError::Internal(err)) => return Err(err.into()),
     };
 
@@ -151,6 +155,19 @@ fn parse_request(params: SubmitOpParams) -> Result<CanvasOpRequest, ApiError> {
             }
             Ok(CanvasOpRequest::Clear { before_seq })
         }
+        "restore" => {
+            if params.object_ids.is_some() {
+                return Err(ApiError::BadRequest("object_ids is not valid for restore"));
+            }
+            if params.before_seq.is_some() {
+                return Err(ApiError::BadRequest("before_seq is not valid for restore"));
+            }
+            let target_op = params
+                .target_op
+                .ok_or(ApiError::BadRequest("restore needs target_op"))?;
+            let target_op = CanvasOpId(parse_uuid(&target_op)?);
+            Ok(CanvasOpRequest::Restore { target_op })
+        }
         _ => Err(ApiError::BadRequest("unknown canvas op kind")),
     }
 }
@@ -161,7 +178,7 @@ fn publish(state: &AppState, channel_id: ChannelId, op_id: CanvasOpId, outcome: 
             channel_id,
             seq: Seq(outcome.seq),
             op_id,
-            object_ids: outcome.removed_ids.clone(),
+            object_ids: outcome.touched_ids.clone(),
         }),
         "clear" => state.hub.publish(Event::CanvasCleared {
             channel_id,
@@ -169,6 +186,23 @@ fn publish(state: &AppState, channel_id: ChannelId, op_id: CanvasOpId, outcome: 
             op_id,
             before_seq: Seq(outcome.cleared_before_seq.unwrap_or(0)),
         }),
+        "restore" => state.hub.publish(Event::CanvasObjectsRestored {
+            channel_id,
+            seq: Seq(outcome.seq),
+            op_id,
+            object_ids: restorable_ids(&outcome.touched_ids),
+        }),
         _ => {}
+    }
+}
+
+/// The ids a restore's frame may name, or none past this bound; see
+/// [`Event::CanvasObjectsRestored`]'s own doc for why a restore, unlike a
+/// remove, cannot assume its touched set is always small.
+fn restorable_ids(touched: &[CanvasObjectId]) -> Vec<CanvasObjectId> {
+    if touched.len() > MAX_REMOVE_IDS_PER_OP {
+        Vec::new()
+    } else {
+        touched.to_vec()
     }
 }

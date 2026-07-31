@@ -9,6 +9,7 @@
 mod feed;
 mod fixtures;
 mod http_gate;
+mod restore;
 #[path = "../support/mod.rs"]
 mod support;
 mod write;

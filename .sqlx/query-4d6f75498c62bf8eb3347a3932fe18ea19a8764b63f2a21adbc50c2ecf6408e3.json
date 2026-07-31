@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE canvas_objects SET deleted_at = NULL\n             WHERE id = ? AND channel_id = ? AND deleted_at IS NOT NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "4d6f75498c62bf8eb3347a3932fe18ea19a8764b63f2a21adbc50c2ecf6408e3"
+}

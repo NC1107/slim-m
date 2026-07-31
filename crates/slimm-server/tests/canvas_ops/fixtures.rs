@@ -157,6 +157,10 @@ pub(crate) fn clear(id: &str, before_seq: i64) -> Value {
     json!({ "id": id, "kind": "clear", "before_seq": before_seq })
 }
 
+pub(crate) fn restore(id: &str, target_op: &str) -> Value {
+    json!({ "id": id, "kind": "restore", "target_op": target_op })
+}
+
 pub(crate) async fn get_ops(
     app: &Router,
     channel: ChannelId,

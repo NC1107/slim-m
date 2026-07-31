@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT channel_id AS \"channel_id!: ChannelId\", seq AS \"seq!: i64\",\n                  kind AS \"kind!\", bound_seq AS \"bound_seq: i64\",\n                  created_at AS \"created_at!: i64\"\n           FROM canvas_ops WHERE id = ?",
+  "query": "SELECT channel_id AS \"channel_id!: ChannelId\", seq AS \"seq!: i64\",\n                  kind AS \"kind!\", actor_id AS \"actor_id: UserId\",\n                  bound_seq AS \"bound_seq: i64\", created_at AS \"created_at!: i64\"\n           FROM canvas_ops WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -19,13 +19,18 @@
         "type_info": "Text"
       },
       {
-        "name": "bound_seq: i64",
+        "name": "actor_id: UserId",
         "ordinal": 3,
+        "type_info": "Blob"
+      },
+      {
+        "name": "bound_seq: i64",
+        "ordinal": 4,
         "type_info": "Integer"
       },
       {
         "name": "created_at!: i64",
-        "ordinal": 4,
+        "ordinal": 5,
         "type_info": "Integer"
       }
     ],
@@ -37,8 +42,9 @@
       false,
       false,
       true,
+      true,
       false
     ]
   },
-  "hash": "04314641c9d182cafa23c77b6cd89bfe6aae23e8b3e79a7e96bad871a17c6a1b"
+  "hash": "5415d7384cdd723a67ef68cc4cc41b78d1fb0fd05596952bea573a50f6860af7"
 }

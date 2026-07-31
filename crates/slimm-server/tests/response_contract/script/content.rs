@@ -119,6 +119,22 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         }),
     )
     .await;
+    let removed = c
+        .json(
+            "submitCanvasOp",
+            "POST",
+            &format!("/channels/{channel}/canvas/ops"),
+            root,
+            json!({
+                "id": Uuid::now_v7().to_string(),
+                "kind": "remove",
+                "object_ids": [first_object_id],
+            }),
+        )
+        .await;
+    let remove_op_id = text(&removed["op"], "id");
+    // Undoes the removal above, so this response's `op.kind` is `restore` and
+    // `object_ids` is exercised on that shape too, not only on `remove`.
     c.json(
         "submitCanvasOp",
         "POST",
@@ -126,19 +142,19 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         root,
         json!({
             "id": Uuid::now_v7().to_string(),
-            "kind": "remove",
-            "object_ids": [first_object_id],
+            "kind": "restore",
+            "target_op": remove_op_id,
         }),
     )
     .await;
-    // Two placed and the first erased above, so this page still carries a live object.
+    // Both objects live again, so this page still carries what it had before.
     c.get(
         "listCanvasViewport",
         &format!("/channels/{channel}/canvas/objects?min_x=0&min_y=0&max_x=1920&max_y=1080"),
         root,
     )
     .await;
-    // Covers a dead `place` (`object` absent), a live `place`, and the `remove` op itself.
+    // Covers a `place`, the `remove` op, and the `restore` op that undid it.
     c.get(
         "listCanvasOps",
         &format!("/channels/{channel}/canvas/ops?after_seq=0"),

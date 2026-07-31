@@ -295,7 +295,7 @@ async fn an_unknown_op_kind_is_a_bad_request() {
     let (token, _) = register(&store, "root").await;
     let channel = general(&store).await;
 
-    let body = serde_json::json!({ "id": id(), "kind": "restore", "target_op": id() });
+    let body = serde_json::json!({ "id": id(), "kind": "move", "object_ids": [id()] });
     let (status, _) = submit_op(&app(store), channel, &token, body).await;
     assert_eq!(status, axum::http::StatusCode::BAD_REQUEST);
 }

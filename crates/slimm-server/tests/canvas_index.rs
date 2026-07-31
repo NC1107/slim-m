@@ -12,8 +12,8 @@ use std::path::Path;
 
 use slimm_server::config::Config;
 use slimm_server::db;
-use slimm_server::ids::{CanvasObjectId, ChannelId, UserId};
-use slimm_server::store::{Rect, Store, ViewportQuery};
+use slimm_server::ids::{CanvasObjectId, CanvasOpId, ChannelId, UserId};
+use slimm_server::store::{CanvasOpRequest, Rect, Store, ViewportQuery};
 use sqlx::{Row, SqlitePool};
 
 mod support;
@@ -340,5 +340,72 @@ async fn a_pan_returns_only_what_the_new_region_adds() {
     assert!(
         !ids.contains(&overlap),
         "an object the caller already held was sent again"
+    );
+}
+
+/// Restore's un-delete symmetry, asserted for the first time: erase takes the
+/// R-Tree entry out, and restore has to put it back, or the object exists in
+/// `canvas_objects` while every viewport read still answers as if it did not.
+/// `canvas_rtree_au` already fires `AFTER UPDATE OF ... deleted_at`, so this
+/// costs no Rust code; nothing before this asserted it held.
+#[tokio::test]
+async fn the_index_leaves_on_erase_and_returns_on_restore() {
+    let (pool, _guard) = new_pool("canvas-restore-symmetry").await;
+    let store = Store::new(pool.clone());
+    let channel = store.create_channel("canvas", "voice").await.unwrap().id;
+    let author = store.create_user("ann", "Ann").await.unwrap().id;
+    let id = place(&store, channel, author, (0.0, 0.0, 10.0, 10.0)).await;
+
+    let indexed = |pool: SqlitePool| async move {
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM canvas_rtree")
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+    let here = view(-50.0, -50.0, 50.0, 50.0);
+    assert_eq!(indexed(pool.clone()).await, 1);
+    assert_eq!(visible(&store, channel, here).await, 1);
+
+    let remove_op = CanvasOpId::generate();
+    let removed = store
+        .submit_canvas_op(
+            channel,
+            author,
+            remove_op,
+            false,
+            CanvasOpRequest::Remove(vec![id]),
+        )
+        .await
+        .expect("remove");
+    assert_eq!(removed.affected, 1);
+    assert_eq!(
+        indexed(pool.clone()).await,
+        0,
+        "erase must take the R-Tree entry out"
+    );
+    assert_eq!(visible(&store, channel, here).await, 0);
+
+    let restored = store
+        .submit_canvas_op(
+            channel,
+            author,
+            CanvasOpId::generate(),
+            false,
+            CanvasOpRequest::Restore {
+                target_op: remove_op,
+            },
+        )
+        .await
+        .expect("restore");
+    assert_eq!(restored.affected, 1);
+    assert_eq!(
+        indexed(pool).await,
+        1,
+        "restore must put the R-Tree entry back"
+    );
+    assert_eq!(
+        visible(&store, channel, here).await,
+        1,
+        "the object must be reachable by viewport read again, not merely undeleted"
     );
 }

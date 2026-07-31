@@ -100,6 +100,13 @@ pub(super) enum ServerFrame {
         op_id: String,
         before_seq: i64,
     },
+    #[serde(rename = "canvas.objects.restored")]
+    CanvasObjectsRestored {
+        channel_id: String,
+        seq: i64,
+        op_id: String,
+        object_ids: Vec<String>,
+    },
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]
