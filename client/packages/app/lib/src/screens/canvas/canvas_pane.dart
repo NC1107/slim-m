@@ -168,6 +168,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
             :final objectIds,
           )
           when channelId == widget.channelId:
+
         /// An empty list never means "nothing was restored": the server only
         /// publishes this frame when it restored at least one object, and
         /// empties the list rather than exceed the frame bound a `remove`
