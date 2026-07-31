@@ -1,0 +1,157 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Shared fixtures for the canvas ops test binary: a store, a router, an
+//! authenticated caller, and the HTTP helpers both sibling modules need.
+//!
+//! Bulk fixtures go through `Store` directly rather than HTTP, the same
+//! choice `canvas_write.rs`'s ceiling test makes, so a fixture that places or
+//! seeds dozens of rows is not also a rate-limit test in disguise.
+
+use axum::Router;
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use serde_json::{Value, json};
+use slimm_server::auth::Auth;
+use slimm_server::config::Config;
+use slimm_server::db;
+use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
+use slimm_server::ids::{CanvasObjectId, ChannelId, UserId};
+use slimm_server::media::Media;
+use slimm_server::push::PushSender;
+use slimm_server::ratelimit::RateLimiter;
+use slimm_server::store::Store;
+use slimm_server::voice::VoiceService;
+use tower::ServiceExt;
+use uuid::Uuid;
+
+pub(crate) async fn new_store_and_pool() -> (Store, sqlx::SqlitePool, crate::support::TestDbGuard) {
+    let (path, guard) = crate::support::TestDbGuard::new("slimm-canvas-ops");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    (Store::new(pool.clone()), pool, guard)
+}
+
+pub(crate) async fn new_store() -> (Store, crate::support::TestDbGuard) {
+    let (store, _pool, guard) = new_store_and_pool().await;
+    (store, guard)
+}
+
+pub(crate) fn app(store: Store) -> Router {
+    http::router(AppState {
+        store,
+        auth: Auth::new(2).unwrap(),
+        hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice: VoiceService::disabled(),
+        media: Media::for_tests(),
+    })
+}
+
+pub(crate) async fn register(store: &Store, username: &str) -> (String, UserId) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let tokens = store.open_session(account.id, "cli").await.unwrap();
+    (tokens.access_token, account.id)
+}
+
+pub(crate) async fn general(store: &Store) -> ChannelId {
+    store.list_channels().await.unwrap()[0].id
+}
+
+pub(crate) fn stroke(id: &str) -> Value {
+    json!({
+        "id": id, "kind": "stroke",
+        "x": 10.0, "y": 20.0, "w": 30.0, "h": 40.0,
+        "props": { "points": [0.0, 0.0, 30.0, 40.0], "width": 3.0, "color": "annotation" },
+    })
+}
+
+pub(crate) fn id() -> String {
+    Uuid::now_v7().to_string()
+}
+
+pub(crate) async fn post_object(
+    app: &Router,
+    channel: ChannelId,
+    token: &str,
+    body: Value,
+) -> (StatusCode, Value) {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/channels/{channel}/canvas/objects"))
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+pub(crate) async fn get_ops(
+    app: &Router,
+    channel: ChannelId,
+    token: &str,
+    query: &str,
+) -> (StatusCode, Value) {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/channels/{channel}/canvas/ops?{query}"))
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+/// Places directly through the store, bypassing the HTTP rate limiter.
+pub(crate) async fn place(
+    store: &Store,
+    channel: ChannelId,
+    author: UserId,
+    props_bytes: usize,
+) -> CanvasObjectId {
+    let id = CanvasObjectId::generate();
+    let props = if props_bytes == 0 {
+        "{}".to_owned()
+    } else {
+        serde_json::to_string(&json!({ "filler": "x".repeat(props_bytes) })).unwrap()
+    };
+    store
+        .place_canvas_object(channel, author, id, "stroke", (0.0, 0.0, 1.0, 1.0), &props)
+        .await
+        .expect("placed");
+    id
+}

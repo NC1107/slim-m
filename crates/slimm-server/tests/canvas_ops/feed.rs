@@ -1,235 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The canvas op stream's catch-up feed: `place` writes one op per placement,
-//! the feed pages them densely, and `reset` fires on all three triggers.
-//!
-//! Bulk fixtures go through `Store` directly rather than HTTP, the same
-//! choice `canvas_write.rs`'s ceiling test makes, so a fixture that places or
-//! seeds dozens of rows is not also a rate-limit test in disguise.
+//! The store side of the feed: object liveness, the three reset triggers,
+//! pagination, the byte budget, and anonymization on account deletion.
 
 use std::fs;
 use std::path::Path;
 
-use axum::Router;
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use serde_json::{Value, json};
-use slimm_server::auth::Auth;
-use slimm_server::config::Config;
-use slimm_server::db;
-use slimm_server::http::{self, AppState};
-use slimm_server::hub::Hub;
-use slimm_server::ids::{CanvasObjectId, ChannelId, UserId};
-use slimm_server::media::Media;
-use slimm_server::permissions::Permissions;
-use slimm_server::push::PushSender;
-use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::{CANVAS_OP_GAP, CANVAS_OP_PAGE_BYTES, CanvasOpBody, Store};
-use slimm_server::voice::VoiceService;
-use tower::ServiceExt;
 use uuid::Uuid;
 
-mod support;
+use slimm_server::store::{CANVAS_OP_GAP, CANVAS_OP_PAGE_BYTES, CanvasOpBody};
 
-async fn new_store_and_pool() -> (Store, sqlx::SqlitePool, support::TestDbGuard) {
-    let (path, guard) = support::TestDbGuard::new("slimm-canvas-ops");
-    let config = Config {
-        port: 0,
-        database_path: path,
-        hash_concurrency: 2,
-        ..Config::default()
-    };
-    let pool = db::connect(&config).await.expect("connect + migrate");
-    (Store::new(pool.clone()), pool, guard)
-}
-
-async fn new_store() -> (Store, support::TestDbGuard) {
-    let (store, _pool, guard) = new_store_and_pool().await;
-    (store, guard)
-}
-
-fn app(store: Store) -> Router {
-    http::router(AppState {
-        store,
-        auth: Auth::new(2).unwrap(),
-        hub: Hub::new(),
-        limiter: RateLimiter::new(),
-        push: PushSender::disabled(),
-        voice: VoiceService::disabled(),
-        media: Media::for_tests(),
-    })
-}
-
-async fn register(store: &Store, username: &str) -> (String, UserId) {
-    let account = store
-        .create_account(username, username, "not-a-real-hash")
-        .await
-        .unwrap();
-    store.bootstrap_deployment(account.id).await.unwrap();
-    let tokens = store.open_session(account.id, "cli").await.unwrap();
-    (tokens.access_token, account.id)
-}
-
-async fn general(store: &Store) -> ChannelId {
-    store.list_channels().await.unwrap()[0].id
-}
-
-fn stroke(id: &str) -> Value {
-    json!({
-        "id": id, "kind": "stroke",
-        "x": 10.0, "y": 20.0, "w": 30.0, "h": 40.0,
-        "props": { "points": [0.0, 0.0, 30.0, 40.0], "width": 3.0, "color": "annotation" },
-    })
-}
-
-fn id() -> String {
-    Uuid::now_v7().to_string()
-}
-
-async fn post_object(
-    app: &Router,
-    channel: ChannelId,
-    token: &str,
-    body: Value,
-) -> (StatusCode, Value) {
-    let response = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri(format!("/channels/{channel}/canvas/objects"))
-                .header("authorization", format!("Bearer {token}"))
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&body).unwrap()))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let status = response.status();
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    (
-        status,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
-}
-
-async fn get_ops(
-    app: &Router,
-    channel: ChannelId,
-    token: &str,
-    query: &str,
-) -> (StatusCode, Value) {
-    let response = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("GET")
-                .uri(format!("/channels/{channel}/canvas/ops?{query}"))
-                .header("authorization", format!("Bearer {token}"))
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let status = response.status();
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    (
-        status,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
-}
-
-/// Places directly through the store, bypassing the HTTP rate limiter.
-async fn place(
-    store: &Store,
-    channel: ChannelId,
-    author: UserId,
-    props_bytes: usize,
-) -> CanvasObjectId {
-    let id = CanvasObjectId::generate();
-    let props = if props_bytes == 0 {
-        "{}".to_owned()
-    } else {
-        serde_json::to_string(&json!({ "filler": "x".repeat(props_bytes) })).unwrap()
-    };
-    store
-        .place_canvas_object(channel, author, id, "stroke", (0.0, 0.0, 1.0, 1.0), &props)
-        .await
-        .expect("placed");
-    id
-}
-
-// --- HTTP-level: gating, validation, and the route wired end to end ---
-
-/// Seeing a channel is not seeing its canvas ops, exactly as the viewport
-/// read already requires: `VIEW_CHANNEL` alone must not be enough.
-#[tokio::test]
-async fn reading_the_ops_feed_needs_the_canvas_bit_as_well_as_the_view_bit() {
-    let (store, _guard) = new_store().await;
-    store
-        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
-        .await
-        .unwrap();
-    let drawers = store
-        .create_role("drawers", Permissions::USE_CANVAS, false)
-        .await
-        .unwrap();
-    let app = app(store.clone());
-    let channel = store.create_channel("canvas", "voice").await.unwrap().id;
-
-    let (token, user) = register(&store, "ann").await;
-    let (status, body) = get_ops(&app, channel, &token, "after_seq=0").await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
-
-    store.assign_role(user, drawers).await.unwrap();
-    let (status, body) = get_ops(&app, channel, &token, "after_seq=0").await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-}
-
-#[tokio::test]
-async fn a_negative_after_seq_is_refused() {
-    let (store, _guard) = new_store().await;
-    let (token, _) = register(&store, "root").await;
-    let channel = general(&store).await;
-
-    let (status, body) = get_ops(&app(store), channel, &token, "after_seq=-1").await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
-}
-
-/// The end-to-end path: a real HTTP placement writes an op the feed then
-/// pages back, over the real route rather than the store method directly.
-#[tokio::test]
-async fn the_feed_is_dense_over_place_ops_placed_over_http() {
-    let (store, _guard) = new_store().await;
-    let (token, _) = register(&store, "root").await;
-    let channel = general(&store).await;
-    let app = app(store.clone());
-
-    for _ in 0..5 {
-        let (status, _) = post_object(&app, channel, &token, stroke(&id())).await;
-        assert_eq!(status, StatusCode::CREATED);
-    }
-
-    let (status, body) = get_ops(&app, channel, &token, "after_seq=0").await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-    let ops = body["ops"].as_array().unwrap();
-    assert_eq!(ops.len(), 5);
-    let seqs: Vec<i64> = ops.iter().map(|o| o["seq"].as_i64().unwrap()).collect();
-    assert_eq!(
-        seqs,
-        vec![1, 2, 3, 4, 5],
-        "the sequence must be dense with no gap"
-    );
-    assert!(ops.iter().all(|o| o["kind"] == "place"));
-    assert_eq!(body["latest_seq"], 5);
-    assert_eq!(body["has_more"], false);
-    assert_eq!(body["reset"], false);
-}
-
-// --- Store-level: object liveness, reset triggers, pagination, anonymization ---
+use crate::fixtures::{new_store, new_store_and_pool, place};
 
 #[tokio::test]
 async fn a_place_ops_object_is_present_and_matches_what_was_placed() {
@@ -262,6 +42,93 @@ async fn a_place_ops_object_is_absent_once_the_object_has_been_removed() {
     match &page.ops[0].body {
         CanvasOpBody::Place(None) => {}
         other => panic!("expected the object to read as gone, got {other:?}"),
+    }
+}
+
+/// Nothing writes a `remove`, `clear` or `restore` op yet, but the schema's
+/// own CHECK constraints already admit all four kinds, so the feed's read
+/// side is built to serialize every one of them now rather than only once a
+/// later PR adds a way to write them. Raw SQL stands in for that future
+/// write path, testing the read side generically ahead of it.
+#[tokio::test]
+async fn the_feed_serializes_every_kind_the_schema_admits() {
+    let (store, pool, _guard) = new_store_and_pool().await;
+    let author = store.create_user("ann", "Ann").await.unwrap().id;
+    let channel = store.create_channel("canvas", "voice").await.unwrap().id;
+    let placed = place(&store, channel, author, 0).await; // seq 1
+
+    let remove_op = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO canvas_ops (channel_id, seq, id, kind, actor_id, created_at)
+         VALUES (?, 2, ?, 'remove', ?, 0)",
+    )
+    .bind(channel)
+    .bind(remove_op)
+    .bind(author)
+    .execute(&pool)
+    .await
+    .expect("seed a remove op");
+    sqlx::query("INSERT INTO canvas_op_targets (channel_id, seq, object_id) VALUES (?, 2, ?)")
+        .bind(channel)
+        .bind(placed)
+        .execute(&pool)
+        .await
+        .expect("seed the remove op's target");
+
+    sqlx::query(
+        "INSERT INTO canvas_ops (channel_id, seq, id, kind, actor_id, bound_seq, created_at)
+         VALUES (?, 3, randomblob(16), 'clear', ?, 1, 0)",
+    )
+    .bind(channel)
+    .bind(author)
+    .execute(&pool)
+    .await
+    .expect("seed a clear op");
+
+    sqlx::query(
+        "INSERT INTO canvas_ops (channel_id, seq, id, kind, actor_id, target_op, created_at)
+         VALUES (?, 4, randomblob(16), 'restore', ?, ?, 0)",
+    )
+    .bind(channel)
+    .bind(author)
+    .bind(remove_op)
+    .execute(&pool)
+    .await
+    .expect("seed a restore op");
+    sqlx::query("INSERT INTO canvas_op_targets (channel_id, seq, object_id) VALUES (?, 4, ?)")
+        .bind(channel)
+        .bind(placed)
+        .execute(&pool)
+        .await
+        .expect("seed the restore op's target");
+    sqlx::query(
+        "UPDATE channel_seq_counters SET next_seq = 5 WHERE channel_id = ? AND stream = 'canvas'",
+    )
+    .bind(channel)
+    .execute(&pool)
+    .await
+    .expect("advance the counter to match");
+
+    let page = store.list_canvas_ops(channel, 0, 100).await.unwrap();
+    assert_eq!(page.ops.len(), 4);
+
+    match &page.ops[1].body {
+        CanvasOpBody::Remove(ids) => assert_eq!(ids, &[placed]),
+        other => panic!("expected Remove, got {other:?}"),
+    }
+    match &page.ops[2].body {
+        CanvasOpBody::Clear { before_seq } => assert_eq!(*before_seq, 1),
+        other => panic!("expected Clear, got {other:?}"),
+    }
+    match &page.ops[3].body {
+        CanvasOpBody::Restore {
+            target_op,
+            object_ids,
+        } => {
+            assert_eq!(*target_op, slimm_server::ids::CanvasOpId(remove_op));
+            assert_eq!(object_ids, &[placed]);
+        }
+        other => panic!("expected Restore, got {other:?}"),
     }
 }
 
