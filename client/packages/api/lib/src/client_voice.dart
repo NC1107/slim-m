@@ -6,7 +6,7 @@ part of 'client.dart';
 extension SlimmApiVoice on SlimmApi {
   /// Mints a join token for a channel's voice room.
   ///
-  /// Throws [NotImplementedException] when the deployment has no SFU, which is
+  /// Throws [NotConfiguredException] when the deployment has no SFU, which is
   /// a supported way to run text-only rather than a fault, so a caller should
   /// hide voice rather than retry.
   Future<VoiceToken> voiceToken(String channelId) async {
@@ -23,6 +23,19 @@ extension SlimmApiVoice on SlimmApi {
   Future<void> kickVoiceParticipant(String channelId, String userId) => _send(
         'POST',
         '/channels/$channelId/voice/participants/$userId/kick',
+        expectNoContent: true,
+      );
+
+  /// Refreshes proof that this client is still on a channel's call.
+  ///
+  /// Idempotent, and meant to be sent on a plain interval for as long as the
+  /// call is connected: a heartbeat that stops arriving is what the server
+  /// uses to bound how long a terminated app can leave a ghost participant
+  /// behind, rather than waiting on the SFU's own default. Throws
+  /// [NotConfiguredException] when the deployment has no SFU.
+  Future<void> sendVoiceHeartbeat(String channelId) => _send(
+        'POST',
+        '/channels/$channelId/voice/heartbeat',
         expectNoContent: true,
       );
 

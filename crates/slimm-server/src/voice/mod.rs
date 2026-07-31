@@ -24,6 +24,14 @@
 //!   the room service ([`VoiceService::remove_participant`]) and their token
 //!   expires quickly enough that re-joining means asking again, and being
 //!   re-checked.
+//!
+//! A kick or a timeout is a deliberate eviction; a terminated app is not, and
+//! nothing tells this service about it directly, since a killed process runs
+//! no code and the SFU's own reconnect grace period is not this project's to
+//! set. [`VoiceService::sweep_stale_calls`] is what closes that: a live
+//! client refreshes its own entry on an interval, and a refresh that stops
+//! arriving is what the sweep, run from `lib.rs`, treats as gone. See
+//! `voice::heartbeat` for the bound this actually gives.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -37,7 +45,9 @@ use crate::config::Config;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 
+mod heartbeat;
 mod roster;
+use heartbeat::{CallHeartbeats, STALE_AFTER as HEARTBEAT_STALE_AFTER};
 pub use roster::RoomParticipant;
 
 /// How long a join token is good for.
@@ -100,6 +110,10 @@ pub fn room_for_channel(channel_id: ChannelId) -> String {
 #[derive(Clone)]
 pub struct VoiceService {
     inner: Option<std::sync::Arc<Enabled>>,
+    /// Ephemeral, independent of `inner`: it costs nothing to keep even when
+    /// no SFU is configured, and a `VoiceService::new` that later reloads a
+    /// config with voice freshly enabled starts this bookkeeping empty either way.
+    heartbeats: CallHeartbeats,
 }
 
 struct Enabled {
@@ -144,12 +158,18 @@ impl VoiceService {
                 None
             }
         };
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            heartbeats: CallHeartbeats::new(),
+        })
     }
 
     /// A service with no SFU behind it, for tests and text-only deployments.
     pub fn disabled() -> Self {
-        Self { inner: None }
+        Self {
+            inner: None,
+            heartbeats: CallHeartbeats::new(),
+        }
     }
 
     /// A service wired to an explicit key and secret, for tests that need to
@@ -163,6 +183,7 @@ impl VoiceService {
                 http: reqwest::Client::new(),
                 service_url: http_url_for(url).expect("test url"),
             })),
+            heartbeats: CallHeartbeats::new(),
         }
     }
 
@@ -224,6 +245,24 @@ impl VoiceService {
         })
     }
 
+    /// Records that `user_id` is still on `channel_id`'s call as of now; see
+    /// [`CallHeartbeats`] for what refreshing this staves off.
+    pub fn record_heartbeat(&self, user_id: UserId, channel_id: ChannelId) {
+        self.heartbeats.record(user_id, channel_id);
+    }
+
+    /// Every `(user, channel)` call whose heartbeat has gone stale, handed
+    /// back (and forgotten) for the caller to actually evict at the SFU.
+    pub fn sweep_stale_calls(&self) -> Vec<(UserId, ChannelId)> {
+        self.heartbeats.sweep_stale(HEARTBEAT_STALE_AFTER)
+    }
+
+    /// Whether a heartbeat is on record for this `(user, channel)`, for a
+    /// test to confirm the HTTP handler actually reached [`Self::record_heartbeat`].
+    pub fn has_heartbeat_for_test(&self, user_id: UserId, channel_id: ChannelId) -> bool {
+        self.heartbeats.contains(user_id, channel_id)
+    }
+
     /// Removes a participant from a channel's room immediately.
     ///
     /// Used when somebody loses the right to be there, which a token they
@@ -236,6 +275,8 @@ impl VoiceService {
         channel_id: ChannelId,
         user_id: UserId,
     ) -> Result<(), VoiceError> {
+        // Ended on purpose, so a later sweep must not rediscover and re-call it.
+        self.heartbeats.forget(user_id, channel_id);
         let Some(enabled) = self.inner.as_ref() else {
             return Err(VoiceError::Unavailable);
         };

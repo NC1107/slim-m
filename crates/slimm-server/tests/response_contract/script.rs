@@ -156,6 +156,13 @@ pub async fn run(c: &mut Contract) {
         root,
     )
     .await;
+    c.bare(
+        "sendVoiceHeartbeat",
+        "POST",
+        &format!("/channels/{channel}/voice/heartbeat"),
+        root,
+    )
+    .await;
 
     push_calls(c, root).await;
     invite_calls(c, root, bob_token).await;

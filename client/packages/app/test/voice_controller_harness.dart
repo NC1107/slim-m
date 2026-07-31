@@ -195,16 +195,24 @@ class FakeSession implements VoiceSession {
   void emitParticipants(List<VoiceParticipant> p) => _participants.add(p);
 }
 
-/// Answers the token endpoint however the test asks, and nothing else.
+/// Answers the token and heartbeat endpoints however the test asks.
 ///
 /// [sfuUrl] defaults to a wss address, the only shape the server's own
 /// config validation and most tests need; the plain-ws suite overrides it.
+/// [onRequest], when given, is called with every request this client
+/// answers, so a test can count or inspect heartbeat calls without a second
+/// mock layered on top.
 http.Client voiceApi({
   int status = 200,
   bool canPublish = true,
   String sfuUrl = 'wss://sfu.example.com',
+  void Function(Uri url)? onRequest,
 }) {
   return MockClient((request) async {
+    onRequest?.call(request.url);
+    if (request.url.path.endsWith('/voice/heartbeat')) {
+      return http.Response('', 204);
+    }
     if (!request.url.path.endsWith('/voice/token')) {
       return http.Response('{}', 404);
     }
@@ -251,6 +259,7 @@ class VoiceHarness {
     FakeSession session,
     http.Client client, {
     Duration broadcastStartTimeout = const Duration(seconds: 30),
+    Duration voiceHeartbeatInterval = const Duration(seconds: 15),
   }) {
     final container = ProviderContainer(
       overrides: [
@@ -270,6 +279,7 @@ class VoiceHarness {
             ref,
             session: session,
             broadcastStartTimeout: broadcastStartTimeout,
+            voiceHeartbeatInterval: voiceHeartbeatInterval,
           ),
         ),
       ],

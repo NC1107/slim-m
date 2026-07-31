@@ -39,6 +39,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/channels/{channel_id}/voice/token", post(token))
         .route("/channels/{channel_id}/voice/roster", get(roster))
+        .route("/channels/{channel_id}/voice/heartbeat", post(heartbeat))
         .route(
             "/channels/{channel_id}/voice/participants/{user_id}/kick",
             post(kick),
@@ -111,6 +112,41 @@ async fn token(
         )),
         Err(VoiceError::Internal(err)) => Err(err.into()),
     }
+}
+
+/// Refreshes proof that the caller is still on this channel's call.
+///
+/// `CONNECT` is the gate, the same one minting a token requires: a heartbeat
+/// for a room the caller could not have joined is not evidence of anything.
+/// Best-effort by design on the client, and idempotent here - repeating it
+/// only pushes the deadline out further. See [`crate::voice::VoiceService`]
+/// for what a heartbeat that stops arriving eventually causes.
+async fn heartbeat(
+    Authed(ctx): Authed,
+    parts: Parts,
+    Path(channel_id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<StatusCode, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    let channel_id = ChannelId(parse_uuid(&channel_id)?);
+
+    if !state.voice.is_enabled() {
+        return Err(ApiError::NotConfigured(
+            "this server has no voice configured",
+        ));
+    }
+
+    let permissions = state
+        .store
+        .permissions_in_channel(ctx.user_id, channel_id)
+        .await?;
+    let needed = Permissions::VIEW_CHANNEL.union(Permissions::CONNECT);
+    if !permissions.contains(needed) {
+        return Err(ApiError::Forbidden);
+    }
+
+    state.voice.record_heartbeat(ctx.user_id, channel_id);
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(Serialize)]

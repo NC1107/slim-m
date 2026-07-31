@@ -142,6 +142,7 @@ class VoiceController extends StateNotifier<VoiceState> {
     this._ref, {
     VoiceSession? session,
     this.broadcastStartTimeout = const Duration(seconds: 30),
+    this.voiceHeartbeatInterval = const Duration(seconds: 15),
   }) : _session = session ?? VoiceSession(),
        super(const VoiceState()) {
     _states = _session.states.listen((s) {
@@ -149,6 +150,7 @@ class VoiceController extends StateNotifier<VoiceState> {
       // "you joined elsewhere" from "your network went".
       final dropped = _session.lastDisconnect;
       if (s == VoiceSessionState.failed && dropped != null) {
+        _stopHeartbeat();
         _log('Call ended: ${dropped.name}', detail: dropped.message);
         state = state.copyWith(
           state: s,
@@ -156,6 +158,16 @@ class VoiceController extends StateNotifier<VoiceState> {
           clearConnectedAt: true,
         );
         return;
+      }
+      switch (s) {
+        case VoiceSessionState.connected:
+          // Not gated on lifecycle: only termination may let this lapse.
+          _startHeartbeat(state.channelId);
+        case VoiceSessionState.idle:
+        case VoiceSessionState.failed:
+          _stopHeartbeat();
+        default:
+          break;
       }
       // The duration clock starts at the connected transition and only there,
       // so participant churn does not restart it.
@@ -187,11 +199,21 @@ class VoiceController extends StateNotifier<VoiceState> {
   /// countdown; short enough that a build with no extension is not a mystery.
   final Duration broadcastStartTimeout;
 
+  /// How often a live call refreshes the server's proof it is still
+  /// connected. Independent of `AppLifecycleState` on purpose: a phone call
+  /// that stopped the moment you switched apps would be useless, so this
+  /// keeps ticking through backgrounding and only really stops when the
+  /// process does. See `crates/slimm-server/src/voice/heartbeat.rs` for the
+  /// bound this and the server's own staleness threshold together give a
+  /// terminated app's ghost participant.
+  final Duration voiceHeartbeatInterval;
+
   final Ref _ref;
   final VoiceSession _session;
   late final StreamSubscription<VoiceSessionState> _states;
   late final StreamSubscription<List<VoiceParticipant>> _participants;
   Timer? _broadcastDeadline;
+  Timer? _heartbeat;
 
   /// Sets the microphone preference before joining. Has no effect on a live
   /// call; use [toggleMicrophone] for that.
@@ -249,8 +271,34 @@ class VoiceController extends StateNotifier<VoiceState> {
 
   Future<void> leave() async {
     _cancelBroadcastDeadline();
+    _stopHeartbeat();
     await _session.leave();
     state = const VoiceState();
+  }
+
+  /// Starts refreshing the server's proof that this call is still live, if
+  /// it is not running already. Idempotent so every `connected` transition
+  /// (including a mid-call reconnect) can call it without double-ticking.
+  void _startHeartbeat(String? channelId) {
+    if (_heartbeat != null || channelId == null) return;
+    unawaited(_sendHeartbeat(channelId));
+    _heartbeat = Timer.periodic(
+      voiceHeartbeatInterval,
+      (_) => unawaited(_sendHeartbeat(channelId)),
+    );
+  }
+
+  Future<void> _sendHeartbeat(String channelId) async {
+    try {
+      await _ref.read(apiProvider).sendVoiceHeartbeat(channelId);
+    } catch (_) {
+      // Best-effort: a missed beat only makes the server's own sweep notice sooner.
+    }
+  }
+
+  void _stopHeartbeat() {
+    _heartbeat?.cancel();
+    _heartbeat = null;
   }
 
   Future<void> toggleMicrophone() async {
@@ -397,6 +445,7 @@ class VoiceController extends StateNotifier<VoiceState> {
   @override
   void dispose() {
     _cancelBroadcastDeadline();
+    _stopHeartbeat();
     unawaited(_states.cancel());
     unawaited(_participants.cancel());
     unawaited(_session.dispose());

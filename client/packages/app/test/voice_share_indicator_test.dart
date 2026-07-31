@@ -42,6 +42,8 @@ void main() {
       await tester.pump();
 
       expect(find.text('You are sharing your screen.'), findsOneWidget);
+      // Clears the heartbeat timer a connected call now keeps running.
+      await controller.leave();
     });
 
     testWidgets('stays quiet for a share only requested, not live', (
@@ -64,8 +66,8 @@ void main() {
       expect(controller.state.awaitingBroadcast, isTrue);
       expect(find.text('You are sharing your screen.'), findsNothing);
 
-      // Clears the pending-broadcast deadline timer before the test ends.
-      await controller.setScreenShare(false);
+      // Clears the pending-broadcast deadline and heartbeat timers.
+      await controller.leave();
     });
 
     testWidgets('stays quiet with no share at all', (tester) async {
@@ -80,6 +82,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('You are sharing your screen.'), findsNothing);
+      await controller.leave();
     });
   });
 
@@ -117,6 +120,7 @@ void main() {
       // The stage mounted, wired to the sharing participant specifically.
       expect(find.byKey(const Key('fake-share-view-peer-1')), findsOneWidget);
       expect(find.text("Ada's screen"), findsOneWidget);
+      await controller.leave();
     });
 
     testWidgets('your own share gets the banner, never an echo stage', (
@@ -145,6 +149,7 @@ void main() {
 
       expect(find.text('You are sharing your screen.'), findsOneWidget);
       expect(find.byKey(const Key('fake-share-view-me')), findsNothing);
+      await controller.leave();
     });
   });
 
@@ -169,6 +174,7 @@ void main() {
       // Said in words, not left to a small glyph a tooltip has to explain: the
       // collapsed strip is exactly where a live share is easiest to miss.
       expect(find.textContaining('sharing'), findsOneWidget);
+      await controller.leave();
     });
 
     testWidgets('stays quiet for a share only requested, not live', (
@@ -194,8 +200,8 @@ void main() {
       expect(controller.state.awaitingBroadcast, isTrue);
       expect(find.textContaining('sharing'), findsNothing);
 
-      // Clears the pending-broadcast deadline timer before the test ends.
-      await controller.setScreenShare(false);
+      // Clears the pending-broadcast deadline and heartbeat timers.
+      await controller.leave();
     });
 
     testWidgets('stays quiet with no share at all', (tester) async {
@@ -213,6 +219,7 @@ void main() {
       await tester.pump();
 
       expect(find.textContaining('sharing'), findsNothing);
+      await controller.leave();
     });
   });
 }

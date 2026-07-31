@@ -47,6 +47,7 @@ pub async fn run() -> anyhow::Result<()> {
     let limiter = ratelimit::RateLimiter::with_trusted_hops(config.trust_proxy_hops);
     let push = push::PushSender::new(&config)?;
     let voice = voice::VoiceService::new(&config)?;
+    spawn_call_sweep(voice.clone());
     let app = cors.apply(http::router(http::AppState {
         store,
         auth,
@@ -131,6 +132,42 @@ fn spawn_attachment_sweep(store: store::Store, media: media::Media) {
                 }
                 Ok(_) => {}
                 Err(err) => tracing::warn!(error = %err, "attachment sweep failed"),
+            }
+        }
+    });
+}
+
+/// How often a stale voice heartbeat is checked for. Short, unlike the token
+/// and attachment sweeps: this bounds how long a terminated app's ghost
+/// participant lingers, so the interval is part of that bound rather than
+/// housekeeping on its own schedule; see `voice::heartbeat`.
+const CALL_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Runs the stale-voice-call sweep in the background for the life of the
+/// process, on the same detached, best-effort, wait-first model as
+/// [`spawn_token_sweep`]. A deployment with no SFU configured never has
+/// anything to sweep, so this is safe to spawn unconditionally.
+fn spawn_call_sweep(voice: voice::VoiceService) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(CALL_SWEEP_INTERVAL);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            for (user_id, channel_id) in voice.sweep_stale_calls() {
+                match voice.remove_participant(channel_id, user_id).await {
+                    Ok(()) => tracing::info!(
+                        %user_id,
+                        %channel_id,
+                        "removed a voice participant with no recent heartbeat"
+                    ),
+                    Err(voice::VoiceError::Unavailable) => {}
+                    Err(voice::VoiceError::Internal(err)) => tracing::warn!(
+                        error = %err,
+                        %user_id,
+                        %channel_id,
+                        "failed to remove a stale voice participant"
+                    ),
+                }
             }
         }
     });

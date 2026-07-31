@@ -1,0 +1,251 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! `POST .../voice/heartbeat`: the route a live call refreshes so a
+//! terminated app's ghost participant is bounded rather than left to
+//! whatever the SFU's own reconnect grace period happens to be.
+//!
+//! The staleness arithmetic itself (a fresh heartbeat survives, a stopped one
+//! goes stale, a refresh resets the clock) is unit-tested directly against
+//! `CallHeartbeats` in `src/voice/heartbeat.rs`; this file is only the route:
+//! that it is gated the same way minting a token is, and that it actually
+//! reaches the tracker rather than just answering 204. Split into its own
+//! file because `tests/voice.rs` was already past the file-size budget.
+
+use axum::Router;
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use slimm_server::auth::Auth;
+use slimm_server::config::Config;
+use slimm_server::db;
+use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
+use slimm_server::ids::{ChannelId, UserId};
+use slimm_server::permissions::Permissions;
+use slimm_server::push::PushSender;
+use slimm_server::ratelimit::RateLimiter;
+use slimm_server::store::Store;
+use slimm_server::voice::VoiceService;
+use tower::ServiceExt;
+
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-voice-heartbeat-test");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    (Store::new(pool), guard)
+}
+
+fn app(store: Store, voice: VoiceService) -> Router {
+    http::router(AppState {
+        store,
+        auth: Auth::new(2).unwrap(),
+        hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice,
+        media: slimm_server::media::Media::for_tests(),
+    })
+}
+
+fn enabled_voice() -> VoiceService {
+    VoiceService::for_test(
+        "wss://livekit.example.com",
+        "APItestkey",
+        "a-test-secret-of-at-least-32-characters",
+    )
+}
+
+fn request(method: &str, uri: &str, token: Option<&str>) -> Request<Body> {
+    let mut builder = Request::builder().method(method).uri(uri);
+    if let Some(token) = token {
+        builder = builder.header("authorization", format!("Bearer {token}"));
+    }
+    builder.body(Body::empty()).unwrap()
+}
+
+async fn member(store: &Store, username: &str) -> (UserId, String) {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(account.id).await.unwrap();
+    let session = store.open_session(account.id, "cli").await.unwrap();
+    (account.id, session.access_token)
+}
+
+/// The route actually has to reach the tracker, not just answer 204: a
+/// handler that returns success without calling `record_heartbeat` would
+/// pass every status-code assertion in this file and still leave a
+/// terminated app's ghost participant unbounded.
+#[tokio::test]
+async fn a_heartbeat_is_recorded_against_the_caller_and_channel() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::CONNECT),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let voice = enabled_voice();
+    let (user_id, token) = member(&store, "alice").await;
+    let app = app(store.clone(), voice.clone());
+
+    assert!(!voice.has_heartbeat_for_test(user_id, channel.id));
+
+    let response = app
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{}/voice/heartbeat", channel.id),
+            Some(&token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    assert!(voice.has_heartbeat_for_test(user_id, channel.id));
+}
+
+#[tokio::test]
+async fn a_heartbeat_without_connect_is_refused() {
+    let (store, _guard) = new_store().await;
+    // @everyone can see the channel but not connect to it.
+    store
+        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let voice = enabled_voice();
+    let (user_id, token) = member(&store, "alice").await;
+    let app = app(store.clone(), voice.clone());
+
+    let response = app
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{}/voice/heartbeat", channel.id),
+            Some(&token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert!(!voice.has_heartbeat_for_test(user_id, channel.id));
+}
+
+#[tokio::test]
+async fn a_heartbeat_requires_authentication() {
+    let (store, _guard) = new_store().await;
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let app = app(store, enabled_voice());
+
+    let response = app
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{}/voice/heartbeat", channel.id),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn a_heartbeat_on_a_text_only_deployment_says_so_instead_of_pretending() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::CONNECT),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    // No SFU configured, which is a supported way to run this.
+    let app = app(store.clone(), VoiceService::disabled());
+    let (_, token) = member(&store, "alice").await;
+
+    let response = app
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{}/voice/heartbeat", channel.id),
+            Some(&token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+}
+
+/// The evaluator already covers precedence; this pins that the route reads
+/// the per-channel answer rather than the base one, matching `voice.rs`'s own
+/// `a_channel_denying_connect_beats_the_role_that_grants_it`.
+#[tokio::test]
+async fn a_channel_denying_connect_beats_the_role_that_grants_it() {
+    let (store, _guard) = new_store().await;
+    let everyone = store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::CONNECT),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    store
+        .set_role_overwrite(
+            channel.id,
+            everyone,
+            Permissions::NONE,
+            Permissions::CONNECT,
+        )
+        .await
+        .unwrap();
+    let voice = enabled_voice();
+    let (user_id, token) = member(&store, "alice").await;
+    let app = app(store.clone(), voice.clone());
+
+    let response = app
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{}/voice/heartbeat", channel.id),
+            Some(&token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert!(!voice.has_heartbeat_for_test(user_id, channel.id));
+}
+
+/// A nonexistent channel must refuse identically to one the caller may not
+/// join, so its existence is not observable through this route either.
+#[tokio::test]
+async fn a_channel_that_does_not_exist_refuses_like_one_you_cannot_join() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::CONNECT),
+            true,
+        )
+        .await
+        .unwrap();
+    store.create_channel("general", "text").await.unwrap();
+    let app = app(store.clone(), enabled_voice());
+    let (_, token) = member(&store, "alice").await;
+
+    let missing = ChannelId(uuid::Uuid::now_v7());
+    let response = app
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{missing}/voice/heartbeat"),
+            Some(&token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}

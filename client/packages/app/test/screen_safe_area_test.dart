@@ -392,5 +392,7 @@ void main() {
       _view.height,
       reason: 'the control bar background must still reach the edge',
     );
+    // Clears the heartbeat timer a connected call now keeps running.
+    await container.read(voiceControllerProvider.notifier).leave();
   });
 }
