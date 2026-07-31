@@ -11,6 +11,7 @@ import 'package:slimm_data/data.dart';
 
 import 'channel_history.dart';
 import 'channel_refresher.dart';
+import 'message_ops_sync.dart';
 import 'message_extras.dart';
 import 'providers.dart';
 
@@ -142,6 +143,7 @@ class SyncController extends StateNotifier<SyncStatus> {
     SlimmApi api,
     MessageStore store,
   ) async {
+    bool isCurrent() => generation == _generation;
     final cursors = await store.allCursors();
     if (cursors.isEmpty) return;
 
@@ -151,15 +153,31 @@ class SyncController extends StateNotifier<SyncStatus> {
     for (final delta in deltas) {
       if (generation != _generation) return;
       if (delta.reset) {
-        // The gap is too large to stream: local state is untrusted, so drop and refetch.
-        await store.resetChannel(delta.channelId);
-        final fresh = await api.listMessages(delta.channelId, limit: 50);
-        if (generation != _generation) return;
-        await store.applyMessages(fresh);
+        // Either cursor is too far behind to stream: local state is untrusted.
+        await _resetScope(generation, api, store, delta.channelId);
+        if (!isCurrent()) return;
         continue;
       }
       await store.applyMessages(delta.messages);
-      more = more || delta.hasMore;
+
+      // After the messages: an edit cannot precede the message it names.
+      if (delta.opLatestSeq != null) {
+        final cursor = await store.opCursorFor(delta.channelId);
+        if (!isCurrent()) return;
+        if (cursor == null) {
+          // Adopt the head; asking from zero replays every edit ever made.
+          await store.setOpCursor(delta.channelId, delta.opLatestSeq);
+        } else if (delta.ops.isNotEmpty) {
+          final outcome = await applyOps(store, delta.channelId, delta.ops);
+          if (!isCurrent()) return;
+          if (outcome == OpsOutcome.needsReset) {
+            await _resetScope(generation, api, store, delta.channelId);
+            continue;
+          }
+        }
+      }
+
+      more = more || delta.hasMore || delta.opsHasMore;
     }
 
     /// At most one continuation per round, however many scopes are behind.
@@ -183,6 +201,37 @@ class SyncController extends StateNotifier<SyncStatus> {
         }),
       );
     }
+  }
+
+  /// Drops a scope's cached messages and both its cursors, then refetches the
+  /// newest page.
+  ///
+  /// [MessageStore.resetChannel] clears the op cursor to null as well as
+  /// rewinding the message one, so the next catch-up adopts a fresh head
+  /// rather than asking from a seq the server may have swept past.
+  Future<void> _resetScope(
+    int generation,
+    SlimmApi api,
+    MessageStore store,
+    String channelId,
+  ) async {
+    await store.resetChannel(channelId);
+    final fresh = await api.listMessages(channelId, limit: 50);
+    if (generation != _generation) return;
+    await store.applyMessages(fresh);
+  }
+
+  /// Runs one catch-up round against the current generation.
+  ///
+  /// The gap detector's entry point: a live op that is not exactly the next
+  /// one schedules this rather than applying a payload it cannot place.
+  Future<void> reconcile() async {
+    if (_disposed) return;
+    final generation = _generation;
+    final api = _ref.read(apiProvider);
+    final store = await _ref.read(storeProvider.future);
+    if (generation != _generation) return;
+    await _catchUp(generation, api, store);
   }
 
   /// Attaches the live socket. Its closure schedules a full restart, so the
@@ -231,19 +280,26 @@ class SyncController extends StateNotifier<SyncStatus> {
     bool isCurrent() => generation == _generation;
     switch (event) {
       case MessageCreated(:final message):
-      case MessageEdited(:final message):
         // A DM's first message is a channel never fetched; materialise it first or this no-ops.
         if (!await store.hasChannel(message.channelId)) {
           await _channelRefresher.refreshOnce(api, store, isCurrent: isCurrent);
         }
         if (!isCurrent()) return;
         await store.applyMessage(message);
-      case MessageDeleted(:final messageId):
+      case MessageEdited(:final message, :final opSeq):
+        if (!await store.hasChannel(message.channelId)) {
+          await _channelRefresher.refreshOnce(api, store, isCurrent: isCurrent);
+        }
+        if (!isCurrent()) return;
+        if (!await _placeLiveOp(message.channelId, opSeq, store)) return;
+        await store.applyMessage(message);
+      case MessageDeleted(:final channelId, :final messageId, :final opSeq):
 
         /// Closes a real gap: this switch previously had no case for a
         /// delete at all, so a message removed by another user (or this
         /// account's own delete looping back) never left the local store
         /// and stayed visible until the next full resync.
+        if (!await _placeLiveOp(channelId, opSeq, store)) return;
         await store.discard(messageId);
       case ChannelCreated(:final channel):
       case ChannelUpdated(:final channel):
@@ -261,6 +317,30 @@ class SyncController extends StateNotifier<SyncStatus> {
         unawaited(start());
       case _:
         break;
+    }
+  }
+
+  /// Decides whether a live op may be applied, and advances the cursor when
+  /// it may. Answers false when the caller must not apply the payload.
+  ///
+  /// A gap schedules one reconcile rather than applying an op it cannot place:
+  /// moving the cursor past something never seen would strand it permanently,
+  /// where a stall only lasts until the next round.
+  Future<bool> _placeLiveOp(
+    String channelId,
+    int? opSeq,
+    MessageStore store,
+  ) async {
+    final cursor = await store.opCursorFor(channelId);
+    switch (liveOpDecision(opSeq, cursor)) {
+      case LiveOpOutcome.ignored:
+        return false;
+      case LiveOpOutcome.needsReconcile:
+        unawaited(reconcile().catchError((_) {}));
+        return false;
+      case LiveOpOutcome.applied:
+        if (opSeq != null) await store.setOpCursor(channelId, opSeq);
+        return true;
     }
   }
 
