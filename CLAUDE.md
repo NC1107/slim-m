@@ -1080,6 +1080,9 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 
 ## Parked and reference
 
+- [docs/OPEN-QUESTIONS.md](docs/OPEN-QUESTIONS.md): what an autonomous run could not settle without the owner - device confirmations nobody here can do, accounts only he holds, and decisions left open.
+  Read it before assuming an untested iOS or Android path works; several entries exist precisely because a fix was recorded as done and a real device later disproved it.
+
 - [docs/BACKLOG.md](docs/BACKLOG.md): accepted extra features, architectural hooks to preserve, and deliberate declines from the segment gap analysis.
 - [docs/design/design-language.md](docs/design/design-language.md): the visual identity spec (colour, type, spacing, iconography, motion). It moved out of `docs/research/` on 2026-07-26, which is where it was hiding.
 - [docs/decisions/0004-visual-identity-review.md](docs/decisions/0004-visual-identity-review.md): the designer review that gated token lock. Read this before changing a token; it also closes the seven accent roles and settles the canvas `window` contradiction.
