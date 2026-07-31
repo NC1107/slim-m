@@ -27,16 +27,26 @@ Also closed from the wider set: the WebSocket frame set is documented and gated
 (#163), and `Hub`'s duplicated constructor and the healthcheck's `Config`
 bypass (#171).
 
+This table was last rebuilt in #173.
+Closed since then, evidence cited by PR rather than carried over: **the
+`messages_fts` rowid rebuild** (#183, migration
+`0024_messages_rowid_alias.sql`, moved out of "deliberately still open"
+below); the screens report's member-roster truncation at 50 (#181) and
+missing channel history pagination (#197); and three admin-screen defects the
+screens report named outside its top three - the invites screen's uncopiable
+code and unshown role grant, and the emoji upload's missing preview and
+unenforced clear (#175), plus roles offering "Assign" on `@everyone` (#190).
+`schema/README.md`'s stale codegen and CI-gate claims and two stale line
+counts in `scripts/file-budget-allow.txt`, both named in the process report,
+were corrected directly in this same pass rather than by an earlier PR.
+
 **Deliberately still open**, with the reason rather than by omission:
 
-- **The `messages_fts` rowid rebuild** (server report, medium). Latent, and the
-  fix is a full table rebuild on real message data while the live instance
-  auto-updates from `latest`, so it wants a person watching the deploy. See
-  CLAUDE.md's owner list.
-- **Seven unreachable `SlimmApi` methods.** The gate that stops an eighth is in
-  (#169); the seven themselves are allowlisted with dated reasons, and two of
-  them are the whole of the account-recovery owner decision, which has no UI at
-  either end.
+- **Six unreachable `SlimmApi` methods**, down from seven: `canvasViewport`
+  gained a caller in #198, the canvas write slice.
+  The gate that stops a seventh is in (#169); the six remaining are
+  allowlisted with dated reasons, and two of them are the whole of the
+  account-recovery owner decision, which has no UI at either end.
 
 Several findings turned out to be **already fixed when checked**: the
 server-identity tick reads the pinned fingerprint and has a `mismatch` state,
