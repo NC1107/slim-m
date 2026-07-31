@@ -38,6 +38,10 @@ uuid_id!(DeviceId, "A device identity.");
 uuid_id!(SessionId, "A login-session identity.");
 uuid_id!(RoleId, "A role identity.");
 uuid_id!(CanvasObjectId, "A canvas object identity.");
+uuid_id!(
+    CanvasOpId,
+    "A canvas op identity: client-minted for a mutation, server-minted for a place."
+);
 uuid_id!(EmojiId, "A custom emoji identity.");
 uuid_id!(
     FamilyId,

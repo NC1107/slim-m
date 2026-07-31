@@ -14,8 +14,9 @@
 //! reconnect, and a repeated pan is idempotent rather than a stream of
 //! corrections. What it does not cover is objects removed while the caller was
 //! looking at them: a soft delete does not advance the row's `seq`, so no
-//! cursor over `canvas_objects` can observe one. That belongs to the
-//! `canvas_ops` stream, which Phase 6 materializes this table from.
+//! cursor over `canvas_objects` can observe one. That belongs to
+//! [`super::canvas_ops`], the ordered feed over the op stream this route's
+//! `latest_seq` is now a cursor into.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
@@ -24,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::AppState;
+use super::canvas_ops::list_ops;
 use super::canvas_write::{MAX_BODY_BYTES, place};
 use super::error::ApiError;
 use super::extract::{AuthedLimited, CANVAS, Json, Query};
@@ -40,13 +42,15 @@ const MAX_LIMIT: i64 = 2000;
 
 /// The canvas routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
-    Router::new().route(
-        "/channels/{channel_id}/canvas/objects",
-        get(viewport)
-            .post(place)
-            // Refused at the byte level, before serde builds a `Value` several times its wire size.
-            .layer(DefaultBodyLimit::max(MAX_BODY_BYTES)),
-    )
+    Router::new()
+        .route(
+            "/channels/{channel_id}/canvas/objects",
+            get(viewport)
+                .post(place)
+                // Refused at the byte level, before serde builds a `Value` several times its wire size.
+                .layer(DefaultBodyLimit::max(MAX_BODY_BYTES)),
+        )
+        .route("/channels/{channel_id}/canvas/ops", get(list_ops))
 }
 
 // --- Wire types ---
@@ -159,15 +163,12 @@ async fn viewport(
         limit: limit + 1,
     };
 
-    // The cursor is read before the objects, not after, and the order is the
-    // whole point once a write route exists (Phase 6). Read after, an object
-    // placed between the two reads has a seq at or below the returned cursor
-    // but was absent from the page, so a client that resumes from this cursor
-    // over the same rect never sees it. Read before, the same object either
-    // has a higher seq (a later delta finds it) or is included here; either way
-    // it cannot be lost. Over-reporting self-heals, under-reporting does not.
-    let latest_seq = state.store.latest_canvas_seq(channel_id).await?;
-    let mut objects = state.store.viewport_objects(channel_id, &query).await?;
+    // Both read from one deferred transaction (`Store::viewport_snapshot`), so
+    // WAL gives them one snapshot: `latest_seq` means exactly "every op at or
+    // below this is reflected in the objects just read". A write landing
+    // between two separate reads could produce a cursor the page does not
+    // cover; over-reporting instead self-heals on the next read.
+    let (latest_seq, mut objects) = state.store.viewport_snapshot(channel_id, &query).await?;
     let has_more = objects.len() as i64 > limit;
     // From the front: the store reads newest-first and reverses, so the extra row is the oldest.
     if has_more {

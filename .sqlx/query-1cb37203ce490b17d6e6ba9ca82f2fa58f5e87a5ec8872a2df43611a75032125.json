@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT seq AS \"seq!: i64\", object_id AS \"object_id!: CanvasObjectId\"\n                   FROM canvas_op_targets\n                   WHERE channel_id = ? AND seq >= ? AND seq <= ?\n                   ORDER BY seq",
+  "describe": {
+    "columns": [
+      {
+        "name": "seq!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "object_id!: CanvasObjectId",
+        "ordinal": 1,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "1cb37203ce490b17d6e6ba9ca82f2fa58f5e87a5ec8872a2df43611a75032125"
+}

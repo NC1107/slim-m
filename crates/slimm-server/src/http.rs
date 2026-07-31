@@ -26,6 +26,7 @@ use extract::{Json, READ, RateLimited};
 mod attachments;
 mod auth;
 mod canvas;
+mod canvas_ops;
 mod canvas_write;
 pub mod capability;
 mod channels;

@@ -101,7 +101,7 @@ impl Store {
         .execute(&mut *tx)
         .await?;
         sqlx::query!(
-            "UPDATE canvas_ops SET author_id = NULL WHERE author_id = ?",
+            "UPDATE canvas_ops SET actor_id = NULL WHERE actor_id = ?",
             user_id
         )
         .execute(&mut *tx)

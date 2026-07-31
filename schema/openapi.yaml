@@ -104,7 +104,8 @@ tags:
   - name: canvas
     description: >
       The Voice Canvas: reading the objects in a region of a channel's
-      canvas, and the delta a client receives as it pans.
+      canvas, the delta a client receives as it pans, and the ordered op
+      stream a client catches up from after a reconnect.
 
 security:
   - bearerAuth: []
@@ -2166,7 +2167,8 @@ paths:
 
         The delta covers objects arriving, not objects removed. A soft delete
         does not advance an object's `seq`, so no cursor over this endpoint can
-        report one; removals belong to the canvas op stream.
+        report one; removals belong to `listCanvasOps`, the ordered op stream
+        this operation's `latest_seq` is also a valid cursor into.
       parameters:
         - name: min_x
           in: query
@@ -2186,16 +2188,22 @@ paths:
           schema: { type: number, format: double }
         - name: prev_min_x
           in: query
-          description: The leaving rectangle. Send all four bounds or none.
+          deprecated: true
+          description: >-
+            The leaving rectangle. Send all four bounds or none. Superseded by
+            `listCanvasOps`: no known client sends this.
           schema: { type: number, format: double }
         - name: prev_min_y
           in: query
+          deprecated: true
           schema: { type: number, format: double }
         - name: prev_max_x
           in: query
+          deprecated: true
           schema: { type: number, format: double }
         - name: prev_max_y
           in: query
+          deprecated: true
           schema: { type: number, format: double }
         - name: after_seq
           in: query
@@ -2293,6 +2301,74 @@ paths:
           $ref: "#/components/responses/Conflict"
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
+
+  /channels/{channelId}/canvas/ops:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: listCanvasOps
+      tags: [canvas]
+      summary: Page a channel's canvas op stream from a cursor.
+      description: >
+        Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel,
+        byte-identical to the viewport read's gate. No timeout check: this is
+        a read.
+
+
+        Every canvas mutation allocates one seq and writes one op row in the
+        same transaction, so the sequence is dense over ops: `after_seq + 1`
+        is always either the very next op or past `latest_seq`, with no
+        possibility of an allocated-but-unwritten gap. Unlike the viewport
+        read's `has_more`, this cursor is stable and paging is correct - every
+        op has its own seq and there are no ties, so a page boundary is never
+        ambiguous the way the viewport read's "ask for a smaller region"
+        advice is.
+
+
+        `reset: true` always comes with an empty `ops` array and means the
+        cursor cannot be paged from: discard local canvas state and cold-fetch
+        the viewport instead. It is returned when the caller is more than
+        2,000 ops behind, when `after_seq` names a point before the oldest op
+        this server still retains (nothing sweeps the op stream yet, so this
+        cannot happen today, but the wire is ready for when something does),
+        or when `after_seq` is past `latest_seq`, which happens after a
+        restore from backup.
+
+
+        A page also stops early, before `limit` rows, once the accumulated
+        `place` props cross a byte budget: a `place` op carries whole props at
+        up to 4 KiB while every other kind carries none, so a row count alone
+        does not bound the response.
+      parameters:
+        - name: after_seq
+          in: query
+          required: true
+          description: Exclusive cursor. 0 reads from the start of the stream.
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+        - name: limit
+          in: query
+          description: Page size; the server clamps it.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+      responses:
+        "200":
+          description: The next page of the op stream, or a reset.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CanvasOpPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /channels/{channelId}/voice/token:
     post:
@@ -3646,8 +3722,79 @@ components:
           type: integer
           format: int64
           description: >-
-            The channel's highest assigned canvas `seq`, to send back as
-            `after_seq` on the next read.
+            The channel's highest assigned canvas `seq`. Every op at or below
+            this is reflected in `objects`, since both are read from one
+            snapshot. Send back as `after_seq` on the next viewport read, or
+            as the cursor into `listCanvasOps` to learn what has changed
+            since, removals included.
+
+    CanvasOp:
+      type: object
+      required: [seq, id, kind, actor_id, created_at]
+      description: >-
+        One entry in a channel's canvas op stream. Which of `object`,
+        `object_ids`, `before_seq` and `target_op` are present depends on
+        `kind`: a `place` carries `object` (absent once the object has since
+        been removed); a `remove` or `restore` carries `object_ids`; a `clear`
+        carries `before_seq`; a `restore` also carries `target_op`.
+      properties:
+        seq:
+          type: integer
+          format: int64
+        id:
+          type: string
+          format: uuid
+          description: >-
+            Server-minted for a `place` (the object's own id is already the
+            idempotency key); client-minted for every other kind.
+        kind:
+          type: string
+          enum: [place, remove, clear, restore]
+        actor_id:
+          type: [string, "null"]
+          format: uuid
+          description: Null once the actor's account has been anonymized.
+        created_at:
+          type: integer
+          format: int64
+        object:
+          $ref: "#/components/schemas/CanvasObject"
+        object_ids:
+          type: array
+          items: { type: string, format: uuid }
+          description: The objects a `remove` or `restore` touched.
+        before_seq:
+          type: integer
+          format: int64
+          description: A `clear` removed every object placed at or below this seq.
+        target_op:
+          type: string
+          format: uuid
+          description: The `remove` or `clear` op a `restore` undoes.
+
+    CanvasOpPage:
+      type: object
+      required: [ops, latest_seq, has_more, reset]
+      properties:
+        ops:
+          type: array
+          items:
+            $ref: "#/components/schemas/CanvasOp"
+        latest_seq:
+          type: integer
+          format: int64
+        has_more:
+          type: boolean
+          description: >-
+            More ops exist past this page; page again from the last op's
+            `seq`. Unlike the viewport read's `has_more`, this cursor is
+            stable and paging is correct.
+        reset:
+          type: boolean
+          description: >-
+            The cursor could not be paged from. `ops` is always empty
+            alongside this; discard local canvas state and cold-fetch the
+            viewport instead of trusting a partial answer.
 
     Message:
       type: object

@@ -23,7 +23,9 @@
 //! nothing; `tests/canvas.rs` asserts the plan rather than trusting it.
 
 use anyhow::Context;
+use sqlx::SqliteExecutor;
 
+use super::canvas_ops::insert_place_op;
 use super::{Store, now_ms};
 use crate::ids::{CanvasObjectId, ChannelId, Seq, UserId};
 
@@ -225,6 +227,8 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // Same transaction, same seq, or the op stream stops being dense.
+        insert_place_op(&mut tx, channel_id, seq, author_id, id, now).await?;
         tx.commit().await?;
 
         Ok(Placement {
@@ -299,73 +303,107 @@ impl Store {
         channel_id: ChannelId,
         query: &ViewportQuery,
     ) -> anyhow::Result<Vec<CanvasObject>> {
-        let key = channel_key(channel_id);
-        let view = query.view;
-        let previous = query.previous.unwrap_or(Rect {
-            min_x: 0.0,
-            min_y: 0.0,
-            max_x: 0.0,
-            max_y: 0.0,
-        });
-        let has_previous = i64::from(query.previous.is_some());
-
-        let rows = sqlx::query_as!(
-            CanvasObject,
-            r#"SELECT o.id AS "id!: CanvasObjectId", o.kind AS "kind!",
-                      o.z_index AS "z_index!: i64",
-                      o.x AS "x!: f64", o.y AS "y!: f64",
-                      o.w AS "w!: f64", o.h AS "h!: f64",
-                      o.props AS "props!", o.author_id AS "author_id: UserId",
-                      o.seq AS "seq!: Seq", o.created_at AS "created_at!: i64"
-               FROM canvas_rtree r
-               CROSS JOIN canvas_objects o ON o.rt_id = r.rt_id
-               WHERE r.min_key <= ? AND r.max_key >= ?
-                 AND r.max_x >= ? AND r.min_x <= ?
-                 AND r.max_y >= ? AND r.min_y <= ?
-                 AND o.channel_id = ? AND o.deleted_at IS NULL
-                 AND o.x <= ? AND o.x + o.w >= ?
-                 AND o.y <= ? AND o.y + o.h >= ?
-                 AND (? = 0 OR o.seq > ?
-                      OR NOT (o.x <= ? AND o.x + o.w >= ?
-                              AND o.y <= ? AND o.y + o.h >= ?))
-               ORDER BY o.z_index DESC, o.seq DESC
-               LIMIT ?"#,
-            key,
-            key,
-            view.min_x,
-            view.max_x,
-            view.min_y,
-            view.max_y,
-            channel_id,
-            view.max_x,
-            view.min_x,
-            view.max_y,
-            view.min_y,
-            has_previous,
-            query.after_seq,
-            previous.max_x,
-            previous.min_x,
-            previous.max_y,
-            previous.min_y,
-            query.limit
-        )
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(rows.into_iter().rev().collect())
+        viewport_objects_query(&self.pool, channel_id, query).await
     }
 
     /// The channel's highest assigned canvas sequence, which a client keeps as
     /// the cursor for its next viewport read.
     pub async fn latest_canvas_seq(&self, channel_id: ChannelId) -> anyhow::Result<i64> {
-        let seq = sqlx::query_scalar!(
-            r#"SELECT next_seq - 1 AS "seq!: i64" FROM channel_seq_counters
-               WHERE channel_id = ? AND stream = 'canvas'"#,
-            channel_id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-        Ok(seq.unwrap_or(0))
+        latest_canvas_seq_query(&self.pool, channel_id).await
     }
+
+    /// [`Store::latest_canvas_seq`] and [`Store::viewport_objects`], read from
+    /// one deferred transaction so a write landing between the two cannot
+    /// produce a `latest_seq` the page does not cover: over-reporting
+    /// self-heals on the next read, under-reporting does not.
+    pub async fn viewport_snapshot(
+        &self,
+        channel_id: ChannelId,
+        query: &ViewportQuery,
+    ) -> anyhow::Result<(i64, Vec<CanvasObject>)> {
+        let mut tx = self.pool.begin().await?;
+        let latest_seq = latest_canvas_seq_query(&mut *tx, channel_id).await?;
+        let objects = viewport_objects_query(&mut *tx, channel_id, query).await?;
+        tx.commit().await?;
+        Ok((latest_seq, objects))
+    }
+}
+
+async fn viewport_objects_query<'e, E>(
+    executor: E,
+    channel_id: ChannelId,
+    query: &ViewportQuery,
+) -> anyhow::Result<Vec<CanvasObject>>
+where
+    E: SqliteExecutor<'e>,
+{
+    let key = channel_key(channel_id);
+    let view = query.view;
+    let previous = query.previous.unwrap_or(Rect {
+        min_x: 0.0,
+        min_y: 0.0,
+        max_x: 0.0,
+        max_y: 0.0,
+    });
+    let has_previous = i64::from(query.previous.is_some());
+
+    let rows = sqlx::query_as!(
+        CanvasObject,
+        r#"SELECT o.id AS "id!: CanvasObjectId", o.kind AS "kind!",
+                  o.z_index AS "z_index!: i64",
+                  o.x AS "x!: f64", o.y AS "y!: f64",
+                  o.w AS "w!: f64", o.h AS "h!: f64",
+                  o.props AS "props!", o.author_id AS "author_id: UserId",
+                  o.seq AS "seq!: Seq", o.created_at AS "created_at!: i64"
+           FROM canvas_rtree r
+           CROSS JOIN canvas_objects o ON o.rt_id = r.rt_id
+           WHERE r.min_key <= ? AND r.max_key >= ?
+             AND r.max_x >= ? AND r.min_x <= ?
+             AND r.max_y >= ? AND r.min_y <= ?
+             AND o.channel_id = ? AND o.deleted_at IS NULL
+             AND o.x <= ? AND o.x + o.w >= ?
+             AND o.y <= ? AND o.y + o.h >= ?
+             AND (? = 0 OR o.seq > ?
+                  OR NOT (o.x <= ? AND o.x + o.w >= ?
+                          AND o.y <= ? AND o.y + o.h >= ?))
+           ORDER BY o.z_index DESC, o.seq DESC
+           LIMIT ?"#,
+        key,
+        key,
+        view.min_x,
+        view.max_x,
+        view.min_y,
+        view.max_y,
+        channel_id,
+        view.max_x,
+        view.min_x,
+        view.max_y,
+        view.min_y,
+        has_previous,
+        query.after_seq,
+        previous.max_x,
+        previous.min_x,
+        previous.max_y,
+        previous.min_y,
+        query.limit
+    )
+    .fetch_all(executor)
+    .await?;
+    Ok(rows.into_iter().rev().collect())
+}
+
+async fn latest_canvas_seq_query<'e, E>(executor: E, channel_id: ChannelId) -> anyhow::Result<i64>
+where
+    E: SqliteExecutor<'e>,
+{
+    let seq = sqlx::query_scalar!(
+        r#"SELECT next_seq - 1 AS "seq!: i64" FROM channel_seq_counters
+           WHERE channel_id = ? AND stream = 'canvas'"#,
+        channel_id
+    )
+    .fetch_optional(executor)
+    .await?;
+    Ok(seq.unwrap_or(0))
 }
 
 /// Fetches one object, the channel it belongs to and whether it is removed,
