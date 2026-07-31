@@ -6,10 +6,18 @@ part of 'events.dart';
 
 /// A message was deleted (soft, but gone from every live view).
 class MessageDeleted extends ServerEvent {
-  const MessageDeleted({required this.channelId, required this.messageId});
+  const MessageDeleted({
+    required this.channelId,
+    required this.messageId,
+    this.opSeq,
+  });
 
   final String channelId;
   final String messageId;
+
+  /// This delete's place in the channel's message-op stream, null against a
+  /// server that has none.
+  final int? opSeq;
 }
 
 /// A message's reaction tallies changed. Carries the whole current set

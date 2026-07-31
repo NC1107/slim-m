@@ -37,14 +37,17 @@ sealed class ServerEvent {
       'hello' => HelloEvent(protocol: decoded['protocol'] as int? ?? 0),
       'message.created' when message is Map<String, dynamic> =>
         MessageCreated(Message.fromJson(message)),
-      'message.edited' when message is Map<String, dynamic> =>
-        MessageEdited(Message.fromJson(message)),
+      'message.edited' when message is Map<String, dynamic> => MessageEdited(
+          Message.fromJson(message),
+          opSeq: decoded['op_seq'] as int?,
+        ),
       'message.deleted'
           when decoded['channel_id'] is String &&
               decoded['message_id'] is String =>
         MessageDeleted(
           channelId: decoded['channel_id'] as String,
           messageId: decoded['message_id'] as String,
+          opSeq: decoded['op_seq'] as int?,
         ),
       'reactions.changed'
           when decoded['channel_id'] is String &&
@@ -211,9 +214,17 @@ class MessageCreated extends ServerEvent {
 
 /// A message was edited.
 class MessageEdited extends ServerEvent {
-  const MessageEdited(this.message);
+  const MessageEdited(this.message, {this.opSeq});
 
   final Message message;
+
+  /// This edit's place in the channel's message-op stream, null against a
+  /// server that has none.
+  ///
+  /// A different number in a different sequence from `message.seq`, which is
+  /// the message's own creation order and is unmoved by an edit. The two
+  /// sitting adjacent in one frame is the obvious thing to conflate.
+  final int? opSeq;
 }
 
 /// Keepalive reply.

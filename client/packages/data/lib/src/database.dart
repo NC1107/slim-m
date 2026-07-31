@@ -47,6 +47,16 @@ class Channels extends Table {
   /// until the next channel refresh replaces it.
   TextColumn get dmParticipantId => text().nullable()();
 
+  /// The highest message-op `seq` this client has applied for the channel.
+  ///
+  /// Nullable, and the nullability is the whole mechanism: null means "I hold
+  /// no op cursor, adopt whatever head the next response reports", and there
+  /// is no in-band integer that could mean that. Zero means "I am caught up
+  /// with a stream that has never had an op", which is a different claim.
+  /// A reset clears it back to null rather than lowering it to zero, or the
+  /// client asks from 0 forever against a server that has swept.
+  IntColumn get opCursor => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -84,7 +94,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -113,6 +123,14 @@ class SlimmDatabase extends _$SlimmDatabase {
   ///
   /// v6 adds `channels.dmParticipantId` the same way again: null until the
   /// next refresh fills it in for every DM row.
+  ///
+  /// v7 adds `channels.opCursor` and then does what v3 did, for a reason of
+  /// its own rather than a repeat of v3's. Edits and deletes made before the
+  /// server had an op stream to record them in are unrecoverable by any
+  /// mechanism: no cursor can reach behind the first op ever written, so a
+  /// message this cache holds a stale copy of would stay stale forever. The
+  /// cache is dropped once to close that pre-log epoch, and every op from
+  /// here on reconciles without another wipe.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -130,9 +148,12 @@ class SlimmDatabase extends _$SlimmDatabase {
           if (from < 6) {
             await m.addColumn(channels, channels.dmParticipantId);
           }
-          // v2's null display names are unreachable by a keyset sync, so the
-          // cache is dropped and the cursor rewound. See the doc comment above.
-          if (from < 3) {
+          if (from < 7) {
+            await m.addColumn(channels, channels.opCursor);
+          }
+          // v2's null display names and the pre-op-stream epoch are both
+          // unreachable by a keyset sync. See the doc comment above.
+          if (from < 7) {
             await m.deleteTable(messages.actualTableName);
             await m.createTable(messages);
             await m.database.customStatement('UPDATE channels SET cursor = 0');

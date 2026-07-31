@@ -19,6 +19,7 @@ export 'models_identity.dart';
 export 'models_moderation.dart';
 export 'models_canvas.dart';
 export 'models_canvas_ops.dart';
+export 'models_message_ops.dart';
 export 'models_pins.dart';
 export 'models_polls.dart';
 export 'models_presence.dart';
@@ -30,6 +31,7 @@ export 'models_version.dart';
 // Message needs these in scope here, which only `import` grants; the exports
 // above are what re-surface them to callers of this file.
 import 'models_attachments.dart';
+import 'models_message_ops.dart';
 import 'models_polls.dart';
 import 'models_reactions.dart';
 
@@ -278,14 +280,26 @@ class ReadState {
 
 /// One scope's position, sent when catching up.
 class ScopeCursor {
-  const ScopeCursor({required this.channelId, required this.afterSeq});
+  const ScopeCursor({
+    required this.channelId,
+    required this.afterSeq,
+    this.afterOpSeq,
+  });
 
   final String channelId;
   final int afterSeq;
 
+  /// The message-op cursor, absent when this client holds none.
+  ///
+  /// Absent is what an older client always sends and what a newer one sends
+  /// before it has adopted a head, and both get the same answer: no ops, and
+  /// never a reset from an op gap. Sending it is what opts a scope in.
+  final int? afterOpSeq;
+
   Map<String, dynamic> toJson() => {
         'channel_id': channelId,
         'after_seq': afterSeq,
+        if (afterOpSeq != null) 'after_op_seq': afterOpSeq,
       };
 }
 
@@ -296,6 +310,9 @@ class ScopeDelta {
     required this.messages,
     required this.hasMore,
     required this.reset,
+    this.ops = const <MessageOp>[],
+    this.opLatestSeq,
+    this.opsHasMore = false,
   });
 
   final String channelId;
@@ -306,8 +323,27 @@ class ScopeDelta {
   /// More remains past what this response carried.
   final bool hasMore;
 
-  /// The cursor was too far behind: drop local state for this scope and refetch.
+  /// Either cursor was too far behind: drop local state for this scope and
+  /// refetch. There is no separate ops flag, because the recovery is the same
+  /// either way, and it is only ever set from an op gap for a scope whose
+  /// request carried an op cursor.
   final bool reset;
+
+  /// Empty whenever the request carried no op cursor, and empty when there is
+  /// genuinely nothing, the convention `reactions` and `attachments` follow.
+  final List<MessageOp> ops;
+
+  /// The head of the channel's op stream, and the old-server detector: a
+  /// server with no op stream sends no such key, so null means "this
+  /// deployment cannot reconcile" rather than "the stream is empty".
+  ///
+  /// Detection is by field absence rather than through the capability
+  /// handshake, which derives its list by probing the router and so can see a
+  /// new path but never a new field.
+  final int? opLatestSeq;
+
+  /// More ops remain past what this response carried.
+  final bool opsHasMore;
 
   factory ScopeDelta.fromJson(Map<String, dynamic> json) => ScopeDelta(
         channelId: json['channel_id'] as String,
@@ -316,6 +352,11 @@ class ScopeDelta {
             .toList(growable: false),
         hasMore: json['has_more'] as bool,
         reset: json['reset'] as bool,
+        ops: (json['ops'] as List<dynamic>? ?? const <dynamic>[])
+            .map((o) => MessageOp.fromJson(o as Map<String, dynamic>))
+            .toList(growable: false),
+        opLatestSeq: json['op_latest_seq'] as int?,
+        opsHasMore: json['ops_has_more'] as bool? ?? false,
       );
 }
 

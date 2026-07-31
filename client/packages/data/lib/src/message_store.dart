@@ -88,11 +88,44 @@ class MessageStore {
     return row != null;
   }
 
-  /// Every channel's cursor, for a bundled catch-up request.
+  /// The highest message-op seq applied for a channel, or null where this
+  /// client holds no op cursor at all.
+  ///
+  /// Null and zero are different answers and the caller must keep them apart:
+  /// see [Channels.opCursor].
+  Future<int?> opCursorFor(String channelId) async {
+    final row = await (db.select(db.channels)
+          ..where((c) => c.id.equals(channelId)))
+        .getSingleOrNull();
+    return row?.opCursor;
+  }
+
+  /// Moves a channel's op cursor forward, or clears it when [seq] is null.
+  ///
+  /// Monotonic in the same shape [_advanceCursor] is, with one difference
+  /// that matters: null is a clear, never a lowering to zero. Adopting a
+  /// server-reported head is also a forward move, so it goes through here.
+  Future<void> setOpCursor(String channelId, int? seq) async {
+    await db.transaction(() async {
+      final row = await (db.select(db.channels)
+            ..where((c) => c.id.equals(channelId)))
+          .getSingleOrNull();
+      if (row == null) return;
+      if (seq != null && row.opCursor != null && row.opCursor! >= seq) return;
+      await (db.update(db.channels)..where((c) => c.id.equals(channelId)))
+          .write(ChannelsCompanion(opCursor: Value(seq)));
+    });
+  }
+
+  /// Every channel's cursors, for a bundled catch-up request.
   Future<List<api.ScopeCursor>> allCursors() async {
     final rows = await db.select(db.channels).get();
     return rows
-        .map((c) => api.ScopeCursor(channelId: c.id, afterSeq: c.cursor))
+        .map((c) => api.ScopeCursor(
+              channelId: c.id,
+              afterSeq: c.cursor,
+              afterOpSeq: c.opCursor,
+            ))
         .toList(growable: false);
   }
 
@@ -221,7 +254,10 @@ class MessageStore {
                 (m) => m.channelId.equals(channelId) & m.pending.equals(false)))
           .go();
       await (db.update(db.channels)..where((c) => c.id.equals(channelId)))
-          .write(const ChannelsCompanion(cursor: Value(0)));
+          .write(const ChannelsCompanion(
+        cursor: Value(0),
+        opCursor: Value(null),
+      ));
     });
   }
 
@@ -289,6 +325,23 @@ class MessageStore {
   /// vanish from every view. Same operation either way.
   Future<void> discard(String id) async {
     await (db.delete(db.messages)..where((m) => m.id.equals(id))).go();
+  }
+
+  /// Applies an edit to a message already held, and does nothing else.
+  ///
+  /// Three things it deliberately does not do, because each is a one-word
+  /// mistake with no symptom until much later: it never inserts, so an edit
+  /// for a message this client does not hold is dropped rather than
+  /// materialised as a row with no `seq`; it never writes `seq`, which
+  /// belongs to the message stream and not to this one; and it never advances
+  /// the message cursor, which would skip whatever sits between.
+  Future<void> applyEdit(
+      String messageId, String content, int? editedAt) async {
+    await (db.update(db.messages)..where((m) => m.id.equals(messageId)))
+        .write(MessagesCompanion(
+      content: Value(content),
+      editedAt: Value(editedAt),
+    ));
   }
 
   /// Mirrors the server's read marker.
