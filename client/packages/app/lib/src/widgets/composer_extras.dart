@@ -264,8 +264,8 @@ class NewlineHint extends StatelessWidget {
 }
 
 /// Who is typing in this channel, from real `typing.started`/`typing.stopped`
-/// events. Receive-only: see `providers/typing_controller.dart` for why this
-/// client has nothing to send one back with yet.
+/// events; `TypingController` also sends the `typing` frame this client
+/// emits while the user types (see `providers/typing_controller.dart`).
 ///
 /// The server fans a typist's own frame back to their own connections too
 /// (so a second device can show it), so the caller's own id is dropped here

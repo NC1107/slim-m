@@ -38,6 +38,11 @@ void main() {
     expect(channel.name, 'Priya');
     expect(channel.kind, dmChannelKind);
     expect(channel.createdAt, 1000);
+    expect(
+      channel.isPersonalSpace,
+      isFalse,
+      reason: 'the other participant is not the caller',
+    );
   });
 
   test('channelFromDm names a personal space distinctly rather than with the '
@@ -62,6 +67,43 @@ void main() {
       reason:
           'a personal space labelled with your own name would read as a '
           'DM with yourself rather than what it is',
+    );
+    expect(
+      channel.isPersonalSpace,
+      isTrue,
+      reason: 'this is the one signal the rail may use to identify it',
+    );
+  });
+
+  test('a DM whose other participant chose the sentinel as their own display '
+      'name is not marked as the personal space', () {
+    final dm = api.DmConversation(
+      channelId: 'dm-imposter',
+      user: const api.UserProfile(
+        id: 'user-2',
+        username: 'imposter',
+        displayName: personalSpaceName,
+        createdAt: 0,
+      ),
+      unread: 0,
+      createdAt: 1000,
+    );
+
+    final channel = channelFromDm(dm, selfId: 'self');
+
+    expect(
+      channel.isPersonalSpace,
+      isFalse,
+      reason:
+          'the other participant is not the caller, whatever their '
+          'display name says',
+    );
+    expect(
+      channel.name,
+      personalSpaceName,
+      reason:
+          'the label collides - that is the point of this test - but '
+          'identity must not be read off it',
     );
   });
 
@@ -122,6 +164,7 @@ void main() {
       expect(channels.single.id, 'dm-1');
       expect(channels.single.name, 'Priya');
       expect(channels.single.kind, dmChannelKind);
+      expect(channels.single.isPersonalSpace, isFalse);
     },
   );
 
@@ -178,5 +221,10 @@ void main() {
     final store = await container.read(storeProvider.future);
     final channels = await store.watchChannels().first;
     expect(channels.single.name, personalSpaceName);
+    expect(
+      channels.single.isPersonalSpace,
+      isTrue,
+      reason: 'the persisted marker, not just the display name, must be set',
+    );
   });
 }

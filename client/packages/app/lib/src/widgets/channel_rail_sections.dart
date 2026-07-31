@@ -9,12 +9,11 @@ import 'package:go_router/go_router.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import '../providers/dms.dart';
-import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'channel_rail_channel_rows.dart';
 import 'create_channel_sheet.dart';
+import 'personal_space_row.dart';
 
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text, {this.onAdd, this.addSemanticLabel});
@@ -73,8 +72,11 @@ class _SectionLabel extends StatelessWidget {
 /// message someone.
 ///
 /// A DM with yourself - your personal space - is the one exception: it gets
-/// its own always-present [_PersonalSpaceRow] rather than being something
-/// you find by searching your own name in the member list.
+/// its own always-present [PersonalSpaceRow] rather than being something
+/// you find by searching your own name in the member list. The split below
+/// reads [Channel.isPersonalSpace], not [Channel.name]: another member can
+/// freely set their own display name to [personalSpaceName], and their DM
+/// must still render, and open, as an ordinary row rather than as this one.
 class DirectMessagesSection extends StatelessWidget {
   const DirectMessagesSection({
     super.key,
@@ -91,7 +93,7 @@ class DirectMessagesSection extends StatelessWidget {
     Channel? personal;
     final others = <Channel>[];
     for (final channel in channels) {
-      if (channel.name == personalSpaceName && personal == null) {
+      if (channel.isPersonalSpace && personal == null) {
         personal = channel;
       } else {
         others.add(channel);
@@ -102,7 +104,7 @@ class DirectMessagesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionLabel('Direct messages'),
-        _PersonalSpaceRow(
+        PersonalSpaceRow(
           channel: personal,
           selected: personal != null && personal.id == selectedId,
         ),
@@ -127,48 +129,6 @@ class DirectMessagesSection extends StatelessWidget {
               onTap: () => context.go(Routes.channel(channel.id)),
             ),
       ],
-    );
-  }
-}
-
-/// The always-present entry point to the caller's own notes. Reachable
-/// before the channel exists at all - the first tap opens it - and renders
-/// identically after, so the row never moves once it does.
-class _PersonalSpaceRow extends ConsumerWidget {
-  const _PersonalSpaceRow({required this.channel, required this.selected});
-
-  /// The local channel row already synced for this personal space, or null
-  /// before it has ever been opened on any device.
-  final Channel? channel;
-  final bool selected;
-
-  Future<void> _open(BuildContext context, WidgetRef ref) async {
-    final existing = channel;
-    if (existing != null) {
-      context.go(Routes.channel(existing.id));
-      return;
-    }
-    final selfId = ref.read(sessionProvider).tokens?.userId;
-    if (selfId == null) return;
-    final container = ProviderScope.containerOf(context, listen: false);
-    final channelId = await openDirectMessage(container, selfId);
-    if (context.mounted) context.go(Routes.channel(channelId));
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final existing = channel;
-    return AppListRow(
-      label: personalSpaceName,
-      selected: selected,
-      unread: existing != null && existing.cursor > existing.lastReadSeq,
-      leading: Icon(
-        AppIcons.notebook,
-        size: AppSizes.icon16,
-        color: selected ? tokens.accent : tokens.textSecondary,
-      ),
-      onTap: () => _open(context, ref),
     );
   }
 }

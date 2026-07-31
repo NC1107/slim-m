@@ -42,6 +42,7 @@ Channel _channel(
   topic: topic,
   cursor: 0,
   lastReadSeq: 0,
+  isPersonalSpace: false,
 );
 
 /// Wraps [child] with everything a sheet's provider reads need: a session,

@@ -28,15 +28,21 @@ const _tokens = api.TokenPair(
   accessExpiresAt: 0,
 );
 
-Channel _dm(String id, String name, {int cursor = 0, int lastReadSeq = 0}) =>
-    Channel(
-      id: id,
-      name: name,
-      kind: dmChannelKind,
-      createdAt: 0,
-      cursor: cursor,
-      lastReadSeq: lastReadSeq,
-    );
+Channel _dm(
+  String id,
+  String name, {
+  int cursor = 0,
+  int lastReadSeq = 0,
+  bool isPersonalSpace = false,
+}) => Channel(
+  id: id,
+  name: name,
+  kind: dmChannelKind,
+  createdAt: 0,
+  cursor: cursor,
+  lastReadSeq: lastReadSeq,
+  isPersonalSpace: isPersonalSpace,
+);
 
 /// A container wired with a signed-in session and, when [onOpen] is given, an
 /// API client answering `POST /dms/self`. Tests that never tap the personal
@@ -142,7 +148,10 @@ void main() {
       await tester.pumpWidget(
         _harness(
           container: container,
-          channels: [_dm('dm-1', 'Priya'), _dm('dm-self', personalSpaceName)],
+          channels: [
+            _dm('dm-1', 'Priya'),
+            _dm('dm-self', personalSpaceName, isPersonalSpace: true),
+          ],
         ),
       );
 
@@ -150,6 +159,53 @@ void main() {
       expect(find.text('Priya'), findsOneWidget);
     },
   );
+
+  testWidgets('a DM whose other participant set their own display name to the '
+      'personal space sentinel is not rendered, or navigable, as the '
+      'personal space', (tester) async {
+    final container = _container();
+    addTearDown(container.dispose);
+
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => Scaffold(
+            body: DirectMessagesSection(
+              // isPersonalSpace defaults to false: a matching label, no matching identity.
+              channels: [_dm('dm-imposter', personalSpaceName)],
+              selectedId: null,
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/channels/:channelId',
+          builder: (context, state) => Scaffold(
+            body: Text('channel:${state.pathParameters['channelId']}'),
+          ),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _harness(container: container, channels: [], router: router),
+    );
+
+    // The always-present personal space row and the impostor's row both carry this label.
+    expect(find.text(personalSpaceName), findsNWidgets(2));
+
+    await tester.tap(find.text(personalSpaceName).last);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('channel:dm-imposter'),
+      findsOneWidget,
+      reason:
+          'tapping the impostor row must open their own channel, never '
+          'the caller\'s personal space',
+    );
+  });
 
   testWidgets('an unread DM shows the unread marker', (tester) async {
     final container = _container();
@@ -247,7 +303,9 @@ void main() {
           path: '/',
           builder: (context, state) => Scaffold(
             body: DirectMessagesSection(
-              channels: [_dm('dm-self', personalSpaceName)],
+              channels: [
+                _dm('dm-self', personalSpaceName, isPersonalSpace: true),
+              ],
               selectedId: null,
             ),
           ),

@@ -37,6 +37,7 @@ final _channel = Channel(
   createdAt: 0,
   cursor: 0,
   lastReadSeq: 0,
+  isPersonalSpace: false,
 );
 
 const _rosterPath = '/channels/ch-1/voice/roster';
