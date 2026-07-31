@@ -129,6 +129,19 @@ class CanvasSync {
     unawaited(catchUp());
   }
 
+  /// Reconciles an op the live frame could not carry, without advancing the
+  /// cursor past it.
+  ///
+  /// The one caller is a restore whose frame arrived with no ids, which the
+  /// server does when the restored set is larger than a `remove` may name.
+  /// Deliberately not [applyLive] with an empty apply: that would move the
+  /// cursor past the only op able to clear those tombstones, and no later
+  /// frame or cold fetch would ever bring the objects back, since the
+  /// document refuses to re-place a tombstoned id. Leaving the cursor where
+  /// it is means the feed re-delivers the op with its full list, and any
+  /// frame arriving meanwhile reads as a gap and lands here too.
+  void deferToFeed() => unawaited(catchUp());
+
   /// Pages the ops feed from the current cursor, applying every op in order.
   ///
   /// Runs on the first successful viewport read, on every later fetch (cold

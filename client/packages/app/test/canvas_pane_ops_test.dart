@@ -7,6 +7,7 @@
 library;
 
 import 'package:flutter/services.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/permissions.dart';
 
@@ -163,4 +164,38 @@ void main() {
       expect(surfaceDocument(tester).objectCount.value, 0);
     },
   );
+
+  /// The server empties a restore frame's id list rather than exceed the
+  /// bound a `remove` sets, so an empty list means "more than I can name",
+  /// never "nothing". Applying it would clear no tombstone while advancing
+  /// the cursor past the only op that could, leaving those objects invisible
+  /// on this client permanently. Reachable only since clear got a caller.
+  testWidgets('a restore frame carrying no ids asks the feed rather than '
+      'advancing past it', (tester) async {
+    final fixture = CanvasPaneFixture();
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+    await pumpCanvasPane(tester, container);
+    await tester.pumpAndSettle();
+    final settled = fixture.opsGets;
+
+    fixture.events.add(
+      const api.CanvasObjectsRestored(
+        channelId: 'c1',
+        seq: 1,
+        opId: 'op-1',
+        objectIds: <String>[],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      fixture.opsGets,
+      greaterThan(settled),
+      reason:
+          'an unenumerable restore must be reconciled from the feed, which '
+          'carries the full list, rather than trusted as an empty apply',
+    );
+  });
 }
