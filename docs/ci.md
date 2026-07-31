@@ -22,6 +22,7 @@ Each section below is named for its workflow file.
 | `e2e` | every push to `main`, a nightly schedule, and by hand | the whole product through two real headless browsers; advisory, not required |
 | `push-relay-contract` | changes to the server's push path | a server-generated envelope through the relay repo's real HTTP handler |
 | `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline |
+| `main-builds` | changes under `client/` or `crates/` on every push to `main`, excluding a release commit's own files | continuous TestFlight, a Fedora COPR snapshot, an Android artifact, and `latest` on the live server image; never a version bump, changelog or GitHub Release |
 
 ## server-ci
 
@@ -462,3 +463,64 @@ A run number is monotonic and cannot be forgotten, so a reused build number stop
 
 `--build-name` comes from the tag, not from pubspec.
 The pubspec version is a local-build default and has sat at 0.1.0 across every release, so without this a tester cannot tell one build from another and every TestFlight build reads 0.1.0 whatever was tagged.
+
+## main-builds
+
+The owner's own framing: "every time I go to main, I should be able to test on all devices that have changes... if I change the way voice canvas works and we take a PR to main, in 20 minutes or so I should automatically have an iOS release and Fedora PC should have the update also, with no extra touching involved."
+This is the workflow that answers that, deliberately kept out of `release.yml`: that workflow's whole shape keys off release-please outputs and tag refs, and mixing an untagged path into it would make both harder to reason about.
+Nothing here is versioned, changelogged, tagged or attached to a GitHub Release; that stays `release`'s job, triggered the same way it always has been by merging a release PR.
+On a client merge, iOS reaches TestFlight and the owner's Fedora desktop gets a new build through the same COPR project `dnf upgrade` already polls; on a server merge, the live instance updates on its own, because `latest` moves.
+A tagged release still supersedes all of this: it wins over any COPR snapshot of the same version (see the versioning section below), and it alone attaches signed assets to the GitHub release.
+
+### What triggers it, and the one filter step that replaces two workflows
+
+A single `on.push.paths` list cannot tell a client-only merge from a server-only one, so the trigger is deliberately wide (`client/**` or `crates/**`, minus a release commit's own `client/CHANGELOG.md` and `client/pubspec.yaml`) and a `changes` job built on `dorny/paths-filter` narrows that into the two booleans (`client`, `server`) every downstream job gates on.
+The brief allowed splitting this into two workflows with their own top-level `paths` instead; one workflow with one filter step was chosen because it keeps the concurrency group, the header, and this section in one place, and because the filter step is one checkout rather than two.
+
+The two client exclusions are load-bearing.
+A release-please release commit for the client touches exactly `.release-please-manifest.json`, `client/CHANGELOG.md` and `client/pubspec.yaml` (verified against the actual `chore(main): release client 0.16.0` commit).
+Without the exclusions, that commit would also match `client/**`, and this workflow would rebuild and re-upload the exact commit `release.yml` just shipped to TestFlight and Play, under the same version, racing a second altool upload against the first.
+No equivalent exclusion exists for the server side: a server release-please commit touches `crates/slimm-server/Cargo.toml` and `crates/slimm-server/CHANGELOG.md`, both under `crates/**`, so it still re-triggers `server-image` here.
+That is accepted rather than worked around: excluding `Cargo.toml` from the trigger would also hide a real dependency-bump PR that happens to touch only that file, and there is no path-only way to tell the two apart.
+The redundant build pushes the same `latest` the release itself would have pushed moments earlier for the same commit, so nothing wrong reaches production; it is simply a build that did not need to happen.
+
+### What each side does
+
+The client side reuses `release.yml`'s `ios-testflight`, `android-client` and `linux-client` steps verbatim where the two paths overlap: the throwaway keychain and `set-key-partition-list` for iOS, the upload-key signer verification for Android, the Fedora container for the rpm build.
+It differs because there is no tagged release to publish against: `softprops/action-gh-release` has nothing to attach to on an untagged push, so the Android apk and aab go up as `actions/upload-artifact` run artifacts instead (there is no Android device to test the push path here, and the Play upload stays manual regardless, so an artifact is all this path is for).
+The Linux side goes further than an artifact: it lands on the owner's actual Fedora machine, through COPR, covered in its own section below.
+And the version name passed to `--build-name` is read directly out of `client/pubspec.yaml` (the file release-please itself writes, and the exact value this workflow's own trigger excludes from re-triggering it) rather than out of a release-please output or a tag, since neither exists here; it therefore repeats across every continuous build until the next real release moves it, which is fine, because uniqueness is per version-and-build, not per version alone.
+`--build-number` still comes from `github.run_number`, exactly as `release.yml` uses its own, for the same reason: both stores reject a reused build number for a version.
+Worth naming rather than assuming away: `release.yml` and `main-builds.yml` are two different workflow files, so each has its own independent `run_number` counter, and nothing here proves those two counters can never land on the same integer while a version briefly overlaps between a continuous build and the release that follows it.
+No such collision has been observed, and `release.yml` runs on every push to `main` regardless of path while this workflow only runs on a subset of those pushes, which keeps its counter behind; if that ever stops holding, the fix is to derive the build number from something workflow-independent, such as a count of commits.
+
+The server side pushes one native `linux/amd64` image to GHCR, tagged `sha-<commit>`, `main` and `latest`, with no arm64 build, no digest-then-merge manifest assembly and no cosign signing.
+amd64 only because nothing consumes an arm64 image from this path: the owner's live instance (`CLAUDE.md`'s "Running deployment" section) is an amd64 Ubuntu Docker host, and a released version still gets the full signed multi-arch manifest `release.yml` builds.
+Moving `latest` here is continuous deployment in the plain sense of the term: Watchtower on the live instance polls that tag, so a server merge reaches production within one build with nobody deploying it by hand, and a bad merge reaches it exactly as fast.
+That is the trade the owner asked for explicitly, not a gap: fast iteration on the one host that matters to him, at the cost of no gate between a merge and production.
+
+### Fedora, COPR, and the two problems a snapshot build has that a release does not
+
+`packaging/rpm/slim-m-client.spec`'s `Source0` points at a GitHub *release* asset (`.../releases/download/client-v%{version}/slim-m-client-%{version}-linux-amd64.tar.gz`), and the release path's `copr` job fetches it with `spectool -g -R` because COPR's mock buildroot has no network and needs the tarball inside the SRPM before it submits.
+An untagged main push has no such release, so `spectool` would 404 on every single continuous build.
+The fix is not to create a release to satisfy it: `linux-client` already builds the identical tarball for its own rpm, uploads it as the `slim-m-client-tarball` artifact, and the `copr` job downloads that artifact and copies it into `~/rpmbuild/SOURCES/` under the exact filename `Source0` names, then calls `rpmbuild -bs` directly with no `spectool` step at all.
+The release path's own `spectool` call is untouched; this is a second, parallel way of populating `SOURCES/`, not a change to the first.
+
+The spec is committed at `Version: 0.4.0` / `Release: 1%{?dist}`, and the release job already rewrites `Version` to the tag's version on its own copy of the spec, never on the one in git.
+A continuous build does the same version rewrite (to the client's current tracked version, read out of `client/pubspec.yaml`, the same value the mobile builds use), but it also has to rewrite `Release`, or every snapshot of one version would collide with the committed `1%{?dist}` and with each other.
+It is set to `0.${{ github.run_number }}%{?dist}`.
+RPM's version comparison splits `Release` into alphanumeric segments and compares them one at a time, so `0.<n>` and `1` compare on their first segment, `0` against `1`, and `0` always loses.
+That means every snapshot of a given version sorts below the real tagged release of that same version, however high its own run number climbs, so cutting an actual release always supersedes whatever snapshots came before it on `dnf upgrade`, while snapshots still sort in increasing order among themselves because `run_number` only grows.
+Neither the committed spec's `Release:` line nor the release path's own behaviour is touched; both rewrites happen only on the build-time copy under `~/rpmbuild/SPECS/`.
+
+### Secrets, gating, and the environments it deliberately does not use
+
+Every job that needs a secret checks for it first and warns rather than fails when it is absent, the identical shape `release.yml` uses for its Android, iOS and COPR jobs: a fork or a repo missing a credential gets a visible warning and a skipped step, never a red required check.
+`release.yml`'s equivalent jobs declare `environment: release` or `environment: testflight`; this workflow's jobs deliberately do not.
+Checked directly against the repository (`gh secret list`, `gh api repos/.../environments`): every secret these jobs read is a repository-level secret, not an environment-level one, and both environments currently carry no protection rules, so omitting the environment name changes nothing about what a job can read today.
+It is still the right default for this workflow rather than an oversight: an owner open item already on record is adding reviewer protection to those two environments for real releases, and if that lands later, a job that names the same environment here would suddenly require a manual approval on every ordinary merge, which defeats the entire point of a fast, unattended path.
+
+### Concurrency, and why it is the opposite of `release.yml`
+
+`release.yml` sets `cancel-in-progress: false`, because a half-published release is worse than a queued one.
+This workflow sets it `true`, because a continuous build carries no such asymmetry: a newer commit's build simply supersedes an older one's, so cancelling the older run in favour of the newer one loses nothing worth keeping.
