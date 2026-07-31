@@ -90,7 +90,10 @@ Grouped by what they are rather than by where they were said, because three of t
 
 ### The message row
 
-- **Rows bounce on hover.** The reaction affordance renders bottom-left and reflows the row, so the whole chat log moves under the pointer. Discord's answer is a floating action cluster pinned top-right that does not participate in layout; that is the shape to copy.
+- **Rows bounce on hover.** Diagnosed 2026-07-31, so the next pass need not re-find it: `ReactionsRow.build` (`client/packages/app/lib/src/widgets/message_row_parts.dart:83`) returns `SizedBox.shrink()` when a message has no reactions and is not hovered. Hovering therefore swaps absent-to-present rather than hidden-to-visible, and the row grows by the button's height, pushing everything below it.
+  The current doc comment directly above that line argues for exactly this behaviour ("a permanent add-button under every message costs a row of vertical space each ... so the affordance belongs on hover with the row absent until then"). That reasoning is sound about the cost it names and is what produced the bounce, so the fix has to replace the argument rather than just the line: reserving the space instead would restore the very cost it avoids.
+  The shape to copy is Discord's, which the owner named: a floating action cluster pinned top-right, in a `Stack`/`Positioned` inside `MessageRow` (the `builder: (context, hovered)` at `message_row.dart:144` already has the hover state), so it overlays rather than participating in layout. `ReactionsRow` then stops taking `showAddButton` entirely and renders only real reactions.
+  Doing this also puts the affordance where the other two message-row items want to live, which is why these three should be one change rather than three.
 - **Author icons stay vertically centred as a message grows.** They should align to the top of the text block, as Discord does. Currently a long message centres its avatar halfway down.
 - **No way to highlight a message.** No selection, no jump-to, no visual mark.
 
