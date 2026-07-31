@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! End-to-end WebSocket tests against a real server on an ephemeral port, driven
-//! by a real WebSocket client. Covers the two-client fan-out and ordering, the
-//! per-event permission filter, and connect-time ticket auth.
+//! by a real WebSocket client. Covers the two-client fan-out and ordering and
+//! the per-event permission filter, including a store error while resolving
+//! it. Session-lifecycle closes (logout, device removal, account deletion, a
+//! bad ticket) live in `tests/ws_session_lifecycle.rs`.
 
 use std::time::Duration;
 
@@ -13,11 +15,13 @@ use slimm_server::auth::Auth;
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
-use slimm_server::hub::Hub;
+use slimm_server::hub::{Event, Hub};
+use slimm_server::ids::MessageId;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
+use sqlx::SqlitePool;
 use tokio::net::TcpListener;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
@@ -39,6 +43,21 @@ async fn new_store() -> (Store, support::TestDbGuard) {
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     (Store::new(pool), guard)
+}
+
+/// Like [`new_store`], but also hands back the raw pool so a test can break a
+/// single query for real; see
+/// `a_store_error_authorizing_fan_out_closes_the_connection`.
+async fn new_store_with_pool() -> (Store, SqlitePool, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-ws-test");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    (Store::new(pool.clone()), pool, guard)
 }
 
 fn state_for(store: &Store) -> AppState {
@@ -224,141 +243,55 @@ async fn fan_out_respects_view_permission() {
     assert!(bob_next.is_err(), "bob must not receive a hidden channel");
 }
 
-#[tokio::test]
-async fn logout_closes_the_live_socket() {
-    let (store, _guard) = new_store().await;
-    let state = state_for(&store);
-    let (alice_access, alice_ticket, _alice) = user_ticket(&store, "alice").await;
-
-    let addr = serve(state.clone()).await;
-    let mut alice_ws = connect(addr, &alice_ticket).await;
-
-    // Log out over REST on the same session; the shared hub carries the
-    // revocation to the live socket.
-    let response = http::router(state.clone())
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/auth/logout")
-                .header("authorization", format!("Bearer {alice_access}"))
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::NO_CONTENT);
-
-    // The socket closes promptly rather than lingering with fan-out access.
-    let closed = tokio::time::timeout(Duration::from_secs(2), wait_closed(&mut alice_ws)).await;
-    assert!(closed.is_ok(), "the socket should close after logout");
-}
-
-/// Removing a device is the third way a session dies, alongside logout and
-/// account deletion, and the only one with no test until now.
+/// A store error while resolving the fan-out permission check must not read
+/// as "not visible" and be silently dropped: `/sync` filters purely by seq,
+/// so a connection whose cursor has already moved past a dropped event can
+/// never recover it short of a full channel reset. The connection closes
+/// instead, onto the same resync path a lagged subscriber already takes.
 ///
-/// `Store::revoke_device` deliberately does not publish anything itself: the
-/// handler does, because it is the layer that holds the hub. That split is
-/// easy to undo by accident while refactoring, and nothing would fail.
+/// The message is sent through `Store::send_message` directly rather than the
+/// REST handler, and the column is broken before that call rather than after:
+/// the REST handler's own permission check reads the identical query, so
+/// breaking it first (rather than racing the handler's send against the
+/// asynchronous fan-out) is what makes this deterministic instead of racy.
 #[tokio::test]
-async fn removing_a_device_closes_its_live_socket() {
-    let (store, _guard) = new_store().await;
-    let state = state_for(&store);
-    let (alice_access, alice_ticket, alice) = user_ticket(&store, "alice").await;
-
-    // A second device on the same account, whose socket must survive: the
-    // revocation has to reach one session, not every session the user has.
-    let other = store.open_session(alice, "phone").await.unwrap();
-    let other_ctx = store
-        .authenticate(&other.access_token)
-        .await
-        .unwrap()
-        .unwrap();
-    let (other_ticket, _) = store.mint_ws_ticket(&other_ctx).await.unwrap();
-
-    let addr = serve(state.clone()).await;
-    let mut alice_ws = connect(addr, &alice_ticket).await;
-    let mut other_ws = connect(addr, &other_ticket).await;
-
-    let device = store
-        .authenticate(&alice_access)
-        .await
-        .unwrap()
-        .unwrap()
-        .device_id;
-    let response = http::router(state.clone())
-        .oneshot(
-            Request::builder()
-                .method("DELETE")
-                .uri(format!("/devices/{device}"))
-                .header("authorization", format!("Bearer {}", other.access_token))
-                .body(Body::empty())
-                .unwrap(),
+async fn a_store_error_authorizing_fan_out_closes_the_connection() {
+    let (store, pool, _guard) = new_store_with_pool().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
         )
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::NO_CONTENT);
-
-    let closed = tokio::time::timeout(Duration::from_secs(2), wait_closed(&mut alice_ws)).await;
-    assert!(
-        closed.is_ok(),
-        "the removed device's socket must close, not linger with fan-out access"
-    );
-
-    // The surviving device keeps its socket, so the revocation was targeted.
-    let still_open =
-        tokio::time::timeout(Duration::from_millis(400), wait_closed(&mut other_ws)).await;
-    assert!(
-        still_open.is_err(),
-        "removing one device must not close another device's socket"
-    );
-}
-
-#[tokio::test]
-async fn a_bad_ticket_is_rejected() {
-    let (store, _guard) = new_store().await;
-    let addr = serve(state_for(&store)).await;
-
-    let (mut ws, _response) = connect_async(format!("ws://{addr}/ws")).await.unwrap();
-    ws.send(WsMessage::Text(
-        json!({ "type": "hello", "ticket": "not-a-real-ticket", "protocol": 1 }).to_string(),
-    ))
-    .await
-    .unwrap();
-
-    let frame = read_frame(&mut ws).await;
-    assert_eq!(frame["type"], "error");
-}
-
-/// Deleting an account revokes its sessions and publishes the same event
-/// logout does, but only logout had a test proving a live socket actually
-/// closes. Deletion is the path where a socket left attached would keep
-/// delivering a channel's messages to an account that no longer exists.
-#[tokio::test]
-async fn deleting_the_account_closes_its_live_socket() {
-    let (store, _guard) = new_store().await;
+    let channel = store.create_channel("general", "text").await.unwrap();
     let state = state_for(&store);
-    let (alice_access, alice_ticket, _alice) = user_ticket(&store, "alice").await;
+
+    let (_alice_access, _alice_ticket, alice) = user_ticket(&store, "alice").await;
+    let (_bob_access, bob_ticket, _bob) = user_ticket(&store, "bob").await;
 
     let addr = serve(state.clone()).await;
-    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
 
-    let response = http::router(state.clone())
-        .oneshot(
-            Request::builder()
-                .method("DELETE")
-                .uri("/account")
-                .header("authorization", format!("Bearer {alice_access}"))
-                .body(Body::empty())
-                .unwrap(),
-        )
+    sqlx::query("ALTER TABLE channels RENAME COLUMN topic TO topic_broken")
+        .execute(&pool)
+        .await
+        .expect("break the column permissions_in_channel queries by name");
+
+    let sent = store
+        .send_message(channel.id, alice, MessageId::generate(), "hello", &[])
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    state.hub.publish(Event::MessageCreated {
+        message: sent.message,
+        attachments: Vec::new(),
+    });
 
-    let closed = tokio::time::timeout(Duration::from_secs(2), wait_closed(&mut alice_ws)).await;
+    let closed = tokio::time::timeout(Duration::from_secs(2), wait_closed(&mut bob_ws)).await;
     assert!(
         closed.is_ok(),
-        "the socket must close when the account behind it is deleted"
+        "a store error authorizing fan-out must close the connection, not drop the message"
     );
 }
 

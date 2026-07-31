@@ -18,6 +18,7 @@ use crate::store::{SessionContext, Store};
 pub(super) struct PresenceGuard {
     hub: Hub,
     user_id: UserId,
+    idle_watch: tokio::task::AbortHandle,
 }
 
 impl PresenceGuard {
@@ -28,14 +29,48 @@ impl PresenceGuard {
         if hub.presence().connect(user_id) {
             hub.publish(Event::PresenceChanged(user_id));
         }
-        Self { hub, user_id }
+        let idle_watch = tokio::spawn(watch_idle(hub.clone(), user_id)).abort_handle();
+        Self {
+            hub,
+            user_id,
+            idle_watch,
+        }
     }
 }
 
 impl Drop for PresenceGuard {
     fn drop(&mut self) {
+        self.idle_watch.abort();
         if self.hub.presence().disconnect(self.user_id) {
             self.hub.publish(Event::PresenceChanged(self.user_id));
+        }
+    }
+}
+
+/// Announces `user_id` crossing the idle threshold, in either direction.
+///
+/// Idle is purely a function of elapsed time against `PresenceTracker`'s
+/// clock, not an event anything publishes on its own, so nothing would ever
+/// tell a live viewer it happened otherwise: a connection that goes quiet
+/// would read as online forever to everyone already watching, until some
+/// unrelated event happened to touch this user's row again. Runs for the
+/// connection's whole lifetime and is aborted by `PresenceGuard`'s `Drop`.
+///
+/// A user with several live connections runs one of these per connection,
+/// all polling the one shared idle clock those connections share; a
+/// transition can be published more than once for the same instant, which
+/// costs a redundant re-derivation on every receiving connection and nothing
+/// more, the same trade `Hub::publish`'s own callers accept elsewhere.
+async fn watch_idle(hub: Hub, user_id: UserId) {
+    let mut ticks = tokio::time::interval(hub.idle_poll_interval());
+    ticks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    let mut idle = false;
+    loop {
+        ticks.tick().await;
+        let now_idle = hub.presence().is_idle(user_id);
+        if now_idle != idle {
+            idle = now_idle;
+            hub.publish(Event::PresenceChanged(user_id));
         }
     }
 }
@@ -99,8 +134,7 @@ pub(super) async fn handle_typing(
         _ => return,
     }
 
-    hub.presence().touch(ctx.user_id);
-
+    // `super::serve` already touched the idle clock for this frame.
     let (generation, is_new) = hub.typing().start(channel_id, ctx.user_id);
     if is_new {
         hub.publish(Event::TypingStarted {

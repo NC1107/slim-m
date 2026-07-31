@@ -33,6 +33,7 @@ mod reactions;
 mod read_state;
 mod recovery;
 mod removals;
+mod reports;
 mod roles;
 mod safety;
 mod sessions;
@@ -62,8 +63,9 @@ pub use push::{PushError, PushTarget};
 pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
 pub use recovery::{ConsumeResetError, IssueResetError};
 pub use removals::{RemoveMemberError, SpaceRemoval};
+pub use reports::{Report, ReportError, ReportSubject};
 pub use roles::{Role, RoleGuardError};
-pub use safety::{Device, Report, ReportError, ReportSubject};
+pub use safety::Device;
 pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext, SweptTokens,
 };
