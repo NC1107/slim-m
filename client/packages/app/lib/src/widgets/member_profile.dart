@@ -236,6 +236,37 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     if (ok && mounted) ref.invalidate(membersProvider);
   }
 
+  /// [channelId] is the call this member shares with the caller right now,
+  /// captured before the popover is dismissed for the same reason [_remove]
+  /// captures its container: a kick from a room nobody is in means nothing.
+  Future<void> _eject(
+    BuildContext host,
+    ProviderContainer container,
+    String channelId,
+  ) async {
+    final name = widget.profile.displayName;
+    final confirmed = await confirmDangerousAction(
+      host,
+      title: 'Eject $name from this call?',
+      // A live token still works after this: says so, not just "removed".
+      message:
+          'They will be disconnected from the call right now. Nothing stops '
+          'them rejoining - time them out or remove them from the Space for '
+          'something that sticks.',
+      confirmLabel: 'Eject',
+    );
+    if (!confirmed) return;
+    final failure = await runGuarded(
+      whatFailed: 'eject $name from the call',
+      action: () => container
+          .read(apiProvider)
+          .kickVoiceParticipant(channelId, widget.profile.id),
+    );
+    if (failure != null && host.mounted) {
+      ScaffoldMessenger.of(host).showSnackBar(SnackBar(content: Text(failure)));
+    }
+  }
+
   /// [container] must be captured before the popover is dismissed: this
   /// awaits a confirmation dialog first, and by the time it answers `ref` is
   /// tied to a disposed element, exactly the bug this whole file exists to
@@ -286,7 +317,14 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     final canTimeOut = !isSelf && mine.hasPermission(Perm.kickMembers);
     final canRemove = !isSelf && mine.hasPermission(Perm.banMembers);
     final canManageRoles = !isSelf && mine.hasPermission(Perm.manageRoles);
-    final showModeration = canTimeOut || canRemove || canManageRoles;
+    // Needs a room to evict them from, not just the bit; the call section above already answers that.
+    final canEject =
+        !isSelf &&
+        inCallTogether &&
+        voice.channelId != null &&
+        mine.hasPermission(Perm.kickMembers);
+    final showModeration =
+        canTimeOut || canRemove || canManageRoles || canEject;
 
     // Captured before onDone, whose Navigator.pop disposes this element.
     void run(Future<void> Function(ProviderContainer container) action) {
@@ -363,6 +401,21 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
         // Absent while one is in force: the badge above already carries it.
         if (canTimeOut && profile.timedOutUntil == null)
           TimeoutDurationChips(onChosen: _timeOut),
+        if (canEject)
+          AppMenuItem(
+            label: 'Eject from call...',
+            leading: AppIcons.leaveCall,
+            tone: AppMenuItemTone.danger,
+            onTap: () {
+              final container = ProviderScope.containerOf(
+                context,
+                listen: false,
+              );
+              final channelId = voice.channelId!;
+              widget.onDone();
+              unawaited(_eject(host, container, channelId));
+            },
+          ),
         if (canRemove)
           AppMenuItem(
             label: 'Remove from Space...',

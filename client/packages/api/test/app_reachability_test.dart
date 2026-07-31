@@ -40,14 +40,6 @@ const Map<String, String> _allowlist = {
   'resetPassword':
       'no sign-in surface spends a reset code, so an account that cannot sign '
           'in has no route back even where an admin has issued one (2026-07-30)',
-  'updateMe':
-      'nothing in the app edits your own profile: personal_settings_screen '
-          'renders me.displayName and offers no way to change it, so the display '
-          'name a member picks at sign-up is the one they keep (2026-07-30)',
-  'kickVoiceParticipant':
-      'moderation can time a member out or remove them from the Space, and '
-          'both already drop them from every voice room; ejecting somebody from '
-          'one call without any other sanction has no UI (2026-07-30)',
   'pinnedMessageCount':
       'the pins sheet lists pinned messages and shows no count beside the '
           'header, so nothing asks for one (2026-07-30)',

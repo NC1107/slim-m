@@ -17,6 +17,8 @@
 /// belong to instead of behind a second route nothing linked to twice.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -26,6 +28,7 @@ import '../routing/routes.dart';
 import '../widgets/app_info_section.dart';
 import '../widgets/appearance_settings_section.dart';
 import '../widgets/avatar_settings_section.dart';
+import '../widgets/edit_display_name_sheet.dart';
 import '../widgets/personal_account_sections.dart';
 import '../widgets/personal_status_sections.dart';
 import '../widgets/settings_panes.dart';
@@ -133,13 +136,29 @@ class _WhoYouAre extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                me.displayName,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.ui.copyWith(
-                  color: tokens.textPrimary,
-                  fontWeight: AppWeights.medium,
-                ),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      me.displayName,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.ui.copyWith(
+                        color: tokens.textPrimary,
+                        fontWeight: AppWeights.medium,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s4),
+                  AppIconButton(
+                    icon: AppIcons.edit,
+                    semanticLabel: 'Edit display name',
+                    tooltip: 'Edit display name',
+                    size: AppIconButtonSize.sm,
+                    onPressed: () => unawaited(
+                      showEditDisplayNameSheet(context, me.displayName),
+                    ),
+                  ),
+                ],
               ),
               Text(
                 '@${me.username}',
