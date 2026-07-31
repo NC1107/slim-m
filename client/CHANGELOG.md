@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.14.0](https://github.com/NC1107/slim-m/compare/client-v0.13.3...client-v0.14.0) (2026-07-31)
+
+
+### Features
+
+* a personal space, opened by DMing yourself ([#204](https://github.com/NC1107/slim-m/issues/204)) ([951d1b3](https://github.com/NC1107/slim-m/commit/951d1b341ebc3e7c1985211407ec05e9ce44e1f1))
+
+
+### Bug Fixes
+
+* canvas safe area and the two stacked call docks on phone ([#203](https://github.com/NC1107/slim-m/issues/203)) ([1100e65](https://github.com/NC1107/slim-m/commit/1100e65c4a51cdf2f96aca458a2a1f180f5e1b52))
+* scale the draft stroke's width by the live camera zoom ([#207](https://github.com/NC1107/slim-m/issues/207)) ([b34938d](https://github.com/NC1107/slim-m/commit/b34938dc197d2e0ddf44f72ab633e4c234f22e55))
+
 ## [0.13.3](https://github.com/NC1107/slim-m/compare/client-v0.13.2...client-v0.13.3) (2026-07-30)
 
 
