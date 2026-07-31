@@ -15,7 +15,7 @@ Each section below is named for its workflow file.
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | the iOS CallKit XCTest on macOS, and the extension-embeds-no-frameworks check |
 | `schema-ci` | changes under `schema/`, `redocly.yaml` | redocly lint, and the additive-only oasdiff gate on pull requests |
 | `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
-| `hygiene` | every push and pull request | iOS purpose strings, no emoji in UI source, SPDX headers on Rust source, the file-size budget |
+| `hygiene` | every push and pull request | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap |
 | `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main` | every Rust crate's and every pub package's license is in the one allowlist |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
 | `compose-smoke` | changes to the self-host stack, plus a weekly schedule | `docker compose up` on a fresh box produces a working deployment |
@@ -92,11 +92,26 @@ App Store review rejects a binary whose linked SDKs reference a sensitive API wi
 altool uploads, the job goes green, and the rejection arrives by email some minutes later.
 This gate turns that into a red PR instead.
 
+### The iOS broadcast extension is wired up
+
+Every piece of the screen-share broadcast extension (the Xcode target, its App Group, its Info.plist entries, its embedding in the app bundle) fails silently at runtime when wrong: the button does nothing, or the broadcast starts and sends no frames.
+This step checks the identifiers agree with each other across `project.pbxproj` and both Info.plists rather than merely that each file exists, since that is exactly how this shipped broken once already.
+
+### Orientation is locked on phones only
+
+Phones are locked to portrait and tablets are free to rotate, on both platforms, and the two halves fail in opposite directions if either is quietly edited.
+This step reads the iOS orientation arrays, the two Android `bools.xml` overrides, and the Kotlin code that applies the lock, and fails if any of the four no longer agrees with the others.
+
 ### No emoji in UI source
 
 Emoji are user content (reactions), never interface chrome; chrome uses Lucide icons.
 The gate fails on any emoji codepoint in client source.
 It matches text sources only and passes `--binary-files=without-match`, so a compiled artifact that happens to contain those bytes cannot trip it.
+
+### SPDX headers on Rust source
+
+Every file under `crates/` needs an `SPDX-License-Identifier` header on its first line; this step fails and names the file otherwise.
+CLAUDE.md's own contribution rule says "a CI gate checks the Rust ones," and `find crates -name '*.rs'` is that scope exactly, not a gap - widening it to the Dart, Swift and Kotlin sources that also lack headers is a separate, smaller decision nobody has made yet.
 
 ### The file-size budget
 
@@ -115,9 +130,15 @@ The gate treats it as that file's own ceiling, so a listed file may shrink and m
 An entry whose file has dropped back under 500, or which no longer names a checked file, is an error rather than a silent no-op, so the list cannot rot the way a plain exemption list would.
 
 Nothing in that list is a judgement that the file is acceptable.
-The two worst are production code, not tests: `store/sessions.rs` at 957 lines carries tokens, refresh rotation, ws tickets and account deletion together, and `push.rs` at 625 carries envelope sealing, the relay client and fan-out triggering.
+The two worst are production code, not tests: `store/sessions.rs` at 815 lines carries tokens, refresh rotation, ws tickets and account deletion together, and `push.rs` at 600 carries envelope sealing, the relay client and fan-out triggering.
 Splitting them is real work with real regression risk and does not belong in the change that introduces the gate.
 `schema/openapi.yaml` and `release.yml` are the two that will most likely stay: one OpenAPI document split across `$ref` files would give `tests/openapi_contract.rs` two sources to reconcile, and the release workflow's ten publish jobs share release-please's outputs.
+
+### The comment cap
+
+`scripts/check-comment-cap.sh` enforces the other half of the same `CLAUDE.md` rule: a plain `//` or `#` comment never exceeds one line.
+It ratchets rather than merely allows: a file may not gain a new run past its listed count, and the pre-existing ones are frozen at the count they were found at in `scripts/comment-cap-allow.txt`, the same shape as the file-size allowlist above.
+Doc comments (`///`, `//!`, `/**`) are exempt everywhere, and a `#` block at the very top of a YAML, TOML or shell file is treated as that file's doc comment for the same reason those languages have no other doc-comment syntax.
 
 ## licenses
 
