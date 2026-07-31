@@ -174,6 +174,29 @@ async fn they_leave_the_member_list_and_appear_in_the_removals_list() {
     assert_eq!(removals[0].removed_by, Some(admin.id));
 }
 
+/// `member_count` is what an invite shows a prospective joiner, and its own
+/// doc comment claims a removed member does not count any more than they
+/// appear in `list_members`. It filtered only `deleted_at`, so that claim was
+/// false the moment removal shipped: the count stayed one too high for as
+/// long as the removed member's account existed.
+#[tokio::test]
+async fn a_removed_member_does_not_count_toward_member_count() {
+    let (s, _guard) = store().await;
+    let (admin, member) = deployment(&s).await;
+
+    assert_eq!(s.member_count().await.unwrap(), 2);
+
+    s.remove_from_space(member.id, admin.id, Some("spam"))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        s.member_count().await.unwrap(),
+        1,
+        "member_count must agree with list_members about a removed member"
+    );
+}
+
 /// Otherwise a removal hands the way back in to whoever they gave a code to
 /// on the way out.
 #[tokio::test]

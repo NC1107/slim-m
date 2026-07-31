@@ -4,7 +4,7 @@
 //! offline when the last live socket closes rather than only when a client
 //! says so.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -15,6 +15,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
+use slimm_server::presence;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
@@ -40,11 +41,11 @@ async fn new_store() -> (Store, support::TestDbGuard) {
     (Store::new(pool), guard)
 }
 
-fn state_for(store: &Store) -> AppState {
+fn state_for(store: &Store, hub: Hub) -> AppState {
     AppState {
         store: store.clone(),
         auth: Auth::new(2).unwrap(),
-        hub: Hub::new(),
+        hub,
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
@@ -155,7 +156,7 @@ async fn presence_status(state: &AppState, token: &str, target_id: &str) -> Stri
 #[tokio::test]
 async fn hidden_user_reads_offline_to_others_but_true_to_self() {
     let (store, _guard) = new_store().await;
-    let state = state_for(&store);
+    let state = state_for(&store, Hub::new());
     let (alice_access, alice_ticket, alice_id) = user_ticket(&store, "alice").await;
     let (_bob_access, bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
     let alice_id_str = alice_id.to_string();
@@ -222,7 +223,7 @@ async fn hidden_user_reads_offline_to_others_but_true_to_self() {
 #[tokio::test]
 async fn presence_flips_to_offline_when_the_last_socket_closes() {
     let (store, _guard) = new_store().await;
-    let state = state_for(&store);
+    let state = state_for(&store, Hub::new());
     let (_alice_access, alice_ticket, alice_id) = user_ticket(&store, "alice").await;
     let (bob_access, bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
     let alice_id_str = alice_id.to_string();
@@ -261,7 +262,7 @@ async fn presence_flips_to_offline_when_the_last_socket_closes() {
 #[tokio::test]
 async fn unknown_id_is_simply_absent() {
     let (store, _guard) = new_store().await;
-    let state = state_for(&store);
+    let state = state_for(&store, Hub::new());
     let (access, _ticket, _id) = user_ticket(&store, "alice").await;
 
     let missing = uuid::Uuid::now_v7();
@@ -275,4 +276,131 @@ async fn unknown_id_is_simply_absent() {
         .unwrap();
     let entries: Vec<Value> = serde_json::from_slice(&body).unwrap();
     assert!(entries.is_empty());
+}
+
+/// A ping is activity too, not just a typing refresh: the idle clock used to
+/// be reset only inside the typing handler, so a connection that only reads
+/// (never types) would sit "away" after ten minutes even while answering
+/// pings the whole time.
+///
+/// The idle threshold is simulated by winding the tracker's clock back
+/// directly (`PresenceTracker::touch_at`) rather than waiting ten real
+/// minutes; the pong round trip after the ping is what proves the server has
+/// already processed the inbound frame (and so already called `touch`) by
+/// the time the test reads `is_idle`.
+#[tokio::test]
+async fn a_ping_resets_the_idle_clock_not_just_typing() {
+    let (store, _guard) = new_store().await;
+    let hub = Hub::new();
+    let state = state_for(&store, hub.clone());
+    let (_access, ticket, id) = user_ticket(&store, "alice").await;
+
+    let addr = serve(state.clone()).await;
+    let mut ws = connect(addr, &ticket).await;
+    // Her own connect publishes her own presence; drain it before the pong.
+    let _ = next_presence_for(&mut ws, &id.to_string()).await;
+
+    let long_ago = Instant::now() - presence::IDLE_TIMEOUT - Duration::from_secs(1);
+    hub.presence().touch_at(id, long_ago);
+    assert!(
+        hub.presence().is_idle(id),
+        "the simulated last activity must read as idle before the ping"
+    );
+
+    ws.send(WsMessage::Text(json!({ "type": "ping" }).to_string()))
+        .await
+        .unwrap();
+    let pong = read_frame(&mut ws).await;
+    assert_eq!(pong["type"], "pong");
+
+    assert!(
+        !hub.presence().is_idle(id),
+        "a ping must reset the idle clock like a typing refresh already does"
+    );
+}
+
+/// Idle is purely a function of elapsed time, not an event anything publishes
+/// on its own, so nothing used to tell a *different* viewer a connected user
+/// went idle: their status read "online" forever to everyone else until some
+/// unrelated event happened to touch their row again.
+///
+/// The poll interval is shortened (`Hub::with_idle_poll_interval`) so the
+/// transition is observed in milliseconds; the idle threshold itself is
+/// still simulated by winding the tracker's clock back directly, since
+/// nothing about the fix needs ten real minutes to pass to prove it.
+#[tokio::test]
+async fn an_idle_transition_is_announced_to_another_viewer() {
+    let (store, _guard) = new_store().await;
+    let hub = Hub::with_idle_poll_interval(Duration::from_millis(20));
+    let state = state_for(&store, hub.clone());
+    let (_alice_access, alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    let (_bob_access, bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
+    let alice_id_str = alice_id.to_string();
+
+    let addr = serve(state.clone()).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+    let _ = next_presence_for(&mut bob_ws, &_bob_id.to_string()).await;
+
+    let _alice_ws = connect(addr, &alice_ticket).await;
+    let online = next_presence_for(&mut bob_ws, &alice_id_str).await;
+    assert_eq!(online["status"], "online");
+
+    let long_ago = Instant::now() - presence::IDLE_TIMEOUT - Duration::from_secs(1);
+    hub.presence().touch_at(alice_id, long_ago);
+
+    let away = next_presence_for(&mut bob_ws, &alice_id_str).await;
+    assert_eq!(
+        away["status"], "away",
+        "another viewer must be told when a connected user goes idle, not just alice herself"
+    );
+}
+
+/// The idle watcher must publish nothing at all for somebody appearing
+/// offline, not merely publish a frame that derives to "offline".
+///
+/// `status_for` ignores `idle` for every visibility except `Online`, so the
+/// derived status would have been right either way. What would not have been
+/// right is the frame's existence: it arrives exactly when a hidden user goes
+/// quiet and again when they return, so an observer timestamping frames reads
+/// their activity pattern off the timing alone. This is the same shape as the
+/// typing leak already closed elsewhere, and the status being correct is
+/// precisely what makes it easy to miss.
+#[tokio::test]
+async fn a_hidden_users_idle_transition_is_never_published() {
+    let (store, _guard) = new_store().await;
+    let hub = Hub::with_idle_poll_interval(Duration::from_millis(20));
+    let state = state_for(&store, hub.clone());
+    let (_alice_access, alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    let (_bob_access, bob_ticket, bob_id) = user_ticket(&store, "bob").await;
+    let alice_id_str = alice_id.to_string();
+
+    store
+        .set_presence_visibility(alice_id, presence::Visibility::Hidden)
+        .await
+        .unwrap();
+
+    let addr = serve(state.clone()).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+    let _ = next_presence_for(&mut bob_ws, &bob_id.to_string()).await;
+
+    let _alice_ws = connect(addr, &alice_ticket).await;
+    // Her connect still publishes, which predates the idle watcher and is its own question.
+    let _ = next_presence_for(&mut bob_ws, &alice_id_str).await;
+
+    let long_ago = Instant::now() - presence::IDLE_TIMEOUT - Duration::from_secs(1);
+    hub.presence().touch_at(alice_id, long_ago);
+
+    let leaked = tokio::time::timeout(Duration::from_millis(400), async {
+        loop {
+            let frame = read_frame(&mut bob_ws).await;
+            if frame["type"] == "presence.changed" && frame["user_id"] == alice_id_str.as_str() {
+                return frame;
+            }
+        }
+    })
+    .await;
+    assert!(
+        leaked.is_err(),
+        "a hidden user going idle must produce no frame at all; one arrived: {leaked:?}"
+    );
 }

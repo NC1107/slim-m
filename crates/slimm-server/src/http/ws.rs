@@ -12,7 +12,7 @@
 //! leaks a channel the caller could not read over REST. If the connection falls
 //! behind the broadcast buffer it is closed and the client resyncs over REST.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use axum::Router;
 use axum::extract::State;
@@ -30,12 +30,14 @@ use super::PROTOCOL_VERSION;
 use super::canvas::CanvasObjectDto;
 use super::channels::ChannelDto;
 use super::messages::{AttachmentDto, MessageDto};
-use crate::hub::{Event, Hub};
-use crate::permissions::Permissions;
-use crate::store::{SessionContext, Store};
-use frames::{ClientFrame, PollOptionCountDto, ReactionCountDto, ServerFrame};
+use crate::hub::Event;
+use crate::store::SessionContext;
+use authorization::{Authorization, authorize};
+use frames::ClientFrame;
+use frames::ServerFrame;
 use permission_cache::PermissionCache;
 
+mod authorization;
 mod frames;
 mod permission_cache;
 mod signals;
@@ -91,7 +93,8 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
 
     // Guarantees the matching disconnect however this function returns; see
     // `signals::PresenceGuard`.
-    let _presence_guard = signals::PresenceGuard::connect(state.hub.clone(), ctx.user_id);
+    let _presence_guard =
+        signals::PresenceGuard::connect(state.hub.clone(), state.store.clone(), ctx.user_id);
 
     if send_frame(
         &mut sink,
@@ -110,8 +113,10 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
             incoming = stream.next() => {
                 match incoming {
                     Some(Ok(Message::Text(text))) => {
+                        // Touch after the parse, never before: it takes the shared presence lock and nothing rate-limits inbound frames.
                         match serde_json::from_str::<ClientFrame>(text.as_str()) {
                             Ok(ClientFrame::Ping) => {
+                                state.hub.presence().touch(ctx.user_id);
                                 if send_frame(&mut sink, &ServerFrame::Pong).await.is_err() {
                                     break;
                                 }
@@ -133,9 +138,11 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                     }
                     Some(Ok(Message::Close(_))) | None => break,
                     Some(Err(_)) => break,
-                    // Other frames (binary, ping, pong) are ignored; axum answers
-                    // protocol-level pings itself.
-                    Some(Ok(_)) => {}
+                    // Other frames (binary, ping, pong): axum answers a
+                    // protocol-level ping itself, but it is still activity.
+                    Some(Ok(_)) => {
+                        state.hub.presence().touch(ctx.user_id);
+                    }
                 }
             }
             event = events.recv() => {
@@ -147,11 +154,22 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                         }
                     }
                     Ok(event) => {
-                        if let Some(frame) =
-                            authorize(&state.store, &state.hub, &ctx, &mut cache, event).await
-                            && send_frame(&mut sink, &frame).await.is_err()
-                        {
-                            break;
+                        match authorize(&state.store, &state.hub, &ctx, &mut cache, event).await {
+                            Authorization::Deliver(frame) => {
+                                if send_frame(&mut sink, &frame).await.is_err() {
+                                    break;
+                                }
+                            }
+                            Authorization::Withhold => {}
+                            // See `Authorization::Unknown`'s doc comment for why.
+                            Authorization::Unknown => {
+                                let _ = send_frame(
+                                    &mut sink,
+                                    &ServerFrame::Error { message: "resync".to_owned() },
+                                )
+                                .await;
+                                break;
+                            }
                         }
                     }
                     Err(RecvError::Lagged(_)) => {
@@ -194,257 +212,6 @@ async fn authenticate(
         Ok(Some(ctx)) => Some(ctx),
         _ => reject(sink, "invalid ticket").await,
     }
-}
-
-/// Filters an event down to a wire frame, or `None` if this user may not see it.
-/// A permission-check error fails closed (no delivery).
-///
-/// Presence is handled up front rather than folded into the channel-scoped
-/// match: it has no channel to check view permission against (it is
-/// deployment-wide, like the member list) and needs the receiving connection's
-/// own user id to resolve the right answer for it.
-async fn authorize(
-    store: &Store,
-    hub: &Hub,
-    ctx: &SessionContext,
-    cache: &mut PermissionCache,
-    event: Event,
-) -> Option<ServerFrame> {
-    // Ahead of the channel-scoped match below; see the note on this function.
-    if let Event::PresenceChanged(target_id) = event {
-        // A gone account and a store blip both mean silence here, unlike below.
-        let Ok(Some(status)) = signals::presence_status(store, hub, ctx.user_id, target_id).await
-        else {
-            return None;
-        };
-        return Some(ServerFrame::PresenceChanged {
-            user_id: target_id.to_string(),
-            status: status.as_str().to_owned(),
-        });
-    }
-    // Deployment-wide like presence, but with nothing per-viewer to resolve.
-    match event {
-        Event::MemberTimeoutChanged { user_id, until } => {
-            return Some(ServerFrame::MemberTimeoutChanged {
-                user_id: user_id.to_string(),
-                until,
-            });
-        }
-        Event::MemberRemoved(user_id) => {
-            return Some(ServerFrame::MemberRemoved {
-                user_id: user_id.to_string(),
-            });
-        }
-        Event::RoleChanged { role_id } => {
-            return Some(ServerFrame::RoleChanged {
-                role_id: role_id.to_string(),
-            });
-        }
-        Event::MemberRoleChanged { user_id, role_id } => {
-            return Some(ServerFrame::MemberRoleChanged {
-                user_id: user_id.to_string(),
-                role_id: role_id.to_string(),
-            });
-        }
-        _ => {}
-    }
-
-    // Special-cased; see `Event::ChannelDeleted`'s doc comment for why.
-    if let Event::ChannelDeleted { channel_id } = event {
-        let viewed = store
-            .viewed_channel_before_delete(ctx.user_id, channel_id)
-            .await
-            .unwrap_or(false);
-        return viewed.then(|| ServerFrame::ChannelDeleted {
-            channel_id: channel_id.to_string(),
-        });
-    }
-
-    let channel_id = match &event {
-        Event::MessageCreated { message, .. } | Event::MessageEdited(message) => message.channel_id,
-        Event::MessageDeleted { channel_id, .. } => *channel_id,
-        Event::ReactionsChanged { channel_id, .. } => *channel_id,
-        Event::MessagePinned { channel_id, .. } => *channel_id,
-        Event::MessageUnpinned { channel_id, .. } => *channel_id,
-        Event::PollVoted { channel_id, .. } => *channel_id,
-        Event::TypingStarted { channel_id, .. } | Event::TypingStopped { channel_id, .. } => {
-            *channel_id
-        }
-        Event::ChannelCreated(channel) | Event::ChannelUpdated(channel) => channel.id,
-        Event::OverwriteChanged { channel_id, .. } => *channel_id,
-        Event::CanvasObjectPlaced { channel_id, .. } => *channel_id,
-        // Control events are handled in the loop; the rest already returned above.
-        Event::SessionRevoked(_)
-        | Event::PresenceChanged(_)
-        | Event::MemberTimeoutChanged { .. }
-        | Event::MemberRemoved(_)
-        | Event::RoleChanged { .. }
-        | Event::MemberRoleChanged { .. }
-        | Event::ChannelDeleted { .. } => return None,
-    };
-    // The one event whose subject may have just lost this very view.
-    let held_it_before = matches!(
-        &event,
-        Event::OverwriteChanged { previously_visible_to, .. }
-            if previously_visible_to.contains(&ctx.user_id)
-    );
-    // Read before the query, never after; see `PermissionCache::insert`.
-    let epoch = hub.permissions_epoch();
-    let permissions = match cache.get(channel_id, Instant::now(), epoch) {
-        Some(cached) => cached,
-        None => match store.permissions_in_channel(ctx.user_id, channel_id).await {
-            Ok(answer) => {
-                cache.insert(channel_id, answer, Instant::now(), epoch);
-                answer
-            }
-            // Fails closed for this event only; a blip must not be remembered.
-            Err(_) => Permissions::NONE,
-        },
-    };
-    let visible = permissions.contains(Permissions::VIEW_CHANNEL);
-    if !visible && !held_it_before {
-        return None;
-    }
-    // The one surface gated on a second bit, as its own read route is; without this a denial is void here.
-    if matches!(event, Event::CanvasObjectPlaced { .. })
-        && !permissions.contains(Permissions::USE_CANVAS)
-    {
-        return None;
-    }
-
-    // Typing carries the typist's id to everyone in the channel, so it is a
-    // second way to learn someone is online. Appear-offline is enforced at
-    // one choke point for exactly this reason, and a typing frame bypassed it:
-    // a hidden user's keystrokes announced them. Dropped here, per viewer,
-    // through the same function every other presence surface uses.
-    //
-    // Unlike the `PresenceChanged` branch above, this one must fail closed on
-    // a store blip rather than let it through: withholding a status change
-    // just loses an update, but withholding this gate leaks one. So only a
-    // confirmed non-offline status clears it; `Ok(None)` (account gone) and
-    // `Err` (could not tell) both drop the frame, same as a real `Offline`.
-    if let Event::TypingStarted { user_id, .. } | Event::TypingStopped { user_id, .. } = event {
-        let confirmed_visible = matches!(
-            signals::presence_status(store, hub, ctx.user_id, user_id).await,
-            Ok(Some(status)) if status != crate::presence::Status::Offline
-        );
-        if !confirmed_visible {
-            return None;
-        }
-    }
-
-    Some(match event {
-        Event::MessageCreated {
-            message,
-            attachments,
-        } => {
-            let channel_id = message.channel_id.to_string();
-            let seq = message.seq.0;
-            let mut dto = MessageDto::from(message);
-            dto.attachments = attachments.into_iter().map(AttachmentDto::from).collect();
-            ServerFrame::MessageCreated {
-                channel_id,
-                seq,
-                message: dto,
-            }
-        }
-        Event::MessageEdited(message) => ServerFrame::MessageEdited {
-            channel_id: message.channel_id.to_string(),
-            seq: message.seq.0,
-            message: MessageDto::from(message),
-        },
-        Event::MessageDeleted {
-            channel_id,
-            message_id,
-        } => ServerFrame::MessageDeleted {
-            channel_id: channel_id.to_string(),
-            message_id: message_id.to_string(),
-        },
-        Event::ReactionsChanged {
-            channel_id,
-            message_id,
-        } => ServerFrame::ReactionsChanged {
-            channel_id: channel_id.to_string(),
-            message_id: message_id.to_string(),
-            // Per viewer: see the event's own doc comment for why.
-            reactions: store
-                .reactions_for_message(message_id, ctx.user_id)
-                .await
-                .ok()?
-                .into_iter()
-                .map(|summary| ReactionCountDto {
-                    emoji: summary.emoji,
-                    count: summary.count,
-                })
-                .collect(),
-        },
-        Event::MessagePinned {
-            channel_id,
-            message_id,
-            pinned_by,
-            pinned_at,
-        } => ServerFrame::MessagePinned {
-            channel_id: channel_id.to_string(),
-            message_id: message_id.to_string(),
-            pinned_by: pinned_by.map(|id| id.to_string()),
-            pinned_at,
-        },
-        Event::MessageUnpinned {
-            channel_id,
-            message_id,
-        } => ServerFrame::MessageUnpinned {
-            channel_id: channel_id.to_string(),
-            message_id: message_id.to_string(),
-        },
-        Event::PollVoted {
-            channel_id,
-            message_id,
-            options,
-        } => ServerFrame::PollVoted {
-            channel_id: channel_id.to_string(),
-            message_id: message_id.to_string(),
-            options: options
-                .into_iter()
-                .map(|(position, votes)| PollOptionCountDto { position, votes })
-                .collect(),
-        },
-        Event::TypingStarted {
-            channel_id,
-            user_id,
-        } => ServerFrame::TypingStarted {
-            channel_id: channel_id.to_string(),
-            user_id: user_id.to_string(),
-        },
-        Event::TypingStopped {
-            channel_id,
-            user_id,
-        } => ServerFrame::TypingStopped {
-            channel_id: channel_id.to_string(),
-            user_id: user_id.to_string(),
-        },
-        Event::ChannelCreated(channel) => ServerFrame::ChannelCreated {
-            channel: ChannelDto::from(channel),
-        },
-        Event::ChannelUpdated(channel) => ServerFrame::ChannelUpdated {
-            channel: ChannelDto::from(channel),
-        },
-        Event::OverwriteChanged { channel_id, .. } => ServerFrame::OverwriteChanged {
-            channel_id: channel_id.to_string(),
-        },
-        Event::CanvasObjectPlaced { channel_id, object } => ServerFrame::CanvasObjectPlaced {
-            channel_id: channel_id.to_string(),
-            seq: object.seq.0,
-            object: CanvasObjectDto::from(object),
-        },
-        // The deployment-wide and channel-deletion cases already returned above.
-        Event::SessionRevoked(_)
-        | Event::PresenceChanged(_)
-        | Event::MemberTimeoutChanged { .. }
-        | Event::MemberRemoved(_)
-        | Event::RoleChanged { .. }
-        | Event::MemberRoleChanged { .. }
-        | Event::ChannelDeleted { .. } => return None,
-    })
 }
 
 async fn send_frame(sink: &mut Sink, frame: &ServerFrame) -> Result<(), ()> {

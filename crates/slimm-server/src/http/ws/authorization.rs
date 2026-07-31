@@ -1,0 +1,308 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Per-event, per-connection authorization: turning a fanned-out [`Event`]
+//! into the wire frame one specific viewer may or may not be shown.
+//!
+//! Split out of `super` (the envelope and connection loop) to keep that file
+//! focused on the socket lifecycle; this one owns the permission and
+//! visibility decision itself.
+
+use std::time::Instant;
+
+use super::frames::{PollOptionCountDto, ReactionCountDto, ServerFrame};
+use super::permission_cache::PermissionCache;
+use super::signals;
+use super::{AttachmentDto, CanvasObjectDto, ChannelDto, MessageDto};
+use crate::hub::{Event, Hub};
+use crate::permissions::Permissions;
+use crate::store::{SessionContext, Store};
+
+/// The outcome of authorizing one event for one connection.
+pub(super) enum Authorization {
+    /// The event is cleared to go out as this frame. Boxed: `ServerFrame`'s
+    /// largest variant otherwise makes every `Authorization`, including the
+    /// two that carry nothing, pay for it.
+    Deliver(Box<ServerFrame>),
+    /// This user may not see the event; say nothing, same as if it never
+    /// happened for them.
+    Withhold,
+    /// A store read needed to decide failed, so it is unknown whether this
+    /// connection may see the event - not "no" the way `Withhold` is.
+    /// Silently dropping it here would lose the event for good: `/sync`
+    /// filters purely by seq and this connection's cursor has already moved
+    /// past it, so only a full channel reset would ever recover it. The
+    /// caller closes the connection instead, onto the same resync path a
+    /// lagged subscriber already takes.
+    Unknown,
+}
+
+/// How long to wait before the single retry of a failed permission read.
+///
+/// A store error here is not per-connection, it is per-*event*: every
+/// connection that event would have reached hits it in the same instant, and
+/// `Authorization::Unknown` closes each of them. The client's resync has no
+/// backoff, so all of them re-run `/sync`, mint a ticket and reconnect at
+/// once, against the database that just failed. This project has already seen
+/// SQLITE_BUSY under concurrent load, which is exactly the transient a second
+/// attempt turns back into a delivered frame. Short enough that a real
+/// outage still gives up promptly.
+const RESOLVE_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(25);
+
+/// Filters an event down to a wire frame, or the reason it is not delivered.
+///
+/// Presence is handled up front rather than folded into the channel-scoped
+/// match: it has no channel to check view permission against (it is
+/// deployment-wide, like the member list) and needs the receiving connection's
+/// own user id to resolve the right answer for it.
+pub(super) async fn authorize(
+    store: &Store,
+    hub: &Hub,
+    ctx: &SessionContext,
+    cache: &mut PermissionCache,
+    event: Event,
+) -> Authorization {
+    // Ahead of the channel-scoped match below; see the note on this function.
+    if let Event::PresenceChanged(target_id) = event {
+        // A gone account and a store blip both mean silence here, unlike below.
+        let Ok(Some(status)) = signals::presence_status(store, hub, ctx.user_id, target_id).await
+        else {
+            return Authorization::Withhold;
+        };
+        return Authorization::Deliver(Box::new(ServerFrame::PresenceChanged {
+            user_id: target_id.to_string(),
+            status: status.as_str().to_owned(),
+        }));
+    }
+    // Deployment-wide like presence, but with nothing per-viewer to resolve.
+    match event {
+        Event::MemberTimeoutChanged { user_id, until } => {
+            return Authorization::Deliver(Box::new(ServerFrame::MemberTimeoutChanged {
+                user_id: user_id.to_string(),
+                until,
+            }));
+        }
+        Event::MemberRemoved(user_id) => {
+            return Authorization::Deliver(Box::new(ServerFrame::MemberRemoved {
+                user_id: user_id.to_string(),
+            }));
+        }
+        Event::RoleChanged { role_id } => {
+            return Authorization::Deliver(Box::new(ServerFrame::RoleChanged {
+                role_id: role_id.to_string(),
+            }));
+        }
+        Event::MemberRoleChanged { user_id, role_id } => {
+            return Authorization::Deliver(Box::new(ServerFrame::MemberRoleChanged {
+                user_id: user_id.to_string(),
+                role_id: role_id.to_string(),
+            }));
+        }
+        _ => {}
+    }
+
+    // Special-cased; see `Event::ChannelDeleted`'s doc comment for why.
+    if let Event::ChannelDeleted { channel_id } = event {
+        let viewed = match store
+            .viewed_channel_before_delete(ctx.user_id, channel_id)
+            .await
+        {
+            Ok(viewed) => viewed,
+            Err(_) => return Authorization::Unknown,
+        };
+        return if viewed {
+            Authorization::Deliver(Box::new(ServerFrame::ChannelDeleted {
+                channel_id: channel_id.to_string(),
+            }))
+        } else {
+            Authorization::Withhold
+        };
+    }
+
+    let channel_id = match &event {
+        Event::MessageCreated { message, .. } | Event::MessageEdited(message) => message.channel_id,
+        Event::MessageDeleted { channel_id, .. } => *channel_id,
+        Event::ReactionsChanged { channel_id, .. } => *channel_id,
+        Event::MessagePinned { channel_id, .. } => *channel_id,
+        Event::MessageUnpinned { channel_id, .. } => *channel_id,
+        Event::PollVoted { channel_id, .. } => *channel_id,
+        Event::TypingStarted { channel_id, .. } | Event::TypingStopped { channel_id, .. } => {
+            *channel_id
+        }
+        Event::ChannelCreated(channel) | Event::ChannelUpdated(channel) => channel.id,
+        Event::OverwriteChanged { channel_id, .. } => *channel_id,
+        Event::CanvasObjectPlaced { channel_id, .. } => *channel_id,
+        // Control events are handled in the loop; the rest already returned above.
+        Event::SessionRevoked(_)
+        | Event::PresenceChanged(_)
+        | Event::MemberTimeoutChanged { .. }
+        | Event::MemberRemoved(_)
+        | Event::RoleChanged { .. }
+        | Event::MemberRoleChanged { .. }
+        | Event::ChannelDeleted { .. } => return Authorization::Withhold,
+    };
+    // The one event whose subject may have just lost this very view.
+    let held_it_before = matches!(
+        &event,
+        Event::OverwriteChanged { previously_visible_to, .. }
+            if previously_visible_to.contains(&ctx.user_id)
+    );
+    // Read before the query, never after; see `PermissionCache::insert`.
+    let epoch = hub.permissions_epoch();
+    let permissions = match cache.get(channel_id, Instant::now(), epoch) {
+        Some(cached) => cached,
+        None => {
+            let resolved = match store.permissions_in_channel(ctx.user_id, channel_id).await {
+                Ok(answer) => Ok(answer),
+                // Retried once: the alternative is every connection dropping together.
+                Err(_) => {
+                    tokio::time::sleep(RESOLVE_RETRY_DELAY).await;
+                    store.permissions_in_channel(ctx.user_id, channel_id).await
+                }
+            };
+            match resolved {
+                Ok(answer) => {
+                    cache.insert(channel_id, answer, Instant::now(), epoch);
+                    answer
+                }
+                // Unresolved rather than remembered; see `Authorization::Unknown`.
+                Err(_) => return Authorization::Unknown,
+            }
+        }
+    };
+    let visible = permissions.contains(Permissions::VIEW_CHANNEL);
+    if !visible && !held_it_before {
+        return Authorization::Withhold;
+    }
+    // The one surface gated on a second bit, as its own read route is; without this a denial is void here.
+    if matches!(event, Event::CanvasObjectPlaced { .. })
+        && !permissions.contains(Permissions::USE_CANVAS)
+    {
+        return Authorization::Withhold;
+    }
+
+    // Typing leaks presence too, so it must fail closed on a blip, unlike `PresenceChanged`.
+    if let Event::TypingStarted { user_id, .. } | Event::TypingStopped { user_id, .. } = event {
+        let confirmed_visible = matches!(
+            signals::presence_status(store, hub, ctx.user_id, user_id).await,
+            Ok(Some(status)) if status != crate::presence::Status::Offline
+        );
+        if !confirmed_visible {
+            return Authorization::Withhold;
+        }
+    }
+
+    Authorization::Deliver(Box::new(match event {
+        Event::MessageCreated {
+            message,
+            attachments,
+        } => {
+            let channel_id = message.channel_id.to_string();
+            let seq = message.seq.0;
+            let mut dto = MessageDto::from(message);
+            dto.attachments = attachments.into_iter().map(AttachmentDto::from).collect();
+            ServerFrame::MessageCreated {
+                channel_id,
+                seq,
+                message: dto,
+            }
+        }
+        Event::MessageEdited(message) => ServerFrame::MessageEdited {
+            channel_id: message.channel_id.to_string(),
+            seq: message.seq.0,
+            message: MessageDto::from(message),
+        },
+        Event::MessageDeleted {
+            channel_id,
+            message_id,
+        } => ServerFrame::MessageDeleted {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
+        },
+        // A separate store read past the view check; see `Authorization::Unknown`.
+        Event::ReactionsChanged {
+            channel_id,
+            message_id,
+        } => {
+            let summaries = match store.reactions_for_message(message_id, ctx.user_id).await {
+                Ok(summaries) => summaries,
+                Err(_) => return Authorization::Unknown,
+            };
+            ServerFrame::ReactionsChanged {
+                channel_id: channel_id.to_string(),
+                message_id: message_id.to_string(),
+                reactions: summaries
+                    .into_iter()
+                    .map(|summary| ReactionCountDto {
+                        emoji: summary.emoji,
+                        count: summary.count,
+                    })
+                    .collect(),
+            }
+        }
+        Event::MessagePinned {
+            channel_id,
+            message_id,
+            pinned_by,
+            pinned_at,
+        } => ServerFrame::MessagePinned {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
+            pinned_by: pinned_by.map(|id| id.to_string()),
+            pinned_at,
+        },
+        Event::MessageUnpinned {
+            channel_id,
+            message_id,
+        } => ServerFrame::MessageUnpinned {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
+        },
+        Event::PollVoted {
+            channel_id,
+            message_id,
+            options,
+        } => ServerFrame::PollVoted {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
+            options: options
+                .into_iter()
+                .map(|(position, votes)| PollOptionCountDto { position, votes })
+                .collect(),
+        },
+        Event::TypingStarted {
+            channel_id,
+            user_id,
+        } => ServerFrame::TypingStarted {
+            channel_id: channel_id.to_string(),
+            user_id: user_id.to_string(),
+        },
+        Event::TypingStopped {
+            channel_id,
+            user_id,
+        } => ServerFrame::TypingStopped {
+            channel_id: channel_id.to_string(),
+            user_id: user_id.to_string(),
+        },
+        Event::ChannelCreated(channel) => ServerFrame::ChannelCreated {
+            channel: ChannelDto::from(channel),
+        },
+        Event::ChannelUpdated(channel) => ServerFrame::ChannelUpdated {
+            channel: ChannelDto::from(channel),
+        },
+        Event::OverwriteChanged { channel_id, .. } => ServerFrame::OverwriteChanged {
+            channel_id: channel_id.to_string(),
+        },
+        Event::CanvasObjectPlaced { channel_id, object } => ServerFrame::CanvasObjectPlaced {
+            channel_id: channel_id.to_string(),
+            seq: object.seq.0,
+            object: CanvasObjectDto::from(object),
+        },
+        // The deployment-wide and channel-deletion cases already returned above.
+        Event::SessionRevoked(_)
+        | Event::PresenceChanged(_)
+        | Event::MemberTimeoutChanged { .. }
+        | Event::MemberRemoved(_)
+        | Event::RoleChanged { .. }
+        | Event::MemberRoleChanged { .. }
+        | Event::ChannelDeleted { .. } => return Authorization::Withhold,
+    }))
+}

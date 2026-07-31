@@ -218,7 +218,15 @@ pub struct Hub {
     presence: PresenceTracker,
     typing: TypingTracker,
     permissions_epoch: Arc<AtomicU64>,
+    idle_poll_interval: Duration,
 }
+
+/// Default value of [`Hub::idle_poll_interval`]: how often a live connection
+/// checks whether its user just crossed the idle threshold, in either
+/// direction, so the transition can be announced (see
+/// `http::ws::signals::watch_idle`). Idle itself does not move this fast; it
+/// only bounds how long an announcement can lag the real transition by.
+const IDLE_POLL_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Whether this event means somebody's permissions may have moved.
 ///
@@ -266,6 +274,7 @@ impl Hub {
             presence: PresenceTracker::new(),
             typing: TypingTracker::new(),
             permissions_epoch: Arc::new(AtomicU64::new(0)),
+            idle_poll_interval: IDLE_POLL_INTERVAL,
         }
     }
 
@@ -281,6 +290,24 @@ impl Hub {
             typing: TypingTracker::with_ttl(ttl),
             ..Self::new()
         }
+    }
+
+    /// Builds a hub with a non-default idle poll interval, so a test can
+    /// observe an idle transition being announced in milliseconds instead of
+    /// the production 30 seconds, without needing 10 real minutes to pass to
+    /// reach the idle threshold itself (see `presence::PresenceTracker`'s own
+    /// `_at` methods for how a test drives that half instead).
+    pub fn with_idle_poll_interval(interval: Duration) -> Self {
+        Self {
+            idle_poll_interval: interval,
+            ..Self::new()
+        }
+    }
+
+    /// How often a live connection checks whether its user just crossed the
+    /// idle threshold; see [`Self::with_idle_poll_interval`].
+    pub fn idle_poll_interval(&self) -> Duration {
+        self.idle_poll_interval
     }
 
     /// Publishes an event to every current subscriber. Does nothing if there are

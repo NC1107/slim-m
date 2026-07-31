@@ -139,6 +139,58 @@ async fn devices_list_and_sign_out_only_your_own() {
     );
 }
 
+/// Every sign-in mints a fresh device row and nothing ever deletes one on an
+/// ordinary logout (only the explicit "remove this device" action does), so
+/// the list must filter live sessions out from under it rather than showing
+/// every device an account has ever signed into.
+///
+/// Logout (`Store::revoke_session`) is used here rather than
+/// `Store::remove_device`, on purpose: that path leaves the device row
+/// sitting in the table untouched (only its sessions, tokens and tickets
+/// die), so this is the case a naive "select every device row" query cannot
+/// tell from one still in active use.
+#[tokio::test]
+async fn devices_list_hides_a_signed_out_device() {
+    let (store, _guard) = new_store().await;
+    let auth = Auth::new(2).unwrap();
+    let hash = auth
+        .hash_password("hunter2hunter2".to_owned())
+        .await
+        .unwrap();
+    let alice = store.create_account("alice", "Alice", &hash).await.unwrap();
+
+    let laptop = store.open_session(alice.id, "laptop").await.unwrap();
+    let phone = store.open_session(alice.id, "phone").await.unwrap();
+    let app = app(store.clone());
+
+    let before = json_body(
+        app.clone()
+            .oneshot(request("GET", "/devices", Some(&laptop.access_token), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(before.as_array().unwrap().len(), 2);
+
+    // An ordinary logout, not removal: the phone's device row stays.
+    store.revoke_session(phone.session_id).await.unwrap();
+
+    let after = json_body(
+        app.clone()
+            .oneshot(request("GET", "/devices", Some(&laptop.access_token), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let after = after.as_array().unwrap();
+    assert_eq!(
+        after.len(),
+        1,
+        "a signed-out device must drop out of the list, not just its own token stop working"
+    );
+    assert_eq!(after[0]["name"], "laptop");
+}
+
 #[tokio::test]
 async fn blocking_is_private_idempotent_and_one_directional() {
     let (store, _guard) = new_store().await;
