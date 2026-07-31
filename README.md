@@ -6,9 +6,9 @@ A lightweight, cross-platform, open source messaging platform with optional self
 
 ## Status
 
-Phase 0 (foundations) is underway.
-The server skeleton compiles, runs, migrates its embedded SQLite database, and serves liveness and version endpoints; the surrounding build, CI, and release machinery is being stood up.
-See the [roadmap](docs/ROADMAP.md) for phases and exit criteria.
+Phases 0 through 4 (foundations, server and protocol core, client shell, push notifications, voice and screen share) are complete, and later phases are substantially underway: a first Voice Canvas write slice, the admin and moderation screens, the client capability handshake, and part of the motion, accessibility and audio-design polish pass have all shipped.
+Server `crates/slimm-server` is at 0.18.5 and the Flutter client at 0.13.3 (see `.release-please-manifest.json`), both with signed release artifacts and a running self-hosted instance.
+See [CLAUDE.md](CLAUDE.md) for what has shipped most recently and the [roadmap](docs/ROADMAP.md) for phases and exit criteria.
 
 ## Layout
 
@@ -33,7 +33,7 @@ curl localhost:8080/version     # -> {"name":"slim-m",...}
 
 ## Documents
 
-- API reference: [schema/openapi.yaml](schema/openapi.yaml) is the source of record; a rendered HTML copy is attached to each schema-ci run as the `api-docs` artifact, or build one locally with `npx @redocly/cli build-docs schema/openapi.yaml -o /tmp/api.html`
+- API reference: [schema/openapi.yaml](schema/openapi.yaml) is the source of record; nothing renders it automatically (GitHub has no built-in OpenAPI viewer and building one into a CI artifact nobody downloads was not worth a job), so build a browsable copy locally with `npx @redocly/cli build-docs schema/openapi.yaml -o /tmp/api.html`
 - [Brief](docs/BRIEF.md), [strategy](docs/STRATEGY.md), [roadmap](docs/ROADMAP.md)
 - [Decisions of record](docs/decisions/), [backlog](docs/BACKLOG.md)
 - [Licensing](LICENSING.md) (AGPL-3.0 server, Apache-2.0 client and schema), [contributing](CONTRIBUTING.md)
