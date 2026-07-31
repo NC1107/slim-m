@@ -11,6 +11,15 @@
          a no-op on every older API level, where notification permission is
          granted at install time. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Voice has never worked on Android without this: a call publishes a
+         microphone track, and Android refuses the capture outright when the
+         permission is not declared. It was missing from the day voice
+         shipped, which went unnoticed because no Android device has ever
+         been available to test a call on. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Declared alongside the camera pre-toggle this change adds; without
+         it the toggle would appear to work and capture nothing. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <application
         android:label="slim-m"
         android:name="${applicationName}"
