@@ -1,0 +1,494 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: main-builds
+
+# Continuous, path-scoped deployment on every merge to main. Separate from
+# release.yml on purpose: that workflow's structure is built entirely around
+# release-please outputs and tag refs, and mixing an untagged fast path into
+# it would make both harder to reason about. See docs/ci.md.
+#
+# What this buys, within minutes of a merge and with nobody touching
+# anything: a client merge reaches TestFlight and lands a snapshot build in
+# the same Fedora COPR project `dnf upgrade` already tracks on the owner's
+# desktop, with no second release-PR merge, no personal access token and no
+# version bump; a server merge rebuilds and pushes `latest`, the rolling tag
+# the owner's live instance polls for its own auto-update. That last part is
+# continuous deployment in the plain sense of the phrase: a bad merge to
+# `crates/**` reaches the running production instance on its own, and that
+# is a deliberate trade being made here, not a gap nobody noticed.
+#
+# One workflow with one `on.push.paths` trigger wide enough for both halves,
+# narrowed per job by a `dorny/paths-filter` job. Two workflows with their
+# own top-level `paths` was the other shape the brief allowed; one file keeps
+# the shared concurrency group and this header in one place instead of
+# duplicated across two.
+#
+# Every job below reads secrets directly rather than declaring
+# `environment: release` or `environment: testflight`. Both exist with no
+# protection rules today, and every secret these jobs use is repository-
+# scoped rather than environment-scoped, so naming either environment would
+# change nothing about what a job can read right now. If a reviewer gate is
+# ever added to either for real releases, a continuous build must not
+# inherit it: the whole point of this workflow is that nobody approves a
+# merge by hand. See docs/ci.md for the rest of the reasoning.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - "crates/**"
+      - "!client/CHANGELOG.md"
+      - "!client/pubspec.yaml"
+
+# Minimal default; each job widens to exactly what it needs.
+permissions:
+  contents: read
+
+# The opposite of release.yml's cancel-in-progress: false, since a newer commit's build supersedes an older one's here rather than racing a publish.
+concurrency:
+  group: main-builds-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Narrows "client/** or crates/** changed" into the two booleans every job below gates on.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      client: ${{ steps.filter.outputs.client }}
+      server: ${{ steps.filter.outputs.server }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        id: filter
+        with:
+          filters: |
+            client:
+              - 'client/**'
+              - '!client/CHANGELOG.md'
+              - '!client/pubspec.yaml'
+            server:
+              - 'crates/**'
+
+  # The Linux build and its portable tarball, which both the rpm below and the copr job downstream are built from.
+  linux-client:
+    needs: [changes]
+    if: needs.changes.outputs.client == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: resolve version
+        id: ver
+        run: |
+          version="$(grep -m1 '^version:' client/pubspec.yaml | awk '{print $2}')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+
+      - name: build linux release
+        run: |
+          flutter config --enable-linux-desktop
+          dart pub get --enforce-lockfile
+          flutter build linux --release
+        working-directory: client/packages/app
+
+      # This tarball's name matches the spec's Source0 basename exactly, which is what lets the copr job skip spectool.
+      - name: stage portable tarball
+        run: |
+          version="${{ steps.ver.outputs.version }}"
+          name="slim-m-client-${version}"
+          bundle="client/packages/app/build/linux/x64/release/bundle"
+          if [ ! -x "${bundle}/slimm_app" ]; then
+            echo "::error::no linux bundle at ${bundle}"
+            exit 1
+          fi
+          mkdir -p "stage/${name}" dist
+          cp -a "${bundle}/." "stage/${name}/"
+          cp LICENSES/Apache-2.0.txt "stage/${name}/LICENSE"
+          cp packaging/linux/README.md "stage/${name}/README.md"
+          tar -C stage -czf "dist/${name}-linux-amd64.tar.gz" "${name}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: slim-m-client-tarball
+          path: dist/*-linux-amd64.tar.gz
+          if-no-files-found: error
+
+      - name: check rpm spec
+        id: pkg
+        run: |
+          if [ -f packaging/rpm/slim-m-client.spec ]; then
+            echo "rpm=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rpm=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No packaging/rpm/slim-m-client.spec, so no rpm is built for this commit. Skipping."
+          fi
+
+      # Built in a Fedora container, not on the runner: the spec targets Fedora's macros and Ubuntu's rpm has neither.
+      - name: build rpm
+        if: steps.pkg.outputs.rpm == 'true'
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+        run: |
+          docker run --rm -v "${PWD}:/w" -w /w -e VER fedora:latest bash -eo pipefail -c '
+            dnf -y install rpm-build patchelf desktop-file-utils tar gzip >/dev/null
+            mkdir -p rpmbuild/SOURCES
+            cp dist/slim-m-client-*-linux-amd64.tar.gz \
+              packaging/rpm/top.npcserver.slimm.desktop \
+              packaging/linux/icons/top.npcserver.slimm*.png \
+              packaging/linux/icons/top.npcserver.slimm.svg rpmbuild/SOURCES/
+            sed "s/^Version:.*/Version:        ${VER}/" \
+              packaging/rpm/slim-m-client.spec > rpmbuild/slim-m-client.spec
+            rpmbuild -bb --define "_topdir /w/rpmbuild" --define "_rpmdir /w/dist" \
+              rpmbuild/slim-m-client.spec
+          '
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: steps.pkg.outputs.rpm == 'true'
+        with:
+          name: slim-m-client-rpm
+          path: dist/*/*.rpm
+          if-no-files-found: error
+
+  # Upload-signed apk and appbundle as run artifacts; inert without its three secrets, same gate as release.yml.
+  android-client:
+    needs: [changes]
+    if: needs.changes.outputs.client == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ANDROID_UPLOAD_KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+      ANDROID_KEY_PROPERTIES: ${{ secrets.ANDROID_KEY_PROPERTIES }}
+      ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+    steps:
+      - name: check secrets
+        id: gate
+        run: |
+          if [ -n "$ANDROID_UPLOAD_KEYSTORE_B64" ] && [ -n "$ANDROID_KEY_PROPERTIES" ] \
+             && [ -n "$ANDROID_GOOGLE_SERVICES_JSON" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Android signing secrets are not configured. Add ANDROID_UPLOAD_KEYSTORE_B64, ANDROID_KEY_PROPERTIES, and ANDROID_GOOGLE_SERVICES_JSON to enable the signed build. Skipping."
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: steps.gate.outputs.ready == 'true'
+
+      - name: resolve version
+        if: steps.gate.outputs.ready == 'true'
+        id: ver
+        run: |
+          version="$(grep -m1 '^version:' client/pubspec.yaml | awk '{print $2}')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: write signing assets
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON" \
+            > client/packages/app/android/app/google-services.json
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE_B64" | base64 -d \
+            > client/packages/app/android/app/upload-keystore.jks
+          printf '%s' "$ANDROID_KEY_PROPERTIES" \
+            > client/packages/app/android/key.properties
+
+      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          channel: stable
+
+      # Build number from the run number, build name from pubspec's tracked version; never from local pubspec defaults.
+      - name: build android release
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: client/packages/app
+        run: |
+          flutter pub get --enforce-lockfile
+          flutter build appbundle --release \
+            --build-name=${{ steps.ver.outputs.version }} \
+            --build-number=${{ github.run_number }}
+          flutter build apk --release \
+            --build-name=${{ steps.ver.outputs.version }} \
+            --build-number=${{ github.run_number }}
+
+      - name: verify the signer is the upload key, not debug
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: client/packages/app
+        env:
+          # Play's registered upload certificate fingerprint; public, not a secret.
+          EXPECTED_SHA256: 9dc12a6a03bd6125065fb5f6eca2d8d8477f74009e0f6624efee2d2b98ec033b
+        run: |
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [ -z "$sdk" ] || [ ! -d "$sdk/build-tools" ]; then
+            echo "::error::no Android build-tools; ANDROID_HOME='${sdk}'"
+            exit 1
+          fi
+          tool="$(find "$sdk/build-tools" -name apksigner -type f | sort -V | tail -n1)"
+          if [ -z "$tool" ]; then
+            echo "::error::no apksigner under $sdk/build-tools"
+            ls -1 "$sdk/build-tools" || true
+            exit 1
+          fi
+          "$tool" verify --print-certs \
+            build/app/outputs/flutter-apk/app-release.apk > certs.txt 2>&1 || {
+              echo "::error::apksigner could not verify the release apk"
+              cat certs.txt
+              exit 1
+            }
+          cat certs.txt
+          if grep -q 'Android Debug' certs.txt; then
+            echo "::error::release apk is signed with the debug keystore; key.properties did not take effect"
+            exit 1
+          fi
+          if ! grep -qi "$EXPECTED_SHA256" certs.txt; then
+            echo "::error::signer is not Play's registered upload key (want $EXPECTED_SHA256)"
+            exit 1
+          fi
+          echo "signed by the expected upload key"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          name: slim-m-client-android
+          path: |
+            client/packages/app/build/app/outputs/flutter-apk/app-release.apk
+            client/packages/app/build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+  # Signed ipa straight to TestFlight; inert without its six secrets, the same gate release.yml uses.
+  ios-testflight:
+    needs: [changes]
+    if: needs.changes.outputs.client == 'true'
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    env:
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      IOS_SIGNING_CERTIFICATE_P12: ${{ secrets.IOS_SIGNING_CERTIFICATE_P12 }}
+      IOS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.IOS_SIGNING_CERTIFICATE_PASSWORD }}
+      IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+      IOS_BROADCAST_PROVISIONING_PROFILE: ${{ secrets.IOS_BROADCAST_PROVISIONING_PROFILE }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: check secrets
+        id: gate
+        run: |
+          if [ -n "$APP_STORE_CONNECT_KEY_ID" ] && [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] \
+             && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ] && [ -n "$IOS_SIGNING_CERTIFICATE_P12" ] \
+             && [ -n "$IOS_SIGNING_CERTIFICATE_PASSWORD" ] && [ -n "$IOS_PROVISIONING_PROFILE" ] \
+             && [ -n "$IOS_BROADCAST_PROVISIONING_PROFILE" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::iOS TestFlight secrets are not configured. Add the App Store Connect API key, signing certificate, and both provisioning profile secrets (the app's and the broadcast extension's) to enable the build and upload. Skipping."
+          fi
+
+      - name: resolve version
+        if: steps.gate.outputs.ready == 'true'
+        id: ver
+        run: |
+          version="$(grep -m1 '^version:' client/pubspec.yaml | awk '{print $2}')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      # A throwaway keychain, not the login one, and set-key-partition-list so codesign never hangs waiting for permission.
+      - name: import signing assets
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          KEYDIR="${HOME}/.appstoreconnect/private_keys"
+          mkdir -p "$KEYDIR"
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            > "${KEYDIR}/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+
+          CERT_PATH="${RUNNER_TEMP}/build_certificate.p12"
+          PROFILE_PATH="${RUNNER_TEMP}/build_pp.mobileprovision"
+          KEYCHAIN_PATH="${RUNNER_TEMP}/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          printf '%s' "$IOS_SIGNING_CERTIFICATE_P12" | base64 --decode > "$CERT_PATH"
+          printf '%s' "$IOS_PROVISIONING_PROFILE" | base64 --decode > "$PROFILE_PATH"
+          BROADCAST_PROFILE_PATH="${RUNNER_TEMP}/build_pp_broadcast.mobileprovision"
+          printf '%s' "$IOS_BROADCAST_PROVISIONING_PROFILE" \
+            | base64 --decode > "$BROADCAST_PROFILE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$IOS_SIGNING_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          PROFILE_DIR="${HOME}/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+          INSTALLED=""
+          for pp in "$PROFILE_PATH" "$BROADCAST_PROFILE_PATH"; do
+            UUID="$(security cms -D -i "$pp" | plutil -extract UUID raw -o - -)"
+            NAME="$(security cms -D -i "$pp" | plutil -extract Name raw -o - -)"
+            cp "$pp" "${PROFILE_DIR}/${UUID}.mobileprovision"
+            echo "installed profile ${NAME} (${UUID})"
+            INSTALLED="${INSTALLED}${NAME}\n"
+          done
+
+          EXPORT_OPTIONS=client/packages/app/ios/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Print :provisioningProfiles" "$EXPORT_OPTIONS" \
+            | sed -n 's/^ *[^ ]* = \(.*\)$/\1/p' > "${RUNNER_TEMP}/wanted_profiles"
+          printf '%b' "$INSTALLED" > "${RUNNER_TEMP}/installed_profiles"
+          missing=0
+          while read -r want; do
+            [ -n "$want" ] || continue
+            grep -qxF "$want" "${RUNNER_TEMP}/installed_profiles" || {
+              echo "::error::ExportOptions names profile '${want}', which is not installed"
+              missing=1
+            }
+          done < "${RUNNER_TEMP}/wanted_profiles"
+          [ "$missing" -eq 0 ] || exit 1
+
+          echo "signing identities available to codesign:"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          channel: stable
+
+      # Build number from the run number, build name from pubspec's tracked version; both stores reject a reuse.
+      - name: build ipa
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: client/packages/app
+        run: |
+          flutter pub get --enforce-lockfile
+          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist \
+            --build-name=${{ steps.ver.outputs.version }} \
+            --build-number=${{ github.run_number }}
+
+      - name: upload to TestFlight
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: client/packages/app
+        run: |
+          xcrun altool --upload-app --type ios \
+            --file "$(ls build/ios/ipa/*.ipa | head -n1)" \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+
+  # Snapshot build submitted to the same COPR project `dnf upgrade` already tracks on the owner's Fedora desktop.
+  copr:
+    needs: [changes, linux-client]
+    if: needs.changes.outputs.client == 'true'
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    permissions:
+      contents: read
+    env:
+      COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
+    steps:
+      - name: check secret
+        id: gate
+        run: |
+          if [ -n "$COPR_CONFIG" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::COPR_CONFIG is not configured. Add it to enable the Fedora COPR publish. Skipping."
+          fi
+
+      - name: install tooling
+        if: steps.gate.outputs.ready == 'true'
+        run: dnf -y install git copr-cli rpm-build rpmdevtools >/dev/null
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: steps.gate.outputs.ready == 'true'
+
+      - name: resolve version
+        if: steps.gate.outputs.ready == 'true'
+        id: ver
+        run: |
+          version="$(grep -m1 '^version:' client/pubspec.yaml | awk '{print $2}')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          name: slim-m-client-tarball
+          path: dist
+
+      # RPM compares Release segment by segment: 0.<run> sorts below the committed spec's 1, so a tagged release always supersedes a same-version snapshot.
+      - name: submit snapshot to COPR
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+          SNAPSHOT_RELEASE: 0.${{ github.run_number }}
+        run: |
+          set -uo pipefail
+          spec=packaging/rpm/slim-m-client.spec
+          if [ ! -f "$spec" ]; then
+            echo "::warning::${spec} does not exist, so there is nothing to submit to COPR. Skipping."
+            exit 0
+          fi
+          mkdir -p ~/.config
+          printf '%s\n' "$COPR_CONFIG" > ~/.config/copr
+          chmod 600 ~/.config/copr
+          rpmdev-setuptree
+          cp "$spec" ~/rpmbuild/SPECS/slim-m-client.spec
+          cp packaging/rpm/top.npcserver.slimm.desktop \
+            packaging/linux/icons/top.npcserver.slimm*.png \
+            packaging/linux/icons/top.npcserver.slimm.svg ~/rpmbuild/SOURCES/
+          cp "dist/slim-m-client-${VER}-linux-amd64.tar.gz" ~/rpmbuild/SOURCES/
+          sed -i "s/^Version:.*/Version:        ${VER}/" ~/rpmbuild/SPECS/slim-m-client.spec
+          sed -i "s/^Release:.*/Release:        ${SNAPSHOT_RELEASE}%{?dist}/" ~/rpmbuild/SPECS/slim-m-client.spec
+          rpmbuild -bs ~/rpmbuild/SPECS/slim-m-client.spec >/dev/null
+          srpm=$(ls ~/rpmbuild/SRPMS/slim-m-client-*.src.rpm)
+          if copr-cli build nc1107/slim-m "$srpm" --nowait; then
+            echo "submitted slim-m-client ${VER}-${SNAPSHOT_RELEASE} snapshot to COPR (nc1107/slim-m)"
+          else
+            echo "::warning::COPR submit failed for slim-m-client ${VER}-${SNAPSHOT_RELEASE}. TestFlight and the live server are unaffected; rebuild by hand with 'copr-cli build nc1107/slim-m <srpm>'."
+          fi
+
+  # One native amd64 image per push, tagged by commit sha, main and latest; moving latest here is continuous deployment to the live instance, see the header above.
+  server-image:
+    needs: [changes]
+    if: needs.changes.outputs.server == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/nc1107/slim-m-server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      - uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: docker/server.Dockerfile
+          platforms: linux/amd64
+          tags: |
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+            ${{ env.IMAGE }}:main
+            ${{ env.IMAGE }}:latest
+          push: true
