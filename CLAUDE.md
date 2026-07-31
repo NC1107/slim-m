@@ -509,6 +509,7 @@ A malformed origin fails the process at startup, named in the error, rather than
 Full operator-facing writeup in `deploy/README.md`.
 
 Settings gained a "Community management" section (`_ModerationSection` in `settings_screen.dart`), hidden entirely, including its divider, when the caller holds none of the four gating permission bits.
+Renamed and split by #142 (2026-07-29): personal and Space settings are now separate screens (`personal_settings_screen.dart`, `space_settings_screen.dart`), and the gated section lives in `SpaceSettingsSection` (`widgets/space_settings_section.dart`), reachable via `spaceSettingsReachable`.
 Four screens: a reports queue (MANAGE_MESSAGES), invites (CREATE_INVITE), roles (MANAGE_ROLES), and per-channel permission overwrites (MANAGE_ROLES).
 The overwrites screen cannot show an existing overwrite because the API has no `GET` for one, only set or clear, and it says so in a callout rather than faking current state.
 Its "Allow" option is unavailable when the caller lacks that bit themselves, the same restriction the server enforces.
@@ -625,6 +626,11 @@ Confirmed but not fixed, still real:
 Three touched files now exceed the 300-line review budget: `sync_controller.dart` (316, crossed it this pass), `member_pane.dart` (396, crossed it this pass), `channel_screen.dart` (583, already over before this pass). Split before opening a PR from this work rather than adding to them further.
 
 ## Current state (2026-07-25)
+
+> **Status header, added in the 2026-07-30/31 documentation pass.** This section is a point-in-time snapshot from 2026-07-25, kept for its detail rather than rewritten.
+> Everything dated later in this file (every section above this one) supersedes it: Phase 4 finished, Phase 5's canvas spikes ran, a first canvas write slice shipped, the Phase 7 capability handshake landed, and part of Phase 8's polish pass is done.
+> The server is at 0.18.5 and the client at 0.13.3 (`.release-please-manifest.json`), not the 0.10.0 named a few lines below.
+> Read this for the PR #50 and phase 1-3 history, not for what phase the project is currently in.
 
 Phases 0 (foundations), 1 (server and protocol core), and 2 (client shell and text messaging) are complete.
 Phase 3 (push relay and notifications) is complete on every exit criterion except the two that need hardware or a Mac; see "Still open in Phase 3" below.
@@ -837,8 +843,10 @@ Note that `livekit.npc-server.top` is proxied by Cloudflare, which rejects some 
 
 ```
 crates/slimm-server   Rust home server (Axum + embedded SQLite via sqlx). A lib (slimm_server) plus a thin bin.
-  src/                lib.rs, main.rs, config.rs, db.rs, http.rs, ids.rs, store.rs
-  migrations/         forward-only sqlx migrations (0001 init, 0002 core schema)
+  src/                lib.rs, main.rs plus one file per concern (config, db, auth, cors, emoji, hub,
+                      identity, media, permissions, presence, push, ratelimit, typing) and the
+                      emoji/, http/, push/, store/, voice/ directories
+  migrations/         24 forward-only sqlx migrations (0001_init.sql through 0024_messages_rowid_alias.sql)
   benches/            criterion hot-path benchmarks
   tests/              integration tests
 schema/               openapi.yaml, the single source of record for the wire protocol
@@ -968,7 +976,7 @@ Left unconverted: `tests/response_contract/**` (a concurrent change owned it) an
 
 ## CI and release, plus gotchas learned the hard way
 
-Workflows: server-ci, client-ci, schema-ci, hygiene, perf, release. All green on main.
+13 workflows now, not the original six: server-ci, client-ci, client-ios-ci, schema-ci, hygiene, perf, release, licenses, audio-ci, compose-smoke, e2e, push-relay-contract, verify-release-checks. See `docs/ci.md` for what each gates. All green on main.
 
 - Multi-arch images are built NATIVELY per architecture (ubuntu-latest for amd64, ubuntu-24.04-arm for arm64), pushed by digest, then merged into one manifest and cosign keyless-signed. No QEMU, no `cross`. The static binaries are built the same native-per-arch way. `cross` was dropped because its arm64 toolchain image hit a GLIBC mismatch.
 - The Dockerfile builds natively for whatever platform buildx targets; do not reintroduce `--platform=$BUILDPLATFORM` cross-copying (it silently ships a host-arch binary in the foreign-arch image).
