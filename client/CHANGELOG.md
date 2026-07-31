@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.16.0](https://github.com/NC1107/slim-m/compare/client-v0.15.0...client-v0.16.0) (2026-07-31)
+
+
+### Features
+
+* **client:** canvas eraser, undo and clear controls ([#223](https://github.com/NC1107/slim-m/issues/223)) ([5869f9e](https://github.com/NC1107/slim-m/commit/5869f9e0301b14104d723a1d0f87a258d0eecd49))
+
+
+### Bug Fixes
+
+* a restore frame with no ids must ask the feed, not be applied as empty ([#225](https://github.com/NC1107/slim-m/issues/225)) ([d97f41f](https://github.com/NC1107/slim-m/commit/d97f41f64d3ce215e1062bd430d9d187aded0eab))
+
 ## [0.15.0](https://github.com/NC1107/slim-m/compare/client-v0.14.0...client-v0.15.0) (2026-07-31)
 
 
