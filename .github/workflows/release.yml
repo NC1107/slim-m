@@ -148,6 +148,7 @@ jobs:
     env:
       IMAGE: ghcr.io/nc1107/slim-m-server
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: resolve version
         id: ver
         run: |
@@ -171,21 +172,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: decide whether :latest may move
+        id: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "move=$(bash scripts/decide-latest-tag.sh "$IMAGE" "${{ steps.ver.outputs.version }}")" >> "$GITHUB_OUTPUT"
       - name: create and inspect manifest
         id: manifest
         run: |
           version="${{ steps.ver.outputs.version }}"
           refs=""
-          for f in /tmp/digests/*; do
-            refs="${refs} ${IMAGE}@$(cat "$f")"
-          done
-          # `latest` is the rolling tag deployments track for auto-updates; the
-          # version and sha tags stay for pinning and for tracing to a commit.
-          docker buildx imagetools create \
-            -t "${IMAGE}:${version}" \
-            -t "${IMAGE}:sha-${GITHUB_SHA}" \
-            -t "${IMAGE}:latest" \
-            ${refs}
+          for f in /tmp/digests/*; do refs="${refs} ${IMAGE}@$(cat "$f")"; done
+          tags=(-t "${IMAGE}:${version}" -t "${IMAGE}:sha-${GITHUB_SHA}")
+          if [ "${{ steps.latest.outputs.move }}" = "true" ]; then tags+=(-t "${IMAGE}:latest"); fi
+          docker buildx imagetools create "${tags[@]}" ${refs}
           digest="$(docker buildx imagetools inspect "${IMAGE}:${version}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
@@ -241,7 +241,7 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: build static binary
-        run: cargo build --release --target ${{ matrix.target }} --bin slimm-server
+        run: cargo build --locked --release --target ${{ matrix.target }} --bin slimm-server
 
       - name: stage binary
         id: stage
@@ -353,7 +353,7 @@ jobs:
       - name: build linux release
         run: |
           flutter config --enable-linux-desktop
-          dart pub get
+          dart pub get --enforce-lockfile
           flutter build linux --release
         working-directory: client/packages/app
 

@@ -81,7 +81,7 @@ def scenarios(a, b, admin, member, room_id):
             a, admin, picture)),
         ("settings: theme and status", lambda: (
             e2e_settings.change_theme(a),
-            e2e_settings.change_status(a))),
+            e2e_settings.change_status(a, admin))),
         ("settings: Space settings stand alone",
          lambda: e2e_settings.space_settings_reachable(a)),
         ("settings: who can join", lambda: e2e_settings.change_join_policy(

@@ -58,38 +58,40 @@ const fixtureTokens = api.TokenPair(
 /// Without this the test binding draws every glyph as a filled box and every
 /// icon as an empty square, which reads as a layout bug in the PNG rather
 /// than as a missing font.
-Future<void> loadRealFonts() async {
-  Future<void> load(String family, List<String> paths) async {
-    final loader = FontLoader(family);
-    for (final path in paths) {
-      loader.addFont(File(path).readAsBytes().then(ByteData.sublistView));
-    }
-    await loader.load();
-  }
-
+///
+/// [pubCacheOverride] exists only so a test can point the Lucide lookup at a
+/// directory that cannot resolve, without touching the real `PUB_CACHE`.
+Future<void> loadRealFonts({String? pubCacheOverride}) async {
   const design = '../design_system';
-  await load('packages/slimm_design_system/IBM Plex Sans', [
+  await loadFontFamily('packages/slimm_design_system/IBM Plex Sans', [
     '$design/fonts/IBMPlexSans-Regular.ttf',
     '$design/fonts/IBMPlexSans-Medium.ttf',
     '$design/fonts/IBMPlexSans-SemiBold.ttf',
   ]);
-  await load('packages/slimm_design_system/IBM Plex Mono', [
+  await loadFontFamily('packages/slimm_design_system/IBM Plex Mono', [
     '$design/fonts/IBMPlexMono-Regular.ttf',
     '$design/fonts/IBMPlexMono-Medium.ttf',
   ]);
 
-  final lucideDir = '${_pubCache()}/lucide_icons_flutter-${_lucideVersion()}';
-  final lucide = File('$lucideDir/assets/lucide.ttf');
-  if (lucide.existsSync()) {
-    await load('packages/lucide_icons_flutter/Lucide', [lucide.path]);
-  }
+  final cache = pubCacheOverride ?? _pubCache();
+  final lucideDir = '$cache/lucide_icons_flutter-${_lucideVersion()}';
+  await loadFontFamily('packages/lucide_icons_flutter/Lucide', [
+    '$lucideDir/assets/lucide.ttf',
+  ]);
   // AppIcons uses the 1.5-stroke variants, which live on their own family.
-  final lucide300 = File(
+  await loadFontFamily('packages/lucide_icons_flutter/Lucide300', [
     '$lucideDir/assets/build_font/LucideVariable-w300.ttf',
-  );
-  if (lucide300.existsSync()) {
-    await load('packages/lucide_icons_flutter/Lucide300', [lucide300.path]);
+  ]);
+}
+
+/// Loads one font family, letting a missing asset throw rather than
+/// rendering that family's glyphs as boxes with nothing in the run saying so.
+Future<void> loadFontFamily(String family, List<String> paths) async {
+  final loader = FontLoader(family);
+  for (final path in paths) {
+    loader.addFont(File(path).readAsBytes().then(ByteData.sublistView));
   }
+  await loader.load();
 }
 
 String _pubCache() {

@@ -35,25 +35,48 @@ def personal_settings_reachable(client):
 
 
 def change_theme(client):
-    """A preference that persists is a preference that was actually stored."""
+    """A preference that persists is a preference that was actually stored.
+
+    The control relabelling itself is a local Riverpod state change and would
+    say the same thing whether or not `ThemeController.select` ever reached
+    `SharedPreferences`; the storage key it writes is read back directly.
+    """
     _open_personal(client)
     client.click(L.APPEARANCE_PANE, settle=2)
     client.click(L.THEME, settle=2)
     client.wait_for('Dark')
     client.click('Dark', settle=2)
     client.wait_for('Theme, currently Dark')
-    print('  theme changed to Dark and the control says so')
+
+    stored = client.ev(
+        "JSON.parse(localStorage.getItem('flutter.slimm.appearance.theme') "
+        "|| 'null')")
+    assert stored == 'dark', f'nothing durable recorded the choice: {stored!r}'
+    print('  theme changed to Dark, and it was actually written to storage')
 
 
-def change_status(client):
-    """Presence is a real server-side state, not a local badge."""
+def change_status(client, api):
+    """Presence is a real server-side state, not a local badge, and asking
+    the server about the same account's own id always answers truthfully."""
     _open_personal(client)
     client.click(L.ACCOUNT_PANE, settle=2)
     client.click(L.STATUS, settle=2)
     client.wait_for('Do not disturb')
     client.click('Do not disturb', settle=3)
     client.wait_for('Status, currently Do not disturb')
-    print('  status changed to do-not-disturb')
+
+    me_id = api.me()['id']
+    deadline = time.time() + 20
+    status = None
+    while time.time() < deadline:
+        rows = api.call('GET', f'/presence?ids={me_id}')
+        row = next((r for r in rows if r['user_id'] == me_id), None)
+        status = row['status'] if row else None
+        if status == 'dnd':
+            break
+        time.sleep(1)
+    assert status == 'dnd', f'the server still reports status {status!r}'
+    print('  status changed to do-not-disturb, and the server agrees')
 
 
 def upload_avatar(client, api, path):

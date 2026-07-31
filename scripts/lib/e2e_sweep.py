@@ -175,13 +175,23 @@ def devices_and_read_state(api, channel_id):
     latest = api.messages(channel_id)[-1]
     api.call("PUT", f"/channels/{channel_id}/read", {"seq": latest["seq"]})
     _did("PUT /channels/{id}/read")
-    assert api.call("GET", f"/channels/{channel_id}/read") is not None
+
+    read_state = api.call("GET", f"/channels/{channel_id}/read")
     _did("GET /channels/{id}/read")
+    assert read_state["last_read_seq"] == latest["seq"], \
+        f"marking read to {latest['seq']} did not stick: {read_state}"
+    assert read_state["unread"] == 0, \
+        f"nothing should be unread right after marking read: {read_state}"
+
     synced = api.call("POST", "/sync", {
         "scopes": [{"channel_id": channel_id, "after_seq": 0}]})
     _did("POST /sync")
-    assert synced is not None, "sync answered nothing"
-    print(f"  {len(rows)} device(s) listed, read state and sync answered")
+    scope = next(s for s in synced["scopes"] if s["channel_id"] == channel_id)
+    ids = {m["id"] for m in scope["messages"]}
+    assert latest["id"] in ids, \
+        f"sync from 0 did not carry the latest message: {scope}"
+    print(f"  {len(rows)} device(s) listed, read state advanced and sync "
+          f"carried {len(scope['messages'])} message(s)")
 
 
 def run_all(api, channel_id, other_id):

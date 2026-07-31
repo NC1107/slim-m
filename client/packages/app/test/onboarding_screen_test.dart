@@ -2,6 +2,8 @@
 /// Tests for the server-identity confirmation step in the manual "connect to
 /// a server" flow: pin on first connect, stay silent on a later match, and
 /// force an explicit, non-default action through if the key ever changes.
+///
+/// Userinfo-stripping coverage lives in onboarding_screen_userinfo_test.dart.
 library;
 
 import 'dart:convert';

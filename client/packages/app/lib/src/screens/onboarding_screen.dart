@@ -13,6 +13,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart';
+import '../server_address_reduction.dart';
 import '../server_scheme_policy.dart';
 import '../widgets/onboarding_shell.dart';
 import '../widgets/server_identity_confirmation.dart';
@@ -212,9 +213,11 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
       _error = null;
     });
 
+    // Userinfo must never ride along on the probe or persist; see reduceServerAddress.
+    final reduced = reduceServerAddress(address);
     // The same probe seam confirmServerIdentity uses, so a test can fake the
     // transport for this untrusted address the same way it does for that.
-    final client = ref.read(probeApiProvider)(address);
+    final client = ref.read(probeApiProvider)(reduced);
     try {
       final check = await client.checkInvite(_code.text.trim());
       if (check is api.InviteUnusable) {
@@ -230,7 +233,7 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
         return;
       }
       if (mounted) {
-        Navigator.of(context).pop((address, _code.text.trim()));
+        Navigator.of(context).pop((reduced, _code.text.trim()));
       }
     } on api.ApiException catch (e) {
       setState(
@@ -334,7 +337,8 @@ class _ManualServerDialogState extends State<_ManualServerDialog> {
       setState(() => _error = schemeError);
       return;
     }
-    Navigator.of(context).pop(address);
+    // Userinfo must never survive into storage; see reduceServerAddress.
+    Navigator.of(context).pop(reduceServerAddress(address));
   }
 
   @override
