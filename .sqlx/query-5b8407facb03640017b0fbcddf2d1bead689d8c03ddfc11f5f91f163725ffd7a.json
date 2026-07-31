@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT MIN(seq) AS \"floor: i64\" FROM canvas_ops WHERE channel_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "floor: i64",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "5b8407facb03640017b0fbcddf2d1bead689d8c03ddfc11f5f91f163725ffd7a"
+}

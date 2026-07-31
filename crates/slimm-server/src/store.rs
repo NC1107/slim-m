@@ -18,6 +18,7 @@ mod account_deletion;
 mod attachments;
 mod bootstrap;
 mod canvas;
+mod canvas_ops;
 mod channels;
 mod dms;
 mod emoji;
@@ -47,6 +48,9 @@ pub use bootstrap::Bootstrap;
 pub use canvas::{
     CanvasObject, MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL, PlaceError, Placement, Rect,
     ViewportQuery, WORLD_LIMIT,
+};
+pub use canvas_ops::{
+    CANVAS_OP_GAP, CANVAS_OP_PAGE_BYTES, CanvasOpBody, CanvasOpEntry, CanvasOpsPage,
 };
 pub use channels::DeleteChannelError;
 pub(crate) use dms::DM_CHANNEL_KIND;

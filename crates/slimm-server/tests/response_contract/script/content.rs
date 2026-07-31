@@ -111,6 +111,13 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         root,
     )
     .await;
+    // Placed above and nothing has removed it, so the page carries a live `object`.
+    c.get(
+        "listCanvasOps",
+        &format!("/channels/{channel}/canvas/ops?after_seq=0"),
+        root,
+    )
+    .await;
 
     let overwrite = format!("/channels/{channel}/overwrites/member/{bob_id}");
     c.json(

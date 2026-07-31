@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT next_seq - 1 AS \"seq!: i64\" FROM channel_seq_counters\n           WHERE channel_id = ? AND stream = 'canvas'",
+  "describe": {
+    "columns": [
+      {
+        "name": "seq!: i64",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f084344e227448a64ff23857bde9c5c82665d3c9af8f96dc11030c6921aaa00d"
+}
