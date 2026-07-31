@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.0](https://github.com/NC1107/slim-m/compare/server-v0.19.0...server-v0.20.0) (2026-07-31)
+
+
+### Features
+
+* **server:** canvas remove and clear, MANAGE_CANVAS enforcement, and the two new socket events ([#219](https://github.com/NC1107/slim-m/issues/219)) ([1ba6846](https://github.com/NC1107/slim-m/commit/1ba6846177436ad98fd2c28e470f8630f91b7b68))
+* **server:** canvas restore, its authorship gate, and the object ceiling ([#221](https://github.com/NC1107/slim-m/issues/221)) ([f847baa](https://github.com/NC1107/slim-m/commit/f847baa9cb0efc586cdb8e92df33b4962892c272))
+
 ## [0.19.0](https://github.com/NC1107/slim-m/compare/server-v0.18.5...server-v0.19.0) (2026-07-31)
 
 
