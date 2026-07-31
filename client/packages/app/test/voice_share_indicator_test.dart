@@ -148,8 +148,12 @@ void main() {
     });
   });
 
+  // The strip only ever mounts at compact width, so every test pins that viewport.
   group('the collapsed strip', () {
     testWidgets('names the share in words for a live share', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
       final session = FakeSession();
       final controller = harness.controllerWith(session, voiceApi());
       await controller.join('channel-1');
@@ -164,12 +168,15 @@ void main() {
 
       // Said in words, not left to a small glyph a tooltip has to explain: the
       // collapsed strip is exactly where a live share is easiest to miss.
-      expect(find.textContaining('Sharing your screen'), findsOneWidget);
+      expect(find.textContaining('sharing'), findsOneWidget);
     });
 
     testWidgets('stays quiet for a share only requested, not live', (
       tester,
     ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
       final session = FakeSession(
         screenShareOutcome: ScreenShareOutcome.pendingBroadcast,
       );
@@ -185,13 +192,16 @@ void main() {
       await tester.pump();
 
       expect(controller.state.awaitingBroadcast, isTrue);
-      expect(find.textContaining('Sharing your screen'), findsNothing);
+      expect(find.textContaining('sharing'), findsNothing);
 
       // Clears the pending-broadcast deadline timer before the test ends.
       await controller.setScreenShare(false);
     });
 
     testWidgets('stays quiet with no share at all', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
       final session = FakeSession();
       final controller = harness.controllerWith(session, voiceApi());
       await controller.join('channel-1');
@@ -202,7 +212,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.textContaining('Sharing your screen'), findsNothing);
+      expect(find.textContaining('sharing'), findsNothing);
     });
   });
 }

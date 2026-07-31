@@ -255,10 +255,11 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    // No AppBar sits above CanvasBar, so this pane insets itself, or a stroke could start under the notch.
+    // No AppBar sits above CanvasBar, so this pane insets itself for top/bottom; left stays unconsumed because a rail, not this pane, ever occupies the true left edge.
     return Container(
       color: tokens.surfaceBase,
       child: SafeArea(
+        left: false,
         child: Column(
           children: [
             CanvasBar(
