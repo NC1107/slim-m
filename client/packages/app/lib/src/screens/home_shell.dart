@@ -3,6 +3,8 @@
 /// plus the member pane at expanded width.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_data/data.dart';
@@ -13,6 +15,7 @@ import 'package:slimm_rtc/rtc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/blocks_controller.dart';
+import '../providers/composer_focus.dart';
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/breakpoints.dart';
@@ -144,17 +147,48 @@ class HomeShell extends ConsumerWidget {
       scaffold = const Scaffold(body: ChannelRail());
     }
 
-    // Binds the shared shortcut table's own key rather than a second,
-    // hardcoded `Ctrl K`, so a remap of quickSwitch is honoured here too.
+    // Binds the shared shortcut table's own keys, so a future remap reaches every one of these.
     final quickSwitch = activatorFor(AppAction.quickSwitch);
+    final focusComposer = activatorFor(AppAction.focusComposer);
+    final openSettings = activatorFor(AppAction.openSettings);
+    final nextChannel = activatorFor(AppAction.nextChannel);
+    final previousChannel = activatorFor(AppAction.previousChannel);
     return CallbackShortcuts(
       bindings: {
         if (quickSwitch != null) quickSwitch: () => openCommandPalette(context),
+        if (focusComposer != null)
+          focusComposer: () =>
+              ref.read(composerFocusNodeProvider)?.requestFocus(),
+        if (openSettings != null)
+          openSettings: () => context.push(Routes.personalSettings),
+        if (nextChannel != null)
+          nextChannel: () => unawaited(_cycleChannel(context, ref, 1)),
+        if (previousChannel != null)
+          previousChannel: () => unawaited(_cycleChannel(context, ref, -1)),
       },
       // CallbackShortcuts only fires for a focused descendant, so this default
       // makes the shortcut work the instant the app opens.
       child: Focus(autofocus: true, child: scaffold),
     );
+  }
+
+  /// Moves selection to the channel [direction] (1 or -1) away from the one
+  /// currently open, in [orderedChannels]' order, wrapping at either end.
+  Future<void> _cycleChannel(
+    BuildContext context,
+    WidgetRef ref,
+    int direction,
+  ) async {
+    final store = ref.read(storeProvider).valueOrNull;
+    if (store == null) return;
+    final ordered = orderedChannels(await store.allChannels());
+    if (ordered.isEmpty || !context.mounted) return;
+    final current = selectedChannelId(context);
+    final index = ordered.indexWhere((c) => c.id == current);
+    final target = index == -1
+        ? ordered.first
+        : ordered[(index + direction) % ordered.length];
+    context.go(Routes.channel(target.id));
   }
 }
 

@@ -14,6 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
 import '../providers/admin_providers.dart';
+import '../providers/composer_focus.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/typing_controller.dart';
@@ -57,6 +58,16 @@ class _ComposerState extends ConsumerState<Composer> {
   final List<api.Attachment> _pendingAttachments = [];
   late final FocusNode _focus = FocusNode(onKeyEvent: _onKey);
 
+  /// Captured once rather than read from `ref` in [dispose]: by then
+  /// Riverpod has already detached this element's `ref`, and reading it
+  /// throws "Cannot use ref after the widget was disposed". Every write to
+  /// it, from [initState] and [dispose] alike, goes through a post-frame
+  /// callback rather than running synchronously: either method can be
+  /// reached as part of the very build/frame that swaps this widget out
+  /// (for `BlockedDmNotice` among others), and a provider write from there
+  /// is a build-time mutation, which Riverpod rejects outside tests too.
+  StateController<FocusNode?>? _focusRegistry;
+
   /// The trigger the caret is inside, and which of its offers is current.
   ///
   /// Held here rather than in the panel because all three act on the text
@@ -76,10 +87,25 @@ class _ComposerState extends ConsumerState<Composer> {
     _hasText = widget.controller.text.isNotEmpty;
     _hasSendableText = widget.controller.text.trim().isNotEmpty;
     widget.controller.addListener(_handleChange);
+    // See [_focusRegistry]'s doc comment for why this waits a frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final registry = ref.read(composerFocusNodeProvider.notifier);
+      registry.state = _focus;
+      _focusRegistry = registry;
+    });
   }
 
   @override
   void dispose() {
+    // Guards mounted too: the whole container can be gone by this frame.
+    final registry = _focusRegistry;
+    final focus = _focus;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (registry != null && registry.mounted && registry.state == focus) {
+        registry.state = null;
+      }
+    });
     widget.controller.removeListener(_handleChange);
     _focus.dispose();
     super.dispose();

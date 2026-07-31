@@ -21,6 +21,8 @@ import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/channel_history.dart';
 import '../providers/channel_search_controller.dart';
+import '../providers/dm_participant.dart';
+import '../providers/dms.dart' show dmChannelKind;
 import '../providers/emoji_catalog_provider.dart';
 import '../providers/member_presence.dart';
 import '../providers/message_actions.dart';
@@ -29,6 +31,7 @@ import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
 import '../routing/breakpoints.dart';
+import '../widgets/blocked_dm_notice.dart';
 import '../widgets/channel_header.dart';
 import '../widgets/channel_search.dart';
 import '../widgets/composer.dart';
@@ -287,6 +290,12 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               .firstOrNull;
           final channelName = channel?.name ?? '';
           final lastReadSeq = channel?.lastReadSeq ?? 0;
+          // Only asked for a DM: it is a full GET /dms listing, not worth it otherwise.
+          final dmPartnerId = channel?.kind == dmChannelKind
+              ? ref.watch(dmParticipantProvider(widget.channelId)).valueOrNull
+              : null;
+          final blockedDm =
+              dmPartnerId != null && blocked.contains(dmPartnerId);
 
           return Column(
             children: [
@@ -414,12 +423,15 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                         ),
                 ),
               ),
-              Composer(
-                controller: _composer,
-                channelId: widget.channelId,
-                channelName: channelName,
-                onSend: _send,
-              ),
+              if (blockedDm)
+                BlockedDmNotice(name: channelName)
+              else
+                Composer(
+                  controller: _composer,
+                  channelId: widget.channelId,
+                  channelName: channelName,
+                  onSend: _send,
+                ),
             ],
           );
         },

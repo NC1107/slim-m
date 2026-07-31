@@ -40,7 +40,7 @@ class _ChannelOverwritesScreenState
   String? _targetId;
   String? _targetLabel;
   final Map<int, OverwriteState> _state = {
-    for (final p in Perm.editable) p.$1: OverwriteState.inherit,
+    for (final p in Perm.channelOverwriteEditable) p.$1: OverwriteState.inherit,
   };
   bool _busy = false;
 
@@ -106,6 +106,18 @@ class _ChannelOverwritesScreenState
           break;
       }
     }
+    final confirmed = await confirmDangerousAction(
+      context,
+      title: 'Replace this overwrite?',
+      message:
+          'There is no way to see what $_targetLabel already has set in '
+          '"${_channel!.name}", so this replaces the whole thing: any '
+          'permission left at "Inherit" above goes back to inheriting from '
+          'their roles, even if it was allowed or denied before.',
+      confirmLabel: 'Set overwrite',
+    );
+    if (!confirmed || !mounted) return;
+
     setState(() => _busy = true);
     try {
       await ref
@@ -194,7 +206,9 @@ class _ChannelOverwritesScreenState
             child: Text(
               'There is no way to read an existing overwrite back, so this '
               'always starts from "inherit". Setting one replaces whatever '
-              'was there for every permission at once.',
+              'was there for every permission at once, and asks you to '
+              'confirm before it does. Administrator is not listed here: it '
+              'bypasses channel overwrites entirely, so one would do nothing.',
             ),
           ),
           const SizedBox(height: AppSpacing.s16),
@@ -249,7 +263,7 @@ class _ChannelOverwritesScreenState
           ],
           if (_targetId != null) ...[
             const SizedBox(height: AppSpacing.s16),
-            for (final (bit, label) in Perm.editable)
+            for (final (bit, label) in Perm.channelOverwriteEditable)
               PermissionOverwriteRow(
                 label: label,
                 value: _state[bit]!,

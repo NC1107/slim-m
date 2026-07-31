@@ -35,6 +35,16 @@ String? channelIdInPath(String path) {
 String? selectedChannelId(BuildContext context) =>
     channelIdInPath(GoRouterState.of(context).uri.path);
 
+/// [channels] grouped and ordered the way the rail renders them: direct
+/// messages, then text channels, then voice channels, each in its own
+/// relative order. Shared with the next/previous-channel shortcuts so
+/// cycling through channels matches what the rail shows on screen.
+List<Channel> orderedChannels(List<Channel> channels) => [
+  ...channels.where((c) => c.kind == dmChannelKind),
+  ...channels.where((c) => c.kind == 'text'),
+  ...channels.where((c) => c.kind == 'voice'),
+];
+
 class ChannelRail extends ConsumerStatefulWidget {
   const ChannelRail({super.key});
 

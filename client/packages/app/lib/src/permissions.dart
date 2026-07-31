@@ -44,6 +44,14 @@ abstract final class Perm {
     (manageCanvas, 'Manage the voice canvas'),
     (manageServer, 'Manage Space settings'),
   ];
+
+  /// [editable] minus [administrator]: the server's evaluator returns every
+  /// permission the moment a caller's roles carry [administrator], before it
+  /// ever looks at a channel overwrite, so an allow or deny of it in a
+  /// per-channel overwrite can never change anything in either direction.
+  static final List<(int bit, String label)> channelOverwriteEditable = editable
+      .where((p) => p.$1 != administrator)
+      .toList();
 }
 
 /// Whether a raw permission bitmask contains every bit in [required].
