@@ -41,6 +41,18 @@ private final class RecordingProvider: OutgoingCallReporting {
   }
 }
 
+/// Stands in for a CallKit-delivered action. A test cannot use a real one:
+/// `fulfill()` is a no-op on an action no `CXTransaction` ever carried, so
+/// `isComplete` would stay false however correct the code is.
+private final class RecordingAction: CallActionFulfilling {
+  let callUUID: UUID
+  private(set) var fulfilled = 0
+
+  init(callUUID: UUID) { self.callUUID = callUUID }
+
+  func fulfill() { fulfilled += 1 }
+}
+
 /// A UI-joined call must reach CallKit through the outgoing side of its API,
 /// since there is no incoming-style "report a new outgoing call" entry
 /// point: it has to be requested, granted, and only then reported.
@@ -86,13 +98,15 @@ final class OutgoingCallLifecycleTests: XCTestCase {
     let provider = RecordingProvider()
     let lifecycle = OutgoingCallLifecycle(controller: controller, provider: provider)
     let id = UUID()
-    let action = CXStartCallAction(call: id, handle: CXHandle(type: .generic, value: "Voice call"))
+    let action = RecordingAction(callUUID: id)
 
     lifecycle.handleStartAction(action)
 
     XCTAssertEqual(provider.startedConnecting.count, 1)
     XCTAssertEqual(provider.startedConnecting.first?.uuid, id)
-    XCTAssertTrue(action.isComplete)
+    XCTAssertEqual(
+      action.fulfilled, 1,
+      "an unfulfilled start action is timed out by CallKit and the call never starts")
   }
 
   func testCallConnectedReportsTheActiveCallConnected() {
@@ -151,11 +165,11 @@ final class OutgoingCallLifecycleTests: XCTestCase {
 
     var hungUp = false
     lifecycle.onHangUp = { hungUp = true }
-    let action = CXEndCallAction(call: id)
+    let action = RecordingAction(callUUID: id)
     lifecycle.handleEndAction(action)
 
     XCTAssertTrue(hungUp, "the system call UI ending the call must tell Dart to leave the room")
     XCTAssertNil(lifecycle.activeCallId)
-    XCTAssertTrue(action.isComplete)
+    XCTAssertEqual(action.fulfilled, 1)
   }
 }

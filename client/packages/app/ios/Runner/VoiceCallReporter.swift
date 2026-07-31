@@ -32,6 +32,23 @@ extension CXCallController: CallRequesting {
   }
 }
 
+/// A CallKit action this class has to fulfil, as a seam rather than the
+/// concrete `CXStartCallAction`/`CXEndCallAction`.
+///
+/// The seam exists because `fulfill()` does nothing to an action a test
+/// constructed itself: an action only becomes complete when CallKit
+/// delivered it inside a real `CXTransaction`, so `isComplete` stays false
+/// off-device no matter what the code does. Asserting on it therefore tests
+/// nothing, while failing to fulfil at all is a real bug - CallKit times the
+/// action out and the call never starts. Recording the call through this
+/// protocol is what makes the difference observable.
+protocol CallActionFulfilling: AnyObject {
+  var callUUID: UUID { get }
+  func fulfill()
+}
+
+extension CXCallAction: CallActionFulfilling {}
+
 /// Reports a call this app's own UI joined - never an inbound VoIP push - to
 /// CallKit, so it gets the same background execution grant an incoming call
 /// already gets. See `VoipCallHandler.swift`'s doc comment and
@@ -80,7 +97,7 @@ final class OutgoingCallLifecycle {
   }
 
   /// CallKit grants the request from [callStarted] here.
-  func handleStartAction(_ action: CXStartCallAction) {
+  func handleStartAction(_ action: CallActionFulfilling) {
     provider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: Date())
     action.fulfill()
   }
@@ -99,7 +116,7 @@ final class OutgoingCallLifecycle {
   }
 
   /// The system call UI asked to end the call.
-  func handleEndAction(_ action: CXEndCallAction) {
+  func handleEndAction(_ action: CallActionFulfilling) {
     activeCallId = nil
     onHangUp?()
     action.fulfill()
