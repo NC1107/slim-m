@@ -30,6 +30,7 @@ void main(List<String> args) {
   results.addAll(_zoom(notes));
   results.addAll(_cellSweep(notes));
   results.addAll(_buildCost());
+  results.addAll(_afterRemoval(notes));
 
   if (asJson) {
     stdout.writeln(
@@ -183,6 +184,40 @@ List<BenchResult> _cellSweep(Map<String, Object> notes) {
     out.add(
       _row('grid   n=20000 hotspot cell=${cellSize.toInt()}', () {
         grid.queryGrid(vp[0], vp[1], vp[2], vp[3], cull);
+        return cull.slots.length;
+      }),
+    );
+  }
+  return out;
+}
+
+/// Whether the canvas removal slice's park-and-swap-remove moves the numbers
+/// the spike measured (26us linear, 16us grid at the 20,000 ceiling; an 8.5x
+/// regression on the clustered shape): removes a third, then culls the same
+/// viewport the un-removed scaling and shape benchmarks already measure.
+List<BenchResult> _afterRemoval(Map<String, Object> notes) {
+  final out = <BenchResult>[];
+  for (final shape in const <WorldShape>[
+    WorldShape.hotspot,
+    WorldShape.clustered
+  ]) {
+    final grid = buildWorld(count: 20000, cellSize: 2048, shape: shape);
+    for (var slot = 0; slot < 20000; slot += 3) {
+      grid.remove(slot);
+    }
+    notes['${shape.name}_after_removal_live'] = grid.liveLength;
+    final cull = CullResult();
+    final vp = viewportAt(0, 0, 1);
+
+    out.add(
+      _row('grid   n=20000 ${shape.name} zoom=1 after 1/3 removed', () {
+        grid.queryGrid(vp[0], vp[1], vp[2], vp[3], cull);
+        return cull.slots.length;
+      }),
+    );
+    out.add(
+      _row('linear n=20000 ${shape.name} zoom=1 after 1/3 removed', () {
+        grid.queryLinear(vp[0], vp[1], vp[2], vp[3], cull);
         return cull.slots.length;
       }),
     );

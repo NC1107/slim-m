@@ -107,4 +107,63 @@ void main() {
 
     expect(strokes, 0);
   });
+
+  testWidgets('the eraser tool reports world points and commits no ink', (
+    tester,
+  ) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    var strokes = 0;
+    final erased = <Offset>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          tool: CanvasTool.eraser,
+          onStroke: (_) => strokes++,
+          onErase: erased.add,
+        ),
+      ),
+    );
+    await tester.pump();
+    document.setCamera(const Camera(x: 100, y: 50, zoom: 1));
+    await tester.pump();
+
+    final gesture = await tester.startGesture(const Offset(20, 20));
+    await gesture.moveTo(const Offset(60, 40));
+    await gesture.up();
+    await tester.pump();
+
+    expect(strokes, 0, reason: 'the eraser must never commit a pen stroke');
+    expect(erased, [const Offset(120, 70), const Offset(160, 90)]);
+  });
+
+  testWidgets('a disabled eraser reports nothing', (tester) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    var erased = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          tool: CanvasTool.eraser,
+          enabled: false,
+          onStroke: (_) {},
+          onErase: (_) => erased++,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final gesture = await tester.startGesture(const Offset(20, 20));
+    await gesture.moveTo(const Offset(80, 80));
+    await gesture.up();
+    await tester.pump();
+
+    expect(erased, 0);
+  });
 }

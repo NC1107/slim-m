@@ -49,10 +49,19 @@ class UniformGrid {
   Float64List _bounds;
   Int32List _stamp;
   int _count = 0;
+  int _removed = 0;
   int _queryId = 0;
 
-  /// Number of objects indexed.
+  /// Number of slots ever handed out by [insert], dead or alive.
+  ///
+  /// Slots are dense addresses [CanvasDocument] uses to index its own
+  /// strokes and are never renumbered, so this never shrinks - a removal
+  /// parks a slot rather than freeing it. See [liveLength] for the count a
+  /// cull can actually still return.
   int get length => _count;
+
+  /// Objects still findable by either cull branch.
+  int get liveLength => _count - _removed;
 
   /// Occupied cells. Sparse-grid memory is proportional to this, not to world
   /// area, which is the whole reason the grid is a hash map.
@@ -90,6 +99,67 @@ class UniformGrid {
       }
     }
     return slot;
+  }
+
+  /// Takes a slot out of every bucket it spans and parks its box inverted, so
+  /// both cull branches reject it on the first comparison of the overlap test
+  /// they already run.
+  ///
+  /// Infinities, never NaN: the overlap test below is a *rejection* test, so
+  /// a NaN-parked box would make every comparison false, which the test
+  /// reads as "kept" - the exact opposite of removal. Slots are never
+  /// renumbered: [CanvasDocument] addresses its strokes by the integer this
+  /// class hands out, and compaction would mis-address every stroke above
+  /// the hole.
+  void remove(int slot) {
+    final base = slot << 2;
+    final left = _bounds[base];
+    final top = _bounds[base + 1];
+    final right = _bounds[base + 2];
+    final bottom = _bounds[base + 3];
+    // The parked box is inverted, so this is also the idempotence guard.
+    if (right < left) return;
+
+    final cx0 = (left / cellSize).floor();
+    final cy0 = (top / cellSize).floor();
+    final cx1 = (right / cellSize).floor();
+    final cy1 = (bottom / cellSize).floor();
+    for (var cy = cy0; cy <= cy1; cy++) {
+      for (var cx = cx0; cx <= cx1; cx++) {
+        _removeFromBucket(_key(cx, cy), slot);
+      }
+    }
+
+    _bounds[base] = double.infinity;
+    _bounds[base + 1] = double.infinity;
+    _bounds[base + 2] = double.negativeInfinity;
+    _bounds[base + 3] = double.negativeInfinity;
+    _removed++;
+  }
+
+  /// Empties the index for a document-wide reset.
+  ///
+  /// The typed arrays are kept at their current size rather than
+  /// reallocated: a reset is always followed by fresh inserts, so shrinking
+  /// them first would only cost a regrow.
+  void reset() {
+    _cells.clear();
+    _count = 0;
+    _removed = 0;
+    _queryId = 0;
+  }
+
+  /// Swap-remove: order is irrelevant because `CanvasDocument.paintOrder`
+  /// sorts by z-index, and a linear `List.remove` cannot afford a bucket
+  /// holding the clustered worst case's thousands of slots.
+  void _removeFromBucket(int key, int slot) {
+    final bucket = _cells[key];
+    if (bucket == null) return;
+    final i = bucket.indexOf(slot);
+    if (i == -1) return;
+    bucket[i] = bucket.last;
+    bucket.removeLast();
+    if (bucket.isEmpty) _cells.remove(key);
   }
 
   /// Broad phase over grid cells, then an exact overlap test per candidate.
@@ -159,7 +229,12 @@ class UniformGrid {
   /// Picks whichever phase does less work for this viewport.
   ///
   /// Without this a fully zoomed-out camera probes every cell in the world,
-  /// which is unboundedly worse than just testing every object once.
+  /// which is unboundedly worse than just testing every object once. The
+  /// choice is against [length], deliberately not [liveLength]: a parked
+  /// slot makes the grid branch strictly cheaper (it is out of every
+  /// bucket) and the linear branch no cheaper (it still walks every slot,
+  /// parked or not), so [length] is the honest cost of the linear branch
+  /// this is choosing against.
   CullStrategy query(
     double left,
     double top,
