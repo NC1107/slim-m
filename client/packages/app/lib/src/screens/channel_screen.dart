@@ -29,6 +29,7 @@ import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
 import '../routing/breakpoints.dart';
+import '../widgets/blocked_dm_notice.dart';
 import '../widgets/channel_header.dart';
 import '../widgets/channel_search.dart';
 import '../widgets/composer.dart';
@@ -287,6 +288,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               .firstOrNull;
           final channelName = channel?.name ?? '';
           final lastReadSeq = channel?.lastReadSeq ?? 0;
+          final dmPartnerId = channel?.dmParticipantId;
+          final blockedDm =
+              dmPartnerId != null && blocked.contains(dmPartnerId);
 
           return Column(
             children: [
@@ -414,12 +418,15 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                         ),
                 ),
               ),
-              Composer(
-                controller: _composer,
-                channelId: widget.channelId,
-                channelName: channelName,
-                onSend: _send,
-              ),
+              if (blockedDm)
+                BlockedDmNotice(name: channelName)
+              else
+                Composer(
+                  controller: _composer,
+                  channelId: widget.channelId,
+                  channelName: channelName,
+                  onSend: _send,
+                ),
             ],
           );
         },

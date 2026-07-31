@@ -219,4 +219,102 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'Administrator is not offered: it bypasses channel overwrites entirely',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await _pumpToTargetPicker(
+        tester,
+        handler: (request) => request.url.path == '/roles'
+            ? http.Response(
+                jsonEncode([
+                  {
+                    'id': 'r1',
+                    'name': 'Moderators',
+                    'permissions': 0,
+                    'is_everyone': false,
+                    'created_at': 0,
+                  },
+                ]),
+                200,
+              )
+            : http.Response('{}', 200),
+      );
+
+      await tester.tap(find.text('Choose a role'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Moderators'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Administrator'),
+        findsNothing,
+        reason:
+            'the evaluator returns every permission before it ever looks at '
+            'a channel overwrite, so allowing or denying this bit here can '
+            'never do anything',
+      );
+      expect(find.text('View channels'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'setting an overwrite asks for confirmation before replacing it',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      var putCount = 0;
+      await _pumpToTargetPicker(
+        tester,
+        handler: (request) {
+          if (request.url.path == '/roles') {
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 'r1',
+                  'name': 'Moderators',
+                  'permissions': 0,
+                  'is_everyone': false,
+                  'created_at': 0,
+                },
+              ]),
+              200,
+            );
+          }
+          if (request.method == 'PUT' &&
+              request.url.path == '/channels/c1/overwrites/role/r1') {
+            putCount++;
+            return http.Response('', 204);
+          }
+          return http.Response('{}', 200);
+        },
+      );
+
+      await tester.tap(find.text('Choose a role'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Moderators'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(AppButton, 'Set overwrite'));
+      await tester.pumpAndSettle();
+
+      expect(
+        putCount,
+        0,
+        reason: 'the request must wait on the confirmation, not fire on tap',
+      );
+      expect(find.text('Replace this overwrite?'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Set overwrite').last);
+      await tester.pumpAndSettle();
+
+      expect(putCount, 1);
+    },
+  );
 }

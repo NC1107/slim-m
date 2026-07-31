@@ -94,6 +94,7 @@ class Channel {
     required this.createdAt,
     this.topic,
     this.isPersonalSpace = false,
+    this.dmParticipantId,
   });
 
   final String id;
@@ -113,6 +114,12 @@ class Channel {
   /// display copy and must never be used to answer this question: another
   /// member's freely chosen display name can collide with it.
   final bool isPersonalSpace;
+
+  /// The other user in this DM, or null for a non-DM channel. Never sent or
+  /// read on the wire, exactly like [isPersonalSpace] and set at the same
+  /// place, so a caller that needs to know who a DM is with (blocking) can
+  /// read it off the local row instead of fetching the whole `/dms` listing.
+  final String? dmParticipantId;
 
   bool get isVoice => kind == 'voice';
 

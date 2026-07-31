@@ -63,6 +63,14 @@ class MessageStore {
     return query.watch();
   }
 
+  /// [watchChannels]'s own snapshot, for a caller that wants today's list
+  /// once rather than a subscription it would only ever read one value from.
+  Future<List<Channel>> allChannels() {
+    final query = db.select(db.channels)
+      ..orderBy([(c) => OrderingTerm(expression: c.createdAt)]);
+    return query.get();
+  }
+
   /// The highest `seq` held for a channel: what catch-up should resume from.
   Future<int> cursorFor(String channelId) async {
     final row = await (db.select(db.channels)
@@ -121,6 +129,7 @@ class MessageStore {
             createdAt: channel.createdAt,
             topic: Value(channel.topic),
             isPersonalSpace: Value(channel.isPersonalSpace),
+            dmParticipantId: Value(channel.dmParticipantId),
           ),
           onConflict: DoUpdate(
             (_) => ChannelsCompanion.custom(
@@ -128,6 +137,7 @@ class MessageStore {
               kind: Variable(channel.kind),
               topic: Variable(channel.topic),
               isPersonalSpace: Variable(channel.isPersonalSpace),
+              dmParticipantId: Variable(channel.dmParticipantId),
             ),
           ),
         );

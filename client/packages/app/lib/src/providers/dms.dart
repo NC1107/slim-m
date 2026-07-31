@@ -40,7 +40,9 @@ const String personalSpaceName = 'Notes to self';
 /// that can answer "is this my personal space" reliably. The [name] set
 /// above must never be asked that question instead - a member is free to
 /// set their own display name to [personalSpaceName], and nothing stops a
-/// DM with them from carrying that exact string too.
+/// DM with them from carrying that exact string too. [dm.user.id] is also
+/// persisted as [api.Channel.dmParticipantId], so a caller that needs it
+/// (blocking) reads it off the local row rather than fetching `/dms` again.
 api.Channel channelFromDm(api.DmConversation dm, {required String? selfId}) {
   final isSelf = dm.user.id == selfId;
   return api.Channel(
@@ -49,6 +51,7 @@ api.Channel channelFromDm(api.DmConversation dm, {required String? selfId}) {
     kind: dmChannelKind,
     createdAt: dm.createdAt,
     isPersonalSpace: isSelf,
+    dmParticipantId: dm.user.id,
   );
 }
 

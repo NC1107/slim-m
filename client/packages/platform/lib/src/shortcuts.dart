@@ -58,14 +58,31 @@ SingleActivator _primary(LogicalKeyboardKey key, {bool shift = false}) =>
       shift: shift,
     );
 
-/// The bindings a user has not overridden.
-Map<ShortcutActivator, AppAction> defaultBindings() => {
+/// Next/previous-channel's key on every platform but the web build.
+SingleActivator _cycleChannelKey({bool previous = false}) =>
+    _primary(LogicalKeyboardKey.tab, shift: previous);
+
+/// Next/previous-channel's key on the web build. Every browser reserves
+/// Ctrl+Tab and Ctrl+Shift+Tab to switch its own tabs, so [_cycleChannelKey]
+/// never reaches the page at all there; Alt+Down/Alt+Up carry no browser
+/// meaning on any engine this ships on.
+SingleActivator _cycleChannelKeyWeb({bool previous = false}) => SingleActivator(
+      previous ? LogicalKeyboardKey.arrowUp : LogicalKeyboardKey.arrowDown,
+      alt: true,
+    );
+
+/// The bindings a user has not overridden. [forWeb] picks the browser-safe
+/// next/previous-channel keys; it defaults to the real [kIsWeb], which a
+/// caller cannot flip at runtime, so a test passes it explicitly instead.
+Map<ShortcutActivator, AppAction> defaultBindings({bool forWeb = kIsWeb}) => {
       _primary(LogicalKeyboardKey.keyK): AppAction.quickSwitch,
       _primary(LogicalKeyboardKey.keyL): AppAction.focusComposer,
       _primary(LogicalKeyboardKey.comma): AppAction.openSettings,
       const SingleActivator(LogicalKeyboardKey.escape): AppAction.escape,
-      _primary(LogicalKeyboardKey.tab): AppAction.nextChannel,
-      _primary(LogicalKeyboardKey.tab, shift: true): AppAction.previousChannel,
+      (forWeb ? _cycleChannelKeyWeb : _cycleChannelKey)():
+          AppAction.nextChannel,
+      (forWeb ? _cycleChannelKeyWeb : _cycleChannelKey)(previous: true):
+          AppAction.previousChannel,
     };
 
 /// The active bindings, defaults overlaid with a user's overrides.
@@ -75,11 +92,12 @@ Map<ShortcutActivator, AppAction> defaultBindings() => {
 /// want.
 Map<ShortcutActivator, AppAction> resolveBindings({
   Map<AppAction, ShortcutActivator?> overrides = const {},
+  bool forWeb = kIsWeb,
 }) {
   final resolved = <ShortcutActivator, AppAction>{};
   final overridden = overrides.keys.toSet();
 
-  for (final entry in defaultBindings().entries) {
+  for (final entry in defaultBindings(forWeb: forWeb).entries) {
     if (overridden.contains(entry.value)) continue;
     resolved[entry.key] = entry.value;
   }
@@ -96,8 +114,9 @@ Map<ShortcutActivator, AppAction> resolveBindings({
 ShortcutActivator? activatorFor(
   AppAction action, {
   Map<AppAction, ShortcutActivator?> overrides = const {},
+  bool forWeb = kIsWeb,
 }) {
-  final resolved = resolveBindings(overrides: overrides);
+  final resolved = resolveBindings(overrides: overrides, forWeb: forWeb);
   for (final entry in resolved.entries) {
     if (entry.value == action) return entry.key;
   }

@@ -100,5 +100,32 @@ void main() {
       );
       expect(activator, isNull);
     });
+
+    /// Every browser reserves Ctrl+Tab (and Ctrl+Shift+Tab) to switch its
+    /// own tabs, so the default binding would do nothing on the web build;
+    /// `forWeb` cannot be read off the real `kIsWeb` here, since a VM test
+    /// never runs as web, so it is passed explicitly.
+    test('next/previous channel use a browser-safe key on the web build', () {
+      final native =
+          activatorFor(AppAction.nextChannel, forWeb: false) as SingleActivator;
+      final web =
+          activatorFor(AppAction.nextChannel, forWeb: true) as SingleActivator;
+
+      expect(native.trigger, LogicalKeyboardKey.tab);
+      expect(web.trigger, LogicalKeyboardKey.arrowDown);
+      expect(web.alt, isTrue);
+      expect(web.control, isFalse);
+      expect(web.meta, isFalse);
+    });
+
+    test('the web binding still tells next and previous apart', () {
+      final next =
+          activatorFor(AppAction.nextChannel, forWeb: true) as SingleActivator;
+      final previous = activatorFor(AppAction.previousChannel, forWeb: true)
+          as SingleActivator;
+
+      expect(next.trigger, LogicalKeyboardKey.arrowDown);
+      expect(previous.trigger, LogicalKeyboardKey.arrowUp);
+    });
   });
 }
