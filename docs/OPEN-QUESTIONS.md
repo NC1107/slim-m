@@ -59,3 +59,29 @@ Carried forward from `CLAUDE.md`'s own owner list, unchanged by this run:
 
 - Whether to keep release-please's standing release PR or move to manual tag-based releases.
 - Where, if anywhere, a flatpak build should be published once the manifest exists.
+
+## 7. The next client build wipes its own message cache, once
+
+Message reconciliation landed on 2026-07-31 (#235, #236, #237, #238), closing the debt where an edit or a delete made while a client was offline never reached it.
+
+Part of that is a drift schema bump to v7 that **drops every cached message and rewinds the sync cursor**, on every device, the first time it runs.
+
+That is deliberate and it is not avoidable.
+Edits and deletes made before the server had an op stream to record them in are unrecoverable by any mechanism: no cursor reaches behind the first op ever written, so a message this cache holds a stale copy of would stay stale forever.
+Dropping the cache once is the only thing that closes that epoch.
+
+*What you will see:* open the app after updating and each channel refetches its newest 50 messages.
+Anything older is refetched by scrolling, exactly as it is on a fresh install.
+Channels, read markers and unsent drafts are untouched; only the message cache goes.
+
+*Not a question, just something you should not have to diagnose in the moment.*
+If it looks like data loss rather than a refetch, that would be a real bug and worth reporting.
+
+## 8. Nothing verifies reconciliation on a real pair of devices
+
+Every property of the op stream is covered by unit and integration tests, and the mutation tests confirm each one can fail.
+What none of that proves is the thing the feature exists for: edit a message on your phone while your desktop is closed, reopen the desktop, and see the new text.
+
+`scripts/e2e.sh` drives two browsers and would be the natural place for it, but it holds both clients open throughout, so it cannot currently express "one client is away while the other writes".
+
+*Question:* worth growing the e2e harness to close and reopen one client mid-run, or is confirming it by hand across your own two devices enough?
