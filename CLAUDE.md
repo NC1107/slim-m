@@ -1020,5 +1020,5 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 - [docs/decisions/0004-visual-identity-review.md](docs/decisions/0004-visual-identity-review.md): the designer review that gated token lock. Read this before changing a token; it also closes the seven accent roles and settles the canvas `window` contradiction.
 - [docs/design/layout-explorations.md](docs/design/layout-explorations.md): the parked Spaces/Focus/Deck layout concepts (the sidebar layout was kept for v1, and the review confirms nothing needs reopening).
 - [docs/design/feature-exploration.md](docs/design/feature-exploration.md): the segment feature-gap analysis.
-- [docs/research/](docs/research/): the specialist domain reports and adversarial reviews that fed the strategy; note that `stack-decision.md` and the fresh domain files supersede any older content.
+- [docs/research/README.md](docs/research/README.md): an index over the 48-file, 11,000-line research corpus, added 2026-07-30/31 because nothing linked it and a reader could mistake a pre-implementation file for current state. Read that before `docs/research/` itself; it groups the corpus and says what each file is superseded by, if anything.
 - Interactive design mockups were published as Claude artifacts (a design proposal and a layout-explorations page).
