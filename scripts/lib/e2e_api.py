@@ -80,6 +80,16 @@ class Api:
                 return m
         raise AssertionError(f"no message containing {needle!r}")
 
+    def edit_message(self, channel_id, message_id, content):
+        """Rewrites a message's content, the way another device would."""
+        return self.call("PATCH",
+                         f"/channels/{channel_id}/messages/{message_id}",
+                         {"content": content})
+
+    def delete_message(self, channel_id, message_id):
+        return self.call("DELETE",
+                         f"/channels/{channel_id}/messages/{message_id}")
+
     def members(self):
         got = self.call("GET", "/members")
         return got["members"] if isinstance(got, dict) else got

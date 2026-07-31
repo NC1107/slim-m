@@ -104,6 +104,32 @@ class Client:
             time.sleep(2)
         raise AssertionError(f"{self.name}: accessibility tree never came up")
 
+    def go_away(self):
+        """Navigates to a blank page, which closes the app's socket.
+
+        Returns the app's own URL so [come_back] can restore it, rather than
+        needing the web origin plumbed in from the runner.
+
+        This is how "the client was away" is expressed. It is not a kill: the
+        browser profile and so drift's IndexedDB survive, which is the whole
+        point - the local cache and its cursors are still there to be wrong.
+        """
+        home = self.ev("location.href")
+        self.send("Page.navigate", {"url": "about:blank"})
+        time.sleep(2)
+        return home
+
+    def come_back(self, home):
+        """Reloads the app and waits for the accessibility tree again.
+
+        Semantics are per document, so the placeholder has to be clicked once
+        more; without this every later `find` sees an empty tree and the
+        failure reads as a missing label rather than a missing handle.
+        """
+        self.send("Page.navigate", {"url": home})
+        time.sleep(4)
+        self.enable_semantics()
+
     def nodes(self):
         """Every leaf widget on screen, plus the fields.
 
