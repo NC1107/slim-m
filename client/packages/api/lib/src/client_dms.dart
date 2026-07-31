@@ -13,9 +13,10 @@ extension SlimmApiDms on SlimmApi {
         .toList(growable: false);
   }
 
-  /// Opens (or returns) the DM channel with [userId]. Idempotent and
-  /// race-safe: opening the same pair twice, even concurrently, converges on
-  /// one channel. Refused if either party has blocked the other.
+  /// Opens (or returns) the DM channel with [userId] - or, passing the
+  /// caller's own id, their personal space. Idempotent and race-safe:
+  /// opening the same pair twice, even concurrently, converges on one
+  /// channel. Refused if either party has blocked the other.
   Future<DmConversation> openDirectMessage(String userId) async {
     final json = await _send('POST', '/dms/$userId');
     return DmConversation.fromJson(json as Map<String, dynamic>);

@@ -32,12 +32,37 @@ void main() {
       createdAt: 1000,
     );
 
-    final channel = channelFromDm(dm);
+    final channel = channelFromDm(dm, selfId: 'self');
 
     expect(channel.id, 'dm-1');
     expect(channel.name, 'Priya');
     expect(channel.kind, dmChannelKind);
     expect(channel.createdAt, 1000);
+  });
+
+  test('channelFromDm names a personal space distinctly rather than with the '
+      'caller\'s own display name', () {
+    final dm = api.DmConversation(
+      channelId: 'dm-self',
+      user: const api.UserProfile(
+        id: 'self',
+        username: 'nick',
+        displayName: 'Nick',
+        createdAt: 0,
+      ),
+      unread: 0,
+      createdAt: 1000,
+    );
+
+    final channel = channelFromDm(dm, selfId: 'self');
+
+    expect(
+      channel.name,
+      personalSpaceName,
+      reason:
+          'a personal space labelled with your own name would read as a '
+          'DM with yourself rather than what it is',
+    );
   });
 
   test(
@@ -99,4 +124,59 @@ void main() {
       expect(channels.single.kind, dmChannelKind);
     },
   );
+
+  test('opening your own personal space stores it under the personal space '
+      'name, not your own display name', () async {
+    final db = SlimmDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    const tokens = api.TokenPair(
+      userId: 'self',
+      accessToken: 'access',
+      refreshToken: 'refresh',
+      accessExpiresAt: 0,
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(api.SessionStore(tokens: tokens)),
+        databaseProvider.overrideWith((ref) async => db),
+        apiProvider.overrideWith((ref) {
+          final client = api.SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((request) async {
+              expect(request.url.path, '/dms/self');
+              return http.Response(
+                jsonEncode({
+                  'channel_id': 'dm-self',
+                  'user': {
+                    'id': 'self',
+                    'username': 'nick',
+                    'display_name': 'Nick',
+                    'created_at': 0,
+                  },
+                  'unread': 0,
+                  'created_at': 500,
+                }),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }),
+          );
+          ref.onDispose(client.close);
+          return client;
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final channelId = await openDirectMessage(container, 'self');
+    expect(channelId, 'dm-self');
+
+    final store = await container.read(storeProvider.future);
+    final channels = await store.watchChannels().first;
+    expect(channels.single.name, personalSpaceName);
+  });
 }

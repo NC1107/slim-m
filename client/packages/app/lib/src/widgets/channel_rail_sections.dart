@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/dms.dart';
+import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'channel_rail_channel_rows.dart';
@@ -66,8 +68,13 @@ class _SectionLabel extends StatelessWidget {
 /// `providers/dms.dart`), so this reads the same channel stream
 /// [TextChannelsSection] and [VoiceChannelsSection] do, filtered the same
 /// way they filter to their own kind. There is still no way to start a new
-/// DM from here directly; that lives on a member's row in [AppMemberPane],
-/// which is where a person already is when they decide to message someone.
+/// DM with someone else from here directly; that lives on a member's row in
+/// [AppMemberPane], which is where a person already is when they decide to
+/// message someone.
+///
+/// A DM with yourself - your personal space - is the one exception: it gets
+/// its own always-present [_PersonalSpaceRow] rather than being something
+/// you find by searching your own name in the member list.
 class DirectMessagesSection extends StatelessWidget {
   const DirectMessagesSection({
     super.key,
@@ -81,23 +88,37 @@ class DirectMessagesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    Channel? personal;
+    final others = <Channel>[];
+    for (final channel in channels) {
+      if (channel.name == personalSpaceName && personal == null) {
+        personal = channel;
+      } else {
+        others.add(channel);
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionLabel('Direct messages'),
-        if (channels.isEmpty)
+        _PersonalSpaceRow(
+          channel: personal,
+          selected: personal != null && personal.id == selectedId,
+        ),
+        if (others.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s8,
               vertical: AppSpacing.s4,
             ),
             child: Text(
-              'No direct messages yet. Open one from a member in the list.',
+              'No other direct messages yet. Open one from a member in the list.',
               style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
           )
         else
-          for (final channel in channels)
+          for (final channel in others)
             AppListRow(
               label: channel.name,
               selected: channel.id == selectedId,
@@ -106,6 +127,48 @@ class DirectMessagesSection extends StatelessWidget {
               onTap: () => context.go(Routes.channel(channel.id)),
             ),
       ],
+    );
+  }
+}
+
+/// The always-present entry point to the caller's own notes. Reachable
+/// before the channel exists at all - the first tap opens it - and renders
+/// identically after, so the row never moves once it does.
+class _PersonalSpaceRow extends ConsumerWidget {
+  const _PersonalSpaceRow({required this.channel, required this.selected});
+
+  /// The local channel row already synced for this personal space, or null
+  /// before it has ever been opened on any device.
+  final Channel? channel;
+  final bool selected;
+
+  Future<void> _open(BuildContext context, WidgetRef ref) async {
+    final existing = channel;
+    if (existing != null) {
+      context.go(Routes.channel(existing.id));
+      return;
+    }
+    final selfId = ref.read(sessionProvider).tokens?.userId;
+    if (selfId == null) return;
+    final container = ProviderScope.containerOf(context, listen: false);
+    final channelId = await openDirectMessage(container, selfId);
+    if (context.mounted) context.go(Routes.channel(channelId));
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final existing = channel;
+    return AppListRow(
+      label: personalSpaceName,
+      selected: selected,
+      unread: existing != null && existing.cursor > existing.lastReadSeq,
+      leading: Icon(
+        AppIcons.notebook,
+        size: AppSizes.icon16,
+        color: selected ? tokens.accent : tokens.textSecondary,
+      ),
+      onTap: () => _open(context, ref),
     );
   }
 }

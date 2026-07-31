@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Direct messages: a DM is a channel of kind [`DM_CHANNEL_KIND`] with
-//! exactly two participants recorded in `dm_channels`, normalized so the pair
-//! (a, b) and (b, a) always resolve to the same row and hence the same
-//! channel.
+//! Direct messages: a DM is a channel of kind [`DM_CHANNEL_KIND`] with one or
+//! two participants recorded in `dm_channels`, normalized so the pair (a, b)
+//! and (b, a) always resolve to the same row and hence the same channel.
+//!
+//! A pair may name the same user twice: [`Store::open_dm`] no longer refuses
+//! `caller == target`, and that self pair is a personal space rather than a
+//! conversation with anyone else - notes that sync across devices the same
+//! way any other channel does, with nobody else ever able to reach it.
 //!
 //! Modelling a DM as a channel is what lets every other feature - sending,
 //! editing, keyset pagination, full-text search, bundled sync, push fan-out,
@@ -47,8 +51,6 @@ const BLOCKED_DENY: Permissions = Permissions::SEND_MESSAGES
 /// Why opening a DM failed.
 #[derive(Debug)]
 pub enum OpenDmError {
-    /// A user cannot open a DM with themselves.
-    SameUser,
     /// The target account does not exist, or has been deleted.
     UserNotFound,
     /// Either party has blocked the other.
@@ -81,14 +83,17 @@ pub struct DmConversation {
 
 /// Orders a pair so (a, b) and (b, a) always produce the same result. `Uuid`
 /// orders by its raw bytes, the same order SQLite compares a `BLOB` column
-/// with, so this matches the `CHECK (user_a < user_b)` constraint the
-/// migration puts on the table.
+/// with, so this matches the `CHECK (user_a <= user_b)` constraint the
+/// migration puts on the table. A self pair (a == b) is already ordered
+/// either way this branches, which is exactly what admits it.
 fn normalize_pair(a: UserId, b: UserId) -> (UserId, UserId) {
     if a.0 < b.0 { (a, b) } else { (b, a) }
 }
 
 impl Store {
     /// Opens the DM channel between two users, creating it on first contact.
+    /// `caller == target` opens (or returns) the caller's own personal space
+    /// rather than being refused: see the module doc comment.
     ///
     /// Idempotent and race-safe: two callers opening the same pair at once
     /// converge on one channel, never two. This reads whether the pair
@@ -106,14 +111,13 @@ impl Store {
     /// relationship never learns whether a channel already exists between
     /// them, and a re-open is refused exactly as the first open would be.
     pub async fn open_dm(&self, caller: UserId, target: UserId) -> Result<Channel, OpenDmError> {
-        if caller == target {
-            return Err(OpenDmError::SameUser);
-        }
         if self.user_profile(target).await?.is_none() {
             return Err(OpenDmError::UserNotFound);
         }
-        // Ahead of the pair table lookup; see the note on this function.
-        if self.has_blocked(caller, target).await? || self.has_blocked(target, caller).await? {
+        // A self pair can never be blocked (refused at the HTTP layer), so skip it.
+        if caller != target
+            && (self.has_blocked(caller, target).await? || self.has_blocked(target, caller).await?)
+        {
             return Err(OpenDmError::Blocked);
         }
 
@@ -267,7 +271,10 @@ impl Store {
             return Ok(Permissions::NONE);
         };
 
-        if self.has_blocked(user_id, other).await? || self.has_blocked(other, user_id).await? {
+        // A personal space's "other" party is the caller themself; see open_dm.
+        if other != user_id
+            && (self.has_blocked(user_id, other).await? || self.has_blocked(other, user_id).await?)
+        {
             return Ok(DM_BASE.remove(BLOCKED_DENY));
         }
         Ok(DM_BASE)

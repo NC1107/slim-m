@@ -75,8 +75,10 @@ List<PaletteResultItem> buildChannelItems(
     ),
 ];
 
-/// Members matching [query], excluding [selfId]: there is no self-DM to open,
-/// matching the member pane's own rule for the same case.
+/// Members matching [query], excluding [selfId]. A DM with yourself is a
+/// personal space now and opens fine, but it has its own dedicated row in
+/// the rail's Direct messages section - finding it by searching your own
+/// name here would be the opposite of obvious.
 List<PaletteResultItem> buildMemberItems(
   List<api.UserProfile> members,
   String query,

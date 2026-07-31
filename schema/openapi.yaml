@@ -1067,21 +1067,24 @@ paths:
       - name: userId
         in: path
         required: true
-        description: The other participant's UUID.
+        description: >
+          The other participant's UUID, or the caller's own to open their
+          personal space.
         schema:
           type: string
           format: uuid
     post:
       operationId: openDirectMessage
       tags: [dms]
-      summary: Open (or return) the DM channel with another user.
+      summary: Open (or return) the DM channel with another user, or yourself.
       description: >
         Idempotent and race-safe: opening the same pair twice, even
         concurrently, converges on one channel. Membership of the pair is the
         only thing that grants access to it; the deployment's role and
         channel-overwrite system, ADMINISTRATOR included, does not apply.
         Refused if either party has blocked the other (both directions
-        checked), or if the target does not exist.
+        checked), or if the target does not exist. Passing the caller's own
+        id opens their personal space instead of being refused.
       responses:
         "200":
           description: The DM conversation, existing or newly opened.
