@@ -140,6 +140,38 @@ void main() {
     expect(erased, [const Offset(120, 70), const Offset(160, 90)]);
   });
 
+  testWidgets(
+    'onEraseEnd fires once, when the last pointer lifts, not per move',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      var ends = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CanvasSurface(
+            document: document,
+            ink: const Color(0xFFE86A5C),
+            gridLine: const Color(0xFF303030),
+            tool: CanvasTool.eraser,
+            onStroke: (_) {},
+            onErase: (_) {},
+            onEraseEnd: () => ends++,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final gesture = await tester.startGesture(const Offset(20, 20));
+      await gesture.moveTo(const Offset(60, 40));
+      await gesture.moveTo(const Offset(90, 70));
+      expect(ends, 0, reason: 'a move is not the end of the gesture');
+      await gesture.up();
+      await tester.pump();
+
+      expect(ends, 1);
+    },
+  );
+
   testWidgets('a disabled eraser reports nothing', (tester) async {
     final document = CanvasDocument();
     addTearDown(document.dispose);

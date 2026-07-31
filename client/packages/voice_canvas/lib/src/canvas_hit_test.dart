@@ -20,17 +20,22 @@ import 'spatial_grid.dart';
 /// on pen width small enough to make a tighter pad safe.
 const double _cullPad = 64;
 
-/// Finds the topmost live stroke within tolerance of [world], or null.
+/// Finds the topmost live stroke within tolerance of [world] that [allowed]
+/// accepts, or null.
 ///
 /// Candidates come from a small cull around the pointer, never a full scan.
 /// They are tested highest z-index first, so an eraser takes the same
 /// stroke a viewer sees on top, and the first one within its own
-/// `width / 2 + slop` wins.
+/// `width / 2 + slop` wins. A candidate [allowed] refuses is skipped rather
+/// than stopping the search, so a foreign stroke on top of the caller's own
+/// ink does not shield it: the eraser is meant to scope what it can pick up
+/// at hit-test time, not merely at the request the server would refuse.
 String? hitTestStroke(
   CanvasDocument document,
   Offset world, {
   double slop = 4,
   CullResult? scratch,
+  bool Function(CanvasStroke stroke)? allowed,
 }) {
   final out = scratch ?? CullResult();
   document.scene.queryRect(
@@ -52,6 +57,7 @@ String? hitTestStroke(
 
   for (final slot in candidates) {
     final stroke = document.strokeAt(slot);
+    if (allowed != null && !allowed(stroke)) continue;
     final tolerance = stroke.width / 2 + slop;
     if (_withinTolerance(stroke.points, world.dx, world.dy, tolerance)) {
       return stroke.id;

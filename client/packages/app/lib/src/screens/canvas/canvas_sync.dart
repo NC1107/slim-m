@@ -55,6 +55,7 @@ CanvasStrokeInput? canvasStrokeInputFrom(api.CanvasObject object) {
     points: raw.whereType<num>().map((n) => n.toDouble()).toList(),
     width: (object.props['width'] as num?)?.toDouble() ?? 3,
     colorKey: object.props['color'] as String? ?? 'annotation',
+    authorId: object.authorId,
   );
 }
 
@@ -90,7 +91,11 @@ class CanvasSync {
 
   /// The highest op this document reflects, or null before the first
   /// viewport read has landed.
-  @visibleForTesting
+  ///
+  /// Also the clear control's fencing token: sending this back as
+  /// `before_seq` says "clear everything already reflected in what I've
+  /// seen," so a lost response retried cannot wipe ink drawn in the
+  /// interval it was in flight.
   int? get asOfSeq => _asOfSeq;
 
   void dispose() => _disposed = true;

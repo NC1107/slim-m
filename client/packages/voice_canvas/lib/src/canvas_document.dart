@@ -66,6 +66,17 @@ class CanvasDocument extends ChangeNotifier {
 
   bool knows(String id) => _slotById.containsKey(id);
 
+  /// True if [id] names a stroke this document currently shows as alive: it
+  /// landed (or was drawn locally) and has not since been killed or removed.
+  ///
+  /// The distinction undo needs: a gesture's placement may have already
+  /// failed for good by the time somebody undoes it, and a failed one needs
+  /// no further removal, unlike a genuinely committed one.
+  bool isAlive(String id) {
+    final slot = _slotById[id];
+    return slot != null && (_strokes[slot]?.alive ?? false);
+  }
+
   /// Slots the last cull kept, in paint order.
   ///
   /// Sorted here rather than taken as the cull emits them: [UniformGrid]
@@ -137,6 +148,7 @@ class CanvasDocument extends ChangeNotifier {
         colorKey: input.colorKey,
         zIndex: input.zIndex,
         seq: input.seq,
+        authorId: input.authorId,
       ),
     );
     _slotById[input.id] = slot;
