@@ -143,11 +143,20 @@ class DraftStroke extends ChangeNotifier {
 }
 
 /// Paints [DraftStroke] straight in screen space.
+///
+/// [width] is the pen's width in world units, the same quantity a committed
+/// [CanvasStroke.width] carries, so it must be scaled by the live camera zoom
+/// here or the preview disagrees with [StrokePainter] the moment zoom is not 1.
 class DraftPainter extends CustomPainter {
-  DraftPainter({required this.draft, required this.ink, required this.width})
-      : super(repaint: draft);
+  DraftPainter({
+    required this.draft,
+    required this.document,
+    required this.ink,
+    required this.width,
+  }) : super(repaint: Listenable.merge([draft, document]));
 
   final DraftStroke draft;
+  final CanvasDocument document;
   final Color ink;
   final double width;
 
@@ -160,7 +169,7 @@ class DraftPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = width
+      ..strokeWidth = width * document.camera.zoom
       ..isAntiAlias = true;
     final path = Path()..moveTo(points.first.dx, points.first.dy);
     for (var i = 1; i < points.length; i++) {

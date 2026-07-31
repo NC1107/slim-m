@@ -58,6 +58,7 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
   );
   late final DraftPainter _draftPainter = DraftPainter(
     draft: _draft,
+    document: widget.document,
     ink: widget.ink,
     width: widget.strokeWidth,
   );
