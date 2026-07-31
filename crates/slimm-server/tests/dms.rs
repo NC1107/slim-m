@@ -5,7 +5,7 @@
 //! idempotent and race-safe under real concurrency, blocking refuses both
 //! opening and sending in either direction, a DM never appears in the
 //! ordinary channel list, and sync/search behave the same way VIEW_CHANNEL
-//! does everywhere else.
+//! does everywhere else. A DM with yourself is `dms_personal_space.rs`.
 
 use axum::Router;
 use axum::body::Body;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Direct-message conversations: listing the caller's own, and opening (or
-//! returning) the one with another user.
+//! returning) the one with another user - or, naming yourself, your own
+//! personal space (see `crate::store::dms`).
 //!
 //! A DM is a channel under the hood (kind `dm`), so once one is open, every
 //! other message operation - send, list, edit, delete, react, search, mark
@@ -95,7 +96,8 @@ async fn list(
     ))
 }
 
-/// Opens (or returns) the DM channel with another user.
+/// Opens (or returns) the DM channel with another user, or - passing the
+/// caller's own id - their personal space.
 ///
 /// Idempotent and race-safe on the store side (see
 /// [`crate::store::Store::open_dm`]), so two clients opening the same pair at
@@ -111,9 +113,6 @@ async fn open(
 
     let channel = match state.store.open_dm(ctx.user_id, target).await {
         Ok(channel) => channel,
-        Err(OpenDmError::SameUser) => {
-            return Err(ApiError::BadRequest("cannot open a DM with yourself"));
-        }
         Err(OpenDmError::UserNotFound) => return Err(ApiError::NotFound("user not found")),
         // The same answer whichever direction blocked, so a caller learns
         // only that the DM is refused, never who blocked whom.

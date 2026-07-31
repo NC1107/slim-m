@@ -36,6 +36,12 @@ class Channels extends Table {
   /// How far the user has read, mirrored from the server.
   IntColumn get lastReadSeq => integer().withDefault(const Constant(0))();
 
+  /// Whether this is the caller's own personal space, set only by
+  /// `channelFromDm` from `dm.user.id == selfId` - never from `name`, which
+  /// is a display string another member's own display name can collide with.
+  BoolColumn get isPersonalSpace =>
+      boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -73,7 +79,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -94,6 +100,11 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// channels are fully refetched on every sync rather than paged by a cursor,
   /// so a null topic fills itself in on the next connect without dropping
   /// anything.
+  ///
+  /// v5 adds `channels.isPersonalSpace` the same way: it defaults to false for
+  /// every existing row, and the next channel refresh (`ChannelRefresher`)
+  /// sets it correctly on whichever row is the caller's own personal space,
+  /// since that refresh always replaces the whole channel list.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -104,6 +115,9 @@ class SlimmDatabase extends _$SlimmDatabase {
           // added in place. See the doc comment above.
           if (from < 4) {
             await m.addColumn(channels, channels.topic);
+          }
+          if (from < 5) {
+            await m.addColumn(channels, channels.isPersonalSpace);
           }
           // v2's null display names are unreachable by a keyset sync, so the
           // cache is dropped and the cursor rewound. See the doc comment above.

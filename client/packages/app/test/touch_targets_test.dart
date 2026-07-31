@@ -24,6 +24,7 @@ Channel _channel(String id, String name) => Channel(
   createdAt: 0,
   cursor: 0,
   lastReadSeq: 0,
+  isPersonalSpace: false,
 );
 
 Finder _createButton() => find.byWidgetPredicate(

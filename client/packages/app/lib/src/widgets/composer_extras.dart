@@ -13,6 +13,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/member_presence.dart';
+import '../providers/providers.dart';
 import '../providers/typing_controller.dart';
 
 /// Whether this platform's primary text input is a soft keyboard, which has
@@ -263,8 +264,14 @@ class NewlineHint extends StatelessWidget {
 }
 
 /// Who is typing in this channel, from real `typing.started`/`typing.stopped`
-/// events. Receive-only: see `providers/typing_controller.dart` for why this
-/// client has nothing to send one back with yet.
+/// events; `TypingController` also sends the `typing` frame this client
+/// emits while the user types (see `providers/typing_controller.dart`).
+///
+/// The server fans a typist's own frame back to their own connections too
+/// (so a second device can show it), so the caller's own id is dropped here
+/// rather than at the source: without it, typing into a channel with nobody
+/// else in it - a personal space above all - would read "you are typing"
+/// back at you the whole time you typed.
 class TypingIndicator extends ConsumerWidget {
   const TypingIndicator({super.key, required this.channelId});
 
@@ -272,7 +279,11 @@ class TypingIndicator extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final typingIds = ref.watch(typingControllerProvider(channelId));
+    final selfId = ref.watch(sessionProvider).tokens?.userId;
+    final typingIds = ref
+        .watch(typingControllerProvider(channelId))
+        .where((id) => id != selfId)
+        .toSet();
     if (typingIds.isEmpty) return const SizedBox.shrink();
 
     final tokens = Theme.of(context).extension<AppTokens>()!;

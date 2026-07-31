@@ -93,6 +93,7 @@ class Channel {
     required this.kind,
     required this.createdAt,
     this.topic,
+    this.isPersonalSpace = false,
   });
 
   final String id;
@@ -103,6 +104,15 @@ class Channel {
   /// A one-line header shown beside the name. Null for no topic; the server
   /// never stores an empty string, so blank and absent mean the same thing.
   final String? topic;
+
+  /// Whether this row is the caller's own personal space: a DM with
+  /// themself. Never sent or read on the wire - the server has no such
+  /// concept, and [fromJson] always defaults this to false - it is set only
+  /// by `channelFromDm` (`providers/dms.dart`), the one place a caller's id
+  /// is compared against the DM's other participant. [name] is cosmetic
+  /// display copy and must never be used to answer this question: another
+  /// member's freely chosen display name can collide with it.
+  final bool isPersonalSpace;
 
   bool get isVoice => kind == 'voice';
 

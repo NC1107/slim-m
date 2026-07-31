@@ -17,22 +17,45 @@ import 'providers.dart';
 /// restored local row and a freshly synced one agree.
 const String dmChannelKind = 'dm';
 
+/// Display copy for a personal space's channel row: a DM opened with
+/// yourself (`store/dms.rs` no longer refuses `caller == target`), used for
+/// private notes that still sync across every signed-in device the way any
+/// other channel does. Purely cosmetic - another member can set this exact
+/// string as their own display name, and a DM with them would render the
+/// same label. [Channel.isPersonalSpace] (`api.Channel`), not this string,
+/// is what the rail matches on; see [channelFromDm].
+const String personalSpaceName = 'Notes to self';
+
 /// Turns a DM listing into the same [api.Channel] shape an ordinary channel
 /// arrives as. The server stores a DM channel's own `name` as empty (a DM
 /// has no name of its own), so the other participant's display name stands
-/// in for it here; every screen that shows a channel's name already reads it
-/// off the local store rather than the server's channel list, so this is
-/// the only place that substitution needs to happen.
-api.Channel channelFromDm(api.DmConversation dm) => api.Channel(
-  id: dm.channelId,
-  name: dm.user.displayName,
-  kind: dmChannelKind,
-  createdAt: dm.createdAt,
-);
+/// in for it here - except when that participant is the caller: a personal
+/// space labelled with your own name would read as a DM with yourself
+/// rather than what it is. Every screen that shows a channel's name already
+/// reads it off the local store rather than the server's channel list, so
+/// this is the only place that substitution needs to happen.
+///
+/// [dm.user.id == selfId] is also what sets [api.Channel.isPersonalSpace]:
+/// this is the one place that comparison is made, so it is the one place
+/// that can answer "is this my personal space" reliably. The [name] set
+/// above must never be asked that question instead - a member is free to
+/// set their own display name to [personalSpaceName], and nothing stops a
+/// DM with them from carrying that exact string too.
+api.Channel channelFromDm(api.DmConversation dm, {required String? selfId}) {
+  final isSelf = dm.user.id == selfId;
+  return api.Channel(
+    id: dm.channelId,
+    name: isSelf ? personalSpaceName : dm.user.displayName,
+    kind: dmChannelKind,
+    createdAt: dm.createdAt,
+    isPersonalSpace: isSelf,
+  );
+}
 
-/// Opens (or returns) the DM with [userId] and gets it into the local store,
-/// so the screen this navigates to has a name and kind to render
-/// immediately rather than waiting on the next reconnect's channel refresh.
+/// Opens (or returns) the DM with [userId] - or, passing your own id, your
+/// personal space - and gets it into the local store, so the screen this
+/// navigates to has a name and kind to render immediately rather than
+/// waiting on the next reconnect's channel refresh.
 ///
 /// Takes a [ProviderContainer] rather than a [WidgetRef]: a caller that
 /// dismisses its own surface before this answers (the member popover's
@@ -42,10 +65,11 @@ Future<String> openDirectMessage(
   ProviderContainer container,
   String userId,
 ) async {
-  final conversation = await container
-      .read(apiProvider)
-      .openDirectMessage(userId);
+  final client = container.read(apiProvider);
+  final conversation = await client.openDirectMessage(userId);
   final store = await container.read(storeProvider.future);
-  await store.upsertChannels([channelFromDm(conversation)]);
+  await store.upsertChannels([
+    channelFromDm(conversation, selfId: client.session.tokens?.userId),
+  ]);
   return conversation.channelId;
 }

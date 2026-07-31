@@ -79,6 +79,9 @@ abstract final class AppIcons {
   static const IconData signOut = LucideIcons.logOut300;
   static const IconData account = LucideIcons.circleUser300;
 
+  /// The personal space: your own notes, not another person's avatar.
+  static const IconData notebook = LucideIcons.notebookPen300;
+
   // Notifications.
   static const IconData notificationsOn = LucideIcons.bell300;
   static const IconData notificationsOff = LucideIcons.bellOff300;

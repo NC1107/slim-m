@@ -35,7 +35,11 @@ class ChannelRefresher {
   Future<void> refresh(SlimmApi api, MessageStore store) async {
     final channels = await api.listChannels();
     final dms = await api.listDirectMessages();
-    final all = [...channels, ...dms.map(channelFromDm)];
+    final selfId = api.session.tokens?.userId;
+    final all = [
+      ...channels,
+      ...dms.map((dm) => channelFromDm(dm, selfId: selfId)),
+    ];
     await store.replaceChannels(all);
 
     /// Per channel: the server has no bulk read-state endpoint, and one

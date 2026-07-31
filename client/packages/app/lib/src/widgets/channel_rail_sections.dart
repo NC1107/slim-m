@@ -13,6 +13,7 @@ import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'channel_rail_channel_rows.dart';
 import 'create_channel_sheet.dart';
+import 'personal_space_row.dart';
 
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text, {this.onAdd, this.addSemanticLabel});
@@ -66,8 +67,16 @@ class _SectionLabel extends StatelessWidget {
 /// `providers/dms.dart`), so this reads the same channel stream
 /// [TextChannelsSection] and [VoiceChannelsSection] do, filtered the same
 /// way they filter to their own kind. There is still no way to start a new
-/// DM from here directly; that lives on a member's row in [AppMemberPane],
-/// which is where a person already is when they decide to message someone.
+/// DM with someone else from here directly; that lives on a member's row in
+/// [AppMemberPane], which is where a person already is when they decide to
+/// message someone.
+///
+/// A DM with yourself - your personal space - is the one exception: it gets
+/// its own always-present [PersonalSpaceRow] rather than being something
+/// you find by searching your own name in the member list. The split below
+/// reads [Channel.isPersonalSpace], not [Channel.name]: another member can
+/// freely set their own display name to [personalSpaceName], and their DM
+/// must still render, and open, as an ordinary row rather than as this one.
 class DirectMessagesSection extends StatelessWidget {
   const DirectMessagesSection({
     super.key,
@@ -81,23 +90,37 @@ class DirectMessagesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    Channel? personal;
+    final others = <Channel>[];
+    for (final channel in channels) {
+      if (channel.isPersonalSpace && personal == null) {
+        personal = channel;
+      } else {
+        others.add(channel);
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionLabel('Direct messages'),
-        if (channels.isEmpty)
+        PersonalSpaceRow(
+          channel: personal,
+          selected: personal != null && personal.id == selectedId,
+        ),
+        if (others.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s8,
               vertical: AppSpacing.s4,
             ),
             child: Text(
-              'No direct messages yet. Open one from a member in the list.',
+              'No other direct messages yet. Open one from a member in the list.',
               style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
           )
         else
-          for (final channel in channels)
+          for (final channel in others)
             AppListRow(
               label: channel.name,
               selected: channel.id == selectedId,
