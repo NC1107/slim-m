@@ -172,6 +172,23 @@ fn clear_request(channel: ChannelId, token: &str, before_seq: i64) -> Request<Bo
         .unwrap()
 }
 
+fn restore_request(channel: ChannelId, token: &str, target_op: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(format!("/channels/{channel}/canvas/ops"))
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "id": Uuid::now_v7().to_string(),
+                "kind": "restore",
+                "target_op": target_op,
+            })
+            .to_string(),
+        ))
+        .unwrap()
+}
+
 /// The load-bearing one. Carol holds `VIEW_CHANNEL` and is denied `USE_CANVAS`
 /// by a member overwrite, so she reads the channel and must never be handed a
 /// canvas frame; a cache that only remembers the view bit delivers to her.
@@ -293,11 +310,14 @@ async fn a_canvas_burst_does_not_disconnect_a_text_only_connection() {
     assert_eq!(seen, 60);
 }
 
-/// The same load-bearing property as the placement test above, for the two
+/// The same load-bearing property as the placement test above, for the three
 /// new frames: a member an overwrite denies `USE_CANVAS` must receive
-/// neither a removal nor a clear, exactly as she receives no placement.
+/// neither a removal, a clear, nor a restore, exactly as she receives no
+/// placement. Extends the reachability guard `extra_bit` exists for: reverting
+/// it to a `matches!` naming only `CanvasObjectPlaced` fails this the moment
+/// any one of the three fires.
 #[tokio::test]
-async fn a_removal_and_a_clear_need_both_bits_and_a_denied_member_never_sees_either() {
+async fn a_removal_a_clear_and_a_restore_need_both_bits_and_a_denied_member_never_sees_any() {
     let (store, _guard) = new_store().await;
     let state = state_for(&store);
     let (alice_access, alice_ticket, alice) = user_ticket(&store, "alice").await;
@@ -334,6 +354,11 @@ async fn a_removal_and_a_clear_need_both_bits_and_a_denied_member_never_sees_eit
         .await
         .unwrap();
     assert_eq!(removed.status(), StatusCode::CREATED);
+    let bytes = axum::body::to_bytes(removed.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let removed_body: Value = serde_json::from_slice(&bytes).unwrap();
+    let remove_op_id = removed_body["op"]["id"].as_str().unwrap().to_owned();
     let frame = read_frame(&mut alice_ws).await;
     assert_eq!(frame["type"], "canvas.objects.removed");
     assert_eq!(frame["channel_id"], channel.to_string());
@@ -364,11 +389,21 @@ async fn a_removal_and_a_clear_need_both_bits_and_a_denied_member_never_sees_eit
     assert_eq!(frame["type"], "canvas.cleared");
     assert_eq!(frame["before_seq"], 100);
 
+    let restored = http::router(state.clone())
+        .oneshot(restore_request(channel, &alice_access, &remove_op_id))
+        .await
+        .unwrap();
+    assert_eq!(restored.status(), StatusCode::CREATED);
+    let frame = read_frame(&mut alice_ws).await;
+    assert_eq!(frame["type"], "canvas.objects.restored");
+    assert_eq!(frame["channel_id"], channel.to_string());
+    assert_eq!(frame["object_ids"], json!([object_id]));
+
     let carol_next =
         tokio::time::timeout(Duration::from_millis(300), read_frame(&mut carol_ws)).await;
     assert!(
         carol_next.is_err(),
-        "carol is denied USE_CANVAS and must receive neither a removal nor a clear",
+        "carol is denied USE_CANVAS and must receive neither a removal, a clear, nor a restore",
     );
 }
 

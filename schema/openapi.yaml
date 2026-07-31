@@ -2372,11 +2372,11 @@ paths:
     post:
       operationId: submitCanvasOp
       tags: [canvas]
-      summary: Remove objects from a channel's canvas, or clear it.
+      summary: Remove objects from a channel's canvas, clear it, or restore a removal.
       description: >
         Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel.
-        `restore` is not accepted yet (a later slice); an unrecognised `kind`
-        is a 400, the same as an unrecognised placement kind.
+        An unrecognised `kind` is a 400, the same as an unrecognised
+        placement kind.
 
 
         `id` is a client-minted UUIDv7 and the op's own idempotency key, the
@@ -2397,10 +2397,22 @@ paths:
         without one would wipe whatever was drawn in the interval.
 
 
-        Refused for neither kind is a timeout: a timeout freezes the pen, not
-        the eraser, so a timed-out member may still remove their own ink.
-        `affected` may be 0 - every named object already gone, or nothing at
-        or below `before_seq` - in which case no seq is allocated, no op is
+        `restore` names a prior `remove` or `clear` op as `target_op` and
+        un-deletes exactly the objects that op touched. Restoring an op you
+        authored needs nothing further; restoring anyone else's needs
+        `MANAGE_CANVAS` - the gate is on authorship of the *op*, never of the
+        objects it touched, or the person being moderated could undo the
+        moderation. `target_op` naming an op that is not a `remove` or a
+        `clear` in this channel is a 404, the same one an absent or foreign id
+        gets. A restore that would push this channel's live object count past
+        its ceiling is a 409, refused inside the same transaction that counts.
+
+
+        Refused for none of the three kinds is a timeout: a timeout freezes
+        the pen, not the eraser, so a timed-out member may still remove or
+        restore their own ink. `affected` may be 0 - every named object
+        already gone, nothing at or below `before_seq`, or a restore naming
+        nothing still dead - in which case no seq is allocated, no op is
         written, and nothing is published; an op row exists only for a real
         state transition.
       requestBody:
@@ -2424,6 +2436,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
   /channels/{channelId}/voice/token:
     post:
@@ -3855,10 +3869,11 @@ components:
       type: object
       required: [id, kind]
       description: >-
-        One mutation submitted to `submitCanvasOp`. Which of `object_ids` and
-        `before_seq` may be present depends on `kind`: a `remove` takes
-        `object_ids` and no `before_seq`; a `clear` takes `before_seq` and no
-        `object_ids`. `restore` is not accepted yet.
+        One mutation submitted to `submitCanvasOp`. Which of `object_ids`,
+        `before_seq` and `target_op` may be present depends on `kind`: a
+        `remove` takes `object_ids` and neither other field; a `clear` takes
+        `before_seq` and neither other field; a `restore` takes `target_op`
+        and neither other field.
       properties:
         id:
           type: string
@@ -3866,7 +3881,7 @@ components:
           description: Client-minted UUIDv7; also the idempotency key.
         kind:
           type: string
-          enum: [remove, clear]
+          enum: [remove, clear, restore]
         object_ids:
           type: array
           minItems: 1
@@ -3880,6 +3895,13 @@ components:
           description: >-
             Required for `clear`. Every live object placed at or below this
             canvas `seq` is removed.
+        target_op:
+          type: string
+          format: uuid
+          description: >-
+            Required for `restore`. The `remove` or `clear` op to undo, which
+            must belong to this channel and which the caller must have
+            authored unless they hold `MANAGE_CANVAS`.
 
     CanvasOpResult:
       type: object
@@ -3897,13 +3919,14 @@ components:
               format: int64
             kind:
               type: string
-              enum: [remove, clear]
+              enum: [remove, clear, restore]
             affected:
               type: integer
               format: int64
               description: >-
                 How many objects this op actually changed. May be 0: every
-                named object was already gone, or nothing matched `before_seq`.
+                named object was already gone, nothing matched `before_seq`,
+                or a restore named nothing still dead.
             created_at:
               type: integer
               format: int64
@@ -4411,6 +4434,7 @@ components:
         - $ref: "#/components/schemas/CanvasObjectPlaced"
         - $ref: "#/components/schemas/CanvasObjectsRemoved"
         - $ref: "#/components/schemas/CanvasCleared"
+        - $ref: "#/components/schemas/CanvasObjectsRestored"
         - $ref: "#/components/schemas/ServerPong"
         - $ref: "#/components/schemas/ServerError"
 
@@ -4484,6 +4508,32 @@ components:
         before_seq:
           type: integer
           format: int64
+
+    CanvasObjectsRestored:
+      type: object
+      required: [type, channel_id, seq, op_id, object_ids]
+      description: >-
+        A `remove` or a `clear` was undone, gated the same way
+        `canvas.object.placed` is. `object_ids` names what came back, up to
+        the same bound `canvas.objects.removed` does; past it (only possible
+        when the restored op was a large `clear`) it is empty and a receiver
+        should refetch instead of trusting an incomplete list.
+      properties:
+        type:
+          type: string
+          enum: [canvas.objects.restored]
+        channel_id:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          format: int64
+        op_id:
+          type: string
+          format: uuid
+        object_ids:
+          type: array
+          items: { type: string, format: uuid }
 
     ServerHello:
       type: object

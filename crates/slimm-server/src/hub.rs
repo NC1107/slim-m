@@ -228,6 +228,22 @@ pub enum Event {
         op_id: CanvasOpId,
         before_seq: Seq,
     },
+    /// A removal or a clear was undone.
+    ///
+    /// Ids only, the same shape [`Event::CanvasObjectsRemoved`] already uses -
+    /// a receiver that cannot resurrect them locally refetches rather than
+    /// being told what to redraw - but only up to
+    /// [`crate::store::MAX_REMOVE_IDS_PER_OP`]. A restore of a `remove` is
+    /// naturally at or under that bound already; a restore of a `clear` is
+    /// not, and can reach the channel's whole live ceiling, exactly the shape
+    /// [`Event::CanvasCleared`] carries no ids to avoid. Past the bound this
+    /// carries none either, and a receiver falls back to a refetch.
+    CanvasObjectsRestored {
+        channel_id: ChannelId,
+        seq: Seq,
+        op_id: CanvasOpId,
+        object_ids: Vec<CanvasObjectId>,
+    },
 }
 
 /// A cloneable handle to the broadcast channel and the connection limiter,
@@ -283,6 +299,7 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::CanvasObjectPlaced { .. }
         | Event::CanvasObjectsRemoved { .. }
         | Event::CanvasCleared { .. }
+        | Event::CanvasObjectsRestored { .. }
         | Event::SessionRevoked(_) => false,
     }
 }
