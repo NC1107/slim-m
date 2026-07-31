@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import '../providers/pins_controller.dart';
 import '../screens/canvas/canvas_open_button.dart';
 import '../routing/breakpoints.dart';
 import 'member_pane.dart';
@@ -94,8 +93,12 @@ class ChannelHeader extends ConsumerWidget {
               ],
             ),
           ),
-          _PinPill(channelId: channelId),
-          const SizedBox(width: AppSpacing.s8),
+          AppIconButton(
+            icon: AppIcons.pin,
+            semanticLabel: 'Pinned messages',
+            onPressed: () => showPinnedMessagesSheet(context, channelId),
+          ),
+          const SizedBox(width: AppSpacing.s4),
           CanvasOpenButton(channelId: channelId),
           const SizedBox(width: AppSpacing.s4),
           AppIconButton(
@@ -116,65 +119,6 @@ class ChannelHeader extends ConsumerWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-/// A real, live count from [pinsControllerProvider]: a dash while the first
-/// fetch is in flight, the true count (including zero) once it lands.
-/// Tapping opens [showPinnedMessagesSheet], which is the one place pins
-/// round-trip a write (unpinning); pinning a message itself has nowhere to
-/// live yet, since it would need the shared context menu this client does
-/// not build (see the phase 2 known-gaps note in the project's knowledge
-/// base) rather than a new, unreviewed affordance on every message row.
-class _PinPill extends ConsumerWidget {
-  const _PinPill({required this.channelId});
-
-  final String channelId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final pins = ref.watch(pinsControllerProvider(channelId));
-    final label = pins.pinned == null ? '-' : '${pins.pinned!.length}';
-
-    return GestureDetector(
-      onTap: () => showPinnedMessagesSheet(context, channelId),
-      // Opaque so the whole 44dp box hits, not just the 28dp pill drawn in it.
-      behavior: HitTestBehavior.opaque,
-      child: Semantics(
-        button: true,
-        label: pins.pinned == null
-            ? 'Pinned messages, loading'
-            : 'Pinned messages, ${pins.pinned!.length}',
-        child: SizedBox(
-          height: 44,
-          child: Center(
-            child: Container(
-              height: 28,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
-              decoration: BoxDecoration(
-                border: Border.all(color: tokens.borderSubtle),
-                borderRadius: BorderRadius.circular(AppRadii.control),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(AppIcons.pin, size: 14, color: tokens.textSecondary),
-                  const SizedBox(width: AppSpacing.s4),
-                  Text(
-                    label,
-                    style: AppText.micro.copyWith(
-                      color: tokens.textSecondary,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

@@ -61,7 +61,10 @@ ProviderContainer _containerWithPins(List<Map<String, dynamic>> pins) {
 }
 
 void main() {
-  testWidgets('the pill shows the real count once it resolves', (tester) async {
+  testWidgets('the pin action carries no counter, like its neighbours', (
+    tester,
+  ) async {
+    // It was a bordered pill with a count; two pins must render no "2".
     final container = _containerWithPins([_pinJson('m1'), _pinJson('m2')]);
     addTearDown(container.dispose);
 
@@ -82,45 +85,14 @@ void main() {
         ),
       ),
     );
-
-    // Before the fetch resolves: an honest dash, never a fabricated number.
-    expect(find.text('-'), findsOneWidget);
-
     await tester.pumpAndSettle();
 
-    expect(find.text('2'), findsOneWidget);
+    expect(find.text('2'), findsNothing);
+    expect(find.text('0'), findsNothing);
     expect(find.text('-'), findsNothing);
   });
 
-  testWidgets('a channel with nothing pinned shows zero, not a dash', (
-    tester,
-  ) async {
-    final container = _containerWithPins(const []);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: Scaffold(
-            body: ChannelHeader(
-              channelId: 'c1',
-              name: 'general',
-              isVoice: false,
-              searchOpen: false,
-              onToggleSearch: () {},
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('0'), findsOneWidget);
-  });
-
-  testWidgets('tapping the pill opens the pinned messages sheet', (
+  testWidgets('tapping the pin action opens the pinned messages sheet', (
     tester,
   ) async {
     final container = _containerWithPins([_pinJson('m1')]);
@@ -145,7 +117,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('1'));
+    await tester.tap(find.bySemanticsLabel('Pinned messages').first);
     await tester.pumpAndSettle();
 
     expect(find.text('Pinned messages'), findsOneWidget);
