@@ -22,7 +22,9 @@ use serde::{Deserialize, Serialize};
 use super::AppState;
 use super::error::ApiError;
 use super::extract::{Authed, AuthedLimited, Json, WRITE};
-use super::messages::{MessageDto, parse_uuid, with_reactions};
+use super::message_enrich::with_reactions;
+use super::messages::{MessageDto, parse_uuid};
+use super::sync_ops::{MessageOpDto, SYNC_RESPONSE_BYTES, ops_for_scope};
 use crate::ids::ChannelId;
 use crate::permissions::Permissions;
 
@@ -67,6 +69,13 @@ struct SyncRequest {
 struct ScopeCursor {
     channel_id: String,
     after_seq: i64,
+    /// The message-op cursor, absent when the client holds none.
+    ///
+    /// Absent is what every older client sends and what a newer one sends
+    /// before it has adopted a head. Both take the same branch, and a scope
+    /// that carries none is never told to reset from an op gap.
+    #[serde(default)]
+    after_op_seq: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -80,8 +89,19 @@ struct ScopeDelta {
     messages: Vec<MessageDto>,
     /// More messages remain past what this response carried.
     has_more: bool,
-    /// The cursor was too far behind; discard local state and re-fetch fresh.
+    /// Either cursor was too far behind; discard local state and re-fetch.
+    ///
+    /// One flag rather than two, because the client's recovery is identical
+    /// whichever cursor could not be answered. It is only ever set from an op
+    /// gap for a scope whose request carried an op cursor.
     reset: bool,
+    /// Empty whenever the request carried no op cursor, and empty when there
+    /// is genuinely nothing.
+    ops: Vec<MessageOpDto>,
+    /// The head of this channel's op stream. Always present on this server,
+    /// which is how a new client tells it from one that has no op stream.
+    op_latest_seq: i64,
+    ops_has_more: bool,
 }
 
 // --- Handlers ---
@@ -159,6 +179,7 @@ async fn sync(
 
     let mut scopes = Vec::new();
     let mut budget = AGGREGATE_LIMIT;
+    let mut bytes = SYNC_RESPONSE_BYTES;
     for cursor in cursors {
         let channel_id = ChannelId(parse_uuid(&cursor.channel_id)?);
         // Silently skip scopes the caller cannot view, so sync never confirms a
@@ -171,31 +192,19 @@ async fn sync(
             continue;
         }
 
+        // Read after the permission check, never before it.
+        let ops = ops_for_scope(&state, channel_id, cursor.after_op_seq, &mut bytes).await?;
+
         let latest = state.store.latest_message_seq(channel_id).await?;
-        let delta = if cursor.after_seq >= latest {
-            ScopeDelta {
-                channel_id: cursor.channel_id,
-                messages: Vec::new(),
-                has_more: false,
-                reset: false,
-            }
+        let (messages, has_more, message_reset) = if cursor.after_seq >= latest {
+            (Vec::new(), false, false)
         } else if latest.saturating_sub(cursor.after_seq) > SNAPSHOT_GAP {
-            ScopeDelta {
-                channel_id: cursor.channel_id,
-                messages: Vec::new(),
-                has_more: true,
-                reset: true,
-            }
+            (Vec::new(), true, true)
         } else {
             let limit = PER_SCOPE_LIMIT.min(budget);
             if limit <= 0 {
                 // The aggregate budget is spent; report more remains here.
-                ScopeDelta {
-                    channel_id: cursor.channel_id,
-                    messages: Vec::new(),
-                    has_more: true,
-                    reset: false,
-                }
+                (Vec::new(), true, false)
             } else {
                 let mut rows = state
                     .store
@@ -206,15 +215,23 @@ async fn sync(
                 budget -= rows.len() as i64;
                 // `with_reactions`, never a bare `MessageDto::from`; see the
                 // note on this function.
-                ScopeDelta {
-                    channel_id: cursor.channel_id,
-                    messages: with_reactions(&state, ctx.user_id, rows).await?,
-                    has_more,
-                    reset: false,
+                let dtos = with_reactions(&state, ctx.user_id, rows).await?;
+                for dto in &dtos {
+                    bytes = bytes.saturating_sub(dto.wire_cost());
                 }
+                (dtos, has_more, false)
             }
         };
-        scopes.push(delta);
+
+        scopes.push(ScopeDelta {
+            channel_id: cursor.channel_id,
+            messages,
+            has_more,
+            reset: message_reset || ops.reset,
+            ops: ops.ops,
+            op_latest_seq: ops.op_latest_seq,
+            ops_has_more: ops.ops_has_more,
+        });
     }
 
     Ok(Json(SyncResponse { scopes }))

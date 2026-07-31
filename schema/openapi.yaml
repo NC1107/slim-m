@@ -4338,6 +4338,15 @@ components:
           type: integer
           format: int64
           description: The highest `seq` this client already holds for the scope.
+        after_op_seq:
+          type: integer
+          format: int64
+          description: >
+            The highest message-op `seq` this client already holds. Absent when
+            it holds none, which is what every client older than the op stream
+            sends and what a newer one sends before adopting a head. A scope
+            that omits this receives no `ops` and is never told to `reset`
+            because of an op gap.
 
     SyncResponse:
       type: object
@@ -4350,7 +4359,7 @@ components:
 
     ScopeDelta:
       type: object
-      required: [channel_id, messages, has_more, reset]
+      required: [channel_id, messages, has_more, reset, ops, op_latest_seq, ops_has_more]
       properties:
         channel_id:
           type: string
@@ -4366,8 +4375,65 @@ components:
         reset:
           type: boolean
           description: >
-            The cursor was too far behind to stream. Discard local state for
-            this scope and refetch it.
+            Either cursor was too far behind to stream. Discard local state for
+            this scope and refetch it. One flag rather than two, because the
+            recovery is identical whichever cursor could not be answered; it is
+            only ever set from an op gap for a scope that sent `after_op_seq`.
+        ops:
+          type: array
+          description: >
+            Message edits and deletes after `after_op_seq`, oldest first. Empty
+            whenever the request carried no op cursor, and empty when there is
+            genuinely nothing.
+          items:
+            $ref: "#/components/schemas/MessageOp"
+        op_latest_seq:
+          type: integer
+          format: int64
+          description: >
+            The head of this channel's message-op stream. Always present on a
+            server that has one, which is how a client tells that apart from a
+            stream nothing has been written to.
+        ops_has_more:
+          type: boolean
+          description: More ops remain past what this response carried.
+
+    MessageOp:
+      type: object
+      required: [seq, kind, message_id, created_at]
+      description: >
+        One entry in a channel's message-op stream: the record of an edit or a
+        delete, which `messages.seq` cannot carry because it is allocated once
+        at creation and never moves. No op names its actor, on any kind: the
+        live `message.deleted` frame carries only the ids a connection needs to
+        drop it from view, and this feed does not disclose more than that.
+      properties:
+        seq:
+          type: integer
+          format: int64
+          description: >
+            Order within the message-op stream, dense over ops. A different
+            sequence from a message's own `seq`.
+        kind:
+          type: string
+          enum: [edit, delete]
+        message_id:
+          type: string
+          format: uuid
+        created_at:
+          type: integer
+          format: int64
+        content:
+          type: string
+          description: >
+            The message's current text, joined at read time rather than stored
+            on the op. Absent on a `delete`, absent once the message has been
+            deleted, and absent on every edit but the last naming a message
+            within one page. An op with no content still carries its `seq`, so
+            a cursor advances through it.
+        edited_at:
+          type: integer
+          format: int64
 
     ClientFrame:
       description: A frame sent by the client over the WebSocket.
@@ -4580,6 +4646,15 @@ components:
         seq:
           type: integer
           format: int64
+          description: >
+            The message's own order key, which an edit does not move. Not to be
+            confused with `op_seq` beside it.
+        op_seq:
+          type: integer
+          format: int64
+          description: >
+            This edit's place in the channel's message-op stream, a different
+            sequence from `seq`. Absent from a server with no op stream.
         message:
           $ref: "#/components/schemas/Message"
 
@@ -4596,6 +4671,13 @@ components:
         message_id:
           type: string
           format: uuid
+        op_seq:
+          type: integer
+          format: int64
+          description: >
+            This delete's place in the channel's message-op stream. Absent from
+            a server with no op stream, and absent when the delete found
+            nothing to do.
 
     ReactionsChanged:
       type: object

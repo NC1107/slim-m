@@ -54,8 +54,10 @@ pub enum Event {
         message: Message,
         attachments: Vec<AttachmentSummary>,
     },
-    /// A message was edited.
-    MessageEdited(Message),
+    /// A message was edited. `op_seq` is its place in the *message-op* stream,
+    /// a different sequence from the message's own `seq`, which an edit does
+    /// not move; the two sit adjacent in one frame.
+    MessageEdited { message: Message, op_seq: i64 },
     /// A poll's votes changed. Carries the whole per-option tally rather than
     /// a delta, so a client that missed a frame cannot drift, exactly like
     /// `ReactionsChanged`; who cast which vote is deliberately never present.
@@ -69,6 +71,9 @@ pub enum Event {
     MessageDeleted {
         channel_id: ChannelId,
         message_id: MessageId,
+        /// This delete's place in the message-op stream, absent when the
+        /// delete found nothing to do.
+        op_seq: Option<i64>,
     },
     /// A message's reactions changed. Carries the ids only: the tally itself is
     /// per viewer, since a reactor the receiver has blocked is not counted for
@@ -287,7 +292,7 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::ChannelUpdated(_)
         | Event::ChannelDeleted { .. } => true,
         Event::MessageCreated { .. }
-        | Event::MessageEdited(_)
+        | Event::MessageEdited { .. }
         | Event::MessageDeleted { .. }
         | Event::ReactionsChanged { .. }
         | Event::MessagePinned { .. }
@@ -458,6 +463,7 @@ mod epoch_tests {
         });
         hub.publish(Event::PresenceChanged(UserId::generate()));
         hub.publish(Event::MessageDeleted {
+            op_seq: None,
             channel_id: ChannelId::generate(),
             message_id: crate::ids::MessageId::generate(),
         });

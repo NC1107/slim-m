@@ -172,4 +172,38 @@ impl Store {
             .collect();
         Ok(MessageOpsPage { ops, latest_seq })
     }
+
+    /// The highest op seq allocated for a channel, 0 where none has been.
+    ///
+    /// A counter read, so a scope that carries no op cursor can still be told
+    /// the head to adopt without paging anything.
+    pub async fn latest_message_op_seq(&self, channel_id: ChannelId) -> anyhow::Result<i64> {
+        Ok(sqlx::query_scalar!(
+            r#"SELECT next_seq - 1 AS "seq!: i64" FROM channel_seq_counters
+               WHERE channel_id = ? AND stream = 'message_op'"#,
+            channel_id
+        )
+        .fetch_optional(&self.pool)
+        .await?
+        .unwrap_or(0))
+    }
+
+    /// The lowest op seq still retained for a channel, `None` where the stream
+    /// holds nothing.
+    ///
+    /// Nothing sweeps `message_ops` today, so the floor is always the first op
+    /// ever written. This exists so a sweep can be added later with no wire
+    /// change, and so the reset branch depending on it is written and tested
+    /// now rather than discovered missing then.
+    pub async fn earliest_message_op_seq(
+        &self,
+        channel_id: ChannelId,
+    ) -> anyhow::Result<Option<i64>> {
+        Ok(sqlx::query_scalar!(
+            r#"SELECT MIN(seq) AS "floor: i64" FROM message_ops WHERE channel_id = ?"#,
+            channel_id
+        )
+        .fetch_one(&self.pool)
+        .await?)
+    }
 }

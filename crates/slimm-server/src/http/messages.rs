@@ -22,7 +22,7 @@ use super::error::ApiError;
 use super::extract::{Authed, Json, Query, enforce};
 use super::polls::PollDto;
 use crate::hub::Event;
-use crate::ids::{ChannelId, MessageId, UserId};
+use crate::ids::{ChannelId, MessageId};
 use crate::media;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
@@ -66,7 +66,7 @@ pub(crate) struct MessageDto {
     /// batch-loads them; a single echoed message carries none because it
     /// cannot have any yet.
     #[serde(default)]
-    reactions: Vec<ReactionDto>,
+    pub(crate) reactions: Vec<ReactionDto>,
     /// The poll this message carries, if any. Always present as a key (never
     /// omitted): `null` means this message is not a poll, the same "always
     /// there, empty or null means genuinely none" convention `reactions`
@@ -106,11 +106,20 @@ impl From<AttachmentSummary> for AttachmentDto {
 /// One emoji on a message, with the asking user's own state.
 #[derive(Serialize)]
 pub(crate) struct ReactionDto {
-    emoji: String,
-    count: i64,
+    pub(crate) emoji: String,
+    pub(crate) count: i64,
     /// Whether the caller reacted with this emoji, so the client can render the
     /// toggled state without a second request.
-    reacted: bool,
+    pub(crate) reacted: bool,
+}
+
+impl MessageDto {
+    /// Roughly what this row costs a `/sync` response, for the shared byte
+    /// budget. The body dominates; the fixed addend stands in for the ids and
+    /// timestamps around it rather than pretending to be exact.
+    pub(super) fn wire_cost(&self) -> usize {
+        self.content.len() + 128
+    }
 }
 
 impl From<Message> for MessageDto {
@@ -266,7 +275,7 @@ async fn list(
         .store
         .list_messages(channel_id, params.before, limit)
         .await?;
-    let dtos = with_reactions(&state, ctx.user_id, messages).await?;
+    let dtos = super::message_enrich::with_reactions(&state, ctx.user_id, messages).await?;
     Ok(Json(dtos))
 }
 
@@ -324,6 +333,7 @@ async fn delete(
     let outcome = state.store.delete_message(message_id, ctx.user_id).await?;
     if outcome.deleted {
         state.hub.publish(Event::MessageDeleted {
+            op_seq: outcome.op_seq,
             channel_id,
             message_id,
         });
@@ -400,58 +410,15 @@ async fn edit(
         Edited::Gone => return Err(ApiError::NotFound("message not found")),
         // No op row was written, so nothing changed for anybody to be told about.
         Edited::Unchanged(message) => message,
-        Edited::Edited { message, .. } => {
-            state.hub.publish(Event::MessageEdited(message.clone()));
+        Edited::Edited { message, op_seq } => {
+            state.hub.publish(Event::MessageEdited {
+                message: message.clone(),
+                op_seq,
+            });
             message
         }
     };
     Ok(Json(updated.into()))
-}
-
-// --- Shared enrichment ---
-
-/// Batch-attaches each message's reaction summary and, if it carries one,
-/// its poll, to its DTO - in a fixed small number of queries rather than one
-/// per row, which only bites once a channel has real traffic. Shared by
-/// [`list`], the full-text search route, sync, and the pinned-message list,
-/// which all enrich a page of messages the same way.
-pub(crate) async fn with_reactions(
-    state: &AppState,
-    viewer: UserId,
-    messages: Vec<Message>,
-) -> anyhow::Result<Vec<MessageDto>> {
-    let ids: Vec<MessageId> = messages.iter().map(|m| m.id).collect();
-    let mut by_message = state.store.reactions_for_messages(&ids, viewer).await?;
-    let mut attachments_by_message = state.store.attachments_for_messages(&ids).await?;
-
-    let mut dtos: Vec<MessageDto> = Vec::with_capacity(messages.len());
-    for message in messages {
-        let id = message.id;
-        let mut dto = MessageDto::from(message);
-        if let Some(pos) = by_message.iter().position(|(mid, _)| *mid == id) {
-            let (_, summaries) = by_message.swap_remove(pos);
-            dto.reactions = summaries
-                .into_iter()
-                .map(|s| ReactionDto {
-                    emoji: s.emoji,
-                    count: s.count,
-                    reacted: s.reacted,
-                })
-                .collect();
-        }
-        if let Some(pos) = attachments_by_message
-            .iter()
-            .position(|(mid, _)| *mid == id)
-        {
-            let (_, summaries) = attachments_by_message.swap_remove(pos);
-            dto.attachments = summaries.into_iter().map(AttachmentDto::from).collect();
-        }
-        dtos.push(dto);
-    }
-    // `attach_polls` pairs the two lists positionally, which holds because the
-    // loop above pushes exactly one `dtos` entry per `ids` entry.
-    super::polls::attach_polls(state, viewer, &ids, &mut dtos).await?;
-    Ok(dtos)
 }
 
 // --- Validation ---

@@ -26,13 +26,18 @@ pub(super) enum ServerFrame {
     #[serde(rename = "message.edited")]
     MessageEdited {
         channel_id: String,
+        /// The *message's* order key, unmoved by an edit. Not `op_seq`.
         seq: i64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        op_seq: Option<i64>,
         message: MessageDto,
     },
     #[serde(rename = "message.deleted")]
     MessageDeleted {
         channel_id: String,
         message_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        op_seq: Option<i64>,
     },
     #[serde(rename = "reactions.changed")]
     ReactionsChanged {
