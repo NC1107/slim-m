@@ -3822,7 +3822,12 @@ components:
         actor_id:
           type: [string, "null"]
           format: uuid
-          description: Null once the actor's account has been anonymized.
+          description: >-
+            Null once the actor's account has been anonymized, and on a
+            `remove`, `clear` or `restore` read without `MANAGE_CANVAS`: a
+            moderation act does not name its moderator to the whole channel,
+            which is what the live removal event withholds too. A `place`
+            always names its actor - `CanvasObject.author_id` is the same id.
         created_at:
           type: integer
           format: int64

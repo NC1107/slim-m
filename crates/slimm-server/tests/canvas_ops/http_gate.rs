@@ -71,3 +71,66 @@ async fn the_feed_is_dense_over_place_ops_placed_over_http() {
     assert_eq!(body["has_more"], false);
     assert_eq!(body["reset"], false);
 }
+
+/// A moderation act must not name its moderator to the whole channel.
+///
+/// [`Event::CanvasObjectsRemoved`] withholds the actor deliberately, and this
+/// feed handed the same channel exactly what that withholds - more reliably,
+/// since a live frame is ephemeral and this read is durable and repeatable.
+/// A `place` keeps its actor because `CanvasObject.author_id` is already on
+/// the viewport read, so hiding it here would hide nothing.
+#[tokio::test]
+async fn the_feed_names_who_drew_but_not_who_removed() {
+    let (store, _guard) = crate::fixtures::new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::USE_CANVAS),
+            true,
+        )
+        .await
+        .unwrap();
+    let mods = store
+        .create_role("mods", Permissions::MANAGE_CANVAS, false)
+        .await
+        .unwrap();
+    let (root, root_id) = register(&store, "root").await;
+    store.assign_role(root_id, mods).await.unwrap();
+    let (bystander, _) = crate::fixtures::member(&store, "bystander").await;
+    let channel = store.create_channel("canvas", "voice").await.unwrap().id;
+    let app = app(store.clone());
+
+    let object = id();
+    let (status, _) = post_object(&app, channel, &root, stroke(&object)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, _) = crate::fixtures::submit_op(
+        &app,
+        channel,
+        &root,
+        crate::fixtures::remove(&id(), &[&object]),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let (status, body) = get_ops(&app, channel, &bystander, "after_seq=0").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let ops = body["ops"].as_array().unwrap();
+    assert_eq!(ops.len(), 2);
+    assert_eq!(ops[0]["kind"], "place");
+    assert!(
+        ops[0]["actor_id"].is_string(),
+        "who drew is already public on the viewport read"
+    );
+    assert_eq!(ops[1]["kind"], "remove");
+    assert!(
+        ops[1]["actor_id"].is_null(),
+        "who removed must not be readable by the whole channel: {body}"
+    );
+
+    let (status, body) = get_ops(&app, channel, &root, "after_seq=0").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(
+        body["ops"][1]["actor_id"].is_string(),
+        "a moderator keeps the trail, which is why the ops table is not compacted"
+    );
+}
