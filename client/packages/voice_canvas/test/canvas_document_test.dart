@@ -31,6 +31,38 @@ CanvasStrokeInput stroke(
     );
 
 void main() {
+  test('authorId threads from the input to the stored stroke', () {
+    final document = CanvasDocument()..setViewport(const Size(800, 600));
+    document.applyPlaced(
+      CanvasStrokeInput(
+        id: 'a',
+        seq: 1,
+        zIndex: 1,
+        x: 0,
+        y: 0,
+        w: 10,
+        h: 10,
+        points: const [0, 0, 10, 10],
+        width: 3,
+        colorKey: 'annotation',
+        authorId: 'alice',
+      ),
+    );
+    document.refresh();
+
+    final slot = document.paintOrder.single;
+    expect(document.strokeAt(slot).authorId, 'alice');
+  });
+
+  test('an unset authorId is null, not a default sentinel', () {
+    final document = CanvasDocument()..setViewport(const Size(800, 600));
+    document
+      ..applyPlaced(stroke('a'))
+      ..refresh();
+
+    expect(document.strokeAt(document.paintOrder.single).authorId, isNull);
+  });
+
   test('the same id twice is one object', () {
     final document = CanvasDocument()..setViewport(const Size(800, 600));
     final first = document.applyPlaced(stroke('a'));

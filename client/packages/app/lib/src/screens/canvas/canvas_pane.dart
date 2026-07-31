@@ -20,17 +20,19 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
-import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../../ids.dart';
+import '../../permissions.dart';
 import '../../providers/providers.dart';
 import '../../providers/live_events.dart';
 import '../../providers/sync_controller.dart';
-import 'canvas_bar.dart';
 import 'canvas_commit_queue.dart';
+import 'canvas_ops_controller.dart';
+import 'canvas_pane_body.dart';
 import 'canvas_sync.dart';
 
 /// The channel whose canvas is open, or null.
@@ -54,6 +56,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   final CanvasDocument _document = CanvasDocument();
   StreamSubscription<api.ServerEvent>? _live;
   CanvasCommitQueue? _queue;
+  CanvasOpsController? _opsController;
   Timer? _panDebounce;
   late final CanvasSync _sync;
   ProviderSubscription<SyncStatus>? _syncStatusSubscription;
@@ -67,6 +70,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   String? _error;
   bool _truncated = false;
   int _localZ = provisionalLocalZIndex;
+  CanvasTool _tool = CanvasTool.pen;
 
   @override
   void initState() {
@@ -110,6 +114,27 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       _document
         ..kill(id)
         ..refresh();
+      if (mounted) setState(() => _error = message);
+    },
+    onRemoved: (id) {
+      _document
+        ..removeObject(id)
+        ..refresh();
+      if (mounted) {
+        setState(
+          () => _error = 'That stroke was erased while it was being saved.',
+        );
+      }
+    },
+    onEraseOnConfirm: (id) => unawaited(_ops.eraseOnConfirm(id)),
+  );
+
+  CanvasOpsController get _ops => _opsController ??= CanvasOpsController(
+    channelId: widget.channelId,
+    client: ref.read(apiProvider),
+    document: _document,
+    commits: _commits,
+    onError: (message) {
       if (mounted) setState(() => _error = message);
     },
   );
@@ -254,8 +279,11 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   }
 
   void _onStroke(List<Offset> worldPoints) {
+    final selfId = ref.read(meProvider).valueOrNull?.id;
+    final ids = <String>[];
     for (final segment in splitStroke(worldPoints)) {
       final id = newCanvasObjectId();
+      ids.add(id);
       _document.applyPlaced(
         CanvasStrokeInput(
           id: id,
@@ -268,6 +296,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           points: segment.points,
           width: 3,
           colorKey: 'annotation',
+          authorId: selfId,
         ),
       );
       _commits.add(
@@ -286,63 +315,63 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       );
     }
     _document.refresh();
+    // recordDraw is what makes undoing this whole gesture one op, not several.
+    _ops.recordDraw(ids);
+    if (mounted) setState(() {});
   }
+
+  void _onErase(Offset world) {
+    final me = ref.read(meProvider).valueOrNull;
+    _ops.onErasePoint(
+      world,
+      manageCanvas: me?.permissions.hasPermission(Perm.manageCanvas) ?? false,
+      selfId: me?.id,
+    );
+  }
+
+  Future<void> _onEraseEnd() async {
+    await _ops.endErase();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _onUndo() async {
+    await _ops.undo();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _onClear() => _ops.clear(_sync.asOfSeq ?? 0);
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    // No AppBar sits above CanvasBar, so this pane insets itself for top/bottom; left stays unconsumed because a rail, not this pane, ever occupies the true left edge.
-    return Container(
-      color: tokens.surfaceBase,
-      child: SafeArea(
-        left: false,
-        child: Column(
-          children: [
-            CanvasBar(
-              channelId: widget.channelId,
-              onClose: () => ref.read(canvasOpenProvider.notifier).state = null,
-            ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.s12),
-                child: AppErrorState(
-                  message: _error!,
-                  onDismiss: () => setState(() => _error = null),
-                ),
-              ),
-            if (_truncated)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.s12,
-                  0,
-                  AppSpacing.s12,
-                  AppSpacing.s12,
-                ),
-                child: const AppCallout(
-                  child: Text(
-                    'Some ink in this region is not shown. Zoom in to see it.',
-                  ),
-                ),
-              ),
-            Expanded(
-              child: ValueListenableBuilder<int>(
-                valueListenable: _document.objectCount,
-                builder: (context, count, child) => Semantics(
-                  container: true,
-                  label: _loading
-                      ? 'Canvas, loading'
-                      : 'Canvas, $count objects drawn',
-                  child: child,
-                ),
-                child: CanvasSurface(
-                  document: _document,
-                  ink: AppCanvasColors.annotation,
-                  gridLine: tokens.borderSubtle,
-                  onStroke: _onStroke,
-                ),
-              ),
-            ),
-          ],
+    final me = ref.watch(meProvider).valueOrNull;
+    final manageCanvas =
+        me?.permissions.hasPermission(Perm.manageCanvas) ?? false;
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyZ, control: true): () =>
+            unawaited(_onUndo()),
+        const SingleActivator(LogicalKeyboardKey.keyZ, meta: true): () =>
+            unawaited(_onUndo()),
+      },
+      child: Focus(
+        autofocus: true,
+        child: CanvasPaneBody(
+          channelId: widget.channelId,
+          onClose: () => ref.read(canvasOpenProvider.notifier).state = null,
+          tool: _tool,
+          onToolChanged: (tool) => setState(() => _tool = tool),
+          canUndo: _ops.canUndo,
+          onUndo: () => unawaited(_onUndo()),
+          canManage: manageCanvas,
+          document: _document,
+          onClear: _onClear,
+          error: _error,
+          onDismissError: () => setState(() => _error = null),
+          truncated: _truncated,
+          loading: _loading,
+          onStroke: _onStroke,
+          onErase: _onErase,
+          onEraseEnd: () => unawaited(_onEraseEnd()),
         ),
       ),
     );

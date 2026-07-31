@@ -90,6 +90,36 @@ void main() {
     expect(hitTestStroke(document, const Offset(50, 0)), isNull);
   });
 
+  test('allowed skips a disallowed candidate for the one behind it', () {
+    final document = CanvasDocument()..setViewport(const Size(800, 600));
+    document
+      ..applyPlaced(horizontalStroke('foreign', zIndex: 2))
+      ..applyPlaced(horizontalStroke('mine', zIndex: 1))
+      ..refresh();
+
+    expect(hitTestStroke(document, const Offset(50, 0)), 'foreign');
+    expect(
+      hitTestStroke(
+        document,
+        const Offset(50, 0),
+        allowed: (stroke) => stroke.id == 'mine',
+      ),
+      'mine',
+    );
+  });
+
+  test('allowed refusing every candidate is a miss, not the nearest one', () {
+    final document = CanvasDocument()..setViewport(const Size(800, 600));
+    document
+      ..applyPlaced(horizontalStroke('a'))
+      ..refresh();
+
+    expect(
+      hitTestStroke(document, const Offset(50, 0), allowed: (_) => false),
+      isNull,
+    );
+  });
+
   test('a single-point stroke is hit by proximity to that point', () {
     final document = CanvasDocument()..setViewport(const Size(800, 600));
     document

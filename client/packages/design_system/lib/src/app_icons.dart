@@ -75,6 +75,14 @@ abstract final class AppIcons {
   static const IconData leaveCall = LucideIcons.phoneOff300;
   static const IconData canvas = LucideIcons.pencilRuler300;
 
+  /// The canvas's own draw/erase toggle. Distinct constants from [edit] even
+  /// though [pen] shares its glyph, since one names a message action and the
+  /// other a drawing tool - a future change to one must not silently retint
+  /// the other.
+  static const IconData pen = LucideIcons.pencil300;
+  static const IconData eraser = LucideIcons.eraser300;
+  static const IconData undo = LucideIcons.undo2300;
+
   // Account.
   static const IconData signOut = LucideIcons.logOut300;
   static const IconData account = LucideIcons.circleUser300;

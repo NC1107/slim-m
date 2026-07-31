@@ -35,6 +35,7 @@ class CanvasSurface extends StatefulWidget {
     required this.gridLine,
     required this.onStroke,
     this.onErase,
+    this.onEraseEnd,
     this.tool = CanvasTool.pen,
     this.strokeWidth = 3,
     this.enabled = true,
@@ -55,6 +56,12 @@ class CanvasSurface extends StatefulWidget {
   /// [CanvasTool.eraser], so a drag can wipe through several objects the way
   /// a moderator clearing a defaced region expects.
   final ValueChanged<Offset>? onErase;
+
+  /// Fires once the whole erase gesture ends - the last pointer lifting,
+  /// not the first of several in a multi-touch pan - so the caller can
+  /// submit whatever [onErase] collected as one removal rather than one per
+  /// point, which is what makes undoing an erase drag a single op.
+  final VoidCallback? onEraseEnd;
 
   /// False freezes the pen and leaves pan and zoom alone, which is what a
   /// timed-out member gets: they keep seeing the canvas and cannot add to it.
@@ -122,7 +129,10 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
 
   void _up(PointerEvent event) {
     _pointers = (_pointers - 1).clamp(0, 10);
-    if (widget.tool == CanvasTool.eraser) return;
+    if (widget.tool == CanvasTool.eraser) {
+      if (_pointers == 0) widget.onEraseEnd?.call();
+      return;
+    }
     if (_draft.isEmpty) return;
     final screen = _draft.take();
     if (screen.length < 2) return;

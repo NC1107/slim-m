@@ -84,6 +84,7 @@ class CanvasStrokeInput {
     required this.points,
     required this.width,
     required this.colorKey,
+    this.authorId,
   });
 
   final String id;
@@ -102,6 +103,11 @@ class CanvasStrokeInput {
   /// rather than being dropped, because the set is closed and a row is
   /// durable: a client too old to know a colour must still draw the mark.
   final String colorKey;
+
+  /// Null for a locally drawn stroke still awaiting its first server answer,
+  /// or once the author's account has been anonymized. The eraser scopes a
+  /// hit test on this, so an anonymized object is nobody's own ink.
+  final String? authorId;
 }
 
 /// A stroke ready to paint: its [Path] is built once, at insert, in
@@ -117,6 +123,7 @@ class CanvasStroke {
     required this.colorKey,
     required this.zIndex,
     required this.seq,
+    this.authorId,
   });
 
   final String id;
@@ -125,6 +132,9 @@ class CanvasStroke {
   final Path path;
   final double width;
   final String colorKey;
+
+  /// See [CanvasStrokeInput.authorId].
+  final String? authorId;
 
   /// Every point in absolute world coordinates, for hit testing against a
   /// world-space pointer with no per-call offset arithmetic.

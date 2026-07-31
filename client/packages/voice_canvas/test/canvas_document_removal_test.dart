@@ -196,6 +196,24 @@ void main() {
     expect(result, isNotNull);
   });
 
+  test('isAlive tells a committed placement from a killed one', () {
+    final document = CanvasDocument()..setViewport(const Size(800, 600));
+    document
+      ..applyPlaced(stroke('committed'))
+      ..applyPlaced(stroke('failed'))
+      ..refresh();
+    expect(document.isAlive('committed'), isTrue);
+    expect(document.isAlive('unknown'), isFalse);
+
+    document.kill('failed');
+    expect(document.isAlive('failed'), isFalse);
+
+    document
+      ..removeObject('committed')
+      ..refresh();
+    expect(document.isAlive('committed'), isFalse);
+  });
+
   test('_removedIds evicts FIFO past the tracked ceiling', () {
     final document = CanvasDocument()..setViewport(const Size(800, 600));
     for (var i = 0; i < maxRemovedIdsTracked; i++) {
