@@ -117,7 +117,9 @@ void main() {
       final options = calls.last.$2;
       expect(options, isNotNull);
       expect(options!.useiOSBroadcastExtension, isTrue);
-      expect(options.params.dimensions.width, ScreenShareQuality.crisp.width,
+      // Frame rate, not size: size is capped on iOS so every tier shares it.
+      expect(
+          options.params.encoding!.maxFramerate, ScreenShareQuality.crisp.fps,
           reason: 'must be this call\'s quality, not a default');
     });
 
@@ -341,6 +343,63 @@ void main() {
 
       expect(options.useiOSBroadcastExtension, isTrue);
       expect(options.deviceId, 'broadcast-manual');
+    });
+
+    /// A broadcast upload extension has 50 MB and iOS kills it past that,
+    /// which a user sees as the same "Screen Recording has stopped" alert a
+    /// failed start gives. So an over-large capture is not a quality question
+    /// on this platform, it is the difference between sharing and not.
+    test('every iOS tier is bounded to one phone-sized capture', () {
+      for (final quality in ScreenShareQuality.values) {
+        final options = ScreenShareControl.captureOptionsFor(
+          quality,
+          null,
+          isIOS: true,
+        );
+
+        expect(
+          options.params.dimensions.width,
+          720,
+          reason: '${quality.name} must not widen an iOS capture',
+        );
+        expect(options.params.dimensions.height, 1280);
+      }
+    });
+
+    /// The cap is on size alone. A tier that changed nothing at all would be
+    /// a control that cannot change anything, which is worse than no control.
+    test('an iOS tier still decides frame rate and bitrate', () {
+      final smooth = ScreenShareControl.captureOptionsFor(
+        ScreenShareQuality.smooth,
+        null,
+        isIOS: true,
+      );
+      final crisp = ScreenShareControl.captureOptionsFor(
+        ScreenShareQuality.crisp,
+        null,
+        isIOS: true,
+      );
+
+      expect(
+          smooth.params.encoding!.maxFramerate, ScreenShareQuality.smooth.fps);
+      expect(crisp.params.encoding!.maxFramerate, ScreenShareQuality.crisp.fps);
+      expect(
+        smooth.params.encoding!.maxBitrate,
+        isNot(crisp.params.encoding!.maxBitrate),
+      );
+    });
+
+    /// Desktop is the platform the landscape tiers were written for, and it
+    /// has no extension and no 50 MB budget.
+    test('off iOS the chosen tier still sets the capture size', () {
+      final options = ScreenShareControl.captureOptionsFor(
+        ScreenShareQuality.crisp,
+        'screen-1',
+        isIOS: false,
+      );
+
+      expect(options.params.dimensions.width, ScreenShareQuality.crisp.width);
+      expect(options.params.dimensions.height, ScreenShareQuality.crisp.height);
     });
   });
 }

@@ -217,12 +217,15 @@ class ScreenShareControl {
     bool? isIOS,
   }) {
     final onIOS = isIOS ?? lk.lkPlatformIs(lk.PlatformType.iOS);
+    final dimensions = onIOS
+        ? const lk.VideoDimensions(_iosCaptureShortEdge, _iosCaptureLongEdge)
+        : lk.VideoDimensions(quality.width, quality.height);
     return lk.ScreenShareCaptureOptions(
       useiOSBroadcastExtension: onIOS,
       sourceId: onIOS ? _iosBroadcastManualDeviceId : sourceId,
       maxFrameRate: quality.fps.toDouble(),
       params: lk.VideoParameters(
-        dimensions: lk.VideoDimensions(quality.width, quality.height),
+        dimensions: dimensions,
         encoding: lk.VideoEncoding(
           maxBitrate: quality.maxBitrate,
           maxFramerate: quality.fps,
@@ -234,4 +237,24 @@ class ScreenShareControl {
   /// LiveKit's own hint for the `BroadcastManager`'s second pass; see
   /// [captureOptionsFor].
   static const _iosBroadcastManualDeviceId = 'broadcast-manual';
+
+  /// The capture size every iOS share is bounded to, whatever tier was picked.
+  ///
+  /// A broadcast upload extension gets 50 MB of memory and iOS kills it when
+  /// it goes over, which surfaces to the person sharing as the same "Screen
+  /// Recording has stopped" alert a failed start gives - so the failure this
+  /// prevents is indistinguishable, to a user, from the one the rest of this
+  /// class fixes. Twilio's own iOS guidance says their SDK exceeds that budget
+  /// capturing retina screens and that they downscale to stay inside it.
+  ///
+  /// Portrait, and short edge first, because the source is a phone held
+  /// upright rather than a desktop: [ScreenShareQuality]'s landscape figures
+  /// describe a monitor, and the widest of them asks to upscale a roughly
+  /// 1290-point-wide screen to 2560, which buys nothing and costs buffer.
+  ///
+  /// The tier still decides frame rate and bitrate, which are the knobs that
+  /// mean something on a phone. Only the dimensions are overridden, so a
+  /// choice made in the share dialog still changes what is published.
+  static const _iosCaptureShortEdge = 720;
+  static const _iosCaptureLongEdge = 1280;
 }
