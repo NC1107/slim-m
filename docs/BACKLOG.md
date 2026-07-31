@@ -82,3 +82,40 @@ Each can be revisited if the product's direction changes, but the default answer
 - Events with RSVP and a calendar subsystem: a real subsystem beyond chat; polls, pins, scheduled messages, and a webhook calendar integration cover the coordination need.
 - Scheduled or recurring pings that store PII such as birthdays: recurring scheduler plus PII storage is bot-like scope creep that belongs in the automation API.
 - Shared media gallery view: a non-essential convenience; because it is only a filtered query over the existing attachment store it can be added later at essentially zero design cost.
+
+## From using it on a real device (2026-07-31)
+
+Raised by the owner after real use, in his words where the wording matters.
+Grouped by what they are rather than by where they were said, because three of them are the same underlying complaint about the message row.
+
+### The message row
+
+- **Rows bounce on hover.** The reaction affordance renders bottom-left and reflows the row, so the whole chat log moves under the pointer. Discord's answer is a floating action cluster pinned top-right that does not participate in layout; that is the shape to copy.
+- **Author icons stay vertically centred as a message grows.** They should align to the top of the text block, as Discord does. Currently a long message centres its avatar halfway down.
+- **No way to highlight a message.** No selection, no jump-to, no visual mark.
+
+### Composing
+
+- **No markdown or list formatting in any text field.** No way to type a list at all.
+- **Ctrl+V does not attach an image.** Pasting an image does nothing; it has to go through the file picker.
+
+### The rail and DMs
+
+- **"Notes to self" is treated as a channel under the hood and should be a DM.** It reads wrong in the list because of it.
+- **The DM section is wordy**: "Notes to self" followed by "No other direct messages yet ..." as a list entry.
+- **No way to reorganise, move or collapse channels in the sidebar**, and no way to collapse the left sidebar entirely to gain channel real estate.
+
+### Voice and canvas
+
+- **The voice lobby screen has no purpose.** Owner's standing view, repeated: the join-preview screen is not earning its place.
+- **The pins button is styled differently from its neighbours** and carries a counter. It should be the same icon treatment as the rest, with no count.
+- **No background blur or replacement on camera**, which Discord has and which the owner calls "kindve a required feature" rather than a nice-to-have. Worth treating as a camera-launch blocker rather than polish: people will not turn a camera on in their own home without it. Note this is a real engineering item, not a setting - it needs a segmentation model running per frame on the local track before publish, so it lands with the camera work rather than after it.
+
+### One open product question, not a task
+
+The owner is thinking aloud about **canvas lifetime**, and it is not decided:
+
+> perhaps if every docker server is just one "space" we could do a file browser or something, unsure how to handle canvases, like are they forever spaces, or is it like teams where every meeting is a new meeting and chat and the canvas changes after each meeting and is just an artifact or something, or should it persist for as long as the call exists, and people clear it as they need or save/export it as they need
+
+Three candidate models, none chosen: a canvas that is permanent per channel (what ships today), one that is per-call and becomes an artifact afterwards, or one that lives as long as the call and is cleared or exported by hand.
+This is a product decision with real schema consequences - `canvas_objects` is currently keyed per channel with no notion of a session - so it belongs in [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md) rather than being resolved by whoever picks up the next canvas slice.
