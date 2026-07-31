@@ -408,15 +408,16 @@ Accepted risks: routing official-instance traffic through the relay adds a netwo
 ### Repo Structure and Licensing
 
 Decision: two repositories.
-A core monorepo holds the Rust server, the Flutter client, and the OpenAPI plus JSON Schema protocol definitions both consume, so a wire-protocol change lands as one atomic PR against one CI run; a separate repository holds the Go push relay, adapted from check-in-relay.
+A core monorepo holds the Rust server, the Flutter client, and the `schema/openapi.yaml` protocol definition both are checked against, so a wire-protocol change lands as one atomic PR against one CI run; a separate repository holds the Go push relay, adapted from check-in-relay.
 See [research/oss.md](research/oss.md) and [research/devops.md](research/devops.md).
 
-Rationale: the committed schema-first codegen enforces cross-language types only if it runs against one schema in one CI job, so client and server must co-locate, while the relay differs in language, holds live push credentials most contributors never need, and is only ever officially operated, so folding it in would add a third toolchain to every checkout for a component almost no contributor touches.
+Rationale: the schema-first contract test enforces cross-language route agreement only if it runs against one schema in one CI job, so client and server must co-locate, while the relay differs in language, holds live push credentials most contributors never need, and is only ever officially operated, so folding it in would add a third toolchain to every checkout for a component almost no contributor touches.
+Corrected 2026-07-30: this used to say "the committed schema-first codegen enforces cross-language types," describing a code generator that was never built; see the correction a few sections above for what CI actually gates.
 The server-to-relay push envelope is still a real cross-repo contract on equal footing with the client/server protocol: additive-only, versioned, and guarded by a contract test against a real relay instance, so a mismatch fails loudly in CI rather than as silently missed pushes.
 
-Licensing: AGPL-3.0 for the server, Apache-2.0 for the Flutter client, the shared protocol and schema package, and the push relay.
+Licensing: AGPL-3.0 for the server, Apache-2.0 for the Flutter client, the shared protocol schema, and the push relay.
 The server carries the real SaaS-rehosting risk that only AGPL's network-use clause closes, since running a modified server as a hosted service is not distribution under plain GPL, and its contributor-access cost is an accepted, deliberate tradeoff for that anti-rehoster lever rather than an unexamined one.
-The client has no rehosting risk and AGPL on app-store binaries has caused real friction, so Apache-2.0 fits, and its explicit patent grant beats MIT for binaries reaching end users; the shared schema package stays permissive because its generated code compiles directly into the permissively licensed client.
+The client has no rehosting risk and AGPL on app-store binaries has caused real friction, so Apache-2.0 fits, and its explicit patent grant beats MIT for binaries reaching end users; the shared schema directory stays permissive so hand-written client code reading it stays permissive too (corrected 2026-07-30: it has no generated code to compile into anything).
 The relay is Apache-2.0 rather than AGPL because its only real moat is possession of the official APNs and FCM credentials, not the code (a trivial credential-gated forwarder anyone could rewrite in a weekend), so AGPL would add contributor friction with no offsetting anti-rehost benefit; the relay's protection is a trademark and branding policy on the official name and instance.
 check-in-relay currently ships with no LICENSE file, which under default copyright makes it all-rights-reserved, so an explicit Apache-2.0 LICENSE is added as part of the fork before external contribution to the relay repository is invited.
 
