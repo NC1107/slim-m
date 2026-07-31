@@ -86,6 +86,8 @@ extension SlimmApiAuth on SlimmApi {
       );
       final tokens = TokenPair.fromJson(json as Map<String, dynamic>);
       session.set(tokens);
+      // The old refresh token is already spent server-side; wait for the new one to be durable.
+      await session.settled;
       return tokens;
     } on UnauthorizedException {
       // The refresh token is spent, revoked, or the session is gone; the only

@@ -44,6 +44,8 @@ class SyncController extends StateNotifier<SyncStatus> {
       if (signedIn == _lastSignedIn) return;
       _lastSignedIn = signedIn;
       if (signedIn) {
+        // A fresh sign-in reuses this process, so a stale cached identity must not survive it.
+        _ref.invalidate(meProvider);
         unawaited(start());
       } else {
         unawaited(_endSession());
@@ -62,6 +64,12 @@ class SyncController extends StateNotifier<SyncStatus> {
   bool _disposed = false;
   int _attempt = 0;
   final _channelRefresher = ChannelRefresher();
+
+  /// Bumped by every [stop] and every fresh [start], so a run superseded
+  /// mid-flight (a sign-out landing during catch-up, or a second start
+  /// racing the first) notices at its next checkpoint rather than finishing
+  /// and writing stale data into a store a newer run already cleared.
+  int _generation = 0;
 
   /// Every event this session receives, broadcast to whoever else wants one
   /// (presence, typing, reactions, pins, polls): a second, independent
@@ -82,24 +90,34 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// error to the person typing.
   void notifyTyping(String channelId) => _connection?.typing(channelId);
 
-  /// Starts, or restarts, synchronisation. Safe to call repeatedly.
+  /// Starts, or restarts, synchronisation. Safe to call repeatedly: a call
+  /// superseded by a later [start] or a [stop] before it reaches a given
+  /// checkpoint abandons itself there rather than finishing against a
+  /// session, or a store, that has since moved on.
   Future<void> start() async {
     if (_disposed) return;
+    final generation = ++_generation;
     _retry?.cancel();
     await _teardown();
+    if (generation != _generation) return;
     state = SyncStatus.connecting;
 
     try {
       final api = _ref.read(apiProvider);
       final store = await _ref.read(storeProvider.future);
+      if (generation != _generation) return;
 
       await _channelRefresher.refresh(api, store);
-      await _catchUp(api, store);
+      if (generation != _generation) return;
+      await _catchUp(generation, api, store);
+      if (generation != _generation) return;
       await _attach(api, store);
+      if (generation != _generation) return;
 
       _attempt = 0;
       state = SyncStatus.live;
     } catch (_) {
+      if (generation != _generation) return;
       // A connectivity or auth problem here: both mean show offline and retry with backoff.
       state = SyncStatus.offline;
       _scheduleRetry();
@@ -107,17 +125,29 @@ class SyncController extends StateNotifier<SyncStatus> {
   }
 
   /// Catches every known scope up in one request, applying deltas in order.
-  Future<void> _catchUp(SlimmApi api, MessageStore store) async {
+  ///
+  /// [generation] is this call's [start], checked before every write: a
+  /// sign-out landing while the network round trip above is already in
+  /// flight must not let its answer, arriving after the store has been
+  /// cleared for the account signing out, write into it anyway.
+  Future<void> _catchUp(
+    int generation,
+    SlimmApi api,
+    MessageStore store,
+  ) async {
     final cursors = await store.allCursors();
     if (cursors.isEmpty) return;
 
     final deltas = await api.sync(cursors);
+    if (generation != _generation) return;
     var more = false;
     for (final delta in deltas) {
+      if (generation != _generation) return;
       if (delta.reset) {
         // The gap is too large to stream: local state is untrusted, so drop and refetch.
         await store.resetChannel(delta.channelId);
         final fresh = await api.listMessages(delta.channelId, limit: 50);
+        if (generation != _generation) return;
         await store.applyMessages(fresh);
         continue;
       }
@@ -140,9 +170,9 @@ class SyncController extends StateNotifier<SyncStatus> {
       unawaited(
         Future<void>.delayed(
           Duration.zero,
-          () => _catchUp(api, store),
+          () => _catchUp(generation, api, store),
         ).catchError((_) {
-          if (!_disposed) _onDropped();
+          if (!_disposed && generation == _generation) _onDropped();
         }),
       );
     }
@@ -253,6 +283,8 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// away for an account the user is still signed into. The wipe belongs to
   /// the session actually ending, which is [_endSession].
   Future<void> stop() async {
+    // Supersedes any in-flight start(), even one paused mid-catch-up on a network call.
+    _generation++;
     _retry?.cancel();
     await _teardown();
     state = SyncStatus.offline;
@@ -277,6 +309,7 @@ class SyncController extends StateNotifier<SyncStatus> {
   Future<void> _endSession() async {
     await stop();
     _ref.invalidate(channelHistoryProvider);
+    _ref.invalidate(meProvider);
     _ref.read(messageExtrasProvider.notifier).clear();
     try {
       final store = await _ref.read(storeProvider.future);
@@ -289,6 +322,7 @@ class SyncController extends StateNotifier<SyncStatus> {
   @override
   void dispose() {
     _disposed = true;
+    _generation++;
     unawaited(_sessionSubscription.cancel());
     _retry?.cancel();
     unawaited(_teardown());

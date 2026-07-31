@@ -7,6 +7,8 @@
 /// leave is a trap.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
@@ -305,7 +307,8 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
   /// deletion is not safe to assume happened just because the request failed,
   /// and clearing it would orphan the account with no session left to retry
   /// from. The failure still has to reach the screen, or the user is stranded
-  /// with no idea why nothing updates any more.
+  /// with no idea why nothing updates any more; sync and push, stopped ahead
+  /// of the request, are restarted on that same failure for the same reason.
   Future<void> _confirmDeletion(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -344,6 +347,9 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
     } on api.ApiException catch (e) {
       if (!mounted) return;
       setState(() => _deleteError = e.message);
+      // The account is fine and the session still valid; undo stopping sync and push for the attempt.
+      unawaited(ref.read(syncControllerProvider.notifier).start());
+      unawaited(ref.read(pushControllerProvider.notifier).register());
     }
   }
 }

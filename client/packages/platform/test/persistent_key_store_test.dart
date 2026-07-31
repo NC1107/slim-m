@@ -102,6 +102,28 @@ void main() {
       expect(await store.read('c'), 'third');
     });
 
+    test(
+        'a transient open failure does not disable storage for the rest of '
+        'the process: the next call retries rather than replaying the same '
+        'rejection', () async {
+      // A file sits where the store's directory needs to be, so its first open fails.
+      final blocker = Directory('${dir.path}/blocker');
+      File(blocker.path).createSync();
+      final store = FileKeyStore(directory: blocker);
+
+      await expectLater(
+        () => store.put('a', 'first'),
+        throwsA(isA<FileSystemException>()),
+      );
+
+      // The environment recovers: a real directory now sits at that path.
+      File(blocker.path).deleteSync();
+      Directory(blocker.path).createSync();
+
+      expect(await store.put('a', 'first'), 'a');
+      expect(await store.read('a'), 'first');
+    });
+
     test('the secrets file is restricted to this OS account', () async {
       final store = FileKeyStore(directory: dir);
       await store.put('session', 'super-secret');

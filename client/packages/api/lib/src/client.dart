@@ -34,9 +34,17 @@ part 'client_voice.dart';
 /// in tests) can vary without the client knowing, and so a refresh performed by
 /// one call is visible to every other.
 class SessionStore {
-  SessionStore({TokenPair? tokens}) : _tokens = tokens;
+  SessionStore({TokenPair? tokens, Future<void> Function(TokenPair?)? onChange})
+      : _tokens = tokens,
+        _onChange = onChange;
 
   TokenPair? _tokens;
+  final Future<void> Function(TokenPair?)? _onChange;
+
+  /// Chains every [_onChange] call behind the last, the same reason
+  /// [_persistSession] in providers.dart used to chain its own: a slow write
+  /// must not finish after a faster later one and leave a stale value stored.
+  Future<void> _pending = Future<void>.value();
 
   final _changes = StreamController<TokenPair?>.broadcast();
 
@@ -46,12 +54,30 @@ class SessionStore {
   TokenPair? get tokens => _tokens;
   bool get isSignedIn => _tokens != null;
 
+  /// In-memory and announced immediately, same as always: nothing here
+  /// depends on [_onChange], so a slow or hung persist layer never delays a
+  /// live session from working. [settled] is the separate, explicit way to
+  /// wait for durability.
   void set(TokenPair? tokens) {
     _tokens = tokens;
     _changes.add(tokens);
+    if (_onChange case final onChange?) {
+      // Caught, or an uncaught error here would poison every later onChange (see FileKeyStore).
+      _pending = _pending.then((_) => onChange(tokens)).catchError((_) {});
+    }
   }
 
   void clear() => set(null);
+
+  /// Resolves once every [_onChange] triggered by [set] so far has settled,
+  /// whether it succeeded or failed.
+  ///
+  /// [SlimmApiAuth._refreshOnce] awaits this after rotating: the server has
+  /// already spent the old refresh token by the time a new one comes back, so
+  /// a process death between that response and the new token reaching disk
+  /// replays the old, now-spent one on the next launch and gets read as
+  /// reuse. Awaiting this closes that window down to the write itself.
+  Future<void> get settled => _pending;
 
   Future<void> dispose() => _changes.close();
 }

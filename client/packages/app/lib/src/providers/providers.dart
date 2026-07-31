@@ -95,30 +95,31 @@ const hasLaunchedBeforeKey = 'slimm.has_launched_before';
 /// rejected refresh deletes it. [restoreSession] does the other half, reading
 /// it back on the next launch.
 ///
-/// Writes are chained, not fired in parallel: a burst of rapid session
-/// changes (a restore immediately followed by a refresh) must land on disk in
-/// the order they happened, or a slow write can finish after a faster later
-/// one and leave a stale value as the persisted state.
+/// Writes are chained, not fired in parallel, inside [SessionStore] itself: a
+/// burst of rapid session changes (a restore immediately followed by a
+/// refresh) must land on disk in the order they happened, or a slow write can
+/// finish after a faster later one and leave a stale value as the persisted
+/// state. [SessionStore.settled] is what lets a rotation wait for its own
+/// write to land before anything relies on it being durable.
 final sessionProvider = Provider<SessionStore>((ref) {
-  final store = SessionStore();
   final keyStore = ref.read(keyStoreProvider);
-  var pending = Future<void>.value();
-  final subscription = store.changes.listen((tokens) {
-    final serverUrl = tokens == null ? null : ref.read(serverUrlProvider);
-    pending = pending
-        .then((_) => _persistSession(keyStore, tokens, serverUrl))
-        .catchError((Object _, StackTrace __) {
-          /// The server rotates refresh tokens with reuse detection: a write that
-          /// failed here may have left a stale, already-spent token on disk, and
-          /// replaying that on the next launch reads as reuse and revokes the
-          /// whole family. Dropping the stored session outright degrades to a
-          /// fresh sign-in instead of that false replay.
-          if (tokens != null) {
-            return keyStore.delete(sessionTokenHandle).catchError((_) {});
-          }
-        });
-  });
-  ref.onDispose(subscription.cancel);
+  final store = SessionStore(
+    onChange: (tokens) async {
+      final serverUrl = tokens == null ? null : ref.read(serverUrlProvider);
+      try {
+        await _persistSession(keyStore, tokens, serverUrl);
+      } catch (_) {
+        /// The server rotates refresh tokens with reuse detection: a write that
+        /// failed here may have left a stale, already-spent token on disk, and
+        /// replaying that on the next launch reads as reuse and revokes the
+        /// whole family. Dropping the stored session outright degrades to a
+        /// fresh sign-in instead of that false replay.
+        if (tokens != null) {
+          await keyStore.delete(sessionTokenHandle).catchError((_) {});
+        }
+      }
+    },
+  );
   ref.onDispose(store.dispose);
   return store;
 });
