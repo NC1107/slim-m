@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.17.0](https://github.com/NC1107/slim-m/compare/client-v0.16.0...client-v0.17.0) (2026-07-31)
+
+
+### Features
+
+* **client:** an op cursor and the message-op wire model ([#236](https://github.com/NC1107/slim-m/issues/236)) ([7ecdcde](https://github.com/NC1107/slim-m/commit/7ecdcdebd3d0932efb2d45c40580d1177c0869b0))
+* **client:** apply message ops, closing the reconciliation debt ([#238](https://github.com/NC1107/slim-m/issues/238)) ([fad73a2](https://github.com/NC1107/slim-m/commit/fad73a211beec7d34fbda6d8d573e773a1f8c1ab))
+* **client:** eject from a call, rename yourself, a camera pre-toggle, and CallKit for UI-joined calls ([#231](https://github.com/NC1107/slim-m/issues/231)) ([33c0fec](https://github.com/NC1107/slim-m/commit/33c0fec3df35711867e98a70a379f0c563dab8d8))
+
+
+### Bug Fixes
+
+* **client:** the pin action matches its neighbours and drops the counter ([#242](https://github.com/NC1107/slim-m/issues/242)) ([7a88b91](https://github.com/NC1107/slim-m/commit/7a88b9144045a51639392617d728715f0215444a))
+* take manual control of iOS screen share publication ([#227](https://github.com/NC1107/slim-m/issues/227)) ([9257ede](https://github.com/NC1107/slim-m/commit/9257edec8b448b8f15d5fe0199b8b121cdc18084))
+
 ## [0.16.0](https://github.com/NC1107/slim-m/compare/client-v0.15.0...client-v0.16.0) (2026-07-31)
 
 
