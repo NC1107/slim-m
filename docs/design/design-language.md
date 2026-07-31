@@ -90,6 +90,8 @@ Elevation is border-first: a 1px hairline is the default separator, and only two
 This is performance and identity together: blurred shadows and backdrop blur cost more to composite than a hairline border, which matters on the lightweight self-host and older-device targets, and reads calmer than Discord's shadowed panels.
 Message layout is flat and grouped (avatar, name, timestamp, stacked lines), not chat-bubble style, matching the brief's instruction that layout should "resemble the familiarity of Discord or Slack," where bubbles read as consumer messaging instead.
 Risk: border-only separation can feel flat on dense screens, mitigated by pairing borders with a sunken background step for the few screens that need a third depth cue.
+The computed contrast ratios that motivated true black's brighter hairline above (`#23282D` at 1.41:1 against `#000000`, raised to `#2C3238` at 1.62:1) come from [design-language-review.md](design-language-review.md)'s finding 1, which measured all six border/surface pairs across the three themes and found every one below the 3:1 WCAG 1.4.11 threshold for a UI component boundary.
+Decision 0004 above records why that threshold question is still open rather than resolved by the raise.
 
 ## Iconography
 

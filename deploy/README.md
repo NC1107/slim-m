@@ -302,7 +302,8 @@ The last remaining administrator cannot be removed at all.
 
 ## Upgrading
 
-Bump the pinned image tag in `docker-compose.yml` (server, Caddy, LiveKit, or Litestream) and run `docker compose up -d` again.
+The server image is `${SLIMM_VERSION:-latest}` in `docker-compose.yml`, so upgrading or pinning it is bumping `SLIMM_VERSION` in `.env`, never editing `docker-compose.yml` itself (see the note above).
+Caddy, LiveKit, and Litestream are hardcoded tags in `docker-compose.yml`; bump those directly and run `docker compose up -d` again.
 Newer patches are at hub.docker.com for Caddy and Litestream and at github.com/livekit/livekit/releases for LiveKit.
 The named volumes (`slimm_data`, `caddy_data`, `caddy_config`) are untouched by an image swap.
 

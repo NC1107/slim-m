@@ -1,6 +1,6 @@
 # Design Language Plan: Adversarial Review
 
-Target document: `docs/research/design-language.md`.
+Target document: `docs/design/design-language.md` (moved out of `docs/research/` on 2026-07-26; this review predates the move).
 Cross-checked against `docs/BRIEF.md`, `docs/research/flutter-client.md`, `docs/research/voice-canvas.md`, `docs/research/performance.md`, `docs/research/ux.md`, `docs/research/appstore.md`, `docs/research/oss.md`, and the sibling review `docs/research/flutter-client-review.md`.
 Every color-contrast figure below is computed directly from the hex values in `design-language.md` using the standard WCAG relative-luminance and contrast-ratio formulas, not estimated by eye.
 
