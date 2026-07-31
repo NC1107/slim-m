@@ -121,7 +121,7 @@ void main() {
         reason: 'it must be reachable before it has ever been opened',
       );
       expect(
-        find.textContaining('No other direct messages yet'),
+        find.textContaining('Start one from the member list'),
         findsOneWidget,
       );
     },
@@ -136,7 +136,7 @@ void main() {
 
     expect(find.text('Priya'), findsOneWidget);
     expect(find.text(personalSpaceName), findsOneWidget);
-    expect(find.textContaining('No other direct messages yet'), findsNothing);
+    expect(find.textContaining('Start one from the member list'), findsNothing);
   });
 
   testWidgets(
