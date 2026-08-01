@@ -127,6 +127,43 @@ Worth noticing as a shape: a lesson learned once and applied to a single file is
 Nothing should cancel those checks on main now, so the path should be unreachable, but if it ever is again the symptom is once more a silently missing store build rather than a red release.
 Whether it should re-run and keep waiting instead is a trade about how long a release may block, and it is in `docs/OPEN-QUESTIONS.md` rather than decided here.
 
+## The owner reports bugs in the app itself, and expects reactions back (2026-08-01)
+
+There is a **`backlog` text channel on the live instance** (`https://slim.npc-server.top`) where the owner posts bugs and issues from real device use, usually as a screenshot with a line of context.
+This is now the primary source of grounded work, ahead of `docs/BACKLOG.md`, which is the older written list.
+Read the channel before picking a task.
+
+**Status is reported with reactions on the message itself, and the owner asked for this explicitly.**
+
+- 👀 (`U+1F440`) when the item is picked up and being worked on
+- ✅ (`U+2705`) when it is **done and merged to main**, not merely when a PR is open
+- pins are reserved for items blocked on the owner, so the pins panel reads as "what Nick needs to answer"
+
+Reactions rather than pin-and-unpin, decided 2026-08-01 after the owner proposed pinning every item and unpinning as they were done.
+Unpinning erases the record - a finished item becomes indistinguishable from one never touched - and pin/unpin carries one bit where the real states are picked-up, done, blocked and won't-do.
+Pins are also capped at 200 and mean "highlight"; a queue in the pins panel would spend the feature.
+The owner agreed ("you were right we can just reactions for progress of the bugs").
+
+**One item per message is the convention that matters.** A reaction attaches to a message, so several bugs in one post can only be marked all-or-nothing.
+
+### Reaching the deployment as an agent
+
+There is a `claude` account on the live instance (user id `019fbd20-3d53-7482-9855-77551a00d47c`, display name **Claude**), registered 2026-08-01 with an invite the owner supplied.
+Credentials are **not** in the repo: the password is in the session scratchpad, and a fresh session that cannot find it should ask the owner for a new invite code and register again rather than hunting for it.
+
+Everything is plain REST against `https://slim.npc-server.top`, no client build needed:
+
+- `POST /auth/register` takes `username`, `display_name`, `password`, `device_name` and `invite_code`; the code is required because the deployment is claimed and the join policy is `invite`.
+- **Access tokens are short-lived and a 401 is normally just expiry.** `POST /auth/refresh` with `{"refresh_token": ...}` returns a fresh pair, and the refresh token **rotates**, so write the whole response back over the stored one or the next refresh fails reuse detection.
+- `GET /channels` lists them; the backlog channel is `019fbd32-f633-7a63-a6a8-497513c44e6b`.
+- `GET /channels/{id}/messages?limit=N` reads them, newest first, with `attachments` inline.
+- `GET /attachments/{sha256}` returns the bytes, permission-checked, so it needs the bearer token like anything else.
+- `PUT /messages/{messageId}/reactions/{emoji}` sets a reaction; the emoji is **percent-encoded in the path** (👀 is `%F0%9F%91%80`, ✅ is `%E2%9C%85`). Note the route is `/messages/...`, not `/channels/{id}/messages/...`, unlike pin which is `/channels/{channelId}/messages/{messageId}/pin`.
+
+**Screenshots can be read directly.** Download the attachment, downscale if it is large (a phone screenshot is often 4000px wide), and read it as an image. This was verified end to end rather than assumed: an upload, a post, a fetch back byte-identical, and a real screenshot from the owner's phone read and described.
+
+Two things learned reading real reports: a filename of `pasted-image.png` means the owner used image paste, which is a useful signal about whether that path works on a device; and a screenshot beats a photo of the screen, because small text survives one and not the other.
+
 ## Markdown is hand-rolled, and that is a decision rather than an omission (2026-08-01)
 
 Released in client 0.19.0.
