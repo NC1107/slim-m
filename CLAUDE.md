@@ -101,6 +101,49 @@ Worth noticing as a shape: a lesson learned once and applied to a single file is
 Nothing should cancel those checks on main now, so the path should be unreachable, but if it ever is again the symptom is once more a silently missing store build rather than a red release.
 Whether it should re-run and keep waiting instead is a trade about how long a release may block, and it is in `docs/OPEN-QUESTIONS.md` rather than decided here.
 
+## Markdown is hand-rolled, and that is a decision rather than an omission (2026-08-01)
+
+Released in client 0.19.0.
+Read this before adding a markdown package or touching `message_inline.dart`.
+
+**`flutter_markdown` cannot do this job, and the reason is structural.**
+Those packages render a whole document with their own theming and produce their own widget tree.
+What this transcript needs is a `Text.rich` whose children include `WidgetSpan`s: mention chips resolved against `knownUsernames`, custom emoji images resolved against the deployment's own catalog, and inline code in the design system's own `AppInlineCode`.
+None of those survive a document renderer, and all three predate the markdown work.
+So the subset is a small recursive-descent parser (`message_inline.dart`) producing a node tree that `message_text.dart` walks into spans, with inline code, mentions and emoji as leaves in the new grammar.
+Their existing tests pass unchanged, which is the evidence the seam was drawn in the right place.
+The file's own doc comment says all of this, so the next contributor does not "fix" it by adding the package.
+
+**The risk is not the new syntax, it is every message already sent.**
+A markdown pass changes how existing text renders, so the false-positive cases got most of the attention: `snake_case_name` and `2 * 3` must not become italic, an opener with no closer stays literal, a `>` mid-line is not a quote, a `#` with no following space is not a heading, and content inside inline code or a fence is never rescanned.
+Each has its own test.
+
+**Two mutations are worth recording because one of them found a real bug.**
+Removing the left-neighbour check in the italic closer scan exposed that `*italic with **bold** inside*` was mis-parsing the second character of `**` as a lone-star closer.
+And removing the `*` opener's whitespace-boundary check was **not** caught by the existing `2 * 3` test, because that string has one asterisk and so nothing to wrongly pair with; the weak assertion was found by mutating rather than by reading, and a new test with a later legitimate closer now covers it.
+
+**The e2e is what proves the property the unit tests structurally cannot see.**
+Server and screen deliberately disagree here: the raw markers go over REST unchanged and the client is the only thing that applies them.
+A test at either layer alone passes while the other half is broken, so `scripts/lib/e2e_markdown.py` asserts both directions in one scenario - the rendered text is in the accessibility tree with no markers anywhere, and the server's stored copy still has them, because an edit that lost them would lose the formatting for every future client.
+The spoiler scenario asserts its content is **absent** from the tree rather than dimmed: asserting on opacity would pass for text a screen reader still reads aloud, which is the failure that matters.
+
+**Scenario order in `e2e_run.py` is state, not a set.**
+Putting these at the end failed on a composer that was not on screen, because the admin scenarios leave that client parked in a settings screen, and the failure then cascaded into taking the voice scenario down with it.
+A new scenario inherits wherever the previous one left the browser.
+
+## The release-PR conflict is now a pattern, not an incident (2026-08-01)
+
+Three times in two days, in both directions.
+`release-please` only refreshes a component's standing PR when that component has new releasable commits, so merging one component's release moves `.release-please-manifest.json` underneath the other's branch and conflicts it on three generated files.
+
+The workaround is understood and reliable: merging any change affecting the stuck component regenerates its PR cleanly, usually within about two minutes.
+It is not a repair, though, and every available shortcut (hand-resolving, deleting the branch, editing the changelog) means editing generated files by hand, which is forbidden here.
+**A conflicted PR also runs no CI at all**, so the state is worse than it looks: it is not a slow queue, it is nothing running.
+
+Worth naming the real cost: a component with no pending work stays unreleasable until unrelated work happens to touch it.
+Server 0.22.1 sat conflicted with nothing server-side pending to unstick it.
+`docs/OPEN-QUESTIONS.md` section 6 already lists switching to the manual tag-based flow, which has no standing PR to go stale; three recurrences is the evidence that question was waiting for.
+
 ## The one-flag iOS screen share fix did not survive a real device (2026-07-31)
 
 The 2026-07-29 entry below ("iOS screen share was starting the broadcast twice") shipped `useiOSBroadcastExtension: true` in `captureOptionsFor` and called it fixed, with a caveat that it still needed a device.
