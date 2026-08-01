@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.1](https://github.com/NC1107/slim-m/compare/client-v0.21.0...client-v0.21.1) (2026-08-01)
+
+
+### Bug Fixes
+
+* **client:** center the composer hint and add a Material to the image viewer ([#291](https://github.com/NC1107/slim-m/issues/291)) ([2cd1e8b](https://github.com/NC1107/slim-m/commit/2cd1e8b85a91dd5ce39268dfebc3a8b0f99920bd))
+* reconcile a display name across already-cached messages ([#288](https://github.com/NC1107/slim-m/issues/288)) ([7ed4906](https://github.com/NC1107/slim-m/commit/7ed4906fd6aa4e3c0c4cda81f1a315e2917ce2b1))
+
 ## [0.21.0](https://github.com/NC1107/slim-m/compare/client-v0.20.2...client-v0.21.0) (2026-08-01)
 
 
