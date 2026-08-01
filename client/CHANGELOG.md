@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.2](https://github.com/NC1107/slim-m/compare/client-v0.21.1...client-v0.21.2) (2026-08-01)
+
+
+### Bug Fixes
+
+* **client:** paste an image on iOS via the long-press edit menu, prompt-free ([#292](https://github.com/NC1107/slim-m/issues/292)) ([4b07872](https://github.com/NC1107/slim-m/commit/4b07872b086d1012385c5a5f0b0e6ea7016757ff))
+
 ## [0.21.1](https://github.com/NC1107/slim-m/compare/client-v0.21.0...client-v0.21.1) (2026-08-01)
 
 
