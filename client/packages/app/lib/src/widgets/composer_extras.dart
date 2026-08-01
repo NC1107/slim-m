@@ -193,15 +193,21 @@ class StagedAttachmentChip extends StatelessWidget {
 /// Attach, poll and code move behind the one button that already means "add
 /// something"; emoji and send stay on the row because both are used mid-
 /// sentence, where a sheet would cost the caret.
+///
+/// Attaching splits into two rows rather than one, because a single "Attach
+/// a file" hid a choice `file_picker` actually requires on iOS and Android;
+/// see `attachment_picker.dart` for why the two cannot share one request.
 Future<void> showComposerActionsSheet(
   BuildContext context, {
-  required VoidCallback onAttach,
+  required VoidCallback onPhotoLibrary,
+  required VoidCallback onBrowseFiles,
   required VoidCallback onPoll,
   required VoidCallback onCode,
 }) {
   final tokens = Theme.of(context).extension<AppTokens>()!;
   final actions = <(IconData, String, VoidCallback)>[
-    (AppIcons.add, 'Attach a file', onAttach),
+    (AppIcons.image, 'Photo library', onPhotoLibrary),
+    (AppIcons.attachFile, 'Browse files', onBrowseFiles),
     (AppIcons.poll, 'Create a poll', onPoll),
     (AppIcons.code, 'Insert code', onCode),
   ];

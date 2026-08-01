@@ -72,7 +72,8 @@ void main() {
     await tester.pumpWidget(_harness(container));
     await tester.pumpAndSettle();
 
-    expect(find.text('Upload photo'), findsOneWidget);
+    expect(find.text('Photo library'), findsOneWidget);
+    expect(find.text('Browse files'), findsOneWidget);
     expect(find.text('Remove'), findsNothing);
   });
 
@@ -126,49 +127,51 @@ void main() {
     },
   );
 
-  testWidgets(
-    'tapping Upload photo with no picker result available never calls upload',
-    (tester) async {
-      final requests = <String>[];
-      final container = ProviderContainer(
-        overrides: [
-          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-          apiProvider.overrideWith((ref) {
-            final api = SlimmApi(
-              baseUrl: Uri.parse('http://localhost:8080'),
-              session: ref.watch(sessionProvider),
-              httpClient: MockClient((request) async {
-                requests.add('${request.method} ${request.url.path}');
-                if (request.url.path == '/me') {
-                  return http.Response(
-                    jsonEncode(_meJson(null)),
-                    200,
-                    headers: {'content-type': 'application/json'},
-                  );
-                }
-                return http.Response('', 404);
-              }),
-            );
-            ref.onDispose(api.close);
-            return api;
-          }),
-        ],
-      );
-      addTearDown(container.dispose);
+  for (final label in ['Photo library', 'Browse files']) {
+    testWidgets(
+      'tapping $label with no picker result available never calls upload',
+      (tester) async {
+        final requests = <String>[];
+        final container = ProviderContainer(
+          overrides: [
+            keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+            sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+            apiProvider.overrideWith((ref) {
+              final api = SlimmApi(
+                baseUrl: Uri.parse('http://localhost:8080'),
+                session: ref.watch(sessionProvider),
+                httpClient: MockClient((request) async {
+                  requests.add('${request.method} ${request.url.path}');
+                  if (request.url.path == '/me') {
+                    return http.Response(
+                      jsonEncode(_meJson(null)),
+                      200,
+                      headers: {'content-type': 'application/json'},
+                    );
+                  }
+                  return http.Response('', 404);
+                }),
+              );
+              ref.onDispose(api.close);
+              return api;
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
 
-      await tester.pumpWidget(_harness(container));
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(_harness(container));
+        await tester.pumpAndSettle();
 
-      /// No platform implementation is registered for file_picker's method
-      /// channel in a widget test, so this either throws (caught, shown as a
-      /// snack bar) or resolves with no file chosen; either way, the point
-      /// under test is that nothing ever reaches the upload endpoint from a
-      /// picker that produced nothing to upload.
-      await tester.tap(find.text('Upload photo'));
-      await tester.pumpAndSettle();
+        /// No platform implementation is registered for file_picker's method
+        /// channel in a widget test, so this either throws (caught, shown as
+        /// a snack bar) or resolves with no file chosen; either way, the
+        /// point under test is that nothing ever reaches the upload endpoint
+        /// from a picker that produced nothing to upload.
+        await tester.tap(find.text(label));
+        await tester.pumpAndSettle();
 
-      expect(requests, isNot(contains('POST /me/avatar')));
-    },
-  );
+        expect(requests, isNot(contains('POST /me/avatar')));
+      },
+    );
+  }
 }

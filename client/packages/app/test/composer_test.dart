@@ -272,7 +272,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Attach a file'), findsOneWidget);
+      expect(find.text('Photo library'), findsOneWidget);
+      expect(find.text('Browse files'), findsOneWidget);
       expect(find.text('Create a poll'), findsOneWidget);
       expect(find.text('Insert code'), findsOneWidget);
     });
