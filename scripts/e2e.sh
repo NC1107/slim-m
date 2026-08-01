@@ -23,6 +23,18 @@ LK_CONTAINER=slimm-e2e-lk
 KEEP=0
 [[ "${1:-}" == "--keep" ]] && KEEP=1
 
+# What was actually built, since a stale tree passes and reads as thorough.
+say_commit() {
+  local head behind
+  head="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  echo "e2e: building from $head"
+  git -C "$ROOT" rev-parse --verify -q origin/main >/dev/null || return 0
+  behind="$(git -C "$ROOT" rev-list --count "HEAD..origin/main" 2>/dev/null || echo 0)"
+  [[ "$behind" == "0" ]] || echo "e2e: WARNING this tree is $behind commit(s) behind origin/main"
+  git -C "$ROOT" diff --quiet 2>/dev/null || echo "e2e: note the working tree has uncommitted changes"
+}
+say_commit
+
 export E2E_SHOTS="$SHOTS"
 export E2E_FIXTURES="$WORK/fixtures"
 export E2E_SCHEMA="$ROOT/schema/openapi.yaml"

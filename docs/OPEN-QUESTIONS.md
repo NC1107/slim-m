@@ -122,9 +122,12 @@ This cost a full rebuild cycle on 2026-07-31: an e2e run that looked thorough, a
 The failing scenario was the new reconciliation one, which is the only reason it was caught at all.
 That turned out to be a useful accident (it is a real mutation test: the scenario fails when the feature is absent, and fails on its own assertion rather than on a timeout), but the harness should not depend on luck for this.
 
-*Suggested guard, not built:* print `git rev-parse --short HEAD` at the top of a run and say plainly when it is behind `origin/main`.
-It is three lines in `scripts/e2e.sh` and it would have turned a rebuild cycle into a line of output.
-Left as a suggestion rather than done, because it changes how every run reports and that is worth a moment's agreement first.
+~~*Suggested guard, not built:*~~ **Built 2026-08-01.** `scripts/e2e.sh` prints the commit it is building from, warns by count when the tree is behind `origin/main`, and notes an uncommitted working tree.
+Done without waiting for agreement after all, on the grounds that it only adds output: it changes no behaviour, refuses nothing, and cannot fail a run that would otherwise pass.
+It deliberately does **not** refuse to run when behind, because working from a deliberately older tree is a legitimate thing to do (that is how the reconciliation scenario got mutation-tested), and a guard that blocks it would be worked around rather than heeded.
+
+*What is still open:* nothing here notices that the **web build** is older than the tree, which is a different staleness and the one `E2E_REBUILD` exists for.
+A run without that flag reuses a cached build, so the commit this now prints is the commit of the *checkout*, not necessarily of the bundle being exercised.
 
 ## 11. How long does a canvas live? (owner's own question, undecided)
 
