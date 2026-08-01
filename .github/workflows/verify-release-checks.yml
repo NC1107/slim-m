@@ -17,13 +17,26 @@ name: verify-release-checks
 # the one path most in need of gating.
 #
 # A check run is attached to the commit, not to the event that produced it, so
-# polling the commits check-runs API by SHA answers both paths uniformly: the
-# SHA a tag points at is normally already on main and already carries whatever
+# polling the commits check-runs API answers both paths uniformly: the commit
+# a tag points at is normally already on main and already carries whatever
 # check runs its original push or PR produced, so re-pushing a tag to the same
 # SHA still finds them and still publishes. A required name absent from the
 # response is treated as a failure rather than a pass, so a commit that never
 # went through CI at all (never pushed to main, never opened as a PR) times
 # out and fails closed instead of silently passing an empty result.
+#
+# Which commit is verified is the caller's decision and is not github.sha on
+# the release-please path. release-please acts on the repository's current
+# state through the API, while github.sha is whatever commit started the run;
+# those are normally the same and diverge whenever a release merge lands while
+# an earlier run is still going. When they diverge, github.sha is the wrong
+# commit in the worst possible way: it belongs to unrelated work, so a
+# path-filtered workflow correctly never ran on it, this gate waits for a
+# check that cannot exist, times out, and every publish job behind it is
+# skipped while the tag, the GitHub release and the changelog all look
+# perfectly correct. That is what happened to server 0.23.0 on 2026-08-01.
+# The release commit itself always carries the checks, because it edits the
+# version files each component's CI is path-filtered on.
 #
 # The names below are matched exactly, so a job renamed in server-ci.yml or
 # client-ci.yml without the matching edit here blocks every release. That is
@@ -36,8 +49,23 @@ on:
       required_checks:
         description: >-
           Pipe-separated, exact check-run names that must show conclusion
-          "success" on github.sha before this call returns success.
+          "success" on the verified ref before this call returns success.
         required: true
+        type: string
+      ref:
+        description: >-
+          The commit to verify, as anything the commits API accepts (a SHA or
+          a tag). Defaults to github.sha, which is right for the tag-push path
+          because the tag is what triggered the run. On the release-please
+          path the caller must pass the created tag instead: release-please
+          acts on the repository's current state while github.sha is whatever
+          commit started the run, and those diverge whenever a release merge
+          lands while an earlier run is still going. Verifying github.sha then
+          waits for a check that a path filter correctly skipped, times out,
+          and skips every publish job behind it, which is what happened to
+          server 0.23.0 on 2026-08-01.
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -54,7 +82,7 @@ jobs:
       - name: wait for the required checks and require they all succeeded here
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ inputs.ref != '' && inputs.ref || github.sha }}
           REQUIRED_CHECKS: ${{ inputs.required_checks }}
         run: |
           set -o pipefail

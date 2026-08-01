@@ -58,6 +58,7 @@ jobs:
       contents: read
     uses: ./.github/workflows/verify-release-checks.yml
     with:
+      ref: ${{ needs.release-please.outputs.server_tag }}
       required_checks: "check|hygiene|cargo dependency licenses"
 
   # Requires client-ci, client-ios-ci, hygiene and the license gate to have
@@ -73,6 +74,7 @@ jobs:
       contents: read
     uses: ./.github/workflows/verify-release-checks.yml
     with:
+      ref: ${{ needs.release-please.outputs.client_tag }}
       required_checks: "analyze, format check, test|ios unit tests (callkit invariant)|hygiene|pub dependency licenses"
 
   # One single-arch image per architecture, built on a NATIVE runner and pushed
