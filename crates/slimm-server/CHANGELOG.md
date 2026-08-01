@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/NC1107/slim-m/compare/server-v0.24.0...server-v0.25.0) (2026-08-01)
+
+
+### Features
+
+* threads, a channel with a parent (docs/decisions/0005-threads.md) ([#312](https://github.com/NC1107/slim-m/issues/312)) ([dc5e624](https://github.com/NC1107/slim-m/commit/dc5e624b496c8a4c5cd4d39a0c4758791ac6f61f))
+
 ## [0.24.0](https://github.com/NC1107/slim-m/compare/server-v0.23.0...server-v0.24.0) (2026-08-01)
 
 
