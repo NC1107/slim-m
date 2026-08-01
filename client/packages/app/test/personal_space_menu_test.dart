@@ -67,6 +67,7 @@ const _personal = Channel(
   name: personalSpaceName,
   kind: dmChannelKind,
   createdAt: 0,
+  position: 0,
   cursor: 0,
   lastReadSeq: 0,
   isPersonalSpace: true,

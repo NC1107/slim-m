@@ -22,6 +22,7 @@ Channel _channel(
   name: id,
   kind: kind,
   createdAt: 0,
+  position: 0,
   cursor: 0,
   lastReadSeq: 0,
   isPersonalSpace: isPersonalSpace,
@@ -75,6 +76,46 @@ void main() {
             "DirectMessagesSection always renders the personal space "
             'above every other DM, whatever order they were opened in',
       );
+    });
+  });
+
+  group('spliceKindOrder', () {
+    test(
+      'rewrites only the named kind, leaving every other slot untouched',
+      () {
+        final fullOrder = [
+          _channel('t1'),
+          _channel('v1', kind: 'voice'),
+          _channel('t2'),
+          _channel('v2', kind: 'voice'),
+        ];
+
+        final result = spliceKindOrder(
+          fullOrder: fullOrder,
+          kind: 'text',
+          newKindOrder: ['t2', 't1'],
+        );
+
+        expect(
+          result,
+          ['t2', 'v1', 't1', 'v2'],
+          reason:
+              'the voice channels keep the exact slots they held; only '
+              'the text channels move, in the order given',
+        );
+      },
+    );
+
+    test('an unchanged kind order is a no-op', () {
+      final fullOrder = [_channel('a'), _channel('b', kind: 'voice')];
+
+      final result = spliceKindOrder(
+        fullOrder: fullOrder,
+        kind: 'text',
+        newKindOrder: ['a'],
+      );
+
+      expect(result, ['a', 'b']);
     });
   });
 }

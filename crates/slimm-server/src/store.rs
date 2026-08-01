@@ -20,6 +20,7 @@ mod bootstrap;
 mod canvas;
 mod canvas_ops;
 mod canvas_ops_write;
+mod channel_order;
 mod channels;
 mod dms;
 mod emoji;
@@ -56,6 +57,7 @@ pub use canvas_ops::{
     CANVAS_OP_GAP, CANVAS_OP_PAGE_BYTES, CanvasOpBody, CanvasOpEntry, CanvasOpsPage,
 };
 pub use canvas_ops_write::{CanvasOpRequest, MAX_REMOVE_IDS_PER_OP, SubmitOpError, SubmittedOp};
+pub use channel_order::{ReorderChannelsError, ReorderOutcome};
 pub use channels::DeleteChannelError;
 pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};
@@ -104,6 +106,11 @@ pub struct Channel {
     /// it back to `None` is what an edit to a blank value normalizes to, the
     /// same way an empty topic and no topic render identically to a viewer.
     pub topic: Option<String>,
+    /// Sort key among the deployment's live, non-DM channels: lower sorts
+    /// first. Deployment-wide, not per-device - see
+    /// [`super::channel_order::reorder_channels`]. Meaningless for a DM,
+    /// which is never listed or reordered by it.
+    pub position: i64,
     pub created_at: i64,
 }
 

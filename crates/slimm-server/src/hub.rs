@@ -156,10 +156,12 @@ pub enum Event {
     /// exactly who should be told, the same channel-scoped check every
     /// message event already uses.
     ChannelCreated(Channel),
-    /// A channel was renamed or had its topic replaced. Never changes what a
-    /// channel's permission model allows, so the ordinary current-state
-    /// channel-scoped check is exact here too: nobody's view of the channel
-    /// changes, only its name or topic.
+    /// A channel was renamed, had its topic replaced, or moved in the
+    /// deployment's order. Never changes what a channel's permission model
+    /// allows, so the ordinary current-state channel-scoped check is exact
+    /// here too: nobody's view of the channel changes, only its name, topic
+    /// or position. `PUT /channels/order` publishes one of these per channel
+    /// whose position actually moved, reusing this rather than a new variant.
     ChannelUpdated(Channel),
     /// A channel was soft-deleted. Carries only the id: there is nothing left
     /// to show once it is gone. Gated specially in `http::ws::authorize`

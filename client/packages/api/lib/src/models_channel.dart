@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: Apache-2.0
+/// The `Channel` wire model, split out of `models.dart` for the line budget.
+library;
+
+/// A text or voice channel.
+class Channel {
+  const Channel({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.createdAt,
+    this.topic,
+    this.position = 0,
+    this.isPersonalSpace = false,
+    this.dmParticipantId,
+  });
+
+  final String id;
+  final String name;
+  final String kind;
+  final int createdAt;
+
+  /// A one-line header shown beside the name. Null for no topic; the server
+  /// never stores an empty string, so blank and absent mean the same thing.
+  final String? topic;
+
+  /// Sort key among the deployment's live, non-DM channels: lower sorts
+  /// first. Deployment-wide, set by [SlimmApiChannelAdmin.reorderChannels],
+  /// not a per-device preference. Defaults to 0 for a server too old to send
+  /// it, which reads as "unordered" rather than a real position - the same
+  /// reason a missing `topic` reads as unknown rather than "no topic".
+  /// Meaningless on a DM, which never appears in [SlimmApi.listChannels].
+  final int position;
+
+  /// Whether this row is the caller's own personal space: a DM with
+  /// themself. Never sent or read on the wire - the server has no such
+  /// concept, and [fromJson] always defaults this to false - it is set only
+  /// by `channelFromDm` (`providers/dms.dart`), the one place a caller's id
+  /// is compared against the DM's other participant. [name] is cosmetic
+  /// display copy and must never be used to answer this question: another
+  /// member's freely chosen display name can collide with it.
+  final bool isPersonalSpace;
+
+  /// The other user in this DM, or null for a non-DM channel. Never sent or
+  /// read on the wire, exactly like [isPersonalSpace] and set at the same
+  /// place, so a caller that needs to know who a DM is with (blocking) can
+  /// read it off the local row instead of fetching the whole `/dms` listing.
+  final String? dmParticipantId;
+
+  bool get isVoice => kind == 'voice';
+
+  factory Channel.fromJson(Map<String, dynamic> json) => Channel(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        kind: json['kind'] as String,
+        createdAt: json['created_at'] as int,
+        topic: json['topic'] as String?,
+        position: json['position'] as int? ?? 0,
+      );
+}

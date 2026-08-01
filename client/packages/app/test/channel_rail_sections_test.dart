@@ -39,6 +39,7 @@ Channel _dm(
   name: name,
   kind: dmChannelKind,
   createdAt: 0,
+  position: 0,
   cursor: cursor,
   lastReadSeq: lastReadSeq,
   isPersonalSpace: isPersonalSpace,

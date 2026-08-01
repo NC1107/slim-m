@@ -122,6 +122,21 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.20.0',
+    headline: 'Reorder channels by dragging them in the sidebar',
+    points: [
+      WhatsNewPoint(
+        'If you manage channels, press and hold a text or voice channel to '
+        'drag it to a new spot. The order is shared by the whole Space, not '
+        'just your device, so everyone sees channels in the same place.',
+      ),
+      WhatsNewPoint(
+        'If a reorder cannot be saved, the sidebar says so and lets you '
+        'retry rather than quietly snapping back with no explanation.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,

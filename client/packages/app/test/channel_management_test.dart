@@ -39,6 +39,7 @@ Channel _channel(
   name: name,
   kind: kind,
   createdAt: 0,
+  position: 0,
   topic: topic,
   cursor: 0,
   lastReadSeq: 0,
@@ -120,6 +121,7 @@ void main() {
           TextChannelsSection(
             channels: [_channel('c1', 'general')],
             selectedId: null,
+            onReorder: (_) {},
           ),
           handler: (_) => http.Response('{}', 200),
         ),
@@ -138,6 +140,7 @@ void main() {
               channels: [_channel('c1', 'general')],
               selectedId: null,
               canManage: true,
+              onReorder: (_) {},
             ),
             handler: (_) => http.Response('{}', 200),
           ),
@@ -160,6 +163,7 @@ void main() {
             channels: const [],
             selectedId: null,
             canManage: true,
+            onReorder: (_) {},
           ),
           handler: (request) {
             requests.add(request);
@@ -207,6 +211,7 @@ void main() {
             channels: [_channel('c1', 'general')],
             selectedId: null,
             canManage: true,
+            onReorder: (_) {},
           ),
           handler: (request) => request.method == 'DELETE'
               ? http.Response(
@@ -244,6 +249,7 @@ void main() {
             channels: [_channel('c1', 'general'), _channel('c2', 'random')],
             selectedId: 'c1',
             canManage: true,
+            onReorder: (_) {},
           ),
           initialLocation: Routes.channel('c1'),
           handler: (request) {
@@ -288,6 +294,7 @@ void main() {
             channels: [_channel('c1', 'general'), _channel('c2', 'random')],
             selectedId: 'c1',
             canManage: true,
+            onReorder: (_) {},
           ),
           initialLocation: Routes.channel('c1'),
           handler: (request) {
@@ -331,6 +338,7 @@ void main() {
             channels: [_channel('c1', 'general'), _channel('c2', 'random')],
             selectedId: 'c1',
             canManage: true,
+            onReorder: (_) {},
           ),
           initialLocation: Routes.channel('c1'),
           handler: (request) => request.method == 'DELETE'

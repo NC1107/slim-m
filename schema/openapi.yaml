@@ -1041,6 +1041,45 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
+  /channels/order:
+    put:
+      operationId: reorderChannels
+      tags: [channels]
+      summary: Set the deployment's channel order.
+      description: >
+        Requires MANAGE_CHANNELS at the deployment level, the same check
+        `createChannel` uses. Deployment-wide, not a per-device preference:
+        one deployment is one community, and everyone seeing the same order
+        is the point. Takes the whole ordered list of channel ids a drag
+        produced, applied atomically, rather than a position PATCH per
+        channel that could interleave with another admin's drag and leave
+        the order neither of them asked for. The list must name exactly the
+        live, non-DM channels - no more, no fewer, no repeats - or the
+        request is refused with a 400 naming which channels were missing or
+        unrecognized; a partial list is never applied. Submitting the order
+        already in effect is not an error and changes nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderChannelsRequest"
+      responses:
+        "200":
+          description: Every live, non-DM channel, in its new order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Channel"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /dms:
     get:
       operationId: listDirectMessages
@@ -3573,6 +3612,15 @@ components:
             channel header, or null for no topic. Absent on servers older
             than this field, which a client must treat as unknown rather
             than "no topic".
+        position:
+          type: integer
+          format: int64
+          description: >
+            Sort key among the deployment's live, non-DM channels: lower
+            sorts first. Deployment-wide, set by `reorderChannels`, not a
+            per-device preference. Absent on servers older than this field,
+            which a client must treat as unknown rather than assuming 0.
+            Meaningless on a DM, which never appears in `listChannels`.
         created_at:
           type: integer
           format: int64
@@ -3608,6 +3656,19 @@ components:
           description: >
             A blank or whitespace-only value clears the topic back to null
             rather than storing an empty string.
+
+    ReorderChannelsRequest:
+      type: object
+      required: [channel_ids]
+      properties:
+        channel_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: >
+            Every live, non-DM channel id, in the desired order. Must name
+            exactly that set - no more, no fewer, no repeats.
 
     DmConversation:
       type: object
