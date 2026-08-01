@@ -176,6 +176,22 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.20.3',
+    headline: 'Attaching a photo on iPhone and Android',
+    points: [
+      WhatsNewPoint(
+        'The attach button on a phone used to only open the Files browser, '
+        'which cannot see your camera roll at all. It now asks whether you '
+        'want your photo library or files, the same choice you get '
+        'attaching a photo anywhere else.',
+      ),
+      WhatsNewPoint(
+        'Your profile picture picker got the same choice, so a photo that '
+        'arrived by download or AirDrop is no longer stuck.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,

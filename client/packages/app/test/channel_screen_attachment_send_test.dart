@@ -174,7 +174,7 @@ void main() {
       ),
     );
     await _flush(tester);
-    await tester.tap(find.text('Attach a file'));
+    await tester.tap(find.text('Browse files'));
     await _flush(tester);
 
     expect(

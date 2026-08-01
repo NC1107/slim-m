@@ -64,6 +64,10 @@ class FakePicker extends FilePickerPlatform {
 
   int calls = 0;
 
+  /// What the most recent call actually asked for, so a test can tell the
+  /// composer's two attach routes apart without a platform channel.
+  FileType? lastType;
+
   @override
   Future<FilePickerResult?> pickFiles({
     String? dialogTitle,
@@ -81,6 +85,7 @@ class FakePicker extends FilePickerPlatform {
     AndroidSAFOptions? androidSafOptions,
   }) async {
     calls += 1;
+    lastType = type;
     if (failure != null) throw failure!;
     return file == null ? null : FilePickerResult([file!]);
   }
@@ -225,6 +230,10 @@ Finder get attachButton => find.byWidgetPredicate(
 
 Finder get emojiButton => find.byWidgetPredicate(
   (w) => w is AppIconButton && w.semanticLabel == 'Insert emoji',
+);
+
+Finder get moreActionsButton => find.byWidgetPredicate(
+  (w) => w is AppIconButton && w.semanticLabel == 'More actions',
 );
 
 bool fieldHasFocus(WidgetTester tester) =>

@@ -18,6 +18,7 @@ import '../providers/composer_focus.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/typing_controller.dart';
+import 'attachment_picker.dart';
 import 'composer_autocomplete.dart';
 import 'composer_autocomplete_items.dart';
 import 'composer_autocomplete_query.dart';
@@ -271,7 +272,10 @@ class _ComposerState extends ConsumerState<Composer> {
   void _openActions() => unawaited(
     showComposerActionsSheet(
       context,
-      onAttach: () => unawaited(_pickAttachment()),
+      onPhotoLibrary: () =>
+          unawaited(_pickAttachment(AttachmentSource.photoLibrary)),
+      onBrowseFiles: () =>
+          unawaited(_pickAttachment(AttachmentSource.fileBrowser)),
       onPoll: () => showPollComposerSheet(context, widget.channelId),
       onCode: _insertCodeFence,
     ),
@@ -284,13 +288,18 @@ class _ComposerState extends ConsumerState<Composer> {
     unawaited(_send());
   }
 
+  /// Desktop has no photo-versus-files split (see `attachment_picker.dart`),
+  /// so its single tap goes straight to the document picker.
+  void _pickFileFromButton() =>
+      unawaited(_pickAttachment(AttachmentSource.fileBrowser));
+
   /// Re-focuses the field on every exit, including a cancelled pick: the
   /// native picker takes focus with it, and without this the caret never
   /// comes back and typing goes nowhere.
-  Future<void> _pickAttachment() async {
+  Future<void> _pickAttachment(AttachmentSource source) async {
     final FilePickerResult? result;
     try {
-      result = await FilePicker.pickFiles();
+      result = await ref.read(attachmentPickerProvider(source))();
     } catch (e) {
       if (!mounted) return;
       _focus.requestFocus();
@@ -422,7 +431,7 @@ class _ComposerState extends ConsumerState<Composer> {
                         : (touch ? 'More actions' : 'Attach a file'),
                     onPressed: _uploading
                         ? null
-                        : (touch ? _openActions : _pickAttachment),
+                        : (touch ? _openActions : _pickFileFromButton),
                   ),
                   const SizedBox(width: AppSpacing.s8),
                   Expanded(

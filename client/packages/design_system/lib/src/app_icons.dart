@@ -59,6 +59,10 @@ abstract final class AppIcons {
   /// A picked image, once there is one to replace rather than choose fresh.
   static const IconData image = LucideIcons.image300;
 
+  /// The document-browser route onto an attachment, distinct from [image]'s
+  /// Photos-backed one; see `attachment_picker.dart`.
+  static const IconData attachFile = LucideIcons.paperclip300;
+
   /// A staleness cue distinct from [pending]: the same glyph, a different
   /// role (an expiring device or invite rather than an in-flight send), kept
   /// as its own name so the two are never conflated at a call site.

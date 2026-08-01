@@ -7,6 +7,7 @@
 /// three ways the pick can end.
 library;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -185,6 +186,42 @@ void main() {
         fieldHasFocus(tester),
         isTrue,
         reason: 'a broken picker must not cost the caret either',
+      );
+    });
+
+    // The owner's report: the attach button on a phone only opened Files.
+    testWidgets('the sheet routes Photo library and Browse files to '
+        'different requests', (tester) async {
+      // Touch density, and so the sheet at all, follows width; see AppTouchTargets.of.
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final picker = usePicker(pickedFile());
+      await tester.pumpWidget(
+        composerHarness(
+          controller: controller,
+          sends: sends,
+          platform: TargetPlatform.iOS,
+        ),
+      );
+
+      await tester.tap(moreActionsButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Photo library'));
+      await tester.pumpAndSettle();
+
+      expect(picker.lastType, FileType.image);
+
+      await tester.tap(moreActionsButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Browse files'));
+      await tester.pumpAndSettle();
+
+      expect(
+        picker.lastType,
+        isNot(FileType.image),
+        reason: 'the document browser must not be asked to filter to Photos',
       );
     });
   });

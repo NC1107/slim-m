@@ -2,6 +2,10 @@
 /// Settings' avatar section: a preview of the caller's own picture plus
 /// upload and remove actions, following the same pick-bytes-then-upload
 /// shape the composer's attachment picker already uses.
+///
+/// Two upload buttons rather than one, for the same reason the composer's
+/// attach action split in two: a Photos-only pick cannot reach a picture
+/// that arrived by download or AirDrop. See `attachment_picker.dart`.
 library;
 
 import 'package:file_picker/file_picker.dart';
@@ -12,6 +16,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
 import '../providers/providers.dart';
+import 'attachment_picker.dart';
 import 'avatar_crop_sheet.dart';
 import 'settings_section_header.dart';
 import 'user_avatar.dart';
@@ -27,10 +32,10 @@ class AvatarSettingsSection extends ConsumerStatefulWidget {
 class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
   bool _busy = false;
 
-  Future<void> _upload() async {
+  Future<void> _upload(AttachmentSource source) async {
     final FilePickerResult? result;
     try {
-      result = await FilePicker.pickFiles(type: FileType.image);
+      result = await ref.read(attachmentPickerProvider(source))();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -113,19 +118,31 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               else
-                Wrap(
-                  spacing: AppSpacing.s8,
-                  children: [
-                    TextButton(
-                      onPressed: me == null ? null : _upload,
-                      child: const Text('Upload photo'),
-                    ),
-                    if (hasAvatar)
+                // Expanded, or an unconstrained Wrap in a Row never wraps and three buttons overflow instead of taking a second line.
+                Expanded(
+                  child: Wrap(
+                    spacing: AppSpacing.s8,
+                    runSpacing: AppSpacing.s4,
+                    children: [
                       TextButton(
-                        onPressed: _remove,
-                        child: const Text('Remove'),
+                        onPressed: me == null
+                            ? null
+                            : () => _upload(AttachmentSource.photoLibrary),
+                        child: const Text('Photo library'),
                       ),
-                  ],
+                      TextButton(
+                        onPressed: me == null
+                            ? null
+                            : () => _upload(AttachmentSource.fileBrowser),
+                        child: const Text('Browse files'),
+                      ),
+                      if (hasAvatar)
+                        TextButton(
+                          onPressed: _remove,
+                          child: const Text('Remove'),
+                        ),
+                    ],
+                  ),
                 ),
             ],
           ),
