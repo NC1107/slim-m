@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.22.0](https://github.com/NC1107/slim-m/compare/client-v0.21.3...client-v0.22.0) (2026-08-01)
+
+
+### Features
+
+* **client:** an actionable report queue ([#304](https://github.com/NC1107/slim-m/issues/304)) ([2733e0d](https://github.com/NC1107/slim-m/commit/2733e0d26ffde640896b72d784b160fc512fbee3))
+* **client:** swipe from the left edge to open the channel rail ([#301](https://github.com/NC1107/slim-m/issues/301)) ([ae4a31b](https://github.com/NC1107/slim-m/commit/ae4a31b81b614682bd3b7ae29474e7404582cce1))
+
+
+### Bug Fixes
+
+* **client:** centre the settings avatar and add a tap-to-change badge ([#303](https://github.com/NC1107/slim-m/issues/303)) ([720f450](https://github.com/NC1107/slim-m/commit/720f450eca98809dcdf3d1ac77f580e0092e7d65))
+* **client:** jump button size, reaction spacing, and the member pane not closing ([#302](https://github.com/NC1107/slim-m/issues/302)) ([e7bdf39](https://github.com/NC1107/slim-m/commit/e7bdf39955c64f2dd718f0afaf6d70583eb7d7b2))
+* **client:** restore the composer's Paste image fallback on iOS ([#299](https://github.com/NC1107/slim-m/issues/299)) ([74661b1](https://github.com/NC1107/slim-m/commit/74661b1626c8109675767b422721157618de1f48))
+
 ## [0.21.3](https://github.com/NC1107/slim-m/compare/client-v0.21.2...client-v0.21.3) (2026-08-01)
 
 
