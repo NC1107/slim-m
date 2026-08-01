@@ -145,4 +145,8 @@ abstract final class AppIcons {
   /// Removing a row from a personal list view rather than deleting anything:
   /// distinct from [delete], which destroys the thing itself.
   static const IconData removeFromList = LucideIcons.listX300;
+
+  /// Leaving this surface to view something in its own context - the report
+  /// queue's "Jump to message", not a link to another site.
+  static const IconData jumpToMessage = LucideIcons.externalLink300;
 }

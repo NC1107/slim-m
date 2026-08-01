@@ -1,33 +1,43 @@
 // SPDX-License-Identifier: Apache-2.0
 /// One report in the moderation queue, split out of `reports_screen.dart` to
-/// keep that file under budget.
+/// keep that file under budget. Naming the reporter and reported subject
+/// lives in `report_card_labels.dart`; the quick moderation actions live in
+/// `report_card_actions.dart` - both split out for the same reason.
 ///
-/// A report is an irreversible-close decision, and the card has to name what
-/// is being decided: who filed it, and for a user report, who is being
-/// reported. Both resolve through [batchProfilesControllerProvider] rather
-/// than rendering the raw id the wire carries.
+/// The reported snapshot renders through the same markdown pipeline the
+/// transcript uses ([MessageBody]), on purpose: a moderator judging content
+/// should see what the channel actually saw, not the raw markup underneath
+/// it. `report.reason` (the filer's own explanation) stays plain text - it is
+/// moderator-facing metadata about the report, not the reported content.
 ///
-/// A message report needs its author named too, and `subject_id` is the
-/// *message's* id rather than the author's - so that one could not be resolved
-/// from what the wire carried. `Report.subjectAuthorId` was added for this,
-/// joined at read time server-side, and it is null in the three cases an
-/// author id is always null: a user report, a message since hard-deleted, and
-/// an anonymized account.
+/// Quick actions - jump to the message, delete it, time out or remove its
+/// author - are each absent without the permission they need, never offered
+/// and refused, matching `AppSegmentedOption`'s own rule.
 library;
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../format.dart';
+import '../../permissions.dart';
+import '../../providers/admin_providers.dart';
+import '../../providers/emoji_catalog_provider.dart';
+import '../../providers/member_presence.dart' show membersProvider;
 import '../../providers/providers.dart';
-import '../../providers/reports_controller.dart';
 import '../../providers/user_profiles.dart';
+import '../../widgets/channel_rail.dart' show selectedChannelId;
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/message_jump.dart';
+import '../../widgets/message_text.dart';
 import '../../widgets/run_guarded.dart';
+import 'report_card_actions.dart';
+import 'report_card_labels.dart';
+import 'report_card_quick_actions.dart';
 
 class ReportCard extends ConsumerStatefulWidget {
   const ReportCard({super.key, required this.report});
@@ -42,16 +52,25 @@ class _ReportCardState extends ConsumerState<ReportCard>
     with GuardedActionState<ReportCard> {
   bool _busy = false;
 
+  /// Null while unproven; jumping stays disabled until this is true. See
+  /// [_checkReachability].
+  bool? _channelReachable;
+
   @override
   void initState() {
     super.initState();
     _requestProfiles();
+    unawaited(_checkReachability());
   }
 
   @override
   void didUpdateWidget(covariant ReportCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.report.id != widget.report.id) _requestProfiles();
+    if (oldWidget.report.id != widget.report.id) {
+      _channelReachable = null;
+      _requestProfiles();
+      unawaited(_checkReachability());
+    }
   }
 
   /// The ids this card needs a name for: the reporter always, and the
@@ -65,6 +84,31 @@ class _ReportCardState extends ConsumerState<ReportCard>
     };
     if (ids.isEmpty) return;
     unawaited(ref.read(batchProfilesControllerProvider.notifier).resolve(ids));
+  }
+
+  /// See [reportedChannelReachable]. Left null (jump disabled) for a report
+  /// with nothing to jump to at all.
+  Future<void> _checkReachability() async {
+    final report = widget.report;
+    final channelId = report.channelId;
+    if (report.subjectKind != api.ReportSubject.message || channelId == null) {
+      return;
+    }
+    final reachable = await reportedChannelReachable(ref, channelId);
+    if (!mounted || widget.report.id != report.id) return;
+    setState(() => _channelReachable = reachable);
+  }
+
+  void _jump() {
+    final channelId = widget.report.channelId;
+    if (channelId == null) return;
+    jumpToMessage(
+      GoRouter.of(context),
+      ref.read,
+      currentChannelId: selectedChannelId(context),
+      channelId: channelId,
+      messageId: widget.report.subjectId,
+    );
   }
 
   Future<void> _resolve(api.ReportResolution resolution) async {
@@ -82,17 +126,25 @@ class _ReportCardState extends ConsumerState<ReportCard>
       confirmLabel: verb,
     );
     if (!confirmed || !mounted) return;
-
-    setState(() => _busy = true);
-    await guard(
-      whatFailed: 'close the report',
-      action: () async {
-        await ref
+    await _runQuickAction((g) async {
+      await g(
+        whatFailed: 'close the report',
+        action: () => ref
             .read(apiProvider)
-            .resolveReport(reportId: widget.report.id, resolution: resolution);
-        await ref.read(reportsControllerProvider.notifier).refresh();
-      },
-    );
+            .resolveReport(reportId: widget.report.id, resolution: resolution),
+      );
+    });
+  }
+
+  /// [action] receives this card's own [guard], not a plain closure: each of
+  /// `report_card_actions.dart`'s helpers renders its own failure through it
+  /// and closes the report itself, so this only owns the busy flag around it.
+  Future<void> _runQuickAction(
+    Future<void> Function(Guard guard) action,
+  ) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    await action(guard);
     if (!mounted) return;
     setState(() => _busy = false);
   }
@@ -102,35 +154,47 @@ class _ReportCardState extends ConsumerState<ReportCard>
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final report = widget.report;
     final profiles = ref.watch(batchProfilesControllerProvider);
-    final reporterLabel = _reporterLabel(report.reporterId, profiles);
+    final me = ref.watch(meProvider).valueOrNull;
+    final mine = ref.watch(myPermissionsProvider);
+    final knownUsernames = ref
+        .watch(membersProvider)
+        .maybeWhen(
+          data: (members) =>
+              members.map((m) => m.username.toLowerCase()).toSet(),
+          orElse: () => const <String>{},
+        );
+    final customEmoji = ref.watch(customEmojiIndexProvider);
+
+    final isMessageReport = report.subjectKind == api.ReportSubject.message;
+    final targetUserId = isMessageReport
+        ? report.subjectAuthorId
+        : report.subjectId;
+    final targetName = isMessageReport
+        ? authorHeadline(report.subjectAuthorId, profiles)
+        : subjectHeadline(report.subjectId, profiles);
+    final isSelf = targetUserId != null && me != null && targetUserId == me.id;
+
+    final canJump = isMessageReport && report.channelId != null;
+    final jumpEnabled = canJump && (_channelReachable ?? false);
+    final canDeleteMessage =
+        isMessageReport && mine.hasPermission(Perm.manageMessages);
+    final canTimeOut =
+        targetUserId != null && !isSelf && mine.hasPermission(Perm.kickMembers);
+    final canRemove =
+        targetUserId != null && !isSelf && mine.hasPermission(Perm.banMembers);
+    final hasQuickActions =
+        canJump || canDeleteMessage || canTimeOut || canRemove;
 
     return AppCard(
-      title: report.subjectKind == api.ReportSubject.message
-          ? 'Reported message'
-          : 'Reported user',
+      title: isMessageReport ? 'Reported message' : 'Reported user',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (report.subjectKind == api.ReportSubject.message) ...[
-            Text(
-              _authorHeadline(report.subjectAuthorId, profiles),
-              style: AppText.body.copyWith(
-                fontWeight: AppWeights.semi,
-                color: tokens.textPrimary,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s8),
-          ],
-          if (report.subjectKind == api.ReportSubject.user) ...[
-            Text(
-              _subjectHeadline(report.subjectId, profiles),
-              style: AppText.body.copyWith(
-                fontWeight: AppWeights.semi,
-                color: tokens.textPrimary,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s8),
-          ],
+          ReportLabeledValue(
+            label: isMessageReport ? 'Reported author' : 'Reported user',
+            value: targetName,
+          ),
+          const SizedBox(height: AppSpacing.s8),
           Text(report.reason, style: TextStyle(color: tokens.textPrimary)),
           if (report.snapshot != null) ...[
             const SizedBox(height: AppSpacing.s8),
@@ -140,20 +204,88 @@ class _ReportCardState extends ConsumerState<ReportCard>
                 color: tokens.surfaceSunken,
                 borderRadius: BorderRadius.circular(AppRadii.control),
               ),
-              child: Text(
-                report.snapshot!,
-                // Bounded so one long paste cannot grow past the rest.
-                maxLines: 6,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              // Bounded and scrolling, not clipped, so one long paste cannot grow past the rest.
+              constraints: const BoxConstraints(maxHeight: 160),
+              child: SingleChildScrollView(
+                child: MessageBody(
+                  content: report.snapshot!,
+                  knownUsernames: knownUsernames,
+                  customEmoji: customEmoji,
+                ),
               ),
             ),
           ],
           const SizedBox(height: AppSpacing.s8),
-          Text(
-            'Filed by $reporterLabel · ${formatDateTime(report.createdAt)}',
-            style: AppText.caption.copyWith(color: tokens.textSecondary),
+          Row(
+            children: [
+              Text(
+                'Reporter',
+                style: AppText.caption.copyWith(
+                  color: tokens.textSecondary,
+                  fontWeight: AppWeights.medium,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s4),
+              Text(
+                reporterLabel(report.reporterId, profiles),
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
+              const Spacer(),
+              Text(
+                formatDateTime(report.createdAt),
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
+            ],
           ),
+          if (hasQuickActions) ...[
+            const SizedBox(height: AppSpacing.s12),
+            ReportQuickActions(
+              busy: _busy,
+              jumpEnabled: canJump ? jumpEnabled : null,
+              onJump: canJump ? _jump : null,
+              onDelete: canDeleteMessage
+                  ? () => unawaited(
+                      _runQuickAction(
+                        (g) => deleteReportedMessage(
+                          context,
+                          ref,
+                          g,
+                          channelId: report.channelId!,
+                          messageId: report.subjectId,
+                          reportId: report.id,
+                        ),
+                      ),
+                    )
+                  : null,
+              onRemove: canRemove
+                  ? () => unawaited(
+                      _runQuickAction(
+                        (g) => removeReportedAuthor(
+                          context,
+                          ref,
+                          g,
+                          userId: targetUserId,
+                          name: targetName,
+                          reportId: report.id,
+                        ),
+                      ),
+                    )
+                  : null,
+              onTimeOut: canTimeOut
+                  ? (d) => unawaited(
+                      _runQuickAction(
+                        (g) => timeOutReportedAuthor(
+                          ref,
+                          g,
+                          userId: targetUserId,
+                          duration: d,
+                          reportId: report.id,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+          ],
           const SizedBox(height: AppSpacing.s12),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -182,33 +314,4 @@ class _ReportCardState extends ConsumerState<ReportCard>
       ),
     );
   }
-}
-
-/// The reporter's name for the "Filed by ..." line. [id] itself null (the
-/// server already anonymized that account) and a batch fetch that came back
-/// without it (deleted since) read the same honest way; an id not yet asked
-/// for reads as still loading.
-String _reporterLabel(String? id, Map<String, api.UserProfile?> profiles) {
-  if (id == null) return 'a deleted account';
-  if (!profiles.containsKey(id)) return 'someone';
-  return profiles[id]?.displayName ?? 'a deleted account';
-}
-
-/// The reported user's name for a user report's headline: the same three
-/// states as [_reporterLabel], worded to stand alone rather than complete a
-/// sentence.
-String _subjectHeadline(String id, Map<String, api.UserProfile?> profiles) {
-  if (!profiles.containsKey(id)) return 'Resolving...';
-  return profiles[id]?.displayName ?? 'Deleted account';
-}
-
-/// Who wrote the reported message, for the headline of a message report.
-///
-/// A null id is not a lookup that failed: the server sends none when the
-/// message has been hard-deleted or its author anonymized, and saying so is
-/// more use to a moderator than a name that would be wrong.
-String _authorHeadline(String? id, Map<String, api.UserProfile?> profiles) {
-  if (id == null) return 'Author no longer on this Space';
-  if (!profiles.containsKey(id)) return 'Resolving...';
-  return profiles[id]?.displayName ?? 'Deleted account';
 }
