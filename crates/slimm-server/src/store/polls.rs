@@ -219,6 +219,8 @@ impl Store {
                 content: content.to_owned(),
                 created_at: now,
                 edited_at: None,
+                // A poll message is never created as a reply.
+                reply_to_id: None,
             },
             fresh: true,
         })

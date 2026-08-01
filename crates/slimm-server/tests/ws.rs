@@ -280,7 +280,7 @@ async fn a_store_error_authorizing_fan_out_closes_the_connection() {
         .expect("break the column permissions_in_channel queries by name");
 
     let sent = store
-        .send_message(channel.id, alice, MessageId::generate(), "hello", &[])
+        .send_message(channel.id, alice, MessageId::generate(), "hello", &[], None)
         .await
         .unwrap();
     state.hub.publish(Event::MessageCreated {

@@ -88,7 +88,7 @@ async fn admin(store: &Store, username: &str) -> (UserId, String, ChannelId) {
 
 async fn message(store: &Store, channel: ChannelId, author: UserId, body: &str) -> MessageId {
     store
-        .send_message(channel, author, MessageId::generate(), body, &[])
+        .send_message(channel, author, MessageId::generate(), body, &[], None)
         .await
         .unwrap()
         .message

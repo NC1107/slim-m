@@ -27,7 +27,7 @@ async fn store() -> (Store, support::TestDbGuard) {
 }
 
 async fn send(s: &Store, channel: ChannelId, author: UserId, body: &str) -> MessageId {
-    s.send_message(channel, author, MessageId::generate(), body, &[])
+    s.send_message(channel, author, MessageId::generate(), body, &[], None)
         .await
         .unwrap()
         .message

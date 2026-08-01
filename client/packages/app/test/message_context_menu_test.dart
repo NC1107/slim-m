@@ -79,6 +79,8 @@ void main() {
     await tester.pumpWidget(
       rowWith(
         MessageActions(
+          canReply: false,
+          onReply: noop,
           canEdit: true,
           onEdit: () => edited = true,
           canDelete: false,
@@ -109,6 +111,8 @@ void main() {
     await tester.pumpWidget(
       rowWith(
         const MessageActions(
+          canReply: false,
+          onReply: noop,
           canEdit: false,
           onEdit: noop,
           canDelete: false,
@@ -136,6 +140,8 @@ void main() {
     await tester.pumpWidget(
       rowWith(
         MessageActions(
+          canReply: false,
+          onReply: noop,
           canEdit: false,
           onEdit: noop,
           canDelete: true,
@@ -168,6 +174,8 @@ void main() {
     await tester.pumpWidget(
       rowWith(
         MessageActions(
+          canReply: false,
+          onReply: noop,
           canEdit: false,
           onEdit: noop,
           canDelete: false,
@@ -298,6 +306,8 @@ void main() {
             const Spacer(),
             row(
               const MessageActions(
+                canReply: false,
+                onReply: noop,
                 canEdit: true,
                 onEdit: noop,
                 canDelete: true,

@@ -188,7 +188,7 @@ async fn reacting_cannot_probe_for_messages_you_cannot_see() {
     let author = store.create_user("author", "Author").await.unwrap();
     let real = slimm_server::ids::MessageId::generate();
     store
-        .send_message(channel.id, author.id, real, "secret", &[])
+        .send_message(channel.id, author.id, real, "secret", &[], None)
         .await
         .unwrap();
     let hidden_status = app

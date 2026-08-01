@@ -85,7 +85,8 @@ impl Store {
                       m.author_id AS "author_id: UserId",
                       u.display_name AS "author_display_name?: String",
                       m.seq AS "seq!: Seq",
-                      m.content AS "content!", m.created_at AS "created_at!", m.edited_at
+                      m.content AS "content!", m.created_at AS "created_at!", m.edited_at,
+                      m.reply_to_id AS "reply_to_id: MessageId"
                FROM messages_fts
                JOIN messages m ON m.fts_rowid = messages_fts.rowid
                LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL

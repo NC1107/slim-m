@@ -308,3 +308,10 @@ Moot - there is nothing to tap.
 *What the run did instead:* traced the exact obstacle in the checked-out Flutter engine source at `~/development/flutter/engine/src/flutter/shell/platform/darwin/ios/framework/Source/FlutterTextInputPlugin.{h,mm}` rather than assuming the class name or method signatures, wrote the swizzle to fail back to today's behaviour (log and no-op) if either selector or the class itself is not found, and covered the Dart-side contract with unit tests.
 That work stands; the swizzle installs and fails safe exactly as designed, and remains real for a non-Material field or iOS below 16.
 It was simply never reachable from the one field that matters, which no amount of reasoning about the swizzle itself could have found without a device.
+
+## 18. Threads: which shape, still undecided
+
+Replies shipped (`crates/slimm-server/migrations/0029_message_replies.sql`, `messages.replyToId`): a message can point at another message, and the transcript shows a compact quote you can tap to jump to it.
+Threads, the "hidden sub-channel you click Reply in Thread to open" the owner described, did not, on purpose - see [docs/decisions/0005-threads.md](decisions/0005-threads.md) for the three ways to build it, what each costs in migrations and touched subsystems, and a recommendation.
+
+*Question:* pick a shape (the record recommends a thread as a channel with a parent), or say the cheap filtered-view version is good enough for now, knowing it does not match the Slack model named.

@@ -4035,6 +4035,14 @@ components:
         edited_at:
           type: [integer, "null"]
           format: int64
+        reply_to_id:
+          type: [string, "null"]
+          format: uuid
+          description: >-
+            The message this one replies to, or null. Always in this same
+            channel. Carries only the id: resolve the parent's own content,
+            author and liveness by looking that id up like any other message,
+            never trust a cached copy of them here.
         reactions:
           type: array
           description: >-
@@ -4309,6 +4317,12 @@ components:
           items:
             type: string
           maxItems: 10
+        reply_to_id:
+          type: [string, "null"]
+          format: uuid
+          description: >-
+            The message this one replies to. Must already exist (live or
+            soft-deleted) in this same channel, or the send is a 400.
 
     EditMessageRequest:
       type: object

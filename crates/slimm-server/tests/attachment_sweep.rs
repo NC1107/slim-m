@@ -193,6 +193,7 @@ async fn deleting_a_message_whose_image_is_also_an_emoji_still_works() {
             message,
             "look at this",
             &[shared.to_vec()],
+            None,
         )
         .await
         .expect("the message is sent with its attachment");

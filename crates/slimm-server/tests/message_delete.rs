@@ -217,7 +217,7 @@ async fn deleting_in_a_hidden_channel_cannot_be_used_to_probe() {
     let real = slimm_server::ids::MessageId::generate();
     let author = store.create_user("author", "Author").await.unwrap();
     store
-        .send_message(channel.id, author.id, real, "secret", &[])
+        .send_message(channel.id, author.id, real, "secret", &[], None)
         .await
         .unwrap();
 

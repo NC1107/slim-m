@@ -148,6 +148,13 @@ pub struct Message {
     pub content: String,
     pub created_at: i64,
     pub edited_at: Option<i64>,
+    /// The message this one replies to, if any. Always in this same channel:
+    /// [`Store::send_message`] refuses any other target at write time. The
+    /// parent's own content, author and liveness are never copied here -
+    /// resolve them by looking that id up like any other message, so a
+    /// later edit or delete of the parent is never something a reply's own
+    /// row could go stale about.
+    pub reply_to_id: Option<MessageId>,
 }
 
 /// How recently a spent refresh token may be replayed before it counts as reuse

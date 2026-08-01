@@ -28,17 +28,17 @@ async fn seq_is_monotonic_and_independent_per_channel() {
     let b = s.create_channel("gaming", "text").await.unwrap();
 
     let a1 = s
-        .send_message(a.id, author.id, MessageId::generate(), "one", &[])
+        .send_message(a.id, author.id, MessageId::generate(), "one", &[], None)
         .await
         .unwrap()
         .message;
     let a2 = s
-        .send_message(a.id, author.id, MessageId::generate(), "two", &[])
+        .send_message(a.id, author.id, MessageId::generate(), "two", &[], None)
         .await
         .unwrap()
         .message;
     let b1 = s
-        .send_message(b.id, author.id, MessageId::generate(), "other", &[])
+        .send_message(b.id, author.id, MessageId::generate(), "other", &[], None)
         .await
         .unwrap()
         .message;
@@ -57,13 +57,13 @@ async fn send_is_idempotent_by_id() {
 
     let id = MessageId::generate();
     let first = s
-        .send_message(c.id, author.id, id, "hi", &[])
+        .send_message(c.id, author.id, id, "hi", &[], None)
         .await
         .unwrap()
         .message;
     // A retry with the same id returns the stored message and wastes no sequence.
     let retry = s
-        .send_message(c.id, author.id, id, "hi again", &[])
+        .send_message(c.id, author.id, id, "hi again", &[], None)
         .await
         .unwrap()
         .message;
@@ -77,7 +77,7 @@ async fn send_is_idempotent_by_id() {
 
     // The next real send is seq 2, proving the retry did not consume seq 2.
     let second = s
-        .send_message(c.id, author.id, MessageId::generate(), "second", &[])
+        .send_message(c.id, author.id, MessageId::generate(), "second", &[], None)
         .await
         .unwrap()
         .message;
@@ -99,6 +99,7 @@ async fn edit_and_keyset_pagination() {
             MessageId::generate(),
             &format!("m{i}"),
             &[],
+            None,
         )
         .await
         .unwrap();
@@ -146,13 +147,13 @@ async fn a_retry_reports_itself_as_a_retry() {
     let id = MessageId::generate();
 
     let first = s
-        .send_message(c.id, author.id, id, "hi", &[])
+        .send_message(c.id, author.id, id, "hi", &[], None)
         .await
         .unwrap();
     assert!(first.fresh, "a first send is fresh");
 
     let retry = s
-        .send_message(c.id, author.id, id, "hi", &[])
+        .send_message(c.id, author.id, id, "hi", &[], None)
         .await
         .unwrap();
     assert!(
@@ -186,6 +187,7 @@ async fn concurrent_sends_each_take_a_distinct_sequence_number() {
                 MessageId::generate(),
                 &format!("m{i}"),
                 &[],
+                None,
             )
             .await
         })

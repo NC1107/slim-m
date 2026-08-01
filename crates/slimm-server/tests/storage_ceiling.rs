@@ -257,6 +257,7 @@ async fn a_report_reason_is_capped_too() {
             slimm_server::ids::MessageId::generate(),
             "hello",
             &[],
+            None,
         )
         .await
         .unwrap()

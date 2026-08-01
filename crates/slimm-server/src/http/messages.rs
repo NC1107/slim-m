@@ -62,6 +62,12 @@ pub(crate) struct MessageDto {
     content: String,
     created_at: i64,
     edited_at: Option<i64>,
+    /// The message this one replies to, or `null`. Only ever the id: the
+    /// parent's own content, author and liveness are resolved by looking that
+    /// id up like any other message, never copied onto this row, or a client
+    /// caching this reply would go stale the moment the parent is edited or
+    /// deleted with no way to notice.
+    reply_to_id: Option<String>,
     /// Empty unless the caller asked for a list, which is the only path that
     /// batch-loads them; a single echoed message carries none because it
     /// cannot have any yet.
@@ -133,6 +139,7 @@ impl From<Message> for MessageDto {
             content: message.content,
             created_at: message.created_at,
             edited_at: message.edited_at,
+            reply_to_id: message.reply_to_id.map(|id| id.to_string()),
             reactions: Vec::new(),
             poll: None,
             attachments: Vec::new(),
@@ -152,6 +159,10 @@ struct SendRequest {
     /// drop.
     #[serde(default)]
     attachment_ids: Vec<String>,
+    /// The message this one replies to, if any. Must already exist in this
+    /// same channel (live or soft-deleted); anything else is a 400.
+    #[serde(default)]
+    reply_to_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -215,9 +226,21 @@ async fn send(
 
     let content = validate_content(&req.content, !attachment_ids.is_empty())?;
     let id = MessageId(parse_uuid(&req.id)?);
+    let reply_to_id = req
+        .reply_to_id
+        .as_deref()
+        .map(|raw| parse_uuid(raw).map(MessageId))
+        .transpose()?;
     let sent = state
         .store
-        .send_message(channel_id, ctx.user_id, id, content, &attachment_ids)
+        .send_message(
+            channel_id,
+            ctx.user_id,
+            id,
+            content,
+            &attachment_ids,
+            reply_to_id,
+        )
         .await?;
 
     // Read once and used twice: the live frame and this response need the

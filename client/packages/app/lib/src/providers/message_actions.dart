@@ -70,6 +70,16 @@ Future<void> castVote(WidgetRef ref, String messageId, int option) async {
 bool _isAuthor(Message message, String? myUserId) =>
     message.authorId != null && message.authorId == myUserId;
 
+/// Any live message, own included - unlike edit and delete, replying to your
+/// own message is completely ordinary. Gated on SEND_MESSAGES, the same bit
+/// the server checks on the send this starts: offering it to somebody a
+/// timeout or an overwrite has denied would only ever end in the 400 that
+/// permission produces.
+bool canReplyToMessage(Message message, int myPermissions) =>
+    !message.pending &&
+    !message.failed &&
+    myPermissions.hasPermission(Perm.sendMessages);
+
 /// Own message only, matching the server's author check: a member holding
 /// MANAGE_MESSAGES can edit someone else's message server-side too, but
 /// that is deliberately not offered here (see `channel_screen.dart`).

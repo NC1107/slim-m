@@ -306,6 +306,7 @@ async fn reporting_a_message_keeps_a_snapshot_and_resists_flooding() {
             MessageId::generate(),
             "something awful",
             &[],
+            None,
         )
         .await
         .unwrap()
@@ -397,7 +398,14 @@ async fn a_message_you_cannot_see_cannot_be_reported() {
     let bob = store.create_account("bob", "Bob", &hash).await.unwrap();
     let hidden = store.create_channel("hidden", "text").await.unwrap();
     let message = store
-        .send_message(hidden.id, bob.id, MessageId::generate(), "private", &[])
+        .send_message(
+            hidden.id,
+            bob.id,
+            MessageId::generate(),
+            "private",
+            &[],
+            None,
+        )
         .await
         .unwrap()
         .message;

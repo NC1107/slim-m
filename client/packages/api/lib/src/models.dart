@@ -102,6 +102,7 @@ class Message {
     required this.content,
     required this.createdAt,
     required this.editedAt,
+    this.replyToId,
     // Empty is the honest default and the common case; requiring these at
     // every construction site bought no safety and broke every caller.
     this.reactions = const [],
@@ -123,6 +124,13 @@ class Message {
   final String content;
   final int createdAt;
   final int? editedAt;
+
+  /// The message this one replies to, or null. Only ever the id: resolve the
+  /// parent's own content, author and liveness by looking that id up locally
+  /// like any other message, never trust a cached copy of them here - there
+  /// is none, on purpose, so a later edit or delete of the parent is never
+  /// something this row could go stale about.
+  final String? replyToId;
 
   /// Reaction summaries, one entry per distinct emoji, with `reacted` set
   /// from the calling user's point of view. Always present: an empty list
@@ -153,6 +161,7 @@ class Message {
         content: json['content'] as String,
         createdAt: json['created_at'] as int,
         editedAt: json['edited_at'] as int?,
+        replyToId: json['reply_to_id'] as String?,
         // Not in the schema's `required` list despite its description promising
         // it is always sent; empty beats crashing on a conformant response.
         reactions: (json['reactions'] as List<dynamic>?)

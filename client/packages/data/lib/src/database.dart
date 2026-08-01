@@ -84,6 +84,12 @@ class Messages extends Table {
   IntColumn get createdAt => integer()();
   IntColumn get editedAt => integer().nullable()();
 
+  /// The message this one replies to, or null. Only ever the id: the
+  /// parent's own content, author and liveness are read by looking that id
+  /// up in this same table, never copied onto this row - there is nothing
+  /// here for an edit or delete of the parent to leave stale.
+  TextColumn get replyToId => text().nullable()();
+
   /// True while the send is in flight. The UI shows these differently and they
   /// are replaced in place by the server's copy on acknowledgement.
   BoolColumn get pending => boolean().withDefault(const Constant(false))();
@@ -100,7 +106,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -142,6 +148,15 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// every existing row defaults to 0, and the next channel refresh replaces
   /// it with the server's real value, since channels are refetched whole
   /// rather than paged by a cursor.
+  ///
+  /// v9 adds `messages.replyToId` in place, unlike v2's `authorDisplayName` -
+  /// deliberately not a wipe. That one needed one because the server already
+  /// held display names a keyset sync could never page back far enough to
+  /// backfill. `reply_to_id` has no such gap: it is new on the server in the
+  /// same release, so no message any existing local cache holds could
+  /// possibly be a reply the server knows about but this column does not -
+  /// there is nothing to backfill, only rows that were correctly never a
+  /// reply in the first place.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -164,6 +179,9 @@ class SlimmDatabase extends _$SlimmDatabase {
           }
           if (from < 8) {
             await m.addColumn(channels, channels.position);
+          }
+          if (from < 9) {
+            await m.addColumn(messages, messages.replyToId);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

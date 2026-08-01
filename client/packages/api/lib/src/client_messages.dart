@@ -32,12 +32,14 @@ extension SlimmApiMessages on SlimmApi {
   /// idempotent, so retrying an uncertain send is always safe. [attachmentIds]
   /// are hex sha256 ids already uploaded through [SlimmApi.uploadAttachment],
   /// in display order; a non-empty list needs ATTACH_FILES in addition to
-  /// SEND_MESSAGES.
+  /// SEND_MESSAGES. [replyToId] must already name a message in this same
+  /// channel (live or deleted) or the send is refused.
   Future<Message> sendMessage({
     required String channelId,
     required String id,
     required String content,
     List<String> attachmentIds = const [],
+    String? replyToId,
   }) async {
     final json = await _send(
       'POST',
@@ -46,6 +48,7 @@ extension SlimmApiMessages on SlimmApi {
         'id': id,
         'content': content,
         if (attachmentIds.isNotEmpty) 'attachment_ids': attachmentIds,
+        if (replyToId != null) 'reply_to_id': replyToId,
       },
     );
     return Message.fromJson(json as Map<String, dynamic>);

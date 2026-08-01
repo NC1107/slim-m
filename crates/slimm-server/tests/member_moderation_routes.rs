@@ -329,7 +329,7 @@ async fn a_timed_out_author_cannot_edit_their_way_around_the_block() {
 
     let message_id = slimm_server::ids::MessageId::generate();
     store
-        .send_message(channel, member, message_id, "the original", &[])
+        .send_message(channel, member, message_id, "the original", &[], None)
         .await
         .unwrap();
 

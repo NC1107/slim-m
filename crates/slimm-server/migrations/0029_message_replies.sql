@@ -1,0 +1,22 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+-- A message may reply to one other message: a nullable self-reference,
+-- resolved live at read time from the same `messages` table rather than
+-- denormalized onto the reply - checked against 0002_core_schema.sql first,
+-- and nothing was waiting for this one.
+--
+-- References messages(id), not the bare table name: 0024 gave `messages` an
+-- explicit `fts_rowid INTEGER PRIMARY KEY`, so a bare `REFERENCES messages`
+-- would bind to that instead of `id`, the same spelling 0027's message_ops
+-- already had to get right.
+--
+-- No ON DELETE clause: messages are never hard-deleted except when their
+-- whole channel cascades away, and the write path only ever accepts a
+-- reply_to_id whose parent shares the reply's own channel_id, so parent and
+-- child are always removed together in that one cascade, never one without
+-- the other.
+--
+-- No index either: every read of this column is by a reply's own row (its
+-- primary key already covers that), never "which messages reply to X", so an
+-- index here would be exactly the kind the R-Tree section of this project's
+-- own history warns against - one nothing queries yet.
+ALTER TABLE messages ADD COLUMN reply_to_id BLOB REFERENCES messages(id);

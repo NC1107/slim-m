@@ -43,7 +43,14 @@ async fn delete_account_anonymizes_content_and_revokes_access() {
     let channel = store.create_channel("general", "text").await.unwrap();
     let tokens = store.open_session(account.id, "laptop").await.unwrap();
     let message = store
-        .send_message(channel.id, account.id, MessageId::generate(), "hello", &[])
+        .send_message(
+            channel.id,
+            account.id,
+            MessageId::generate(),
+            "hello",
+            &[],
+            None,
+        )
         .await
         .unwrap()
         .message;
@@ -178,6 +185,7 @@ async fn delete_account_removes_attachment_uploader_rows() {
             MessageId::generate(),
             "before",
             std::slice::from_ref(&sha256),
+            None,
         )
         .await
         .expect("alice can link bytes she uploaded");
@@ -192,6 +200,7 @@ async fn delete_account_removes_attachment_uploader_rows() {
             MessageId::generate(),
             "after",
             std::slice::from_ref(&sha256),
+            None,
         )
         .await;
     assert!(
