@@ -6,39 +6,76 @@
 /// - `ClipboardImagePlugin.swift` on iOS, `ClipboardImageChannel.kt` on
 /// Android.
 ///
-/// [clipboardImagePasteSupported] stays false and the two Ctrl+V hooks stay
-/// no-ops here on purpose: mobile has no equivalent of the web's live
-/// paste-event listener to hook. The affordance this file backs is
-/// poll-and-tap instead - [hasClipboardImage] is checked once when the
-/// composer's "+" sheet opens, and [readClipboardImage] runs only if the
-/// person taps the row it gates - see `composer_clipboard_paste.dart`.
+/// Two distinct routes share this one channel, and only iOS has both.
 ///
-/// Desktop (Linux, Windows, macOS) registers no platform-side handler for
-/// this channel at all, so a call here simply finds nothing to answer it.
-/// That is treated as "not supported" rather than surfaced as a crash: both
-/// functions below catch [MissingPluginException] and answer false or null.
-/// It is also what makes this file exercisable in a plain `flutter test` run
-/// on any host: mocking the channel stands in for the platform side on every
-/// target, mobile or not.
+/// [hasClipboardImage]/[readClipboardImage] are poll-and-tap: checked once
+/// when the composer's "+" sheet opens, read only if the person taps the row
+/// they gate - see `composer_clipboard_paste.dart`. [readClipboardImage] may
+/// raise iOS's "Allow Paste?" prompt **on every call**, confirmed on a real
+/// device 2026-08-01 (an earlier note here said once per install, which did
+/// not survive contact with a phone).
+///
+/// [startClipboardImagePaste]/[stopClipboardImagePaste] back the better
+/// route on iOS: `ClipboardPasteBridge.m` swizzles Flutter's own private text
+/// input view so the system edit menu's Paste item works for an image with
+/// no prompt at all, then hands the bytes to this channel's Dart side as a
+/// `pastedImage` call - native-initiated, the mirror image of the poll-and-
+/// tap pair above. Registering the handler here while the composer's field
+/// has focus (see `Composer._handleFocusChange`) is what makes this the same
+/// seam `composer_clipboard_image_web.dart`'s live paste-event listener
+/// already is, even though the two triggers (a DOM event, a native menu tap)
+/// share nothing else. It is inert on Android and desktop: nothing there
+/// ever calls `pastedImage`, so registering the handler costs nothing.
+///
+/// [editMenuPasteAvailable] reports whether that swizzle actually installed,
+/// which is what `composer_clipboard_paste.dart` uses to decide whether the
+/// older poll-and-tap row is still worth offering.
+///
+/// Desktop (Linux, Windows, macOS) and Android (for the swizzle-only calls)
+/// register no platform-side handler at all, so a call here simply finds
+/// nothing to answer it. That is treated as "not supported" rather than
+/// surfaced as a crash: every function below catches [MissingPluginException]
+/// and answers false or null. It is also what makes this file exercisable in
+/// a plain `flutter test` run on any host: mocking the channel stands in for
+/// the platform side on every target, mobile or not.
 library;
 
 import 'package:flutter/services.dart';
 
 /// False here; see `composer_clipboard_image_web.dart` for the one platform
-/// where a live paste listener is real.
+/// where a live Ctrl+V/paste-event listener is real. The native edit-menu
+/// route [startClipboardImagePaste] backs on iOS is a menu action, not a
+/// keystroke, so it is not what this flag is about.
 const bool clipboardImagePasteSupported = false;
-
-/// No-op: there is no paste-event equivalent to hook on this target.
-void startClipboardImagePaste(
-  void Function(Uint8List bytes, String filename) onImage,
-) {}
-
-/// No-op, matching [startClipboardImagePaste].
-void stopClipboardImagePaste() {}
 
 const MethodChannel _clipboardImageChannel = MethodChannel(
   'top.npcserver.slimm/clipboard_image',
 );
+
+void Function(Uint8List bytes, String filename)? _onPastedImage;
+
+/// Starts listening for an image the iOS edit menu's Paste item hands over;
+/// call once per focus gained, paired with [stopClipboardImagePaste] on
+/// focus lost - see this file's doc comment for why a native menu tap is
+/// treated as the same seam as the web listener it mirrors.
+void startClipboardImagePaste(
+  void Function(Uint8List bytes, String filename) onImage,
+) {
+  _onPastedImage = onImage;
+  _clipboardImageChannel.setMethodCallHandler(_handlePastedImageCall);
+}
+
+/// Stops listening; safe to call even if nothing was ever started.
+void stopClipboardImagePaste() {
+  _onPastedImage = null;
+  _clipboardImageChannel.setMethodCallHandler(null);
+}
+
+Future<void> _handlePastedImageCall(MethodCall call) async {
+  if (call.method != 'pastedImage') return;
+  final bytes = call.arguments as Uint8List?;
+  if (bytes != null) _onPastedImage?.call(bytes, 'pasted-image.png');
+}
 
 /// Thrown by [readClipboardImage] when the clipboard holds an image but the
 /// platform could not read it - on Android, most often a `content://` URI
@@ -67,8 +104,9 @@ Future<bool> hasClipboardImage() async {
 }
 
 /// Reads the clipboard's image, or null if it holds none. This is the call
-/// that may raise iOS's paste prompt, once per install, since it reads the
-/// pasteboard's actual value rather than metadata about it.
+/// that raises iOS's paste prompt, on every call (see this file's doc
+/// comment), since it reads the pasteboard's actual value rather than
+/// metadata about it.
 Future<Uint8List?> readClipboardImage() async {
   try {
     return await _clipboardImageChannel.invokeMethod<Uint8List>('readImage');
@@ -78,5 +116,20 @@ Future<Uint8List?> readClipboardImage() async {
     throw ClipboardImageReadException(
       e.message ?? 'The clipboard image could not be read.',
     );
+  }
+}
+
+/// Whether `ClipboardPasteBridge.m`'s swizzle installed - true only on iOS,
+/// and only once `AppDelegate` has run; false with no platform handler at
+/// all (Android, desktop) and false if a future Flutter engine upgrade moved
+/// the private class or selectors it depends on.
+Future<bool> editMenuPasteAvailable() async {
+  try {
+    return await _clipboardImageChannel.invokeMethod<bool>(
+          'editMenuPasteAvailable',
+        ) ??
+        false;
+  } on MissingPluginException {
+    return false;
   }
 }

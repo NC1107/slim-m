@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The composer's "Paste image" row end to end: whether it appears, what
-/// tapping it stages, and what a platform read failure shows.
+/// tapping it stages, what a platform read failure shows, and that it steps
+/// aside once `ClipboardPasteBridge.m`'s edit-menu swizzle is confirmed live
+/// so it never becomes a redundant, prompt-every-time duplicate of the
+/// native route.
 ///
 /// Driven at the same `top.npcserver.slimm/clipboard_image` method channel
 /// `composer_clipboard_image_test.dart` proves at the seam level, so the
@@ -71,6 +74,30 @@ void main() {
 
     expect(find.text('Paste image'), findsNothing);
   });
+
+  testWidgets(
+    'the row is absent when the edit-menu swizzle is confirmed live, even '
+    'though the clipboard holds an image',
+    (tester) async {
+      _useTouchViewport(tester);
+      _mock((call) async {
+        if (call.method == 'editMenuPasteAvailable') return true;
+        if (call.method == 'hasImage') return true;
+        return null;
+      });
+
+      await tester.pumpWidget(
+        composerHarness(
+          controller: controller,
+          sends: sends,
+          platform: TargetPlatform.iOS,
+        ),
+      );
+      await _openActionsSheet(tester);
+
+      expect(find.text('Paste image'), findsNothing);
+    },
+  );
 
   testWidgets(
     'the row appears when the clipboard holds an image, and stages it like '

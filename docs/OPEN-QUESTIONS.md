@@ -285,3 +285,16 @@ The behaviour on the day it *is* reachable again is still the same, though, and 
 Waiting means a release can block for as long as the check takes (the iOS one is about 13 minutes) and could in principle loop.
 Failing fast means the release is wrong in the one way nobody sees.
 Recorded rather than chosen, because it is a trade about how long you are willing for a release to hang rather than a correctness question.
+
+## 17. iOS image paste via the edit menu needs a real device (2026-08-01)
+
+Client 0.21.0's "Paste image" row was built on a prediction - the "Allow Paste?" prompt appears once per install - that the owner's own iPhone disproved: it prompts on every use.
+The fix built in response swizzles Flutter's private `FlutterTextInputView` (`ClipboardPasteBridge.m`) so the long-press edit menu's own Paste item works for an image with no prompt at all, and is reasoned from the engine's own source rather than assumed - see `CLAUDE.md`'s "The image-paste prompt was never once per install" entry for the full mechanism.
+
+Nothing about an Objective-C method swizzle, a native pasteboard read, or the "Allow Paste?" prompt's own exemptions can be exercised in this environment, which has no iPhone.
+Two things specifically need confirming on a real device, in this order, because the second is meaningless without the first:
+
+1. **The menu item appears.** Copy an image (not text), long-press inside the composer's text field, and confirm Paste is offered - it would not be, pre-fix, since `canPerformAction:` answered `hasStrings` for an image-only pasteboard.
+2. **Tapping it attaches the image with no prompt.** The whole point of routing through the system's own dispatch of `paste:` rather than a Dart-triggered read.
+
+*What the run did instead:* traced the exact obstacle in the checked-out Flutter engine source at `~/development/flutter/engine/src/flutter/shell/platform/darwin/ios/framework/Source/FlutterTextInputPlugin.{h,mm}` rather than assuming the class name or method signatures, wrote the swizzle to fail back to today's behaviour (log and no-op) if either selector or the class itself is not found, and covered the Dart-side contract with unit tests. None of that substitutes for the two checks above.
