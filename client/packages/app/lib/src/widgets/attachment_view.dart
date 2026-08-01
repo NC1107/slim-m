@@ -35,6 +35,17 @@ const Set<String> inlineImageTypes = {
 bool isInlineImage(String contentType) =>
     inlineImageTypes.contains(contentType);
 
+/// The largest an image is drawn inline, in logical pixels, on both axes.
+///
+/// Half [kMessageColumnMax]. An uncapped preview let one image fill a desktop
+/// screen and push the rest of the conversation off it, and the height was
+/// unbounded entirely, so a tall narrow image was worse than a wide one.
+///
+/// Capping both axes rather than the width alone is the point: the transcript
+/// is the conversation, and an attachment is a thing in it. Full size is one
+/// tap away and already built.
+const double kInlineImageMax = kMessageColumnMax / 2;
+
 /// `1.2 MB`-style formatting; short enough that this app has no existing
 /// dependency worth using instead.
 String formatByteSize(int bytes) {
@@ -130,12 +141,18 @@ class AttachmentView extends ConsumerWidget {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadii.control),
-                // Never decodes wider than the column can ever draw it.
-                child: Image.memory(
-                  bytes,
-                  fit: BoxFit.contain,
-                  semanticLabel: attachment.filename,
-                  cacheWidth: decodeEdge(context, kMessageColumnMax),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: kInlineImageMax,
+                    maxHeight: kInlineImageMax,
+                  ),
+                  // Never decodes wider than the transcript can draw it.
+                  child: Image.memory(
+                    bytes,
+                    fit: BoxFit.contain,
+                    semanticLabel: attachment.filename,
+                    cacheWidth: decodeEdge(context, kInlineImageMax),
+                  ),
                 ),
               ),
             ),

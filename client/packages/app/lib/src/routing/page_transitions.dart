@@ -25,6 +25,13 @@ import 'breakpoints.dart';
 /// [key] is what makes a channel switch animate at all: each destination is a
 /// distinct page under its own key, so the framework animates the old one out
 /// and the new one in rather than reusing a single page and rebuilding.
+///
+/// The wide branch is a genuine fade-through rather than a cross-fade, and
+/// that distinction was a real bug: it faded the incoming pane in while the
+/// outgoing one sat at full opacity underneath, so for the whole transition
+/// two channels were legible at once and read as one drawn over the other.
+/// The outgoing pane now clears over the first third before the incoming one
+/// begins to arrive.
 CustomTransitionPage<void> fadeThroughPage(
   BuildContext context,
   Widget child, {
@@ -63,14 +70,27 @@ CustomTransitionPage<void> fadeThroughPage(
           ),
         );
       }
+      // A fade-through, not a cross-fade: see this function's own doc.
+      final incoming = CurvedAnimation(
+        parent: animation,
+        curve: const Interval(0.35, 1, curve: Curves.easeOut),
+      );
+      final outgoing = CurvedAnimation(
+        parent: secondaryAnimation,
+        curve: const Interval(0, 0.35, curve: Curves.easeIn),
+      );
       return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 0.02),
-            end: Offset.zero,
-          ).animate(curved),
-          child: child,
+        // Its underlay role: gone before whatever replaces it becomes legible.
+        opacity: Tween<double>(begin: 1, end: 0).animate(outgoing),
+        child: FadeTransition(
+          opacity: incoming,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.02),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
         ),
       );
     },
