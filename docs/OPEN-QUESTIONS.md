@@ -92,8 +92,16 @@ What none of that proves is the thing the feature exists for: edit a message on 
 The fix was the one predicted below and nothing else: merging a client-affecting change ([#259](https://github.com/NC1107/slim-m/pull/259)) made release-please regenerate the standing PR, which went from `CONFLICTING` to `MERGEABLE` within about two minutes and merged cleanly, with no generated file touched by hand.
 The reconciliation work is now on your devices as well as the server.
 
-The *question* at the end is still live, and is now better informed: this recurred twice in two days.
-If it happens a third time the manual tag-based flow in section 6 is worth taking seriously rather than waiting it out again.
+The *question* at the end is now the live part, and **it happened a third time within the hour**, in the other direction: merging client 0.19.0 conflicted the standing **server** 0.22.1 release PR.
+
+So this is a pattern rather than three incidents, and the threshold I set for reconsidering has been met.
+The new information is the cost, which the earlier entries did not state: a component with **no pending work of its own** stays unreleasable until unrelated work happens to touch it.
+Server 0.22.1 is a test-only fix with nothing server-side queued behind it, so nothing was going to unstick it on its own.
+A conflicted PR also runs **no CI at all**, so the state is worse than it looks - not a slow queue, nothing running.
+
+*My recommendation, for your call:* switch to the manual tag-based flow already listed in section 6.
+It has no standing PR to go stale, it matches the zero-open-PRs preference recorded there, and the release jobs already keep their `refs/tags/client-v` and `refs/tags/server-v` branches, so hand-tagging is a supported path rather than a workaround.
+What it costs is that the changelog stops being generated for you, which is the thing release-please is actually buying.
 
 The original entry follows, kept because the reasoning is what made the fix predictable rather than lucky.
 
