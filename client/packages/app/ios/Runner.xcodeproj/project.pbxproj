@@ -11,6 +11,7 @@
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		7A11C0DE0001000000000002 /* VoipCallHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0001000000000001 /* VoipCallHandler.swift */; };
+		7A11C0DE0004000000000002 /* ClipboardImagePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0004000000000001 /* ClipboardImagePlugin.swift */; };
 		7A11C0DE0001000000000004 /* VoipCallHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0001000000000003 /* VoipCallHandlerTests.swift */; };
 		7A11C0DE0003000000000002 /* VoiceCallReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0003000000000001 /* VoiceCallReporter.swift */; };
 		7A11C0DE0003000000000004 /* VoiceCallReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0003000000000003 /* VoiceCallReporterTests.swift */; };
@@ -79,6 +80,7 @@
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		7A11C0DE0001000000000001 /* VoipCallHandler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoipCallHandler.swift; sourceTree = "<group>"; };
+		7A11C0DE0004000000000001 /* ClipboardImagePlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipboardImagePlugin.swift; sourceTree = "<group>"; };
 		7A11C0DE0001000000000003 /* VoipCallHandlerTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoipCallHandlerTests.swift; sourceTree = "<group>"; };
 		7A11C0DE0003000000000001 /* VoiceCallReporter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceCallReporter.swift; sourceTree = "<group>"; };
 		7A11C0DE0003000000000003 /* VoiceCallReporterTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceCallReporterTests.swift; sourceTree = "<group>"; };
@@ -195,6 +197,7 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				7A11C0DE0001000000000001 /* VoipCallHandler.swift */,
+				7A11C0DE0004000000000001 /* ClipboardImagePlugin.swift */,
 				7A11C0DE0003000000000001 /* VoiceCallReporter.swift */,
 				7A11C0DE000200000000000A /* BroadcastChannel.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
@@ -390,6 +393,7 @@
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				7A11C0DE0001000000000002 /* VoipCallHandler.swift in Sources */,
+				7A11C0DE0004000000000002 /* ClipboardImagePlugin.swift in Sources */,
 				7A11C0DE0003000000000002 /* VoiceCallReporter.swift in Sources */,
 				7A11C0DE0002000000000018 /* BroadcastChannel.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,

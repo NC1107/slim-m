@@ -178,7 +178,7 @@ const List<WhatsNewEntry> whatsNewEntries = [
   ),
   WhatsNewEntry(
     version: '0.20.3',
-    headline: 'Attaching a photo on iPhone and Android',
+    headline: 'Attaching and pasting a photo on iPhone and Android',
     points: [
       WhatsNewPoint(
         'The attach button on a phone used to only open the Files browser, '
@@ -189,6 +189,11 @@ const List<WhatsNewEntry> whatsNewEntries = [
       WhatsNewPoint(
         'Your profile picture picker got the same choice, so a photo that '
         'arrived by download or AirDrop is no longer stuck.',
+      ),
+      WhatsNewPoint(
+        'If you have copied an image, the same attach button now offers a '
+        'Paste image action. iOS may ask once whether this app can read '
+        'your clipboard; that is expected and only asks the first time.',
       ),
     ],
   ),

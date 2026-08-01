@@ -10,6 +10,7 @@ import UserNotifications
 
   private var pushChannel: FlutterMethodChannel?
   private var broadcastChannel: FlutterMethodChannel?
+  private var clipboardImageChannel: FlutterMethodChannel?
   private let voiceCallChannel = VoiceCallChannel()
 
   // The token or a registration failure can each arrive before Dart has asked
@@ -43,6 +44,13 @@ import UserNotifications
       BroadcastChannel.handle(call, result: result)
     }
     broadcastChannel = broadcast
+
+    let clipboardImage = FlutterMethodChannel(
+      name: ClipboardImagePlugin.name, binaryMessenger: messenger)
+    clipboardImage.setMethodCallHandler { call, result in
+      ClipboardImagePlugin.handle(call, result: result)
+    }
+    clipboardImageChannel = clipboardImage
 
     voiceCallChannel.attach(to: messenger)
   }

@@ -23,6 +23,7 @@ import 'composer_autocomplete.dart';
 import 'composer_autocomplete_items.dart';
 import 'composer_autocomplete_query.dart';
 import 'composer_clipboard_image.dart';
+import 'composer_clipboard_paste.dart';
 import 'composer_extras.dart';
 import 'emoji_picker.dart';
 import 'poll_composer_sheet.dart';
@@ -69,6 +70,7 @@ class _ComposerState extends ConsumerState<Composer> {
   bool _hasSendableText = false;
   bool _uploading = false;
   final List<api.Attachment> _pendingAttachments = [];
+  String? _clipboardPasteError;
   late final FocusNode _focus = FocusNode(onKeyEvent: _onKey);
 
   /// Captured once rather than read from `ref` in [dispose]: by then
@@ -276,6 +278,10 @@ class _ComposerState extends ConsumerState<Composer> {
           unawaited(_pickAttachment(AttachmentSource.photoLibrary)),
       onBrowseFiles: () =>
           unawaited(_pickAttachment(AttachmentSource.fileBrowser)),
+      canPasteImage: composerClipboardPasteAvailable(),
+      onPasteImage: () => unawaited(
+        pasteClipboardImage(_stageAttachment, _setClipboardPasteError),
+      ),
       onPoll: () => showPollComposerSheet(context, widget.channelId),
       onCode: _insertCodeFence,
     ),
@@ -348,6 +354,10 @@ class _ComposerState extends ConsumerState<Composer> {
   void _handlePastedImage(Uint8List bytes, String filename) =>
       unawaited(_stageAttachment(bytes, filename));
 
+  void _setClipboardPasteError(String? message) {
+    if (mounted) setState(() => _clipboardPasteError = message);
+  }
+
   void _removeAttachment(api.Attachment attachment) {
     setState(() => _pendingAttachments.remove(attachment));
   }
@@ -385,21 +395,13 @@ class _ComposerState extends ConsumerState<Composer> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_pendingAttachments.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-                child: Wrap(
-                  spacing: AppSpacing.s8,
-                  runSpacing: AppSpacing.s8,
-                  children: [
-                    for (final attachment in _pendingAttachments)
-                      StagedAttachmentChip(
-                        filename: attachment.filename,
-                        onRemove: () => _removeAttachment(attachment),
-                      ),
-                  ],
-                ),
-              ),
+            ComposerBanners(
+              clipboardPasteError: _clipboardPasteError,
+              onDismissClipboardPasteError: () =>
+                  setState(() => _clipboardPasteError = null),
+              pendingAttachments: _pendingAttachments,
+              onRemoveAttachment: _removeAttachment,
+            ),
             // Above the field, never below: that is the send row and keyboard.
             ComposerAutocomplete(
               suggestions: _suggestions,
