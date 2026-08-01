@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.23.0](https://github.com/NC1107/slim-m/compare/server-v0.22.0...server-v0.23.0) (2026-08-01)
+
+
+### Features
+
+* drag to reorder channels, ordered deployment-wide ([#271](https://github.com/NC1107/slim-m/issues/271)) ([753b3d4](https://github.com/NC1107/slim-m/commit/753b3d4521908186ffe811dda712993fe20ed1aa))
+
+
+### Bug Fixes
+
+* **test:** stop the attachment fixture leaking a media directory per test ([#263](https://github.com/NC1107/slim-m/issues/263)) ([e5e6a5f](https://github.com/NC1107/slim-m/commit/e5e6a5f66153b7551b351074ca88d97677671bed))
+
 ## [0.22.0](https://github.com/NC1107/slim-m/compare/server-v0.21.0...server-v0.22.0) (2026-08-01)
 
 
