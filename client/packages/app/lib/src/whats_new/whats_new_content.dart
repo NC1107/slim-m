@@ -181,6 +181,20 @@ const List<WhatsNewEntry> whatsNewEntries = [
         'Blocking someone stops a call the same way it already stops a '
         'message: neither of you can ring the other.',
       ),
+      WhatsNewPoint(
+        'Opening the canvas over a call or a channel used to swap the whole '
+        'view instantly. It now fades through, the same way switching '
+        'channels or opening settings already did.',
+      ),
+      WhatsNewPoint(
+        'Confirming a server\'s identity, the screen you see the first time '
+        'you connect somewhere new, now uses that same motion instead of '
+        'a plain platform default.',
+      ),
+      WhatsNewPoint(
+        'Your status avatar in the rail footer now presses down like every '
+        'other button in the app, instead of doing nothing until it opens.',
+      ),
     ],
   ),
 ];

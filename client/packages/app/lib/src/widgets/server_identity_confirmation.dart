@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
 import '../providers/providers.dart';
+import '../routing/page_transitions.dart';
 import 'server_fingerprint_step.dart';
 import 'server_identity_changed_step.dart';
 
@@ -65,14 +66,16 @@ Future<bool> confirmServerIdentity(
 
   final trusted = pinned == null
       ? await Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (context) =>
+          fadeThroughRoute<bool>(
+            context,
+            (context) =>
                 ServerFingerprintStep(address: server, identity: identity!),
           ),
         )
       : await Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (context) =>
+          fadeThroughRoute<bool>(
+            context,
+            (context) =>
                 ServerIdentityChangedStep(address: server, identity: identity!),
           ),
         );
