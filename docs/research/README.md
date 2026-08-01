@@ -75,6 +75,7 @@ Everything below postdates the pre-build research above by weeks and reports on 
 | [nine-specialist-audit-2026-07-29.md](nine-specialist-audit-2026-07-29.md) | 2026-07-29 | Nine parallel specialist reviews (five code, four screenshot) over the running product; consolidated findings, fixes, and deliberate deferrals |
 | [audit-2026-07-30/](audit-2026-07-30/README.md) | 2026-07-30 | Thirty-three specialist reviews over the whole stack (screens, client code, server code, security, process) plus the rejected-findings list; see that directory's own README for current status, which this cleanup pass rebuilt from merged-PR evidence |
 | [canvas-removal-design-2026-07-31.md](canvas-removal-design-2026-07-31.md) | 2026-07-31 | The design for canvas slice two (erase, clear, undo, restore, and the `canvas_ops` stream): three independent designs, three adversarial judges, and the synthesised implementation plan the PRs are built from. Live rather than historical while those PRs are open |
+| [background-blur-spike.md](background-blur-spike.md) | 2026-08-01 | Camera background blur/replacement spike, ahead of the camera-publish work: whether `livekit_client`/`flutter_webrtc` have a frame-transform seam, what segmentation model options cover which platforms, and the frame-budget evidence behind the recommendation to ship it as a reduced, per-platform feature rather than uniformly |
 
 ## Why this corpus stays, unpruned
 
