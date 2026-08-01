@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Settings' avatar section: a preview of the caller's own picture plus
-/// upload and remove actions, following the same pick-bytes-then-upload
-/// shape the composer's attachment picker already uses.
+/// Settings' avatar section: a centred preview of the caller's own picture
+/// with a camera badge that reads as "tap to change", plus a way to remove
+/// an existing one.
 ///
-/// Two upload buttons rather than one, for the same reason the composer's
-/// attach action split in two: a Photos-only pick cannot reach a picture
-/// that arrived by download or AirDrop. See `attachment_picker.dart`.
+/// The badge opens the same two-source choice the composer's attach action
+/// already offers, rather than one picker directly: a Photos-only pick
+/// cannot reach a picture that arrived by download or AirDrop. See
+/// `attachment_picker.dart`.
 library;
+
+import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +24,12 @@ import 'avatar_crop_sheet.dart';
 import 'settings_section_header.dart';
 import 'user_avatar.dart';
 
+/// Large enough on its own to clear the 44pt touch minimum, so the badge
+/// never needs a separately expanded hit target the way a small icon button
+/// would.
+const double _avatarSize = 72;
+const double _badgeSize = 28;
+
 class AvatarSettingsSection extends ConsumerStatefulWidget {
   const AvatarSettingsSection({super.key});
 
@@ -32,7 +41,55 @@ class AvatarSettingsSection extends ConsumerStatefulWidget {
 class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
   bool _busy = false;
 
-  Future<void> _upload(AttachmentSource source) async {
+  Future<AttachmentSource?> _pickSource() {
+    return showAppSheet<AttachmentSource>(
+      context,
+      builder: (sheetContext) {
+        final tokens = Theme.of(sheetContext).extension<AppTokens>()!;
+        const options = [
+          (AppIcons.image, 'Photo library', AttachmentSource.photoLibrary),
+          (AppIcons.attachFile, 'Browse files', AttachmentSource.fileBrowser),
+        ];
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s12,
+              0,
+              AppSpacing.s12,
+              AppSpacing.s12,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final (icon, label, source) in options)
+                  AppListRow(
+                    label: label,
+                    leading: Icon(
+                      icon,
+                      size: AppSizes.icon16,
+                      color: tokens.textSecondary,
+                    ),
+                    onTap: () => Navigator.of(sheetContext).pop(source),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Fires the same tick every other tappable in this system does, since a
+  /// plain [InkWell] carries none of that on its own.
+  void _onTapChange() {
+    AppHaptics.selection();
+    unawaited(_changePicture());
+  }
+
+  Future<void> _changePicture() async {
+    final source = await _pickSource();
+    if (source == null || !mounted) return;
+
     final FilePickerResult? result;
     try {
       result = await ref.read(attachmentPickerProvider(source))();
@@ -86,15 +143,14 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     final me = ref.watch(meProvider).valueOrNull;
     final hasAvatar = me?.avatarUpdatedAt != null;
+    final enabled = me != null && !_busy;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SettingsSectionHeader('Avatar'),
-        // Bottom padding, not just horizontal: the row was the only section
-        // content with none, so the disc sat flush on the divider below it.
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.s16,
@@ -102,48 +158,84 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
             AppSpacing.s16,
             AppSpacing.s16,
           ),
-          child: Row(
+          child: Column(
             children: [
-              UserAvatar(
-                userId: me?.id,
-                avatarUpdatedAt: me?.avatarUpdatedAt,
-                name: me?.displayName ?? '',
-                size: 56,
-              ),
-              const SizedBox(width: AppSpacing.s16),
-              if (_busy)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else
-                // Expanded, or an unconstrained Wrap in a Row never wraps and three buttons overflow instead of taking a second line.
-                Expanded(
-                  child: Wrap(
-                    spacing: AppSpacing.s8,
-                    runSpacing: AppSpacing.s4,
+              Semantics(
+                button: true,
+                enabled: enabled,
+                label: 'Change profile picture',
+                child: InkWell(
+                  onTap: enabled ? _onTapChange : null,
+                  customBorder: const CircleBorder(),
+                  child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      TextButton(
-                        onPressed: me == null
-                            ? null
-                            : () => _upload(AttachmentSource.photoLibrary),
-                        child: const Text('Photo library'),
-                      ),
-                      TextButton(
-                        onPressed: me == null
-                            ? null
-                            : () => _upload(AttachmentSource.fileBrowser),
-                        child: const Text('Browse files'),
-                      ),
-                      if (hasAvatar)
-                        TextButton(
-                          onPressed: _remove,
-                          child: const Text('Remove'),
+                      ExcludeSemantics(
+                        child: UserAvatar(
+                          userId: me?.id,
+                          avatarUpdatedAt: me?.avatarUpdatedAt,
+                          name: me?.displayName ?? '',
+                          size: _avatarSize,
                         ),
+                      ),
+                      if (_busy)
+                        Positioned.fill(
+                          child: ExcludeSemantics(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: tokens.surfaceBase.withValues(
+                                  alpha: 0.6,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: ExcludeSemantics(
+                          child: Container(
+                            width: _badgeSize,
+                            height: _badgeSize,
+                            decoration: BoxDecoration(
+                              color: tokens.accentFill,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: tokens.surfaceBase,
+                                width: 2,
+                              ),
+                            ),
+                            child: Icon(
+                              AppIcons.avatarCamera,
+                              size: AppSizes.icon16,
+                              color: tokens.accentOn,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
+              ),
+              if (hasAvatar) ...[
+                const SizedBox(height: AppSpacing.s8),
+                AppButton(
+                  label: 'Remove',
+                  variant: AppButtonVariant.ghost,
+                  size: AppButtonSize.sm,
+                  onPressed: enabled ? _remove : null,
+                ),
+              ],
             ],
           ),
         ),
