@@ -111,7 +111,7 @@ Grouped by what they are rather than by where they were said, because three of t
 
 - ~~**"Notes to self" is treated as a channel under the hood and should be a DM.**~~ Fixed in #256, released in client 0.18.0. It renders as an ordinary DM titled **You** now, with its own kebab menu carrying a hide action; hiding it is a local preference rather than a delete, and searching your own name brings it back, which the empty state says in words so the route back is discoverable rather than folklore.
 - ~~**The DM section is wordy**~~ Fixed in #243.
-- **No way to reorganise or move channels in the sidebar.** ~~and no way to collapse the left sidebar entirely~~ - the collapse half shipped in #256 (client 0.18.0). Reordering is still open, and note it is a full-stack question rather than a client one: nothing in the schema orders channels, so it needs either a `position` column and a route, or a deliberate decision that ordering is a per-device preference.
+- ~~**No way to reorganise or move channels in the sidebar.**~~ ~~and no way to collapse the left sidebar entirely~~ - the collapse half shipped in #256 (client 0.18.0). Reordering closed on `feat/channel-ordering`: `channels.position` (dormant since `0002_core_schema.sql`, the `attachments`/`topic` shape) is now written by `PUT /channels/order`, deployment-wide rather than per-device (one deployment is one community, so everyone sees the same order), with drag-to-reorder in the rail behind MANAGE_CHANNELS and an optimistic client update that reverts visibly on failure.
 
 ### Voice and canvas
 
