@@ -97,6 +97,31 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.19.0',
+    headline: 'Formatting, lists and spoilers in messages',
+    points: [
+      WhatsNewPoint(
+        'Messages take **bold**, *italic*, ~~strikethrough~~ and '
+        '||spoiler|| markers. A spoiler stays covered until it is tapped.',
+      ),
+      WhatsNewPoint(
+        'Bullet and numbered lists, quotes and headings render as what they '
+        'are rather than as the characters you typed. Pressing Enter inside '
+        'a list carries the marker to the next line, and pressing it on an '
+        'empty item ends the list.',
+      ),
+      WhatsNewPoint(
+        'Ctrl+B and Ctrl+I wrap whatever you have selected, or drop the '
+        'markers where the caret is.',
+      ),
+      WhatsNewPoint(
+        'Text that only looks like formatting is left alone: snake_case '
+        'names, a lone asterisk between spaces, and anything inside a code '
+        'span or a code fence.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
