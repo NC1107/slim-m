@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/NC1107/slim-m/compare/client-v0.18.0...client-v0.19.0) (2026-08-01)
+
+
+### Features
+
+* **client:** markdown formatting, lists and spoilers in messages ([#267](https://github.com/NC1107/slim-m/issues/267)) ([531d133](https://github.com/NC1107/slim-m/commit/531d1332ee06450fbfeb69e5b7a561ae733a625f))
+
 ## [0.18.0](https://github.com/NC1107/slim-m/compare/client-v0.17.2...client-v0.18.0) (2026-08-01)
 
 
