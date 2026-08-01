@@ -125,11 +125,12 @@ void main() {
     },
   );
 
-  /// [HomeShell]'s own rail and member-pane `AnimatedContainer`s are not
-  /// this test's concern and, driven through a real reduce-motion pump, hit
-  /// an unrelated pre-existing zero-duration `AnimatedSize` crash - so this
-  /// pumps `ConversationPane` directly rather than through the full shell,
-  /// isolating the one animation this change actually added.
+  /// Pumps the real [HomeShell], rail and member pane included, not just
+  /// [ConversationPane] in isolation: those siblings used to trip an
+  /// unrelated zero-duration `AnimatedSize` crash under reduce motion (see
+  /// `AppMotion.reducedSize`'s doc comment), which is why this test once
+  /// pumped `ConversationPane` alone to dodge it. Fixed now, so this drives
+  /// the shell a viewer with the setting actually sees.
   testWidgets(
     'the canvas swap is instant under reduce motion, not merely faster',
     (tester) async {
@@ -142,25 +143,13 @@ void main() {
           createdAt: 0,
         ),
       ]);
-      tester.view.physicalSize = const Size(1400, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: s.container,
-          child: MediaQuery(
-            data: MediaQueryData.fromView(
-              tester.view,
-            ).copyWith(disableAnimations: true),
-            child: MaterialApp(
-              theme: buildTheme(Brightness.light, AppTokens.light),
-              home: const Scaffold(body: ConversationPane(channelId: 'c1')),
-            ),
-          ),
-        ),
+      await pumpAtWidth(
+        tester,
+        s.container,
+        1400,
+        location: '/channels/c1',
+        reduceMotion: true,
       );
-      await tester.pumpAndSettle();
       expect(find.byType(CanvasSurface), findsNothing);
 
       s.container.read(canvasOpenProvider.notifier).state = 'c1';

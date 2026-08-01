@@ -161,23 +161,36 @@ GoRouter testRouter(String location) => GoRouter(
   ],
 );
 
+/// [reduceMotion] wraps the app in a [MediaQuery] with
+/// `disableAnimations: true`, driving the real shell the way a viewer who
+/// has asked for less motion actually sees it, rather than a pane pumped in
+/// isolation.
 Future<void> pumpAtWidth(
   WidgetTester tester,
   ProviderContainer container,
   double width, {
   String location = '/channels',
+  bool reduceMotion = false,
 }) async {
   tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
+  final app = MaterialApp.router(
+    theme: buildTheme(Brightness.light, AppTokens.light),
+    routerConfig: testRouter(location),
+  );
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp.router(
-        theme: buildTheme(Brightness.light, AppTokens.light),
-        routerConfig: testRouter(location),
-      ),
+      child: reduceMotion
+          ? MediaQuery(
+              data: MediaQueryData.fromView(
+                tester.view,
+              ).copyWith(disableAnimations: true),
+              child: app,
+            )
+          : app,
     ),
   );
   await tester.pumpAndSettle();

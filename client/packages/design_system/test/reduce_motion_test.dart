@@ -214,4 +214,82 @@ void main() {
       expect(duration, const Duration(milliseconds: 150));
     });
   });
+
+  group('AppMotion.reducedSize', () {
+    testWidgets('an untouched setting leaves it at the full duration',
+        (tester) async {
+      late Duration duration;
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(),
+          child: Builder(
+            builder: (context) {
+              duration = AppMotion.reducedSize(context, AppMotion.base);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      expect(duration, AppMotion.base);
+    });
+
+    testWidgets('reduced motion never collapses it to a literal zero',
+        (tester) async {
+      late Duration duration;
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: Builder(
+            builder: (context) {
+              duration = AppMotion.reducedSize(context, AppMotion.base);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      expect(
+        duration,
+        isNot(Duration.zero),
+        reason: 'RenderAnimatedSize completes a zero-duration controller '
+            'synchronously and re-enters markNeedsLayout on itself mid-layout',
+      );
+    });
+
+    /// `RenderAnimatedSize` restarts its controller every time its child's
+    /// size differs from what it last saw; two such changes across
+    /// consecutive frames is what reproduces the crash `reducedSize` exists
+    /// to avoid. Reverting it to [AppMotion.reduced] fails this test with "A
+    /// RenderAnimatedSize was mutated in its own performLayout
+    /// implementation."
+    testWidgets(
+      'an AnimatedSize wired through it survives its child changing size '
+      'twice in a row',
+      (tester) async {
+        Widget frame(bool tall) => MediaQuery(
+              data: const MediaQueryData(disableAnimations: true),
+              child: Directionality(
+                textDirection: TextDirection.ltr,
+                child: Center(
+                  child: Builder(
+                    builder: (context) => AnimatedSize(
+                      duration: AppMotion.reducedSize(context, AppMotion.base),
+                      child: tall
+                          ? const SizedBox(width: 100, height: 100)
+                          : const SizedBox(width: 100, height: 0),
+                    ),
+                  ),
+                ),
+              ),
+            );
+
+        await tester.pumpWidget(frame(false));
+        await tester.pumpWidget(frame(true));
+        await tester.pump();
+        await tester.pumpWidget(frame(false));
+        await tester.pump();
+      },
+    );
+  });
 }
