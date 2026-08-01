@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.24.0](https://github.com/NC1107/slim-m/compare/server-v0.23.0...server-v0.24.0) (2026-08-01)
+
+
+### Features
+
+* calling in a DM ([#306](https://github.com/NC1107/slim-m/issues/306)) ([6823474](https://github.com/NC1107/slim-m/commit/68234746807e080edb7f5e0b0ee4ebb2ecf95115))
+* reply to a message, and write up threads instead of building them ([#308](https://github.com/NC1107/slim-m/issues/308)) ([dffcdaa](https://github.com/NC1107/slim-m/commit/dffcdaa1747eae05e61c858c6dcc17380fe990d8))
+
+
+### Bug Fixes
+
+* reconcile a display name across already-cached messages ([#288](https://github.com/NC1107/slim-m/issues/288)) ([7ed4906](https://github.com/NC1107/slim-m/commit/7ed4906fd6aa4e3c0c4cda81f1a315e2917ce2b1))
+
 ## [0.23.0](https://github.com/NC1107/slim-m/compare/server-v0.22.0...server-v0.23.0) (2026-08-01)
 
 
