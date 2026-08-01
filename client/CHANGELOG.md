@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.21.0](https://github.com/NC1107/slim-m/compare/client-v0.20.2...client-v0.21.0) (2026-08-01)
+
+
+### Features
+
+* **client:** paste an image into the composer on iPhone and Android ([#286](https://github.com/NC1107/slim-m/issues/286)) ([55e97e3](https://github.com/NC1107/slim-m/commit/55e97e308744048d2fbc671d3e2f2c72b9831431))
+
+
+### Bug Fixes
+
+* **client:** let the composer's attach button reach the photo library ([#284](https://github.com/NC1107/slim-m/issues/284)) ([10363d1](https://github.com/NC1107/slim-m/commit/10363d1dc6acd527eee79b14461c25212e3233ca))
+
 ## [0.20.2](https://github.com/NC1107/slim-m/compare/client-v0.20.1...client-v0.20.2) (2026-08-01)
 
 
