@@ -61,4 +61,20 @@ abstract final class AppMotion {
   /// the state change that carries the meaning, never the travel between.
   static Duration reduced(BuildContext context, Duration full) =>
       isReduced(context) ? Duration.zero : full;
+
+  /// [reduced], except an [AnimatedSize] must never actually receive the
+  /// zero it returns.
+  ///
+  /// `RenderAnimatedSize` listens to its own `AnimationController` and calls
+  /// `markNeedsLayout` from that listener; a zero-duration controller
+  /// completes and notifies synchronously rather than on the next tick, so a
+  /// child whose size changes twice before the animation settles re-enters
+  /// `markNeedsLayout` on the very `RenderObject` still inside its own
+  /// `performLayout`, which Flutter asserts against. `AnimationController`
+  /// carries the identical scar: its own `forward()` runs a zero-duration
+  /// animation at 5% of its real duration instead, with a comment reading
+  /// "the framework cannot handle zero duration animations". One millisecond
+  /// is that same fix, sized for this design language's shortest step.
+  static Duration reducedSize(BuildContext context, Duration full) =>
+      isReduced(context) ? const Duration(milliseconds: 1) : full;
 }

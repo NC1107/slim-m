@@ -126,7 +126,7 @@ class RailConnectionBar extends ConsumerWidget {
     // height (motion spec 08), growing and shrinking over the panel duration
     // instead of jumping the rail's footer around.
     return AnimatedSize(
-      duration: AppMotion.reduced(context, AppMotion.base),
+      duration: AppMotion.reducedSize(context, AppMotion.base),
       curve: AppMotion.entrance,
       alignment: Alignment.topCenter,
       child: status == SyncStatus.live
@@ -207,7 +207,7 @@ class RailUserFooter extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
           // The call-elsewhere row grows the footer rather than sharing the identity row's width; see RailCallSummary's own doc for why.
           child: AnimatedSize(
-            duration: AppMotion.reduced(context, AppMotion.base),
+            duration: AppMotion.reducedSize(context, AppMotion.base),
             curve: AppMotion.entrance,
             alignment: Alignment.topCenter,
             child: Column(
