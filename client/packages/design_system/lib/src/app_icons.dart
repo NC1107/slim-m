@@ -63,6 +63,10 @@ abstract final class AppIcons {
   /// Photos-backed one; see `attachment_picker.dart`.
   static const IconData attachFile = LucideIcons.paperclip300;
 
+  /// The composer's mobile "Paste image" action; see
+  /// `composer_clipboard_paste.dart`.
+  static const IconData clipboardPaste = LucideIcons.clipboardPaste300;
+
   /// A staleness cue distinct from [pending]: the same glyph, a different
   /// role (an expiring device or invite rather than an in-flight send), kept
   /// as its own name so the two are never conflated at a call site.

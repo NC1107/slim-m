@@ -14,6 +14,12 @@
 /// backs ([startClipboardImagePaste]) is itself a pair of top-level
 /// functions: only one composer is ever focused at a time, so one active
 /// listener is all this needs to hold.
+///
+/// [hasClipboardImage] and [readClipboardImage] are the mobile seam's
+/// poll-and-tap pair (see `composer_clipboard_image_stub.dart`); the browser
+/// has no permission-free way to check clipboard contents ahead of a real
+/// paste, so both are no-ops here and the "Paste image" row they gate never
+/// shows on web - Ctrl+V through the listener above is already the way in.
 library;
 
 import 'dart:async';
@@ -50,6 +56,13 @@ void stopClipboardImagePaste() {
   _listener = null;
   _onImage = null;
 }
+
+/// Always false: see this file's doc comment for why the browser cannot
+/// answer this without a permission prompt of its own.
+Future<bool> hasClipboardImage() async => false;
+
+/// Always null, matching [hasClipboardImage].
+Future<Uint8List?> readClipboardImage() async => null;
 
 void _handlePaste(web.ClipboardEvent event) =>
     unawaited(_readPastedImage(event));

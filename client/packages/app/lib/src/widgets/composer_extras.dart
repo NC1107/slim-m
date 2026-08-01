@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import 'composer_markdown_shortcuts.dart';
@@ -136,6 +137,24 @@ class ComposerField extends StatelessWidget {
   }
 }
 
+/// A dismissible inline failure, in the composer's own vertical rhythm.
+class ComposerInlineError extends StatelessWidget {
+  const ComposerInlineError({
+    super.key,
+    required this.message,
+    required this.onDismiss,
+  });
+
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+    child: AppErrorState(message: message, onDismiss: onDismiss),
+  );
+}
+
 /// One attachment uploaded but not yet sent. The whole chip is the tap
 /// target for removing it, since [AppChip.operator] is deliberately
 /// non-interactive and there is no dedicated "remove" glyph in
@@ -186,6 +205,57 @@ class StagedAttachmentChip extends StatelessWidget {
   }
 }
 
+/// The composer's two optional bands above the action bar: a clipboard-paste
+/// failure, if there is one to show, and the staged-attachment chips.
+///
+/// One widget rather than two calls at the build site, since both are
+/// "nothing, unless" content and `composer.dart` has no line budget left to
+/// spend on laying them out itself.
+class ComposerBanners extends StatelessWidget {
+  const ComposerBanners({
+    super.key,
+    required this.clipboardPasteError,
+    required this.onDismissClipboardPasteError,
+    required this.pendingAttachments,
+    required this.onRemoveAttachment,
+  });
+
+  final String? clipboardPasteError;
+  final VoidCallback onDismissClipboardPasteError;
+  final List<api.Attachment> pendingAttachments;
+  final ValueChanged<api.Attachment> onRemoveAttachment;
+
+  @override
+  Widget build(BuildContext context) {
+    final error = clipboardPasteError;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (error != null)
+          ComposerInlineError(
+            message: error,
+            onDismiss: onDismissClipboardPasteError,
+          ),
+        if (pendingAttachments.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+            child: Wrap(
+              spacing: AppSpacing.s8,
+              runSpacing: AppSpacing.s8,
+              children: [
+                for (final attachment in pendingAttachments)
+                  StagedAttachmentChip(
+                    filename: attachment.filename,
+                    onRemove: () => onRemoveAttachment(attachment),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 /// The composer's secondary actions, off the row rather than on it.
 ///
 /// At touch density five 44pt controls plus their gaps leave a 390pt phone
@@ -197,50 +267,66 @@ class StagedAttachmentChip extends StatelessWidget {
 /// Attaching splits into two rows rather than one, because a single "Attach
 /// a file" hid a choice `file_picker` actually requires on iOS and Android;
 /// see `attachment_picker.dart` for why the two cannot share one request.
+///
+/// [canPasteImage] decides whether the "Paste image" row is worth offering
+/// (see `composer_clipboard_paste.dart`'s `composerClipboardPasteAvailable`)
+/// and is resolved here, after the sheet is already open, rather than
+/// awaited by the caller first: the row simply appears a moment later
+/// rather than the whole sheet waiting on a platform-channel round trip to
+/// open at all. Deliberate, not an oversight - awaiting it first was tried
+/// and reverted; see this file's neighbour for why.
 Future<void> showComposerActionsSheet(
   BuildContext context, {
   required VoidCallback onPhotoLibrary,
   required VoidCallback onBrowseFiles,
+  required Future<bool> canPasteImage,
+  required VoidCallback onPasteImage,
   required VoidCallback onPoll,
   required VoidCallback onCode,
 }) {
-  final tokens = Theme.of(context).extension<AppTokens>()!;
-  final actions = <(IconData, String, VoidCallback)>[
-    (AppIcons.image, 'Photo library', onPhotoLibrary),
-    (AppIcons.attachFile, 'Browse files', onBrowseFiles),
-    (AppIcons.poll, 'Create a poll', onPoll),
-    (AppIcons.code, 'Insert code', onCode),
-  ];
-
   return showAppSheet<void>(
     context,
-    builder: (sheetContext) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.s12,
-          0,
-          AppSpacing.s12,
-          AppSpacing.s12,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final (icon, label, action) in actions)
-              AppListRow(
-                label: label,
-                leading: Icon(
-                  icon,
-                  size: AppSizes.icon16,
-                  color: tokens.textSecondary,
-                ),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  action();
-                },
-              ),
-          ],
-        ),
-      ),
+    builder: (sheetContext) => FutureBuilder<bool>(
+      future: canPasteImage,
+      builder: (context, snapshot) {
+        final tokens = Theme.of(context).extension<AppTokens>()!;
+        final actions = <(IconData, String, VoidCallback)>[
+          (AppIcons.image, 'Photo library', onPhotoLibrary),
+          (AppIcons.attachFile, 'Browse files', onBrowseFiles),
+          if (snapshot.data == true)
+            (AppIcons.clipboardPaste, 'Paste image', onPasteImage),
+          (AppIcons.poll, 'Create a poll', onPoll),
+          (AppIcons.code, 'Insert code', onCode),
+        ];
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s12,
+              0,
+              AppSpacing.s12,
+              AppSpacing.s12,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final (icon, label, action) in actions)
+                  AppListRow(
+                    label: label,
+                    leading: Icon(
+                      icon,
+                      size: AppSizes.icon16,
+                      color: tokens.textSecondary,
+                    ),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      action();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     ),
   );
 }

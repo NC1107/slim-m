@@ -3,6 +3,7 @@ package top.npcserver.slimm
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
 
 class MainActivity : FlutterActivity() {
     /**
@@ -23,5 +24,10 @@ class MainActivity : FlutterActivity() {
         } else {
             ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
+    }
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        ClipboardImageChannel(applicationContext).attach(flutterEngine.dartExecutor.binaryMessenger)
     }
 }
