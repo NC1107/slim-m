@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../routing/breakpoints.dart';
 import 'context_menu_focus.dart';
 import 'hover_reveal.dart';
 import 'message_context_menu_layout.dart';
@@ -79,6 +80,11 @@ class MessageActions {
 /// long-press timeout rather than the spec's 350ms, because the gesture stays
 /// a [GestureDetector] (the thing that publishes `SemanticsAction.longPress`)
 /// and the tint has to end when the gesture it tracks does.
+///
+/// On a compact layout the menu is a bottom sheet, Discord-style, rather than
+/// the floating follower: a floating menu opened by a long-press sits right
+/// under the thumb that opened it. Wider layouts keep the floating overlay
+/// unchanged, since a mouse anchors the menu to where it clicked instead.
 class MessageContextMenuRegion extends StatefulWidget {
   const MessageContextMenuRegion({
     super.key,
@@ -121,6 +127,10 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
   /// signal fires no pointer down, so the tap region never sees it.
   Offset _anchor = Offset.zero;
 
+  /// Whether the compact bottom sheet is currently showing; the wide
+  /// floating overlay tracks its own visibility on [_controller] instead.
+  bool _sheetOpen = false;
+
   @override
   void dispose() {
     _watched?.removeListener(_closeOnScroll);
@@ -131,10 +141,36 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
   /// reflow under an open menu. A long-press passes false: touch reveals
   /// nothing, so pinning would only mount a control the menu itself covers.
   void _setOpen(bool open, {bool pinRow = true}) {
+    if (pinRow || !open) HoverRevealScope.maybeOf(context)?.pin(open);
+    if (LayoutClass.of(context) == LayoutClass.compact) {
+      _setSheetOpen(open);
+      return;
+    }
     if (open) _anchor = _anchorOffset();
     _watchScroll(open);
-    if (pinRow || !open) HoverRevealScope.maybeOf(context)?.pin(open);
     open ? _controller.show() : _controller.hide();
+  }
+
+  /// The compact half of [_setOpen]: a bottom sheet rather than the floating
+  /// follower. Neither the anchor nor the scroll-close tracking applies here:
+  /// the sheet is not placed against the row at all, and its own modal
+  /// barrier already stops the row underneath from scrolling while it shows.
+  void _setSheetOpen(bool open) {
+    if (!open) {
+      if (_sheetOpen) Navigator.of(context).maybePop();
+      return;
+    }
+    if (_sheetOpen) return;
+    _sheetOpen = true;
+    showAppSheet<void>(
+      context,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: AppMenu(
+          children: _items(() => Navigator.of(sheetContext).pop()),
+        ),
+      ),
+    ).whenComplete(() => _sheetOpen = false);
   }
 
   void _closeOnScroll() {
@@ -157,15 +193,71 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
     return box.localToGlobal(_menuInset, ancestor: overlay);
   }
 
-  void _run(VoidCallback action) {
-    _setOpen(false);
-    action();
+  /// The item list both the floating menu and the bottom sheet render,
+  /// parameterised on how each closes itself: hiding the overlay controller
+  /// for one, popping the sheet's own route for the other.
+  List<Widget> _items(VoidCallback close) {
+    final actions = widget.actions;
+    void run(VoidCallback action) {
+      close();
+      action();
+    }
+
+    return [
+      AppMenuItem(
+        label: 'Add reaction',
+        leading: AppIcons.smile,
+        onTap: () => run(widget.onAddReaction),
+      ),
+      const AppMenuDivider(),
+      AppMenuItem(
+        label: 'Copy text',
+        leading: AppIcons.copy,
+        onTap: () =>
+            run(() => Clipboard.setData(ClipboardData(text: widget.content))),
+      ),
+      if (actions.canEdit)
+        AppMenuItem(
+          label: 'Edit',
+          leading: AppIcons.edit,
+          onTap: () => run(actions.onEdit),
+        ),
+      if (actions.canManagePins)
+        AppMenuItem(
+          label: actions.pinned ? 'Unpin' : 'Pin',
+          leading: AppIcons.pin,
+          onTap: () => run(actions.onTogglePin),
+        ),
+      if (actions.canReport || actions.canBlockAuthor) ...[
+        const AppMenuDivider(),
+        if (actions.canReport)
+          AppMenuItem(
+            label: 'Report message',
+            leading: AppIcons.report,
+            onTap: () => run(actions.onReport),
+          ),
+        if (actions.canBlockAuthor)
+          AppMenuItem(
+            label: 'Block user',
+            leading: AppIcons.revoke,
+            tone: AppMenuItemTone.danger,
+            onTap: () => run(actions.onBlockAuthor),
+          ),
+      ],
+      if (actions.canDelete) ...[
+        const AppMenuDivider(),
+        AppMenuItem(
+          label: 'Delete',
+          leading: AppIcons.delete,
+          tone: AppMenuItemTone.danger,
+          onTap: () => run(actions.onDelete),
+        ),
+      ],
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
-    final actions = widget.actions;
-
     return OverlayPortal(
       controller: _controller,
       overlayChildBuilder: (context) => Positioned.fill(
@@ -184,60 +276,7 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
               child: SingleChildScrollView(
                 child: AppMenu(
                   width: 200,
-                  children: [
-                    AppMenuItem(
-                      label: 'Add reaction',
-                      leading: AppIcons.smile,
-                      onTap: () => _run(widget.onAddReaction),
-                    ),
-                    const AppMenuDivider(),
-                    AppMenuItem(
-                      label: 'Copy text',
-                      leading: AppIcons.copy,
-                      onTap: () => _run(
-                        () => Clipboard.setData(
-                          ClipboardData(text: widget.content),
-                        ),
-                      ),
-                    ),
-                    if (actions.canEdit)
-                      AppMenuItem(
-                        label: 'Edit',
-                        leading: AppIcons.edit,
-                        onTap: () => _run(actions.onEdit),
-                      ),
-                    if (actions.canManagePins)
-                      AppMenuItem(
-                        label: actions.pinned ? 'Unpin' : 'Pin',
-                        leading: AppIcons.pin,
-                        onTap: () => _run(actions.onTogglePin),
-                      ),
-                    if (actions.canReport || actions.canBlockAuthor) ...[
-                      const AppMenuDivider(),
-                      if (actions.canReport)
-                        AppMenuItem(
-                          label: 'Report message',
-                          leading: AppIcons.report,
-                          onTap: () => _run(actions.onReport),
-                        ),
-                      if (actions.canBlockAuthor)
-                        AppMenuItem(
-                          label: 'Block user',
-                          leading: AppIcons.revoke,
-                          tone: AppMenuItemTone.danger,
-                          onTap: () => _run(actions.onBlockAuthor),
-                        ),
-                    ],
-                    if (actions.canDelete) ...[
-                      const AppMenuDivider(),
-                      AppMenuItem(
-                        label: 'Delete',
-                        leading: AppIcons.delete,
-                        tone: AppMenuItemTone.danger,
-                        onTap: () => _run(actions.onDelete),
-                      ),
-                    ],
-                  ],
+                  children: _items(() => _setOpen(false)),
                 ),
               ),
             ),
