@@ -56,7 +56,6 @@ class ReactionsRow extends StatelessWidget {
     required this.onReactionTap,
     required this.onPickReaction,
     this.customEmoji = const {},
-    this.showAddButton = false,
   });
 
   final List<api.ReactionSummary> reactions;
@@ -70,17 +69,22 @@ class ReactionsRow extends StatelessWidget {
   /// literal text it already was, exactly as a message body degrades.
   final Map<String, String> customEmoji;
 
-  /// Whether to offer the add-a-reaction control. The row keeps rendering
-  /// existing reactions without it.
-  final bool showAddButton;
-
-  /// The design shows a reactions row only on a message that has one. A
-  /// permanent add-button under every message costs a row of vertical space
-  /// each and turns a quiet list into a grid of identical glyphs, so the
-  /// affordance belongs on hover with the row absent until then.
+  /// Renders existing reactions and nothing else.
+  ///
+  /// The add-a-reaction control used to live here, revealed on hover, and
+  /// that is what made rows jump: an unreacted message rendered nothing, so
+  /// hovering swapped absent for present and grew the row, moving the whole
+  /// log under the pointer. It lives in [MessageRow]'s hover overlay now,
+  /// outside layout entirely.
+  ///
+  /// The reasoning that put it here was sound and still holds - a permanent
+  /// add-button under every message costs a row of vertical space each and
+  /// turns a quiet list into a grid of identical glyphs. That is why the fix
+  /// is an overlay rather than reserving the space: reserving it would buy
+  /// back exactly the cost this avoided.
   @override
   Widget build(BuildContext context) {
-    if (reactions.isEmpty && !showAddButton) return const SizedBox.shrink();
+    if (reactions.isEmpty) return const SizedBox.shrink();
 
     // No top inset: it reads as part of the message above, not a new line.
     return Wrap(
@@ -108,7 +112,6 @@ class ReactionsRow extends StatelessWidget {
               onTap: () => onReactionTap(reaction),
             ),
           ),
-        if (showAddButton) EmojiPickerButton(onSelect: onPickReaction),
       ],
     );
   }
