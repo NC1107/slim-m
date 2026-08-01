@@ -94,6 +94,10 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
   final _controller = OverlayPortalController();
   final _link = LayerLink();
 
+  /// Finger-down feedback, the same shape [AppIconButton] uses: nothing else
+  /// here draws a hover fill for a tap to interrupt.
+  bool _pressed = false;
+
   /// Applies [visibility] and closes the menu once the server has agreed to
   /// it. A refusal leaves the menu open with [actionError] rendered inline,
   /// rather than closing over a change that never happened.
@@ -123,19 +127,30 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
           onTap: _controller.toggle,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: _controller.toggle,
+            onTapDown: (_) => setState(() => _pressed = true),
+            onTapUp: (_) => setState(() => _pressed = false),
+            onTapCancel: () => setState(() => _pressed = false),
+            onTap: () {
+              AppHaptics.selection();
+              _controller.toggle();
+            },
             child: ConstrainedBox(
               constraints: const BoxConstraints(
                 minWidth: AppSizes.rowTouch,
                 minHeight: AppSizes.rowTouch,
               ),
               child: Center(
-                child: UserAvatar(
-                  userId: me.valueOrNull?.id,
-                  avatarUpdatedAt: me.valueOrNull?.avatarUpdatedAt,
-                  name: me.valueOrNull?.displayName ?? '',
-                  size: 28,
-                  status: widget.presence,
+                child: AnimatedScale(
+                  scale: _pressed ? AppMotion.pressScale : 1,
+                  duration: AppMotion.reduced(context, AppMotion.fast),
+                  curve: AppMotion.entrance,
+                  child: UserAvatar(
+                    userId: me.valueOrNull?.id,
+                    avatarUpdatedAt: me.valueOrNull?.avatarUpdatedAt,
+                    name: me.valueOrNull?.displayName ?? '',
+                    size: 28,
+                    status: widget.presence,
+                  ),
                 ),
               ),
             ),

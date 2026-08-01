@@ -271,13 +271,24 @@ class ConversationPane extends ConsumerWidget {
           final dmCallOpen =
               channel?.kind == 'dm' &&
               ref.watch(dmCallOpenProvider) == channelId;
-          final body = canvasOpen
-              ? CanvasPane(channelId: channelId)
+          // Keyed by stage, so each pane fades through the one it replaces.
+          final stage = canvasOpen
+              ? 'canvas'
               : isVoice
-              ? VoiceScreen(channelId: channelId)
+              ? 'voice'
               : dmCallOpen
-              ? DmCallPane(channelId: channelId)
-              : ChannelScreen(channelId: channelId);
+              ? 'dm-call'
+              : 'text';
+          final body = AppFadeIn(
+            key: ValueKey('pane-$stage'),
+            child: canvasOpen
+                ? CanvasPane(channelId: channelId)
+                : isVoice
+                ? VoiceScreen(channelId: channelId)
+                : dmCallOpen
+                ? DmCallPane(channelId: channelId)
+                : ChannelScreen(channelId: channelId),
+          );
 
           if (!layout.showsBothPanes || !isVoice || canvasOpen) return body;
           return Column(
