@@ -17,6 +17,7 @@ import traceback
 import e2e_admin
 import e2e_labels as L
 import e2e_messaging
+import e2e_markdown
 import e2e_reconcile
 import e2e_settings
 import e2e_coverage
@@ -67,6 +68,12 @@ def scenarios(a, b, admin, member, room_id):
             L.TEXT_CHANNEL)),
         ("messaging: an attachment", lambda: e2e_messaging.attach(
             a, b, L.TEXT_CHANNEL, upload, admin)),
+        ("markdown: formatting applies without reaching the wire",
+         lambda: e2e_markdown.formats_without_storing_the_markers(
+             a, b, L.TEXT_CHANNEL, admin)),
+        ("markdown: a spoiler keeps its text out of the tree",
+         lambda: e2e_markdown.a_spoiler_hides_its_text(
+             a, b, L.TEXT_CHANNEL, admin)),
         ("moderation: reporting a message", lambda: e2e_admin.report_a_message(
             member, admin, admin.channel_named(L.TEXT_CHANNEL)["id"],
             L.FIRST_MESSAGE)),
