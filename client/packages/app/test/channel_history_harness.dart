@@ -15,11 +15,13 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
+import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_app/src/screens/channel_screen.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -166,6 +168,7 @@ Future<HistoryHarness> mountChannel(
   List<String> blockedUserIds = const [],
   SyncStatus syncStatus = SyncStatus.offline,
   MessageStore Function(SlimmDatabase db)? storeFactory,
+  List<Map<String, dynamic>> searchHits = const [],
 }) async {
   tester.view.physicalSize = const Size(500, 800);
   tester.view.devicePixelRatio = 1;
@@ -204,6 +207,7 @@ Future<HistoryHarness> mountChannel(
               olderPagesFail,
               messageAuthorId,
               blockedUserIds,
+              searchHits,
             ),
           ),
         );
@@ -214,12 +218,27 @@ Future<HistoryHarness> mountChannel(
   );
   addTearDown(container.dispose);
 
+  // A real GoRouter, not a bare MaterialApp: jumping from a tapped search result reads it.
+  final router = GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) =>
+            const Scaffold(body: ChannelScreen(channelId: 'c1')),
+      ),
+      GoRoute(
+        path: Routes.channelPattern,
+        builder: (context, state) =>
+            const Scaffold(body: ChannelScreen(channelId: 'c1')),
+      ),
+    ],
+  );
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(
+      child: MaterialApp.router(
         theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const Scaffold(body: ChannelScreen(channelId: 'c1')),
+        routerConfig: router,
       ),
     ),
   );
@@ -242,8 +261,12 @@ Future<http.Response> _answer(
   bool olderPagesFail,
   String messageAuthorId,
   List<String> blockedUserIds,
+  List<Map<String, dynamic>> searchHits,
 ) async {
   final path = request.url.path;
+  if (request.method == 'GET' && path == '/channels/c1/messages/search') {
+    return _jsonBody(searchHits);
+  }
   if (request.method == 'GET' && path == '/channels/c1/messages') {
     requests.add(request.url);
     final older = request.url.queryParameters.containsKey('before');

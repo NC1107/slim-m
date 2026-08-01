@@ -242,7 +242,14 @@ class _CommandPaletteContentState
       ),
       ('Members', buildMemberItems(members, _query, me?.id)),
       if (widget.currentChannelId != null && !_messagesForbidden)
-        ('Messages', buildMessageItems(_messageResults, tokens)),
+        (
+          'Messages',
+          buildMessageItems(
+            _messageResults,
+            tokens,
+            currentChannelId: widget.currentChannelId,
+          ),
+        ),
       ('Actions', buildActionItems(_query, permissions)),
     ].where((g) => g.$2.isNotEmpty).toList();
 

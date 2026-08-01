@@ -12,6 +12,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -25,6 +26,7 @@ import '../providers/emoji_catalog_provider.dart';
 import '../providers/member_presence.dart';
 import '../providers/message_actions.dart';
 import '../providers/message_extras.dart';
+import '../providers/message_jump.dart';
 import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
@@ -35,6 +37,7 @@ import '../widgets/channel_search.dart';
 import '../widgets/composer.dart';
 import '../widgets/jump_to_latest_button.dart';
 import '../widgets/message_context_menu.dart';
+import '../widgets/message_jump.dart';
 import '../widgets/message_transcript.dart';
 import 'channel_message_actions.dart';
 import 'channel_read_marker.dart';
@@ -97,7 +100,12 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     super.didUpdateWidget(oldWidget);
     // This State outlives a channel switch (see [ReadMarker]), so the field
     // would otherwise still hold the previous channel's query.
-    if (oldWidget.channelId != widget.channelId) _searchController.clear();
+    if (oldWidget.channelId != widget.channelId) {
+      _searchController.clear();
+      // A jump neither finished nor consumed before the switch must not
+      // replay against whichever channel is open next.
+      ref.read(messageJumpProvider.notifier).cancelFor(oldWidget.channelId);
+    }
   }
 
   Future<void> _hydrateExtras() async {
@@ -254,6 +262,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     ) {
       if (!open) _searchController.clear();
     });
+    final jumpArrival = watchMessageJump(ref, context, widget.channelId);
     final knownUsernames = ref
         .watch(membersProvider)
         .maybeWhen(
@@ -323,6 +332,16 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                           failed: search.failed,
                           forbidden: search.forbidden,
                           onRetry: () => _search(search.query!),
+                          onSelect: (m) {
+                            _toggleSearch();
+                            jumpToMessage(
+                              GoRouter.of(context),
+                              ref.read,
+                              currentChannelId: widget.channelId,
+                              channelId: m.channelId,
+                              messageId: m.id,
+                            );
+                          },
                         )
                       : Stack(
                           children: [
@@ -400,6 +419,13 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                       unawaited(castVote(ref, m.id, option)),
                                   onSubmitEdit: _submitEdit,
                                   onCancelEdit: _cancelEdit,
+                                  jumpTargetId: jumpArrival?.messageId,
+                                  jumpToken: jumpArrival?.token,
+                                  onJumpArrived: jumpArrival == null
+                                      ? null
+                                      : () => ref
+                                            .read(messageJumpProvider.notifier)
+                                            .consume(jumpArrival.token),
                                 );
                               },
                             ),

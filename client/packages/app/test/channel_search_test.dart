@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/widgets/channel_search.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -28,6 +29,7 @@ void main() {
           failed: false,
           forbidden: false,
           onRetry: _noop,
+          onSelect: _noopMessage,
         ),
       ),
     );
@@ -49,6 +51,7 @@ void main() {
           failed: true,
           forbidden: false,
           onRetry: () => retried = true,
+          onSelect: _noopMessage,
         ),
       ),
     );
@@ -74,6 +77,7 @@ void main() {
           failed: true,
           forbidden: true,
           onRetry: _noop,
+          onSelect: _noopMessage,
         ),
       ),
     );
@@ -99,6 +103,7 @@ void main() {
           failed: false,
           forbidden: false,
           onRetry: _noop,
+          onSelect: _noopMessage,
         ),
       ),
     );
@@ -108,3 +113,5 @@ void main() {
 }
 
 void _noop() {}
+
+void _noopMessage(api.Message _) {}

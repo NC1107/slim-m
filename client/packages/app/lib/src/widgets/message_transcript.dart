@@ -8,6 +8,8 @@
 /// against a plain list of messages.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
@@ -16,6 +18,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/channel_history.dart';
 import '../providers/sync_controller.dart';
 import 'message_context_menu.dart';
+import 'message_jump.dart';
 import 'message_row.dart';
 import 'message_row_identity.dart';
 import 'message_transcript_widgets.dart';
@@ -49,6 +52,9 @@ class MessageTranscript extends StatefulWidget {
     required this.onVote,
     required this.onSubmitEdit,
     required this.onCancelEdit,
+    this.jumpTargetId,
+    this.jumpToken,
+    this.onJumpArrived,
   });
 
   final List<Message> messages;
@@ -99,6 +105,20 @@ class MessageTranscript extends StatefulWidget {
   final void Function(Message message, String content) onSubmitEdit;
   final VoidCallback onCancelEdit;
 
+  /// A jump ([messageJumpProvider]) has landed on this message id: scroll to
+  /// it and flash it. Null the rest of the time.
+  final String? jumpTargetId;
+
+  /// Identifies which arrival [jumpTargetId] is, so a fresh jump to the same
+  /// id (asked for twice) still mounts a fresh flash rather than reusing one
+  /// already fading out.
+  final int? jumpToken;
+
+  /// Called once the jump has actually scrolled to and started flashing the
+  /// target, so the caller can tell the jump controller this arrival is
+  /// handled.
+  final VoidCallback? onJumpArrived;
+
   @override
   State<MessageTranscript> createState() => _MessageTranscriptState();
 }
@@ -115,6 +135,61 @@ class _MessageTranscriptState extends State<MessageTranscript> {
   /// How close to the oldest end still counts as having reached it, so a page
   /// starts before the reader hits a hard stop.
   static const double _loadOlderSlop = 240;
+
+  /// The last jump token already given a rough scroll, so a rebuild carrying
+  /// the same token (a new message arriving elsewhere, say) does not keep
+  /// re-jumping a reader who has since scrolled away on their own.
+  int? _estimatedJumpToken;
+
+  /// How many rounds [_refineJumpScroll] jumps and re-reads the estimate for.
+  /// A [ListView.builder] only knows the true extent of what it has actually
+  /// laid out, and rows here vary sharply - a grouped continuation is far
+  /// shorter than a headed one - so `maxScrollExtent` measured from whatever
+  /// handful of rows sat at the bottom before the jump routinely undershoots
+  /// the real total several times over. Jumping once, letting a frame
+  /// settle, and re-reading it again converges on the right spot as more of
+  /// the list gets measured, which a single jump cannot; a fixed round count
+  /// bounds it rather than looping until some notion of "close enough".
+  static const int _jumpRefineRounds = 6;
+
+  /// [ListView.builder] only builds what is near the viewport, so a target
+  /// row far from wherever the reader currently is has no context yet for
+  /// [MessageJumpHighlight] to call `Scrollable.ensureVisible` on. This gets
+  /// the reader close by proportion of position in the loaded list - an
+  /// estimate, not exact, since rows vary in height - which is what puts the
+  /// real target within the list's cache extent so it actually gets built
+  /// and can then correct itself precisely.
+  void _estimateJumpScroll() {
+    final token = widget.jumpToken;
+    final targetId = widget.jumpTargetId;
+    if (token == null || targetId == null || token == _estimatedJumpToken) {
+      return;
+    }
+    final index = widget.messages.indexWhere((m) => m.id == targetId);
+    final span = widget.messages.length - 1;
+    if (index == -1 || span <= 0) return;
+    _estimatedJumpToken = token;
+    unawaited(_refineJumpScroll(token, index, span));
+  }
+
+  /// [ScrollController.jumpTo] fires its listeners synchronously, and doing
+  /// that straight out of [build] reaches a sibling `ValueListenableBuilder`
+  /// mid-build, which Flutter refuses; every round below awaits a frame
+  /// first, including the first, for that reason alone.
+  Future<void> _refineJumpScroll(int token, int index, int span) async {
+    for (var round = 0; round < _jumpRefineRounds; round++) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || widget.jumpToken != token) return;
+      if (!widget.scrollController.hasClients) return;
+      final position = widget.scrollController.position;
+      // Reversed: the newest sits at the minimum extent, the oldest at the maximum, so distance from the newest end is the fraction below.
+      final fromNewest = widget.messages.length - 1 - index;
+      final estimate = position.maxScrollExtent * fromNewest / span;
+      widget.scrollController.jumpTo(
+        estimate.clamp(position.minScrollExtent, position.maxScrollExtent),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -203,6 +278,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
     }
 
     _checkAfterLayout();
+    _estimateJumpScroll();
     final newestId = messages.last.id;
     final animateNewest = _hydrated && !_seen.contains(newestId);
     // Everything on screen counts as seen, so a recycle never replays.
@@ -258,11 +334,18 @@ class _MessageTranscriptState extends State<MessageTranscript> {
             actions: widget.actionsFor(message),
           ),
         );
-        if (i != 0) return row;
+        final content = message.id == widget.jumpTargetId
+            ? MessageJumpHighlight(
+                key: ValueKey('jump-${widget.jumpToken}'),
+                onArrived: widget.onJumpArrived ?? () {},
+                child: row,
+              )
+            : row;
+        if (i != 0) return content;
         return MessageEntrance(
           key: ValueKey('entrance-$newestId'),
           animateOnMount: animateNewest,
-          child: row,
+          child: content,
         );
       },
     );
