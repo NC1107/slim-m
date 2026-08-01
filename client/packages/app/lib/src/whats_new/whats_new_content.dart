@@ -138,6 +138,20 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'Swipe from the left edge to open the channel list',
     points: [
       WhatsNewPoint(
+        'Reports can be acted on. Jump straight to the message, and delete '
+        'it, time the author out or remove them, without leaving the queue. '
+        'The card also says plainly who was reported and who reported them.',
+      ),
+      WhatsNewPoint(
+        'Your profile picture is centred with a camera badge, so it is '
+        'obvious you can tap it to change.',
+      ),
+      WhatsNewPoint(
+        'The jump-to-latest button is out of the way, reactions sit closer '
+        'to their message, and opening a direct message from the member '
+        'list closes the list behind you.',
+      ),
+      WhatsNewPoint(
         'On a phone, swiping in from the left edge of a conversation now '
         'pulls the channel list over it, the gesture every other messaging '
         'app already trains you to reach for. Swipe it shut again or tap '
