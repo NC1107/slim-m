@@ -39,9 +39,10 @@ void main() {
 
   group('pendingWhatsNewEntries', () {
     test('a null lastSeen returns every entry up to currentVersion', () {
+      // The newest shipped entry, or a new entry breaks this every release.
       final pending = pendingWhatsNewEntries(
         lastSeen: null,
-        currentVersion: '0.17.2',
+        currentVersion: whatsNewEntries.last.version,
       );
       expect(pending, whatsNewEntries);
     });

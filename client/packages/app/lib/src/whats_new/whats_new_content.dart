@@ -67,6 +67,36 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.18.0',
+    headline: 'A round of fixes from using the app on real devices',
+    points: [
+      WhatsNewPoint(
+        'Avatars and images no longer reload every time you switch channel. '
+        'They were only ever held while something was on screen looking at '
+        'them, so leaving a channel threw them away.',
+      ),
+      WhatsNewPoint(
+        'Message rows no longer jump when the pointer crosses them, two '
+        'channels no longer overlay each other while switching, and one '
+        'image can no longer fill the whole window.',
+      ),
+      WhatsNewPoint(
+        'On a phone, a long press now raises a sheet from the bottom rather '
+        'than a menu floating under your thumb.',
+      ),
+      WhatsNewPoint(
+        'The channel list collapses, notes to self reads as a direct message '
+        'with You, and you can hide it and find it again by searching your '
+        'own name.',
+      ),
+      WhatsNewPoint(
+        'Pasting an image into the composer works in the browser build. '
+        'Flutter has no image clipboard on desktop or mobile, so there it '
+        'still only pastes text.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
