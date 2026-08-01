@@ -17,6 +17,13 @@
 /// The backdrop is black in both themes: a surface token would tint the
 /// letterbox around a photo, and the controls are themed dark to match rather
 /// than following the app's brightness.
+///
+/// This route is pushed on the root navigator, above any Scaffold, so
+/// nothing upstream supplies the [Material] ancestor [Text] and [Icon] rely
+/// on for their default style; without one Flutter renders them in its own
+/// debug fallback (red text, a double yellow underline) rather than the
+/// theme's, which reads as a colour bug and is not one. `build` below wraps
+/// its content in a transparent [Material] for exactly this reason.
 library;
 
 import 'dart:math' as math;
@@ -125,33 +132,37 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
     final compact = MediaQuery.sizeOf(context).width < kCompactWidth;
     return Theme(
       data: buildTheme(Brightness.dark, AppTokens.dark),
-      child: _Backdrop(
-        compact: compact,
-        onDismiss: _close,
-        child: SafeArea(
-          child: Column(
-            children: [
-              _ViewerHeader(filename: widget.filename, onClose: _close),
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onVerticalDragUpdate: dismissible ? _onDragUpdate : null,
-                  onVerticalDragEnd: dismissible ? _onDragEnd : null,
-                  child: Transform.translate(
-                    offset: Offset(0, _dragged),
-                    child: InteractiveViewer(
-                      transformationController: _transform,
-                      maxScale: _maxScale,
-                      child: Image.memory(
-                        widget.bytes,
-                        fit: BoxFit.contain,
-                        semanticLabel: widget.filename,
+      // Material ancestor for Text/Icon; see this file's library doc.
+      child: Material(
+        type: MaterialType.transparency,
+        child: _Backdrop(
+          compact: compact,
+          onDismiss: _close,
+          child: SafeArea(
+            child: Column(
+              children: [
+                _ViewerHeader(filename: widget.filename, onClose: _close),
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragUpdate: dismissible ? _onDragUpdate : null,
+                    onVerticalDragEnd: dismissible ? _onDragEnd : null,
+                    child: Transform.translate(
+                      offset: Offset(0, _dragged),
+                      child: InteractiveViewer(
+                        transformationController: _transform,
+                        maxScale: _maxScale,
+                        child: Image.memory(
+                          widget.bytes,
+                          fit: BoxFit.contain,
+                          semanticLabel: widget.filename,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

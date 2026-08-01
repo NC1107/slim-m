@@ -207,6 +207,11 @@ const List<WhatsNewEntry> whatsNewEntries = [
         'sometimes for good. It now updates live while everyone is '
         'connected, and catches up the moment a device reconnects.',
       ),
+      WhatsNewPoint(
+        'The composer\'s placeholder text now sits level with the icons '
+        'beside it at rest, instead of pinned to the top of a box taller '
+        'than the line of text in it.',
+      ),
     ],
   ),
 ];

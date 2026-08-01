@@ -3,6 +3,17 @@
 /// the top of the bar as a multi-line message grows it, not drift toward
 /// the middle. Covers both the compact (phone, folded `+` sheet) and wide
 /// (desktop, inline poll/code) layouts, since both share the same Row.
+///
+/// Also covers the companion defect: at rest, a one-line field must not be
+/// taller than its text, or the hint sits at the top of the extra space
+/// while the row's icons, each a fixed-size box, look centred beside it.
+/// Both properties have to hold together, or "fixing" one regresses the
+/// other; see composer.dart's own doc comment on the row's alignment.
+///
+/// The centring assertion needs real fonts loaded: the test binding's
+/// placeholder glyph is tall enough to mask the gap the bug leaves, so a
+/// run against it would pass whether or not the field's minimum height is
+/// actually wired up. See `loadRealFonts`'s own doc for why.
 library;
 
 import 'package:flutter/material.dart';
@@ -11,12 +22,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'composer_harness.dart';
+import 'ui_snapshot_support.dart';
 
 const _barKey = Key('composer-action-bar');
+const _hintKey = Key('composer-hint');
 
 void main() {
   late TextEditingController controller;
   late Sends sends;
+
+  setUpAll(loadRealFonts);
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -75,6 +90,50 @@ void main() {
   testWidgets(
     'wide layout: icons stay pinned to the top of a grown field',
     (tester) => expectIconsPinnedToTop(
+      tester,
+      platform: TargetPlatform.linux,
+      windowSize: const Size(1400, 900),
+    ),
+  );
+
+  /// At rest (one line, no text yet) the hint's vertical centre must track
+  /// the send icon's, not sit at the top of a field taller than its text.
+  Future<void> expectHintCenteredAtRest(
+    WidgetTester tester, {
+    required TargetPlatform platform,
+    required Size windowSize,
+  }) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = windowSize;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      composerHarness(controller: controller, sends: sends, platform: platform),
+    );
+
+    final hintCenterY = tester.getCenter(find.byKey(_hintKey)).dy;
+    final sendCenterY = tester.getCenter(sendButton).dy;
+    expect(
+      (hintCenterY - sendCenterY).abs(),
+      lessThan(2),
+      reason:
+          'the hint should sit level with the send icon at rest, not at '
+          'the top of a field taller than one line of text',
+    );
+  }
+
+  testWidgets(
+    'compact layout: the hint sits level with the send icon at rest',
+    (tester) => expectHintCenteredAtRest(
+      tester,
+      platform: TargetPlatform.iOS,
+      windowSize: const Size(390, 844),
+    ),
+  );
+
+  testWidgets(
+    'wide layout: the hint sits level with the send icon at rest',
+    (tester) => expectHintCenteredAtRest(
       tester,
       platform: TargetPlatform.linux,
       windowSize: const Size(1400, 900),
