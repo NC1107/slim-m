@@ -103,6 +103,10 @@ abstract final class AppIcons {
   /// The personal space: your own notes, not another person's avatar.
   static const IconData notebook = LucideIcons.notebookPen300;
 
+  /// The settings avatar's "tap to change" badge. Distinct from [camera]
+  /// above, which is a video camera for call controls; this is a still one.
+  static const IconData avatarCamera = LucideIcons.camera300;
+
   // Notifications.
   static const IconData notificationsOn = LucideIcons.bell300;
   static const IconData notificationsOff = LucideIcons.bellOff300;

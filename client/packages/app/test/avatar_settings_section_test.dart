@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Tests for the settings avatar section: "Remove" only offers itself when
-/// there is something to remove, and removing it round-trips through the
-/// real endpoint and clears the preview once `Me` is refetched.
+/// Tests for the settings avatar section: the camera badge is a real,
+/// touch-sized affordance that reaches the composer's two-source choice
+/// (pinning #284's behaviour rather than letting this pass regress it),
+/// "Remove" only offers itself when there is something to remove, and
+/// removing it round-trips through the real endpoint and clears the preview
+/// once `Me` is refetched.
 library;
 
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -23,6 +27,8 @@ const _tokens = TokenPair(
   refreshToken: 'refresh',
   accessExpiresAt: 0,
 );
+
+const _cameraLabel = 'Change profile picture';
 
 Map<String, dynamic> _meJson(int? avatarUpdatedAt) => {
   'id': 'self',
@@ -42,7 +48,9 @@ Widget _harness(ProviderContainer container) => UncontrolledProviderScope(
 );
 
 void main() {
-  testWidgets('no avatar set shows only the upload action', (tester) async {
+  testWidgets('no avatar set shows the camera badge and no Remove action', (
+    tester,
+  ) async {
     final container = ProviderContainer(
       overrides: [
         keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
@@ -72,9 +80,45 @@ void main() {
     await tester.pumpWidget(_harness(container));
     await tester.pumpAndSettle();
 
-    expect(find.text('Photo library'), findsOneWidget);
-    expect(find.text('Browse files'), findsOneWidget);
+    expect(find.bySemanticsLabel(_cameraLabel), findsOneWidget);
     expect(find.text('Remove'), findsNothing);
+  });
+
+  testWidgets('the camera badge meets the 44pt touch-target minimum', (
+    tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((request) async {
+              if (request.url.path == '/me') {
+                return http.Response(
+                  jsonEncode(_meJson(null)),
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
+              return http.Response('', 404);
+            }),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_harness(container));
+    await tester.pumpAndSettle();
+
+    final size = tester.getSize(find.bySemanticsLabel(_cameraLabel));
+    expect(size.width, greaterThanOrEqualTo(44));
+    expect(size.height, greaterThanOrEqualTo(44));
   });
 
   testWidgets(
@@ -127,10 +171,75 @@ void main() {
     },
   );
 
-  for (final label in ['Photo library', 'Browse files']) {
+  testWidgets('tapping the camera badge opens both sources, still selectable', (
+    tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((request) async {
+              if (request.url.path == '/me') {
+                return http.Response(
+                  jsonEncode(_meJson(null)),
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
+              return http.Response('', 404);
+            }),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_harness(container));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel(_cameraLabel));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Photo library'), findsOneWidget);
+    expect(find.text('Browse files'), findsOneWidget);
+  });
+
+  /// Mocked directly, rather than left unregistered like the rest of this
+  /// file's picks, so each row is pinned to the real plugin request its
+  /// source names: a routing bug (the wrong source popped, or the sheet's
+  /// choice never reaching `attachmentPickerProvider` at all) changes what
+  /// the plugin is asked for, where an unregistered channel would not tell
+  /// the two apart. Mirrors `attachment_picker_test.dart`'s own proof.
+  const filePickerChannel = MethodChannel(
+    'miguelruivo.flutter.plugins.filepicker',
+  );
+
+  for (final (label, expectedMethod) in [
+    ('Photo library', 'image'),
+    ('Browse files', 'any'),
+  ]) {
     testWidgets(
-      'tapping $label with no picker result available never calls upload',
+      'choosing $label routes to the plugin request that source names',
       (tester) async {
+        MethodCall? seen;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(filePickerChannel, (call) async {
+              seen = call;
+              return null; // no selection, the same shape a cancelled pick returns
+            });
+        addTearDown(
+          () => TestDefaultBinaryMessengerBinding
+              .instance
+              .defaultBinaryMessenger
+              .setMockMethodCallHandler(filePickerChannel, null),
+        );
+
         final requests = <String>[];
         final container = ProviderContainer(
           overrides: [
@@ -162,14 +271,14 @@ void main() {
         await tester.pumpWidget(_harness(container));
         await tester.pumpAndSettle();
 
-        /// No platform implementation is registered for file_picker's method
-        /// channel in a widget test, so this either throws (caught, shown as
-        /// a snack bar) or resolves with no file chosen; either way, the
-        /// point under test is that nothing ever reaches the upload endpoint
-        /// from a picker that produced nothing to upload.
+        await tester.tap(find.bySemanticsLabel(_cameraLabel));
+        await tester.pumpAndSettle();
+
         await tester.tap(find.text(label));
         await tester.pumpAndSettle();
 
+        expect(seen, isNotNull, reason: 'the picker was never invoked');
+        expect(seen!.method, expectedMethod);
         expect(requests, isNot(contains('POST /me/avatar')));
       },
     );
