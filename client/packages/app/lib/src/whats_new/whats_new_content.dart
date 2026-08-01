@@ -165,6 +165,17 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.20.2',
+    headline: 'Opening a DM with someone you have blocked now says so',
+    points: [
+      WhatsNewPoint(
+        'It used to just look empty, with a composer that would fail if you '
+        'tried to use it. Now it explains what is going on and gives you an '
+        'Unblock button right there.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,

@@ -481,9 +481,11 @@ The blocked list rendered raw 36-character uuids where names belong (it reads as
 The member popover offers Unblock rather than Block for somebody already blocked, since offering Block again reads as the block having failed.
 And the copy says only what is true: messages, reactions and typing go, notifications stop, and the person stays in the member list.
 
-Known rough edge, left deliberately (2026-07-30): an existing DM with somebody you then block stays in the rail and opens as an empty transcript with no explanation.
-It is already frozen server-side (`store/dms.rs` denies SEND, ADD_REACTIONS and ATTACH_FILES in both directions), so nothing new can arrive; what is missing is the client saying so instead of rendering a blank channel.
-Presence and the member row are also unfiltered on purpose - hiding somebody from the roster would make the member count wrong and take away the row the unblock lives on.
+~~Known rough edge, left deliberately (2026-07-30): an existing DM with somebody you then block stays in the rail and opens as an empty transcript with no explanation.~~
+Closed 2026-08-01: `BlockedDmNotice` (`widgets/blocked_dm_notice.dart`) now swaps in for the composer, names who is blocked and why (the channel is already frozen server-side, `store/dms.rs` denying SEND, ADD_REACTIONS and ATTACH_FILES both directions), and offers Unblock inline.
+It mutates `blocksProvider` directly rather than through `safety_actions.dart`'s `unblockUser`: that helper is built for a popover that has already closed by the time its request answers, so a failure there can only ever surface as a `SnackBar`.
+This notice stays mounted for as long as the block does, so it uses the `GuardedActionState`/`AppErrorState` pattern instead - the same choice `run_guarded.dart`'s own doc comment draws between a surface with room and one without.
+Filtering is untouched: the transcript still hides their messages at read time, and the member row and presence stay unfiltered for the reasons already given below.
 
 ## The nine-specialist audit, and seeing a shared screen (2026-07-29)
 
