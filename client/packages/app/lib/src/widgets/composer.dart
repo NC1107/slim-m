@@ -25,6 +25,7 @@ import 'composer_clipboard_image.dart';
 import 'composer_extras.dart';
 import 'emoji_picker.dart';
 import 'poll_composer_sheet.dart';
+import 'typing_indicator.dart';
 
 class Composer extends ConsumerStatefulWidget {
   const Composer({
