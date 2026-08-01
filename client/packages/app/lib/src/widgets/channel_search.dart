@@ -56,6 +56,7 @@ class ChannelSearchResults extends StatelessWidget {
     required this.failed,
     required this.forbidden,
     required this.onRetry,
+    required this.onSelect,
   });
 
   /// Null while loading or after a failure; only an empty (not null) list
@@ -74,6 +75,9 @@ class ChannelSearchResults extends StatelessWidget {
   /// A 403: retrying the same query will not succeed, so no retry is offered.
   final bool forbidden;
   final VoidCallback onRetry;
+
+  /// Jumps the transcript to a tapped hit.
+  final ValueChanged<api.Message> onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -122,23 +126,30 @@ class ChannelSearchResults extends StatelessWidget {
         final name =
             message.authorDisplayName ??
             (message.authorId == null ? 'Deleted user' : 'Unknown');
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              name,
-              style: AppText.ui.copyWith(
-                color: tokens.textPrimary,
-                fontWeight: AppWeights.semi,
-              ),
+        return InkWell(
+          onTap: () => onSelect(message),
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.s4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: AppText.ui.copyWith(
+                    color: tokens.textPrimary,
+                    fontWeight: AppWeights.semi,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s4),
+                MessageBody(
+                  content: message.content,
+                  knownUsernames: knownUsernames,
+                  customEmoji: customEmoji,
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.s4),
-            MessageBody(
-              content: message.content,
-              knownUsernames: knownUsernames,
-              customEmoji: customEmoji,
-            ),
-          ],
+          ),
         );
       },
     );

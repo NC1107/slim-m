@@ -7,18 +7,31 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/pins_controller.dart';
+import 'channel_rail.dart' show selectedChannelId;
+import 'message_jump.dart';
 import 'user_avatar.dart';
 
+/// The router and current channel are captured here, not inside the sheet:
+/// `GoRouterState.of` (which [selectedChannelId] needs) only resolves inside
+/// a route's own builder subtree, and the sheet's own context is a dialog
+/// pushed straight onto the Navigator, outside all of them.
 Future<void> showPinnedMessagesSheet(BuildContext context, String channelId) {
+  final router = GoRouter.of(context);
+  final currentChannelId = selectedChannelId(context);
   return showAppSheet<void>(
     context,
     maxWidth: 560,
     scrolls: true,
-    builder: (context) => _PinnedMessagesSheet(channelId: channelId),
+    builder: (context) => _PinnedMessagesSheet(
+      channelId: channelId,
+      router: router,
+      currentChannelId: currentChannelId,
+    ),
   );
 }
 
@@ -31,9 +44,15 @@ String _authorLabel(api.Message message) =>
     (message.authorId == null ? 'Deleted user' : 'Unknown');
 
 class _PinnedMessagesSheet extends ConsumerWidget {
-  const _PinnedMessagesSheet({required this.channelId});
+  const _PinnedMessagesSheet({
+    required this.channelId,
+    required this.router,
+    required this.currentChannelId,
+  });
 
   final String channelId;
+  final GoRouter router;
+  final String? currentChannelId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -71,7 +90,12 @@ class _PinnedMessagesSheet extends ConsumerWidget {
             ),
           ),
           Expanded(
-            child: _Body(channelId: channelId, pins: pins),
+            child: _Body(
+              channelId: channelId,
+              pins: pins,
+              router: router,
+              currentChannelId: currentChannelId,
+            ),
           ),
         ],
       ),
@@ -80,10 +104,17 @@ class _PinnedMessagesSheet extends ConsumerWidget {
 }
 
 class _Body extends ConsumerWidget {
-  const _Body({required this.channelId, required this.pins});
+  const _Body({
+    required this.channelId,
+    required this.pins,
+    required this.router,
+    required this.currentChannelId,
+  });
 
   final String channelId;
   final PinsState pins;
+  final GoRouter router;
+  final String? currentChannelId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -138,6 +169,17 @@ class _Body extends ConsumerWidget {
       itemBuilder: (context, i) {
         final pin = list[i];
         return ListTile(
+          onTap: () {
+            final read = ref.read;
+            Navigator.of(context).pop();
+            jumpToMessage(
+              router,
+              read,
+              currentChannelId: currentChannelId,
+              channelId: pin.message.channelId,
+              messageId: pin.message.id,
+            );
+          },
           leading: AuthorAvatar(
             userId: pin.message.authorId,
             name: _authorLabel(pin.message),

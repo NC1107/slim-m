@@ -124,8 +124,18 @@ const List<WhatsNewEntry> whatsNewEntries = [
   ),
   WhatsNewEntry(
     version: '0.20.0',
-    headline: 'Reorder channels by dragging them in the sidebar',
+    headline: 'Jump straight to a message, and reorder your channels',
     points: [
+      WhatsNewPoint(
+        'Tapping a search result, a pinned message, or a message hit in the '
+        'quick switcher scrolls straight to it and briefly highlights it, '
+        'instead of leaving you to go find it yourself.',
+      ),
+      WhatsNewPoint(
+        'If the message is further back than what has loaded, it pages in '
+        'the history it needs first. If it genuinely cannot be found, you '
+        'are told so rather than being left scrolled to nowhere.',
+      ),
       WhatsNewPoint(
         'If you manage channels, press and hold a text or voice channel to '
         'drag it to a new spot. The order is shared by the whole Space, not '

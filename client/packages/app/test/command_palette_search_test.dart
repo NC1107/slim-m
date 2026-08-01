@@ -11,6 +11,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/providers/message_jump.dart';
 import 'package:slimm_data/data.dart';
 
 import 'command_palette_harness.dart';
@@ -94,6 +95,53 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('No matches.'), findsNothing);
+
+    await teardown(tester, setup.container, setup.db);
+  });
+
+  /// The palette's message row used to read the current channel with
+  /// `selectedChannelId(context)` from inside its own dialog, which needs a
+  /// `GoRouterState` that only resolves inside a route's own builder - the
+  /// palette's context is a dialog sitting outside all of them, so selecting
+  /// a result threw a `GoError` rather than jumping anywhere.
+  testWidgets('selecting a message result closes the palette and jumps to it', (
+    tester,
+  ) async {
+    final setup = setupPalette(
+      hits: [
+        {
+          'id': 'm1',
+          'channel_id': 'ch1',
+          'author_id': 'other',
+          'author_display_name': 'Ren',
+          'seq': 1,
+          'content': 'a message worth finding',
+          'created_at': 0,
+          'edited_at': null,
+        },
+      ],
+    );
+    await MessageStore(setup.db).upsertChannels(const [
+      api.Channel(id: 'ch1', name: 'general', kind: 'text', createdAt: 0),
+    ]);
+    await pump(tester, setup.container, initial: '/channels/ch1');
+    await pressCtrlK(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('command-palette-input')),
+      'worth finding',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(inPalette('a message worth finding'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('command-palette-input')), findsNothing);
+    expect(
+      setup.container.read(messageJumpProvider),
+      isNot(isA<MessageJumpIdle>()),
+      reason: 'the jump itself has to actually have been asked for',
+    );
 
     await teardown(tester, setup.container, setup.db);
   });

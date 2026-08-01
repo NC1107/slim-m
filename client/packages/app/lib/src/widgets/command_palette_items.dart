@@ -14,6 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/dms.dart';
 import '../providers/personal_space_visibility.dart';
 import '../routing/routes.dart';
+import 'message_jump.dart';
 import 'space_settings_section.dart';
 
 /// A running palette result: a label and icon to render, and what selecting
@@ -141,10 +142,17 @@ List<PaletteResultItem> buildMemberItems(
 /// Messages already matched server-side by full-text search, scoped to
 /// whichever channel is open (there is no cross-channel search endpoint).
 /// [tokens] styles the author trailing label.
+///
+/// [currentChannelId] is the palette's own `widget.currentChannelId`, taken
+/// from the caller rather than read here with `selectedChannelId(context)`:
+/// that needs a `GoRouterState`, which only resolves inside a route's own
+/// builder subtree, and the palette's context is a dialog sitting outside
+/// all of them.
 List<PaletteResultItem> buildMessageItems(
   List<api.Message> messages,
-  AppTokens tokens,
-) => [
+  AppTokens tokens, {
+  required String? currentChannelId,
+}) => [
   for (final message in messages)
     PaletteResultItem(
       label: message.content,
@@ -152,8 +160,13 @@ List<PaletteResultItem> buildMessageItems(
         message.authorDisplayName ?? 'Unknown',
         style: AppText.micro.copyWith(color: tokens.textSecondary),
       ),
-      onSelect: (context, ref) async =>
-          context.go(Routes.channel(message.channelId)),
+      onSelect: (context, ref) async => jumpToMessage(
+        GoRouter.of(context),
+        ref.read,
+        currentChannelId: currentChannelId,
+        channelId: message.channelId,
+        messageId: message.id,
+      ),
     ),
 ];
 

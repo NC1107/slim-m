@@ -88,6 +88,34 @@ class MessageStore {
     return row != null;
   }
 
+  /// Whether [messageId] is already held for [channelId] - present at all,
+  /// regardless of whether it falls inside whatever window [watchChannel]
+  /// currently returns. Used to tell a jump to a message it has already got
+  /// apart from one that still needs older history paged in first.
+  Future<bool> hasMessage(String channelId, String messageId) async {
+    final row = await (db.select(db.messages)
+          ..where(
+            (m) => m.channelId.equals(channelId) & m.id.equals(messageId),
+          ))
+        .getSingleOrNull();
+    return row != null;
+  }
+
+  /// The smallest `seq` among [channelId]'s already-delivered rows, or null
+  /// where none are delivered yet. Read straight off the database rather than
+  /// off whatever a screen currently has loaded, so a caller can page a
+  /// channel's history backwards with no transcript on screen for it at all.
+  Future<int?> oldestLocalSeq(String channelId) async {
+    final query = db.select(db.messages)
+      ..where(
+        (m) => m.channelId.equals(channelId) & m.seq.isBiggerThanValue(0),
+      )
+      ..orderBy([(m) => OrderingTerm(expression: m.seq)])
+      ..limit(1);
+    final row = await query.getSingleOrNull();
+    return row?.seq;
+  }
+
   /// The highest message-op seq applied for a channel, or null where this
   /// client holds no op cursor at all.
   ///

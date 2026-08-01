@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
@@ -98,12 +99,12 @@ void main() {
     final container = _containerWithPins([_pinJson('m1')]);
     addTearDown(container.dispose);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: Scaffold(
+    // A real GoRouter, not a bare MaterialApp: opening the sheet reads it before it shows.
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => Scaffold(
             body: ChannelHeader(
               channelId: 'c1',
               name: 'general',
@@ -112,6 +113,15 @@ void main() {
               onToggleSearch: () {},
             ),
           ),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          routerConfig: router,
         ),
       ),
     );
