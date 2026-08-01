@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: ChannelId\", name AS \"name!\", kind AS \"kind!\", topic,\n                      created_at AS \"created_at!\"\n               FROM channels WHERE id = ?",
+  "query": "SELECT id AS \"id!: ChannelId\", name AS \"name!\", kind AS \"kind!\", topic,\n                      position AS \"position!: i64\", created_at AS \"created_at!\"\n               FROM channels WHERE id = ? AND deleted_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -24,8 +24,13 @@
         "type_info": "Text"
       },
       {
-        "name": "created_at!",
+        "name": "position!: i64",
         "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 5,
         "type_info": "Integer"
       }
     ],
@@ -37,8 +42,9 @@
       false,
       false,
       true,
+      false,
       false
     ]
   },
-  "hash": "db0faa5ffc1ea802336d5efb490b344412fb261fb757ef57cefe355bbe47c86e"
+  "hash": "9c0b9838cf7c87bdd39c15beb3c1f449f2baca6588068aab0d159b498157f5a5"
 }

@@ -126,7 +126,7 @@ impl Store {
     pub async fn list_channels(&self) -> anyhow::Result<Vec<super::Channel>> {
         let rows = sqlx::query!(
             r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
-                      created_at AS "created_at!"
+                      position AS "position!: i64", created_at AS "created_at!"
                FROM channels WHERE deleted_at IS NULL AND kind != 'dm'
                ORDER BY position, created_at"#
         )
@@ -139,6 +139,7 @@ impl Store {
                 name: r.name,
                 kind: r.kind,
                 topic: r.topic,
+                position: r.position,
                 created_at: r.created_at,
             })
             .collect())

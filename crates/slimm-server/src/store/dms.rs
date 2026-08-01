@@ -175,6 +175,8 @@ impl Store {
             name: String::new(),
             kind: DM_CHANNEL_KIND.to_owned(),
             topic: None,
+            // Never read: a DM is excluded from every position-ordered query.
+            position: 0,
             created_at: now,
         })
     }

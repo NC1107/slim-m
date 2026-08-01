@@ -50,6 +50,23 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
     )
     .await;
 
+    let live = c.get("listChannels", "/channels", root).await;
+    let mut order: Vec<String> = live
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| text(c, "id"))
+        .collect();
+    order.reverse();
+    c.json(
+        "reorderChannels",
+        "PUT",
+        "/channels/order",
+        root,
+        json!({ "channel_ids": order }),
+    )
+    .await;
+
     c.bare("openDirectMessage", "POST", &format!("/dms/{bob_id}"), root)
         .await;
     c.get("listDirectMessages", "/dms", root).await;

@@ -35,6 +35,7 @@ final _channel = Channel(
   name: 'General voice',
   kind: 'voice',
   createdAt: 0,
+  position: 0,
   cursor: 0,
   lastReadSeq: 0,
   isPersonalSpace: false,

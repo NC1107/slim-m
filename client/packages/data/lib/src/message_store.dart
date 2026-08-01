@@ -57,9 +57,15 @@ class MessageStore {
     return query.watch().map((rows) => rows.reversed.toList(growable: false));
   }
 
+  /// Position first, then creation order as the tiebreak every DM (whose
+  /// position is never set) falls back to - the same ordering the server's
+  /// own `list_channels` applies, so a cold-started rail matches a synced one.
   Stream<List<Channel>> watchChannels() {
     final query = db.select(db.channels)
-      ..orderBy([(c) => OrderingTerm(expression: c.createdAt)]);
+      ..orderBy([
+        (c) => OrderingTerm(expression: c.position),
+        (c) => OrderingTerm(expression: c.createdAt),
+      ]);
     return query.watch();
   }
 
@@ -67,7 +73,10 @@ class MessageStore {
   /// once rather than a subscription it would only ever read one value from.
   Future<List<Channel>> allChannels() {
     final query = db.select(db.channels)
-      ..orderBy([(c) => OrderingTerm(expression: c.createdAt)]);
+      ..orderBy([
+        (c) => OrderingTerm(expression: c.position),
+        (c) => OrderingTerm(expression: c.createdAt),
+      ]);
     return query.get();
   }
 
@@ -135,6 +144,7 @@ class MessageStore {
             kind: channel.kind,
             createdAt: channel.createdAt,
             topic: Value(channel.topic),
+            position: Value(channel.position),
             isPersonalSpace: Value(channel.isPersonalSpace),
             dmParticipantId: Value(channel.dmParticipantId),
           ),
@@ -143,6 +153,7 @@ class MessageStore {
               name: Variable(channel.name),
               kind: Variable(channel.kind),
               topic: Variable(channel.topic),
+              position: Variable(channel.position),
               isPersonalSpace: Variable(channel.isPersonalSpace),
               dmParticipantId: Variable(channel.dmParticipantId),
             ),

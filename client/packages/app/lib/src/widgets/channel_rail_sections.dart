@@ -13,6 +13,7 @@ import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'channel_grouping.dart';
 import 'channel_rail_channel_rows.dart';
+import 'channel_rail_reorder.dart';
 import 'create_channel_sheet.dart';
 import 'personal_space_row.dart';
 
@@ -135,6 +136,7 @@ class TextChannelsSection extends StatelessWidget {
     super.key,
     required this.channels,
     required this.selectedId,
+    required this.onReorder,
     this.canManage = false,
   });
 
@@ -142,8 +144,15 @@ class TextChannelsSection extends StatelessWidget {
   final String? selectedId;
 
   /// Whether the signed-in member holds MANAGE_CHANNELS (read from `GET
-  /// /me` by the caller). Gates every create/manage affordance below.
+  /// /me` by the caller). Gates every create/manage affordance below,
+  /// including whether a row can be dragged at all.
   final bool canManage;
+
+  /// Called with every text channel's id, in the order a drag within this
+  /// section produced. The caller (`ChannelRail`) is the one that knows
+  /// where the voice section's channels sit in the server's shared order,
+  /// so it is the one that splices this back into a full submission.
+  final ValueChanged<List<String>> onReorder;
 
   @override
   Widget build(BuildContext context) {
@@ -158,8 +167,11 @@ class TextChannelsSection extends StatelessWidget {
               : null,
           addSemanticLabel: 'Create a text channel',
         ),
-        for (final channel in channels)
-          ManagedChannelRow(
+        ReorderableChannelRows(
+          channels: channels,
+          canManage: canManage,
+          onReorder: onReorder,
+          rowBuilder: (channel) => ManagedChannelRow(
             canManage: canManage,
             channel: channel,
             row: (kebab) => AppListRow(
@@ -177,6 +189,7 @@ class TextChannelsSection extends StatelessWidget {
               onTap: () => context.go(Routes.channel(channel.id)),
             ),
           ),
+        ),
       ],
     );
   }
@@ -187,12 +200,16 @@ class VoiceChannelsSection extends ConsumerWidget {
     super.key,
     required this.channels,
     required this.selectedId,
+    required this.onReorder,
     this.canManage = false,
   });
 
   final List<Channel> channels;
   final String? selectedId;
   final bool canManage;
+
+  /// See [TextChannelsSection.onReorder].
+  final ValueChanged<List<String>> onReorder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -207,8 +224,11 @@ class VoiceChannelsSection extends ConsumerWidget {
               : null,
           addSemanticLabel: 'Create a voice channel',
         ),
-        for (final channel in channels)
-          ManagedChannelRow(
+        ReorderableChannelRows(
+          channels: channels,
+          canManage: canManage,
+          onReorder: onReorder,
+          rowBuilder: (channel) => ManagedChannelRow(
             canManage: canManage,
             channel: channel,
             row: (kebab) => VoiceChannelRow(
@@ -218,6 +238,7 @@ class VoiceChannelsSection extends ConsumerWidget {
               trailingExtra: kebab,
             ),
           ),
+        ),
       ],
     );
   }

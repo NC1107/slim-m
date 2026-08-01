@@ -3,6 +3,8 @@
 /// the signed-in user's footer bar.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,9 +12,11 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../permissions.dart';
+import '../providers/channel_order_controller.dart';
 import '../providers/dms.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
+import 'channel_grouping.dart';
 import 'channel_rail_frame.dart';
 import 'channel_rail_sections.dart';
 import 'command_palette.dart';
@@ -68,6 +72,8 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
     final me = ref.watch(meProvider).valueOrNull;
     final canManageChannels =
         me != null && me.permissions.hasPermission(Perm.manageChannels);
+    final orderState = ref.watch(channelOrderControllerProvider);
+    final orderController = ref.read(channelOrderControllerProvider.notifier);
 
     return Container(
       color: tokens.surfaceSunken,
@@ -120,6 +126,15 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
               ),
             ),
           ),
+          if (orderState.error != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+              child: AppErrorState(
+                message: orderState.error!,
+                onRetry: () => unawaited(orderController.retry()),
+                onDismiss: orderController.dismiss,
+              ),
+            ),
           Expanded(
             child: storeAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -128,7 +143,13 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
               data: (store) => StreamBuilder<List<Channel>>(
                 stream: store.watchChannels(),
                 builder: (context, snapshot) {
-                  final channels = snapshot.data ?? const <Channel>[];
+                  final channels = _withPendingOrder(
+                    snapshot.data ?? const <Channel>[],
+                    orderState.pendingOrder,
+                  );
+                  final nonDm = channels
+                      .where((c) => c.kind != dmChannelKind)
+                      .toList(growable: false);
                   return ListView(
                     padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
                     children: [
@@ -139,18 +160,34 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                         selectedId: selected,
                       ),
                       TextChannelsSection(
-                        channels: channels
-                            .where((c) => c.kind == 'text')
-                            .toList(),
+                        channels: nonDm.where((c) => c.kind == 'text').toList(),
                         selectedId: selected,
                         canManage: canManageChannels,
+                        onReorder: (newOrder) => unawaited(
+                          orderController.reorder(
+                            spliceKindOrder(
+                              fullOrder: nonDm,
+                              kind: 'text',
+                              newKindOrder: newOrder,
+                            ),
+                          ),
+                        ),
                       ),
                       VoiceChannelsSection(
-                        channels: channels
+                        channels: nonDm
                             .where((c) => c.kind == 'voice')
                             .toList(),
                         selectedId: selected,
                         canManage: canManageChannels,
+                        onReorder: (newOrder) => unawaited(
+                          orderController.reorder(
+                            spliceKindOrder(
+                              fullOrder: nonDm,
+                              kind: 'voice',
+                              newKindOrder: newOrder,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   );
@@ -164,4 +201,21 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
       ),
     );
   }
+}
+
+/// Renders [pending] (a reorder this client is waiting on, or has just had
+/// refused) over [channels], rather than the plain order the local store
+/// still holds - the store is not rewritten until the server confirms it.
+/// Anything [pending] does not name (every DM, or a channel that arrived
+/// concurrently) keeps its place among the rest, appended after.
+List<Channel> _withPendingOrder(List<Channel> channels, List<String>? pending) {
+  if (pending == null) return channels;
+  final byId = {for (final channel in channels) channel.id: channel};
+  final named = pending.toSet();
+  return [
+    for (final id in pending)
+      if (byId.containsKey(id)) byId[id]!,
+    for (final channel in channels)
+      if (!named.contains(channel.id)) channel,
+  ];
 }

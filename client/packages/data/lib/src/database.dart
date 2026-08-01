@@ -47,6 +47,12 @@ class Channels extends Table {
   /// until the next channel refresh replaces it.
   TextColumn get dmParticipantId => text().nullable()();
 
+  /// Sort key among the deployment's live, non-DM channels: lower sorts
+  /// first, mirroring the server's `channels.position`. Deployment-wide, set
+  /// by a manager's drag, not a per-device preference. Meaningless for a DM,
+  /// which is never reordered by it.
+  IntColumn get position => integer().withDefault(const Constant(0))();
+
   /// The highest message-op `seq` this client has applied for the channel.
   ///
   /// Nullable, and the nullability is the whole mechanism: null means "I hold
@@ -94,7 +100,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -131,6 +137,11 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// message this cache holds a stale copy of would stay stale forever. The
   /// cache is dropped once to close that pre-log epoch, and every op from
   /// here on reconciles without another wipe.
+  ///
+  /// v8 adds `channels.position` in place, the same shape as v4's topic:
+  /// every existing row defaults to 0, and the next channel refresh replaces
+  /// it with the server's real value, since channels are refetched whole
+  /// rather than paged by a cursor.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -150,6 +161,9 @@ class SlimmDatabase extends _$SlimmDatabase {
           }
           if (from < 7) {
             await m.addColumn(channels, channels.opCursor);
+          }
+          if (from < 8) {
+            await m.addColumn(channels, channels.position);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

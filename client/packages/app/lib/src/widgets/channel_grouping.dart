@@ -44,3 +44,30 @@ List<Channel> orderedChannels(List<Channel> channels) {
     ...channels.where((c) => c.kind == 'voice'),
   ];
 }
+
+/// Rewrites [fullOrder] (every live, non-DM channel, in the server's one
+/// shared position order) so [kind]'s channels take [newKindOrder] while
+/// every channel of another kind keeps its exact slot.
+///
+/// The rail shows text and voice channels as two separate sections, but the
+/// server's `position` is one sequence across both, so a drag confined to
+/// one section is not itself a valid reorder request - it has to be spliced
+/// back into the full order the other section's channels still occupy, or
+/// submitting it would silently move every voice channel too.
+List<String> spliceKindOrder({
+  required List<Channel> fullOrder,
+  required String kind,
+  required List<String> newKindOrder,
+}) {
+  var next = 0;
+  final result = <String>[];
+  for (final channel in fullOrder) {
+    if (channel.kind == kind) {
+      result.add(newKindOrder[next]);
+      next++;
+    } else {
+      result.add(channel.id);
+    }
+  }
+  return result;
+}

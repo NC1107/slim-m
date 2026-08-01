@@ -30,4 +30,21 @@ extension SlimmApiChannelAdmin on SlimmApi {
   /// not an error.
   Future<void> deleteChannel(String channelId) =>
       _send('DELETE', '/channels/$channelId', expectNoContent: true);
+
+  /// Sets the deployment's channel order. Requires MANAGE_CHANNELS.
+  /// [channelIds] must name exactly the live, non-DM channels, in the
+  /// desired order; a partial or wrong list is refused with a 400 naming
+  /// what was missing or unrecognized rather than silently leaving a gap.
+  /// Deployment-wide, not a per-device preference: everyone sees the same
+  /// order. Returns every live, non-DM channel in its new order.
+  Future<List<Channel>> reorderChannels(List<String> channelIds) async {
+    final json = await _send(
+      'PUT',
+      '/channels/order',
+      body: {'channel_ids': channelIds},
+    );
+    return (json as List<dynamic>)
+        .map((c) => Channel.fromJson(c as Map<String, dynamic>))
+        .toList(growable: false);
+  }
 }

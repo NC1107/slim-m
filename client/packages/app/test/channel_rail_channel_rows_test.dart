@@ -44,6 +44,7 @@ Channel _channel(
   name: name,
   kind: kind,
   createdAt: 0,
+  position: 0,
   cursor: cursor,
   lastReadSeq: lastReadSeq,
   isPersonalSpace: false,
@@ -93,6 +94,7 @@ void main() {
             channels: [_channel('c1', 'general')],
             selectedId: null,
             canManage: true,
+            onReorder: (_) {},
           ),
         ),
       );
@@ -120,6 +122,7 @@ void main() {
             channels: [_channel('c1', 'general', cursor: 5, lastReadSeq: 2)],
             selectedId: null,
             canManage: true,
+            onReorder: (_) {},
           ),
         ),
       );

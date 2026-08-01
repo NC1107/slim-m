@@ -58,6 +58,10 @@ pub(crate) struct ChannelDto {
     /// the same thing, so this is never `Some("")` - see
     /// [`validate_channel_topic`].
     topic: Option<String>,
+    /// Sort key among the deployment's live, non-DM channels: lower sorts
+    /// first. Set via `PUT /channels/order`, deployment-wide rather than
+    /// per-device. Meaningless on a DM, which never appears in this list.
+    position: i64,
     created_at: i64,
 }
 
@@ -68,6 +72,7 @@ impl From<Channel> for ChannelDto {
             name: channel.name,
             kind: channel.kind,
             topic: channel.topic,
+            position: channel.position,
             created_at: channel.created_at,
         }
     }

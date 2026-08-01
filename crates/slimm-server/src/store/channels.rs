@@ -27,15 +27,28 @@ impl From<sqlx::Error> for DeleteChannelError {
 
 impl Store {
     /// Creates a channel and seeds its message and canvas sequence counters.
+    ///
+    /// Appended to the end of the deployment's channel order: one more than
+    /// the highest position among live, non-DM channels, computed inside this
+    /// same transaction so two concurrent creates cannot both claim the last
+    /// slot. A DM's position is left at its schema default (0) and never
+    /// read, since a DM is excluded from every position-ordered query.
     pub async fn create_channel(&self, name: &str, kind: &str) -> anyhow::Result<Channel> {
         let id = ChannelId::generate();
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.begin_write().await?;
+        let position = sqlx::query_scalar!(
+            r#"SELECT COALESCE(MAX(position), -1) + 1 AS "next!: i64" FROM channels
+               WHERE deleted_at IS NULL AND kind != 'dm'"#
+        )
+        .fetch_one(&mut *tx)
+        .await?;
         sqlx::query!(
-            "INSERT INTO channels (id, name, kind, created_at) VALUES (?, ?, ?, ?)",
+            "INSERT INTO channels (id, name, kind, position, created_at) VALUES (?, ?, ?, ?, ?)",
             id,
             name,
             kind,
+            position,
             now
         )
         .execute(&mut *tx)
@@ -54,6 +67,7 @@ impl Store {
             name: name.to_owned(),
             kind: kind.to_owned(),
             topic: None,
+            position,
             created_at: now,
         })
     }
@@ -62,7 +76,7 @@ impl Store {
     pub async fn channel(&self, id: ChannelId) -> anyhow::Result<Option<Channel>> {
         let row = sqlx::query!(
             r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
-                      created_at AS "created_at!"
+                      position AS "position!: i64", created_at AS "created_at!"
                FROM channels WHERE id = ? AND deleted_at IS NULL"#,
             id
         )
@@ -73,6 +87,7 @@ impl Store {
             name: r.name,
             kind: r.kind,
             topic: r.topic,
+            position: r.position,
             created_at: r.created_at,
         }))
     }
@@ -104,7 +119,7 @@ impl Store {
     ) -> anyhow::Result<Option<Channel>> {
         let row = sqlx::query!(
             r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
-                      created_at AS "created_at!"
+                      position AS "position!: i64", created_at AS "created_at!"
                FROM channels WHERE id = ?"#,
             id
         )
@@ -115,6 +130,7 @@ impl Store {
             name: r.name,
             kind: r.kind,
             topic: r.topic,
+            position: r.position,
             created_at: r.created_at,
         }))
     }
