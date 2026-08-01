@@ -64,7 +64,7 @@ tile is not a published track.
 The run ends by reporting how many documented API paths it actually touched,
 counted from what the harness and both browsers requested rather than from a
 list kept by hand, since a hand-kept list overstates coverage the moment a
-scenario changes. A full run currently reaches **36 of 62** documented paths
+scenario changes. A full run currently reaches **37 of 64** documented paths
 (confirmed against a live CI run rather than assumed; the schema has grown
 since this number was first written, the harness's own reach has not).
 
@@ -87,7 +87,7 @@ prints it every time so it cannot quietly grow.
 | `lib/e2e_js.py` | the browser-side half: reading and driving the semantics tree |
 | `lib/e2e_labels.py` | every accessible name the app is driven by, in one place |
 | `lib/e2e_api.py` | the server's own answer, for checking against |
-| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py` | the scenarios |
+| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py`, `e2e_markdown.py`, `e2e_reconcile.py` | the scenarios |
 | `lib/e2e_sweep.py` | the API-level routes the scenarios do not reach |
 | `lib/e2e_seed.py`, `e2e_fixtures.py` | the accounts and the two PNGs a run uploads |
 
