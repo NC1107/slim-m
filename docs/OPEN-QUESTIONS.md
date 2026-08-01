@@ -181,7 +181,25 @@ The blast radius if a run goes wrong is your live deployment and your store buil
 The middle option is the recommendation.
 It keeps the deploy decision human while losing almost nothing, since merging a standing release PR takes seconds and is the one step where a bad change becomes irreversible.
 
-## 14. The release gate checks the wrong commit, and it cost server 0.23.0 its artifacts (2026-08-01)
+## 14. ~~The release gate checks the wrong commit~~ (fixed 2026-08-01, same day)
+
+**Fixed.** `verify-release-checks.yml` takes a `ref` input, and `release.yml` passes release-please's own created tag on the release path.
+The tag-push path is unchanged and still uses `github.sha`, which is correct there because the tag is what triggered the run.
+
+Verified against live data rather than by reasoning, replaying the gate's own logic over the real check runs:
+`server-v0.23.0` and `client-v0.20.0` each carry every one of their required checks at `success`, so both would now pass.
+The commit the broken gate actually looked at (`72f1a36`, the client-only merge) has `hygiene` and the licence check but **no `check` at all**, which is precisely the timeout that skipped the publish jobs.
+
+That the release commit always carries its component's checks is not luck: it edits the version files each component's CI is path-filtered on.
+
+**Server 0.23.0's own artifacts stay missing**, and that is deliberate.
+Republishing means deleting and re-pushing a tag that already has a GitHub release attached, which is a destructive act against published metadata to recover two things nothing is currently blocked on: the ability to pin `0.23.0` specifically, and the static binaries.
+The deployment has the code through `latest`, and the next server release will be complete.
+Say so if you would rather have them and I will do it.
+
+The original entry follows.
+
+### The original diagnosis
 
 **Server 0.23.0's publish jobs were all skipped.** The tag and the GitHub release exist and look perfectly normal; there are no static binaries attached and no `0.23.0` tag on the container image.
 
