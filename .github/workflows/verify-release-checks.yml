@@ -82,11 +82,17 @@ jobs:
       - name: wait for the required checks and require they all succeeded here
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+          REF: ${{ inputs.ref != '' && inputs.ref || github.sha }}
           REQUIRED_CHECKS: ${{ inputs.required_checks }}
         run: |
           set -o pipefail
           IFS='|' read -r -a required <<< "$REQUIRED_CHECKS"
+          # Resolved once: the check-runs path takes a tag, the runs query does not.
+          if ! SHA=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${REF}" --jq '.sha'); then
+            echo "::error::could not resolve ${REF} to a commit; this gate cannot pass without one"
+            exit 1
+          fi
+          echo "verifying ${REF} -> ${SHA}"
           started=$(date +%s)
           deadline=$(( started + 1800 ))
           # Absent-and-nothing-running is a typo; absent-while-running is a queue.
