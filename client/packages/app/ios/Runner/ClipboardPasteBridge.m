@@ -32,6 +32,20 @@
 /// The replacements live on a **donor class of our own**, never in a category
 /// on the target.
 ///
+/// Confirmed on a real device 2026-08-01: this swizzle installs and is never
+/// consulted on this app's own composer field, a plain Material `TextField`.
+/// Flutter's default `contextMenuBuilder` on iOS 16+ routes through
+/// `SystemContextMenu`, which decides Paste's presence in Dart from
+/// `Clipboard.hasStrings()` alone and sends native a fixed item list that
+/// bypasses `canPerformAction:` entirely; see CLAUDE.md's "The edit-menu
+/// route was never reachable" entry for the full mechanism, file by file.
+/// No fix here reaches that - it is a Dart-side widget decision, not an
+/// engine bug. Left in place because it still applies to a non-Material
+/// field or an iOS below 16 (`UIMenuController`'s traditional
+/// `canPerformAction:`-driven path), and failing safe costs nothing; the
+/// composer's own "Paste image" row is the route that actually works and is
+/// never hidden on this swizzle installing.
+///
 /// A category on `FlutterTextInputView` emits a link-time reference to
 /// `_OBJC_CLASS_$_FlutterTextInputView`, and the engine ships that class
 /// without exporting the symbol, so the app fails to link with "Undefined

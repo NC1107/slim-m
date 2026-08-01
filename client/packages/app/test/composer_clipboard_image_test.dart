@@ -4,8 +4,8 @@
 /// or a real Objective-C method swizzle.
 ///
 /// Proves the Dart-side contract only - that [hasClipboardImage],
-/// [readClipboardImage] and [editMenuPasteAvailable] call the right method
-/// with the right shape, that a platform failure becomes
+/// [readClipboardImage] and [editMenuPasteSwizzleInstalled] call the right
+/// method with the right shape, that a platform failure becomes
 /// [ClipboardImageReadException] rather than a silent null, and that
 /// [startClipboardImagePaste] reaches its callback when the platform side
 /// invokes `pastedImage` on this same channel. It does not and cannot prove
@@ -104,24 +104,22 @@ void main() {
     );
   });
 
-  test(
-    'editMenuPasteAvailable asks the platform for editMenuPasteAvailable',
-    () async {
-      MethodCall? seen;
-      _mock((call) async {
-        seen = call;
-        return true;
-      });
+  test('editMenuPasteSwizzleInstalled asks the platform for '
+      'editMenuPasteSwizzleInstalled', () async {
+    MethodCall? seen;
+    _mock((call) async {
+      seen = call;
+      return true;
+    });
 
-      expect(await editMenuPasteAvailable(), isTrue);
-      expect(seen?.method, 'editMenuPasteAvailable');
-    },
-  );
+    expect(await editMenuPasteSwizzleInstalled(), isTrue);
+    expect(seen?.method, 'editMenuPasteSwizzleInstalled');
+  });
 
   test(
-    'editMenuPasteAvailable answers false with no platform handler',
+    'editMenuPasteSwizzleInstalled answers false with no platform handler',
     () async {
-      expect(await editMenuPasteAvailable(), isFalse);
+      expect(await editMenuPasteSwizzleInstalled(), isFalse);
     },
   );
 

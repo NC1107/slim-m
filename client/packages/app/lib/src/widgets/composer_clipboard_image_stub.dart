@@ -27,9 +27,11 @@
 /// share nothing else. It is inert on Android and desktop: nothing there
 /// ever calls `pastedImage`, so registering the handler costs nothing.
 ///
-/// [editMenuPasteAvailable] reports whether that swizzle actually installed,
-/// which is what `composer_clipboard_paste.dart` uses to decide whether the
-/// older poll-and-tap row is still worth offering.
+/// [editMenuPasteSwizzleInstalled] reports only whether that swizzle
+/// installed, never whether the menu it targets actually offers Paste -
+/// confirmed on a real device 2026-08-01 that those are different things,
+/// see `composer_clipboard_paste.dart`'s doc comment for why nothing here
+/// gates the fallback row on it any more.
 ///
 /// Desktop (Linux, Windows, macOS) and Android (for the swizzle-only calls)
 /// register no platform-side handler at all, so a call here simply finds
@@ -119,14 +121,24 @@ Future<Uint8List?> readClipboardImage() async {
   }
 }
 
-/// Whether `ClipboardPasteBridge.m`'s swizzle installed - true only on iOS,
-/// and only once `AppDelegate` has run; false with no platform handler at
-/// all (Android, desktop) and false if a future Flutter engine upgrade moved
-/// the private class or selectors it depends on.
-Future<bool> editMenuPasteAvailable() async {
+/// Whether `ClipboardPasteBridge.m`'s swizzle installed on the native side -
+/// true only on iOS, and only once `AppDelegate` has run; false with no
+/// platform handler at all (Android, desktop) and false if a future Flutter
+/// engine upgrade moved the private class or selectors it depends on.
+///
+/// This is **not** whether the system edit menu actually offers Paste for an
+/// image. Confirmed on a real device 2026-08-01: it does not, on this
+/// composer's plain Material `TextField`. Flutter's default
+/// `contextMenuBuilder` on iOS 16+ routes through `SystemContextMenu`, which
+/// decides the menu's contents in Dart from `Clipboard.hasStrings()` before
+/// any native call happens, so `FlutterTextInputView`'s swizzled
+/// `canPerformAction:` is never consulted for that field regardless of
+/// whether this returns true. See `composer_clipboard_paste.dart`'s doc
+/// comment and CLAUDE.md's "The edit-menu route was never reachable" entry.
+Future<bool> editMenuPasteSwizzleInstalled() async {
   try {
     return await _clipboardImageChannel.invokeMethod<bool>(
-          'editMenuPasteAvailable',
+          'editMenuPasteSwizzleInstalled',
         ) ??
         false;
   } on MissingPluginException {
