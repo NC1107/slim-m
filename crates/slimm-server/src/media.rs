@@ -216,6 +216,17 @@ impl Media {
         media
     }
 
+    /// Overrides the per-upload ceiling, consuming and returning self so a
+    /// test that exercises refusal can pick a size it need not allocate.
+    ///
+    /// Exists so such a test can still start from [`Media::for_tests`] and
+    /// keep its temp-directory guard, rather than reaching for [`Media::new`]
+    /// and hand-rolling a root that nothing then deletes.
+    pub fn with_attachment_max(mut self, max_attachment_bytes: u64) -> Self {
+        self.max_attachment_bytes = max_attachment_bytes;
+        self
+    }
+
     pub fn max_attachment_bytes(&self) -> u64 {
         self.max_attachment_bytes
     }
@@ -349,6 +360,21 @@ mod tests {
 #[cfg(test)]
 mod temp_root_tests {
     use super::*;
+
+    /// The builder exists so a test needing a smaller ceiling can still start
+    /// from [`Media::for_tests`] and keep this guard. Reaching for
+    /// [`Media::new`] instead is how the attachment fixture came to leave one
+    /// directory per test on a shared 16 GiB tmpfs.
+    #[test]
+    fn overriding_the_upload_ceiling_keeps_the_temp_guard() {
+        let media = Media::for_tests().with_attachment_max(4096);
+        let root = media.attachments_dir.parent().unwrap().to_path_buf();
+        assert_eq!(media.max_attachment_bytes(), 4096);
+        assert!(root.exists(), "the root exists while a handle is held");
+
+        drop(media);
+        assert!(!root.exists(), "a ceiling override must not drop the guard");
+    }
 
     #[test]
     fn a_test_media_root_is_removed_when_the_last_clone_drops() {
