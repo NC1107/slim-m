@@ -22,6 +22,7 @@ import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import '../widgets/channel_grouping.dart';
 import '../widgets/channel_rail.dart';
+import '../widgets/channel_rail_drawer.dart';
 import '../widgets/channel_rail_frame.dart';
 import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
@@ -146,6 +147,10 @@ class HomeShell extends ConsumerWidget {
                 channelId: selected,
                 onBack: () => context.go(Routes.channels),
               ),
+        // Withheld with the back button above: the canvas claims the edge.
+        drawer: canvasOpen
+            ? null
+            : CompactChannelRailDrawer(selectedChannelId: selected),
         // The roster slides in from the right instead of docking beside the
         // conversation, which is the only pane there is at this width.
         endDrawer: const Drawer(
