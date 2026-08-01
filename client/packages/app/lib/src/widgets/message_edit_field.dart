@@ -7,8 +7,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'composer_extras.dart' show usesSoftKeyboard;
+
 /// Pre-filled with [initialContent]. Enter saves, Shift+Enter inserts a
-/// newline, and Escape cancels, matching the composer's own field.
+/// newline, and Escape cancels on a hardware keyboard, matching the
+/// composer's own field.
+///
+/// Neither key reaches [CallbackShortcuts] from a soft keyboard: a phone's
+/// on-screen return key is delivered through the text input channel, never
+/// as a raw key event. This field cannot trade Enter for a submit action the
+/// way the composer does either, because an edit has to stay multi-line
+/// editable on a phone too, so the return key must keep inserting a
+/// newline there. Cancel and Save are always drawn below the field instead,
+/// which also fixes the row that used to overflow off a phone's width
+/// entirely: the hint text plus two `TextButton`s ran past 375 logical
+/// pixels, so Save existed in the tree but nowhere a thumb could reach it.
 class MessageEditField extends StatefulWidget {
   const MessageEditField({
     super.key,
@@ -50,6 +63,8 @@ class _MessageEditFieldState extends State<MessageEditField> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    // See the class doc: a soft keyboard gets no keyboard-shortcut hint.
+    final soft = usesSoftKeyboard(context);
 
     return CallbackShortcuts(
       bindings: {
@@ -92,16 +107,25 @@ class _MessageEditFieldState extends State<MessageEditField> {
             const SizedBox(height: AppSpacing.s4),
             Row(
               children: [
-                Text(
-                  'escape to cancel - enter to save',
-                  style: AppText.code.copyWith(color: tokens.textSecondary),
-                ),
+                if (!soft)
+                  Text(
+                    'escape to cancel - enter to save',
+                    style: AppText.code.copyWith(color: tokens.textSecondary),
+                  ),
                 const Spacer(),
-                TextButton(
+                AppButton(
+                  label: 'Cancel',
+                  variant: AppButtonVariant.ghost,
+                  size: AppButtonSize.sm,
                   onPressed: widget.onCancel,
-                  child: const Text('Cancel'),
                 ),
-                TextButton(onPressed: _submit, child: const Text('Save')),
+                const SizedBox(width: AppSpacing.s8),
+                AppButton(
+                  label: 'Save',
+                  variant: AppButtonVariant.primary,
+                  size: AppButtonSize.sm,
+                  onPressed: _submit,
+                ),
               ],
             ),
           ],
