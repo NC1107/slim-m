@@ -451,7 +451,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                 ),
               ),
               if (blockedDm)
-                BlockedDmNotice(name: channelName)
+                BlockedDmNotice(userId: dmPartnerId, name: channelName)
               else
                 Composer(
                   controller: _composer,

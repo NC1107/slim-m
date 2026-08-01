@@ -2,11 +2,13 @@
 /// A DM with somebody already blocked used to open as a blank transcript
 /// with a live composer that would only ever fail on send (the channel is
 /// frozen server-side for that pair; see `store/dms.rs`). This drives the
-/// real screen and asserts the composer is replaced by an explanation
-/// instead, and that an ordinary DM is unaffected.
+/// real screen and asserts the composer is replaced by an explanation with
+/// an Unblock control instead, that unblocking restores the composer with no
+/// restart, and that a failed unblock reports inline rather than vanishing.
 library;
 
 import 'dart:convert';
+import 'dart:io' show SocketException;
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -45,11 +47,13 @@ http.Response _emptyJsonList() => http.Response(
 
 /// Pumps `ChannelScreen` for a DM already in the local store, its row
 /// carrying [otherUserId] as the participant `channelFromDm` would have set,
-/// and `GET /blocks` naming [blockedIds] as blocked.
+/// and `GET /blocks` naming [blockedIds] as blocked. [onUnblock], if given,
+/// answers `DELETE /blocks/{otherUserId}`; the default is a plain success.
 Future<void> _pump(
   WidgetTester tester, {
   required String otherUserId,
   required Set<String> blockedIds,
+  http.Response Function()? onUnblock,
 }) async {
   tester.view.physicalSize = const Size(500, 800);
   tester.view.devicePixelRatio = 1;
@@ -99,6 +103,10 @@ Future<void> _pump(
                 headers: {'content-type': 'application/json'},
               );
             }
+            if (request.method == 'DELETE' &&
+                request.url.path == '/blocks/$otherUserId') {
+              return (onUnblock ?? () => http.Response('', 204))();
+            }
             return _emptyJsonList();
           }),
         );
@@ -138,7 +146,8 @@ Future<void> _unmount(WidgetTester tester) async {
 
 void main() {
   testWidgets(
-    'a DM with a blocked participant shows why instead of a live composer',
+    'a DM with a blocked participant shows why and offers Unblock, instead '
+    'of a live composer',
     (tester) async {
       await _pump(tester, otherUserId: 'alice', blockedIds: {'alice'});
 
@@ -150,6 +159,7 @@ void main() {
             'DM, so a live composer here can only ever fail',
       );
       expect(find.textContaining('You have blocked Alice'), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Unblock Alice'), findsOneWidget);
       await _unmount(tester);
     },
   );
@@ -161,4 +171,47 @@ void main() {
     expect(find.textContaining('You have blocked'), findsNothing);
     await _unmount(tester);
   });
+
+  testWidgets(
+    'unblocking from the notice restores the composer with no restart',
+    (tester) async {
+      await _pump(tester, otherUserId: 'alice', blockedIds: {'alice'});
+
+      await tester.tap(find.widgetWithText(AppButton, 'Unblock Alice'));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+
+      expect(find.byType(Composer), findsOneWidget);
+      expect(find.textContaining('You have blocked'), findsNothing);
+      await _unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'a failed unblock reports inline rather than vanishing or throwing',
+    (tester) async {
+      await _pump(
+        tester,
+        otherUserId: 'alice',
+        blockedIds: {'alice'},
+        onUnblock: () => throw const SocketException('connection refused'),
+      );
+
+      await tester.tap(find.widgetWithText(AppButton, 'Unblock Alice'));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+
+      // Still blocked, and no exception escaped the tap handler.
+      expect(find.byType(Composer), findsNothing);
+      expect(find.byType(AppErrorState), findsOneWidget);
+      expect(find.textContaining('SocketException'), findsNothing);
+      expect(
+        find.textContaining('the server could not be reached'),
+        findsOneWidget,
+      );
+      await _unmount(tester);
+    },
+  );
 }
