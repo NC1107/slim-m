@@ -197,6 +197,19 @@ Republishing means deleting and re-pushing a tag that already has a GitHub relea
 The deployment has the code through `latest`, and the next server release will be complete.
 Say so if you would rather have them and I will do it.
 
+**The first version of this fix had a bug of its own, and client 0.20.1 paid for it.**
+The check-runs API path accepts a tag, so passing the tag straight through looked correct and the gate did verify the right commit.
+The fast-fail branch underneath it queries `actions/runs?head_sha=`, which accepts a **SHA only** - given a tag name it returns zero runs, so the gate read "nothing is still running", decided the missing check would never appear, and failed 300 seconds in.
+What was actually missing was `ios unit tests (callkit invariant)`, which had simply not started yet; `client-ios-ci` takes about thirteen minutes and was still `in_progress` well after the gate gave up.
+The ref is resolved to a SHA once at the top now and everything downstream uses that.
+Measured on the commit that broke: the tag returns 0 runs, the resolved SHA returns 6, one of them the in-progress iOS job the gate needed to wait for.
+
+Worth recording rather than quietly fixing, because the shape recurs: **an identifier that two APIs both accept, where only one of them accepts both forms.**
+The failure is silent and reads as the opposite of what it is - a gate that gives up early looks like a check that failed.
+
+**Client 0.20.1's artifacts are missing for the same reason 0.23.0's are**, and cannot be recovered by re-running: a tag-triggered run reads the workflow file from the tagged commit, which predates the fix.
+The day-divider fix is on main and reaches a device with the next client release.
+
 The original entry follows.
 
 ### The original diagnosis
