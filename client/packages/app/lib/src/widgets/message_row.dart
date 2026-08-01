@@ -24,6 +24,7 @@ import 'message_row_identity.dart';
 import 'message_row_parts.dart';
 import 'message_text.dart';
 import 'poll_view.dart';
+import 'reply_quote.dart';
 
 /// One message, and optionally the "New" divider directly above it.
 ///
@@ -53,6 +54,8 @@ class MessageRow extends StatelessWidget {
     this.reactions = const [],
     this.attachments = const [],
     this.poll,
+    this.replyTo,
+    this.onReplyTap,
   });
 
   final Message message;
@@ -135,6 +138,16 @@ class MessageRow extends StatelessWidget {
   /// The poll this message carries, if it is a poll message.
   final api.Poll? poll;
 
+  /// The message [message] replies to, resolved by the transcript, or null
+  /// when [message] is not a reply at all or its parent could not be
+  /// resolved. See `reply_quote.dart` for what null does and does not mean.
+  final Message? replyTo;
+
+  /// Jumps to the parent named by [Message.replyToId]. Only ever called when
+  /// that id is non-null, so it is safe to leave null when [message] is not
+  /// a reply.
+  final VoidCallback? onReplyTap;
+
   bool get _unsent => message.pending || message.failed;
 
   @override
@@ -209,6 +222,11 @@ class MessageRow extends StatelessWidget {
                                     MessageRowHeader(
                                       message: message,
                                       isWebhook: isWebhook,
+                                    ),
+                                  if (message.replyToId != null)
+                                    ReplyQuote(
+                                      resolved: replyTo,
+                                      onTap: onReplyTap ?? () {},
                                     ),
                                   if (editing)
                                     MessageEditField(

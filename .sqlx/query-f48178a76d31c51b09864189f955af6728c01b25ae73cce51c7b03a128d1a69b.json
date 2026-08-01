@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT m.id AS \"id!: MessageId\", m.channel_id AS \"channel_id!: ChannelId\",\n                      m.author_id AS \"author_id: UserId\",\n                      u.display_name AS \"author_display_name?: String\",\n                      m.seq AS \"seq!: Seq\",\n                      m.content AS \"content!\", m.created_at AS \"created_at!\", m.edited_at\n               FROM messages m\n               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL\n               WHERE m.channel_id = ? AND m.deleted_at IS NULL AND m.seq > ?\n               ORDER BY m.seq ASC\n               LIMIT ?",
+  "query": "SELECT m.id AS \"id!: MessageId\", m.channel_id AS \"channel_id!: ChannelId\",\n                      m.author_id AS \"author_id: UserId\",\n                      u.display_name AS \"author_display_name?: String\",\n                      m.seq AS \"seq!: Seq\",\n                      m.content AS \"content!\", m.created_at AS \"created_at!\", m.edited_at,\n                      m.reply_to_id AS \"reply_to_id: MessageId\"\n               FROM messages m\n               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL\n               WHERE m.channel_id = ? AND m.deleted_at IS NULL AND m.seq > ?\n               ORDER BY m.seq ASC\n               LIMIT ?",
   "describe": {
     "columns": [
       {
@@ -42,6 +42,11 @@
         "name": "edited_at",
         "ordinal": 7,
         "type_info": "Integer"
+      },
+      {
+        "name": "reply_to_id: MessageId",
+        "ordinal": 8,
+        "type_info": "Blob"
       }
     ],
     "parameters": {
@@ -55,8 +60,9 @@
       false,
       false,
       false,
+      true,
       true
     ]
   },
-  "hash": "765a417ea405bd0d306736381d3204a38ad40c7057e8ac817831ecbc860a505e"
+  "hash": "f48178a76d31c51b09864189f955af6728c01b25ae73cce51c7b03a128d1a69b"
 }

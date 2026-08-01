@@ -149,6 +149,9 @@ impl From<SendError> for ApiError {
             SendError::AttachmentNotFound => {
                 ApiError::BadRequest("attachment not found; upload it first")
             }
+            SendError::InvalidReplyTarget => ApiError::BadRequest(
+                "reply_to_id must name a live or deleted message in this channel",
+            ),
             SendError::Internal(e) => {
                 tracing::error!(error = %e, "message send failed");
                 ApiError::Internal

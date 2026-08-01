@@ -45,6 +45,10 @@ pub enum SendError {
     /// One of the referenced attachment ids was never uploaded, or was
     /// already swept as an orphan before this send reached it.
     AttachmentNotFound,
+    /// `reply_to_id` named a message that does not exist, or that exists in a
+    /// different channel from this send. A parent that exists in this
+    /// channel but is already soft-deleted is still a valid target.
+    InvalidReplyTarget,
     Internal(anyhow::Error),
 }
 
@@ -136,6 +140,7 @@ impl Store {
         id: MessageId,
         content: &str,
         attachment_ids: &[Vec<u8>],
+        reply_to_id: Option<MessageId>,
     ) -> Result<Sent, SendError> {
         // Authorized before the write lock, never inside it; see `may_link`.
         for sha256 in attachment_ids {
@@ -163,6 +168,24 @@ impl Store {
             return Err(SendError::IdConflict);
         }
 
+        // A reply's parent must already exist in this exact channel. The
+        // column's bare `REFERENCES messages(id)` only proves the id exists
+        // somewhere, never that it belongs here, so the channel is checked by
+        // hand; a parent that is already soft-deleted still passes, since a
+        // reply to something since removed is honest, not invalid.
+        if let Some(parent_id) = reply_to_id {
+            let parent_channel = sqlx::query_scalar!(
+                r#"SELECT channel_id AS "channel_id!: ChannelId" FROM messages WHERE id = ?"#,
+                parent_id
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
+            if parent_channel != Some(channel_id) {
+                tx.commit().await?;
+                return Err(SendError::InvalidReplyTarget);
+            }
+        }
+
         // RETURNING runs on the updated row, so `next_seq - 1` is the value this
         // message takes and `next_seq` is left pointing at the following one.
         let seq = sqlx::query_scalar!(
@@ -177,14 +200,15 @@ impl Store {
 
         let now = now_ms();
         sqlx::query!(
-            r#"INSERT INTO messages (id, channel_id, author_id, seq, content, created_at)
-               VALUES (?, ?, ?, ?, ?, ?)"#,
+            r#"INSERT INTO messages (id, channel_id, author_id, seq, content, created_at, reply_to_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?)"#,
             id,
             channel_id,
             author_id,
             seq,
             content,
-            now
+            now,
+            reply_to_id
         )
         .execute(&mut *tx)
         .await?;
@@ -214,6 +238,7 @@ impl Store {
                 content: content.to_owned(),
                 created_at: now,
                 edited_at: None,
+                reply_to_id,
             },
             fresh: true,
         })
@@ -323,7 +348,8 @@ impl Store {
                       m.author_id AS "author_id: UserId",
                       u.display_name AS "author_display_name?: String",
                       m.seq AS "seq!: Seq",
-                      m.content AS "content!", m.created_at AS "created_at!", m.edited_at
+                      m.content AS "content!", m.created_at AS "created_at!", m.edited_at,
+                      m.reply_to_id AS "reply_to_id: MessageId"
                FROM messages m
                LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
                WHERE m.channel_id = ? AND m.deleted_at IS NULL AND m.seq < ?
@@ -357,7 +383,8 @@ impl Store {
                       m.author_id AS "author_id: UserId",
                       u.display_name AS "author_display_name?: String",
                       m.seq AS "seq!: Seq",
-                      m.content AS "content!", m.created_at AS "created_at!", m.edited_at
+                      m.content AS "content!", m.created_at AS "created_at!", m.edited_at,
+                      m.reply_to_id AS "reply_to_id: MessageId"
                FROM messages m
                LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
                WHERE m.id = ?"#,
@@ -386,7 +413,8 @@ where
                   m.author_id AS "author_id: UserId",
                   u.display_name AS "author_display_name?: String",
                   m.seq AS "seq!: Seq",
-                  m.content AS "content!", m.created_at AS "created_at!", m.edited_at
+                  m.content AS "content!", m.created_at AS "created_at!", m.edited_at,
+                  m.reply_to_id AS "reply_to_id: MessageId"
            FROM messages m
            LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
            WHERE m.id = ?"#,
@@ -407,7 +435,8 @@ where
                   m.author_id AS "author_id: UserId",
                   u.display_name AS "author_display_name?: String",
                   m.seq AS "seq!: Seq",
-                  m.content AS "content!", m.created_at AS "created_at!", m.edited_at
+                  m.content AS "content!", m.created_at AS "created_at!", m.edited_at,
+                  m.reply_to_id AS "reply_to_id: MessageId"
            FROM messages m
            LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
            WHERE m.id = ? AND m.deleted_at IS NULL"#,

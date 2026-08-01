@@ -34,6 +34,8 @@ const AppTokens _tokens = AppTokens.dark;
 /// Report and block only, so the menu holds exactly the two ungated items
 /// this block of tests drives.
 MessageActions _reportAndBlockOnly() => MessageActions(
+  canReply: false,
+  onReply: () {},
   canEdit: false,
   onEdit: () {},
   canDelete: false,
@@ -76,6 +78,8 @@ Future<SemanticsHandle> _pump(WidgetTester tester) async {
 /// Edit is the one action allowed here, so the menu holds exactly the two
 /// ungated items plus it.
 MessageActions _editOnly(VoidCallback onEdit) => MessageActions(
+  canReply: false,
+  onReply: () {},
   canEdit: true,
   onEdit: onEdit,
   canDelete: false,

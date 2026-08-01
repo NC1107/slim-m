@@ -635,6 +635,12 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
   late final GeneratedColumn<int> editedAt = GeneratedColumn<int>(
       'edited_at', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _replyToIdMeta =
+      const VerificationMeta('replyToId');
+  @override
+  late final GeneratedColumn<String> replyToId = GeneratedColumn<String>(
+      'reply_to_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _pendingMeta =
       const VerificationMeta('pending');
   @override
@@ -664,6 +670,7 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
         content,
         createdAt,
         editedAt,
+        replyToId,
         pending,
         failed
       ];
@@ -718,6 +725,12 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
       context.handle(_editedAtMeta,
           editedAt.isAcceptableOrUnknown(data['edited_at']!, _editedAtMeta));
     }
+    if (data.containsKey('reply_to_id')) {
+      context.handle(
+          _replyToIdMeta,
+          replyToId.isAcceptableOrUnknown(
+              data['reply_to_id']!, _replyToIdMeta));
+    }
     if (data.containsKey('pending')) {
       context.handle(_pendingMeta,
           pending.isAcceptableOrUnknown(data['pending']!, _pendingMeta));
@@ -751,6 +764,8 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
           .read(DriftSqlType.int, data['${effectivePrefix}created_at'])!,
       editedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}edited_at']),
+      replyToId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}reply_to_id']),
       pending: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}pending'])!,
       failed: attachedDatabase.typeMapping
@@ -780,6 +795,12 @@ class Message extends DataClass implements Insertable<Message> {
   final int createdAt;
   final int? editedAt;
 
+  /// The message this one replies to, or null. Only ever the id: the
+  /// parent's own content, author and liveness are read by looking that id
+  /// up in this same table, never copied onto this row - there is nothing
+  /// here for an edit or delete of the parent to leave stale.
+  final String? replyToId;
+
   /// True while the send is in flight. The UI shows these differently and they
   /// are replaced in place by the server's copy on acknowledgement.
   final bool pending;
@@ -795,6 +816,7 @@ class Message extends DataClass implements Insertable<Message> {
       required this.content,
       required this.createdAt,
       this.editedAt,
+      this.replyToId,
       required this.pending,
       required this.failed});
   @override
@@ -813,6 +835,9 @@ class Message extends DataClass implements Insertable<Message> {
     map['created_at'] = Variable<int>(createdAt);
     if (!nullToAbsent || editedAt != null) {
       map['edited_at'] = Variable<int>(editedAt);
+    }
+    if (!nullToAbsent || replyToId != null) {
+      map['reply_to_id'] = Variable<String>(replyToId);
     }
     map['pending'] = Variable<bool>(pending);
     map['failed'] = Variable<bool>(failed);
@@ -835,6 +860,9 @@ class Message extends DataClass implements Insertable<Message> {
       editedAt: editedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(editedAt),
+      replyToId: replyToId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replyToId),
       pending: Value(pending),
       failed: Value(failed),
     );
@@ -853,6 +881,7 @@ class Message extends DataClass implements Insertable<Message> {
       content: serializer.fromJson<String>(json['content']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       editedAt: serializer.fromJson<int?>(json['editedAt']),
+      replyToId: serializer.fromJson<String?>(json['replyToId']),
       pending: serializer.fromJson<bool>(json['pending']),
       failed: serializer.fromJson<bool>(json['failed']),
     );
@@ -869,6 +898,7 @@ class Message extends DataClass implements Insertable<Message> {
       'content': serializer.toJson<String>(content),
       'createdAt': serializer.toJson<int>(createdAt),
       'editedAt': serializer.toJson<int?>(editedAt),
+      'replyToId': serializer.toJson<String?>(replyToId),
       'pending': serializer.toJson<bool>(pending),
       'failed': serializer.toJson<bool>(failed),
     };
@@ -883,6 +913,7 @@ class Message extends DataClass implements Insertable<Message> {
           String? content,
           int? createdAt,
           Value<int?> editedAt = const Value.absent(),
+          Value<String?> replyToId = const Value.absent(),
           bool? pending,
           bool? failed}) =>
       Message(
@@ -896,6 +927,7 @@ class Message extends DataClass implements Insertable<Message> {
         content: content ?? this.content,
         createdAt: createdAt ?? this.createdAt,
         editedAt: editedAt.present ? editedAt.value : this.editedAt,
+        replyToId: replyToId.present ? replyToId.value : this.replyToId,
         pending: pending ?? this.pending,
         failed: failed ?? this.failed,
       );
@@ -911,6 +943,7 @@ class Message extends DataClass implements Insertable<Message> {
       content: data.content.present ? data.content.value : this.content,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       editedAt: data.editedAt.present ? data.editedAt.value : this.editedAt,
+      replyToId: data.replyToId.present ? data.replyToId.value : this.replyToId,
       pending: data.pending.present ? data.pending.value : this.pending,
       failed: data.failed.present ? data.failed.value : this.failed,
     );
@@ -927,6 +960,7 @@ class Message extends DataClass implements Insertable<Message> {
           ..write('content: $content, ')
           ..write('createdAt: $createdAt, ')
           ..write('editedAt: $editedAt, ')
+          ..write('replyToId: $replyToId, ')
           ..write('pending: $pending, ')
           ..write('failed: $failed')
           ..write(')'))
@@ -935,7 +969,7 @@ class Message extends DataClass implements Insertable<Message> {
 
   @override
   int get hashCode => Object.hash(id, channelId, authorId, authorDisplayName,
-      seq, content, createdAt, editedAt, pending, failed);
+      seq, content, createdAt, editedAt, replyToId, pending, failed);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -948,6 +982,7 @@ class Message extends DataClass implements Insertable<Message> {
           other.content == this.content &&
           other.createdAt == this.createdAt &&
           other.editedAt == this.editedAt &&
+          other.replyToId == this.replyToId &&
           other.pending == this.pending &&
           other.failed == this.failed);
 }
@@ -961,6 +996,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   final Value<String> content;
   final Value<int> createdAt;
   final Value<int?> editedAt;
+  final Value<String?> replyToId;
   final Value<bool> pending;
   final Value<bool> failed;
   final Value<int> rowid;
@@ -973,6 +1009,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     this.content = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.editedAt = const Value.absent(),
+    this.replyToId = const Value.absent(),
     this.pending = const Value.absent(),
     this.failed = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -986,6 +1023,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     required String content,
     required int createdAt,
     this.editedAt = const Value.absent(),
+    this.replyToId = const Value.absent(),
     this.pending = const Value.absent(),
     this.failed = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1002,6 +1040,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Expression<String>? content,
     Expression<int>? createdAt,
     Expression<int>? editedAt,
+    Expression<String>? replyToId,
     Expression<bool>? pending,
     Expression<bool>? failed,
     Expression<int>? rowid,
@@ -1015,6 +1054,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       if (content != null) 'content': content,
       if (createdAt != null) 'created_at': createdAt,
       if (editedAt != null) 'edited_at': editedAt,
+      if (replyToId != null) 'reply_to_id': replyToId,
       if (pending != null) 'pending': pending,
       if (failed != null) 'failed': failed,
       if (rowid != null) 'rowid': rowid,
@@ -1030,6 +1070,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       Value<String>? content,
       Value<int>? createdAt,
       Value<int?>? editedAt,
+      Value<String?>? replyToId,
       Value<bool>? pending,
       Value<bool>? failed,
       Value<int>? rowid}) {
@@ -1042,6 +1083,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
       editedAt: editedAt ?? this.editedAt,
+      replyToId: replyToId ?? this.replyToId,
       pending: pending ?? this.pending,
       failed: failed ?? this.failed,
       rowid: rowid ?? this.rowid,
@@ -1075,6 +1117,9 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     if (editedAt.present) {
       map['edited_at'] = Variable<int>(editedAt.value);
     }
+    if (replyToId.present) {
+      map['reply_to_id'] = Variable<String>(replyToId.value);
+    }
     if (pending.present) {
       map['pending'] = Variable<bool>(pending.value);
     }
@@ -1098,6 +1143,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
           ..write('content: $content, ')
           ..write('createdAt: $createdAt, ')
           ..write('editedAt: $editedAt, ')
+          ..write('replyToId: $replyToId, ')
           ..write('pending: $pending, ')
           ..write('failed: $failed, ')
           ..write('rowid: $rowid')
@@ -1386,6 +1432,7 @@ typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   required String content,
   required int createdAt,
   Value<int?> editedAt,
+  Value<String?> replyToId,
   Value<bool> pending,
   Value<bool> failed,
   Value<int> rowid,
@@ -1399,6 +1446,7 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
   Value<String> content,
   Value<int> createdAt,
   Value<int?> editedAt,
+  Value<String?> replyToId,
   Value<bool> pending,
   Value<bool> failed,
   Value<int> rowid,
@@ -1437,6 +1485,9 @@ class $$MessagesTableFilterComposer
 
   ColumnFilters<int> get editedAt => $composableBuilder(
       column: $table.editedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get replyToId => $composableBuilder(
+      column: $table.replyToId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get pending => $composableBuilder(
       column: $table.pending, builder: (column) => ColumnFilters(column));
@@ -1479,6 +1530,9 @@ class $$MessagesTableOrderingComposer
   ColumnOrderings<int> get editedAt => $composableBuilder(
       column: $table.editedAt, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get replyToId => $composableBuilder(
+      column: $table.replyToId, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get pending => $composableBuilder(
       column: $table.pending, builder: (column) => ColumnOrderings(column));
 
@@ -1519,6 +1573,9 @@ class $$MessagesTableAnnotationComposer
   GeneratedColumn<int> get editedAt =>
       $composableBuilder(column: $table.editedAt, builder: (column) => column);
 
+  GeneratedColumn<String> get replyToId =>
+      $composableBuilder(column: $table.replyToId, builder: (column) => column);
+
   GeneratedColumn<bool> get pending =>
       $composableBuilder(column: $table.pending, builder: (column) => column);
 
@@ -1557,6 +1614,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             Value<String> content = const Value.absent(),
             Value<int> createdAt = const Value.absent(),
             Value<int?> editedAt = const Value.absent(),
+            Value<String?> replyToId = const Value.absent(),
             Value<bool> pending = const Value.absent(),
             Value<bool> failed = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -1570,6 +1628,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             content: content,
             createdAt: createdAt,
             editedAt: editedAt,
+            replyToId: replyToId,
             pending: pending,
             failed: failed,
             rowid: rowid,
@@ -1583,6 +1642,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             required String content,
             required int createdAt,
             Value<int?> editedAt = const Value.absent(),
+            Value<String?> replyToId = const Value.absent(),
             Value<bool> pending = const Value.absent(),
             Value<bool> failed = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -1596,6 +1656,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             content: content,
             createdAt: createdAt,
             editedAt: editedAt,
+            replyToId: replyToId,
             pending: pending,
             failed: failed,
             rowid: rowid,

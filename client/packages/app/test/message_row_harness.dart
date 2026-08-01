@@ -42,6 +42,8 @@ void noop() {}
 /// they pass this unchanged; the context menu suite builds its own with just
 /// the flags it needs.
 const noActions = MessageActions(
+  canReply: false,
+  onReply: noop,
   canEdit: false,
   onEdit: noop,
   canDelete: false,

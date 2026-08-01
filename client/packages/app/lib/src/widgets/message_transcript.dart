@@ -54,6 +54,7 @@ class MessageTranscript extends StatefulWidget {
     required this.onVote,
     required this.onSubmitEdit,
     required this.onCancelEdit,
+    required this.onJumpToReply,
     this.jumpTargetId,
     this.jumpToken,
     this.onJumpArrived,
@@ -112,6 +113,10 @@ class MessageTranscript extends StatefulWidget {
   final void Function(Message message, int option) onVote;
   final void Function(Message message, String content) onSubmitEdit;
   final VoidCallback onCancelEdit;
+
+  /// Jumps to the message named by a reply's `replyToId`, whether or not the
+  /// row's own compact quote managed to resolve a preview for it locally.
+  final void Function(String replyToId) onJumpToReply;
 
   /// A jump ([messageJumpProvider]) has landed on this message id: scroll to
   /// it and flash it. Null the rest of the time.
@@ -293,6 +298,9 @@ class _MessageTranscriptState extends State<MessageTranscript> {
     _seen.addAll(messages.map((m) => m.id));
     _hydrated = true;
 
+    // A reply's parent, built from the same already-filtered list this transcript renders; see `reply_quote.dart`.
+    final byId = {for (final m in messages) m.id: m};
+
     // Reversed so a short conversation sits against the composer; the start header rides one past the oldest message, which reverse puts at the top.
     return TranscriptSelection(
       child: ListView.builder(
@@ -341,6 +349,14 @@ class _MessageTranscriptState extends State<MessageTranscript> {
               reactions: extras.reactions,
               attachments: extras.attachments,
               poll: extras.poll,
+              replyTo: switch (message.replyToId) {
+                final String id => byId[id],
+                null => null,
+              },
+              onReplyTap: switch (message.replyToId) {
+                final String id => () => widget.onJumpToReply(id),
+                null => null,
+              },
               editing: message.id == widget.editingId,
               onSubmitEdit: (content) => widget.onSubmitEdit(message, content),
               onCancelEdit: widget.onCancelEdit,

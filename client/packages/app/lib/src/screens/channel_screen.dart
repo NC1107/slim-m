@@ -40,6 +40,7 @@ import '../widgets/jump_to_latest_button.dart';
 import '../widgets/message_context_menu.dart';
 import '../widgets/message_jump.dart';
 import '../widgets/message_transcript.dart';
+import '../widgets/reply_banner.dart';
 import 'channel_message_actions.dart';
 import 'channel_read_marker.dart';
 
@@ -66,6 +67,11 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// The message currently swapped into its inline edit field, if any. At
   /// most one at a time: starting a new edit implicitly cancels another.
   String? _editingId;
+
+  /// The message the next send will reply to, if any. Cleared by sending,
+  /// by an explicit cancel, and by switching channels - a reply is scoped to
+  /// the conversation it was started in, not carried across a channel switch.
+  Message? _replyingTo;
 
   late final ReadMarker _readMarker = ReadMarker(ref);
 
@@ -106,6 +112,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       // A jump neither finished nor consumed before the switch must not
       // replay against whichever channel is open next.
       ref.read(messageJumpProvider.notifier).cancelFor(oldWidget.channelId);
+      _replyingTo = null;
     }
   }
 
@@ -142,6 +149,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     // text nor attachment is the one to drop.
     if (text.isEmpty && attachmentIds.isEmpty) return;
     _composer.clear();
+    // Read and cleared before the first await, same as the composer text.
+    final replyToId = _replyingTo?.id;
+    setState(() => _replyingTo = null);
 
     await sendOptimistically(
       ref,
@@ -150,10 +160,15 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       authorId: ref.read(sessionProvider).tokens?.userId ?? '',
       content: text,
       attachmentIds: attachmentIds,
+      replyToId: replyToId,
       onQueued: _scrollToLatest,
     );
     _scrollToLatest();
   }
+
+  void _startReply(Message message) => setState(() => _replyingTo = message);
+
+  void _cancelReply() => setState(() => _replyingTo = null);
 
   Future<void> _pickReaction(Message message, String emoji) => setReaction(
     ref,
@@ -184,6 +199,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   }) {
     final pinned = pinnedIds.contains(message.id);
     return MessageActions(
+      canReply: canReplyToMessage(message, myPermissions),
+      onReply: () => _startReply(message),
       canEdit: canEditMessage(message, myId),
       onEdit: () => _startEdit(message),
       canDelete: canDeleteMessage(message, myId, myPermissions),
@@ -426,6 +443,13 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                       unawaited(castVote(ref, m.id, option)),
                                   onSubmitEdit: _submitEdit,
                                   onCancelEdit: _cancelEdit,
+                                  onJumpToReply: (replyToId) => jumpToMessage(
+                                    GoRouter.of(context),
+                                    ref.read,
+                                    currentChannelId: widget.channelId,
+                                    channelId: widget.channelId,
+                                    messageId: replyToId,
+                                  ),
                                   jumpTargetId: jumpArrival?.messageId,
                                   jumpToken: jumpArrival?.token,
                                   onJumpArrived: jumpArrival == null
@@ -457,13 +481,16 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               ),
               if (blockedDm)
                 BlockedDmNotice(userId: dmPartnerId, name: channelName)
-              else
+              else ...[
+                if (_replyingTo != null)
+                  ReplyBanner(message: _replyingTo!, onCancel: _cancelReply),
                 Composer(
                   controller: _composer,
                   channelId: widget.channelId,
                   channelName: channelName,
                   onSend: _send,
                 ),
+              ],
             ],
           );
         },

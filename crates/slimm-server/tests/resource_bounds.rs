@@ -264,6 +264,7 @@ async fn an_absurd_read_marker_is_clamped_rather_than_pinned() {
             slimm_server::ids::MessageId::generate(),
             "first",
             &[],
+            None,
         )
         .await
         .unwrap();
@@ -288,6 +289,7 @@ async fn an_absurd_read_marker_is_clamped_rather_than_pinned() {
             slimm_server::ids::MessageId::generate(),
             "second",
             &[],
+            None,
         )
         .await
         .unwrap();

@@ -240,6 +240,7 @@ class MessageStore {
               editedAt: Value(message.editedAt),
               pending: const Value(false),
               failed: const Value(false),
+              replyToId: Value(message.replyToId),
             ),
           );
 
@@ -311,6 +312,7 @@ class MessageStore {
     required String channelId,
     required String authorId,
     required String content,
+    String? replyToId,
   }) async {
     await db.into(db.messages).insertOnConflictUpdate(
           MessagesCompanion.insert(
@@ -321,6 +323,7 @@ class MessageStore {
             createdAt: DateTime.now().millisecondsSinceEpoch,
             pending: const Value(true),
             failed: const Value(false),
+            replyToId: Value(replyToId),
           ),
         );
   }

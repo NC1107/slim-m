@@ -130,6 +130,7 @@ async fn their_messages_stay_and_stay_attributed() {
         slimm_server::ids::MessageId::generate(),
         "said before being removed",
         &[],
+        None,
     )
     .await
     .unwrap();

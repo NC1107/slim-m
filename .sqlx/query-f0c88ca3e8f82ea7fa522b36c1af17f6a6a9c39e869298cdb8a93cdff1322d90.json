@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT p.pinned_by AS \"pinned_by: UserId\", p.pinned_at AS \"pinned_at!\",\n                      m.id AS \"id!: MessageId\", m.channel_id AS \"channel_id!: ChannelId\",\n                      m.author_id AS \"author_id: UserId\",\n                      u.display_name AS \"author_display_name?: String\",\n                      m.seq AS \"seq!: Seq\", m.content AS \"content!\",\n                      m.created_at AS \"created_at!\", m.edited_at\n               FROM pinned_messages p\n               JOIN messages m ON m.id = p.message_id\n               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL\n               WHERE p.channel_id = ? AND m.deleted_at IS NULL\n               ORDER BY p.pinned_at DESC",
+  "query": "SELECT p.pinned_by AS \"pinned_by: UserId\", p.pinned_at AS \"pinned_at!\",\n                      m.id AS \"id!: MessageId\", m.channel_id AS \"channel_id!: ChannelId\",\n                      m.author_id AS \"author_id: UserId\",\n                      u.display_name AS \"author_display_name?: String\",\n                      m.seq AS \"seq!: Seq\", m.content AS \"content!\",\n                      m.created_at AS \"created_at!\", m.edited_at,\n                      m.reply_to_id AS \"reply_to_id: MessageId\"\n               FROM pinned_messages p\n               JOIN messages m ON m.id = p.message_id\n               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL\n               WHERE p.channel_id = ? AND m.deleted_at IS NULL\n               ORDER BY p.pinned_at DESC",
   "describe": {
     "columns": [
       {
@@ -52,6 +52,11 @@
         "name": "edited_at",
         "ordinal": 9,
         "type_info": "Integer"
+      },
+      {
+        "name": "reply_to_id: MessageId",
+        "ordinal": 10,
+        "type_info": "Blob"
       }
     ],
     "parameters": {
@@ -67,8 +72,9 @@
       false,
       false,
       false,
+      true,
       true
     ]
   },
-  "hash": "97d316a89d95564d45dcfed58a1c4bbcd3fa6eb4a6ee8a92803e7975f4349e66"
+  "hash": "f0c88ca3e8f82ea7fa522b36c1af17f6a6a9c39e869298cdb8a93cdff1322d90"
 }

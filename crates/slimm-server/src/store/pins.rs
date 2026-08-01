@@ -161,7 +161,8 @@ impl Store {
                       m.author_id AS "author_id: UserId",
                       u.display_name AS "author_display_name?: String",
                       m.seq AS "seq!: Seq", m.content AS "content!",
-                      m.created_at AS "created_at!", m.edited_at
+                      m.created_at AS "created_at!", m.edited_at,
+                      m.reply_to_id AS "reply_to_id: MessageId"
                FROM pinned_messages p
                JOIN messages m ON m.id = p.message_id
                LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
@@ -184,6 +185,7 @@ impl Store {
                     content: r.content,
                     created_at: r.created_at,
                     edited_at: r.edited_at,
+                    reply_to_id: r.reply_to_id,
                 },
                 pinned_by: r.pinned_by,
                 pinned_at: r.pinned_at,
@@ -218,7 +220,8 @@ async fn fetch_channel_message(
                   m.author_id AS "author_id: UserId",
                   u.display_name AS "author_display_name?: String",
                   m.seq AS "seq!: Seq", m.content AS "content!",
-                  m.created_at AS "created_at!", m.edited_at
+                  m.created_at AS "created_at!", m.edited_at,
+                  m.reply_to_id AS "reply_to_id: MessageId"
            FROM messages m
            LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
            WHERE m.id = ? AND m.channel_id = ? AND m.deleted_at IS NULL"#,
@@ -238,5 +241,6 @@ async fn fetch_channel_message(
         content: r.content,
         created_at: r.created_at,
         edited_at: r.edited_at,
+        reply_to_id: r.reply_to_id,
     }))
 }

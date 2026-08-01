@@ -27,6 +27,8 @@ const double _screenMargin = 8;
 /// flag, so this stays a plain description rather than a policy.
 class MessageActions {
   const MessageActions({
+    required this.canReply,
+    required this.onReply,
     required this.canEdit,
     required this.onEdit,
     required this.canDelete,
@@ -39,6 +41,11 @@ class MessageActions {
     required this.canBlockAuthor,
     required this.onBlockAuthor,
   });
+
+  /// Gated on SEND_MESSAGES in this channel, unlike [canEdit] and [canDelete]:
+  /// replying is a new send, not an act on a message you already authored.
+  final bool canReply;
+  final VoidCallback onReply;
 
   final bool canEdit;
   final VoidCallback onEdit;
@@ -210,6 +217,12 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
         leading: AppIcons.smile,
         onTap: () => run(widget.onAddReaction),
       ),
+      if (actions.canReply)
+        AppMenuItem(
+          label: 'Reply',
+          leading: AppIcons.reply,
+          onTap: () => run(actions.onReply),
+        ),
       const AppMenuDivider(),
       AppMenuItem(
         label: 'Copy text',

@@ -159,6 +159,7 @@ async fn a_live_reaction_from_a_blocked_user_is_absent_for_the_blocker_alone() {
             slimm_server::ids::MessageId::generate(),
             "hello",
             &[],
+            None,
         )
         .await
         .unwrap()

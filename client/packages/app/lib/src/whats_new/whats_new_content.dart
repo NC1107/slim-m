@@ -161,6 +161,11 @@ const List<WhatsNewEntry> whatsNewEntries = [
         'The back button at the top still works exactly as it did; this is '
         'a second way to the same place, not a replacement for it.',
       ),
+      WhatsNewPoint(
+        'You can reply to a specific message now. Open its menu and pick '
+        'Reply, and a compact quote of it rides above what you send; tap '
+        'the quote on either message to jump straight to the original.',
+      ),
     ],
   ),
   WhatsNewEntry(

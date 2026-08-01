@@ -96,6 +96,7 @@ async fn read_state_tracks_unread_and_is_monotonic() {
                 MessageId::generate(),
                 &format!("m{i}"),
                 &[],
+                None,
             )
             .await
             .unwrap();
@@ -196,6 +197,7 @@ async fn sync_returns_messages_after_the_cursor() {
                 MessageId::generate(),
                 &format!("m{i}"),
                 &[],
+                None,
             )
             .await
             .unwrap();
@@ -251,11 +253,25 @@ async fn sync_skips_channels_without_view() {
     let visible = f.store.create_channel("visible", "text").await.unwrap();
     let hidden = f.store.create_channel("hidden", "text").await.unwrap();
     f.store
-        .send_message(visible.id, f.user_id, MessageId::generate(), "hi", &[])
+        .send_message(
+            visible.id,
+            f.user_id,
+            MessageId::generate(),
+            "hi",
+            &[],
+            None,
+        )
         .await
         .unwrap();
     f.store
-        .send_message(hidden.id, f.user_id, MessageId::generate(), "secret", &[])
+        .send_message(
+            hidden.id,
+            f.user_id,
+            MessageId::generate(),
+            "secret",
+            &[],
+            None,
+        )
         .await
         .unwrap();
     // Deny alice the view of the hidden channel.
@@ -340,6 +356,7 @@ async fn sync_collapses_duplicate_scopes() {
                 MessageId::generate(),
                 &format!("m{i}"),
                 &[],
+                None,
             )
             .await
             .unwrap();
@@ -373,7 +390,14 @@ async fn sync_far_behind_cursor_asks_for_reset() {
     let f = setup(Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES)).await;
     let channel = f.store.create_channel("general", "text").await.unwrap();
     f.store
-        .send_message(channel.id, f.user_id, MessageId::generate(), "hi", &[])
+        .send_message(
+            channel.id,
+            f.user_id,
+            MessageId::generate(),
+            "hi",
+            &[],
+            None,
+        )
         .await
         .unwrap();
 

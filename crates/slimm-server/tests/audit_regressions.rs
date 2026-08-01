@@ -159,7 +159,7 @@ async fn a_report_filed_in_a_dm_reaches_the_moderators() {
     let dm = store.open_dm(bob, carol).await.expect("open dm");
     let message_id = slimm_server::ids::MessageId(Uuid::now_v7());
     store
-        .send_message(dm.id, bob, message_id, "abuse", &[])
+        .send_message(dm.id, bob, message_id, "abuse", &[], None)
         .await
         .expect("send in dm");
 

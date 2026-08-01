@@ -20,6 +20,8 @@ import 'package:slimm_design_system/design_system.dart';
 void _noop() {}
 
 const _noActions = MessageActions(
+  canReply: false,
+  onReply: _noop,
   canEdit: false,
   onEdit: _noop,
   canDelete: false,

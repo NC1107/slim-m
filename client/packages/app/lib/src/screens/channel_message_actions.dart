@@ -55,6 +55,7 @@ Future<void> sendOptimistically(
   required String authorId,
   required String content,
   List<String> attachmentIds = const [],
+  String? replyToId,
   VoidCallback? onQueued,
 }) async {
   final store = await ref.read(storeProvider.future);
@@ -63,6 +64,7 @@ Future<void> sendOptimistically(
     channelId: channelId,
     authorId: authorId,
     content: content,
+    replyToId: replyToId,
   );
   onQueued?.call();
   try {
@@ -73,6 +75,7 @@ Future<void> sendOptimistically(
           id: id,
           content: content,
           attachmentIds: attachmentIds,
+          replyToId: replyToId,
         );
     // Lands on the same row, because it carries the same id.
     await store.applyMessage(sent);
@@ -89,6 +92,7 @@ Future<void> retryMessage(WidgetRef ref, Message message) => sendOptimistically(
   channelId: message.channelId,
   authorId: message.authorId ?? '',
   content: message.content,
+  replyToId: message.replyToId,
 );
 
 /// Discards a failed send. Nothing reached the server, so nothing to undo.

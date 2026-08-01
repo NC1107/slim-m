@@ -83,7 +83,7 @@ async fn sync(app: &axum::Router, token: &str, scopes: Value) -> (StatusCode, Va
 
 async fn send(store: &Store, channel: ChannelId, author: UserId, body: &str) -> MessageId {
     store
-        .send_message(channel, author, MessageId::generate(), body, &[])
+        .send_message(channel, author, MessageId::generate(), body, &[], None)
         .await
         .unwrap()
         .message
