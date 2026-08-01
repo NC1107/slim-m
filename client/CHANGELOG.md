@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.0](https://github.com/NC1107/slim-m/compare/client-v0.17.2...client-v0.18.0) (2026-08-01)
+
+
+### Features
+
+* **client:** device-use polish, a what's-new screen, and a dead-code sweep ([#256](https://github.com/NC1107/slim-m/issues/256)) ([cd927ac](https://github.com/NC1107/slim-m/commit/cd927ac993bdaca37a5ccc31041e6f44009f46cd))
+
+
+### Bug Fixes
+
+* **client:** give 0.18.0 its own what's-new entry ([#259](https://github.com/NC1107/slim-m/issues/259)) ([9f9d478](https://github.com/NC1107/slim-m/commit/9f9d47853c7fc017b0c34c3c84a6b788fc003dbc))
+
 ## [0.17.2](https://github.com/NC1107/slim-m/compare/client-v0.17.1...client-v0.17.2) (2026-08-01)
 
 
