@@ -82,37 +82,48 @@ class ReactionsRow extends StatelessWidget {
   /// turns a quiet list into a grid of identical glyphs. That is why the fix
   /// is an overlay rather than reserving the space: reserving it would buy
   /// back exactly the cost this avoided.
+  ///
+  /// Pulled tight against the body above by [AppSpacing.s4] - the closest
+  /// step to the few pixels of line-height leftover a real device still
+  /// showed at a flush 0 - as a [Transform.translate] rather than a negative
+  /// [Padding], which asserts its insets are non-negative. That is safe here
+  /// specifically because [FailedRow] is this row's only possible sibling
+  /// below it in [MessageRow]'s column, and the two never render together:
+  /// both key off `_unsent`, and this row only ever shows once that is false.
   @override
   Widget build(BuildContext context) {
     if (reactions.isEmpty) return const SizedBox.shrink();
 
-    // No top inset: it reads as part of the message above, not a new line.
-    return Wrap(
-      spacing: AppSpacing.s4,
-      runSpacing: AppSpacing.s4,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        // Keyed by emoji and wrapped in a one-shot pop (scale .85 to 1 with
-        // fade): a chip that just appeared confirms the tap landed, and an
-        // existing chip keeps its state so it never replays.
-        for (final reaction in reactions)
-          _ChipPop(
-            key: ValueKey('reaction-${reaction.emoji}'),
-            child: AppChip.reaction(
-              emoji: reaction.emoji,
-              count: reaction.count,
-              active: reaction.reacted,
-              glyph: switch (customEmojiIdFor(reaction.emoji, customEmoji)) {
-                final String id => CustomEmojiImage(
-                  emojiId: id,
-                  size: _reactionEmojiSize,
-                ),
-                null => null,
-              },
-              onTap: () => onReactionTap(reaction),
+    // See the negative-inset note on this class's own doc comment above.
+    return Transform.translate(
+      offset: const Offset(0, -AppSpacing.s4),
+      child: Wrap(
+        spacing: AppSpacing.s4,
+        runSpacing: AppSpacing.s4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          // Keyed by emoji and wrapped in a one-shot pop (scale .85 to 1 with
+          // fade): a chip that just appeared confirms the tap landed, and an
+          // existing chip keeps its state so it never replays.
+          for (final reaction in reactions)
+            _ChipPop(
+              key: ValueKey('reaction-${reaction.emoji}'),
+              child: AppChip.reaction(
+                emoji: reaction.emoji,
+                count: reaction.count,
+                active: reaction.reacted,
+                glyph: switch (customEmojiIdFor(reaction.emoji, customEmoji)) {
+                  final String id => CustomEmojiImage(
+                    emojiId: id,
+                    size: _reactionEmojiSize,
+                  ),
+                  null => null,
+                },
+                onTap: () => onReactionTap(reaction),
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

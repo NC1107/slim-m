@@ -282,15 +282,17 @@ void main() {
     (tester) async {
       await _mount(tester);
 
-      expect(find.text('Jump to latest'), findsNothing);
+      // Icon-only now (jump_to_latest_button.dart), so found by key not text.
+      const jumpButton = Key('jump-to-latest-tap-target');
+      expect(find.byKey(jumpButton), findsNothing);
 
       final scroll = _transcriptScroll(tester);
       scroll.jumpTo(scroll.position.maxScrollExtent / 2);
       await _flush(tester);
 
-      expect(find.text('Jump to latest'), findsOneWidget);
+      expect(find.byKey(jumpButton), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(AppButton, 'Jump to latest'));
+      await tester.tap(find.byKey(jumpButton));
       await _flush(tester);
 
       expect(
@@ -300,7 +302,7 @@ void main() {
             'tapping it must be wired to the same scroll-to-latest '
             'animation the composer already uses after a send',
       );
-      expect(find.text('Jump to latest'), findsNothing);
+      expect(find.byKey(jumpButton), findsNothing);
 
       await _unmount(tester);
     },

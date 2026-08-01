@@ -36,6 +36,7 @@ import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'confirm_dialog.dart';
 import 'member_actions.dart';
+import 'member_profile_popover.dart';
 import 'member_profile_sections.dart';
 import 'member_roles_sheet.dart';
 import 'run_guarded.dart';
@@ -49,6 +50,13 @@ const double _popoverWidth = 280;
 /// [anchor] is the widget the popover hangs off; the caller passes its own
 /// context so the popover lands beside the row that was clicked rather than
 /// in the middle of the window.
+///
+/// On compact width the roster this popover can open from lives in a
+/// `Scaffold.endDrawer`, whose open state lives on the `ScaffoldState` and
+/// outlives a `go_router` navigation - the shell's `Scaffold` is reused
+/// rather than rebuilt. [Scaffold.maybeOf] is read from [anchor] here, before
+/// anything else runs, so a navigating action can close it as part of
+/// itself; see [MemberProfileBody.memberPaneScaffold].
 Future<void> showMemberProfile(
   BuildContext anchor,
   WidgetRef ref, {
@@ -60,6 +68,7 @@ Future<void> showMemberProfile(
   // Read before anything pops: a popped context has no navigator above it.
   final host = Navigator.of(anchor, rootNavigator: true).context;
   final compact = MediaQuery.sizeOf(anchor).width < kCompactWidth;
+  final memberPaneScaffold = Scaffold.maybeOf(anchor);
 
   if (compact) {
     return showModalBottomSheet<void>(
@@ -75,6 +84,7 @@ Future<void> showMemberProfile(
           callChannelName: callChannelName,
           compact: true,
           host: host,
+          memberPaneScaffold: memberPaneScaffold,
           onDone: () => Navigator.of(context).pop(),
         ),
       ),
@@ -94,9 +104,10 @@ Future<void> showMemberProfile(
     barrierLabel: 'Dismiss',
     barrierColor: Colors.transparent,
     transitionDuration: AppMotion.reduced(anchor, AppMotion.base),
-    pageBuilder: (context, _, __) => _AnchoredPopover(
+    pageBuilder: (context, _, __) => AnchoredMemberPopover(
       origin: origin,
       anchorSize: anchorSize,
+      width: _popoverWidth,
       child: MemberProfileBody(
         profile: profile,
         status: status,
@@ -104,6 +115,7 @@ Future<void> showMemberProfile(
         callChannelName: callChannelName,
         compact: false,
         host: host,
+        memberPaneScaffold: memberPaneScaffold,
         onDone: () => Navigator.of(context).pop(),
       ),
     ),
@@ -128,48 +140,6 @@ Future<void> showMemberProfile(
   );
 }
 
-/// Places the popover beside its anchor, kept inside the viewport rather than
-/// running off an edge - the same clamping the message context menu does.
-class _AnchoredPopover extends StatelessWidget {
-  const _AnchoredPopover({
-    required this.origin,
-    required this.anchorSize,
-    required this.child,
-  });
-
-  final Offset origin;
-  final Size anchorSize;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final view = MediaQuery.sizeOf(context);
-    final padding = MediaQuery.paddingOf(context) + const EdgeInsets.all(8);
-    // Prefers the anchor's right side, flipping left when it would overhang.
-    final left = (origin.dx + anchorSize.width + 8 + _popoverWidth > view.width)
-        ? (origin.dx - _popoverWidth - 8).clamp(padding.left, view.width)
-        : (origin.dx + anchorSize.width + 8).clamp(padding.left, view.width);
-    final top = origin.dy.clamp(
-      padding.top,
-      (view.height - padding.bottom - 120).clamp(padding.top, view.height),
-    );
-    return Stack(
-      children: [
-        Positioned(
-          left: left.toDouble(),
-          top: top.toDouble(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: view.height - top - padding.bottom,
-            ),
-            child: SingleChildScrollView(child: child),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// The sections themselves, shared by both presentations.
 class MemberProfileBody extends ConsumerStatefulWidget {
   const MemberProfileBody({
@@ -181,6 +151,7 @@ class MemberProfileBody extends ConsumerStatefulWidget {
     this.mentionChannelName,
     this.callChannelName,
     this.host,
+    this.memberPaneScaffold,
   });
 
   final api.UserProfile profile;
@@ -201,6 +172,11 @@ class MemberProfileBody extends ConsumerStatefulWidget {
   /// one after this closes. Without it a follow-up sheet looks a navigator up
   /// through a context whose route has already popped, which throws.
   final BuildContext? host;
+
+  /// The compact roster's endDrawer, if this popover opened from it. Closing
+  /// it is safe to call unconditionally: [ScaffoldState.closeEndDrawer] is a
+  /// no-op with nothing open, and null means there was never a drawer here.
+  final ScaffoldState? memberPaneScaffold;
 
   @override
   ConsumerState<MemberProfileBody> createState() => _MemberProfileBodyState();
@@ -361,6 +337,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
           leading: AppIcons.settings,
           onTap: () {
             widget.onDone();
+            widget.memberPaneScaffold?.closeEndDrawer();
             host.push(Routes.personalSettings);
           },
         ),
@@ -368,10 +345,13 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
         AppMenuItem(
           label: 'Message',
           leading: AppIcons.send,
-          onTap: () => run((container) async {
-            final channelId = await openDirectMessage(container, profile.id);
-            if (host.mounted) host.go(Routes.channel(channelId));
-          }),
+          onTap: () {
+            widget.memberPaneScaffold?.closeEndDrawer();
+            run((container) async {
+              final channelId = await openDirectMessage(container, profile.id);
+              if (host.mounted) host.go(Routes.channel(channelId));
+            });
+          },
         ),
         if (widget.mentionChannelName != null)
           AppMenuItem(
