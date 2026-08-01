@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.2](https://github.com/NC1107/slim-m/compare/client-v0.20.1...client-v0.20.2) (2026-08-01)
+
+
+### Bug Fixes
+
+* **client:** a blocked DM says so and offers Unblock ([#282](https://github.com/NC1107/slim-m/issues/282)) ([244c47d](https://github.com/NC1107/slim-m/commit/244c47d9e938814f32f7869c690bbcb2e2a1a72b))
+
 ## [0.20.1](https://github.com/NC1107/slim-m/compare/client-v0.20.0...client-v0.20.1) (2026-08-01)
 
 
