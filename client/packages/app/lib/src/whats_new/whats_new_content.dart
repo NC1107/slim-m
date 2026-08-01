@@ -153,6 +153,18 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.20.1',
+    headline: 'The day divider no longer flashes when you send',
+    points: [
+      WhatsNewPoint(
+        'Sending a message into a channel that had not finished loading its '
+        'history put a Today divider above it for a moment and then took it '
+        'away again. The divider now waits until enough history is known '
+        'for it to mean anything.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
