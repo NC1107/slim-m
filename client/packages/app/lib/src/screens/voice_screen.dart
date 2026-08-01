@@ -23,9 +23,14 @@ import 'voice_call_controls.dart';
 import 'voice_join_preview.dart';
 
 class VoiceScreen extends ConsumerWidget {
-  const VoiceScreen({required this.channelId, super.key});
+  const VoiceScreen({required this.channelId, this.isDm = false, super.key});
 
   final String channelId;
+
+  /// Whether this is a DM's call rather than a real voice channel's, so the
+  /// join preview can say "Call" instead of "Voice channel". The in-call
+  /// surface below needs no equivalent: nothing on it names a channel kind.
+  final bool isDm;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -49,7 +54,7 @@ class VoiceScreen extends ConsumerWidget {
           ),
           VoiceSessionState.connecting when inThisChannel =>
             const VoiceConnecting(),
-          _ => VoiceJoinPreview(channelId: channelId),
+          _ => VoiceJoinPreview(channelId: channelId, isDm: isDm),
         },
       ),
     );

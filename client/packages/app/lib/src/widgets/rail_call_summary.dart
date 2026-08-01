@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart';
 import '../routing/routes.dart';
+import '../screens/dm_call_pane.dart';
 import 'call_participant_tiles.dart';
 import 'confirm_dialog.dart';
 
@@ -87,6 +88,9 @@ class _RailCallSummaryState extends ConsumerState<RailCallSummary> {
                   onTapCancel: () => setState(() => _pressed = false),
                   onTap: () {
                     AppHaptics.selection();
+                    // A no-op for a real voice channel; load-bearing for a DM.
+                    ref.read(dmCallOpenProvider.notifier).state =
+                        widget.channelId;
                     context.go(Routes.channel(widget.channelId));
                   },
                   child: AnimatedOpacity(

@@ -24,7 +24,9 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/channel_rail.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane.dart';
+import 'package:slimm_app/src/screens/dm_call_pane.dart';
 import 'package:slimm_app/src/screens/home_shell.dart';
+import 'package:slimm_app/src/screens/voice_join_preview.dart';
 import 'package:slimm_app/src/widgets/channel_search.dart';
 import 'package:slimm_app/src/widgets/member_pane.dart';
 import 'package:slimm_data/data.dart';
@@ -224,6 +226,21 @@ Future<({ProviderContainer container, SlimmDatabase db})> _pumpCanvasOpen(
     api.Channel(id: 'c1', name: 'general', kind: kind, createdAt: 0),
   ]);
   setup.container.read(canvasOpenProvider.notifier).state = 'c1';
+  await _pumpAtWidth(tester, setup.container, width, location: '/channels/c1');
+  return setup;
+}
+
+/// [_pumpCanvasOpen]'s sibling for a DM's call pane rather than the canvas.
+Future<({ProviderContainer container, SlimmDatabase db})> _pumpDmCallOpen(
+  WidgetTester tester, {
+  required double width,
+  required String kind,
+}) async {
+  final setup = _setup(httpClient: _quietClient(), signedIn: true);
+  await MessageStore(setup.db).upsertChannels([
+    api.Channel(id: 'c1', name: 'Alice', kind: kind, createdAt: 0),
+  ]);
+  setup.container.read(dmCallOpenProvider.notifier).state = 'c1';
   await _pumpAtWidth(tester, setup.container, width, location: '/channels/c1');
   return setup;
 }
@@ -428,4 +445,46 @@ void main() {
       await _teardown(tester, setup.container, setup.db);
     },
   );
+
+  /// [dmCallOpenProvider]'s equivalent of the canvas test above: the real
+  /// pane has to swap in, not merely the state that is supposed to drive it.
+  testWidgets(
+    'the dm call provider actually swaps in the voice screen, not just its own state',
+    (tester) async {
+      final setup = await _pumpDmCallOpen(tester, width: 1400, kind: 'dm');
+
+      expect(find.byType(VoiceJoinPreview), findsOneWidget);
+
+      await _teardown(tester, setup.container, setup.db);
+    },
+  );
+
+  /// The DM call pane replaces the header the same way the canvas does; see
+  /// `DmCallPane`'s doc.
+  testWidgets('the compact app bar does not stack above a DM call', (
+    tester,
+  ) async {
+    final setup = await _pumpDmCallOpen(tester, width: 500, kind: 'dm');
+
+    expect(find.byType(VoiceJoinPreview), findsOneWidget);
+    expect(find.bySemanticsLabel('Back to messages'), findsOneWidget);
+    expect(find.bySemanticsLabel('Search messages'), findsNothing);
+
+    await _teardown(tester, setup.container, setup.db);
+  });
+
+  /// `dmCallOpenProvider` is read unconditionally by two "back to the call"
+  /// affordances outside a DM (`RailCallSummary`, `VoiceStripIndicator`), so
+  /// setting it for a channel that never turns out to be a DM must stay
+  /// inert rather than hijacking an ordinary text channel's pane.
+  testWidgets('the dm call provider does nothing for a text channel', (
+    tester,
+  ) async {
+    final setup = await _pumpDmCallOpen(tester, width: 1400, kind: 'text');
+
+    expect(find.byType(DmCallPane), findsNothing);
+    expect(find.byType(VoiceJoinPreview), findsNothing);
+
+    await _teardown(tester, setup.container, setup.db);
+  });
 }
