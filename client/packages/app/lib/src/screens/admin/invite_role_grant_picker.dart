@@ -68,7 +68,7 @@ class InviteRoleGrantPicker extends ConsumerWidget {
       bare: true,
       builder: (sheetContext) => SafeArea(
         top: false,
-        child: AppMenu(
+        child: AppSheetMenu(
           children: [
             const AppMenuLabel('Role granted on redemption'),
             AppMenuItem(

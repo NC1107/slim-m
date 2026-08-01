@@ -68,6 +68,44 @@ class AppMenu extends StatelessWidget {
   }
 }
 
+/// The body for a [showAppSheet] call whose content is a list of
+/// [AppMenuItem]s: [AppMenu]'s own card is right for a menu floating beside a
+/// cursor and wrong inside a bottom sheet, which already draws its own
+/// surface and drag handle - nesting [AppMenu] there doubles the chrome and
+/// its fixed [width] leaves dead space either side on a phone.
+///
+/// On a compact layout this drops the card entirely and lets [children] span
+/// the sheet's own full width; [AppMenuItem]'s `Row` already fills whatever
+/// width it is given, so nothing here has to force it. On anything wider,
+/// where [showAppSheet] presents a dialog instead, it renders the ordinary
+/// floating [AppMenu] - pass `bare: true` to [showAppSheet] alongside this,
+/// or the dialog's own panel nests around the card a second time.
+class AppSheetMenu extends StatelessWidget {
+  const AppSheetMenu({super.key, required this.children, this.width = 250});
+
+  final List<Widget> children;
+
+  /// [AppMenu]'s floating width once this renders as a dialog; unused on a
+  /// compact layout, where the sheet decides the width instead.
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width >= kCompactWidth) {
+      return AppMenu(width: width, children: children);
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s8,
+        0,
+        AppSpacing.s8,
+        AppSpacing.s8,
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: children),
+    );
+  }
+}
+
 /// An uppercase micro section label inside an [AppMenu] ("Channel", "Danger
 /// zone").
 class AppMenuLabel extends StatelessWidget {

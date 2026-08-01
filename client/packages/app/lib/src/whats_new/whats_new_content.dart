@@ -214,6 +214,17 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.21.3',
+    headline: 'The mobile sheets that pick a setting or an action are fixed',
+    points: [
+      WhatsNewPoint(
+        'The message context menu, who can join, and the role granted on '
+        'an invite all opened as a narrow floating card nested inside the '
+        'sheet on a phone. They now span the full width, as one sheet.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,

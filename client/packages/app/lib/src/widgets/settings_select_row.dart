@@ -73,7 +73,7 @@ class SettingsSelectRow<T> extends StatelessWidget {
       bare: true,
       builder: (sheetContext) => SafeArea(
         top: false,
-        child: AppMenu(
+        child: AppSheetMenu(
           children: [
             AppMenuLabel(title),
             for (final choice in choices)
