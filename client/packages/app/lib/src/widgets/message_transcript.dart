@@ -33,6 +33,7 @@ class MessageTranscript extends StatefulWidget {
     this.channelTopic,
     required this.scrollController,
     required this.lastReadSeq,
+    required this.selfId,
     required this.editingId,
     required this.knownUsernames,
     required this.customEmoji,
@@ -63,6 +64,10 @@ class MessageTranscript extends StatefulWidget {
 
   final ScrollController scrollController;
   final int lastReadSeq;
+
+  /// This account's own user id, so a message it wrote never counts as
+  /// unread to it. Null before a session exists, which matches nothing.
+  final String? selfId;
 
   /// The message swapped into its inline edit field, if any.
   final String? editingId;
@@ -226,7 +231,12 @@ class _MessageTranscriptState extends State<MessageTranscript> {
             message: message,
             // A new day breaks a group so a continuation across midnight regains its avatar and header.
             grouped: isGrouped(message, previous) && !newDay,
-            showNewDivider: startsUnread(message, previous, widget.lastReadSeq),
+            showNewDivider: startsUnread(
+              message,
+              previous,
+              widget.lastReadSeq,
+              widget.selfId,
+            ),
             dayLabel: newDay ? formatMessageDay(message.createdAt) : null,
             knownUsernames: widget.knownUsernames,
             customEmoji: widget.customEmoji,
@@ -269,7 +279,25 @@ bool isGrouped(Message message, Message? previous) =>
 
 /// True for the first message past the read marker, so the "New" divider
 /// lands exactly once, directly above it.
-bool startsUnread(Message message, Message? previous, int lastReadSeq) =>
+/// True when this message is the first unread one, so the "new messages"
+/// divider lands exactly once.
+///
+/// A message [selfId] wrote is never unread to them, however far the read
+/// marker is behind. Without that, sending a message flashed the divider
+/// above it for the instant between the optimistic insert and the read
+/// marker catching up - the message was, briefly and literally, newer than
+/// the last thing this account had read.
+///
+/// The comparison is guarded on [selfId] being non-null rather than written
+/// as `authorId != selfId`: an anonymised author is also null, and the plain
+/// form silently treats a deleted account's message as this account's own.
+bool startsUnread(
+  Message message,
+  Message? previous,
+  int lastReadSeq,
+  String? selfId,
+) =>
+    !(selfId != null && message.authorId == selfId) &&
     message.seq > lastReadSeq &&
     (previous == null || previous.seq <= lastReadSeq);
 
