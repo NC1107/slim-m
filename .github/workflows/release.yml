@@ -47,6 +47,7 @@ jobs:
 
   # Requires server-ci, hygiene and the license gate to have passed on this
   # exact commit before any server publish job runs. See docs/ci.md.
+  # Every publish job gates on this job's result alone: a false condition here skips it, and a skip is not a success downstream.
   verify-server-ci:
     needs: [release-please]
     if: >-
@@ -81,11 +82,7 @@ jobs:
   # to GHCR by digest. No QEMU, and no stored key material. See docs/ci.md.
   server-image:
     needs: [release-please, verify-server-ci]
-    if: >-
-      ((needs.release-please.result == 'success' &&
-        needs.release-please.outputs.server_released == 'true') ||
-       startsWith(github.ref, 'refs/tags/server-v')) &&
-      needs.verify-server-ci.result == 'success'
+    if: needs.verify-server-ci.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -136,11 +133,7 @@ jobs:
   # cosign-signs it keylessly over OIDC. Reviewer-gated.
   server-image-merge:
     needs: [release-please, server-image, verify-server-ci]
-    if: >-
-      ((needs.release-please.result == 'success' &&
-        needs.release-please.outputs.server_released == 'true') ||
-       startsWith(github.ref, 'refs/tags/server-v')) &&
-      needs.verify-server-ci.result == 'success'
+    if: needs.verify-server-ci.result == 'success'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -202,11 +195,7 @@ jobs:
   # aggregated by server-release-assets.
   server-binaries:
     needs: [release-please, verify-server-ci]
-    if: >-
-      ((needs.release-please.result == 'success' &&
-        needs.release-please.outputs.server_released == 'true') ||
-       startsWith(github.ref, 'refs/tags/server-v')) &&
-      needs.verify-server-ci.result == 'success'
+    if: needs.verify-server-ci.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -262,11 +251,7 @@ jobs:
   # The GPG secrets are optional; only the .asc is skipped. See docs/ci.md.
   server-release-assets:
     needs: [release-please, server-binaries, verify-server-ci]
-    if: >-
-      ((needs.release-please.result == 'success' &&
-        needs.release-please.outputs.server_released == 'true') ||
-       startsWith(github.ref, 'refs/tags/server-v')) &&
-      needs.verify-server-ci.result == 'success'
+    if: needs.verify-server-ci.result == 'success'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -314,11 +299,7 @@ jobs:
   # their inputs in the repo. Each format gates on its own file. See docs/ci.md.
   linux-client:
     needs: [release-please, verify-client-ci]
-    if: >-
-      ((needs.release-please.result == 'success' &&
-        needs.release-please.outputs.client_released == 'true') ||
-       startsWith(github.ref, 'refs/tags/client-v')) &&
-      needs.verify-client-ci.result == 'success'
+    if: needs.verify-client-ci.result == 'success'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -460,11 +441,7 @@ jobs:
   # and best effort: the .rpm is on the release, so a failure only warns.
   copr:
     needs: [release-please, linux-client, verify-client-ci]
-    if: >-
-      ((needs.release-please.result == 'success' &&
-        needs.release-please.outputs.client_released == 'true') ||
-       startsWith(github.ref, 'refs/tags/client-v')) &&
-      needs.verify-client-ci.result == 'success'
+    if: needs.verify-client-ci.result == 'success'
     runs-on: ubuntu-latest
     container: fedora:latest
     environment: release
@@ -544,11 +521,7 @@ jobs:
   # verifies the signer is the upload key, never debug. See docs/ci.md.
   android-client:
     needs: [release-please, verify-client-ci]
-    if: >-
-      ((needs.release-please.result == 'success' &&
-        needs.release-please.outputs.client_released == 'true') ||
-       startsWith(github.ref, 'refs/tags/client-v')) &&
-      needs.verify-client-ci.result == 'success'
+    if: needs.verify-client-ci.result == 'success'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -685,11 +658,7 @@ jobs:
   # warns and stops rather than faking an upload. See docs/ci.md.
   ios-testflight:
     needs: [release-please, verify-client-ci]
-    if: >-
-      ((needs.release-please.result == 'success' &&
-        needs.release-please.outputs.client_released == 'true') ||
-       startsWith(github.ref, 'refs/tags/client-v')) &&
-      needs.verify-client-ci.result == 'success'
+    if: needs.verify-client-ci.result == 'success'
     runs-on: macos-latest
     environment: testflight
     permissions:
