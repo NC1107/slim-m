@@ -30,6 +30,7 @@ import '../providers/message_jump.dart';
 import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
+import '../providers/user_profiles.dart';
 import '../routing/breakpoints.dart';
 import '../widgets/blocked_dm_notice.dart';
 import '../widgets/channel_header.dart';
@@ -359,6 +360,10 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                 );
                                 final oldest = oldestDeliveredSeq(rows);
                                 paging.syncOldest(oldest);
+                                resolveAuthorProfiles(
+                                  ref,
+                                  transcript.messages.map((m) => m.authorId),
+                                );
                                 _latestSeq = transcript.newestSeq;
                                 _lastReadSeq = lastReadSeq;
                                 // Gated on the viewport: scrolled into history, this rebuild is a message arriving somewhere unread.

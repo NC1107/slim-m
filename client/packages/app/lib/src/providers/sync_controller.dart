@@ -14,6 +14,7 @@ import 'channel_refresher.dart';
 import 'message_ops_sync.dart';
 import 'message_extras.dart';
 import 'providers.dart';
+import 'user_profiles.dart';
 
 /// How the connection is doing, for the UI to show honestly rather than
 /// pretending everything is fine while messages silently stop arriving.
@@ -118,6 +119,8 @@ class SyncController extends StateNotifier<SyncStatus> {
     await _teardown();
     if (generation != _generation) return;
     state = SyncStatus.connecting;
+    // No cursor over a rename to catch up from, so forget every cached name on a fresh connect.
+    _ref.read(batchProfilesControllerProvider.notifier).clear();
 
     try {
       final api = _ref.read(apiProvider);

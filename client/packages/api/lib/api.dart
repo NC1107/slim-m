@@ -59,6 +59,7 @@ export 'src/events.dart'
         PollOptionTally,
         PongEvent,
         PresenceChanged,
+        ProfileChanged,
         ReactionsChanged,
         ReactionTally,
         RoleChanged,

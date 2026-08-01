@@ -197,6 +197,18 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.21.1',
+    headline: 'Renaming yourself now reaches your old messages too',
+    points: [
+      WhatsNewPoint(
+        'Changing your display name used to leave every message you had '
+        'already sent showing the old one on everyone else\'s screen, '
+        'sometimes for good. It now updates live while everyone is '
+        'connected, and catches up the moment a device reconnects.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,

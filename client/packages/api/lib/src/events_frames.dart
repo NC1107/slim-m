@@ -149,6 +149,16 @@ class MemberRemoved extends ServerEvent {
   final String userId;
 }
 
+/// A user changed their display name. Carries only the id, never the new
+/// name: the value lives in exactly one place, a user's own profile, and a
+/// receiver re-asks for it (`SlimmApiUsers.getUser`/`listUsers`) rather than
+/// trusting a second copy riding this frame.
+class ProfileChanged extends ServerEvent {
+  const ProfileChanged({required this.userId});
+
+  final String userId;
+}
+
 /// Someone started typing in a channel. There is no explicit stop frame past
 /// [TypingStopped]: the state also lapses on its own without a refresh.
 class TypingStarted extends ServerEvent {

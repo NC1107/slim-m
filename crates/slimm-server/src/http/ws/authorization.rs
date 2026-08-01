@@ -76,6 +76,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::PresenceChanged(_)
         | Event::MemberTimeoutChanged { .. }
         | Event::MemberRemoved(_)
+        | Event::ProfileChanged(_)
         | Event::RoleChanged { .. }
         | Event::MemberRoleChanged { .. }
         | Event::ChannelDeleted { .. } => None,
@@ -131,6 +132,11 @@ pub(super) async fn authorize(
                 role_id: role_id.to_string(),
             }));
         }
+        Event::ProfileChanged(user_id) => {
+            return Authorization::Deliver(Box::new(ServerFrame::ProfileChanged {
+                user_id: user_id.to_string(),
+            }));
+        }
         _ => {}
     }
 
@@ -175,6 +181,7 @@ pub(super) async fn authorize(
         | Event::PresenceChanged(_)
         | Event::MemberTimeoutChanged { .. }
         | Event::MemberRemoved(_)
+        | Event::ProfileChanged(_)
         | Event::RoleChanged { .. }
         | Event::MemberRoleChanged { .. }
         | Event::ChannelDeleted { .. } => return Authorization::Withhold,
@@ -377,6 +384,7 @@ pub(super) async fn authorize(
         | Event::PresenceChanged(_)
         | Event::MemberTimeoutChanged { .. }
         | Event::MemberRemoved(_)
+        | Event::ProfileChanged(_)
         | Event::RoleChanged { .. }
         | Event::MemberRoleChanged { .. }
         | Event::ChannelDeleted { .. } => return Authorization::Withhold,

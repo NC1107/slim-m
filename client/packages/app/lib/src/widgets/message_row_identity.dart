@@ -8,9 +8,12 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/user_profiles.dart';
+import 'author_label.dart';
 import 'user_avatar.dart';
 
 /// The avatar column's width, and therefore also the continuation gutter's:
@@ -106,7 +109,7 @@ class MessageTimeMark extends StatelessWidget {
   }
 }
 
-class MessageRowLeading extends StatelessWidget {
+class MessageRowLeading extends ConsumerWidget {
   const MessageRowLeading({
     super.key,
     required this.grouped,
@@ -119,7 +122,7 @@ class MessageRowLeading extends StatelessWidget {
   final Message message;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     if (grouped) {
@@ -156,14 +159,20 @@ class MessageRowLeading extends StatelessWidget {
     return ExcludeSemantics(
       child: AuthorAvatar(
         userId: message.authorId,
-        name: _authorLabel(message),
+        name: _label(ref),
         size: _avatarSize,
       ),
     );
   }
+
+  String _label(WidgetRef ref) => authorLabel(
+    authorId: message.authorId,
+    cachedDisplayName: message.authorDisplayName,
+    profiles: ref.watch(batchProfilesControllerProvider),
+  );
 }
 
-class MessageRowHeader extends StatelessWidget {
+class MessageRowHeader extends ConsumerWidget {
   const MessageRowHeader({
     super.key,
     required this.message,
@@ -174,8 +183,13 @@ class MessageRowHeader extends StatelessWidget {
   final bool isWebhook;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final name = authorLabel(
+      authorId: message.authorId,
+      cachedDisplayName: message.authorDisplayName,
+      profiles: ref.watch(batchProfilesControllerProvider),
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.s4),
       child: Row(
@@ -184,7 +198,7 @@ class MessageRowHeader extends StatelessWidget {
         children: [
           Flexible(
             child: Text(
-              _authorLabel(message),
+              name,
               overflow: TextOverflow.ellipsis,
               style: AppText.body.copyWith(
                 color: tokens.textPrimary,
@@ -203,11 +217,3 @@ class MessageRowHeader extends StatelessWidget {
     );
   }
 }
-
-/// Never the raw id: a missing name means the row predates the server
-/// sending names, and a 36-character uuid where a person's name goes reads as
-/// corruption rather than staleness. A null author id is a deleted account,
-/// which is a different and knowable thing.
-String _authorLabel(Message message) =>
-    message.authorDisplayName ??
-    (message.authorId == null ? 'Deleted user' : 'Unknown');

@@ -17,6 +17,7 @@ import '../providers/member_presence.dart' show membersProvider;
 import '../providers/message_search.dart';
 import '../providers/personal_space_visibility.dart';
 import '../providers/providers.dart';
+import '../providers/user_profiles.dart';
 import 'channel_rail.dart' show selectedChannelId;
 import 'command_palette_items.dart';
 
@@ -230,6 +231,8 @@ class _CommandPaletteContentState
     int permissions,
     bool personalSpaceHidden,
   ) {
+    final profiles = ref.watch(batchProfilesControllerProvider);
+    resolveAuthorProfiles(ref, _messageResults.map((m) => m.authorId));
     final groups = <(String, List<PaletteResultItem>)>[
       (
         'Channels',
@@ -248,6 +251,7 @@ class _CommandPaletteContentState
             _messageResults,
             tokens,
             currentChannelId: widget.currentChannelId,
+            profiles: profiles,
           ),
         ),
       ('Actions', buildActionItems(_query, permissions)),

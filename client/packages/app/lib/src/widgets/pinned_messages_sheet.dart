@@ -8,10 +8,11 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/pins_controller.dart';
+import '../providers/user_profiles.dart';
+import 'author_label.dart';
 import 'channel_rail.dart' show selectedChannelId;
 import 'message_jump.dart';
 import 'user_avatar.dart';
@@ -34,14 +35,6 @@ Future<void> showPinnedMessagesSheet(BuildContext context, String channelId) {
     ),
   );
 }
-
-/// Never the raw id: see message_row_identity.dart's `_authorLabel` for the
-/// same rule applied to the local store's own `Message`. Duplicated rather
-/// than shared because [PinnedMessage.message] is the wire `api.Message`, a
-/// different type from the local one that helper reads.
-String _authorLabel(api.Message message) =>
-    message.authorDisplayName ??
-    (message.authorId == null ? 'Deleted user' : 'Unknown');
 
 class _PinnedMessagesSheet extends ConsumerWidget {
   const _PinnedMessagesSheet({
@@ -163,11 +156,19 @@ class _Body extends ConsumerWidget {
       );
     }
 
+    final profiles = ref.watch(batchProfilesControllerProvider);
+    resolveAuthorProfiles(ref, list.map((p) => p.message.authorId));
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
       itemCount: list.length,
       itemBuilder: (context, i) {
         final pin = list[i];
+        final name = authorLabel(
+          authorId: pin.message.authorId,
+          cachedDisplayName: pin.message.authorDisplayName,
+          profiles: profiles,
+        );
         return ListTile(
           onTap: () {
             final read = ref.read;
@@ -182,10 +183,10 @@ class _Body extends ConsumerWidget {
           },
           leading: AuthorAvatar(
             userId: pin.message.authorId,
-            name: _authorLabel(pin.message),
+            name: name,
             size: AppSizes.icon20 + 8,
           ),
-          title: Text(_authorLabel(pin.message)),
+          title: Text(name),
           subtitle: Text(
             pin.message.content,
             maxLines: 2,

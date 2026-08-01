@@ -24,6 +24,7 @@ use super::auth::validate_label;
 use super::error::ApiError;
 use super::extract::{Authed, Bytes, Json, Query, enforce};
 use super::messages::parse_uuid;
+use crate::hub::Event;
 use crate::ids::{RoleId, UserId};
 use crate::media;
 use crate::ratelimit::Class;
@@ -219,6 +220,8 @@ async fn update_me(
         .update_display_name(ctx.user_id, &req.display_name)
         .await?
         .ok_or(ApiError::Unauthorized)?;
+    // Unconditional even on a no-op rename: this carries no ordering invariant a spurious publish could break.
+    state.hub.publish(Event::ProfileChanged(ctx.user_id));
     Ok(Json(to_dto(&state.store, user).await?))
 }
 

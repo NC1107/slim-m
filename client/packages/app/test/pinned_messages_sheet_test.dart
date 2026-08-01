@@ -187,21 +187,25 @@ void main() {
             baseUrl: Uri.parse('http://localhost:8080'),
             session: ref.watch(sessionProvider),
             httpClient: MockClient((request) async {
+              // A batch profile lookup for the pin's author answers empty.
+              final body = request.url.path == '/users'
+                  ? []
+                  : [
+                      {
+                        'id': 'm1',
+                        'channel_id': 'c1',
+                        'author_id': 'other',
+                        'author_display_name': 'Other',
+                        'seq': 1,
+                        'content': 'pinned content',
+                        'created_at': 0,
+                        'edited_at': null,
+                        'pinned_at': 0,
+                        'pinned_by': 'other',
+                      },
+                    ];
               return http.Response(
-                jsonEncode([
-                  {
-                    'id': 'm1',
-                    'channel_id': 'c1',
-                    'author_id': 'other',
-                    'author_display_name': 'Other',
-                    'seq': 1,
-                    'content': 'pinned content',
-                    'created_at': 0,
-                    'edited_at': null,
-                    'pinned_at': 0,
-                    'pinned_by': 'other',
-                  },
-                ]),
+                jsonEncode(body),
                 200,
                 headers: {'content-type': 'application/json'},
               );
