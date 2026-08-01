@@ -75,8 +75,34 @@ Mutating SQL under `SQLX_OFFLINE=true` fails to *compile* against the cache rath
 And `messages.rs` sat at exactly 500 lines - the hard ceiling - so #237 had to split the shared enrichment into `http/message_enrich.rs` to make room; that file has no headroom left either.
 
 **Still open, deliberately.** Reactions, pins and polls do not reconcile, which is correct only because none of them is persisted locally (the drift schema is `[Channels, Messages]`); the day one gains a table this debt reopens for it with none of the machinery reusable, since a reaction op is per-viewer and a pin op is not idempotent by message id.
-Author display names never reconcile either: `messages.authorDisplayName` is denormalised into every row, no event carries a profile change, and a keyset sync cannot reach rows behind its own cursor - the same debt shape on a different column.
+~~Author display names never reconcile either: `messages.authorDisplayName` is denormalised into every row, no event carries a profile change, and a keyset sync cannot reach rows behind its own cursor - the same debt shape on a different column.~~
+Closed 2026-08-01, and not with an op stream; see "Reconciling a display name nobody was online for" below.
 `message_ops` grows without a sweep, and the trail it keeps (who deleted what, with `created_at`) is durable, anonymised on account deletion, and readable from SQL and nowhere else.
+
+## Reconciling a display name nobody was online for (2026-08-01)
+
+Closes the last item the section above left open.
+Read this before touching `BatchProfilesController`, `Event::ProfileChanged`, or `widgets/author_label.dart`.
+
+**This debt was never the op-stream shape, and the earlier note's own reasoning is why.**
+`message_ops` exists because `messages.seq` is allocated once and an edit or delete never moves it, so a cursor over creates is structurally blind to either - there is a *sequence* of changes to reconcile.
+A display name has no sequence: exactly one row is ever true, `users.display_name`, and the server never denormalises it anywhere - every read (list, search, sync, pins) already does a live `LEFT JOIN users`, so a fresh fetch is always correct.
+The staleness was entirely client-side: the drift cache writes `authorDisplayName` into a message row once, at catch-up or creation, and nothing ever asked again.
+A cursor would also have cut across `/sync`'s per-channel scoping for no reason, since a rename touches every channel an author has ever posted in, not one: a new dimension orthogonal to the existing per-channel `ScopeCursor`, not an extension of it.
+
+**The fix is a live cache the transcript prefers over the stored copy, not a rewrite of what gets stored.**
+`authorLabel` (`widgets/author_label.dart`) is the one place a message's author name is resolved now, replacing three copies of the same fallback logic that had quietly diverged (`message_row_identity.dart`, `channel_search.dart`, `pinned_messages_sheet.dart`, and `command_palette_items.dart` all rebuilt it slightly differently, the exact shape the blocking work above already flagged as recurring).
+It reads `BatchProfilesController`'s map - already built for the report queue's reporter/subject lookup, now widened to every message-author render site - and only falls back to the row's own cached `authorDisplayName` when that author has not been asked about yet this session.
+A resolved entry that comes back `null` (a confirmed deletion) wins over the cached name unconditionally, which is what stops a renamed-then-deleted author's stale local copy from ever resurfacing - the non-negotiable this work was built against, satisfied as a side effect of the resolution order rather than a special case.
+
+**Two ways a client learns the current value, neither a cursor.**
+`Event::ProfileChanged(UserId)` is a new deployment-wide, id-only frame (`PATCH /me` publishes it unconditionally, even on a no-op rename - unlike a message-op there is no seq or adjacency invariant a spurious publish could break, so the read-before-write `edit_message` needed is not needed here) that evicts just that id from the live cache, so an already-open transcript corrects itself within the session without waiting for a re-render to trigger a fetch.
+For the gap the event cannot cover - a client that was disconnected when the frame went out - `SyncController.start()` clears the whole cache on every (re)connect, before catch-up runs; since there is nothing to reconcile *from*, forgetting everything and asking fresh on the next render is strictly correct and costs nothing when nothing changed.
+Both are backstops in the sense PR #205's heartbeat is: the live event is the one a person actually sees update; the reconnect clear is what keeps a missed frame from ever mattering.
+
+**Blocking is unaffected by construction.** `visibleTranscript`'s filter is keyed on `authorId`, never on the name, so resolving a live label for an author changes nothing about whether their messages are shown at all.
+
+**Mutation-tested.** `authorLabel`'s resolution order, `BatchProfilesController`'s eviction and `clear()`, `SyncController.start()`'s clear call, and the server's `Event::ProfileChanged` publish each have a test that fails when the load-bearing line is removed; see `author_label_test.dart`, `batch_profiles_controller_test.dart`, `sync_controller_profile_clear_test.dart`, and `live_profile_events.rs`.
 
 ## A release can succeed and still ship no store build (2026-07-31)
 

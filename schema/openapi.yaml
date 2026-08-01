@@ -4555,6 +4555,7 @@ components:
         - $ref: "#/components/schemas/PresenceChanged"
         - $ref: "#/components/schemas/MemberTimeout"
         - $ref: "#/components/schemas/MemberRemoved"
+        - $ref: "#/components/schemas/ProfileChanged"
         - $ref: "#/components/schemas/TypingStarted"
         - $ref: "#/components/schemas/TypingStopped"
         - $ref: "#/components/schemas/RoleChanged"
@@ -4898,6 +4899,24 @@ components:
         type:
           type: string
           enum: [member.removed]
+        user_id:
+          type: string
+          format: uuid
+
+    ProfileChanged:
+      type: object
+      required: [type, user_id]
+      description: >
+        A user changed their display name. Carries only the id: the name
+        itself lives in exactly one place, `users.display_name`, and a
+        receiving connection re-asks `GET /users/{id}` or `GET /users` rather
+        than trusting a second copy of the value riding the wire. Broadcast
+        to every connection like `member.removed`, since a display name is
+        already public on every profile response.
+      properties:
+        type:
+          type: string
+          enum: [profile.changed]
         user_id:
           type: string
           format: uuid

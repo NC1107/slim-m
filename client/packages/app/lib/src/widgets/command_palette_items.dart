@@ -14,6 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/dms.dart';
 import '../providers/personal_space_visibility.dart';
 import '../routing/routes.dart';
+import 'author_label.dart';
 import 'message_jump.dart';
 import 'space_settings_section.dart';
 
@@ -152,12 +153,17 @@ List<PaletteResultItem> buildMessageItems(
   List<api.Message> messages,
   AppTokens tokens, {
   required String? currentChannelId,
+  Map<String, api.UserProfile?> profiles = const {},
 }) => [
   for (final message in messages)
     PaletteResultItem(
       label: message.content,
       trailing: Text(
-        message.authorDisplayName ?? 'Unknown',
+        authorLabel(
+          authorId: message.authorId,
+          cachedDisplayName: message.authorDisplayName,
+          profiles: profiles,
+        ),
         style: AppText.micro.copyWith(color: tokens.textSecondary),
       ),
       onSelect: (context, ref) async => jumpToMessage(

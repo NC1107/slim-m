@@ -11,9 +11,12 @@
 /// messages are on screen.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import 'live_events.dart';
 import 'providers.dart';
 
 /// Null for a deleted or anonymized account (a 404), exactly like
@@ -36,11 +39,24 @@ final userProfileProvider = FutureProvider.autoDispose
 /// means gone" contract), while an id absent from the map has simply not
 /// been resolved yet, which is what lets a caller tell "still loading" apart
 /// from "this account no longer exists".
+///
+/// Also the live cache a message row's author name is resolved against (see
+/// `widgets/author_label.dart`): a [api.ProfileChanged] frame evicts the
+/// renamed id so the next [resolve] re-asks for it, rather than carrying the
+/// new name on the frame itself, which would make this map a second place
+/// the value could be wrong.
 class BatchProfilesController
     extends StateNotifier<Map<String, api.UserProfile?>> {
-  BatchProfilesController(this._ref) : super(const {});
+  BatchProfilesController(this._ref) : super(const {}) {
+    _sub = _ref.read(liveEventsProvider).listen((event) {
+      if (event is api.ProfileChanged && state.containsKey(event.userId)) {
+        state = {...state}..remove(event.userId);
+      }
+    });
+  }
 
   final Ref _ref;
+  late final StreamSubscription<api.ServerEvent> _sub;
 
   /// Fetches whichever of [ids] are not already known. Best-effort: a failed
   /// call leaves those ids unresolved rather than wrongly reading a network
@@ -56,6 +72,18 @@ class BatchProfilesController
       // Left unresolved; whoever asked can retry on the next build.
     }
   }
+
+  /// Forgets every cached profile, for a session that may have missed
+  /// [api.ProfileChanged] frames while disconnected: [SyncController.start]
+  /// calls this on every (re)connect, since there is no cursor over renames
+  /// to catch up from and asking fresh is always correct.
+  void clear() => state = const {};
+
+  @override
+  void dispose() {
+    unawaited(_sub.cancel());
+    super.dispose();
+  }
 }
 
 /// Kept for the screen's lifetime (not `autoDispose`): a moderation queue
@@ -66,3 +94,14 @@ final batchProfilesControllerProvider =
       BatchProfilesController,
       Map<String, api.UserProfile?>
     >((ref) => BatchProfilesController(ref));
+
+/// Kicks off resolving whichever of [authorIds] this session does not
+/// already have cached. Safe to call on every rebuild a message list
+/// produces: [BatchProfilesController.resolve] itself skips ids it already
+/// knows, so a screen that renders the same authors every frame costs one
+/// scan of already-known ids, not a repeated fetch.
+void resolveAuthorProfiles(WidgetRef ref, Iterable<String?> authorIds) {
+  final ids = authorIds.whereType<String>().toSet();
+  if (ids.isEmpty) return;
+  unawaited(ref.read(batchProfilesControllerProvider.notifier).resolve(ids));
+}

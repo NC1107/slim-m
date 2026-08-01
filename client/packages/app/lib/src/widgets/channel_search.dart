@@ -5,9 +5,12 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/user_profiles.dart';
+import 'author_label.dart';
 import 'message_text.dart';
 
 class ChannelSearchBar extends StatelessWidget {
@@ -46,7 +49,7 @@ class ChannelSearchBar extends StatelessWidget {
   }
 }
 
-class ChannelSearchResults extends StatelessWidget {
+class ChannelSearchResults extends ConsumerWidget {
   const ChannelSearchResults({
     super.key,
     required this.results,
@@ -80,7 +83,7 @@ class ChannelSearchResults extends StatelessWidget {
   final ValueChanged<api.Message> onSelect;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     if (loading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
@@ -117,15 +120,19 @@ class ChannelSearchResults extends StatelessWidget {
         ),
       );
     }
+    final profiles = ref.watch(batchProfilesControllerProvider);
+    resolveAuthorProfiles(ref, list.map((m) => m.authorId));
     return ListView.separated(
       padding: const EdgeInsets.all(AppSpacing.s16),
       itemCount: list.length,
       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s12),
       itemBuilder: (context, i) {
         final message = list[i];
-        final name =
-            message.authorDisplayName ??
-            (message.authorId == null ? 'Deleted user' : 'Unknown');
+        final name = authorLabel(
+          authorId: message.authorId,
+          cachedDisplayName: message.authorDisplayName,
+          profiles: profiles,
+        );
         return InkWell(
           onTap: () => onSelect(message),
           borderRadius: BorderRadius.circular(AppRadii.control),
