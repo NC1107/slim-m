@@ -241,18 +241,47 @@ async fn revoke_session_is_instant() {
     ));
 }
 
+/// The real device-revocation path is `Store::remove_device` (the dead
+/// `Store::revoke_device` this used to drive was never called in production).
+/// It kills the device's sessions the same way, and also clears its push
+/// registration, which the dead version did not and nothing else asserts.
 #[tokio::test]
-async fn revoke_device_kills_its_sessions() {
+async fn removing_a_device_kills_its_session_and_push_registration() {
     let (store, _auth, user_id, _guard) = with_alice().await;
     let tokens = store.open_session(user_id, "desktop").await.unwrap();
+    store
+        .register_push(
+            user_id,
+            tokens.device_id,
+            "ios",
+            "a-push-token",
+            None,
+            &[7u8; 32],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        store.push_targets(&[user_id]).await.unwrap().len(),
+        1,
+        "the device is a push target once registered"
+    );
 
-    store.revoke_device(tokens.device_id).await.unwrap();
+    store
+        .remove_device(user_id, tokens.device_id)
+        .await
+        .unwrap()
+        .expect("alice owns this device");
+
     assert!(
         store
             .authenticate(&tokens.access_token)
             .await
             .unwrap()
             .is_none()
+    );
+    assert!(
+        store.push_targets(&[user_id]).await.unwrap().is_empty(),
+        "the removed device's push registration is gone, not just its session"
     );
 }
 

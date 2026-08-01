@@ -9,7 +9,7 @@
 //! owned, tested backstop: a client still on a call keeps refreshing its
 //! entry (`POST .../voice/heartbeat`, on a plain interval, independent of
 //! app-foreground state so a backgrounded call is never mistaken for a dead
-//! one), and [`CallHeartbeats::sweep_stale`] hands back everyone whose
+//! one), and [`CallHeartbeats::sweep_stale_at`] hands back everyone whose
 //! refresh has gone quiet for longer than a real client, even a briefly
 //! reconnecting one, plausibly would.
 //!
@@ -32,7 +32,7 @@ use crate::ids::{ChannelId, UserId};
 /// [`STALE_AFTER`] from it is what makes that the only number to change.
 const CLIENT_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 
-/// How long a heartbeat may go unrefreshed before [`CallHeartbeats::sweep_stale`]
+/// How long a heartbeat may go unrefreshed before [`CallHeartbeats::sweep_stale_at`]
 /// gives it up. 8/3 of [`CLIENT_HEARTBEAT_INTERVAL`] (40s at the current
 /// 15s), so one dropped request under a flaky connection does not evict
 /// somebody still genuinely on the call.
@@ -61,7 +61,7 @@ impl CallHeartbeats {
     }
 
     /// Whether an entry exists at all, regardless of freshness. Production
-    /// code only ever needs [`Self::sweep_stale`]; this is for a test to
+    /// code only ever needs [`Self::sweep_stale_at`]; this is for a test to
     /// confirm a heartbeat was actually recorded.
     pub fn contains(&self, user_id: UserId, channel_id: ChannelId) -> bool {
         lock(&self.state).contains_key(&(user_id, channel_id))
@@ -75,12 +75,7 @@ impl CallHeartbeats {
     }
 
     /// Removes and returns every session whose last heartbeat is at least
-    /// `threshold` old as of now.
-    pub fn sweep_stale(&self, threshold: Duration) -> Vec<(UserId, ChannelId)> {
-        self.sweep_stale_at(threshold, Instant::now())
-    }
-
-    /// [`Self::sweep_stale`] with an explicit clock.
+    /// `threshold` old as of `now`.
     pub fn sweep_stale_at(&self, threshold: Duration, now: Instant) -> Vec<(UserId, ChannelId)> {
         let mut state = lock(&self.state);
         let stale: Vec<_> = state

@@ -135,17 +135,6 @@ impl Store {
         }
     }
 
-    /// How many reports are waiting. The moderation queue itself lands with the
-    /// admin console in Phase 7; this is enough to show that intake works.
-    pub async fn open_report_count(&self) -> anyhow::Result<i64> {
-        let count = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) AS "count!: i64" FROM reports WHERE resolved_at IS NULL"#
-        )
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(count)
-    }
-
     /// One page of the moderation queue: open reports, oldest first.
     ///
     /// Bounded, and filtered *before* the limit rather than after it. That

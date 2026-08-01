@@ -98,11 +98,11 @@ impl Store {
     /// Ownership check, session lookup, revocation and the device delete all
     /// share one `BEGIN IMMEDIATE` transaction: the four used to run as
     /// separate statements (the last two against `self.pool` directly, after
-    /// [`Store::revoke_device`] had already committed its own), so a failure
-    /// between them could leave the device deleted with a session still live,
-    /// or revoked with the device row still sitting there. Uses
-    /// [`revoke_session_rows`] directly rather than `Store::revoke_device`,
-    /// since that method opens its own transaction and cannot join this one.
+    /// a since-removed helper had already committed its own revocation), so a
+    /// failure between them could leave the device deleted with a session
+    /// still live, or revoked with the device row still sitting there. Uses
+    /// [`revoke_session_rows`] directly, in this transaction, rather than a
+    /// helper that opens its own and so cannot join it.
     pub async fn remove_device(
         &self,
         user_id: UserId,

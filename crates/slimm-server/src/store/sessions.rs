@@ -660,46 +660,6 @@ impl Store {
         tx.commit().await?;
         Ok(())
     }
-
-    /// Revokes every live session for a device (device removed from the account).
-    /// A caller that wants any open WebSocket on those sessions closed at once
-    /// must also publish `Event::SessionRevoked`, the way the logout handler does.
-    pub async fn revoke_device(&self, device_id: DeviceId) -> anyhow::Result<()> {
-        let now = now_ms();
-        let mut tx = self.pool.begin().await?;
-        sqlx::query!(
-            "DELETE FROM access_tokens
-             WHERE session_id IN (SELECT id FROM sessions WHERE device_id = ?)",
-            device_id
-        )
-        .execute(&mut *tx)
-        .await?;
-        sqlx::query!(
-            "DELETE FROM ws_tickets
-             WHERE session_id IN (SELECT id FROM sessions WHERE device_id = ?)",
-            device_id
-        )
-        .execute(&mut *tx)
-        .await?;
-        sqlx::query!(
-            "UPDATE refresh_tokens SET revoked_at = ?
-             WHERE session_id IN (SELECT id FROM sessions WHERE device_id = ?)
-               AND revoked_at IS NULL",
-            now,
-            device_id
-        )
-        .execute(&mut *tx)
-        .await?;
-        sqlx::query!(
-            "UPDATE sessions SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL",
-            now,
-            device_id
-        )
-        .execute(&mut *tx)
-        .await?;
-        tx.commit().await?;
-        Ok(())
-    }
 }
 
 /// Sorts out why a refresh claim matched no row: unknown, revoked, expired, a

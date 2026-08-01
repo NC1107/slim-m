@@ -141,7 +141,7 @@ async fn logout_closes_the_live_socket() {
 /// Removing a device is the third way a session dies, alongside logout and
 /// account deletion, and the only one with no test until now.
 ///
-/// `Store::revoke_device` deliberately does not publish anything itself: the
+/// `Store::remove_device` deliberately does not publish anything itself: the
 /// handler does, because it is the layer that holds the hub. That split is
 /// easy to undo by accident while refactoring, and nothing would fail.
 #[tokio::test]

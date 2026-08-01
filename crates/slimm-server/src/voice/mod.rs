@@ -28,7 +28,7 @@
 //! A kick or a timeout is a deliberate eviction; a terminated app is not, and
 //! nothing tells this service about it directly, since a killed process runs
 //! no code and the SFU's own reconnect grace period is not this project's to
-//! set. [`VoiceService::sweep_stale_calls`] is what closes that: a live
+//! set. [`VoiceService::sweep_stale_calls_at`] is what closes that: a live
 //! client refreshes its own entry on an interval, and a refresh that stops
 //! arriving is what the sweep, run from `lib.rs`, treats as gone. See
 //! `voice::heartbeat` for the bound this actually gives.
@@ -262,12 +262,6 @@ impl VoiceService {
         self.heartbeats.forget(user_id, channel_id);
     }
 
-    /// Every `(user, channel)` call whose heartbeat has gone stale, handed
-    /// back (and forgotten) for the caller to actually evict at the SFU.
-    pub fn sweep_stale_calls(&self) -> Vec<(UserId, ChannelId)> {
-        self.heartbeats.sweep_stale(HEARTBEAT_STALE_AFTER)
-    }
-
     /// Whether a heartbeat is on record for this `(user, channel)`, for a
     /// test to confirm the HTTP handler actually reached [`Self::record_heartbeat`].
     pub fn has_heartbeat_for_test(&self, user_id: UserId, channel_id: ChannelId) -> bool {
@@ -285,10 +279,12 @@ impl VoiceService {
         self.heartbeats.record_at(user_id, channel_id, now);
     }
 
-    /// [`Self::sweep_stale_calls`] with an explicit clock. `lib.rs`'s own
-    /// sweep uses this too (passing the real clock), so a test can drive
-    /// exactly the code that runs in production rather than a copy of it
-    /// that could drift; a test is what wants a clock other than the real one.
+    /// Every `(user, channel)` call whose heartbeat has gone stale as of
+    /// `now`, handed back (and forgotten) for the caller to actually evict at
+    /// the SFU. `lib.rs`'s own sweep uses this, passing the real clock, so a
+    /// test can drive exactly the code that runs in production rather than a
+    /// copy of it that could drift; a test is what wants a clock other than
+    /// the real one.
     pub fn sweep_stale_calls_at(&self, now: std::time::Instant) -> Vec<(UserId, ChannelId)> {
         self.heartbeats.sweep_stale_at(HEARTBEAT_STALE_AFTER, now)
     }

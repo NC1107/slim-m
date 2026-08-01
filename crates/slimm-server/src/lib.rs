@@ -168,7 +168,7 @@ pub async fn sweep_stale_voice_calls(voice: &voice::VoiceService) {
 ///
 /// Split out of [`spawn_call_sweep`]'s loop, and `pub` rather than private,
 /// so a test can drive the real coupling between
-/// [`voice::VoiceService::sweep_stale_calls`] and
+/// [`voice::VoiceService::sweep_stale_calls_at`] and
 /// [`voice::VoiceService::remove_participant`] against a controlled clock,
 /// rather than re-implementing the loop and risking the copy drifting from
 /// what actually runs.
