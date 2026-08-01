@@ -48,7 +48,11 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         _harness([
-          const api.ReactionSummary(emoji: '👍', count: 1, reacted: false),
+          const api.ReactionSummary(
+            emoji: '\u{1F44D}',
+            count: 1,
+            reacted: false,
+          ),
         ]),
       );
       await tester.pumpAndSettle();
