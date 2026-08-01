@@ -10,6 +10,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../screens/canvas/canvas_open_button.dart';
 import '../routing/breakpoints.dart';
 import 'member_pane.dart';
+import 'channel_rail.dart';
 import 'pinned_messages_sheet.dart';
 
 class ChannelHeader extends ConsumerWidget {
@@ -101,6 +102,16 @@ class ChannelHeader extends ConsumerWidget {
           const SizedBox(width: AppSpacing.s4),
           CanvasOpenButton(channelId: channelId),
           const SizedBox(width: AppSpacing.s4),
+          if (canToggleMembers)
+            AppIconButton(
+              icon: AppIcons.sidebar,
+              semanticLabel: 'Toggle channel list',
+              active: ref.watch(channelRailVisibleProvider),
+              onPressed: () =>
+                  ref.read(channelRailVisibleProvider.notifier).state = !ref
+                      .read(channelRailVisibleProvider),
+            ),
+          if (canToggleMembers) const SizedBox(width: AppSpacing.s4),
           AppIconButton(
             icon: AppIcons.search,
             semanticLabel: 'Search messages',

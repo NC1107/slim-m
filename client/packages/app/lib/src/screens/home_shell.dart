@@ -54,19 +54,37 @@ class HomeShell extends ConsumerWidget {
     // hide the pane, not summon room for it that is not there.
     final showMembers =
         layout == LayoutClass.expanded && ref.watch(memberPaneVisibleProvider);
+    final showRail = ref.watch(channelRailVisibleProvider);
+
+    final railWidth = layout == LayoutClass.expanded
+        ? ChannelRail.expandedWidth
+        : ChannelRail.mediumWidth;
 
     final Widget scaffold;
     if (layout.showsBothPanes) {
       scaffold = Scaffold(
         body: Row(
           children: [
-            SizedBox(
-              width: layout == LayoutClass.expanded
-                  ? ChannelRail.expandedWidth
-                  : ChannelRail.mediumWidth,
-              child: const ChannelRail(),
+            // Collapsing gives the transcript the rail's width back. The rail
+            // unmounts rather than sitting at zero width, the same reasoning
+            // the member pane's slot carries: it polls voice rosters while
+            // built, and a hidden pane must not keep fetching.
+            ClipRect(
+              child: AnimatedContainer(
+                duration: AppMotion.reduced(context, AppMotion.base),
+                curve: AppMotion.entrance,
+                width: showRail ? railWidth : 0,
+                child: showRail
+                    ? OverflowBox(
+                        minWidth: railWidth,
+                        maxWidth: railWidth,
+                        alignment: Alignment.centerRight,
+                        child: const ChannelRail(),
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ),
-            const VerticalDivider(width: 1),
+            if (showRail) const VerticalDivider(width: 1),
             // Its own semantics node, or the modal barrier inside this pane's
             // navigator blocks everything painted before it, which is the
             // whole rail: no channel row, section or search field reached a

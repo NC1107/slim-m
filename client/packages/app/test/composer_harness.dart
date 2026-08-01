@@ -23,6 +23,7 @@ import 'package:slimm_app/src/providers/emoji_catalog_provider.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/typing_controller.dart';
 import 'package:slimm_app/src/widgets/composer.dart';
+import 'package:slimm_app/src/widgets/composer_clipboard_image.dart';
 import 'package:slimm_app/src/widgets/emoji_picker_grid.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -152,6 +153,7 @@ Widget composerHarness({
   required Sends sends,
   required TargetPlatform platform,
   List<api.CustomEmoji>? customEmoji,
+  FakeClipboardPaste? clipboardPaste,
 }) {
   return ProviderScope(
     overrides: [
@@ -176,12 +178,40 @@ Widget composerHarness({
               channelId: 'c1',
               channelName: 'general',
               onSend: sends.call,
+              clipboardPasteStart:
+                  clipboardPaste?.start ?? startClipboardImagePaste,
+              clipboardPasteStop:
+                  clipboardPaste?.stop ?? stopClipboardImagePaste,
             ),
           ],
         ),
       ),
     ),
   );
+}
+
+/// Stands in for the real browser `paste` listener a widget test cannot
+/// produce: [start] just remembers the callback so a test can invoke it
+/// directly, as though an image had really been pasted.
+class FakeClipboardPaste {
+  void Function(Uint8List bytes, String filename)? _onImage;
+  int stopCalls = 0;
+
+  void start(void Function(Uint8List bytes, String filename) onImage) =>
+      _onImage = onImage;
+
+  void stop() {
+    stopCalls += 1;
+    _onImage = null;
+  }
+
+  /// True only while the composer is actually listening, i.e. its field has
+  /// focus; a test asserts this to prove the seam is armed and disarmed
+  /// with focus rather than left running for the widget's whole life.
+  bool get listening => _onImage != null;
+
+  void paste(Uint8List bytes, String filename) =>
+      _onImage?.call(bytes, filename);
 }
 
 Finder get sendButton => find.ancestor(
