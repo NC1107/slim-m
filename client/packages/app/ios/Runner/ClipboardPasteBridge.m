@@ -29,17 +29,25 @@
 /// half of a pair or crashing, so a break here reads as "the old prompt-every-
 /// time behaviour is back," not as a crash - diagnosable by grepping the
 /// engine source at the two paths named above for what moved.
-@interface FlutterTextInputView : UIView
-@end
-
-@interface FlutterTextInputView (SlimmClipboardPaste)
+/// The replacements live on a **donor class of our own**, never in a category
+/// on the target.
+///
+/// A category on `FlutterTextInputView` emits a link-time reference to
+/// `_OBJC_CLASS_$_FlutterTextInputView`, and the engine ships that class
+/// without exporting the symbol, so the app fails to link with "Undefined
+/// symbol". That is not a theoretical concern: it is exactly how the first
+/// version of this file broke the 0.21.2 iOS build, while every Dart test
+/// passed. Resolving the class by name at runtime is pointless if the
+/// compiler has already been told it exists at link time, and a category is
+/// that assertion.
+@interface SlimmPasteDonor : UIResponder
 - (BOOL)slimm_canPerformAction:(SEL)action withSender:(id)sender;
 - (void)slimm_paste:(id)sender;
 @end
 
 static void (^sOnImage)(NSData *pngData);
 
-@implementation FlutterTextInputView (SlimmClipboardPaste)
+@implementation SlimmPasteDonor
 
 - (BOOL)slimm_canPerformAction:(SEL)action withSender:(id)sender {
   // `hasImages` is UIPasteboard's own metadata check, one of the reads Apple
@@ -83,6 +91,22 @@ BOOL SlimmInstallClipboardPasteBridge(void (^onImage)(NSData *pngData)) {
   // Resolved up front and only exchanged if every lookup succeeds, so a
   // missing selector never leaves one half of the pair swizzled and the
   // other not.
+  // The replacements are read off the donor and grafted onto the target,
+  // which is what keeps the target out of the link table entirely.
+  Method donorCanPerform =
+      class_getInstanceMethod([SlimmPasteDonor class], @selector(slimm_canPerformAction:withSender:));
+  Method donorPaste = class_getInstanceMethod([SlimmPasteDonor class], @selector(slimm_paste:));
+  if (donorCanPerform == NULL || donorPaste == NULL) {
+    NSLog(@"[slimm] ClipboardPasteBridge: donor methods missing; image paste "
+          @"via the edit menu is disabled for this build.");
+    return NO;
+  }
+  class_addMethod(cls, @selector(slimm_canPerformAction:withSender:),
+                  method_getImplementation(donorCanPerform),
+                  method_getTypeEncoding(donorCanPerform));
+  class_addMethod(cls, @selector(slimm_paste:), method_getImplementation(donorPaste),
+                  method_getTypeEncoding(donorPaste));
+
   Method originalCanPerform = class_getInstanceMethod(cls, @selector(canPerformAction:withSender:));
   Method swizzledCanPerform =
       class_getInstanceMethod(cls, @selector(slimm_canPerformAction:withSender:));
