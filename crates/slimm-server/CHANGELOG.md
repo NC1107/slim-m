@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.0](https://github.com/NC1107/slim-m/compare/server-v0.21.0...server-v0.22.0) (2026-08-01)
+
+
+### Features
+
+* **client:** device-use polish, a what's-new screen, and a dead-code sweep ([#256](https://github.com/NC1107/slim-m/issues/256)) ([cd927ac](https://github.com/NC1107/slim-m/commit/cd927ac993bdaca37a5ccc31041e6f44009f46cd))
+
 ## [0.21.0](https://github.com/NC1107/slim-m/compare/server-v0.20.0...server-v0.21.0) (2026-07-31)
 
 
