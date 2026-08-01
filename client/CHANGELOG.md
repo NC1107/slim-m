@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.23.0](https://github.com/NC1107/slim-m/compare/client-v0.22.0...client-v0.23.0) (2026-08-01)
+
+
+### Features
+
+* calling in a DM ([#306](https://github.com/NC1107/slim-m/issues/306)) ([6823474](https://github.com/NC1107/slim-m/commit/68234746807e080edb7f5e0b0ee4ebb2ecf95115))
+* **client:** fade the canvas pane swap and the identity-confirmation push ([#309](https://github.com/NC1107/slim-m/issues/309)) ([34c4715](https://github.com/NC1107/slim-m/commit/34c471539280a65d46efde70fefa356719574347))
+* reply to a message, and write up threads instead of building them ([#308](https://github.com/NC1107/slim-m/issues/308)) ([dffcdaa](https://github.com/NC1107/slim-m/commit/dffcdaa1747eae05e61c858c6dcc17380fe990d8))
+
+
+### Bug Fixes
+
+* **client:** stop reduce motion from crashing AnimatedSize in the rail ([#310](https://github.com/NC1107/slim-m/issues/310)) ([634f2ac](https://github.com/NC1107/slim-m/commit/634f2ac298d79c3a04895eaef47d25f189e920ab))
+
 ## [0.22.0](https://github.com/NC1107/slim-m/compare/client-v0.21.3...client-v0.22.0) (2026-08-01)
 
 
