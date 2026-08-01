@@ -1,0 +1,93 @@
+// SPDX-License-Identifier: Apache-2.0
+/// Whether this install has anything new to be told about, and what.
+///
+/// Three constraints shape this, each chosen over an easier alternative:
+///
+/// - **Once per version, not every launch.** The last version a person was
+///   shown something is persisted ([lastSeenWhatsNewVersionKey]), so a
+///   relaunch on the same build reads as nothing pending rather than
+///   replaying the same sheet. An in-memory "already shown this run" flag
+///   was rejected: it would still show the sheet on every cold start, which
+///   is not what "once per version" means.
+/// - **Never on a fresh install.** [isFreshInstallProvider] is the same fact
+///   [restoreSession] already computes for the keychain-wipe check, reused
+///   rather than re-derived: a fresh install (or a wipe indistinguishable
+///   from one) records the current version as already seen and shows
+///   nothing, so a new user's first screen is never a changelog for updates
+///   that happened before they existed.
+/// - **Never a gate.** [WhatsNewController] only ever decides what to show;
+///   nothing reads its state to decide whether the app itself may proceed,
+///   and the sheet it feeds is always dismissible.
+library;
+
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+
+import '../whats_new/whats_new_content.dart';
+import 'providers.dart';
+
+/// The `SharedPreferences` key the last version a what's-new sheet was shown
+/// for is stored under. Global rather than per-account, the same reasoning
+/// [themeChoiceKey] already carries: the build installed is a property of
+/// the device, not of who happens to be signed into it.
+const lastSeenWhatsNewVersionKey = 'slimm.whats_new.last_seen_version';
+
+/// The entries, if any, still owed to whoever is using this install. Starts
+/// empty and either stays that way or is populated once the async check in
+/// the constructor resolves.
+class WhatsNewController extends StateNotifier<List<WhatsNewEntry>> {
+  WhatsNewController(this._ref) : super(const []) {
+    unawaited(_check());
+  }
+
+  final Ref _ref;
+
+  Future<void> _check() async {
+    try {
+      final prefs = await _ref.read(preferencesProvider.future);
+      final version = (await PackageInfo.fromPlatform()).version;
+
+      if (_ref.read(isFreshInstallProvider)) {
+        await prefs.setString(lastSeenWhatsNewVersionKey, version);
+        return;
+      }
+
+      final lastSeen = prefs.getString(lastSeenWhatsNewVersionKey);
+      final pending = pendingWhatsNewEntries(
+        lastSeen: lastSeen,
+        currentVersion: version,
+      );
+      if (!mounted || pending.isEmpty) return;
+      state = pending;
+    } catch (_) {
+      // Never the reason a launch fails to reach the shell; stay silent.
+    }
+  }
+
+  /// Called once the sheet built from [state] has been shown and dismissed.
+  ///
+  /// Marking seen here, rather than the moment [_check] decides there is
+  /// something to show, means a process killed before the sheet ever painted
+  /// tries again on the next launch instead of silently losing the notice.
+  Future<void> markSeen() async {
+    if (state.isEmpty) return;
+    final version = (await PackageInfo.fromPlatform()).version;
+    state = const [];
+    try {
+      final prefs = await _ref.read(preferencesProvider.future);
+      await prefs.setString(lastSeenWhatsNewVersionKey, version);
+    } catch (_) {
+      // Best effort: worst case the same entries are shown again next launch.
+    }
+  }
+}
+
+/// Deliberately not `autoDispose`: the gate that reads this may rebuild
+/// several times while signed in, and tearing this down between reads would
+/// restart the async check and risk showing the sheet twice in one launch.
+final whatsNewControllerProvider =
+    StateNotifierProvider<WhatsNewController, List<WhatsNewEntry>>(
+      (ref) => WhatsNewController(ref),
+    );

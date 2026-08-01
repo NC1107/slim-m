@@ -20,11 +20,27 @@ const String dmChannelKind = 'dm';
 /// Display copy for a personal space's channel row: a DM opened with
 /// yourself (`store/dms.rs` no longer refuses `caller == target`), used for
 /// private notes that still sync across every signed-in device the way any
-/// other channel does. Purely cosmetic - another member can set this exact
-/// string as their own display name, and a DM with them would render the
-/// same label. [Channel.isPersonalSpace] (`api.Channel`), not this string,
-/// is what the rail matches on; see [channelFromDm].
-const String personalSpaceName = 'Notes to self';
+/// other channel does.
+///
+/// `You`, not `Me`: the app already uses the second person for the caller's
+/// own identity everywhere else this comes up - a voice participant tile
+/// names the local user `$name (you)`, and the personal settings screen's own
+/// section group is labelled `You` - so this reads as one more instance of an
+/// established convention rather than a new word to learn. It also composes
+/// better with this string's one other job, the composer's placeholder
+/// (`Message #$personalSpaceName`): "Message You" parses as an instruction
+/// directed at the reader, where "Message Me" reads as the app talking about
+/// itself.
+///
+/// Purely cosmetic - another member can set this exact string as their own
+/// display name, and a DM with them would render the same label.
+/// [Channel.isPersonalSpace] (`api.Channel`), not this string, is what the
+/// rail matches on; see [channelFromDm]. A caller hunting for this channel by
+/// their own real display name rather than this sentinel still finds it:
+/// `command_palette_items.dart`'s `channelMatchesQuery` matches a personal
+/// space against the caller's own display name too, which is also the one
+/// way back once its rail row has been removed via "Remove from list".
+const String personalSpaceName = 'You';
 
 /// Turns a DM listing into the same [api.Channel] shape an ordinary channel
 /// arrives as. The server stores a DM channel's own `name` as empty (a DM

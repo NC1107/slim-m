@@ -62,24 +62,6 @@ void main() {
   });
 
   group('AppBadge', () {
-    testWidgets('count is filled with the accent, the unread-badge accent role',
-        (tester) async {
-      const tokens = AppTokens.light;
-      await _pump(
-          tester, const AppBadge(variant: AppBadgeVariant.count, label: '3'),
-          tokens: tokens);
-
-      expect(find.text('3'), findsOneWidget);
-      final container = tester.widget<Container>(
-        find.descendant(
-            of: find.byType(AppBadge), matching: find.byType(Container)),
-      );
-      final decoration = container.decoration as BoxDecoration;
-      expect(decoration.color, tokens.accentFill);
-      final text = tester.widget<Text>(find.text('3'));
-      expect(text.style!.color, tokens.accentOn);
-    });
-
     testWidgets('role is outlined from the accent, uppercased, never filled',
         (tester) async {
       const tokens = AppTokens.light;

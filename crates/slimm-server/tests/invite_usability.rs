@@ -65,8 +65,7 @@ async fn exactly_at_max_uses_is_unusable_on_both_paths() {
         .await
         .unwrap();
 
-    // One use left: both paths agree it is usable, and spending it lands
-    // uses exactly on max_uses.
+    // One use left: both agree usable, and spending lands on max_uses.
     assert!(rust_says_usable(&s, &invite.code).await);
     assert!(sql_says_usable(&s, &invite.code, a.id).await);
 
@@ -88,9 +87,7 @@ async fn exactly_at_expiry_is_unusable_on_both_paths() {
         .await
         .unwrap();
 
-    // By the time either side checks, real time has moved on to or past
-    // `expires_at`, so `expiry > now` is false on both: an invite expiring
-    // exactly "now" is already unusable, not usable through its last instant.
+    // Time has moved past `expires_at`, so `expiry > now` is false on both.
     let rust_usable = rust_says_usable(&s, &invite.code).await;
     let sql_usable = sql_says_usable(&s, &invite.code, user.id).await;
     assert_eq!(rust_usable, sql_usable, "diverged exactly at expiry");

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The rail's always-present entry point to the caller's own personal
-/// space. Split out of `channel_rail_sections.dart` to keep that file under
-/// the review budget once this grew a guarded async open.
+/// The rail's entry point to the caller's own personal space.
+///
+/// Split out of `channel_rail_sections.dart` to keep that file under the
+/// review budget once this grew a guarded async open.
 library;
 
 import 'package:flutter/material.dart';
@@ -11,12 +12,19 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/dms.dart';
+import '../providers/personal_space_visibility.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
+import 'personal_space_menu.dart';
 import 'run_guarded.dart';
 
 /// Reachable before the channel exists at all - the first tap opens it -
 /// and renders identically after, so the row never moves once it does.
+///
+/// Present unless [PersonalSpaceVisibilityController] says the caller
+/// removed it: a channel that has never been opened has nothing to hide, so
+/// [channel] being null always wins over a stale hidden flag rather than
+/// stranding the caller with no way to create it at all.
 class PersonalSpaceRow extends ConsumerStatefulWidget {
   const PersonalSpaceRow({
     super.key,
@@ -39,6 +47,11 @@ class _PersonalSpaceRowState extends ConsumerState<PersonalSpaceRow>
   /// first is still in flight - there is no request to dedupe against yet,
   /// unlike an already-open personal space, which just navigates.
   bool _opening = false;
+
+  /// Reveals the kebab on hover or keyboard focus, matching
+  /// `ManagedChannelRow`'s own reveal-on-hover, always-on-touch rule.
+  bool _hovered = false;
+  bool _kebabFocused = false;
 
   Future<void> _open() async {
     final existing = widget.channel;
@@ -66,39 +79,58 @@ class _PersonalSpaceRowState extends ConsumerState<PersonalSpaceRow>
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final existing = widget.channel;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AppListRow(
-          label: personalSpaceName,
-          selected: widget.selected,
-          unread: existing != null && existing.cursor > existing.lastReadSeq,
-          // Matches AppAvatar(size: 20)'s 20x20 footprint; a bare 16px icon left the label 4dp misaligned.
-          leading: SizedBox(
-            width: 20,
-            height: 20,
-            child: Center(
-              child: Icon(
-                AppIcons.notebook,
-                size: AppSizes.icon16,
-                color: widget.selected ? tokens.accent : tokens.textSecondary,
+    // A channel never opened has no menu of its own to have hidden it with.
+    final hidden =
+        existing != null && ref.watch(personalSpaceVisibilityProvider);
+    if (hidden) return const SizedBox.shrink();
+
+    final touch = AppTouchTargets.of(context);
+    final kebabShown = touch || _hovered || _kebabFocused;
+    final kebab = existing == null
+        ? null
+        : PersonalSpaceKebab(
+            visible: kebabShown,
+            onFocusChange: (v) => setState(() => _kebabFocused = v),
+          );
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppListRow(
+            label: personalSpaceName,
+            selected: widget.selected,
+            unread: existing != null && existing.cursor > existing.lastReadSeq,
+            // Matches AppAvatar(size: 20)'s 20x20 footprint; a bare 16px icon left the label 4dp misaligned.
+            leading: SizedBox(
+              width: 20,
+              height: 20,
+              child: Center(
+                child: Icon(
+                  AppIcons.notebook,
+                  size: AppSizes.icon16,
+                  color: widget.selected ? tokens.accent : tokens.textSecondary,
+                ),
               ),
             ),
+            trailingExtra: kebab,
+            onTap: _opening ? null : _open,
           ),
-          onTap: _opening ? null : _open,
-        ),
-        if (actionError != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s8,
-              vertical: AppSpacing.s4,
+          if (actionError != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s8,
+                vertical: AppSpacing.s4,
+              ),
+              child: AppErrorState(
+                message: actionError!,
+                onDismiss: clearActionError,
+              ),
             ),
-            child: AppErrorState(
-              message: actionError!,
-              onDismiss: clearActionError,
-            ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

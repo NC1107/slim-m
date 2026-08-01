@@ -402,6 +402,7 @@ class _ComposerState extends ConsumerState<Composer> {
               child: TypingIndicator(channelId: widget.channelId),
             ),
             Container(
+              key: const Key('composer-action-bar'),
               padding: const EdgeInsets.fromLTRB(12, 5, 10, 5),
               decoration: BoxDecoration(
                 color: tokens.surfaceRaised,
@@ -409,7 +410,8 @@ class _ComposerState extends ConsumerState<Composer> {
                 borderRadius: BorderRadius.circular(AppRadii.card),
               ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                // Top, not centred: a centred icon drifts as the field grows.
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AppIconButton(
                     icon: AppIcons.add,

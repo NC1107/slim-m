@@ -12,9 +12,10 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
 import '../providers/admin_providers.dart';
-import '../providers/blocks_controller.dart';
 import '../routing/modal_page.dart';
 import '../providers/member_presence.dart' show membersProvider;
+import '../providers/message_search.dart';
+import '../providers/personal_space_visibility.dart';
 import '../providers/providers.dart';
 import 'channel_rail.dart' show selectedChannelId;
 import 'command_palette_items.dart';
@@ -68,6 +69,10 @@ class _CommandPaletteContentState
   int _highlighted = 0;
   List<api.Message> _messageResults = const [];
 
+  /// Whether the last message search came back as a 403 rather than a
+  /// genuinely empty result; the two must not read the same.
+  bool _messagesForbidden = false;
+
   /// Guards against a fast typist's earlier request resolving after a later
   /// one and clobbering its results, since there is no debounce here (the
   /// channel search bar this mirrors has none either).
@@ -91,30 +96,41 @@ class _CommandPaletteContentState
     });
     final channelId = widget.currentChannelId;
     if (value.isEmpty || channelId == null) {
-      setState(() => _messageResults = const []);
+      setState(() {
+        _messageResults = const [];
+        _messagesForbidden = false;
+      });
       return;
     }
     _search(channelId, value);
   }
 
+  /// The same call `channelSearchProvider` makes, through the one shared
+  /// helper: identical blocked-author filtering, and the same 403-versus-any-
+  /// other-failure distinction, so the two cannot diverge again the way they
+  /// already had.
   Future<void> _search(String channelId, String query) async {
     final generation = ++_searchGeneration;
-    try {
-      final results = await ref
-          .read(apiProvider)
-          .searchMessages(channelId, q: query, limit: paletteResultLimit);
-      if (!mounted || generation != _searchGeneration) return;
-      // A second search path beside `channelSearchProvider`, filtered alike.
-      final blocks = ref.read(blocksProvider);
-      setState(
-        () => _messageResults = results
-            .where((message) => !blocks.contains(message.authorId))
-            .toList(growable: false),
-      );
-    } on api.ApiException {
-      if (!mounted || generation != _searchGeneration) return;
-      setState(() => _messageResults = const []);
-    }
+    final result = await searchChannelMessages(
+      ref.read,
+      channelId,
+      query,
+      limit: paletteResultLimit,
+    );
+    if (!mounted || generation != _searchGeneration) return;
+    setState(() {
+      switch (result) {
+        case MessageSearchHits(:final messages):
+          _messageResults = messages;
+          _messagesForbidden = false;
+        case MessageSearchForbidden():
+          _messageResults = const [];
+          _messagesForbidden = true;
+        case MessageSearchFailed():
+          _messageResults = const [];
+          _messagesForbidden = false;
+      }
+    });
   }
 
   void _move(int delta) {
@@ -149,8 +165,9 @@ class _CommandPaletteContentState
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final storeAsync = ref.watch(storeProvider);
     final members = ref.watch(membersProvider).valueOrNull ?? const [];
-    final selfId = ref.watch(meProvider).valueOrNull?.id;
+    final me = ref.watch(meProvider).valueOrNull;
     final permissions = ref.watch(myPermissionsProvider);
+    final personalSpaceHidden = ref.watch(personalSpaceVisibilityProvider);
 
     return Align(
       alignment: const Alignment(0, -0.5),
@@ -191,8 +208,9 @@ class _CommandPaletteContentState
                       tokens,
                       channels,
                       members,
-                      selfId,
+                      me,
                       permissions,
+                      personalSpaceHidden,
                     );
                   },
                 ),
@@ -208,16 +226,31 @@ class _CommandPaletteContentState
     AppTokens tokens,
     List<Channel> channels,
     List<api.UserProfile> members,
-    String? selfId,
+    api.Me? me,
     int permissions,
+    bool personalSpaceHidden,
   ) {
     final groups = <(String, List<PaletteResultItem>)>[
-      ('Channels', buildChannelItems(channels, _query)),
-      ('Members', buildMemberItems(members, _query, selfId)),
-      if (widget.currentChannelId != null)
+      (
+        'Channels',
+        buildChannelItems(
+          channels,
+          _query,
+          selfDisplayName: me?.displayName,
+          personalSpaceHidden: personalSpaceHidden,
+        ),
+      ),
+      ('Members', buildMemberItems(members, _query, me?.id)),
+      if (widget.currentChannelId != null && !_messagesForbidden)
         ('Messages', buildMessageItems(_messageResults, tokens)),
       ('Actions', buildActionItems(_query, permissions)),
     ].where((g) => g.$2.isNotEmpty).toList();
+
+    // An empty result and a refusal are different things; so says search too.
+    final showForbiddenNotice =
+        widget.currentChannelId != null &&
+        _messagesForbidden &&
+        _query.isNotEmpty;
 
     final flat = [for (final group in groups) ...group.$2];
     _visible = flat;
@@ -225,7 +258,7 @@ class _CommandPaletteContentState
       _highlighted = flat.isEmpty ? 0 : flat.length - 1;
     }
 
-    if (flat.isEmpty) {
+    if (flat.isEmpty && !showForbiddenNotice) {
       return Padding(
         padding: const EdgeInsets.all(AppSpacing.s16),
         child: Text(
@@ -253,6 +286,21 @@ class _CommandPaletteContentState
           ),
         );
       }
+    }
+    if (showForbiddenNotice) {
+      rows.add(const AppMenuLabel('Messages'));
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s16,
+            vertical: AppSpacing.s8,
+          ),
+          child: Text(
+            'You do not have permission to search this channel.',
+            style: AppText.micro.copyWith(color: tokens.textSecondary),
+          ),
+        ),
+      );
     }
 
     return ConstrainedBox(

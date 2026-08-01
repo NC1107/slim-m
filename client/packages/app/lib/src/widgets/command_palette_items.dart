@@ -12,6 +12,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/dms.dart';
+import '../providers/personal_space_visibility.dart';
 import '../routing/routes.dart';
 import 'space_settings_section.dart';
 
@@ -37,8 +38,24 @@ class PaletteResultItem {
 /// Whether [channel] is worth showing for [query]. An empty query matches
 /// everything, so a blank field browses the whole list rather than showing
 /// nothing until the user types.
-bool channelMatchesQuery(Channel channel, String query) =>
-    query.isEmpty || channel.name.toLowerCase().contains(query.toLowerCase());
+///
+/// A personal space's own name is the fixed sentinel [personalSpaceName],
+/// not the caller's own display name, so it also matches on
+/// [selfDisplayName] when given. That is what makes this the one way back
+/// once the row has been removed from the rail via "Remove from list": the
+/// rail row is gone, but typing your own name still finds the channel.
+bool channelMatchesQuery(
+  Channel channel,
+  String query, {
+  String? selfDisplayName,
+}) {
+  if (query.isEmpty) return true;
+  final q = query.toLowerCase();
+  if (channel.name.toLowerCase().contains(q)) return true;
+  return channel.isPersonalSpace &&
+      selfDisplayName != null &&
+      selfDisplayName.toLowerCase().contains(q);
+}
 
 /// Same rule as [channelMatchesQuery], over both a member's display name and
 /// their username, since either is a name someone might type to find them.
@@ -60,18 +77,38 @@ IconData _channelIcon(Channel channel) => switch (channel.kind) {
 /// Channels and DMs matching [query], text and voice and direct alike: the
 /// rail already renders all three from one stream, and the palette does the
 /// same rather than picking a kind up front.
+///
+/// [personalSpaceHidden] keeps a removed personal space out of a blank-query
+/// browse of everything - the whole point of removing its row - while
+/// [selfDisplayName] (via [channelMatchesQuery]) still surfaces it the
+/// moment a real query actually names the caller. Selecting it un-hides it:
+/// finding it again is also how it comes back onto the rail.
 List<PaletteResultItem> buildChannelItems(
   List<Channel> channels,
-  String query,
-) => [
+  String query, {
+  String? selfDisplayName,
+  bool personalSpaceHidden = false,
+}) => [
   for (final channel
       in channels
-          .where((c) => channelMatchesQuery(c, query))
+          .where(
+            (c) =>
+                query.isNotEmpty || !(c.isPersonalSpace && personalSpaceHidden),
+          )
+          .where(
+            (c) =>
+                channelMatchesQuery(c, query, selfDisplayName: selfDisplayName),
+          )
           .take(paletteResultLimit))
     PaletteResultItem(
       label: channel.name,
       leading: _channelIcon(channel),
-      onSelect: (context, ref) async => context.go(Routes.channel(channel.id)),
+      onSelect: (context, ref) async {
+        if (channel.isPersonalSpace) {
+          await ref.read(personalSpaceVisibilityProvider.notifier).show();
+        }
+        if (context.mounted) context.go(Routes.channel(channel.id));
+      },
     ),
 ];
 

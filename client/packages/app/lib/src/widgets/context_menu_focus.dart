@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The keyboard route into a context menu, shared by `ContextMenuRegion` and
-/// `MessageContextMenuRegion`.
+/// The keyboard route into a context menu, used by `MessageContextMenuRegion`.
 ///
-/// Both open on a right-click or a long press only, which left edit, delete,
-/// pin, report and block with no keyboard route at all: the rows took no
-/// focus and no key opened the menu. A screen reader was always fine, because
-/// `GestureDetector` publishes `SemanticsAction.longPress` for its own
+/// The menu opens on a right-click or a long press only, which left edit,
+/// delete, pin, report and block with no keyboard route at all: the row took
+/// no focus and no key opened the menu. A screen reader was always fine,
+/// because `GestureDetector` publishes `SemanticsAction.longPress` for its own
 /// `onLongPress`, and `context_menu_reachability_test` guards that.
 library;
 

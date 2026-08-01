@@ -54,7 +54,6 @@ client/packages/app/lib/src/widgets/compact_channel_app_bar.dart 1
 client/packages/app/lib/src/widgets/composer.dart 5
 client/packages/app/lib/src/widgets/composer_extras.dart 4
 client/packages/app/lib/src/widgets/confirm_dialog.dart 1
-client/packages/app/lib/src/widgets/context_menu_region.dart 1
 client/packages/app/lib/src/widgets/custom_emoji_image.dart 1
 client/packages/app/lib/src/widgets/emoji_picker.dart 3
 client/packages/app/lib/src/widgets/fullscreen_image_viewer.dart 3
@@ -211,7 +210,6 @@ crates/slimm-server/tests/attachment_sweep.rs 1
 crates/slimm-server/tests/attachments/filenames.rs 4
 crates/slimm-server/tests/attachments/serving.rs 3
 crates/slimm-server/tests/audit_regressions.rs 1
-crates/slimm-server/tests/auth.rs 2
 crates/slimm-server/tests/avatars.rs 1
 crates/slimm-server/tests/bootstrap.rs 4
 crates/slimm-server/tests/canvas_index.rs 2

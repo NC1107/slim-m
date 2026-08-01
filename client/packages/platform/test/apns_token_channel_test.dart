@@ -29,92 +29,6 @@ void main() {
     });
   });
 
-  group('ApnsTokenChannel', () {
-    test('a non-iOS platform never touches the channel', () async {
-      var touched = false;
-      _mock((call) async {
-        touched = true;
-        return null;
-      });
-      addTearDown(() => _mock(null));
-
-      final result = await ApnsTokenChannel(isIOS: false).token();
-
-      expect(result, isNull);
-      expect(touched, isFalse);
-    });
-
-    test('a token already cached natively is returned immediately', () async {
-      _mock((call) async => switch (call.method) {
-            'getToken' => 'abcd1234',
-            _ => null,
-          });
-      addTearDown(() => _mock(null));
-
-      final result = await ApnsTokenChannel(isIOS: true).token();
-
-      expect(result, 'abcd1234');
-    });
-
-    test('a cached registration failure resolves to null without waiting',
-        () async {
-      _mock((call) async => switch (call.method) {
-            'getRegistrationError' => 'denied',
-            _ => null,
-          });
-      addTearDown(() => _mock(null));
-
-      final result = await ApnsTokenChannel(isIOS: true)
-          .token(timeout: const Duration(seconds: 30));
-
-      expect(result, isNull);
-    });
-
-    test('nothing arriving within the timeout resolves to null, not a hang',
-        () async {
-      _mock((call) async => null);
-      addTearDown(() => _mock(null));
-
-      final result = await ApnsTokenChannel(isIOS: true)
-          .token(timeout: const Duration(milliseconds: 20));
-
-      expect(result, isNull);
-    });
-
-    test('a token arriving mid-probe is not dropped', () async {
-      // The native side can deliver in the gap between the getToken and
-      // getRegistrationError round trips. See ApnsTokenChannel.fetch.
-      late Future<void> deliver;
-      _mock((call) async {
-        switch (call.method) {
-          case 'getToken':
-            return null;
-          case 'getRegistrationError':
-            // Simulate the token landing while this reply is in flight.
-            deliver = TestDefaultBinaryMessengerBinding
-                .instance.defaultBinaryMessenger
-                .handlePlatformMessage(
-              _channelName,
-              const StandardMethodCodec().encodeMethodCall(
-                const MethodCall('onToken', 'abc123'),
-              ),
-              (_) {},
-            );
-            return null;
-        }
-        return null;
-      });
-      addTearDown(() => _mock(null));
-
-      final channel = ApnsTokenChannel(isIOS: true);
-      final token = await channel.token(
-        timeout: const Duration(milliseconds: 300),
-      );
-      await deliver;
-      expect(token, 'abc123');
-    });
-  });
-
   group('ApnsTokenChannel.fetch', () {
     test('not iOS is ApnsUnsupported, without touching the channel', () async {
       var touched = false;
@@ -180,6 +94,40 @@ void main() {
       final result = await ApnsTokenChannel(isIOS: true).fetch();
 
       expect(result, isA<ApnsTokenPending>());
+    });
+
+    test('a token arriving mid-probe is not dropped', () async {
+      // The native side can deliver in the gap between the getToken and
+      // getRegistrationError round trips. See ApnsTokenChannel.fetch.
+      late Future<void> deliver;
+      _mock((call) async {
+        switch (call.method) {
+          case 'getToken':
+            return null;
+          case 'getRegistrationError':
+            // Simulate the token landing while this reply is in flight.
+            deliver = TestDefaultBinaryMessengerBinding
+                .instance.defaultBinaryMessenger
+                .handlePlatformMessage(
+              _channelName,
+              const StandardMethodCodec().encodeMethodCall(
+                const MethodCall('onToken', 'abc123'),
+              ),
+              (_) {},
+            );
+            return null;
+        }
+        return null;
+      });
+      addTearDown(() => _mock(null));
+
+      final channel = ApnsTokenChannel(isIOS: true);
+      final result = await channel.fetch(
+        timeout: const Duration(milliseconds: 300),
+      );
+      await deliver;
+      expect(result, isA<ApnsTokenReady>());
+      expect((result as ApnsTokenReady).token, 'abc123');
     });
   });
 }

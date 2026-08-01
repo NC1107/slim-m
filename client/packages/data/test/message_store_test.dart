@@ -30,6 +30,17 @@ api.Message _message({
       editedAt: editedAt,
     );
 
+/// The cursor lives on the channel row itself; there is no dedicated reader.
+Future<int> _cursorOf(MessageStore store, String channelId) async {
+  final channels = await store.allChannels();
+  return channels.firstWhere((c) => c.id == channelId).cursor;
+}
+
+Future<int> _lastReadSeqOf(MessageStore store, String channelId) async {
+  final channels = await store.allChannels();
+  return channels.firstWhere((c) => c.id == channelId).lastReadSeq;
+}
+
 void main() {
   late SlimmDatabase db;
   late MessageStore store;
@@ -85,19 +96,19 @@ void main() {
   test('the cursor only ever moves forward', () async {
     await store.applyMessage(_message(id: 'm1', seq: 1));
     await store.applyMessage(_message(id: 'm3', seq: 3));
-    expect(await store.cursorFor('chan-1'), 3);
+    expect(await _cursorOf(store, 'chan-1'), 3);
 
     // Backfilling an older message must not rewind the resume point.
     await store.applyMessage(_message(id: 'm2', seq: 2));
-    expect(await store.cursorFor('chan-1'), 3);
+    expect(await _cursorOf(store, 'chan-1'), 3);
   });
 
   test('cursors are per channel', () async {
     await store.applyMessage(_message(id: 'a', channelId: 'chan-1', seq: 7));
     await store.applyMessage(_message(id: 'b', channelId: 'chan-2', seq: 2));
 
-    expect(await store.cursorFor('chan-1'), 7);
-    expect(await store.cursorFor('chan-2'), 2);
+    expect(await _cursorOf(store, 'chan-1'), 7);
+    expect(await _cursorOf(store, 'chan-2'), 2);
 
     final cursors = await store.allCursors();
     expect(cursors.map((c) => '${c.channelId}:${c.afterSeq}').toSet(),
@@ -145,31 +156,13 @@ void main() {
     expect(await store.watchChannel('chan-1').first, isEmpty);
   });
 
-  test('unread is derived from the read marker', () async {
-    await store.applyMessages([
-      _message(id: 'm1', seq: 1),
-      _message(id: 'm2', seq: 2),
-      _message(id: 'm3', seq: 3),
-    ]);
-    expect(await store.unreadCount('chan-1'), 3);
-
+  test('the read marker only ever moves forward', () async {
     await store.setReadMarker('chan-1', 2);
-    expect(await store.unreadCount('chan-1'), 1);
+    expect(await _lastReadSeqOf(store, 'chan-1'), 2);
 
-    // The marker is monotonic, so a stale read receipt cannot resurrect unreads.
+    // A stale read receipt must not rewind the marker back below it.
     await store.setReadMarker('chan-1', 1);
-    expect(await store.unreadCount('chan-1'), 1);
-  });
-
-  test('a pending send is not counted as unread', () async {
-    await store.addPending(
-      id: 'local-1',
-      channelId: 'chan-1',
-      authorId: 'user-1',
-      content: 'mine',
-    );
-    // The user's own unsent message is not something they have yet to read.
-    expect(await store.unreadCount('chan-1'), 0);
+    expect(await _lastReadSeqOf(store, 'chan-1'), 2);
   });
 
   test('reset clears the channel but keeps unsent work', () async {
@@ -189,7 +182,7 @@ void main() {
     final rows = await store.watchChannel('chan-1').first;
     expect(rows, hasLength(1));
     expect(rows.single.id, 'local-1', reason: 'the unsent message survives');
-    expect(await store.cursorFor('chan-1'), 0,
+    expect(await _cursorOf(store, 'chan-1'), 0,
         reason: 'refetch from the start');
   });
 
@@ -230,7 +223,6 @@ void main() {
         reason: 'every channel goes, not just the one on screen');
     expect(await store.watchChannels().first, isEmpty,
         reason: 'the channel list itself leaks which server this was');
-    expect(await store.cursorFor('chan-1'), 0);
   });
 
   test('out-of-order arrival still reads back in seq order', () async {
@@ -252,7 +244,7 @@ void main() {
           id: 'chan-1', name: 'general-renamed', kind: 'text', createdAt: 1),
     ]);
 
-    expect(await store.cursorFor('chan-1'), 9);
+    expect(await _cursorOf(store, 'chan-1'), 9);
     final channels = await store.watchChannels().first;
     final channel = channels.firstWhere((c) => c.id == 'chan-1');
     expect(channel.name, 'general-renamed');
@@ -300,7 +292,7 @@ void main() {
 
     final channels = await store.watchChannels().first;
     expect(channels.map((c) => c.id), unorderedEquals(['chan-1', 'chan-3']));
-    expect(await store.cursorFor('chan-1'), 9,
+    expect(await _cursorOf(store, 'chan-1'), 9,
         reason: 'a channel that stays keeps its cursor');
     expect(channels.firstWhere((c) => c.id == 'chan-1').lastReadSeq, 5,
         reason: 'and its read marker');

@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-/// A small label chip: an unread count, a member role, a bot tag, or a
-/// stale-ness warning.
+/// A small label chip: a member role, a bot tag, or a stale-ness warning.
 ///
-/// Only [AppBadgeVariant.count] is filled; the other three are outlined and
-/// unfilled, each with its own letter-spacing (0.06/0.08/0.05em for
-/// role/tag/warn). [AppBadgeVariant.role] is not per-role-coloured: the
-/// source design styles it from the accent, the same for every role, so a
-/// caller cannot recolour it per role even though real role data usually
-/// carries one. Ported as specified rather than "improved" with a colour
-/// parameter the design does not have.
+/// All three are outlined and unfilled, each with its own letter-spacing
+/// (0.06/0.08/0.05em for role/tag/warn). [AppBadgeVariant.role] is not
+/// per-role-coloured: the source design styles it from the accent, the same
+/// for every role, so a caller cannot recolour it per role even though real
+/// role data usually carries one. Ported as specified rather than "improved"
+/// with a colour parameter the design does not have.
 ///
 /// The source design sets role/tag/warn at a literal 10px, a step the six-size
 /// type scale (11/12/14/15/20/24) does not have; [AppText.micro] (11px) is the
-/// nearest and is used for all four rather than a one-off.
+/// nearest and is used for all three rather than a one-off.
 library;
 
 import 'package:flutter/material.dart';
@@ -21,7 +19,7 @@ import '../../app_metrics.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
 
-enum AppBadgeVariant { count, role, tag, warn }
+enum AppBadgeVariant { role, tag, warn }
 
 class AppBadge extends StatelessWidget {
   const AppBadge(
@@ -30,15 +28,6 @@ class AppBadge extends StatelessWidget {
       required this.label,
       this.icon,
       this.semanticLabel});
-
-  /// Convenience for the unread-count case: caps a large count rather than
-  /// growing the pill to fit an arbitrarily wide number.
-  factory AppBadge.count(int count, {Key? key, int max = 99}) {
-    return AppBadge(
-        key: key,
-        variant: AppBadgeVariant.count,
-        label: count > max ? '$max+' : '$count');
-  }
 
   final AppBadgeVariant variant;
   final String label;
@@ -53,11 +42,11 @@ class AppBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
-    // One size for all four variants, not the source's literal 10px, which the
-    // type scale has no step for. See the library doc at the top of the file.
+    // One size for all three variants, not the source's literal 10px, which
+    // the type scale has no step for. See the library doc at the top of the
+    // file.
     final fontSize = AppText.micro.fontSize!;
 
-    final Color? background;
     final Color foreground;
     final Color border;
     final String text;
@@ -65,26 +54,17 @@ class AppBadge extends StatelessWidget {
     var tabularNumerals = false;
 
     switch (variant) {
-      case AppBadgeVariant.count:
-        background = tokens.accentFill;
-        foreground = tokens.accentOn;
-        border = tokens.accentFill;
-        text = label;
-        tabularNumerals = true;
       case AppBadgeVariant.role:
-        background = null;
         foreground = tokens.accent;
         border = tokens.accentFill;
         text = label.toUpperCase();
         letterSpacing = fontSize * 0.06;
       case AppBadgeVariant.tag:
-        background = null;
         foreground = tokens.textSecondary;
         border = tokens.borderSubtle;
         text = label.toUpperCase();
         letterSpacing = fontSize * 0.08;
       case AppBadgeVariant.warn:
-        background = null;
         foreground = tokens.warnText;
         border = tokens.warnText;
         text = label.toUpperCase();
@@ -113,28 +93,14 @@ class AppBadge extends StatelessWidget {
       ],
     );
 
-    final Widget badge;
-    if (variant == AppBadgeVariant.count) {
-      badge = Container(
-        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-        padding: const EdgeInsets.symmetric(horizontal: 5),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(AppRadii.full)),
-        child: child,
-      );
-    } else {
-      badge = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-        decoration: BoxDecoration(
-          color: background,
-          border: Border.all(color: border),
-          borderRadius: BorderRadius.circular(AppRadii.control),
-        ),
-        child: child,
-      );
-    }
+    final badge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        border: Border.all(color: border),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: child,
+    );
 
     // Without ExcludeSemantics, the inner Text's own auto-generated label
     // merges with the explicit one below into a doubled announcement.
