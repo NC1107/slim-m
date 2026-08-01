@@ -349,6 +349,10 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   );
                                 }
                                 return MessageTranscript(
+                                  selfId: ref
+                                      .read(sessionProvider)
+                                      .tokens
+                                      ?.userId,
                                   messages: transcript.messages,
                                   syncStatus: syncStatus,
                                   // Only a real named channel gets the header; a DM's name is a person, and voice never reaches here.
