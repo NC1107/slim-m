@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.21.3](https://github.com/NC1107/slim-m/compare/client-v0.21.2...client-v0.21.3) (2026-08-01)
+
+
+### Bug Fixes
+
+* **client:** make saving a message edit reachable on a phone ([#298](https://github.com/NC1107/slim-m/issues/298)) ([a15164e](https://github.com/NC1107/slim-m/commit/a15164e0f22e4fef757e6fdc51b25fba9718a0ed))
+* **client:** mobile sheets no longer nest a floating AppMenu card ([#297](https://github.com/NC1107/slim-m/issues/297)) ([f2faae5](https://github.com/NC1107/slim-m/commit/f2faae52deb5d4228936b7609f8831f5ab9c6c24))
+* **ios:** stop the paste bridge referencing a class the engine does not export ([#295](https://github.com/NC1107/slim-m/issues/295)) ([c76cc93](https://github.com/NC1107/slim-m/commit/c76cc93340213bf83c441eb771d382ed55f88ab8))
+
 ## [0.21.2](https://github.com/NC1107/slim-m/compare/client-v0.21.1...client-v0.21.2) (2026-08-01)
 
 
