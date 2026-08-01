@@ -86,7 +86,17 @@ What none of that proves is the thing the feature exists for: edit a message on 
 
 *Question:* worth growing the e2e harness to close and reopen one client mid-run, or is confirming it by hand across your own two devices enough?
 
-## 9. The client release PR is stuck, and the fix is a merge rather than a repair
+## 9. ~~The client release PR is stuck~~ (closed 2026-08-01, and the diagnosis held exactly)
+
+**Closed.** Client **0.18.0** is released and on TestFlight.
+The fix was the one predicted below and nothing else: merging a client-affecting change ([#259](https://github.com/NC1107/slim-m/pull/259)) made release-please regenerate the standing PR, which went from `CONFLICTING` to `MERGEABLE` within about two minutes and merged cleanly, with no generated file touched by hand.
+The reconciliation work is now on your devices as well as the server.
+
+The *question* at the end is still live, and is now better informed: this recurred twice in two days.
+If it happens a third time the manual tag-based flow in section 6 is worth taking seriously rather than waiting it out again.
+
+The original entry follows, kept because the reasoning is what made the fix predictable rather than lucky.
+
 
 Server 0.21.0 is released and deployed; the live instance reports it, so migration 0027 has run against production.
 
@@ -167,6 +177,9 @@ It keeps the deploy decision human while losing almost nothing, since merging a 
 That is what silently skipped the iOS build for client 0.17.0 on 2026-07-31: merges in quick succession cancelled the in-flight iOS check, the release gate read the cancellation as failure, and `ios-testflight` was skipped while the tag, the GitHub release and the changelog all looked perfectly correct.
 
 #249 fixed the cause - the four release-gating workflows no longer cancel each other on main - so this path should now be unreachable.
+**Confirmed on client 0.18.0 (2026-08-01):** `ios-testflight`, `android-client`, `linux-client` and `copr` all ran and all succeeded, on a release cut minutes after several merges in quick succession, which is the exact shape that broke 0.17.0.
+Worth saying how that was confirmed, since the failure mode is invisible: the release run's individual job conclusions were read, rather than the release being trusted because it was green.
+A release with a skipped store build is green.
 The behaviour on the day it *is* reachable again is still the same, though, and the symptom is again a store build that quietly never arrives rather than a red release anybody would notice.
 
 *Question:* should it re-run the cancelled check and keep waiting, or keep failing fast?
