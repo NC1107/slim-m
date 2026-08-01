@@ -33,6 +33,7 @@ class MessageTranscript extends StatefulWidget {
     super.key,
     required this.messages,
     required this.syncStatus,
+    required this.historyKnown,
     this.channelName,
     this.channelTopic,
     required this.scrollController,
@@ -62,6 +63,12 @@ class MessageTranscript extends StatefulWidget {
 
   /// Read only to tell an empty channel from one that has not caught up.
   final SyncStatus syncStatus;
+
+  /// Whether this session's first catch-up round has completed, independent
+  /// of whether the live socket ever attaches afterward. See [isNewDay]:
+  /// this is what stops an optimistic send racing that first catch-up from
+  /// briefly anchoring a day divider it does not really own.
+  final bool historyKnown;
 
   /// The channel's name and topic, for the start-of-channel header above the
   /// oldest message. Null on a surface that has no such header (a DM, whose
@@ -300,7 +307,11 @@ class _MessageTranscriptState extends State<MessageTranscript> {
           final index = messages.length - 1 - i;
           final message = messages[index];
           final previous = index == 0 ? null : messages[index - 1];
-          final newDay = isNewDay(message, previous);
+          final newDay = isNewDay(
+            message,
+            previous,
+            historyKnown: widget.historyKnown,
+          );
           final row = MessageRowExtras(
             // By message, not by slot: an arrival shifts every index by one.
             key: ValueKey(message.id),
@@ -390,9 +401,23 @@ bool startsUnread(
 /// True when this message falls on a different calendar day than the one above
 /// it, so a day divider lands exactly once at each day boundary. The oldest
 /// loaded message ([previous] null) also counts, anchoring the top of the
-/// transcript with the day it began.
-bool isNewDay(Message message, Message? previous) {
-  if (previous == null) return true;
+/// transcript with the day it began - but only once [historyKnown] confirms
+/// this channel's initial catch-up has actually run at least once.
+///
+/// Without that gate, an optimistic send made before catch-up completes is
+/// briefly the sole loaded row purely because nothing else has landed yet,
+/// not because it is really first: catch-up then lands with an earlier
+/// same-day message, and the divider that had anchored the sent message
+/// flashes onto it and is removed (docs/BACKLOG.md, "sending a message
+/// flashes a day divider"). This can happen whether or not the sent message
+/// itself is still pending: the send's own round trip is often faster than
+/// the (multi-request) catch-up it happens to race.
+bool isNewDay(
+  Message message,
+  Message? previous, {
+  required bool historyKnown,
+}) {
+  if (previous == null) return historyKnown;
   final a = DateTime.fromMillisecondsSinceEpoch(previous.createdAt);
   final b = DateTime.fromMillisecondsSinceEpoch(message.createdAt);
   return a.year != b.year || a.month != b.month || a.day != b.day;
