@@ -20,6 +20,7 @@ import '../providers/sync_controller.dart';
 import 'message_context_menu.dart';
 import 'message_jump.dart';
 import 'message_row.dart';
+import 'transcript_selection.dart';
 import 'message_row_identity.dart';
 import 'message_transcript_widgets.dart';
 
@@ -286,68 +287,70 @@ class _MessageTranscriptState extends State<MessageTranscript> {
     _hydrated = true;
 
     // Reversed so a short conversation sits against the composer; the start header rides one past the oldest message, which reverse puts at the top.
-    return ListView.builder(
-      controller: widget.scrollController,
-      reverse: true,
-      padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-      itemCount: messages.length + (start != null ? 1 : 0),
-      itemBuilder: (context, i) {
-        if (start != null && i == messages.length) return start;
-        // Index 0 is the newest; `previous` stays the row visually above,
-        // so grouping still reads right.
-        final index = messages.length - 1 - i;
-        final message = messages[index];
-        final previous = index == 0 ? null : messages[index - 1];
-        final newDay = isNewDay(message, previous);
-        final row = MessageRowExtras(
-          // By message, not by slot: an arrival shifts every index by one.
-          key: ValueKey(message.id),
-          messageId: message.id,
-          builder: (extras) => MessageRow(
-            message: message,
-            // A new day breaks a group so a continuation across midnight regains its avatar and header.
-            grouped: isGrouped(message, previous) && !newDay,
-            showNewDivider: startsUnread(
-              message,
-              previous,
-              widget.lastReadSeq,
-              widget.selfId,
+    return TranscriptSelection(
+      child: ListView.builder(
+        controller: widget.scrollController,
+        reverse: true,
+        padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+        itemCount: messages.length + (start != null ? 1 : 0),
+        itemBuilder: (context, i) {
+          if (start != null && i == messages.length) return start;
+          // Index 0 is the newest; `previous` stays the row visually above,
+          // so grouping still reads right.
+          final index = messages.length - 1 - i;
+          final message = messages[index];
+          final previous = index == 0 ? null : messages[index - 1];
+          final newDay = isNewDay(message, previous);
+          final row = MessageRowExtras(
+            // By message, not by slot: an arrival shifts every index by one.
+            key: ValueKey(message.id),
+            messageId: message.id,
+            builder: (extras) => MessageRow(
+              message: message,
+              // A new day breaks a group so a continuation across midnight regains its avatar and header.
+              grouped: isGrouped(message, previous) && !newDay,
+              showNewDivider: startsUnread(
+                message,
+                previous,
+                widget.lastReadSeq,
+                widget.selfId,
+              ),
+              dayLabel: newDay ? formatMessageDay(message.createdAt) : null,
+              knownUsernames: widget.knownUsernames,
+              customEmoji: widget.customEmoji,
+              onRetry: () => widget.onRetry(message),
+              onDiscard: () => widget.onDiscard(message),
+              onEditFailed: widget.onEditFailed == null
+                  ? null
+                  : () => widget.onEditFailed!(message),
+              onPickReaction: (emoji) => widget.onPickReaction(message, emoji),
+              onReactionTap: (reaction) =>
+                  widget.onReactionTap(message, reaction),
+              onVote: (option) => widget.onVote(message, option),
+              reactions: extras.reactions,
+              attachments: extras.attachments,
+              poll: extras.poll,
+              editing: message.id == widget.editingId,
+              onSubmitEdit: (content) => widget.onSubmitEdit(message, content),
+              onCancelEdit: widget.onCancelEdit,
+              actions: widget.actionsFor(message),
             ),
-            dayLabel: newDay ? formatMessageDay(message.createdAt) : null,
-            knownUsernames: widget.knownUsernames,
-            customEmoji: widget.customEmoji,
-            onRetry: () => widget.onRetry(message),
-            onDiscard: () => widget.onDiscard(message),
-            onEditFailed: widget.onEditFailed == null
-                ? null
-                : () => widget.onEditFailed!(message),
-            onPickReaction: (emoji) => widget.onPickReaction(message, emoji),
-            onReactionTap: (reaction) =>
-                widget.onReactionTap(message, reaction),
-            onVote: (option) => widget.onVote(message, option),
-            reactions: extras.reactions,
-            attachments: extras.attachments,
-            poll: extras.poll,
-            editing: message.id == widget.editingId,
-            onSubmitEdit: (content) => widget.onSubmitEdit(message, content),
-            onCancelEdit: widget.onCancelEdit,
-            actions: widget.actionsFor(message),
-          ),
-        );
-        final content = message.id == widget.jumpTargetId
-            ? MessageJumpHighlight(
-                key: ValueKey('jump-${widget.jumpToken}'),
-                onArrived: widget.onJumpArrived ?? () {},
-                child: row,
-              )
-            : row;
-        if (i != 0) return content;
-        return MessageEntrance(
-          key: ValueKey('entrance-$newestId'),
-          animateOnMount: animateNewest,
-          child: content,
-        );
-      },
+          );
+          final content = message.id == widget.jumpTargetId
+              ? MessageJumpHighlight(
+                  key: ValueKey('jump-${widget.jumpToken}'),
+                  onArrived: widget.onJumpArrived ?? () {},
+                  child: row,
+                )
+              : row;
+          if (i != 0) return content;
+          return MessageEntrance(
+            key: ValueKey('entrance-$newestId'),
+            animateOnMount: animateNewest,
+            child: content,
+          );
+        },
+      ),
     );
   }
 }

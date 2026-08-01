@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: Apache-2.0
+/// Dragging across message text to select part of it, on the platforms where
+/// that gesture is not already spoken for.
+///
+/// Copying a whole message has always been in the context menu. What was
+/// missing is selecting *within* one, or across two, which is the only way to
+/// quote a sentence out of a paragraph.
+///
+/// **Touch platforms are deliberately excluded, and that is the whole design
+/// of this file.** A long press on a phone raises the message action sheet,
+/// which the owner asked for specifically and which shipped in 0.18.0.
+/// `SelectionArea` claims that same gesture for selection, so enabling it
+/// everywhere would trade a feature somebody asked for against one nobody
+/// did. On desktop the context menu is on right-click, so the press gesture
+/// is genuinely free.
+///
+/// The platform is the right question rather than the window width: a narrow
+/// desktop window still has a mouse, and a tablet in a wide layout still has
+/// no right button.
+library;
+
+import 'package:flutter/material.dart';
+
+/// True where a press-and-drag is not already the context-menu gesture.
+bool supportsTextSelection(TargetPlatform platform) =>
+    platform != TargetPlatform.iOS && platform != TargetPlatform.android;
+
+/// Wraps [child] in a [SelectionArea] on the platforms that can take one, and
+/// returns it untouched on the platforms that cannot.
+class TranscriptSelection extends StatelessWidget {
+  const TranscriptSelection({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!supportsTextSelection(Theme.of(context).platform)) return child;
+    return SelectionArea(child: child);
+  }
+}

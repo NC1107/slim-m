@@ -145,6 +145,12 @@ const List<WhatsNewEntry> whatsNewEntries = [
         'If a reorder cannot be saved, the sidebar says so and lets you '
         'retry rather than quietly snapping back with no explanation.',
       ),
+      WhatsNewPoint(
+        'On a computer you can drag across message text to select part of '
+        'it, or several messages at once. On a phone a long press still '
+        'opens the message actions, which is what that gesture is for '
+        'there.',
+      ),
     ],
   ),
 ];
