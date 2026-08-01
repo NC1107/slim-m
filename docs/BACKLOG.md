@@ -90,11 +90,13 @@ Grouped by what they are rather than by where they were said, because three of t
 
 ### The message row
 
-- **Rows bounce on hover.** Diagnosed 2026-07-31, so the next pass need not re-find it: `ReactionsRow.build` (`client/packages/app/lib/src/widgets/message_row_parts.dart:83`) returns `SizedBox.shrink()` when a message has no reactions and is not hovered. Hovering therefore swaps absent-to-present rather than hidden-to-visible, and the row grows by the button's height, pushing everything below it.
+- ~~**Rows bounce on hover.**~~ Fixed in #251, released in client 0.18.0. The hover cluster is a `Positioned` child of a `Stack` in `MessageRow` now, so revealing it cannot reflow the transcript, and `message_row_hover_stability_test.dart` measures the row's height rather than inspecting the widget tree - asserting the button sits in a `Stack` would pass just as well if somebody put it back inside the `Column` within one.
+  The original diagnosis, kept because the reasoning it replaced is worth not re-deriving: `ReactionsRow.build` need not re-find it: `ReactionsRow.build` (`client/packages/app/lib/src/widgets/message_row_parts.dart:83`) returns `SizedBox.shrink()` when a message has no reactions and is not hovered. Hovering therefore swaps absent-to-present rather than hidden-to-visible, and the row grows by the button's height, pushing everything below it.
   The current doc comment directly above that line argues for exactly this behaviour ("a permanent add-button under every message costs a row of vertical space each ... so the affordance belongs on hover with the row absent until then"). That reasoning is sound about the cost it names and is what produced the bounce, so the fix has to replace the argument rather than just the line: reserving the space instead would restore the very cost it avoids.
   The shape to copy is Discord's, which the owner named: a floating action cluster pinned top-right, in a `Stack`/`Positioned` inside `MessageRow` (the `builder: (context, hovered)` at `message_row.dart:144` already has the hover state), so it overlays rather than participating in layout. `ReactionsRow` then stops taking `showAddButton` entirely and renders only real reactions.
   Doing this also puts the affordance where the other two message-row items want to live, which is why these three should be one change rather than three.
-- **"as messages get long, the icons stay centered, they should align with the top of the text box like discord does"** - needs one word of clarification before anyone changes code, because the obvious reading does not survive checking.
+- ~~**"as messages get long, the icons stay centered, they should align with the top of the text box like discord does"**~~ Settled 2026-07-31, and it turned out to be a third reading neither of the two below: the owner meant the **composer**'s own action icons, which sat centred against a growing input so they drifted down the screen as a message got longer. `composer.dart`'s action row is `CrossAxisAlignment.start` now. Released in client 0.18.0.
+  The two readings that were recorded at the time, kept because the ambiguity is the point: this needed one word of clarification before anyone changes code, because the obvious reading does not survive checking.
   The *author avatar* is already top-aligned: `MessageRowLeading` (`client/packages/app/lib/src/widgets/message_row_identity.dart:109`) renders a fixed `_avatarSize` box, inside a `Row` that is already `crossAxisAlignment: CrossAxisAlignment.start` (`message_row.dart:181`). A long message does not centre it, so if that is what was meant, the bug is somewhere else and needs a screenshot.
   The likelier reading is the **hover action icons**, which is the same surface as the hover-reflow item above and would be fixed by the same overlay. Fixing that one is safe either way.
   Recorded rather than guessed at, because the two readings want opposite changes and shipping the wrong one is worse than asking.
@@ -103,18 +105,18 @@ Grouped by what they are rather than by where they were said, because three of t
 ### Composing
 
 - **No markdown or list formatting in any text field.** No way to type a list at all.
-- **Ctrl+V does not attach an image.** Pasting an image does nothing; it has to go through the file picker.
+- ~~**Ctrl+V does not attach an image.**~~ Fixed in #256, released in client 0.18.0, and honestly bounded rather than claimed closed: Flutter's own `ClipboardData` carries only `text` and its source says plain text is the only supported variant, so there is no cross-platform clipboard image to read. The web build hooks the browser's `paste` event, which hands over the bytes and needs no permission prompt (unlike `navigator.clipboard.read`). On desktop and mobile the file picker is still the only route, and the what's-new entry says so rather than implying otherwise.
 
 ### The rail and DMs
 
-- **"Notes to self" is treated as a channel under the hood and should be a DM.** It reads wrong in the list because of it.
-- **The DM section is wordy**: "Notes to self" followed by "No other direct messages yet ..." as a list entry.
-- **No way to reorganise, move or collapse channels in the sidebar**, and no way to collapse the left sidebar entirely to gain channel real estate.
+- ~~**"Notes to self" is treated as a channel under the hood and should be a DM.**~~ Fixed in #256, released in client 0.18.0. It renders as an ordinary DM titled **You** now, with its own kebab menu carrying a hide action; hiding it is a local preference rather than a delete, and searching your own name brings it back, which the empty state says in words so the route back is discoverable rather than folklore.
+- ~~**The DM section is wordy**~~ Fixed in #243.
+- **No way to reorganise or move channels in the sidebar.** ~~and no way to collapse the left sidebar entirely~~ - the collapse half shipped in #256 (client 0.18.0). Reordering is still open, and note it is a full-stack question rather than a client one: nothing in the schema orders channels, so it needs either a `position` column and a route, or a deliberate decision that ordering is a per-device preference.
 
 ### Voice and canvas
 
 - **The voice lobby screen has no purpose.** Owner's standing view, repeated: the join-preview screen is not earning its place.
-- **The pins button is styled differently from its neighbours** and carries a counter. It should be the same icon treatment as the rest, with no count.
+- ~~**The pins button is styled differently from its neighbours**~~ Fixed in #242.
 - **No background blur or replacement on camera**, which Discord has and which the owner calls "kindve a required feature" rather than a nice-to-have. Worth treating as a camera-launch blocker rather than polish: people will not turn a camera on in their own home without it. Note this is a real engineering item, not a setting - it needs a segmentation model running per frame on the local track before publish, so it lands with the camera work rather than after it.
 
 ### One open product question, not a task
@@ -128,8 +130,9 @@ This is a product decision with real schema consequences - `canvas_objects` is c
 
 ### A second round, 2026-07-31
 
-- **A what's-new screen on update.** "need an update screen so whenever we update we know whats new". Nothing tells anyone what changed; the release notes exist only on GitHub. Worth noting this interacts with the drift v7 cache wipe already shipped - the first launch after an update refetches the transcript, which currently looks like data loss with nothing on screen to say otherwise.
-- **On mobile, the context menu should slide up from the bottom rather than float.** Owner prefers Discord's shape: a long press raises a bottom sheet, not a positioned overlay near the finger. `ContextMenuRegion` currently uses an `OverlayPortal` follower for both pointer and touch; the compact layout should branch to a sheet. Note `ContextMenuKeyboardScope` and `ContextMenuFocus` exist for the desktop path and should stay untouched.
+- ~~**A what's-new screen on update.**~~ Fixed in #256 and #259, released in client 0.18.0. It carries one known weakness worth stating rather than discovering: nothing forces a contributor to add an entry, so a release can ship user-facing changes and show none of them. That caught us on the very first one - #256 shipped the screen with entries stopping at 0.17.2, so the first build ever to carry it would have had nothing to say about itself, and #259 was the fix.
+- ~~**On mobile, the context menu should slide up from the bottom rather than float.**~~ Fixed in #256, released in client 0.18.0. The desktop path keeps its positioned overlay, its keyboard scope and its focus handling untouched, exactly as this entry asked.
+  One trap found on the way, worth keeping: this entry named `ContextMenuRegion` as the widget to branch, and a first pass built the sheet there - on a widget nothing renders. The message rows go through `MessageContextMenuRegion`, and `ContextMenuRegion` had no call sites at all, so its own test suite passed while covering code that never ran. It is deleted now.
 - **Sending a message flashes a day divider.** "on sending a message it immediately puts a divider bar like the --today-- one and then deletes it."
   Partially diagnosed 2026-07-31, not fixed, because the obvious mechanisms did not survive checking. `isNewDay` (`message_transcript.dart:280`) returns true whenever `previous == null`, so the oldest row in the window always carries a divider - but `watchChannel` windows at 200 and only evicts at that size, so an insert does not change which row is oldest in a shorter channel. The optimistic row's ordering (`seq = 0` sorted first, then reversed to last) is also stable across the insert.
   What is left, and wants reproducing rather than guessing: whether the drift query stream emits an intermediate row set during the optimistic insert or the server-copy replacement, in which the sent message briefly has no predecessor. A speculative fix here would be a change to divider logic that is not the bug.
