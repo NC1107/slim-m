@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.0](https://github.com/NC1107/slim-m/compare/client-v0.19.0...client-v0.20.0) (2026-08-01)
+
+
+### Features
+
+* **client:** jump to message from search, pins and the command palette ([#273](https://github.com/NC1107/slim-m/issues/273)) ([72f1a36](https://github.com/NC1107/slim-m/commit/72f1a36de0c12243a38a41f8e7d931f5780ba21d))
+* drag to reorder channels, ordered deployment-wide ([#271](https://github.com/NC1107/slim-m/issues/271)) ([753b3d4](https://github.com/NC1107/slim-m/commit/753b3d4521908186ffe811dda712993fe20ed1aa))
+
 ## [0.19.0](https://github.com/NC1107/slim-m/compare/client-v0.18.0...client-v0.19.0) (2026-08-01)
 
 
