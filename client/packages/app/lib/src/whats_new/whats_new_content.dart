@@ -216,8 +216,14 @@ const List<WhatsNewEntry> whatsNewEntries = [
   ),
   WhatsNewEntry(
     version: '0.21.3',
-    headline: 'The mobile sheets that pick a setting or an action are fixed',
+    headline: 'Fixes from using the app on a phone',
     points: [
+      WhatsNewPoint(
+        'Save and Cancel used to overflow off the edge of a phone screen '
+        'while editing, leaving no way to finish or back out of an edit. '
+        'Both are reachable now, and a hardware keyboard\'s Enter and '
+        'Escape shortcuts still work exactly as before.',
+      ),
       WhatsNewPoint(
         'The message context menu, who can join, and the role granted on '
         'an invite all opened as a narrow floating card nested inside the '

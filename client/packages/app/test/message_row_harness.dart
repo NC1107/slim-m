@@ -60,9 +60,20 @@ const noActions = MessageActions(
 /// nothing avatar-related; the default, unauthenticated apiProvider fails
 /// fast on that lookup and the row falls back to initials, same as a real
 /// signed-out state would.
-Widget harness(Widget child) => ProviderScope(
+///
+/// [platform] defaults to null, which leaves `ThemeData`'s own default in
+/// place (`TargetPlatform.android` under `flutter_test`) - already a soft
+/// keyboard, so most callers exercise the phone path without asking for it.
+/// A test asserting the hardware-keyboard path passes a desktop platform
+/// explicitly, the way `composer_harness.dart` already does.
+Widget harness(Widget child, {TargetPlatform? platform}) => ProviderScope(
   child: MaterialApp(
-    theme: buildTheme(Brightness.light, AppTokens.light),
+    theme: platform == null
+        ? buildTheme(Brightness.light, AppTokens.light)
+        : buildTheme(
+            Brightness.light,
+            AppTokens.light,
+          ).copyWith(platform: platform),
     home: Scaffold(body: child),
   ),
 );
