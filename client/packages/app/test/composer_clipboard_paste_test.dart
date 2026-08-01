@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The composer's "Paste image" row end to end: whether it appears, what
-/// tapping it stages, what a platform read failure shows, and that it steps
-/// aside once `ClipboardPasteBridge.m`'s edit-menu swizzle is confirmed live
-/// so it never becomes a redundant, prompt-every-time duplicate of the
-/// native route.
+/// tapping it stages, what a platform read failure shows, and that
+/// `ClipboardPasteBridge.m`'s edit-menu swizzle installing successfully
+/// never hides it - that signal was found 2026-08-01 not to prove the menu
+/// item it targets actually appears, and withdrawing the row on it left no
+/// way to paste an image at all. See `composer_clipboard_paste.dart`'s doc
+/// comment.
 ///
 /// Driven at the same `top.npcserver.slimm/clipboard_image` method channel
 /// `composer_clipboard_image_test.dart` proves at the seam level, so the
@@ -75,29 +77,28 @@ void main() {
     expect(find.text('Paste image'), findsNothing);
   });
 
-  testWidgets(
-    'the row is absent when the edit-menu swizzle is confirmed live, even '
-    'though the clipboard holds an image',
-    (tester) async {
-      _useTouchViewport(tester);
-      _mock((call) async {
-        if (call.method == 'editMenuPasteAvailable') return true;
-        if (call.method == 'hasImage') return true;
-        return null;
-      });
+  testWidgets('the row still appears when the edit-menu swizzle is confirmed '
+      'installed - that is not evidence the native menu offers Paste, and '
+      'must never withdraw the only working route (regression guard, '
+      '2026-08-01)', (tester) async {
+    _useTouchViewport(tester);
+    _mock((call) async {
+      if (call.method == 'editMenuPasteSwizzleInstalled') return true;
+      if (call.method == 'hasImage') return true;
+      return null;
+    });
 
-      await tester.pumpWidget(
-        composerHarness(
-          controller: controller,
-          sends: sends,
-          platform: TargetPlatform.iOS,
-        ),
-      );
-      await _openActionsSheet(tester);
+    await tester.pumpWidget(
+      composerHarness(
+        controller: controller,
+        sends: sends,
+        platform: TargetPlatform.iOS,
+      ),
+    );
+    await _openActionsSheet(tester);
 
-      expect(find.text('Paste image'), findsNothing);
-    },
-  );
+    expect(find.text('Paste image'), findsOneWidget);
+  });
 
   testWidgets(
     'the row appears when the clipboard holds an image, and stages it like '

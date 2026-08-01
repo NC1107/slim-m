@@ -19,17 +19,22 @@ import UIKit
 /// once per install as first assumed; see `ClipboardPasteBridge.m` for the
 /// route that does not prompt at all.
 ///
-/// `editMenuPasteAvailable` reports whether `ClipboardPasteBridge.m`'s
-/// swizzle actually installed. The composer prefers that route and only
-/// falls back to this poll-and-tap one when it did not - either because a
-/// future Flutter engine upgrade renamed the class or selectors it depends
-/// on, or on Android, which has no such swizzle at all.
+/// `editMenuPasteSwizzleInstalled` reports only whether
+/// `ClipboardPasteBridge.m`'s swizzle installed on the native side - not
+/// whether the system edit menu it targets actually offers Paste for an
+/// image. Confirmed on a real device 2026-08-01 that those are different
+/// claims: this composer's plain Material `TextField` routes its menu
+/// through Flutter's `SystemContextMenu`, which decides Paste's presence in
+/// Dart before any native call, so the swizzle below is provably never
+/// consulted there regardless of this value. The "+" sheet's own row is
+/// never hidden on this signal for exactly that reason - see
+/// `composer_clipboard_paste.dart`.
 enum ClipboardImagePlugin {
   static let name = "top.npcserver.slimm/clipboard_image"
 
   /// Set once, from `AppDelegate`, to `SlimmInstallClipboardPasteBridge`'s
   /// own return value.
-  static var editMenuPasteAvailable = false
+  static var editMenuPasteSwizzleInstalled = false
 
   static func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
@@ -37,8 +42,8 @@ enum ClipboardImagePlugin {
       result(UIPasteboard.general.hasImages)
     case "readImage":
       result(UIPasteboard.general.image?.pngData())
-    case "editMenuPasteAvailable":
-      result(editMenuPasteAvailable)
+    case "editMenuPasteSwizzleInstalled":
+      result(editMenuPasteSwizzleInstalled)
     default:
       result(FlutterMethodNotImplemented)
     }

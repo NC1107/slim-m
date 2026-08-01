@@ -286,15 +286,25 @@ Waiting means a release can block for as long as the check takes (the iOS one is
 Failing fast means the release is wrong in the one way nobody sees.
 Recorded rather than chosen, because it is a trade about how long you are willing for a release to hang rather than a correctness question.
 
-## 17. iOS image paste via the edit menu needs a real device (2026-08-01)
+## 17. ~~iOS image paste via the edit menu needs a real device~~ - checked, and it does not work (2026-08-01)
 
-Client 0.21.0's "Paste image" row was built on a prediction - the "Allow Paste?" prompt appears once per install - that the owner's own iPhone disproved: it prompts on every use.
-The fix built in response swizzles Flutter's private `FlutterTextInputView` (`ClipboardPasteBridge.m`) so the long-press edit menu's own Paste item works for an image with no prompt at all, and is reasoned from the engine's own source rather than assumed - see `CLAUDE.md`'s "The image-paste prompt was never once per install" entry for the full mechanism.
+~~Client 0.21.0's "Paste image" row was built on a prediction - the "Allow Paste?" prompt appears once per install - that the owner's own iPhone disproved: it prompts on every use.~~
+~~The fix built in response swizzles Flutter's private `FlutterTextInputView` (`ClipboardPasteBridge.m`) so the long-press edit menu's own Paste item works for an image with no prompt at all, and is reasoned from the engine's own source rather than assumed - see `CLAUDE.md`'s "The image-paste prompt was never once per install" entry for the full mechanism.~~
 
-Nothing about an Objective-C method swizzle, a native pasteboard read, or the "Allow Paste?" prompt's own exemptions can be exercised in this environment, which has no iPhone.
-Two things specifically need confirming on a real device, in this order, because the second is meaningless without the first:
+The device check landed 2026-08-01, and check 1 below failed: the long-press edit menu offers "Scan text" and no Paste at all for a copied image.
+Worse, the "+" sheet's own fallback row had also been hidden on the unproven claim that the swizzle installing meant the menu worked, so there was briefly no way to paste an image at all.
+Both are fixed: the fallback row is unconditional again, and the real mechanism is traced and written up in `CLAUDE.md`'s "The edit-menu route was never reachable" entry.
+The short version: this composer's field is a plain Material `TextField`, which on iOS 16+ auto-routes its menu through Flutter's own `SystemContextMenu`, which decides Paste's presence in Dart from `Clipboard.hasStrings()` - text only - before any native call happens, so the swizzled `canPerformAction:` this relied on is never asked.
+Not an engine bug and not fixable by patching the swizzle; a real fix needs a custom `contextMenuBuilder` with its own async clipboard-image state, which is new surface this run declined to build and ship unverified rather than repeat the same mistake.
 
-1. **The menu item appears.** Copy an image (not text), long-press inside the composer's text field, and confirm Paste is offered - it would not be, pre-fix, since `canPerformAction:` answered `hasStrings` for an image-only pasteboard.
-2. **Tapping it attaches the image with no prompt.** The whole point of routing through the system's own dispatch of `paste:` rather than a Dart-triggered read.
+~~Nothing about an Objective-C method swizzle, a native pasteboard read, or the "Allow Paste?" prompt's own exemptions can be exercised in this environment, which has no iPhone.~~
+~~Two things specifically need confirming on a real device, in this order, because the second is meaningless without the first:~~
 
-*What the run did instead:* traced the exact obstacle in the checked-out Flutter engine source at `~/development/flutter/engine/src/flutter/shell/platform/darwin/ios/framework/Source/FlutterTextInputPlugin.{h,mm}` rather than assuming the class name or method signatures, wrote the swizzle to fail back to today's behaviour (log and no-op) if either selector or the class itself is not found, and covered the Dart-side contract with unit tests. None of that substitutes for the two checks above.
+~~1. **The menu item appears.** Copy an image (not text), long-press inside the composer's text field, and confirm Paste is offered - it would not be, pre-fix, since `canPerformAction:` answered `hasStrings` for an image-only pasteboard.~~
+Checked 2026-08-01: it does not appear. See above.
+~~2. **Tapping it attaches the image with no prompt.** The whole point of routing through the system's own dispatch of `paste:` rather than a Dart-triggered read.~~
+Moot - there is nothing to tap.
+
+*What the run did instead:* traced the exact obstacle in the checked-out Flutter engine source at `~/development/flutter/engine/src/flutter/shell/platform/darwin/ios/framework/Source/FlutterTextInputPlugin.{h,mm}` rather than assuming the class name or method signatures, wrote the swizzle to fail back to today's behaviour (log and no-op) if either selector or the class itself is not found, and covered the Dart-side contract with unit tests.
+That work stands; the swizzle installs and fails safe exactly as designed, and remains real for a non-Material field or iOS below 16.
+It was simply never reachable from the one field that matters, which no amount of reasoning about the swizzle itself could have found without a device.

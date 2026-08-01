@@ -25,16 +25,22 @@ import 'composer_clipboard_image.dart';
 
 /// Whether the "+" sheet's own "Paste image" row is worth offering.
 ///
-/// False whenever [editMenuPasteAvailable] answers true: that means
-/// `ClipboardPasteBridge.m`'s swizzle installed, so the iOS long-press edit
-/// menu's own Paste item already does this with no prompt, and this row
-/// would only ever be a strictly worse, prompt-every-time duplicate of it.
-/// Otherwise falls back to [hasClipboardImage] - Android's only route, and
-/// iOS's if some future Flutter engine upgrade ever breaks the swizzle.
-Future<bool> composerClipboardPasteAvailable() async {
-  if (await editMenuPasteAvailable()) return false;
-  return hasClipboardImage();
-}
+/// Answers [hasClipboardImage] alone, on every platform - Android's only
+/// route, and iOS's too, unconditionally.
+///
+/// This used to also answer false whenever [editMenuPasteSwizzleInstalled]
+/// reported true, on the theory that the iOS long-press edit menu's own
+/// Paste item already did this with no prompt, making this row a redundant,
+/// worse duplicate. That theory did not survive a real device (2026-08-01):
+/// the swizzle installing is not evidence the menu item appears, and on this
+/// composer's plain Material `TextField` it provably does not - see
+/// `composer_clipboard_image_stub.dart`'s doc comment on
+/// [editMenuPasteSwizzleInstalled] for the mechanism. Withdrawing the only
+/// working route on an unproven claim left no way to paste an image at all,
+/// so this row is never hidden again on that signal: only genuine evidence
+/// that a paste completed through the native menu would justify hiding it,
+/// and nothing here tracks that yet.
+Future<bool> composerClipboardPasteAvailable() => hasClipboardImage();
 
 /// Runs the whole "Paste image" action: clears [setError] up front, so a
 /// retry that succeeds does not leave a stale failure on screen, then reads

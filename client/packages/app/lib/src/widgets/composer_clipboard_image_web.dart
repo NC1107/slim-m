@@ -66,7 +66,7 @@ Future<Uint8List?> readClipboardImage() async => null;
 
 /// Always false: the edit-menu swizzle this backs on iOS
 /// (`composer_clipboard_image_stub.dart`) has no browser equivalent.
-Future<bool> editMenuPasteAvailable() async => false;
+Future<bool> editMenuPasteSwizzleInstalled() async => false;
 
 void _handlePaste(web.ClipboardEvent event) =>
     unawaited(_readPastedImage(event));

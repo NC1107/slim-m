@@ -28,9 +28,10 @@
 /// (see `composer_clipboard_image_stub.dart`) and a no-op on web and
 /// desktop. A composer offers a "Paste image" action rather than a
 /// keystroke there, because Android's `ClipboardManager` reaches a Flutter
-/// app only when deliberately invoked - see `composer_clipboard_paste.dart`
-/// for why that action is now hidden on iOS wherever the swizzle above is
-/// confirmed live: it prompts on every use, where the edit menu never does.
+/// app only when deliberately invoked. It is offered unconditionally on
+/// mobile whenever the clipboard holds an image - see
+/// `composer_clipboard_paste.dart`'s doc comment for why the swizzle above
+/// installing is not evidence it is redundant.
 library;
 
 export 'composer_clipboard_image_stub.dart'

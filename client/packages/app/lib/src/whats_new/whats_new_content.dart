@@ -231,6 +231,20 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.21.4',
+    headline: 'Paste image is back on iOS',
+    points: [
+      WhatsNewPoint(
+        'The last update hid the composer\'s Paste image action on iOS in '
+        'favor of the system edit menu\'s own Paste item, which turned out '
+        'not to work for images at all - so there was briefly no way to '
+        'paste an image on iOS. The composer\'s own action is back and no '
+        'longer hides itself.',
+        warn: true,
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
