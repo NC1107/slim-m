@@ -21,9 +21,11 @@ import '../routing/routes.dart';
 import 'manage_channel_sheet.dart';
 import 'user_avatar.dart';
 
-/// Pairs a channel row with its manage-sheet trigger, kept as a sibling
-/// rather than [AppListRow.trailing] so it never displaces that slot's own
-/// job (the unread dot, the voice channel's live head count).
+/// Pairs a channel row with its manage-sheet trigger, handed to
+/// [AppListRow.trailingExtra] (via [row]'s own builder) rather than composed
+/// as a plain sibling: a sibling sits outside the tinted container the row's
+/// hover and press highlight paints into, so the highlight visibly stopped
+/// short of the kebab and the row read as two pieces.
 class ManagedChannelRow extends StatefulWidget {
   const ManagedChannelRow({
     super.key,
@@ -34,7 +36,12 @@ class ManagedChannelRow extends StatefulWidget {
 
   final bool canManage;
   final Channel channel;
-  final Widget row;
+
+  /// Builds the row given the kebab to place in its trailing slot, or null
+  /// when [canManage] is false. Passed through unconditionally so the row
+  /// itself decides where to put it (`AppListRow.trailingExtra`, alongside
+  /// whatever [AppListRow.trailing] or the unread dot already occupies).
+  final Widget Function(Widget? kebab) row;
 
   @override
   State<ManagedChannelRow> createState() => _ManagedChannelRowState();
@@ -46,7 +53,7 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.canManage) return widget.row;
+    if (!widget.canManage) return widget.row(null);
     // Mirrors _SectionLabel's own trailing inset so this glyph and the
     // section's add glyph share a right edge; both are AppIconButtonSize.sm.
     final touch = AppTouchTargets.of(context);
@@ -58,43 +65,38 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
     // slot keeps its width either way; nothing reflows. A finger has no
     // hover, so touch keeps it always visible.
     final shown = touch || _hovered || _kebabFocused;
-    final kebab = SizedBox(
-      height: AppListRow.heightFor(context),
-      child: Center(
-        child: Focus(
-          skipTraversal: true,
-          canRequestFocus: false,
-          onFocusChange: (v) => setState(() => _kebabFocused = v),
-          child: AnimatedOpacity(
-            opacity: shown ? 1 : 0,
-            duration: AppMotion.reduced(context, AppMotion.fast),
-            // Hidden from the eye is not hidden from a screen reader: the
-            // manage action must stay in the semantics tree while unhovered.
-            alwaysIncludeSemantics: true,
-            child: AppIconButton(
-              icon: AppIcons.moreVertical,
-              semanticLabel: 'Manage ${widget.channel.name}',
-              size: AppIconButtonSize.sm,
-              onPressed: () => showManageChannelSheet(context, widget.channel),
+    final kebab = Padding(
+      padding: EdgeInsets.only(right: trailingPad),
+      child: SizedBox(
+        height: AppListRow.heightFor(context),
+        child: Center(
+          child: Focus(
+            skipTraversal: true,
+            canRequestFocus: false,
+            onFocusChange: (v) => setState(() => _kebabFocused = v),
+            child: AnimatedOpacity(
+              opacity: shown ? 1 : 0,
+              duration: AppMotion.reduced(context, AppMotion.fast),
+              // Hidden from the eye is not hidden from a screen reader: the
+              // manage action must stay in the semantics tree while unhovered.
+              alwaysIncludeSemantics: true,
+              child: AppIconButton(
+                icon: AppIcons.moreVertical,
+                semanticLabel: 'Manage ${widget.channel.name}',
+                size: AppIconButtonSize.sm,
+                onPressed: () =>
+                    showManageChannelSheet(context, widget.channel),
+              ),
             ),
           ),
         ),
       ),
     );
+    // Inside the row's trailing slot, so no combined height to float against.
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: Padding(
-        padding: EdgeInsets.only(right: trailingPad),
-        child: Row(
-          // Centring floats the button between a voice row and its strip below.
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: widget.row),
-            kebab,
-          ],
-        ),
-      ),
+      child: widget.row(kebab),
     );
   }
 }
@@ -105,11 +107,17 @@ class VoiceChannelRow extends ConsumerWidget {
     required this.channel,
     required this.selected,
     required this.voice,
+    this.trailingExtra,
   });
 
   final Channel channel;
   final bool selected;
   final VoiceState voice;
+
+  /// The kebab [ManagedChannelRow] hands down, rendered in the same
+  /// trailing slot as the participant count so both sit inside the row's
+  /// own press/hover highlight rather than beside it.
+  final Widget? trailingExtra;
 
   bool get _inCall =>
       voice.state == VoiceSessionState.connected &&
@@ -153,6 +161,7 @@ class VoiceChannelRow extends ConsumerWidget {
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
+          trailingExtra: trailingExtra,
           onTap: () => context.go(Routes.channel(channel.id)),
         ),
         if (participants.isNotEmpty)

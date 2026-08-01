@@ -1,36 +1,51 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The context menus stay reachable without a mouse: by long press, including
+/// The context menu stays reachable without a mouse: by long press, including
 /// to a screen reader, and by keyboard.
 ///
-/// Both regions open on a right-click or a long press. An earlier note in this
-/// repository claimed that left them with no semantic action either, so report,
+/// The menu opens on a right-click or a long press. An earlier note in this
+/// repository claimed that left it with no semantic action either, so report,
 /// block, edit, delete and pin were unreachable to assistive technology. That
 /// was wrong, and it was wrong in the direction that matters: `GestureDetector`
 /// publishes `SemanticsAction.longPress` for its own `onLongPress`, so VoiceOver
-/// and TalkBack have always been able to open these.
+/// and TalkBack have always been able to open it.
 ///
 /// It is worth a test anyway, because that reachability is a side effect of one
 /// widget choice rather than anything stated. Swapping `GestureDetector` for a
 /// `Listener`, or setting `excludeFromSemantics`, removes it silently, and the
 /// only symptom is that a group of people quietly lose every message action.
 ///
-/// The keyboard half was genuinely missing until `ContextMenuFocus`: the rows
+/// The keyboard half was genuinely missing until `ContextMenuFocus`: the row
 /// took no focus and no key opened the menu, so edit, delete, pin and report
-/// had no keyboard route at all. Both regions are driven here rather than only
-/// the generic one, because the message region is a separate widget and carries
-/// the per-message actions this gap was really about.
+/// had no keyboard route at all. The first block of tests drives the generic
+/// keyboard machinery through report/block, an ungated pair on every message;
+/// the tests after that drive the message-only actions (edit) the same way.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slimm_app/src/widgets/context_menu_region.dart';
 import 'package:slimm_app/src/widgets/message_context_menu.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 const Key _anchor = Key('anchor');
 const AppTokens _tokens = AppTokens.dark;
+
+/// Report and block only, so the menu holds exactly the two ungated items
+/// this block of tests drives.
+MessageActions _reportAndBlockOnly() => MessageActions(
+  canEdit: false,
+  onEdit: () {},
+  canDelete: false,
+  onDelete: () {},
+  canManagePins: false,
+  pinned: false,
+  onTogglePin: () {},
+  canReport: true,
+  onReport: () {},
+  canBlockAuthor: true,
+  onBlockAuthor: () {},
+);
 
 Future<SemanticsHandle> _pump(WidgetTester tester) async {
   final handle = tester.ensureSemantics();
@@ -39,11 +54,10 @@ Future<SemanticsHandle> _pump(WidgetTester tester) async {
       theme: buildTheme(Brightness.dark, _tokens),
       home: Scaffold(
         body: Center(
-          child: ContextMenuRegion(
-            itemsBuilder: (close) => [
-              AppMenuItem(label: 'Report', onTap: close),
-              AppMenuItem(label: 'Block', onTap: close),
-            ],
+          child: MessageContextMenuRegion(
+            content: 'hello',
+            actions: _reportAndBlockOnly(),
+            onAddReaction: () {},
             child: const SizedBox(
               key: _anchor,
               width: 120,
@@ -161,7 +175,7 @@ void main() {
   testWidgets('invoking that action really opens the menu', (tester) async {
     final handle = await _pump(tester);
 
-    expect(find.text('Report'), findsNothing);
+    expect(find.text('Report message'), findsNothing);
     final node = tester.getSemantics(find.byKey(_anchor));
     tester.binding.performSemanticsAction(
       SemanticsActionEvent(
@@ -174,8 +188,8 @@ void main() {
 
     // Publishing the action and honouring it are two different things, and a
     // published action nothing answers is worse than none.
-    expect(find.text('Report'), findsOneWidget);
-    expect(find.text('Block'), findsOneWidget);
+    expect(find.text('Report message'), findsOneWidget);
+    expect(find.text('Block user'), findsOneWidget);
     handle.dispose();
   });
 
@@ -201,13 +215,13 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pumpAndSettle();
-    expect(find.text('Report'), findsNothing);
+    expect(find.text('Report message'), findsNothing);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
     await tester.pumpAndSettle();
 
-    expect(find.text('Report'), findsOneWidget);
-    expect(find.text('Block'), findsOneWidget);
+    expect(find.text('Report message'), findsOneWidget);
+    expect(find.text('Block user'), findsOneWidget);
     handle.dispose();
   });
 
@@ -224,7 +238,7 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
     await tester.pumpAndSettle();
 
-    expect(find.text('Report'), findsOneWidget);
+    expect(find.text('Report message'), findsOneWidget);
     handle.dispose();
   });
 
@@ -240,15 +254,15 @@ void main() {
     // Answered from the moment it opens, before anything inside has been tabbed to: an intent goes upward from whatever holds focus.
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    expect(find.text('Report'), findsNothing);
+    expect(find.text('Report message'), findsNothing);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
     await tester.pumpAndSettle();
     // A menu that opens and cannot then be operated is half a route, so focus has to reach the items inside the overlay.
-    expect(await _tabTo(tester, 'Block'), isTrue);
+    expect(await _tabTo(tester, 'Block user'), isTrue);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    expect(find.text('Report'), findsNothing);
+    expect(find.text('Report message'), findsNothing);
     handle.dispose();
   });
 

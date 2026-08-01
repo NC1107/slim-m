@@ -71,16 +71,7 @@ class MessageStore {
     return query.get();
   }
 
-  /// The highest `seq` held for a channel: what catch-up should resume from.
-  Future<int> cursorFor(String channelId) async {
-    final row = await (db.select(db.channels)
-          ..where((c) => c.id.equals(channelId)))
-        .getSingleOrNull();
-    return row?.cursor ?? 0;
-  }
-
-  /// Whether a channel row exists locally. Unlike [cursorFor], which returns
-  /// 0 for both "unknown" and "known but unread", this tells them apart.
+  /// Whether a channel row exists locally.
   Future<bool> hasChannel(String channelId) async {
     final row = await (db.select(db.channels)
           ..where((c) => c.id.equals(channelId)))
@@ -127,23 +118,6 @@ class MessageStore {
               afterOpSeq: c.opCursor,
             ))
         .toList(growable: false);
-  }
-
-  /// Unread count for a channel, derived rather than stored so it cannot drift.
-  Future<int> unreadCount(String channelId) async {
-    final row = await (db.select(db.channels)
-          ..where((c) => c.id.equals(channelId)))
-        .getSingleOrNull();
-    if (row == null) return 0;
-    final count = countAll();
-    final query = db.selectOnly(db.messages)
-      ..addColumns([count])
-      ..where(
-        db.messages.channelId.equals(channelId) &
-            db.messages.seq.isBiggerThanValue(row.lastReadSeq) &
-            db.messages.pending.equals(false),
-      );
-    return await query.map((r) => r.read(count) ?? 0).getSingle();
   }
 
   // --- Writes ---

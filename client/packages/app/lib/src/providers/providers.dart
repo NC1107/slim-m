@@ -87,6 +87,18 @@ const serverUrlHandle = 'server_url';
 /// fresh install apart from an ordinary relaunch.
 const hasLaunchedBeforeKey = 'slimm.has_launched_before';
 
+/// Whether [restoreSession] found this install's very first launch (or a
+/// wipe indistinguishable from one) this run.
+///
+/// [hasLaunchedBeforeKey] itself cannot answer this later: by the time
+/// anything else reads it, [restoreSession] has already set it to true for
+/// every future launch this process or any other ever makes. This provider
+/// is the one place that transient fact survives, read once by
+/// `WhatsNewController`, which needs the same "was this genuinely fresh"
+/// answer to keep a first-ever launch from showing a changelog for updates
+/// that happened before the install existed.
+final isFreshInstallProvider = StateProvider<bool>((ref) => false);
+
 /// The session, shared by everything that talks to the server so a refresh in
 /// one place is seen everywhere.
 ///
@@ -168,6 +180,7 @@ Future<void> restoreSession(ProviderContainer container) async {
     if (prefs.getBool(hasLaunchedBeforeKey) != true) {
       await keyStore.clear();
       await prefs.setBool(hasLaunchedBeforeKey, true);
+      container.read(isFreshInstallProvider.notifier).state = true;
       return;
     }
 
@@ -232,15 +245,6 @@ final probeApiProvider = Provider<SlimmApi Function(Uri)>(
       (baseUrl) => SlimmApi(baseUrl: baseUrl),
 );
 
-/// Whether there is a signed-in session, as a stream so routing can react.
-final signedInProvider = StreamProvider<bool>((ref) {
-  final session = ref.watch(sessionProvider);
-  return session.changes
-      .map((tokens) => tokens != null)
-      .distinct()
-      .transform(_startWith(session.isSignedIn));
-});
-
 /// The local database. Opened once and closed with the container.
 final databaseProvider = FutureProvider<SlimmDatabase>((ref) async {
   final db = SlimmDatabase(await openSlimmDatabase());
@@ -256,8 +260,9 @@ final storeProvider = FutureProvider<MessageStore>((ref) async {
 
 /// Ordinary app settings, kept separate from [keyStoreProvider]: nothing
 /// stored here is a secret. Today this backs the first-launch flag
-/// ([hasLaunchedBeforeKey]), the voice preferences, and the appearance
-/// choice ([themeChoiceKey]); the first of those is here precisely because
+/// ([hasLaunchedBeforeKey]), the voice preferences, the appearance choice
+/// ([themeChoiceKey]), and the last what's-new version shown
+/// (`lastSeenWhatsNewVersionKey`); the first of those is here precisely because
 /// this file does NOT survive an iOS/Android reinstall the way the platform
 /// keychain does.
 final preferencesProvider = FutureProvider<SharedPreferences>(
@@ -333,15 +338,6 @@ final mediaCapabilitiesProvider = Provider<MediaCapabilities>(
 final keyStoreProvider = Provider<KeyStore>(
   (ref) => createPersistentKeyStore(),
 );
-
-/// Prepends a current value to a stream, so a listener attaching late still
-/// sees the present state rather than waiting for the next change.
-StreamTransformer<T, T> _startWith<T>(T initial) {
-  return StreamTransformer<T, T>.fromBind((source) async* {
-    yield initial;
-    yield* source;
-  });
-}
 
 /// A username the composer should insert as a mention, set by the member
 /// profile popover and consumed once by whichever channel is open. A

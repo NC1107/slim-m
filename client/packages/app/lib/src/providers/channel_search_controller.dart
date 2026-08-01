@@ -11,8 +11,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
-import 'blocks_controller.dart';
-import 'providers.dart';
+import 'message_search.dart';
 
 /// Hits come straight from the server (`api.Message`), never the local store's
 /// own `Message`: a search result was not necessarily ever written locally.
@@ -66,29 +65,26 @@ class ChannelSearchController extends StateNotifier<ChannelSearchState> {
       return;
     }
     state = ChannelSearchState(open: true, query: trimmed, loading: true);
-    try {
-      final hits = await _ref
-          .read(apiProvider)
-          .searchMessages(_channelId, q: trimmed);
-      if (!mounted) return;
-      // Search reads the transcript by another route; it hides the same authors.
-      final blocks = _ref.read(blocksProvider);
-      final results = hits
-          .where((message) => !blocks.contains(message.authorId))
-          .toList(growable: false);
-      state = ChannelSearchState(open: true, query: trimmed, results: results);
-    } on api.ForbiddenException {
-      if (!mounted) return;
-      state = ChannelSearchState(
+    final result = await searchChannelMessages(_ref.read, _channelId, trimmed);
+    if (!mounted) return;
+    state = switch (result) {
+      MessageSearchHits(:final messages) => ChannelSearchState(
+        open: true,
+        query: trimmed,
+        results: messages,
+      ),
+      MessageSearchForbidden() => ChannelSearchState(
         open: true,
         query: trimmed,
         failed: true,
         forbidden: true,
-      );
-    } on api.ApiException {
-      if (!mounted) return;
-      state = ChannelSearchState(open: true, query: trimmed, failed: true);
-    }
+      ),
+      MessageSearchFailed() => ChannelSearchState(
+        open: true,
+        query: trimmed,
+        failed: true,
+      ),
+    };
   }
 }
 

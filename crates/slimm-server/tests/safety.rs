@@ -64,6 +64,13 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
+/// Counts open reports through the real paged query the moderation queue
+/// route uses, with nothing hidden: these tests exercise report filing, not
+/// per-channel visibility, so every channel is moderatable.
+async fn open_report_count(store: &Store) -> i64 {
+    store.list_open_reports(None, &[], 100).await.unwrap().len() as i64
+}
+
 #[tokio::test]
 async fn devices_list_and_sign_out_only_your_own() {
     let (store, _guard) = new_store().await;
@@ -320,7 +327,7 @@ async fn reporting_a_message_keeps_a_snapshot_and_resists_flooding() {
         .await
         .unwrap();
     assert_eq!(filed.status(), StatusCode::OK);
-    assert_eq!(store.open_report_count().await.unwrap(), 1);
+    assert_eq!(open_report_count(&store).await, 1);
 
     // The same reporter cannot pile up reports on the same subject.
     let duplicate = app
@@ -338,7 +345,7 @@ async fn reporting_a_message_keeps_a_snapshot_and_resists_flooding() {
         .await
         .unwrap();
     assert_eq!(duplicate.status(), StatusCode::CONFLICT);
-    assert_eq!(store.open_report_count().await.unwrap(), 1);
+    assert_eq!(open_report_count(&store).await, 1);
 
     // The snapshot survives the author deleting or editing the content, which is
     // the whole reason it is stored.
@@ -347,7 +354,7 @@ async fn reporting_a_message_keeps_a_snapshot_and_resists_flooding() {
         .await
         .unwrap();
     assert_eq!(
-        store.open_report_count().await.unwrap(),
+        open_report_count(&store).await,
         1,
         "the report still stands"
     );
@@ -424,5 +431,5 @@ async fn a_message_you_cannot_see_cannot_be_reported() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
-    assert_eq!(store.open_report_count().await.unwrap(), 0);
+    assert_eq!(open_report_count(&store).await, 0);
 }

@@ -27,6 +27,7 @@ import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/voice_strip_indicator.dart';
+import '../widgets/whats_new_gate.dart';
 import 'canvas/canvas_open_button.dart';
 import 'canvas/canvas_pane.dart';
 import 'channel_screen.dart';
@@ -54,19 +55,37 @@ class HomeShell extends ConsumerWidget {
     // hide the pane, not summon room for it that is not there.
     final showMembers =
         layout == LayoutClass.expanded && ref.watch(memberPaneVisibleProvider);
+    final showRail = ref.watch(channelRailVisibleProvider);
+
+    final railWidth = layout == LayoutClass.expanded
+        ? ChannelRail.expandedWidth
+        : ChannelRail.mediumWidth;
 
     final Widget scaffold;
     if (layout.showsBothPanes) {
       scaffold = Scaffold(
         body: Row(
           children: [
-            SizedBox(
-              width: layout == LayoutClass.expanded
-                  ? ChannelRail.expandedWidth
-                  : ChannelRail.mediumWidth,
-              child: const ChannelRail(),
+            // Collapsing gives the transcript the rail's width back. The rail
+            // unmounts rather than sitting at zero width, the same reasoning
+            // the member pane's slot carries: it polls voice rosters while
+            // built, and a hidden pane must not keep fetching.
+            ClipRect(
+              child: AnimatedContainer(
+                duration: AppMotion.reduced(context, AppMotion.base),
+                curve: AppMotion.entrance,
+                width: showRail ? railWidth : 0,
+                child: showRail
+                    ? OverflowBox(
+                        minWidth: railWidth,
+                        maxWidth: railWidth,
+                        alignment: Alignment.centerRight,
+                        child: const ChannelRail(),
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ),
-            const VerticalDivider(width: 1),
+            if (showRail) const VerticalDivider(width: 1),
             // Its own semantics node, or the modal barrier inside this pane's
             // navigator blocks everything painted before it, which is the
             // whole rail: no channel row, section or search field reached a
@@ -154,22 +173,25 @@ class HomeShell extends ConsumerWidget {
     final openSettings = activatorFor(AppAction.openSettings);
     final nextChannel = activatorFor(AppAction.nextChannel);
     final previousChannel = activatorFor(AppAction.previousChannel);
-    return CallbackShortcuts(
-      bindings: {
-        if (quickSwitch != null) quickSwitch: () => openCommandPalette(context),
-        if (focusComposer != null)
-          focusComposer: () =>
-              ref.read(composerFocusNodeProvider)?.requestFocus(),
-        if (openSettings != null)
-          openSettings: () => context.push(Routes.personalSettings),
-        if (nextChannel != null)
-          nextChannel: () => unawaited(_cycleChannel(context, ref, 1)),
-        if (previousChannel != null)
-          previousChannel: () => unawaited(_cycleChannel(context, ref, -1)),
-      },
-      // CallbackShortcuts only fires for a focused descendant, so this default
-      // makes the shortcut work the instant the app opens.
-      child: Focus(autofocus: true, child: scaffold),
+    return WhatsNewGate(
+      child: CallbackShortcuts(
+        bindings: {
+          if (quickSwitch != null)
+            quickSwitch: () => openCommandPalette(context),
+          if (focusComposer != null)
+            focusComposer: () =>
+                ref.read(composerFocusNodeProvider)?.requestFocus(),
+          if (openSettings != null)
+            openSettings: () => context.push(Routes.personalSettings),
+          if (nextChannel != null)
+            nextChannel: () => unawaited(_cycleChannel(context, ref, 1)),
+          if (previousChannel != null)
+            previousChannel: () => unawaited(_cycleChannel(context, ref, -1)),
+        },
+        // CallbackShortcuts only fires for a focused descendant, so this
+        // default makes the shortcut work the instant the app opens.
+        child: Focus(autofocus: true, child: scaffold),
+      ),
     );
   }
 

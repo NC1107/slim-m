@@ -1,0 +1,108 @@
+// SPDX-License-Identifier: Apache-2.0
+/// The personal space row's own kebab.
+///
+/// Split out of `personal_space_row.dart` for the same reason
+/// `space_menu_button.dart` sits apart from `channel_rail_frame.dart`: the
+/// row's own tap-to-open logic is a different concern from an overlay
+/// menu's wiring. Its reveal-on-hover, always-on-touch treatment mirrors
+/// `channel_rail_channel_rows.dart`'s `ManagedChannelRow` kebab; unlike
+/// that one, there is no manage sheet behind it, only "Remove from list",
+/// since a personal space cannot be renamed or deleted, only hidden.
+library;
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_design_system/design_system.dart';
+
+import '../providers/personal_space_visibility.dart';
+
+/// The message shown when the row is hidden, naming the one way back:
+/// searching the caller's own display name surfaces it again in the command
+/// palette (`command_palette_items.dart`'s `channelMatchesQuery`), and
+/// selecting that result un-hides it.
+const String personalSpaceHiddenNotice =
+    'Removed from your list. Search your own name to find it again.';
+
+/// Shown for [visible] (touch, hover, or keyboard focus reaching it), the
+/// same rule the ordinary channel kebab follows.
+class PersonalSpaceKebab extends ConsumerStatefulWidget {
+  const PersonalSpaceKebab({
+    super.key,
+    required this.visible,
+    required this.onFocusChange,
+  });
+
+  final bool visible;
+  final ValueChanged<bool> onFocusChange;
+
+  @override
+  ConsumerState<PersonalSpaceKebab> createState() => _PersonalSpaceKebabState();
+}
+
+class _PersonalSpaceKebabState extends ConsumerState<PersonalSpaceKebab> {
+  final _controller = OverlayPortalController();
+  final _link = LayerLink();
+
+  Future<void> _remove() async {
+    _controller.hide();
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    await ref.read(personalSpaceVisibilityProvider.notifier).hide();
+    messenger?.showSnackBar(
+      const SnackBar(content: Text(personalSpaceHiddenNotice)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformTarget(
+      link: _link,
+      child: OverlayPortal(
+        controller: _controller,
+        // Positioned so the follower sizes to its content, not the screen.
+        overlayChildBuilder: (context) => Positioned(
+          left: 0,
+          top: 0,
+          child: CompositedTransformFollower(
+            link: _link,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.bottomRight,
+            followerAnchor: Alignment.topRight,
+            offset: const Offset(0, 4),
+            child: TapRegion(
+              onTapOutside: (_) => _controller.hide(),
+              child: AppMenu(
+                width: 220,
+                children: [
+                  AppMenuItem(
+                    label: 'Remove from list',
+                    leading: AppIcons.removeFromList,
+                    onTap: () => unawaited(_remove()),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        child: Focus(
+          skipTraversal: true,
+          canRequestFocus: false,
+          onFocusChange: widget.onFocusChange,
+          child: AnimatedOpacity(
+            opacity: widget.visible ? 1 : 0,
+            duration: AppMotion.reduced(context, AppMotion.fast),
+            // Hidden from the eye is not hidden from a screen reader.
+            alwaysIncludeSemantics: true,
+            child: AppIconButton(
+              icon: AppIcons.moreVertical,
+              semanticLabel: 'Personal space options',
+              size: AppIconButtonSize.sm,
+              onPressed: _controller.toggle,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

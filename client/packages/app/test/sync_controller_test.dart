@@ -135,14 +135,17 @@ void main() {
     );
     final rows = await store.watchChannel('dm-1').first;
     expect(rows.single.id, 'm1');
+    final channel = (await store.allChannels()).firstWhere(
+      (c) => c.id == 'dm-1',
+    );
     expect(
-      await store.cursorFor('dm-1'),
+      channel.cursor,
       1,
       reason: 'the cursor must advance so unread state comes out right',
     );
     expect(
-      await store.unreadCount('dm-1'),
-      1,
+      channel.cursor > channel.lastReadSeq,
+      isTrue,
       reason: 'this is what puts the unread badge on the new DM',
     );
   });

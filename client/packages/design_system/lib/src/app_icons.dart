@@ -15,6 +15,10 @@ abstract final class AppIcons {
   static const IconData voice = LucideIcons.volume2300;
   static const IconData settings = LucideIcons.settings300;
   static const IconData members = LucideIcons.users300;
+
+  /// The collapsible channel rail, drawn as a panel rather than a hamburger:
+  /// it toggles one region of a visible layout rather than opening a drawer.
+  static const IconData sidebar = LucideIcons.panelLeft300;
   static const IconData back = LucideIcons.arrowLeft300;
   static const IconData add = LucideIcons.plus300;
   static const IconData search = LucideIcons.search300;
@@ -125,4 +129,8 @@ abstract final class AppIcons {
   static const IconData dismiss = LucideIcons.x300;
   static const IconData assignRole = LucideIcons.userCog300;
   static const IconData permissions = LucideIcons.lock300;
+
+  /// Removing a row from a personal list view rather than deleting anything:
+  /// distinct from [delete], which destroys the thing itself.
+  static const IconData removeFromList = LucideIcons.listX300;
 }

@@ -50,6 +50,7 @@ class AppListRow extends StatefulWidget {
     this.leading,
     this.meta,
     this.trailing,
+    this.trailingExtra,
     this.selected = false,
     this.unread = false,
     this.muted = false,
@@ -68,6 +69,14 @@ class AppListRow extends StatefulWidget {
   /// `text-secondary` regardless of the row's other states.
   final String? meta;
   final Widget? trailing;
+
+  /// A control rendered after [trailing] (or the unread dot it falls back
+  /// to), still inside the same tinted [AnimatedContainer] the row's hover
+  /// and selection paint into. This is where a per-row overflow action
+  /// belongs: painted as a plain sibling of this widget instead, the row's
+  /// own press/hover highlight stops before it and the row reads as two
+  /// pieces rather than one.
+  final Widget? trailingExtra;
   final bool selected;
   final bool unread;
   final bool muted;
@@ -206,6 +215,7 @@ class _AppListRowState extends State<AppListRow> {
               opacity: widget.muted ? 0.62 : 1,
               child: trailingContent,
             ),
+          if (widget.trailingExtra != null) widget.trailingExtra!,
         ],
       ),
     );

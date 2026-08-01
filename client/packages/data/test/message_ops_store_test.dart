@@ -30,6 +30,12 @@ api.Message _message({
       editedAt: editedAt,
     );
 
+/// The cursor lives on the channel row itself; there is no dedicated reader.
+Future<int> _cursorOf(MessageStore store, String channelId) async {
+  final channels = await store.allChannels();
+  return channels.firstWhere((c) => c.id == channelId).cursor;
+}
+
 void main() {
   late SlimmDatabase db;
   late MessageStore store;
@@ -63,7 +69,7 @@ void main() {
 
     final rows = await store.watchChannel('chan-1').first;
     expect(rows.single.seq, 4);
-    expect(await store.cursorFor('chan-1'), 4);
+    expect(await _cursorOf(store, 'chan-1'), 4);
   });
 
   test('an edit for a message this client never held inserts nothing',
@@ -108,7 +114,7 @@ void main() {
 
     await store.resetChannel('chan-1');
 
-    expect(await store.cursorFor('chan-1'), 0);
+    expect(await _cursorOf(store, 'chan-1'), 0);
     expect(await store.opCursorFor('chan-1'), null);
   });
 

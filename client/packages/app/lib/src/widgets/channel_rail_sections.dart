@@ -162,7 +162,7 @@ class TextChannelsSection extends StatelessWidget {
           ManagedChannelRow(
             canManage: canManage,
             channel: channel,
-            row: AppListRow(
+            row: (kebab) => AppListRow(
               label: channel.name,
               selected: channel.id == selectedId,
               unread: channel.cursor > channel.lastReadSeq,
@@ -173,6 +173,7 @@ class TextChannelsSection extends StatelessWidget {
                     ? tokens.accent
                     : tokens.textSecondary,
               ),
+              trailingExtra: kebab,
               onTap: () => context.go(Routes.channel(channel.id)),
             ),
           ),
@@ -210,10 +211,11 @@ class VoiceChannelsSection extends ConsumerWidget {
           ManagedChannelRow(
             canManage: canManage,
             channel: channel,
-            row: VoiceChannelRow(
+            row: (kebab) => VoiceChannelRow(
               channel: channel,
               selected: channel.id == selectedId,
               voice: voice,
+              trailingExtra: kebab,
             ),
           ),
       ],

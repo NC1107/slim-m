@@ -21,6 +21,7 @@ import '../providers/typing_controller.dart';
 import 'composer_autocomplete.dart';
 import 'composer_autocomplete_items.dart';
 import 'composer_autocomplete_query.dart';
+import 'composer_clipboard_image.dart';
 import 'composer_extras.dart';
 import 'emoji_picker.dart';
 import 'poll_composer_sheet.dart';
@@ -32,6 +33,8 @@ class Composer extends ConsumerStatefulWidget {
     required this.channelId,
     required this.channelName,
     required this.onSend,
+    this.clipboardPasteStart = startClipboardImagePaste,
+    this.clipboardPasteStop = stopClipboardImagePaste,
   });
 
   final TextEditingController controller;
@@ -43,6 +46,14 @@ class Composer extends ConsumerStatefulWidget {
   /// [SlimmApiAttachments.uploadAttachment]); staging happens here so the
   /// upload finishes before the send request ever goes out.
   final Future<void> Function(List<String> attachmentIds) onSend;
+
+  /// The Ctrl+V seam (see `composer_clipboard_image.dart`): real on web, a
+  /// no-op everywhere else. Parameters rather than a direct call so a test
+  /// can hand over a fake that fires synchronously, since nothing about a
+  /// real browser paste event can be produced from a widget test.
+  final void Function(void Function(Uint8List bytes, String filename) onImage)
+  clipboardPasteStart;
+  final void Function() clipboardPasteStop;
 
   @override
   ConsumerState<Composer> createState() => _ComposerState();
@@ -87,6 +98,7 @@ class _ComposerState extends ConsumerState<Composer> {
     _hasText = widget.controller.text.isNotEmpty;
     _hasSendableText = widget.controller.text.trim().isNotEmpty;
     widget.controller.addListener(_handleChange);
+    _focus.addListener(_handleFocusChange);
     // See [_focusRegistry]'s doc comment for why this waits a frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -107,8 +119,23 @@ class _ComposerState extends ConsumerState<Composer> {
       }
     });
     widget.controller.removeListener(_handleChange);
+    _focus.removeListener(_handleFocusChange);
+    widget.clipboardPasteStop();
     _focus.dispose();
     super.dispose();
+  }
+
+  /// Ctrl+V only reaches an image while this field genuinely has focus: the
+  /// seam behind [Composer.clipboardPasteStart] is a single global listener
+  /// (see `composer_clipboard_image_web.dart`), so it has to be handed off
+  /// on every focus change rather than left running for the widget's whole
+  /// life.
+  void _handleFocusChange() {
+    if (_focus.hasFocus) {
+      widget.clipboardPasteStart(_handlePastedImage);
+    } else {
+      widget.clipboardPasteStop();
+    }
   }
 
   void _handleChange() {
@@ -276,15 +303,21 @@ class _ComposerState extends ConsumerState<Composer> {
     final files = result?.files ?? const <PlatformFile>[];
     if (files.isEmpty) return;
     final file = files.first;
+    // readAsBytes streams from disk; file_picker 12 deprecated withData and
+    // PlatformFile.bytes because eager loading OOMs on a large pick.
+    await _stageAttachment(await file.readAsBytes(), file.name);
+  }
 
+  /// Uploads bytes from wherever they came from and, on success, stages the
+  /// resulting attachment. Shared by the file picker and a pasted image so
+  /// neither invents its own way onto the send path.
+  Future<void> _stageAttachment(Uint8List bytes, String filename) async {
+    if (!mounted) return;
     setState(() => _uploading = true);
     try {
-      // readAsBytes streams from disk; file_picker 12 deprecated withData and
-      // PlatformFile.bytes because eager loading OOMs on a large pick.
-      final bytes = await file.readAsBytes();
       final attachment = await ref
           .read(apiProvider)
-          .uploadAttachment(bytes, filename: file.name);
+          .uploadAttachment(bytes, filename: filename);
       if (!mounted) return;
       setState(() {
         _pendingAttachments.add(attachment);
@@ -298,6 +331,12 @@ class _ComposerState extends ConsumerState<Composer> {
       );
     }
   }
+
+  /// Handed to [Composer.clipboardPasteStart] as the callback a pasted
+  /// image reaches; it goes through the exact same staging path a picked
+  /// file does, never a second attachment mechanism.
+  void _handlePastedImage(Uint8List bytes, String filename) =>
+      unawaited(_stageAttachment(bytes, filename));
 
   void _removeAttachment(api.Attachment attachment) {
     setState(() => _pendingAttachments.remove(attachment));
@@ -363,6 +402,7 @@ class _ComposerState extends ConsumerState<Composer> {
               child: TypingIndicator(channelId: widget.channelId),
             ),
             Container(
+              key: const Key('composer-action-bar'),
               padding: const EdgeInsets.fromLTRB(12, 5, 10, 5),
               decoration: BoxDecoration(
                 color: tokens.surfaceRaised,
@@ -370,7 +410,8 @@ class _ComposerState extends ConsumerState<Composer> {
                 borderRadius: BorderRadius.circular(AppRadii.card),
               ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                // Top, not centred: a centred icon drifts as the field grows.
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AppIconButton(
                     icon: AppIcons.add,

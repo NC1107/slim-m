@@ -35,10 +35,30 @@ pub struct Invite {
 impl Invite {
     /// Whether this invite can still be used right now.
     pub fn is_usable(&self, now: i64) -> bool {
-        !self.revoked
-            && self.max_uses.is_none_or(|max| self.uses < max)
-            && self.expires_at.is_none_or(|expiry| expiry > now)
+        invite_usable(self.revoked, self.max_uses, self.uses, self.expires_at, now)
     }
+}
+
+/// The shared usability rule: not revoked, not past its use limit, not past
+/// its expiry. [`Invite::is_usable`] and [`Store::check_invite`] both read
+/// this out of a differently-shaped source (a full [`Invite`] versus a raw
+/// query row), so this is the one place the rule itself is written down.
+///
+/// [`spend_invite`]'s SQL `WHERE` encodes the identical rule a third time and
+/// cannot be unified with this one - sqlx checks a query's SQL at compile
+/// time against a literal, not a runtime function call - which is why
+/// `tests/invite_usability.rs` exists: it is what would catch the SQL copy
+/// drifting from this one instead of a shared `fn`.
+fn invite_usable(
+    revoked: bool,
+    max_uses: Option<i64>,
+    uses: i64,
+    expires_at: Option<i64>,
+    now: i64,
+) -> bool {
+    !revoked
+        && max_uses.is_none_or(|max| uses < max)
+        && expires_at.is_none_or(|expiry| expiry > now)
 }
 
 /// What a valid invite discloses about itself, returned only for a code
@@ -200,9 +220,13 @@ impl Store {
         let Some(row) = row else {
             return Ok(InviteCheck::Unusable);
         };
-        let usable = row.revoked_at.is_none()
-            && row.max_uses.is_none_or(|max| row.uses < max)
-            && row.expires_at.is_none_or(|expiry| expiry > now);
+        let usable = invite_usable(
+            row.revoked_at.is_some(),
+            row.max_uses,
+            row.uses,
+            row.expires_at,
+            now,
+        );
         if !usable {
             return Ok(InviteCheck::Unusable);
         }

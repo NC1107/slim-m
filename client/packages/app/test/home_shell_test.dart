@@ -21,6 +21,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/widgets/channel_rail.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane.dart';
 import 'package:slimm_app/src/screens/home_shell.dart';
@@ -236,6 +237,21 @@ void main() {
       700,
     ); // medium: two panes, no member pane.
     expect(find.byType(AppMemberPane), findsNothing);
+    await _teardown(tester, setup.container, setup.db);
+  });
+
+  testWidgets('collapsing the rail unmounts it, giving back its width', (
+    tester,
+  ) async {
+    // Unmounted, not zero-width: it polls voice rosters while built.
+    final setup = _setup();
+    await _pumpAtWidth(tester, setup.container, 1400);
+    expect(find.byType(ChannelRail), findsOneWidget);
+
+    setup.container.read(channelRailVisibleProvider.notifier).state = false;
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChannelRail), findsNothing);
     await _teardown(tester, setup.container, setup.db);
   });
 

@@ -30,6 +30,16 @@ String? channelIdInPath(String path) {
 ///
 /// Only valid under a `RouteBase.builder` subtree. A dialog, sheet or overlay
 /// pushed on the root navigator must read [channelIdInPath] off
+/// Whether the channel rail is shown beside the conversation.
+///
+/// Defaults open; the channel header's rail toggle flips it. Collapsing gives
+/// the transcript the rail's width back, which is the point - on a laptop the
+/// rail is a fifth of the window and most of it is empty most of the time.
+///
+/// [HomeShell] unmounts the rail rather than holding it at zero width: it
+/// polls voice rosters while built, and a hidden pane must not keep fetching.
+final channelRailVisibleProvider = StateProvider<bool>((ref) => true);
+
 /// `GoRouter.of(context).state` instead, or [GoRouterState.of] throws a
 /// [GoError], which is an `Error` and so escapes every `on ...Exception` catch.
 String? selectedChannelId(BuildContext context) =>

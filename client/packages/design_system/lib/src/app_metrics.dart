@@ -70,10 +70,6 @@ abstract final class AppSizes {
   static const double icon20 = 20;
   static const double icon24 = 24;
   static const double icon32 = 32;
-
-  /// Lucide's own stroke width. Mixing stroke weights across an icon set is
-  /// the fastest way to make a considered set look assembled from clip art.
-  static const double iconStroke = 1.5;
 }
 
 /// The two shadows, for the two things that genuinely float.

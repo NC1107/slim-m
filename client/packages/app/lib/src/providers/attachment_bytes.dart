@@ -12,10 +12,18 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 
+import 'cache_for.dart';
 import 'providers.dart';
+
+/// Deliberately small next to the avatar cache: these are whole images, and
+/// the point is surviving a switch away and back rather than holding a
+/// channel's history.
+final _recent = KeepAliveCache(12);
 
 final attachmentBytesProvider = FutureProvider.autoDispose
     .family<Uint8List, String>((ref, attachmentId) async {
+      // Far fewer than the avatars': an attachment can be megabytes.
+      _recent.hold(ref, attachmentId);
       final fetched = await ref
           .watch(apiProvider)
           .fetchAttachment(attachmentId);

@@ -101,19 +101,6 @@ class ApnsTokenChannel {
     pending?.complete(token);
   }
 
-  /// The device token, or null if this is not iOS, the user has not yet
-  /// resolved the permission prompt within [timeout], or registration failed.
-  /// A thin, backward-compatible view of [fetch] for callers that only care
-  /// whether a token exists, not why one is missing.
-  Future<String?> token(
-      {Duration timeout = const Duration(seconds: 10)}) async {
-    final result = await fetch(timeout: timeout);
-    return switch (result) {
-      ApnsTokenReady(:final token) => token,
-      _ => null,
-    };
-  }
-
   /// The device token, distinguishing every way one can be missing so a
   /// caller can report push status honestly instead of a flat null.
   ///
