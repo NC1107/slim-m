@@ -1,26 +1,40 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The composer's mobile clipboard-image bridge, proven at the platform
-/// channel: nothing on this box can drive a real iOS or Android pasteboard.
+/// channel: nothing on this box can drive a real iOS or Android pasteboard,
+/// or a real Objective-C method swizzle.
 ///
-/// Proves the Dart-side contract only - that [hasClipboardImage] and
-/// [readClipboardImage] call the right method with the right shape, and that
-/// a platform failure becomes [ClipboardImageReadException] rather than a
-/// silent null. It does not and cannot prove what `UIPasteboard` or
-/// `ClipboardManager` actually do, or that iOS's "Allow Paste?" prompt
-/// behaves the way `ClipboardImagePlugin.swift`'s doc comment reasons; that
-/// needs a device.
+/// Proves the Dart-side contract only - that [hasClipboardImage],
+/// [readClipboardImage] and [editMenuPasteAvailable] call the right method
+/// with the right shape, that a platform failure becomes
+/// [ClipboardImageReadException] rather than a silent null, and that
+/// [startClipboardImagePaste] reaches its callback when the platform side
+/// invokes `pastedImage` on this same channel. It does not and cannot prove
+/// what `UIPasteboard`, `ClipboardManager` or `ClipboardPasteBridge.m`'s
+/// swizzle actually do on a device; that needs one.
 library;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/composer_clipboard_image.dart';
 
-const _channel = MethodChannel('top.npcserver.slimm/clipboard_image');
+const _channelName = 'top.npcserver.slimm/clipboard_image';
+const _channel = MethodChannel(_channelName);
 
 void _mock(Future<Object?> Function(MethodCall call)? handler) {
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(_channel, handler);
 }
+
+/// Simulates the platform side calling Dart, the direction
+/// [startClipboardImagePaste]'s handler answers rather than [_mock]'s own
+/// outgoing-call mock, which is the opposite direction.
+Future<void> _deliverNativeCall(MethodCall call) =>
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+          _channelName,
+          const StandardMethodCodec().encodeMethodCall(call),
+          (_) {},
+        );
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -88,5 +102,78 @@ void main() {
         ),
       ),
     );
+  });
+
+  test(
+    'editMenuPasteAvailable asks the platform for editMenuPasteAvailable',
+    () async {
+      MethodCall? seen;
+      _mock((call) async {
+        seen = call;
+        return true;
+      });
+
+      expect(await editMenuPasteAvailable(), isTrue);
+      expect(seen?.method, 'editMenuPasteAvailable');
+    },
+  );
+
+  test(
+    'editMenuPasteAvailable answers false with no platform handler',
+    () async {
+      expect(await editMenuPasteAvailable(), isFalse);
+    },
+  );
+
+  group('startClipboardImagePaste/stopClipboardImagePaste', () {
+    tearDown(stopClipboardImagePaste);
+
+    test('a native pastedImage call reaches the registered callback', () async {
+      Uint8List? bytes;
+      String? filename;
+      startClipboardImagePaste((b, f) {
+        bytes = b;
+        filename = f;
+      });
+
+      await _deliverNativeCall(
+        MethodCall('pastedImage', Uint8List.fromList([9, 9, 2])),
+      );
+
+      expect(bytes, [9, 9, 2]);
+      expect(filename, 'pasted-image.png');
+    });
+
+    test('an unrelated method name is ignored, even carrying bytes', () async {
+      var called = false;
+      startClipboardImagePaste((_, _) => called = true);
+
+      await _deliverNativeCall(
+        MethodCall('somethingElse', Uint8List.fromList([9, 9, 2])),
+      );
+
+      expect(called, isFalse);
+    });
+
+    test('a pastedImage call carrying no bytes is ignored', () async {
+      var called = false;
+      startClipboardImagePaste((_, _) => called = true);
+
+      await _deliverNativeCall(const MethodCall('pastedImage'));
+
+      expect(called, isFalse);
+    });
+
+    test('stopClipboardImagePaste clears the handler', () async {
+      var called = false;
+      startClipboardImagePaste((_, _) => called = true);
+      stopClipboardImagePaste();
+
+      await _deliverNativeCall(
+        MethodCall('pastedImage', Uint8List.fromList([1])),
+      );
+
+      expect(called, isFalse);
+    });
   });
 }

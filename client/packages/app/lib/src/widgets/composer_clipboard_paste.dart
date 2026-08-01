@@ -23,9 +23,18 @@ import 'dart:typed_data';
 
 import 'composer_clipboard_image.dart';
 
-/// Whether the clipboard currently holds an image worth offering to paste.
-/// Free everywhere it can answer at all; see [hasClipboardImage].
-Future<bool> composerClipboardPasteAvailable() => hasClipboardImage();
+/// Whether the "+" sheet's own "Paste image" row is worth offering.
+///
+/// False whenever [editMenuPasteAvailable] answers true: that means
+/// `ClipboardPasteBridge.m`'s swizzle installed, so the iOS long-press edit
+/// menu's own Paste item already does this with no prompt, and this row
+/// would only ever be a strictly worse, prompt-every-time duplicate of it.
+/// Otherwise falls back to [hasClipboardImage] - Android's only route, and
+/// iOS's if some future Flutter engine upgrade ever breaks the swizzle.
+Future<bool> composerClipboardPasteAvailable() async {
+  if (await editMenuPasteAvailable()) return false;
+  return hasClipboardImage();
+}
 
 /// Runs the whole "Paste image" action: clears [setError] up front, so a
 /// retry that succeeds does not leave a stale failure on screen, then reads

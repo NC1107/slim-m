@@ -207,6 +207,29 @@ Worth naming the real cost: a component with no pending work stays unreleasable 
 Server 0.22.1 sat conflicted with nothing server-side pending to unstick it.
 `docs/OPEN-QUESTIONS.md` section 6 already lists switching to the manual tag-based flow, which has no standing PR to go stale; three recurrences is the evidence that question was waiting for.
 
+## The image-paste prompt was never once per install (2026-08-01)
+
+Client 0.21.0 shipped image paste (PR #286) as a "Paste image" row in the composer's `+` sheet, reading `UIPasteboard.general.image` through a hand-written `MethodChannel`.
+The doc comment on `ClipboardImagePlugin.swift`'s `readImage` predicted the iOS "Allow Paste?" consent prompt would show once per install, and flagged that prediction as resting on one blogger's testing rather than Apple's own documentation.
+~~The prompt appears once per install.~~
+Wrong, found on a real iPhone: it prompts on **every** call to `readImage`, which makes the shipped row worse than the file picker it was meant to improve on.
+Read this before touching `composer_clipboard_image_stub.dart`, `composer_clipboard_paste.dart`, or anything under `ios/Runner/Clipboard*`.
+
+**The real fix is the route iOS itself is documented to exempt from that prompt: the long-press edit menu's own Paste item, dispatched by the system rather than read on demand.**
+The obstacle was already diagnosed correctly and is confirmed against the actual engine source, not assumed: `~/development/flutter/engine/src/flutter/shell/platform/darwin/ios/framework/Source/FlutterTextInputPlugin.mm` shows `FlutterTextInputView.canPerformAction:` answering `[UIPasteboard generalPasteboard].hasStrings` for `paste:` ("Forbid pasting images, memojis, or other non-string content," in the engine's own comment), and `paste:` itself only ever reading `UIPasteboard.generalPasteboard.string`.
+`ClipboardPasteBridge.m` (new) swizzles both methods on that class via `NSClassFromString(@"FlutterTextInputView")` and the Objective-C runtime, so the metadata-only `hasImages` check gates the menu item's visibility (never prompts) and the swizzled `paste:` reads the pasteboard's actual image **synchronously, inside iOS's own dispatch of that action** - the same dispatch the "no prompt" exemption depends on - and hands the bytes to Dart as a native-initiated `pastedImage` call, never a later Dart-triggered read.
+
+**The swizzle is written to fail back to today's behaviour, not to crash, if a future Flutter engine upgrade moves the class or either selector.**
+Both `canPerformAction:withSender:` and `paste:` are resolved via `class_getInstanceMethod` up front; the exchange only happens if all four lookups (two original, two replacement) succeed, so a partial swizzle - one method swapped, the other not - can never happen.
+`SlimmInstallClipboardPasteBridge` returns whether it installed, logged and surfaced to Dart as `editMenuPasteAvailable` (a new method on the existing channel) rather than silently assumed.
+
+**The composer's "+" sheet row is now hidden wherever that swizzle is confirmed live, and kept as a fallback everywhere else.**
+`composerClipboardPasteAvailable()` asks `editMenuPasteAvailable()` first; a `true` answer means the edit menu already does this with no prompt, so the row would only ever be a strictly worse duplicate, and it is suppressed.
+Android has no such swizzle at all, so `editMenuPasteAvailable` is always false there (`MissingPluginException` on a channel with no matching native case) and the row keeps working exactly as shipped - it is Android's only route.
+The same fallback covers a future iOS build where the swizzle silently failed to install: the row reappears rather than leaving no way to paste an image at all.
+
+**Still needs a real iPhone to confirm.** Nothing here can be verified without one: that the long-press menu's Paste item actually appears once an image is copied, and that tapping it attaches the image with no "Allow Paste?" prompt at all. Reasoned from the engine source and covered by Dart-side unit tests (`composer_clipboard_image_test.dart`, `composer_clipboard_paste_test.dart`), not by a device run.
+
 ## The one-flag iOS screen share fix did not survive a real device (2026-07-31)
 
 The 2026-07-29 entry below ("iOS screen share was starting the broadcast twice") shipped `useiOSBroadcastExtension: true` in `captureOptionsFor` and called it fixed, with a caveat that it still needed a device.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Reading an image straight off Ctrl+V, on the one platform that lets a
-/// Flutter app see it at all.
+/// Reading a pasted image, on the platforms that let a Flutter app see one
+/// at all.
 ///
 /// `package:flutter/services.dart`'s own [Clipboard] carries plain text
 /// only; there is no image variant on any target this client ships to,
@@ -11,23 +11,26 @@
 /// branch, and `FlutterTextInputPlugin`'s `canPerformAction:` deliberately
 /// returns `hasStrings` for the system Paste action - "Forbid pasting
 /// images, memojis, or other non-string content," in the engine's own
-/// comment. So Cmd+V and the system Paste item are both dead ends on every
-/// platform, not merely unimplemented on this one.
+/// comment. So the system Paste item is a dead end on every platform through
+/// Flutter's own text-editing path, not merely unimplemented on this one.
 ///
 /// [startClipboardImagePaste]/[stopClipboardImagePaste] are the event-driven
-/// half of this seam, real only on web ([clipboardImagePasteSupported] is
-/// `true` there and nowhere else): a no-op on iOS, Android, Linux, Windows
-/// and macOS, so Ctrl+V keeps its ordinary text-only behaviour on those
-/// rather than silently swallowing the keystroke for a feature that cannot
-/// work through it.
+/// half of this seam: a real, working `paste` DOM listener on web, and on
+/// iOS a real, prompt-free route of its own - `ClipboardPasteBridge.m`
+/// swizzles Flutter's private text input view so the long-press edit menu's
+/// Paste item works for an image directly, and hands the bytes to this pair
+/// rather than through Dart polling anything. A no-op on Android, Linux,
+/// Windows and macOS, so Ctrl+V there keeps its ordinary text-only
+/// behaviour rather than silently swallowing a keystroke nothing backs.
 ///
-/// [hasClipboardImage]/[readClipboardImage] are the second, poll-and-tap
+/// [hasClipboardImage]/[readClipboardImage] are the older poll-and-tap
 /// half, real on iOS and Android through a hand-written platform channel
 /// (see `composer_clipboard_image_stub.dart`) and a no-op on web and
 /// desktop. A composer offers a "Paste image" action rather than a
-/// keystroke there, because neither an iOS `paste:` action nor Android's
-/// `ClipboardManager` reaches a Flutter app without one being deliberately
-/// invoked - see `composer_clipboard_paste.dart`.
+/// keystroke there, because Android's `ClipboardManager` reaches a Flutter
+/// app only when deliberately invoked - see `composer_clipboard_paste.dart`
+/// for why that action is now hidden on iOS wherever the swizzle above is
+/// confirmed live: it prompts on every use, where the edit menu never does.
 library;
 
 export 'composer_clipboard_image_stub.dart'

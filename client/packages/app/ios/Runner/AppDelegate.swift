@@ -51,6 +51,12 @@ import UserNotifications
       ClipboardImagePlugin.handle(call, result: result)
     }
     clipboardImageChannel = clipboardImage
+    // See ClipboardPasteBridge.m: this is the callback its swizzled `paste:`
+    // hands an image to, from inside iOS's own dispatch of that action.
+    ClipboardImagePlugin.editMenuPasteAvailable = SlimmInstallClipboardPasteBridge {
+      [weak self] pngData in
+      self?.clipboardImageChannel?.invokeMethod("pastedImage", arguments: pngData)
+    }
 
     voiceCallChannel.attach(to: messenger)
   }
