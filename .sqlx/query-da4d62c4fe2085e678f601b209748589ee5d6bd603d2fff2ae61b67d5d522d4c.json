@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: ChannelId\" FROM channels\n               WHERE parent_message_id = ? AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "da4d62c4fe2085e678f601b209748589ee5d6bd603d2fff2ae61b67d5d522d4c"
+}

@@ -30,6 +30,7 @@ export 'src/client.dart'
         SlimmApiPresence,
         SlimmApiRoles,
         SlimmApiSpace,
+        SlimmApiThreads,
         SlimmApiUsers,
         SlimmApiVoice,
         JoinPolicy;

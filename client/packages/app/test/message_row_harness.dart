@@ -55,6 +55,8 @@ const noActions = MessageActions(
   onReport: noop,
   canBlockAuthor: false,
   onBlockAuthor: noop,
+  canOpenThread: false,
+  onOpenThread: noop,
 );
 
 /// The leading avatar is provider-backed (it resolves the author's own

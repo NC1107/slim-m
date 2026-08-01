@@ -32,6 +32,7 @@ abstract final class AppIcons {
   // Messaging.
   static const IconData send = LucideIcons.send300;
   static const IconData reply = LucideIcons.reply300;
+  static const IconData thread = LucideIcons.messagesSquare300;
   static const IconData edit = LucideIcons.pencil300;
   static const IconData retry = LucideIcons.rotateCw300;
   static const IconData pending = LucideIcons.clock300;

@@ -92,6 +92,8 @@ void main() {
           onReport: noop,
           canBlockAuthor: false,
           onBlockAuthor: noop,
+          canOpenThread: false,
+          onOpenThread: noop,
         ),
       ),
     );
@@ -105,6 +107,50 @@ void main() {
 
     await tester.tap(find.text('Edit'));
     expect(edited, isTrue);
+  });
+
+  testWidgets('reply in thread is offered when allowed and reports its tap', (
+    tester,
+  ) async {
+    var opened = false;
+    await tester.pumpWidget(
+      rowWith(
+        MessageActions(
+          canReply: false,
+          onReply: noop,
+          canEdit: false,
+          onEdit: noop,
+          canDelete: false,
+          onDelete: noop,
+          canManagePins: false,
+          pinned: false,
+          onTogglePin: noop,
+          canReport: false,
+          onReport: noop,
+          canBlockAuthor: false,
+          onBlockAuthor: noop,
+          canOpenThread: true,
+          onOpenThread: () => opened = true,
+        ),
+      ),
+    );
+
+    await tester.longPressAt(pressPoint(tester));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Reply in thread'));
+    expect(opened, isTrue);
+  });
+
+  testWidgets('reply in thread is absent when the caller disallows it', (
+    tester,
+  ) async {
+    await tester.pumpWidget(rowWith(noActions));
+
+    await tester.longPressAt(pressPoint(tester));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reply in thread'), findsNothing);
   });
 
   testWidgets('the pin item reads "Unpin" once already pinned', (tester) async {
@@ -124,6 +170,8 @@ void main() {
           onReport: noop,
           canBlockAuthor: false,
           onBlockAuthor: noop,
+          canOpenThread: false,
+          onOpenThread: noop,
         ),
       ),
     );
@@ -153,6 +201,8 @@ void main() {
           onReport: noop,
           canBlockAuthor: false,
           onBlockAuthor: noop,
+          canOpenThread: false,
+          onOpenThread: noop,
         ),
       ),
     );
@@ -187,6 +237,8 @@ void main() {
           onReport: () => reported = true,
           canBlockAuthor: true,
           onBlockAuthor: () => blocked = true,
+          canOpenThread: false,
+          onOpenThread: noop,
         ),
       ),
     );
@@ -319,6 +371,8 @@ void main() {
                 onReport: noop,
                 canBlockAuthor: true,
                 onBlockAuthor: noop,
+                canOpenThread: false,
+                onOpenThread: noop,
               ),
             ),
           ],

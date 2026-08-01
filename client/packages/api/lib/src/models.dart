@@ -103,6 +103,7 @@ class Message {
     required this.createdAt,
     required this.editedAt,
     this.replyToId,
+    this.threadChannelId,
     // Empty is the honest default and the common case; requiring these at
     // every construction site bought no safety and broke every caller.
     this.reactions = const [],
@@ -131,6 +132,10 @@ class Message {
   /// is none, on purpose, so a later edit or delete of the parent is never
   /// something this row could go stale about.
   final String? replyToId;
+
+  /// The thread opened from this message, or null if none has been started
+  /// yet. Open (or reuse) it with [SlimmApiThreads.openThread].
+  final String? threadChannelId;
 
   /// Reaction summaries, one entry per distinct emoji, with `reacted` set
   /// from the calling user's point of view. Always present: an empty list
@@ -162,6 +167,7 @@ class Message {
         createdAt: json['created_at'] as int,
         editedAt: json['edited_at'] as int?,
         replyToId: json['reply_to_id'] as String?,
+        threadChannelId: json['thread_channel_id'] as String?,
         // Not in the schema's `required` list despite its description promising
         // it is always sent; empty beats crashing on a conformant response.
         reactions: (json['reactions'] as List<dynamic>?)

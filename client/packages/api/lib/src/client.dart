@@ -24,6 +24,7 @@ part 'client_moderation.dart';
 part 'client_presence.dart';
 part 'client_roles.dart';
 part 'client_space.dart';
+part 'client_threads.dart';
 part 'client_transport.dart';
 part 'client_users.dart';
 part 'client_voice.dart';

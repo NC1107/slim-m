@@ -284,6 +284,33 @@ impl Store {
             .contains(Permissions::VIEW_CHANNEL))
     }
 
+    /// Resolves the channel a permission check against `channel` should
+    /// actually run: itself, unless `channel` is a thread, in which case its
+    /// overwrites and kind are never consulted at all - it delegates
+    /// entirely to the channel its parent message lives in, "a thread
+    /// inherits the parent channel's permissions" per
+    /// docs/decisions/0005-threads.md. `None` means that parent no longer
+    /// resolves to a live channel, so the caller should deny rather than fall
+    /// back to the thread's own (nonexistent) overwrite bucket.
+    pub(super) async fn permission_channel(
+        &self,
+        channel: super::Channel,
+    ) -> anyhow::Result<Option<super::Channel>> {
+        let Some(parent_message_id) = channel.parent_message_id else {
+            return Ok(Some(channel));
+        };
+        let parent_channel_id = sqlx::query_scalar!(
+            r#"SELECT channel_id AS "channel_id!: ChannelId" FROM messages WHERE id = ?"#,
+            parent_message_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        match parent_channel_id {
+            Some(parent_channel_id) => self.channel(parent_channel_id).await,
+            None => Ok(None),
+        }
+    }
+
     /// The shared body of [`Self::granted_in_channel`] and
     /// [`Self::viewed_channel_before_delete`] once a channel row is already in
     /// hand, whether or not it is still live, so the overwrite-precedence
@@ -294,6 +321,10 @@ impl Store {
         user_id: UserId,
         channel: super::Channel,
     ) -> anyhow::Result<Permissions> {
+        // A thread never has overwrites of its own; see `permission_channel`.
+        let Some(channel) = self.permission_channel(channel).await? else {
+            return Ok(Permissions::NONE);
+        };
         let channel_id = channel.id;
         // DMs skip the role and overwrite model; see `granted_in_channel`'s note.
         if channel.kind == super::dms::DM_CHANNEL_KIND {

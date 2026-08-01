@@ -68,6 +68,7 @@ impl Store {
             kind: kind.to_owned(),
             topic: None,
             position,
+            parent_message_id: None,
             created_at: now,
         })
     }
@@ -76,7 +77,9 @@ impl Store {
     pub async fn channel(&self, id: ChannelId) -> anyhow::Result<Option<Channel>> {
         let row = sqlx::query!(
             r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
-                      position AS "position!: i64", created_at AS "created_at!"
+                      position AS "position!: i64",
+                      parent_message_id AS "parent_message_id: crate::ids::MessageId",
+                      created_at AS "created_at!"
                FROM channels WHERE id = ? AND deleted_at IS NULL"#,
             id
         )
@@ -88,6 +91,7 @@ impl Store {
             kind: r.kind,
             topic: r.topic,
             position: r.position,
+            parent_message_id: r.parent_message_id,
             created_at: r.created_at,
         }))
     }
@@ -101,9 +105,18 @@ impl Store {
     /// the deployment's moderators, so this answers false and the caller falls
     /// back to the base check they already passed rather than a per-channel
     /// check that a DM or a gone channel grants to nobody.
+    ///
+    /// A thread answers false for the same reason a DM does: it holds no
+    /// `channel_overwrites` bucket of its own (see [`Store::permission_channel`]),
+    /// and it never appears in [`Store::list_channels`] for `hidden_channels`
+    /// (`http::reports`) to have excluded it from in the first place, so
+    /// scoping it per-channel here would let a report queue that never
+    /// restricted a thread's visibility go on to refuse acting on it.
     pub async fn channel_scopes_moderation(&self, id: ChannelId) -> anyhow::Result<bool> {
         Ok(match self.channel(id).await? {
-            Some(channel) => channel.kind != super::dms::DM_CHANNEL_KIND,
+            Some(channel) => {
+                channel.kind != super::dms::DM_CHANNEL_KIND && channel.parent_message_id.is_none()
+            }
             None => false,
         })
     }
@@ -119,7 +132,9 @@ impl Store {
     ) -> anyhow::Result<Option<Channel>> {
         let row = sqlx::query!(
             r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
-                      position AS "position!: i64", created_at AS "created_at!"
+                      position AS "position!: i64",
+                      parent_message_id AS "parent_message_id: crate::ids::MessageId",
+                      created_at AS "created_at!"
                FROM channels WHERE id = ?"#,
             id
         )
@@ -131,6 +146,7 @@ impl Store {
             kind: r.kind,
             topic: r.topic,
             position: r.position,
+            parent_message_id: r.parent_message_id,
             created_at: r.created_at,
         }))
     }
@@ -213,6 +229,12 @@ impl Store {
     /// Note the last-channel guard counts only non-DM channels: otherwise a
     /// deployment could delete its final real channel as long as one DM existed,
     /// leaving members with nowhere to talk.
+    ///
+    /// It excludes a thread's own channels from that same count for the
+    /// identical reason: a thread is never where anyone lands, and without
+    /// this a deployment holding a handful of threads on its one real channel
+    /// could have that channel deleted while the count still reads above one -
+    /// see docs/decisions/0005-threads.md.
     pub async fn delete_channel(&self, id: ChannelId) -> Result<bool, DeleteChannelError> {
         let now = now_ms();
         let mut tx = self.pool.begin().await?;
@@ -221,7 +243,8 @@ impl Store {
             "UPDATE channels SET deleted_at = ?
              WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'
                AND (SELECT COUNT(*) FROM channels
-                    WHERE deleted_at IS NULL AND kind != 'dm') > 1",
+                    WHERE deleted_at IS NULL AND kind != 'dm'
+                      AND parent_message_id IS NULL) > 1",
             now,
             id
         )

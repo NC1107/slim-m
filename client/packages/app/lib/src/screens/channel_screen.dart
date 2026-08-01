@@ -189,39 +189,28 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     unawaited(submitMessageEdit(ref, context, message, content));
   }
 
-  /// What this viewer may do to [message], which is the screen's business:
-  /// it is the one holding the session and the permission bits.
+  /// What this viewer may do to [message]; the policy itself now lives in
+  /// `channel_message_actions.dart`'s `messageActionsFor`, which this only
+  /// supplies the screen-held state (the session, the permission bits, and
+  /// the two callbacks that swap this screen's own composer state) to.
   MessageActions _actionsFor(
     Message message, {
     required String? myId,
     required int myPermissions,
     required Set<String> pinnedIds,
-  }) {
-    final pinned = pinnedIds.contains(message.id);
-    return MessageActions(
-      canReply: canReplyToMessage(message, myPermissions),
-      onReply: () => _startReply(message),
-      canEdit: canEditMessage(message, myId),
-      onEdit: () => _startEdit(message),
-      canDelete: canDeleteMessage(message, myId, myPermissions),
-      onDelete: () => unawaited(confirmAndDeleteMessage(ref, context, message)),
-      canManagePins: canManageMessagePin(message, myPermissions),
-      pinned: pinned,
-      onTogglePin: () => unawaited(
-        toggleMessagePin(
-          ref,
-          context,
-          channelId: widget.channelId,
-          message: message,
-          pinned: pinned,
-        ),
-      ),
-      canReport: canReportMessage(message, myId),
-      onReport: () => unawaited(reportMessage(context, message)),
-      canBlockAuthor: canBlockMessageAuthor(message, myId),
-      onBlockAuthor: () => unawaited(blockMessageAuthor(context, message)),
-    );
-  }
+    required bool channelIsThread,
+  }) => messageActionsFor(
+    ref,
+    context,
+    message,
+    channelId: widget.channelId,
+    channelIsThread: channelIsThread,
+    myId: myId,
+    myPermissions: myPermissions,
+    pinnedIds: pinnedIds,
+    onReply: _startReply,
+    onEdit: _startEdit,
+  );
 
   /// Both the flag and the query live in [channelSearchProvider] so the
   /// compact layout's app bar, built above this screen, can drive them too.
@@ -307,13 +296,10 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) =>
           const Center(child: Text('Could not open the local store.')),
-      data: (store) => StreamBuilder<List<Channel>>(
-        stream: store.watchChannels(),
-        builder: (context, channelsSnapshot) {
-          final channel = channelsSnapshot.data
-              ?.where((c) => c.id == widget.channelId)
-              .cast<Channel?>()
-              .firstOrNull;
+      data: (store) => StreamBuilder<Channel?>(
+        stream: store.watchChannelRow(widget.channelId),
+        builder: (context, channelSnapshot) {
+          final channel = channelSnapshot.data;
           final channelName = channel?.name ?? '';
           final lastReadSeq = channel?.lastReadSeq ?? 0;
           final dmPartnerId = channel?.dmParticipantId;
@@ -423,6 +409,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                     myId: myId,
                                     myPermissions: myPermissions,
                                     pinnedIds: pinnedIds,
+                                    channelIsThread:
+                                        channel?.parentMessageId != null,
                                   ),
                                   onRetry: (m) =>
                                       unawaited(retryMessage(ref, m)),

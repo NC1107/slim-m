@@ -1869,6 +1869,49 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /channels/{channelId}/messages/{messageId}/thread:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+      - name: messageId
+        in: path
+        required: true
+        description: The message's UUID.
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: openThread
+      tags: [messages]
+      summary: Open (or reuse) the thread hanging off a message.
+      description: >
+        A thread is a hidden channel with `parent_message_id` set to this
+        message: its own view and send permissions inherit the parent
+        channel's, evaluated live rather than copied, and it never appears
+        in `listChannels`. Idempotent per message - a second call for the
+        same message, by anyone who can already see it, returns the same
+        channel rather than creating a second one. Requires VIEW_CHANNEL and
+        SEND_MESSAGES in `channelId`, the same bits `sendMessage` itself
+        needs there, since starting a thread is a way of sending rather than
+        a way of managing the channel. Refused if the named message is
+        itself inside a thread: nesting is not supported.
+      responses:
+        "200":
+          description: The thread channel, created on first use.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Channel"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /channels/{channelId}/pins:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -3621,6 +3664,16 @@ components:
             per-device preference. Absent on servers older than this field,
             which a client must treat as unknown rather than assuming 0.
             Meaningless on a DM, which never appears in `listChannels`.
+        parent_message_id:
+          type: [string, "null"]
+          format: uuid
+          description: >
+            The message this channel is a thread of, or null for an ordinary
+            channel. A thread's own `kind` and permissions are never what
+            govern it: VIEW_CHANNEL/SEND_MESSAGES here inherit the parent
+            message's own channel, resolved live rather than copied. A
+            thread never appears in `listChannels`; reach one through
+            `openThread`.
         created_at:
           type: integer
           format: int64
@@ -4043,6 +4096,14 @@ components:
             channel. Carries only the id: resolve the parent's own content,
             author and liveness by looking that id up like any other message,
             never trust a cached copy of them here.
+        thread_channel_id:
+          type: [string, "null"]
+          format: uuid
+          description: >-
+            The thread opened from this message, or null if none has been
+            started yet. Always present as a key, the same "null means
+            genuinely none" convention `poll` follows. Open (or reuse) it
+            with `openThread`.
         reactions:
           type: array
           description: >-

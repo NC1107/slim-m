@@ -51,6 +51,11 @@ impl Store {
         let Some(channel) = self.channel(channel_id).await? else {
             return Ok(Vec::new());
         };
+        // A thread has no overwrites of its own; see `permission_channel`.
+        let Some(channel) = self.permission_channel(channel).await? else {
+            return Ok(Vec::new());
+        };
+        let channel_id = channel.id;
 
         // One query: asking per candidate restores the cost this function removes.
         let timed_out = self.timed_out_among_until(candidates).await?;

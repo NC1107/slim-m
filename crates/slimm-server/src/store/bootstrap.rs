@@ -123,11 +123,19 @@ impl Store {
     /// rather than trusting every caller of this method to do it themselves,
     /// is what keeps a DM out of the ordinary channel list even though it
     /// lives in the same table.
+    ///
+    /// Also excludes a thread (`parent_message_id IS NOT NULL`), for the same
+    /// reason and by the same mechanism: a thread is a hidden sub-channel
+    /// reached from the message it was opened on, never a rail entry - see
+    /// docs/decisions/0005-threads.md.
     pub async fn list_channels(&self) -> anyhow::Result<Vec<super::Channel>> {
         let rows = sqlx::query!(
             r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
-                      position AS "position!: i64", created_at AS "created_at!"
-               FROM channels WHERE deleted_at IS NULL AND kind != 'dm'
+                      position AS "position!: i64",
+                      parent_message_id AS "parent_message_id: crate::ids::MessageId",
+                      created_at AS "created_at!"
+               FROM channels
+               WHERE deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL
                ORDER BY position, created_at"#
         )
         .fetch_all(&self.pool)
@@ -140,6 +148,7 @@ impl Store {
                 kind: r.kind,
                 topic: r.topic,
                 position: r.position,
+                parent_message_id: r.parent_message_id,
                 created_at: r.created_at,
             })
             .collect())

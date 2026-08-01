@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: ChannelId\", name AS \"name!\", kind AS \"kind!\", topic,\n                      position AS \"position!: i64\", created_at AS \"created_at!\"\n               FROM channels WHERE id = ? AND deleted_at IS NULL",
+  "query": "SELECT id AS \"id!: ChannelId\", name AS \"name!\", kind AS \"kind!\", topic,\n                      position AS \"position!: i64\",\n                      parent_message_id AS \"parent_message_id: crate::ids::MessageId\",\n                      created_at AS \"created_at!\"\n               FROM channels WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -29,8 +29,13 @@
         "type_info": "Integer"
       },
       {
-        "name": "created_at!",
+        "name": "parent_message_id: crate::ids::MessageId",
         "ordinal": 5,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 6,
         "type_info": "Integer"
       }
     ],
@@ -43,8 +48,9 @@
       false,
       true,
       false,
+      true,
       false
     ]
   },
-  "hash": "9c0b9838cf7c87bdd39c15beb3c1f449f2baca6588068aab0d159b498157f5a5"
+  "hash": "38a014c2675628b12e21325265cd39b65fd99a1e240285fef32d6d08902a3677"
 }

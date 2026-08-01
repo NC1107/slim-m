@@ -12,6 +12,46 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## Threads, built from the option [0005](docs/decisions/0005-threads.md) recommended (2026-08-01)
+
+`docs/decisions/0005-threads.md`'s option 1 (a thread is a channel with a parent) is built, under a stated assumption since the owner had not explicitly confirmed the choice: the shape is additive, so it can be walked back.
+Read the decision record first; this section is what building it actually found.
+
+**One column, resolved live, never a second authority.**
+`channels.parent_message_id` (migration 0030) references the message a thread hangs off - not a self-referencing `parent_channel_id` as the decision record's own prose suggested, because the parent *channel* is always derivable from that message's own `channel_id` and storing it separately would be exactly the "second authority over one fact" this project's own reconciliation writeup already named as the canvas's worst residual.
+`Store::permission_channel` (`store/permissions.rs`) is the one place that resolution happens: given a channel, if it carries a `parent_message_id` it is swapped for the channel its parent message lives in before any overwrite or kind is consulted, so a thread's `VIEW_CHANNEL`/`SEND_MESSAGES` are the parent's, not a copy and not a synthesized overwrite.
+
+**Nesting is refused, and finding out why was the one place the plan under-specified itself.**
+`permission_channel` resolves exactly one hop.
+A thread opened on a message that is itself inside a thread would have resolved to the *inner* thread's own channel row, which carries no overwrites of its own either, so the evaluation would silently fall back to base `@everyone` permissions and ignore whatever deny the real top-level channel had set.
+`Store::open_thread` (`store/threads.rs`) refuses this outright - `OpenThreadError::NestedThread`, a 400 - rather than either building recursive resolution or leaving the hole open.
+
+**Every place that lists, counts, or enumerates channels was checked by hand, per the task's own instruction, and each needed at most one line.**
+`Store::list_channels` gained `AND parent_message_id IS NULL` beside its existing `kind != 'dm'` exclusion.
+`Store::reorder_channels` had its *own* copy of that same query (not a call to `list_channels`) and needed the identical fix - the kind of duplicate-query drift this project's history already flags as the recurring shape of these bugs.
+`Store::delete_channel`'s last-channel guard counts `WHERE kind != 'dm'`; without also excluding threads, a deployment holding a handful of threads on its one real channel could have that channel deleted while the count still read above one, exactly the bug the decision record predicted by name.
+`channel_scopes_moderation` now treats a thread like a DM (returns false): it has no `channel_overwrites` bucket of its own for a per-channel moderation check to mean anything, and it is invisible to the report queue's own list-based exclusion (`http::reports::hidden_channels`) for the same reason a DM is, so scoping it per-channel there would have let the queue refuse to act on a report it never restricted seeing in the first place.
+Push fan-out (`viewers_among`) and the plain per-user path (`permissions_in_channel`) both needed the same `permission_channel` substitution independently, since `viewers_among` carries its own inlined copy of the overwrite evaluation for batching - mutation-tested separately, and each kills exactly one of the two tests written for it, not both.
+
+**Discovery is a batch-loaded field, not a live event, and that was a deliberate reach for the project's own established pattern over the more obvious one.**
+A message's `thread_channel_id` is attached by `message_enrich::with_reactions` exactly the way reactions and attachments already are - resolved fresh on every list, search, or `/sync`, never carried on the event that created it.
+No `Event::ThreadOpened` (or similar) was added: a live event would only reach someone already connected when the thread opened, and this project has an entire section above ("Reconciling an edit nobody was online for") about exactly the failure of leaning on live events for state a reconnecting or newly-arriving client also needs.
+The cost is that a bystander who opens the parent channel *after* a thread was created only learns about it on their next fetch of that channel, not instantly; accepted, since the alternative reintroduces the debt this project already paid down once.
+
+**Client-side, the local `channels` table needed the same exclusion as the server's `list_channels`, and the obvious way to add it - filtering `MessageStore.watchChannels()` - would have broken the one screen that legitimately needs a thread row.**
+`ChannelScreen` is reused wholesale for a thread's transcript and composer (`ThreadScreen` is a two-line `Scaffold` wrapper), and it looks its own channel up by id to render a name and read marker.
+Filtering `watchChannels()` centrally would have made that lookup fail for exactly the channel kind this feature exists to open, so a new `MessageStore.watchChannelRow(id)` (unfiltered, singular) was added instead, and `ChannelScreen` was switched to it - which also deleted the `.where().cast().firstOrNull` chain it used to need.
+`channel_screen.dart` sat at exactly 500 lines (the hard ceiling) before this, so making room for the two new `MessageActions` fields meant extracting its `_actionsFor` method into `channel_message_actions.dart`'s new `messageActionsFor` first; the file is 488 lines now.
+
+**`replaceChannels`'s full-list pruning would have silently deleted every open thread on the next routine refresh, and this was caught only by tracing the call graph, not by a test failing.**
+`ChannelRefresher.refresh()` calls `replaceChannels(channels + dms)` on every reconnect and after *any* role, overwrite, or channel-list live event - which a thread, excluded from both `GET /channels` and `GET /dms` by design, can never appear in.
+Unpatched, `replaceChannels` treats "not in the server's list" as "prune it and its messages," so the very first `OverwriteChanged` anywhere in the deployment after opening a thread would have wiped it.
+It now also keeps whatever the local table already has flagged as a thread (`parent_message_id IS NOT NULL`), which is bounded and safe because a thread is otherwise only ever removed by an explicit `ChannelDeleted` event - the same one any other channel's deletion already goes through, since `permission_channel` makes that authorization check resolve correctly for a thread too.
+
+**Mutation-tested by hand, four separate single-line reverts, each restored immediately after**: dropping the `parent_message_id IS NULL` filter from `list_channels` failed the rail-exclusion test and nothing else; removing `permission_channel`'s substitution from `evaluate_channel_permissions` failed the view-inheritance test and nothing else; removing it from `viewers_among` failed the push-fan-out inheritance test and nothing else; reverting `delete_channel`'s guard to count threads failed the last-channel test and nothing else. See `crates/slimm-server/tests/threads.rs`.
+
+Deliberately not built, and named rather than silently missing: a live "thread opened" notification for someone already viewing the parent channel (see the discovery note above); a reply-count or "N replies" affordance on the parent message, which would need the same field surfaced in the message row rather than only used to gate the context-menu item; and any UI for deleting a thread specifically - the generic `DELETE /channels/{id}` route already reaches one for anyone holding deployment-wide `MANAGE_CHANNELS`, with the last-channel guard now correctly indifferent to it.
+
 ## Reconciling an edit nobody was online for (2026-07-31)
 
 The project's oldest recorded correctness debt, closed across four PRs: #235 (the op stream), #236 (the client's cursor and models), #237 (the wire), #238 (applying them).

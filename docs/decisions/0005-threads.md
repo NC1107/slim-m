@@ -1,8 +1,15 @@
 # 0005 - Threads
 
 Date: 2026-08-01.
-Status: open.
-This is options and a recommendation, not a decision - the owner picks.
+Status: **built, 2026-08-01, under a stated assumption.**
+Option 1 (a thread is a channel with a parent) is what shipped.
+`channels.parent_message_id` references the message a thread hangs off, resolved live rather than copied.
+Every place that lists, counts, or evaluates permissions for a channel was checked and either already worked unchanged or was given the one-line exclusion the option's own writeup predicted: `list_channels`, `reorder_channels`'s own query, `delete_channel`'s last-channel guard, and `channel_scopes_moderation`.
+The owner had not explicitly confirmed the choice at build time.
+The shape is additive - a nullable column, one new route, no changes to any existing wire type's meaning - and was judged safe to build ahead of that confirmation on that basis; see the PR for the full reasoning.
+Nesting (a thread opened on a message that is itself inside a thread) is refused server-side, found during the build rather than anticipated by the writeup below.
+The permission-inheritance mechanism resolves exactly one hop, and a second thread layered on top would have evaluated against the inner thread's own empty overwrite bucket instead of the real channel's, silently dropping whatever deny the real channel had set.
+The rest of this file is the pre-build writeup, kept for the record of why option 1 won.
 
 ## Where this came from
 
