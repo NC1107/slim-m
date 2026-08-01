@@ -181,6 +181,43 @@ The blast radius if a run goes wrong is your live deployment and your store buil
 The middle option is the recommendation.
 It keeps the deploy decision human while losing almost nothing, since merging a standing release PR takes seconds and is the one step where a bad change becomes irreversible.
 
+## 14. The release gate checks the wrong commit, and it cost server 0.23.0 its artifacts (2026-08-01)
+
+**Server 0.23.0's publish jobs were all skipped.** The tag and the GitHub release exist and look perfectly normal; there are no static binaries attached and no `0.23.0` tag on the container image.
+
+The deployment is fine and needed no intervention: images are pushed per main commit and `latest` moved to the release commit, so watchtower picked it up and the live instance reports 0.23.0 with the channel-reorder route on it. What is missing is the ability to *pin* that version, and the downloadable binaries.
+
+**The mechanism, which is exact rather than inferred.**
+`release.yml`'s `verify-server-ci` gate polls the check runs on `github.sha` - the commit that *triggered* the workflow run.
+`release-please` inside that same run does not act on `github.sha`; it acts on the repository's current state through the API.
+Those two are normally identical and diverged here: a client-only merge (#273) started a run, and the server release PR was merged while that run was still going, so release-please created server 0.23.0 and reported `server_released=true` **from a run whose `github.sha` was the client-only commit**.
+
+`server-ci` is path-filtered to `crates/**`, `schema/openapi.yaml`, the Cargo files and the Dockerfile, so it correctly never ran on that client-only commit.
+The gate then waited for a `check` that could not exist, timed out, and failed, and every publish job is `needs: verify-server-ci`.
+
+So the failure needs no misconfiguration and no cancelled check.
+It needs only two merges close enough together that a run outlives the state it was started for, which is exactly how this repository is worked on.
+
+**The fix, not built:** gate on the commit being released rather than on `github.sha`. `release-please` already outputs the tag it created, so the released SHA is available in the same job that currently passes `github.sha` down.
+Left unbuilt because it changes the release path, which is the one path where a wrong guess is expensive and invisible, and because it is worth deciding alongside section 13 - both are the same underlying question of what the gate is really asserting about.
+
+**A second thing to know, worth more than the first:** every symptom here was a *green* release.
+The tag, the GitHub release and the changelog all looked right; only reading the individual job conclusions showed four skips.
+That is now the third distinct way this repository has produced a release that looks correct and is not (0.17.0's cancelled check, this, and the changelog gap below), so a release being green should not be taken as a release being complete.
+
+## 15. Client 0.20.0 shipped a feature its changelog does not mention (2026-08-01)
+
+`client/CHANGELOG.md` for 0.20.0 lists the jump-to-message and channel-reorder work and not the message text selection (#274), which is in the release.
+
+My mistake, and the mechanism is worth recording because it is not obvious: I merged #274 and then merged the standing release PR before `release-please` had regenerated it, so the changelog in that PR predated the commit.
+The tag then landed *after* #274, so the code shipped, and because the next release's commit range starts after this tag, that entry will never appear in any changelog.
+
+Not corrected, deliberately: `CHANGELOG.md` is generated and hand-editing it is forbidden here, and this project's notes already record somebody trying exactly that patch-up on client 0.8.0.
+The user-facing impact is nil, since the what's-new screen carries the feature and that is what a person actually sees.
+
+*The rule this needs:* after merging anything that affects a component, its standing release PR has to be allowed to regenerate before being merged.
+`MERGEABLE` is not the signal - the PR was mergeable the whole time, it was just stale.
+
 ## 13. Should a release wait for a cancelled check, or fail?
 
 `verify-release-checks` treats a **cancelled** required check as a failure.
