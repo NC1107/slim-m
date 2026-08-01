@@ -249,6 +249,25 @@ The user-facing impact is nil, since the what's-new screen carries the feature a
 *The rule this needs:* after merging anything that affects a component, its standing release PR has to be allowed to regenerate before being merged.
 `MERGEABLE` is not the signal - the PR was mergeable the whole time, it was just stale.
 
+## 16. Does the voice lobby screen earn its place?
+
+You have said twice that the join-preview screen "has no purpose" and "is not earning its place", and `docs/BACKLOG.md` records it as a standing view rather than a passing remark.
+It is the last open entry in that backlog that is not the camera work, so it is worth settling rather than carrying.
+
+**Why it has not just been deleted.** The same screen is where `_WhoIsHere` renders, which is the roster of who is already in the call before you join.
+That was a Phase 4 gap you asked to have closed, it was closed on 2026-07-28, and it is the one thing on the screen that is doing real work.
+So "delete the lobby" and "keep being able to see who is in a call before joining" pull against each other, and which one wins is a product call rather than an engineering one.
+
+**Three shapes, none chosen:**
+
+1. **Delete it, join directly.** Tapping a voice channel connects immediately. The roster moves to the rail, which already has it: `voiceRosterProvider` is per-channel and already polls for exactly this, and `VoiceChannelRow` already renders it. Cheapest, and the roster survives.
+2. **Keep it only when it has something to say.** Skip straight to the call when the channel is empty, show the preview when somebody is already in it. Avoids a pointless interstitial on the common case without losing the preview when it matters.
+3. **Keep it and give it the missing controls.** The backlog's other voice entry is camera pre-toggle, which is exactly the kind of thing a pre-join screen is for; mic pre-toggle already lives there. This is the "it is not earning its place *yet*" reading.
+
+*My recommendation is 2*, because it is the only one that costs nothing when you are wrong: it removes the interstitial precisely when it is empty, and nothing is lost if you later decide you want 1 or 3.
+
+Not built, because all three are one-line-different in effort and the choice is entirely about what you want the app to feel like.
+
 ## 13. Should a release wait for a cancelled check, or fail?
 
 `verify-release-checks` treats a **cancelled** required check as a failure.
