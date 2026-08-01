@@ -134,6 +134,24 @@ void main() {
     expect(find.byType(AttachmentView), findsOneWidget);
   });
 
+  testWidgets('the filename renders under a real Material ancestor', (
+    tester,
+  ) async {
+    await _openViewer(tester);
+
+    expect(
+      find.ancestor(
+        of: find.text('holiday.png'),
+        matching: find.byType(Material),
+      ),
+      findsWidgets,
+      reason:
+          'without one, Flutter renders the filename in its own debug '
+          'fallback style (red text, a double yellow underline), not the '
+          'colour the theme actually asks for',
+    );
+  });
+
   testWidgets('swiping down dismisses the viewer', (tester) async {
     await _openViewer(tester);
     expect(_viewer(), findsOneWidget);

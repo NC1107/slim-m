@@ -65,6 +65,14 @@ class ComposerField extends StatelessWidget {
     unawaited(onSend());
   }
 
+  /// The row's icon buttons are a fixed square (see [AppIconButton]'s own
+  /// `outerSize`) at this same touch density, so a one-line field is given
+  /// the same floor: short of it, [Stack]'s `centerLeft` alignment centres
+  /// the hint and the caret against the icons rather than sitting flush at
+  /// the top of space the icons alone are claiming.
+  double _minHeight(BuildContext context) =>
+      AppTouchTargets.of(context) ? AppSizes.rowTouch : AppSizes.rowPointer;
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -89,49 +97,53 @@ class ComposerField extends StatelessWidget {
         const SingleActivator(LogicalKeyboardKey.keyI, meta: true): () =>
             controller.value = wrapSelectionWithMarker(controller.value, '*'),
       },
-      child: Stack(
-        alignment: Alignment.centerLeft,
-        children: [
-          if (!hasText)
-            IgnorePointer(
-              child: Text.rich(
-                TextSpan(
-                  // textSecondary, matching AppInput's hint: this input is
-                  // active, and textDisabled's AA exemption does not apply.
-                  style: AppText.body.copyWith(color: tokens.textSecondary),
-                  children: [
-                    const TextSpan(text: 'Message '),
-                    TextSpan(
-                      text: '#$channelName',
-                      style: const TextStyle(fontFamily: AppFonts.mono),
-                    ),
-                  ],
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: _minHeight(context)),
+        child: Stack(
+          alignment: Alignment.centerLeft,
+          children: [
+            if (!hasText)
+              IgnorePointer(
+                child: Text.rich(
+                  key: const Key('composer-hint'),
+                  TextSpan(
+                    // textSecondary, matching AppInput's hint: this input is
+                    // active, and textDisabled's AA exemption does not apply.
+                    style: AppText.body.copyWith(color: tokens.textSecondary),
+                    children: [
+                      const TextSpan(text: 'Message '),
+                      TextSpan(
+                        text: '#$channelName',
+                        style: const TextStyle(fontFamily: AppFonts.mono),
+                      ),
+                    ],
+                  ),
                 ),
               ),
+            TextField(
+              controller: controller,
+              focusNode: focusNode,
+              onChanged: onTyping,
+              minLines: 1,
+              maxLines: 6,
+              keyboardType: TextInputType.multiline,
+              textInputAction: soft ? TextInputAction.send : null,
+              onSubmitted: soft ? (_) => _submit() : null,
+              style: AppText.body.copyWith(color: tokens.textPrimary),
+              cursorColor: tokens.accent,
+              decoration: const InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                // Opts out of the global boxed-input theme; the surrounding
+                // widget draws its own chrome.
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                contentPadding: EdgeInsets.zero,
+              ),
             ),
-          TextField(
-            controller: controller,
-            focusNode: focusNode,
-            onChanged: onTyping,
-            minLines: 1,
-            maxLines: 6,
-            keyboardType: TextInputType.multiline,
-            textInputAction: soft ? TextInputAction.send : null,
-            onSubmitted: soft ? (_) => _submit() : null,
-            style: AppText.body.copyWith(color: tokens.textPrimary),
-            cursorColor: tokens.accent,
-            decoration: const InputDecoration(
-              isDense: true,
-              border: InputBorder.none,
-              // Opts out of the global boxed-input theme; the surrounding
-              // widget draws its own chrome.
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              filled: false,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
