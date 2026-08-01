@@ -17,7 +17,6 @@ use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
-use uuid::Uuid;
 
 /// Small enough that the over-size test does not need to allocate real
 /// megabytes to exceed it.
@@ -36,8 +35,7 @@ pub async fn new_store() -> (Store, crate::support::TestDbGuard) {
 }
 
 fn media_for_test() -> Media {
-    let root = std::env::temp_dir().join(format!("slimm-media-test-{}", Uuid::now_v7()));
-    Media::new(root, TEST_MAX_ATTACHMENT_BYTES).expect("create temp media directories")
+    Media::for_tests().with_attachment_max(TEST_MAX_ATTACHMENT_BYTES)
 }
 
 pub fn app(store: Store) -> Router {

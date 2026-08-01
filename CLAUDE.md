@@ -1098,7 +1098,19 @@ Clear a pre-fix mess with `find /tmp -maxdepth 1 -name 'slimm-*' -delete` (non-e
 `tests/support/mod.rs` is a `TestDbGuard`, included per test binary with `mod support;` (a plain top-level file) or `#[path = "../support/mod.rs"] mod support;` (a `tests/<name>/main.rs` subdirectory binary), since integration tests are separate crates and a `mod.rs` with no `main.rs` is never auto-discovered as its own target.
 It deletes its `.db`, `-wal` and `-shm` siblings on drop, panic or not, and every one of the 46 files now threads it through: a helper returns `(Store, TestDbGuard)` (or `(SqlitePool, TestDbGuard)`), and every wrapper around that helper has to carry the guard onward too, or it drops (and deletes the database) the moment the wrapper returns, before the test body ever runs.
 That exact bug hit three wrappers first (`invites.rs`'s `fixture`, `registration_gate.rs`'s `claimed`, `read_state_sync.rs`'s `setup`) and surfaced as "no such table", not as a leak.
-Left unconverted: `tests/response_contract/**` (a concurrent change owned it) and four sites that create a temp media directory rather than a database (`emoji_refusal.rs`, `attachments/fixtures.rs`, `emoji_import/fixtures.rs` twice) - a different leak shape, no `-wal`/`-shm`, and out of scope for this guard.
+~~Left unconverted: `tests/response_contract/**` and four sites that create a temp media directory rather than a database.~~ Closed 2026-08-01, and the residual outlived the work by more than it should have.
+
+**A full `cargo test --all` now leaves nothing at all in `/tmp`,** measured rather than assumed: the directory is cleared, the suite is run, and the count comes back zero.
+Three of the four media sites had quietly been converted to `TestDirGuard` since the note was written, and the fourth was `tests/attachments/fixtures.rs`, which hand-rolled a root and passed it to `Media::new`.
+That is the unguarded constructor; `Media::for_tests()` had existed the whole time, does the same thing, and carries an `Arc<TempRoot>` that removes the tree when the last clone drops.
+The fixture reached past it only because it needed a smaller per-upload ceiling, so the fix is a `with_attachment_max` builder in the `with_total_ceiling` style, and the fixture is now two lines instead of four.
+
+**The shape worth remembering is that this was duplicated code before it was a leak.**
+A second copy of a constructor is where a guarantee gets dropped, because the copy is written to solve one thing (a smaller ceiling) by somebody not thinking about the other thing (cleanup) the original was carrying.
+It cost 15 directories per run from that binary alone, and `/tmp` here is a 16 GiB tmpfs shared with everything else on the box, which had accumulated 720 of them in a day.
+
+`Media::new` is still public and still unguarded, which is correct - it is what a real deployment calls, and a deployment's media root outlives the process on purpose.
+What guards it now is a test asserting the ceiling override keeps the temp guard, which fails if somebody routes the builder back through `Media::new` (mutation-tested: that change kills exactly that test and nothing else).
 
 ## Contribution conventions
 
