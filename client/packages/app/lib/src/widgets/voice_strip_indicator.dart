@@ -26,6 +26,7 @@ import 'package:slimm_rtc/rtc.dart';
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
+import '../screens/dm_call_pane.dart';
 import 'call_participant_tiles.dart';
 import 'user_avatar.dart';
 
@@ -178,7 +179,11 @@ class _Controls extends ConsumerWidget {
             icon: AppIcons.back,
             semanticLabel: 'Back to the call',
             tooltip: 'Back to the call',
-            onPressed: () => context.go(Routes.channel(channelId)),
+            onPressed: () {
+              // See RailCallSummary's identical line for why.
+              ref.read(dmCallOpenProvider.notifier).state = channelId;
+              context.go(Routes.channel(channelId));
+            },
           ),
         AppIconButton(
           icon: AppIcons.leaveCall,

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../screens/canvas/canvas_open_button.dart';
+import '../screens/dm_call_button.dart';
 import '../routing/breakpoints.dart';
 import 'member_pane.dart';
 import 'channel_rail.dart';
@@ -99,6 +100,8 @@ class ChannelHeader extends ConsumerWidget {
             semanticLabel: 'Pinned messages',
             onPressed: () => showPinnedMessagesSheet(context, channelId),
           ),
+          const SizedBox(width: AppSpacing.s4),
+          DmCallButton(channelId: channelId),
           const SizedBox(width: AppSpacing.s4),
           CanvasOpenButton(channelId: channelId),
           const SizedBox(width: AppSpacing.s4),

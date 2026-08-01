@@ -40,9 +40,16 @@ class VoiceConnecting extends StatelessWidget {
 
 /// The step before the mic and camera open.
 class VoiceJoinPreview extends ConsumerWidget {
-  const VoiceJoinPreview({required this.channelId, super.key});
+  const VoiceJoinPreview({
+    required this.channelId,
+    this.isDm = false,
+    super.key,
+  });
 
   final String channelId;
+
+  /// See [VoiceScreen.isDm]: swaps the heading and icon for a DM's call.
+  final bool isDm;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -69,10 +76,14 @@ class VoiceJoinPreview extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(AppIcons.voice, size: 32, color: tokens.textSecondary),
+                    Icon(
+                      isDm ? AppIcons.startCall : AppIcons.voice,
+                      size: 32,
+                      color: tokens.textSecondary,
+                    ),
                     const SizedBox(height: AppSpacing.s16),
                     Text(
-                      'Voice channel',
+                      isDm ? 'Call' : 'Voice channel',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: tokens.textPrimary,

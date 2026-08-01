@@ -163,6 +163,26 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.23.0',
+    headline: 'Calling someone in a direct message',
+    points: [
+      WhatsNewPoint(
+        'A direct message now has a Call button in its header, right next '
+        'to search and pinned messages. It opens the same join preview a '
+        'voice channel does, mic and camera off until you actually join.',
+      ),
+      WhatsNewPoint(
+        'Stepping away to read messages does not hang up. The call keeps '
+        'running, with the same collapsed strip and "back to the call" '
+        'a voice channel already gives you.',
+      ),
+      WhatsNewPoint(
+        'Blocking someone stops a call the same way it already stops a '
+        'message: neither of you can ring the other.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,

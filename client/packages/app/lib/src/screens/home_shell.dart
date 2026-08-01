@@ -32,6 +32,7 @@ import '../widgets/whats_new_gate.dart';
 import 'canvas/canvas_open_button.dart';
 import 'canvas/canvas_pane.dart';
 import 'channel_screen.dart';
+import 'dm_call_pane.dart';
 import 'voice_screen.dart';
 
 /// The shell. One widget handles every width: at compact widths it shows one
@@ -52,6 +53,9 @@ class HomeShell extends ConsumerWidget {
     // CanvasBar is the only header while open (ConversationPane's doc); the compact app bar below would otherwise stack a second one above it.
     final canvasOpen =
         selected != null && ref.watch(canvasOpenProvider) == selected;
+    // DmCallBar is the same: a DM's call pane replaces the header too.
+    final dmCallOpen =
+        selected != null && ref.watch(dmCallOpenProvider) == selected;
     // Never below expanded width, whatever the header toggle says: it can only
     // hide the pane, not summon room for it that is not there.
     final showMembers =
@@ -140,15 +144,16 @@ class HomeShell extends ConsumerWidget {
           voice.state == VoiceSessionState.connected &&
           voice.channelId != selected;
       // Compact: the conversation replaces the list, with a way back.
+      final replacesHeader = canvasOpen || dmCallOpen;
       scaffold = Scaffold(
-        appBar: canvasOpen
+        appBar: replacesHeader
             ? null
             : CompactChannelAppBar(
                 channelId: selected,
                 onBack: () => context.go(Routes.channels),
               ),
-        // Withheld with the back button above: the canvas claims the edge.
-        drawer: canvasOpen
+        // Withheld with the back button above: the open pane claims the edge.
+        drawer: replacesHeader
             ? null
             : CompactChannelRailDrawer(selectedChannelId: selected),
         // The roster slides in from the right instead of docking beside the
@@ -239,7 +244,8 @@ class NoChannelSelected extends StatelessWidget {
 /// way, so this still supplies a minimal one at wide layouts, as before. The
 /// canvas replaces all of that: [HomeShell] omits [CompactChannelAppBar]
 /// while it is open, and [_VoiceConversationHeader] below is skipped the same
-/// way, so [CanvasBar] is the only header at every width.
+/// way, so [CanvasBar] is the only header at every width. `DmCallPane`
+/// follows the identical shape for a DM's call, carrying its own bar.
 class ConversationPane extends ConsumerWidget {
   const ConversationPane({required this.channelId, super.key});
 
@@ -262,10 +268,15 @@ class ConversationPane extends ConsumerWidget {
               .firstOrNull;
           final isVoice = channel?.kind == 'voice';
           final canvasOpen = ref.watch(canvasOpenProvider) == channelId;
+          final dmCallOpen =
+              channel?.kind == 'dm' &&
+              ref.watch(dmCallOpenProvider) == channelId;
           final body = canvasOpen
               ? CanvasPane(channelId: channelId)
               : isVoice
               ? VoiceScreen(channelId: channelId)
+              : dmCallOpen
+              ? DmCallPane(channelId: channelId)
               : ChannelScreen(channelId: channelId);
 
           if (!layout.showsBothPanes || !isVoice || canvasOpen) return body;

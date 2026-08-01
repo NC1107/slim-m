@@ -1,0 +1,94 @@
+// SPDX-License-Identifier: Apache-2.0
+/// A DM's call, as a mode of that channel's pane rather than a route.
+///
+/// Mirrors `canvas_pane.dart`'s `canvasOpenProvider`: opening a call swaps
+/// the whole conversation body, header included, the same way a real voice
+/// channel's kind always does. The difference is a DM is a call only while
+/// this state says so, since most of the time it is a text conversation;
+/// closing this pane only stops showing it, the same way leaving a real
+/// voice channel's screen does not hang up - a call already joined keeps
+/// running via `voiceControllerProvider` (see `VoiceStripIndicator`)
+/// regardless of whether this pane is what is on screen.
+library;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_design_system/design_system.dart';
+
+import '../widgets/voice_strip_indicator.dart' show CallChannelName;
+import 'voice_screen.dart';
+
+/// The DM channel whose call pane is open, or null.
+final dmCallOpenProvider = StateProvider<String?>((ref) => null);
+
+class DmCallPane extends ConsumerWidget {
+  const DmCallPane({super.key, required this.channelId});
+
+  final String channelId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Container(
+      color: tokens.surfaceBase,
+      // No AppBar sits above this bar; see ConversationPane's doc.
+      child: SafeArea(
+        left: false,
+        child: Column(
+          children: [
+            _DmCallBar(
+              channelId: channelId,
+              onClose: () => ref.read(dmCallOpenProvider.notifier).state = null,
+            ),
+            Expanded(child: VoiceScreen(channelId: channelId, isDm: true)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DmCallBar extends StatelessWidget {
+  const _DmCallBar({required this.channelId, required this.onClose});
+
+  final String channelId;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: AppSizes.paneGutter),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            AppIcons.startCall,
+            size: AppSizes.icon16,
+            color: tokens.textSecondary,
+          ),
+          const SizedBox(width: AppSpacing.s8),
+          Expanded(
+            // The same widget the collapsed call strip uses; see its own doc.
+            child: CallChannelName(
+              channelId: channelId,
+              style: AppText.body.copyWith(
+                color: tokens.textPrimary,
+                fontWeight: AppWeights.medium,
+              ),
+            ),
+          ),
+          AppIconButton(
+            icon: AppIcons.dismiss,
+            semanticLabel: 'Back to messages',
+            tooltip: 'Back to messages',
+            onPressed: onClose,
+          ),
+        ],
+      ),
+    );
+  }
+}

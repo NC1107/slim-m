@@ -86,6 +86,10 @@ abstract final class AppIcons {
   static const IconData cameraOff = LucideIcons.videoOff300;
   static const IconData screenShare = LucideIcons.monitorUp300;
   static const IconData leaveCall = LucideIcons.phoneOff300;
+
+  /// Starting or joining a DM call, distinct from [voice] (a voice channel's
+  /// own icon) since a DM has no channel kind of its own to draw.
+  static const IconData startCall = LucideIcons.phone300;
   static const IconData canvas = LucideIcons.pencilRuler300;
 
   /// The canvas's own draw/erase toggle. Distinct constants from [edit] even

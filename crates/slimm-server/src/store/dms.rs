@@ -10,9 +10,9 @@
 //!
 //! Modelling a DM as a channel is what lets every other feature - sending,
 //! editing, keyset pagination, full-text search, bundled sync, push fan-out,
-//! and the WebSocket fan-out filter - keep working completely unchanged: all
-//! of them already gate on [`Store::has_permission`] /
-//! [`Store::permissions_in_channel`], and [`Store::permissions_in_channel`]
+//! the WebSocket fan-out filter, and voice tokens and rosters - keep working
+//! completely unchanged: all of them already gate on [`Store::has_permission`]
+//! / [`Store::permissions_in_channel`], and [`Store::permissions_in_channel`]
 //! is the one place taught about the `dm` kind (see [`dm_permissions`]).
 //!
 //! What is deliberately NOT reused is the role/overwrite evaluator itself.
@@ -32,21 +32,30 @@ use super::{Channel, Store, User, now_ms};
 pub(crate) const DM_CHANNEL_KIND: &str = "dm";
 
 /// Everything a DM participant can ever do inside it. Deliberately narrower
-/// than [`Permissions::ALL`]: there is no moderation, no roles, and no
-/// canvas or voice inside a DM, only a conversation between two people.
+/// than [`Permissions::ALL`]: there is no moderation, no roles, and no canvas
+/// inside a DM, only a conversation between two people - voice is the one
+/// exception, since a call between exactly those two people is still just
+/// that conversation. `KICK_MEMBERS` stays out on purpose, so neither party
+/// can evict the other from their own call; leaving is each side's own doing.
 const DM_BASE: Permissions = Permissions::VIEW_CHANNEL
     .union(Permissions::SEND_MESSAGES)
     .union(Permissions::ADD_REACTIONS)
-    .union(Permissions::ATTACH_FILES);
+    .union(Permissions::ATTACH_FILES)
+    .union(Permissions::CONNECT)
+    .union(Permissions::SPEAK);
 
-/// What a block removes: everything that creates new content. `VIEW_CHANNEL`
-/// survives so a block stops a conversation without erasing it; a party who
-/// blocked (or was blocked by) the other can still read what already
-/// happened, and it also means an out-of-band delete of `user_blocks` cannot
-/// double as a way to silently reopen a hidden history.
+/// What a block removes: everything that creates new content, voice
+/// included, since a blocked person must not be able to ring or join a call
+/// any more than they can send a message. `VIEW_CHANNEL` survives so a block
+/// stops a conversation without erasing it; a party who blocked (or was
+/// blocked by) the other can still read what already happened, and it also
+/// means an out-of-band delete of `user_blocks` cannot double as a way to
+/// silently reopen a hidden history.
 const BLOCKED_DENY: Permissions = Permissions::SEND_MESSAGES
     .union(Permissions::ADD_REACTIONS)
-    .union(Permissions::ATTACH_FILES);
+    .union(Permissions::ATTACH_FILES)
+    .union(Permissions::CONNECT)
+    .union(Permissions::SPEAK);
 
 /// Why opening a DM failed.
 #[derive(Debug)]
