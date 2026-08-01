@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.17.2](https://github.com/NC1107/slim-m/compare/client-v0.17.1...client-v0.17.2) (2026-08-01)
+
+
+### Bug Fixes
+
+* **client:** a message you sent never raises the unread divider ([#255](https://github.com/NC1107/slim-m/issues/255)) ([13f5278](https://github.com/NC1107/slim-m/commit/13f52780d3a43a9f2522b842e6750569571e2f2a))
+* **client:** hover actions overlay the message row instead of resizing it ([#251](https://github.com/NC1107/slim-m/issues/251)) ([3807840](https://github.com/NC1107/slim-m/commit/38078409b66f49599a402263bb6f40c752a5d37e))
+* **client:** stop two channels overlaying during a switch, and cap inline images ([#253](https://github.com/NC1107/slim-m/issues/253)) ([d9d7854](https://github.com/NC1107/slim-m/commit/d9d7854d854bfcfcb6221d92b7adc236c0d4f512))
+
 ## [0.17.1](https://github.com/NC1107/slim-m/compare/client-v0.17.0...client-v0.17.1) (2026-07-31)
 
 
