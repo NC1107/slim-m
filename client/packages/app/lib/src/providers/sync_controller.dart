@@ -19,6 +19,19 @@ import 'providers.dart';
 /// pretending everything is fine while messages silently stop arriving.
 enum SyncStatus { offline, connecting, live }
 
+/// Whether this session's first catch-up round has completed, independent of
+/// whether the live socket then attaches.
+///
+/// Read by the transcript ([MessageTranscript.historyKnown]) so an optimistic
+/// send made before the very first catch-up lands does not briefly anchor a
+/// day divider it does not really own - see `isNewDay`'s own doc comment.
+/// Deliberately not folded into [SyncStatus]: that flips back to
+/// `connecting`/`offline` on every later reconnect, while this only ever
+/// needs to become true once and stay true for the session, since a
+/// reconnect's catch-up can only confirm history already known, never
+/// un-confirm it.
+final initialSyncCompleteProvider = StateProvider<bool>((ref) => false);
+
 /// Drives synchronisation.
 ///
 /// The order matters and is the whole point: on every (re)connect it catches up
@@ -119,6 +132,7 @@ class SyncController extends StateNotifier<SyncStatus> {
       if (generation != _generation) return;
       await _catchUp(generation, api, store);
       if (generation != _generation) return;
+      _ref.read(initialSyncCompleteProvider.notifier).state = true;
       await _attach(generation, api, store);
       if (generation != _generation) return;
 
@@ -413,6 +427,7 @@ class SyncController extends StateNotifier<SyncStatus> {
     await stop();
     _ref.invalidate(channelHistoryProvider);
     _ref.invalidate(meProvider);
+    _ref.invalidate(initialSyncCompleteProvider);
     _ref.read(messageExtrasProvider.notifier).clear();
     try {
       final store = await _ref.read(storeProvider.future);

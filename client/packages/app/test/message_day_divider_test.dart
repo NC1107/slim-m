@@ -16,20 +16,41 @@ int _ms(int year, int month, int day, [int hour = 12]) =>
 
 void main() {
   group('isNewDay', () {
-    test('the oldest loaded message anchors its own day', () {
-      expect(isNewDay(message(createdAt: _ms(2026, 7, 28)), null), isTrue);
+    test('the oldest loaded message anchors its own day once history is '
+        'known', () {
+      expect(
+        isNewDay(
+          message(createdAt: _ms(2026, 7, 28)),
+          null,
+          historyKnown: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('the oldest loaded message does not anchor before history is '
+        'known, or an optimistic send racing catch-up would flash one '
+        '(docs/BACKLOG.md)', () {
+      expect(
+        isNewDay(
+          message(createdAt: _ms(2026, 7, 28)),
+          null,
+          historyKnown: false,
+        ),
+        isFalse,
+      );
     });
 
     test('two messages on the same day share it, hours apart or not', () {
       final morning = message(createdAt: _ms(2026, 7, 28, 9));
       final night = message(createdAt: _ms(2026, 7, 28, 21));
-      expect(isNewDay(night, morning), isFalse);
+      expect(isNewDay(night, morning, historyKnown: true), isFalse);
     });
 
     test('a message just across midnight opens a new day', () {
       final before = message(createdAt: _ms(2026, 7, 28, 23));
       final after = message(createdAt: _ms(2026, 7, 29, 0));
-      expect(isNewDay(after, before), isTrue);
+      expect(isNewDay(after, before, historyKnown: true), isTrue);
     });
   });
 

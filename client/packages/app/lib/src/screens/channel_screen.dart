@@ -275,6 +275,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     final history = ref.watch(channelHistoryProvider(widget.channelId));
     final paging = ref.read(channelHistoryProvider(widget.channelId).notifier);
     final syncStatus = ref.watch(syncControllerProvider);
+    final historyKnown = ref.watch(initialSyncCompleteProvider);
     final myId = ref.watch(meProvider).valueOrNull?.id;
     final myPermissions = ref.watch(myPermissionsProvider);
     final pinnedIds = <String>{
@@ -374,6 +375,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                       ?.userId,
                                   messages: transcript.messages,
                                   syncStatus: syncStatus,
+                                  historyKnown: historyKnown,
                                   // Only a real named channel gets the header; a DM's name is a person, and voice never reaches here.
                                   channelName: channel?.kind == 'text'
                                       ? channelName

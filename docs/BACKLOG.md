@@ -137,18 +137,39 @@ This is a product decision with real schema consequences - `canvas_objects` is c
 - ~~**A what's-new screen on update.**~~ Fixed in #256 and #259, released in client 0.18.0. It carries one known weakness worth stating rather than discovering: nothing forces a contributor to add an entry, so a release can ship user-facing changes and show none of them. That caught us on the very first one - #256 shipped the screen with entries stopping at 0.17.2, so the first build ever to carry it would have had nothing to say about itself, and #259 was the fix.
 - ~~**On mobile, the context menu should slide up from the bottom rather than float.**~~ Fixed in #256, released in client 0.18.0. The desktop path keeps its positioned overlay, its keyboard scope and its focus handling untouched, exactly as this entry asked.
   One trap found on the way, worth keeping: this entry named `ContextMenuRegion` as the widget to branch, and a first pass built the sheet there - on a widget nothing renders. The message rows go through `MessageContextMenuRegion`, and `ContextMenuRegion` had no call sites at all, so its own test suite passed while covering code that never ran. It is deleted now.
-- **Sending a message flashes a day divider.** "on sending a message it immediately puts a divider bar like the --today-- one and then deletes it."
-  Partially diagnosed 2026-07-31, not fixed, because the obvious mechanisms did not survive checking. `isNewDay` (`message_transcript.dart:280`) returns true whenever `previous == null`, so the oldest row in the window always carries a divider - but `watchChannel` windows at 200 and only evicts at that size, so an insert does not change which row is oldest in a shorter channel. The optimistic row's ordering (`seq = 0` sorted first, then reversed to last) is also stable across the insert.
-  What is left, and wants reproducing rather than guessing: whether the drift query stream emits an intermediate row set during the optimistic insert or the server-copy replacement, in which the sent message briefly has no predecessor. A speculative fix here would be a change to divider logic that is not the bug.
-  Reproduction attempted 2026-08-01, and it did not reproduce under either mechanism named above.
-  Two tests check directly rather than reason about it.
-  `client/packages/app/test/channel_screen_day_divider_flash_test.dart` drives the real `ChannelScreen` through a gated send (the mocked `POST /channels/{id}/messages` response is held behind a `Completer`), seeded with three same-day messages already cached, and counts `DayDivider` widgets on every individual frame from the optimistic insert through the server-copy replacement landing.
-  It stays at exactly one throughout.
-  `client/packages/data/test/message_store_predecessor_test.dart` subscribes directly to `MessageStore.watchChannel`'s stream, with no widget layer at all, across the same `addPending` then `applyMessage` sequence, and asserts the sent message is never the first row in any emitted snapshot while real history exists.
-  It never is.
-  Both pass, which is a real finding rather than an absence of one: the pending row sorts last both before and after promotion (the pending group sorts last pre-reverse, and the promoted `seq` is the channel's newest), so `previous` for the sent row is the same message across both writes and neither write ever drops it.
-  This rules out the two candidate mechanisms without finding the real one.
-  Not tried here, and worth trying before guessing further: a channel whose local cache is behind the server, so the true same-day predecessor has not synced yet, with a real `SyncController` catch-up landing between the optimistic insert and the send resolving; or a live `message.created` echo for the sender's own message racing the REST response over a real socket, rather than the `_NoopSyncController` stub every widget test in this suite (including the two new ones) substitutes for it.
-  Building a harness that drives a real `SyncController` against a fake server is the prerequisite for either, and none of the existing test harnesses set one up.
+- ~~**Sending a message flashes a day divider.**~~
+  Fixed 2026-08-01, and it needed the harness the previous entry's note asked for.
+  "on sending a message it immediately puts a divider bar like the --today-- one and then deletes it."
+  Partially diagnosed 2026-07-31, not fixed then, because the obvious mechanisms did not survive checking.
+  `isNewDay` (`message_transcript.dart:280`) returned true whenever `previous == null`, so the oldest row in the window always carried a divider.
+  But `watchChannel` windows at 200 and only evicts at that size, so an insert did not change which row was oldest in a shorter channel, and the optimistic row's ordering was also stable across the insert.
+  Two tests confirmed that rather than reasoning about it: `channel_screen_day_divider_flash_test.dart` (seeded with same-day history, a gated send) and `message_store_predecessor_test.dart` (the store alone, no widget layer).
+  Both stayed at exactly one divider throughout, ruling out both candidate mechanisms without finding the real one.
+  The entry named what was left untried: a real `SyncController` catch-up landing between an optimistic send and that send's own REST response, or a live `message.created` echo racing the same response.
+  Neither could be driven by any existing widget test, since every one of them substitutes `_NoopSyncController` for the real controller.
+  **`client/packages/app/test/support/sync_harness.dart` is that missing piece.**
+  `SyncTestServer` binds a real loopback `HttpServer` and accepts the WebSocket handshake `SyncController._attach` performs; REST stays mocked through a `RestRouter`, which `MockClient` answers directly.
+  Both pieces are generic to any live-versus-local interleaving, not specific to this bug.
+  **The catch-up race reproduced, on the first mechanism named.**
+  `channel_screen_day_divider_sync_race_test.dart` seeds *no* local history (a device that has never synced this channel), gates `/sync` behind a `Completer`, and sends while it is still gated.
+  The pending message is the sole loaded row, so `isNewDay`'s `previous == null` branch anchors a divider on it - correctly, given what is known so far.
+  Releasing the gate lands two earlier same-day messages ahead of it in one atomic store write, and the divider that had been on the sent message is gone, replaced by one on the row that is now oldest.
+  Mutation-tested: reverting the fix below reproduces the exact flash, frame by frame.
+  **The live-echo race did not reproduce, checked rather than assumed.**
+  `channel_screen_day_divider_live_echo_race_test.dart` pushes the server's own `message.created` echo of the just-sent message down a real socket before that message's REST response resolves, and the divider never moves.
+  `MessageStore.applyMessage` is idempotent and route-agnostic, so which delivery path lands first changes nothing about `previous` for day-divider purposes.
+  Recorded as ruled out rather than deleted, since a future contributor re-suspecting it now has a working way to check.
+  **The fix**: `isNewDay`'s `previous == null` anchor - "the oldest loaded row also counts, anchoring the top of the transcript with the day it began" - is only trustworthy once this session's first catch-up round has actually completed.
+  Before that, the oldest loaded row is oldest only because nothing else has landed *yet*.
+  `initialSyncCompleteProvider` (`sync_controller.dart`) is a `StateProvider<bool>` set true once inside `SyncController.start`, right after `_catchUp` returns and before `_attach`, deliberately independent of whether the live socket then connects.
+  Unlike `SyncStatus`, which drops back to `connecting`/`offline` on every later reconnect, this only needs to become true once and stay true for the session, since a reconnect's catch-up can only confirm history already known, never un-confirm it.
+  `MessageTranscript.historyKnown` threads it down to `isNewDay`; `channel_screen.dart` reads the provider alongside `syncStatus`.
+  Reset on sign-out (`_endSession`) alongside the other per-session providers there.
+  **Setting it from a test's `_NoopSyncController` needs a real `await` first, not just an override.**
+  Riverpod refuses a provider modifying another provider during initialization ("Providers are not allowed to modify other providers" - found by trying it in the constructor and hitting that assertion), and the base `SyncController` constructor calls `unawaited(start())` synchronously, so an override with no `await` before the write runs inside that same initialization window.
+  The real `start()` clears this for free, since `_teardown`'s own await comes first; `_NoopSyncController.start` needs one explicit `await Future<void>.value();` before the write, which is exactly what let `channel_screen_day_divider_flash_test.dart` keep asserting its one real divider.
+  **A real `HttpServer` inside a widget test's fake-time zone hangs the test's shutdown for a fixed ~90 seconds**, then crashes with "Cannot close sink while adding stream" rather than failing cleanly - a new instance of the same class of trap as `RenderRepaintBoundary.toImage()` needing `tester.runAsync` (see the Fedora-build entry in this knowledge base).
+  `HttpServer.bind`'s own periodic idle-timeout timer is captured as a `FakeTimer` when created inside the fake zone, and the test binding's shutdown waits on it for real wall-clock time before giving up.
+  Both `SyncTestServer.start` and `.close` must be called through `tester.runAsync`; the fix is recorded on the class itself so the next caller does not rediscover it by hanging.
 - ~~**Two channels overlay each other while switching.**~~ Fixed in #253: `fadeThroughPage` was a cross-fade, not a fade-through - it faded the incoming pane in while the outgoing sat at full opacity, so both were legible at once.
 - ~~**One image fills the desktop.**~~ Fixed in #253: the inline preview was capped at the full message column on width and had no height bound at all, so a tall image took the screen. `kInlineImageMax` is half the column on both axes.
