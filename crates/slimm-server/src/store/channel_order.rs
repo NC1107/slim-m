@@ -63,7 +63,7 @@ impl Store {
 
         let live: Vec<ChannelId> = sqlx::query_scalar!(
             r#"SELECT id AS "id!: ChannelId" FROM channels
-               WHERE deleted_at IS NULL AND kind != 'dm'
+               WHERE deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL
                ORDER BY position, created_at"#
         )
         .fetch_all(&mut *tx)

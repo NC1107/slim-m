@@ -1,0 +1,23 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+-- A thread is an ordinary channel whose `parent_message_id` names the
+-- message it was opened from - checked against 0002_core_schema.sql first,
+-- and nothing was waiting for this one, the way `channels.topic` and
+-- `channels.position` once were.
+--
+-- One column, not two: the parent *channel* a thread's permissions and
+-- overwrites resolve against is never stored here, only derived live from
+-- `messages.channel_id` at read time (see `Store::permission_channel`) - the
+-- same "resolve, don't copy" choice 0029's `reply_to_id` already made for a
+-- reply's parent, so a thread cannot go stale about a fact `messages`
+-- already owns.
+--
+-- References messages(id), not the bare table name, for the reason 0029's
+-- own header already gives: 0024 gave `messages` an explicit
+-- `fts_rowid INTEGER PRIMARY KEY`, so a bare `REFERENCES messages` would
+-- bind to that instead of `id`.
+--
+-- No uniqueness constraint: `Store::open_thread` runs under `BEGIN
+-- IMMEDIATE`, which already serializes two concurrent opens of the same
+-- message onto one winner, the same race `Store::open_dm` already closes
+-- without one.
+ALTER TABLE channels ADD COLUMN parent_message_id BLOB REFERENCES messages(id);

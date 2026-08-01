@@ -202,6 +202,22 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.24.0',
+    headline: 'Threads',
+    points: [
+      WhatsNewPoint(
+        'A message\'s context menu now offers Reply in thread. It opens a '
+        'hidden side conversation attached to that one message, so a '
+        'tangent stays out of the main channel instead of burying it.',
+      ),
+      WhatsNewPoint(
+        'A thread sends and reads exactly like any other channel - the '
+        'same composer, the same transcript - and anyone who could already '
+        'read the parent channel can read and post in the thread too.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,

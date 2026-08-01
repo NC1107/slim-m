@@ -79,6 +79,12 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
   late final GeneratedColumn<int> opCursor = GeneratedColumn<int>(
       'op_cursor', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _parentMessageIdMeta =
+      const VerificationMeta('parentMessageId');
+  @override
+  late final GeneratedColumn<String> parentMessageId = GeneratedColumn<String>(
+      'parent_message_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -91,7 +97,8 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
         isPersonalSpace,
         dmParticipantId,
         position,
-        opCursor
+        opCursor,
+        parentMessageId
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -160,6 +167,12 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
       context.handle(_opCursorMeta,
           opCursor.isAcceptableOrUnknown(data['op_cursor']!, _opCursorMeta));
     }
+    if (data.containsKey('parent_message_id')) {
+      context.handle(
+          _parentMessageIdMeta,
+          parentMessageId.isAcceptableOrUnknown(
+              data['parent_message_id']!, _parentMessageIdMeta));
+    }
     return context;
   }
 
@@ -191,6 +204,8 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           .read(DriftSqlType.int, data['${effectivePrefix}position'])!,
       opCursor: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}op_cursor']),
+      parentMessageId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}parent_message_id']),
     );
   }
 
@@ -240,6 +255,15 @@ class Channel extends DataClass implements Insertable<Channel> {
   /// A reset clears it back to null rather than lowering it to zero, or the
   /// client asks from 0 forever against a server that has swept.
   final int? opCursor;
+
+  /// The message this channel is a thread of, or null for an ordinary
+  /// channel. Set only by [MessageStore.upsertChannels]'s callers when they
+  /// already hold an `api.Channel` carrying it - see
+  /// `providers/threads.dart`. Never used to derive [kind] or overwrites;
+  /// it exists locally only so a thread row can be told apart from an
+  /// ordinary one when deciding what the rail shows and what a full channel
+  /// refresh may prune.
+  final String? parentMessageId;
   const Channel(
       {required this.id,
       required this.name,
@@ -251,7 +275,8 @@ class Channel extends DataClass implements Insertable<Channel> {
       required this.isPersonalSpace,
       this.dmParticipantId,
       required this.position,
-      this.opCursor});
+      this.opCursor,
+      this.parentMessageId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -271,6 +296,9 @@ class Channel extends DataClass implements Insertable<Channel> {
     map['position'] = Variable<int>(position);
     if (!nullToAbsent || opCursor != null) {
       map['op_cursor'] = Variable<int>(opCursor);
+    }
+    if (!nullToAbsent || parentMessageId != null) {
+      map['parent_message_id'] = Variable<String>(parentMessageId);
     }
     return map;
   }
@@ -293,6 +321,9 @@ class Channel extends DataClass implements Insertable<Channel> {
       opCursor: opCursor == null && nullToAbsent
           ? const Value.absent()
           : Value(opCursor),
+      parentMessageId: parentMessageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentMessageId),
     );
   }
 
@@ -311,6 +342,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       dmParticipantId: serializer.fromJson<String?>(json['dmParticipantId']),
       position: serializer.fromJson<int>(json['position']),
       opCursor: serializer.fromJson<int?>(json['opCursor']),
+      parentMessageId: serializer.fromJson<String?>(json['parentMessageId']),
     );
   }
   @override
@@ -328,6 +360,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       'dmParticipantId': serializer.toJson<String?>(dmParticipantId),
       'position': serializer.toJson<int>(position),
       'opCursor': serializer.toJson<int?>(opCursor),
+      'parentMessageId': serializer.toJson<String?>(parentMessageId),
     };
   }
 
@@ -342,7 +375,8 @@ class Channel extends DataClass implements Insertable<Channel> {
           bool? isPersonalSpace,
           Value<String?> dmParticipantId = const Value.absent(),
           int? position,
-          Value<int?> opCursor = const Value.absent()}) =>
+          Value<int?> opCursor = const Value.absent(),
+          Value<String?> parentMessageId = const Value.absent()}) =>
       Channel(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -357,6 +391,9 @@ class Channel extends DataClass implements Insertable<Channel> {
             : this.dmParticipantId,
         position: position ?? this.position,
         opCursor: opCursor.present ? opCursor.value : this.opCursor,
+        parentMessageId: parentMessageId.present
+            ? parentMessageId.value
+            : this.parentMessageId,
       );
   Channel copyWithCompanion(ChannelsCompanion data) {
     return Channel(
@@ -376,6 +413,9 @@ class Channel extends DataClass implements Insertable<Channel> {
           : this.dmParticipantId,
       position: data.position.present ? data.position.value : this.position,
       opCursor: data.opCursor.present ? data.opCursor.value : this.opCursor,
+      parentMessageId: data.parentMessageId.present
+          ? data.parentMessageId.value
+          : this.parentMessageId,
     );
   }
 
@@ -392,14 +432,26 @@ class Channel extends DataClass implements Insertable<Channel> {
           ..write('isPersonalSpace: $isPersonalSpace, ')
           ..write('dmParticipantId: $dmParticipantId, ')
           ..write('position: $position, ')
-          ..write('opCursor: $opCursor')
+          ..write('opCursor: $opCursor, ')
+          ..write('parentMessageId: $parentMessageId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, kind, createdAt, topic, cursor,
-      lastReadSeq, isPersonalSpace, dmParticipantId, position, opCursor);
+  int get hashCode => Object.hash(
+      id,
+      name,
+      kind,
+      createdAt,
+      topic,
+      cursor,
+      lastReadSeq,
+      isPersonalSpace,
+      dmParticipantId,
+      position,
+      opCursor,
+      parentMessageId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -414,7 +466,8 @@ class Channel extends DataClass implements Insertable<Channel> {
           other.isPersonalSpace == this.isPersonalSpace &&
           other.dmParticipantId == this.dmParticipantId &&
           other.position == this.position &&
-          other.opCursor == this.opCursor);
+          other.opCursor == this.opCursor &&
+          other.parentMessageId == this.parentMessageId);
 }
 
 class ChannelsCompanion extends UpdateCompanion<Channel> {
@@ -429,6 +482,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
   final Value<String?> dmParticipantId;
   final Value<int> position;
   final Value<int?> opCursor;
+  final Value<String?> parentMessageId;
   final Value<int> rowid;
   const ChannelsCompanion({
     this.id = const Value.absent(),
@@ -442,6 +496,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.dmParticipantId = const Value.absent(),
     this.position = const Value.absent(),
     this.opCursor = const Value.absent(),
+    this.parentMessageId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChannelsCompanion.insert({
@@ -456,6 +511,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.dmParticipantId = const Value.absent(),
     this.position = const Value.absent(),
     this.opCursor = const Value.absent(),
+    this.parentMessageId = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         name = Value(name),
@@ -473,6 +529,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     Expression<String>? dmParticipantId,
     Expression<int>? position,
     Expression<int>? opCursor,
+    Expression<String>? parentMessageId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -487,6 +544,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       if (dmParticipantId != null) 'dm_participant_id': dmParticipantId,
       if (position != null) 'position': position,
       if (opCursor != null) 'op_cursor': opCursor,
+      if (parentMessageId != null) 'parent_message_id': parentMessageId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -503,6 +561,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       Value<String?>? dmParticipantId,
       Value<int>? position,
       Value<int?>? opCursor,
+      Value<String?>? parentMessageId,
       Value<int>? rowid}) {
     return ChannelsCompanion(
       id: id ?? this.id,
@@ -516,6 +575,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       dmParticipantId: dmParticipantId ?? this.dmParticipantId,
       position: position ?? this.position,
       opCursor: opCursor ?? this.opCursor,
+      parentMessageId: parentMessageId ?? this.parentMessageId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -556,6 +616,9 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     if (opCursor.present) {
       map['op_cursor'] = Variable<int>(opCursor.value);
     }
+    if (parentMessageId.present) {
+      map['parent_message_id'] = Variable<String>(parentMessageId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -576,6 +639,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
           ..write('dmParticipantId: $dmParticipantId, ')
           ..write('position: $position, ')
           ..write('opCursor: $opCursor, ')
+          ..write('parentMessageId: $parentMessageId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1176,6 +1240,7 @@ typedef $$ChannelsTableCreateCompanionBuilder = ChannelsCompanion Function({
   Value<String?> dmParticipantId,
   Value<int> position,
   Value<int?> opCursor,
+  Value<String?> parentMessageId,
   Value<int> rowid,
 });
 typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
@@ -1190,6 +1255,7 @@ typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
   Value<String?> dmParticipantId,
   Value<int> position,
   Value<int?> opCursor,
+  Value<String?> parentMessageId,
   Value<int> rowid,
 });
 
@@ -1236,6 +1302,10 @@ class $$ChannelsTableFilterComposer
 
   ColumnFilters<int> get opCursor => $composableBuilder(
       column: $table.opCursor, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parentMessageId => $composableBuilder(
+      column: $table.parentMessageId,
+      builder: (column) => ColumnFilters(column));
 }
 
 class $$ChannelsTableOrderingComposer
@@ -1281,6 +1351,10 @@ class $$ChannelsTableOrderingComposer
 
   ColumnOrderings<int> get opCursor => $composableBuilder(
       column: $table.opCursor, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parentMessageId => $composableBuilder(
+      column: $table.parentMessageId,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$ChannelsTableAnnotationComposer
@@ -1324,6 +1398,9 @@ class $$ChannelsTableAnnotationComposer
 
   GeneratedColumn<int> get opCursor =>
       $composableBuilder(column: $table.opCursor, builder: (column) => column);
+
+  GeneratedColumn<String> get parentMessageId => $composableBuilder(
+      column: $table.parentMessageId, builder: (column) => column);
 }
 
 class $$ChannelsTableTableManager extends RootTableManager<
@@ -1360,6 +1437,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<String?> dmParticipantId = const Value.absent(),
             Value<int> position = const Value.absent(),
             Value<int?> opCursor = const Value.absent(),
+            Value<String?> parentMessageId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ChannelsCompanion(
@@ -1374,6 +1452,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             dmParticipantId: dmParticipantId,
             position: position,
             opCursor: opCursor,
+            parentMessageId: parentMessageId,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -1388,6 +1467,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<String?> dmParticipantId = const Value.absent(),
             Value<int> position = const Value.absent(),
             Value<int?> opCursor = const Value.absent(),
+            Value<String?> parentMessageId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ChannelsCompanion.insert(
@@ -1402,6 +1482,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             dmParticipantId: dmParticipantId,
             position: position,
             opCursor: opCursor,
+            parentMessageId: parentMessageId,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

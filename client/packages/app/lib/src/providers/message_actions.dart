@@ -80,6 +80,17 @@ bool canReplyToMessage(Message message, int myPermissions) =>
     !message.failed &&
     myPermissions.hasPermission(Perm.sendMessages);
 
+/// Gated the same way [canReplyToMessage] is - opening a thread is a way of
+/// sending, not a way of managing the channel - plus one more: never inside
+/// a thread already. Nesting is refused server-side (see
+/// `docs/decisions/0005-threads.md`), so this keeps the menu from offering
+/// an action that would only ever come back a 400.
+bool canOpenThreadFor(
+  Message message,
+  int myPermissions, {
+  required bool channelIsThread,
+}) => !channelIsThread && canReplyToMessage(message, myPermissions);
+
 /// Own message only, matching the server's author check: a member holding
 /// MANAGE_MESSAGES can edit someone else's message server-side too, but
 /// that is deliberately not offered here (see `channel_screen.dart`).

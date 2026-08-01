@@ -68,6 +68,14 @@ pub(crate) struct MessageDto {
     /// caching this reply would go stale the moment the parent is edited or
     /// deleted with no way to notice.
     reply_to_id: Option<String>,
+    /// The thread opened from this message, or `null` if none has been
+    /// started yet. Always present as a key, the same "always there, empty
+    /// or null means genuinely none" convention `poll` and `reactions`
+    /// follow. Set by [`super::message_enrich::with_reactions`]'s batch
+    /// lookup, never by this conversion: a message can only grow a thread
+    /// after it already exists, so a freshly sent or edited one always
+    /// carries `null` here, exactly like a fresh message's `poll`.
+    pub(crate) thread_channel_id: Option<String>,
     /// Empty unless the caller asked for a list, which is the only path that
     /// batch-loads them; a single echoed message carries none because it
     /// cannot have any yet.
@@ -140,6 +148,7 @@ impl From<Message> for MessageDto {
             created_at: message.created_at,
             edited_at: message.edited_at,
             reply_to_id: message.reply_to_id.map(|id| id.to_string()),
+            thread_channel_id: None,
             reactions: Vec::new(),
             poll: None,
             attachments: Vec::new(),

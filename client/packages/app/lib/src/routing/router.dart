@@ -23,6 +23,7 @@ import '../screens/personal_settings_screen.dart';
 import '../screens/space_settings_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/sign_in_screen.dart';
+import '../screens/thread_screen.dart';
 import 'modal_page.dart';
 import 'page_transitions.dart';
 import 'routes.dart';
@@ -124,6 +125,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.debugLog,
         pageBuilder: (context, state) =>
             modalPage(context, const DebugLogScreen()),
+      ),
+      GoRoute(
+        path: Routes.threadPattern,
+        pageBuilder: (context, state) => modalPage(
+          context,
+          ThreadScreen(channelId: state.pathParameters['channelId']!),
+        ),
       ),
       // The shell keeps the channel list alive across conversation changes;
       // the child pages fade through so switching one for another reads as a

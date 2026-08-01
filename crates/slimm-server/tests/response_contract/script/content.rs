@@ -273,6 +273,13 @@ pub(super) async fn message_calls(c: &mut Contract, root: &str, channel: &str) -
         root,
     )
     .await;
+    c.bare(
+        "openThread",
+        "POST",
+        &format!("{messages}/{message}/thread"),
+        root,
+    )
+    .await;
     c.get(
         "listPinnedMessages",
         &format!("/channels/{channel}/pins"),

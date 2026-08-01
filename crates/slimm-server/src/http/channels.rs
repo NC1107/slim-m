@@ -62,6 +62,13 @@ pub(crate) struct ChannelDto {
     /// first. Set via `PUT /channels/order`, deployment-wide rather than
     /// per-device. Meaningless on a DM, which never appears in this list.
     position: i64,
+    /// The message this channel is a thread of, or `null` for an ordinary
+    /// channel. A thread's own `kind` and permissions are never what govern
+    /// it: `VIEW_CHANNEL`/`SEND_MESSAGES` here inherit the parent message's
+    /// own channel, resolved live rather than copied - see
+    /// docs/decisions/0005-threads.md. A thread never appears in
+    /// `listChannels`; reach one through `openThread`.
+    parent_message_id: Option<String>,
     created_at: i64,
 }
 
@@ -73,6 +80,7 @@ impl From<Channel> for ChannelDto {
             kind: channel.kind,
             topic: channel.topic,
             position: channel.position,
+            parent_message_id: channel.parent_message_id.map(|id| id.to_string()),
             created_at: channel.created_at,
         }
     }

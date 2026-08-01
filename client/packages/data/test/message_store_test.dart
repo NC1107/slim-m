@@ -301,6 +301,69 @@ void main() {
             'not just its row');
   });
 
+  test('watchChannels excludes a thread, mirroring the server\'s own list',
+      () async {
+    await store.upsertChannels([
+      const api.Channel(
+        id: 'thread-1',
+        name: 'Thread',
+        kind: 'text',
+        createdAt: 3,
+        parentMessageId: 'm1',
+      ),
+    ]);
+
+    final channels = await store.watchChannels().first;
+    expect(channels.map((c) => c.id), unorderedEquals(['chan-1', 'chan-2']),
+        reason: 'a thread is a hidden sub-channel, never a rail entry');
+  });
+
+  test('watchChannelRow finds a thread that watchChannels excludes', () async {
+    await store.upsertChannels([
+      const api.Channel(
+        id: 'thread-1',
+        name: 'Thread',
+        kind: 'text',
+        createdAt: 2,
+        parentMessageId: 'm1',
+      ),
+    ]);
+
+    final row = await store.watchChannelRow('thread-1').first;
+    expect(row?.id, 'thread-1');
+    expect(row?.parentMessageId, 'm1');
+  });
+
+  test(
+      'replaceChannels spares a locally known thread the pruning an ordinary '
+      'dropped channel gets', () async {
+    await store.upsertChannels([
+      const api.Channel(
+          id: 'chan-1', name: 'general', kind: 'text', createdAt: 1),
+      const api.Channel(
+        id: 'thread-1',
+        name: 'Thread',
+        kind: 'text',
+        createdAt: 2,
+        parentMessageId: 'm1',
+      ),
+    ]);
+    await store.applyMessages(
+      [_message(id: 'tm1', channelId: 'thread-1', seq: 1)],
+    );
+
+    // A full refresh names only chan-1; GET /channels never lists a thread.
+    await store.replaceChannels([
+      const api.Channel(
+          id: 'chan-1', name: 'general', kind: 'text', createdAt: 1),
+    ]);
+
+    final row = await store.watchChannelRow('thread-1').first;
+    expect(row, isNotNull, reason: 'the thread row must survive the refresh');
+    expect(await store.watchChannel('thread-1').first, isNotEmpty,
+        reason: 'and its cached messages with it');
+  });
+
   /// The window is the newest rows, not the oldest. This ordered `seq`
   /// ascending under the same limit, so past the limit the transcript was
   /// pinned to the first messages ever synced and every later arrival was

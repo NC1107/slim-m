@@ -60,8 +60,15 @@ class MessageStore {
   /// Position first, then creation order as the tiebreak every DM (whose
   /// position is never set) falls back to - the same ordering the server's
   /// own `list_channels` applies, so a cold-started rail matches a synced one.
+  ///
+  /// Excludes a thread (`parentMessageId` set), mirroring the server's own
+  /// `list_channels` exclusion: a thread is a hidden sub-channel reached
+  /// from the message it was opened on, never a rail entry. [watchChannel]
+  /// (singular, by id) is unaffected, so a thread's own messages still watch
+  /// and send normally once a caller already holds its id.
   Stream<List<Channel>> watchChannels() {
     final query = db.select(db.channels)
+      ..where((c) => c.parentMessageId.isNull())
       ..orderBy([
         (c) => OrderingTerm(expression: c.position),
         (c) => OrderingTerm(expression: c.createdAt),
@@ -73,11 +80,22 @@ class MessageStore {
   /// once rather than a subscription it would only ever read one value from.
   Future<List<Channel>> allChannels() {
     final query = db.select(db.channels)
+      ..where((c) => c.parentMessageId.isNull())
       ..orderBy([
         (c) => OrderingTerm(expression: c.position),
         (c) => OrderingTerm(expression: c.createdAt),
       ]);
     return query.get();
+  }
+
+  /// Watches one channel's own row, by id - unlike [watchChannels], never
+  /// filtered to the ordinary list, so this is what a screen already
+  /// showing a channel's messages should use to find its own name and read
+  /// marker, including a thread's, which [watchChannels] deliberately
+  /// excludes.
+  Stream<Channel?> watchChannelRow(String channelId) {
+    final query = db.select(db.channels)..where((c) => c.id.equals(channelId));
+    return query.watchSingleOrNull();
   }
 
   /// Whether a channel row exists locally.
@@ -175,6 +193,7 @@ class MessageStore {
             position: Value(channel.position),
             isPersonalSpace: Value(channel.isPersonalSpace),
             dmParticipantId: Value(channel.dmParticipantId),
+            parentMessageId: Value(channel.parentMessageId),
           ),
           onConflict: DoUpdate(
             (_) => ChannelsCompanion.custom(
@@ -184,6 +203,7 @@ class MessageStore {
               position: Variable(channel.position),
               isPersonalSpace: Variable(channel.isPersonalSpace),
               dmParticipantId: Variable(channel.dmParticipantId),
+              parentMessageId: Variable(channel.parentMessageId),
             ),
           ),
         );
@@ -196,10 +216,23 @@ class MessageStore {
   /// out - a permission revoked live, or a delete this device did not
   /// perform itself. [upsertChannels] must never gain this: a single-channel
   /// call (a rename, a freshly created channel) would wipe every other row.
+  ///
+  /// A thread is deliberately spared this pruning: `GET /channels` never
+  /// lists one (see [watchChannels]), so it can never appear in [channels]
+  /// even while its parent is still fully visible, and pruning on that
+  /// absence alone would wipe a thread's cached messages on every routine
+  /// refresh (any role or overwrite edit anywhere in the deployment
+  /// triggers one). A thread already known locally is kept until an
+  /// explicit `ChannelDeleted` event removes it - the same event any other
+  /// channel's deletion is learned through.
   Future<void> replaceChannels(List<api.Channel> channels) async {
     await db.transaction(() async {
       await upsertChannels(channels);
-      final keep = channels.map((c) => c.id).toSet();
+      final threadIds = await (db.select(db.channels)
+            ..where((c) => c.parentMessageId.isNotNull()))
+          .map((c) => c.id)
+          .get();
+      final keep = {...channels.map((c) => c.id), ...threadIds};
       final stale = await (db.select(db.channels)
             ..where((c) => c.id.isNotIn(keep)))
           .get();

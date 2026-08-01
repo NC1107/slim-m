@@ -13,6 +13,7 @@ class Channel {
     this.position = 0,
     this.isPersonalSpace = false,
     this.dmParticipantId,
+    this.parentMessageId,
   });
 
   final String id;
@@ -47,7 +48,18 @@ class Channel {
   /// read it off the local row instead of fetching the whole `/dms` listing.
   final String? dmParticipantId;
 
+  /// The message this channel is a thread of, or null for an ordinary
+  /// channel. A thread's `VIEW_CHANNEL`/`SEND_MESSAGES` inherit the parent
+  /// message's own channel, resolved server-side rather than copied; a
+  /// thread never appears in [SlimmApi.listChannels] - reach one through
+  /// [SlimmApiThreads.openThread] or a message's own `threadChannelId`.
+  final String? parentMessageId;
+
   bool get isVoice => kind == 'voice';
+
+  /// Whether this row is a thread rather than an ordinary channel - see
+  /// [parentMessageId].
+  bool get isThread => parentMessageId != null;
 
   factory Channel.fromJson(Map<String, dynamic> json) => Channel(
         id: json['id'] as String,
@@ -56,5 +68,6 @@ class Channel {
         createdAt: json['created_at'] as int,
         topic: json['topic'] as String?,
         position: json['position'] as int? ?? 0,
+        parentMessageId: json['parent_message_id'] as String?,
       );
 }

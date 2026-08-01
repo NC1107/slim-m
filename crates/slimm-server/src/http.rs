@@ -55,6 +55,7 @@ mod search;
 mod space;
 mod sync;
 mod sync_ops;
+mod threads;
 mod users;
 mod voice;
 mod ws;
@@ -129,6 +130,7 @@ pub fn router(state: AppState) -> Router {
         .merge(search::routes())
         .merge(space::routes())
         .merge(sync::routes())
+        .merge(threads::routes())
         .merge(voice::routes())
         .merge(polls::routes())
         .merge(users::routes())

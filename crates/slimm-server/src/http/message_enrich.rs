@@ -27,6 +27,7 @@ pub(crate) async fn with_reactions(
     let ids: Vec<MessageId> = messages.iter().map(|m| m.id).collect();
     let mut by_message = state.store.reactions_for_messages(&ids, viewer).await?;
     let mut attachments_by_message = state.store.attachments_for_messages(&ids).await?;
+    let mut threads_by_message = state.store.threads_for_messages(&ids).await?;
 
     let mut dtos: Vec<MessageDto> = Vec::with_capacity(messages.len());
     for message in messages {
@@ -49,6 +50,10 @@ pub(crate) async fn with_reactions(
         {
             let (_, summaries) = attachments_by_message.swap_remove(pos);
             dto.attachments = summaries.into_iter().map(AttachmentDto::from).collect();
+        }
+        if let Some(pos) = threads_by_message.iter().position(|(mid, _)| *mid == id) {
+            let (_, thread_channel_id) = threads_by_message.swap_remove(pos);
+            dto.thread_channel_id = Some(thread_channel_id.to_string());
         }
         dtos.push(dto);
     }

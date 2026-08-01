@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT c.parent_message_id AS \"parent_message_id: MessageId\"\n               FROM messages m JOIN channels c ON c.id = m.channel_id\n               WHERE m.id = ? AND m.channel_id = ? AND m.deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "parent_message_id: MessageId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "05b3d642b3709bc6889668536b7a8824e02ab74076b8f6245a19f2388d8bd37a"
+}

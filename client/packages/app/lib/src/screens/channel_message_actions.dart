@@ -8,11 +8,16 @@
 /// live down there with the rest.
 ///
 /// Split out of `channel_screen.dart`, where the same try/report block was
-/// written five times over.
+/// written five times over. `messageActionsFor` (bottom of this file) is the
+/// same kind of split, moved here once adding thread support left no room
+/// for it in `channel_screen.dart`'s own 500-line ceiling.
 library;
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 
@@ -20,7 +25,10 @@ import '../providers/message_actions.dart';
 import '../providers/message_extras.dart';
 import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
+import '../providers/threads.dart';
+import '../routing/routes.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/message_context_menu.dart';
 import '../widgets/run_guarded.dart';
 import '../widgets/safety_actions.dart';
 
@@ -175,5 +183,75 @@ Future<void> blockMessageAuthor(BuildContext context, Message message) async {
     context,
     ProviderScope.containerOf(context, listen: false),
     authorId,
+  );
+}
+
+/// Opens (or reuses) the thread hanging off [message], then navigates to it.
+///
+/// The container rather than [WidgetRef], the same reason [reportMessage]
+/// takes one: the row that starts this can be gone (its menu closed) before
+/// the request answers, and a container outlives that.
+Future<void> openThreadForMessage(BuildContext context, Message message) async {
+  final container = ProviderScope.containerOf(context, listen: false);
+  String? threadId;
+  await _reporting(context, 'open the thread', () async {
+    threadId = await openThreadFromMessage(
+      container,
+      message.channelId,
+      message.id,
+    );
+  });
+  if (threadId == null || !context.mounted) return;
+  GoRouter.of(context).push(Routes.thread(threadId!));
+}
+
+/// Builds what this viewer may do to [message]: the policy is here rather
+/// than in `channel_screen.dart` because that file sits at its own 300-line
+/// review budget with no room left, and this is exactly the kind of
+/// per-message decision `channel_message_actions.dart` already owns.
+/// [onReply] and [onEdit] stay callbacks into the caller because both swap
+/// state the screen itself holds (the reply banner, the inline edit field),
+/// not state this file has anywhere to keep.
+MessageActions messageActionsFor(
+  WidgetRef ref,
+  BuildContext context,
+  Message message, {
+  required String channelId,
+  required bool channelIsThread,
+  required String? myId,
+  required int myPermissions,
+  required Set<String> pinnedIds,
+  required void Function(Message) onReply,
+  required void Function(Message) onEdit,
+}) {
+  final pinned = pinnedIds.contains(message.id);
+  return MessageActions(
+    canReply: canReplyToMessage(message, myPermissions),
+    onReply: () => onReply(message),
+    canEdit: canEditMessage(message, myId),
+    onEdit: () => onEdit(message),
+    canDelete: canDeleteMessage(message, myId, myPermissions),
+    onDelete: () => unawaited(confirmAndDeleteMessage(ref, context, message)),
+    canManagePins: canManageMessagePin(message, myPermissions),
+    pinned: pinned,
+    onTogglePin: () => unawaited(
+      toggleMessagePin(
+        ref,
+        context,
+        channelId: channelId,
+        message: message,
+        pinned: pinned,
+      ),
+    ),
+    canReport: canReportMessage(message, myId),
+    onReport: () => unawaited(reportMessage(context, message)),
+    canBlockAuthor: canBlockMessageAuthor(message, myId),
+    onBlockAuthor: () => unawaited(blockMessageAuthor(context, message)),
+    canOpenThread: canOpenThreadFor(
+      message,
+      myPermissions,
+      channelIsThread: channelIsThread,
+    ),
+    onOpenThread: () => unawaited(openThreadForMessage(context, message)),
   );
 }

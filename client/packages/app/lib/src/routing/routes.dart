@@ -24,4 +24,10 @@ abstract final class Routes {
 
   /// The pattern go_router matches, as distinct from a built path.
   static const channelPattern = '/channels/:channelId';
+
+  /// A thread's own messages, opened from a message's context menu rather
+  /// than from the rail - see docs/decisions/0005-threads.md.
+  static String thread(String id) => '/thread/$id';
+
+  static const threadPattern = '/thread/:channelId';
 }

@@ -43,6 +43,7 @@ mod roles;
 mod safety;
 mod sessions;
 mod space;
+mod threads;
 mod timeouts;
 mod users;
 
@@ -82,6 +83,7 @@ pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext, SweptTokens,
 };
 pub use space::JoinPolicy;
+pub use threads::OpenThreadError;
 pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout};
 
 /// Unix milliseconds, `pub(crate)` so the push trigger path (outside this
@@ -111,6 +113,13 @@ pub struct Channel {
     /// [`super::channel_order::reorder_channels`]. Meaningless for a DM,
     /// which is never listed or reordered by it.
     pub position: i64,
+    /// The message this channel is a thread of, or `None` for an ordinary
+    /// channel. A thread's own `kind` and overwrites are never consulted for
+    /// permissions: see [`Store::permission_channel`], which resolves them
+    /// live from this message's own `channel_id` instead, per
+    /// docs/decisions/0005-threads.md. A thread never appears in
+    /// [`Store::list_channels`].
+    pub parent_message_id: Option<MessageId>,
     pub created_at: i64,
 }
 

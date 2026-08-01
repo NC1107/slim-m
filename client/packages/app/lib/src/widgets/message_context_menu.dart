@@ -40,6 +40,8 @@ class MessageActions {
     required this.onReport,
     required this.canBlockAuthor,
     required this.onBlockAuthor,
+    required this.canOpenThread,
+    required this.onOpenThread,
   });
 
   /// Gated on SEND_MESSAGES in this channel, unlike [canEdit] and [canDelete]:
@@ -70,6 +72,12 @@ class MessageActions {
   /// deleted account's content is anonymized and has nobody left to block).
   final bool canBlockAuthor;
   final VoidCallback onBlockAuthor;
+
+  /// Gated like [canReply] plus one more: never inside a thread already,
+  /// since nesting is refused server-side. Opens the hidden sub-channel this
+  /// message already has, or starts one.
+  final bool canOpenThread;
+  final VoidCallback onOpenThread;
 }
 
 /// Wraps [child] so a right-click or long-press over it opens a menu for
@@ -222,6 +230,12 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
           label: 'Reply',
           leading: AppIcons.reply,
           onTap: () => run(actions.onReply),
+        ),
+      if (actions.canOpenThread)
+        AppMenuItem(
+          label: 'Reply in thread',
+          leading: AppIcons.thread,
+          onTap: () => run(actions.onOpenThread),
         ),
       const AppMenuDivider(),
       AppMenuItem(

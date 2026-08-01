@@ -33,6 +33,8 @@ const _noActions = MessageActions(
   onReport: _noop,
   canBlockAuthor: false,
   onBlockAuthor: _noop,
+  canOpenThread: false,
+  onOpenThread: _noop,
 );
 
 Message _message(int index) => Message(

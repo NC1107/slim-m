@@ -63,6 +63,15 @@ class Channels extends Table {
   /// client asks from 0 forever against a server that has swept.
   IntColumn get opCursor => integer().nullable()();
 
+  /// The message this channel is a thread of, or null for an ordinary
+  /// channel. Set only by [MessageStore.upsertChannels]'s callers when they
+  /// already hold an `api.Channel` carrying it - see
+  /// `providers/threads.dart`. Never used to derive [kind] or overwrites;
+  /// it exists locally only so a thread row can be told apart from an
+  /// ordinary one when deciding what the rail shows and what a full channel
+  /// refresh may prune.
+  TextColumn get parentMessageId => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -106,7 +115,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -157,6 +166,10 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// possibly be a reply the server knows about but this column does not -
   /// there is nothing to backfill, only rows that were correctly never a
   /// reply in the first place.
+  ///
+  /// v10 adds `channels.parentMessageId` in place, the same shape as v9:
+  /// threads are new on both sides in the same release, so there is no
+  /// existing row this column could ever need to backfill for.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -182,6 +195,9 @@ class SlimmDatabase extends _$SlimmDatabase {
           }
           if (from < 9) {
             await m.addColumn(messages, messages.replyToId);
+          }
+          if (from < 10) {
+            await m.addColumn(channels, channels.parentMessageId);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.
