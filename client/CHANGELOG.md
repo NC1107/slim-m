@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.1](https://github.com/NC1107/slim-m/compare/client-v0.20.0...client-v0.20.1) (2026-08-01)
+
+
+### Bug Fixes
+
+* **client:** a day divider flashes when a send races the first catch-up ([#278](https://github.com/NC1107/slim-m/issues/278)) ([345d41a](https://github.com/NC1107/slim-m/commit/345d41aa4c0cfafcfee9a57a9d77c535e6cdbeb7))
+
 ## [0.20.0](https://github.com/NC1107/slim-m/compare/client-v0.19.0...client-v0.20.0) (2026-08-01)
 
 
