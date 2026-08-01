@@ -25,6 +25,14 @@ name: verify-release-checks
 # went through CI at all (never pushed to main, never opened as a PR) times
 # out and fails closed instead of silently passing an empty result.
 #
+# The deadline covers queueing, not running. `client-ios-ci` takes about
+# thirteen minutes on a macOS runner and those runners queue: client 0.23.0
+# timed out at the old thirty-minute ceiling with the iOS check still pending,
+# and that same check succeeded minutes later, so re-running the release
+# passed unchanged. A release that fails because a runner was busy is a
+# release somebody has to notice and re-run by hand, which is the failure this
+# gate exists to make impossible rather than merely visible.
+#
 # Which commit is verified is the caller's decision and is not github.sha on
 # the release-please path. release-please acts on the repository's current
 # state through the API, while github.sha is whatever commit started the run;
@@ -77,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     # Generous but bounded: a required check missing outright fails at the
     # deadline below well before this, so the ceiling only covers slow queues.
-    timeout-minutes: 35
+    timeout-minutes: 75
     steps:
       - name: wait for the required checks and require they all succeeded here
         env:
@@ -94,7 +102,7 @@ jobs:
           fi
           echo "verifying ${REF} -> ${SHA}"
           started=$(date +%s)
-          deadline=$(( started + 1800 ))
+          deadline=$(( started + 4200 ))
           # Absent-and-nothing-running is a typo; absent-while-running is a queue.
           creation_grace=300
           while :; do
