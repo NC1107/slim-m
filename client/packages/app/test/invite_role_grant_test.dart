@@ -136,4 +136,32 @@ void main() {
     expect(find.text('moderator'), findsOneWidget);
     expect(find.text('superuser'), findsOneWidget);
   });
+
+  // The reported bug: a fixed-width, bordered AppMenu nested inside the sheet.
+  testWidgets('on a phone the picker is one surface, spanning the full width', (
+    tester,
+  ) async {
+    const window = Size(360, 800);
+    tester.view.physicalSize = window;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await _pump(tester, -1);
+
+    await tester.tap(find.text('Role granted'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(AppMenu),
+      findsNothing,
+      reason:
+          'the sheet already draws one surface; AppMenu would nest a '
+          'second, bordered card inside it',
+    );
+    expect(
+      tester.getRect(find.byType(BottomSheet)).width,
+      window.width,
+      reason: 'a phone sheet should be edge to edge, not a floating card',
+    );
+  });
 }

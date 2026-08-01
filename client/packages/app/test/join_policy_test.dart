@@ -151,6 +151,68 @@ void main() {
     },
   );
 
+  // The reported bug: a fixed-width, bordered AppMenu nested inside the sheet.
+  testWidgets('on a phone the picker is one surface, spanning the full width', (
+    tester,
+  ) async {
+    const window = Size(360, 800);
+    tester.view.physicalSize = window;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final client = MockClient((request) async {
+      return http.Response(
+        jsonEncode({'join_policy': 'invite'}),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final built = api.SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: client,
+          );
+          ref.onDispose(built.close);
+          return built;
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.dark, AppTokens.dark),
+          home: const Scaffold(body: JoinPolicyRow()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Who can join'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(AppMenu),
+      findsNothing,
+      reason:
+          'the sheet already draws one surface; AppMenu would nest a '
+          'second, bordered card inside it',
+    );
+    expect(
+      tester.getRect(find.byType(BottomSheet)).width,
+      window.width,
+      reason: 'a phone sheet should be edge to edge, not a floating card',
+    );
+  });
+
   test('an unknown policy from a newer server reads as invite, not open', () {
     expect(api.JoinPolicy.parse('open'), api.JoinPolicy.open);
     expect(api.JoinPolicy.parse('invite'), api.JoinPolicy.invite);

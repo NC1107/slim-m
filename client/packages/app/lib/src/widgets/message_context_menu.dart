@@ -164,9 +164,10 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
     _sheetOpen = true;
     showAppSheet<void>(
       context,
+      bare: true,
       builder: (sheetContext) => SafeArea(
         top: false,
-        child: AppMenu(
+        child: AppSheetMenu(
           children: _items(() => Navigator.of(sheetContext).pop()),
         ),
       ),

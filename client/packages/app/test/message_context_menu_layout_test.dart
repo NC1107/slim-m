@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/emoji_picker.dart';
 import 'package:slimm_app/src/widgets/message_context_menu.dart';
 import 'package:slimm_app/src/widgets/message_row.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 import 'message_row_harness.dart';
 
@@ -99,6 +100,30 @@ void main() {
       find.byType(EmojiPickerPanel),
       findsOneWidget,
       reason: 'closing the context sheet must not swallow the picker it opens',
+    );
+  });
+
+  // The reported bug: a fixed-width, bordered AppMenu nested inside the sheet.
+  testWidgets('the compact sheet is one surface, spanning the full width', (
+    tester,
+  ) async {
+    const window = Size(360, 800);
+    await _pump(tester, window);
+
+    await tester.longPressAt(_pressPoint(tester));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(AppMenu),
+      findsNothing,
+      reason:
+          'the sheet already draws one surface; AppMenu would nest a '
+          'second, bordered card inside it',
+    );
+    expect(
+      tester.getRect(find.byType(BottomSheet)).width,
+      window.width,
+      reason: 'a phone sheet should be edge to edge, not a floating card',
     );
   });
 }
