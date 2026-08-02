@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.24.0](https://github.com/NC1107/slim-m/compare/client-v0.23.0...client-v0.24.0) (2026-08-02)
+
+
+### Features
+
+* a reply-count affordance on threaded messages ([#315](https://github.com/NC1107/slim-m/issues/315)) ([a5d0524](https://github.com/NC1107/slim-m/commit/a5d05245162cdd5decacde3d487dd13e5053c955))
+* threads, a channel with a parent (docs/decisions/0005-threads.md) ([#312](https://github.com/NC1107/slim-m/issues/312)) ([dc5e624](https://github.com/NC1107/slim-m/commit/dc5e624b496c8a4c5cd4d39a0c4758791ac6f61f))
+
 ## [0.23.0](https://github.com/NC1107/slim-m/compare/client-v0.22.0...client-v0.23.0) (2026-08-01)
 
 
