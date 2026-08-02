@@ -24,11 +24,13 @@ import UIKit
 /// whether the system edit menu it targets actually offers Paste for an
 /// image. Confirmed on a real device 2026-08-01 that those are different
 /// claims: this composer's plain Material `TextField` routes its menu
-/// through Flutter's `SystemContextMenu`, which decides Paste's presence in
-/// Dart before any native call, so the swizzle below is provably never
-/// consulted there regardless of this value. The "+" sheet's own row is
-/// never hidden on this signal for exactly that reason - see
-/// `composer_clipboard_paste.dart`.
+/// through Flutter's `SystemContextMenu`, which decided Paste's presence in
+/// Dart before any native call, so the swizzle below went unconsulted there
+/// until `composer_context_menu.dart` started forcing the platform's own
+/// Paste item into that list - confirmed working end to end on a real
+/// iPhone 2026-08-02. The "+" sheet's own row is never hidden on this signal
+/// regardless, since installed is still not the same claim as working -
+/// see `composer_clipboard_paste.dart`.
 enum ClipboardImagePlugin {
   static let name = "top.npcserver.slimm/clipboard_image"
 

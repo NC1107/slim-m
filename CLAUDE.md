@@ -288,107 +288,49 @@ See `docs/ci.md`'s "How a release is cut" section and `docs/OPEN-QUESTIONS.md` s
 The mechanism is straightforward (two independent file pairs cannot conflict on a file neither of them shares), and `python3 -m json.tool`/`yaml.safe_load` confirm every touched file still parses, but no local run can simulate release-please actually opening two PRs against a real GitHub repo and merging one while the other is pending.
 The next server-only and client-only releases are what actually close this out.
 
-## The image-paste prompt was never once per install (2026-08-01)
+## Image paste on iPhone, confirmed working (2026-08-02)
 
-Client 0.21.0 shipped image paste (PR #286) as a "Paste image" row in the composer's `+` sheet, reading `UIPasteboard.general.image` through a hand-written `MethodChannel`.
-The doc comment on `ClipboardImagePlugin.swift`'s `readImage` predicted the iOS "Allow Paste?" consent prompt would show once per install, and flagged that prediction as resting on one blogger's testing rather than Apple's own documentation.
+Confirmed on a real iPhone, the owner's own words: "paste worked on iphone, i just long pressed in input box and it let me paste this time."
+Long-press the composer, the edit menu offers Paste, tap it, and the image attaches with no "Allow Paste?" prompt.
+That closes three attempts across client 0.21.0 through 0.24.2 (PRs #286, #292, #295, #299, #319), consolidated into this one entry in place of the three it used to be split across.
+Read this before touching `composer_clipboard_image_stub.dart`, `composer_clipboard_paste.dart`, `composer_context_menu.dart`, or anything under `ios/Runner/Clipboard*`.
+
+**Attempt one (0.21.0, PR #286): a `MethodChannel` read, and a wrong prediction about the consent prompt.**
+`ClipboardImagePlugin.swift`'s `readImage` read `UIPasteboard.general.image` directly from a "Paste image" row in the composer's `+` sheet.
+Its doc comment predicted iOS's "Allow Paste?" prompt would show once per install - a claim the comment itself flagged as resting on one blogger's testing rather than Apple's own documentation, and believed anyway for lack of anything better to check it against.
 ~~The prompt appears once per install.~~
-Wrong, found on a real iPhone: it prompts on **every** call to `readImage`, which makes the shipped row worse than the file picker it was meant to improve on.
-Read this before touching `composer_clipboard_image_stub.dart`, `composer_clipboard_paste.dart`, or anything under `ios/Runner/Clipboard*`.
+Wrong: the owner's iPhone showed it on **every** call, which made the row worse than the file picker it was meant to improve on.
 
-**The real fix is the route iOS itself is documented to exempt from that prompt: the long-press edit menu's own Paste item, dispatched by the system rather than read on demand.**
-The obstacle was already diagnosed correctly and is confirmed against the actual engine source, not assumed: `~/development/flutter/engine/src/flutter/shell/platform/darwin/ios/framework/Source/FlutterTextInputPlugin.mm` shows `FlutterTextInputView.canPerformAction:` answering `[UIPasteboard generalPasteboard].hasStrings` for `paste:` ("Forbid pasting images, memojis, or other non-string content," in the engine's own comment), and `paste:` itself only ever reading `UIPasteboard.generalPasteboard.string`.
-`ClipboardPasteBridge.m` (new) swizzles both methods on that class via `NSClassFromString(@"FlutterTextInputView")` and the Objective-C runtime, so the metadata-only `hasImages` check gates the menu item's visibility (never prompts) and the swizzled `paste:` reads the pasteboard's actual image **synchronously, inside iOS's own dispatch of that action** - the same dispatch the "no prompt" exemption depends on - and hands the bytes to Dart as a native-initiated `pastedImage` call, never a later Dart-triggered read.
+**Attempt two (0.21.2-0.21.3, PRs #292, #295, #299): the right mechanism, undone by two real mistakes.**
+The fix chased was the route iOS documents as exempt from that prompt: the long-press edit menu's own Paste item, dispatched natively rather than read on Dart's initiative.
+`ClipboardPasteBridge.m` swizzles `FlutterTextInputView.canPerformAction:` and `paste:` so the metadata-only `hasImages` check gates the item without ever prompting, and the swizzled `paste:` reads the image synchronously inside iOS's own dispatch of that action - the same dispatch the exemption depends on.
+~~`composerClipboardPasteAvailable()` hid the "+" sheet's fallback row wherever the swizzle reported installed, on the theory that installing meant the menu item worked.~~
+It does not: installing only proves the Objective-C method exchange succeeded, never that iOS ever asks it anything, and on the owner's phone it installed while the edit menu still offered only "Scan Text" - so the row vanished and there was briefly no way to paste an image at all.
+Separately, the first version of the swizzle was written as a category on `FlutterTextInputView`.
+**A category on a private engine class emits a link-time reference to it, and the engine ships that class without exporting the symbol**: the 0.21.2 iOS build failed to link with `Undefined symbol: _OBJC_CLASS_$_FlutterTextInputView`, every Dart test passed, and the store build never happened.
+Resolving a class by name at runtime buys nothing if the compiler was already told at link time that it exists, which is exactly what a category asserts.
+The fix is a donor class of our own, `SlimmPasteDonor`, a plain `UIResponder` subclass whose methods are read off with `class_getInstanceMethod` and grafted onto the runtime-resolved target with `class_addMethod` before the exchange, so the private class never enters the link table.
+**The rule that follows: never write a category on a class resolved through `NSClassFromString`; graft its methods from a donor class instead, or the next engine-private reference breaks the build the same way.**
 
-**The swizzle is written to fail back to today's behaviour, not to crash, if a future Flutter engine upgrade moves the class or either selector.**
-Both `canPerformAction:withSender:` and `paste:` are resolved via `class_getInstanceMethod` up front; the exchange only happens if all four lookups (two original, two replacement) succeed, so a partial swizzle - one method swapped, the other not - can never happen.
-`SlimmInstallClipboardPasteBridge` returns whether it installed, logged and surfaced to Dart as `editMenuPasteAvailable` (a new method on the existing channel) rather than silently assumed.
+**The durable rule the hidden-row mistake produced: never withdraw a working affordance on a claim that something else works, only on evidence that it did.**
+`composerClipboardPasteAvailable()` is `hasClipboardImage()` alone now, unconditionally on every mobile platform, and `composer_clipboard_paste_test.dart` carries a named regression guard (`the row still appears when the edit-menu swizzle is confirmed installed`) that fails if the gate comes back.
+The "+" sheet row is Android's **only** route to a pasted image - there is no edit-menu swizzle there at all - and iOS's fallback for a non-Material field, iOS below 16, or any future regression in the edit-menu path.
+It stays in the tree unconditionally and must not be hidden again behind any signal short of a confirmed native paste actually completing.
 
-~~**The composer's "+" sheet row is now hidden wherever that swizzle is confirmed live, and kept as a fallback everywhere else.**~~
-Wrong, found on a real iPhone 2026-08-01: the swizzle installing was treated as evidence the edit menu offers Paste, and it is not. The row was hidden and the owner had no way to paste an image at all. See "The edit-menu route was never reachable" below for the fix and the mechanism.
-~~`composerClipboardPasteAvailable()` asks `editMenuPasteAvailable()` first; a `true` answer means the edit menu already does this with no prompt, so the row would only ever be a strictly worse duplicate, and it is suppressed.~~
-~~Android has no such swizzle at all, so `editMenuPasteAvailable` is always false there (`MissingPluginException` on a channel with no matching native case) and the row keeps working exactly as shipped - it is Android's only route.~~
-~~The same fallback covers a future iOS build where the swizzle silently failed to install: the row reappears rather than leaving no way to paste an image at all.~~
-That last claim was the actual bug: the fallback's absence was gated on the swizzle *installing*, not on it *working*, and those turned out to be different things.
+**Tracing why the swizzle still never fired found the real gap: `SystemContextMenu` decides Paste's presence in Dart, before any native call happens.**
+The composer's field is a plain Material `TextField`, which on iOS 16+ auto-opts into Flutter's own `SystemContextMenu`.
+That widget builds its item list from `EditableTextState.contextMenuButtonItems`, gated on `Clipboard.hasStrings()` alone - text only, never images - so an image-only pasteboard never got a `paste` entry into the list Dart sent native at all, and the already-correct swizzle was never consulted because nothing had ever asked it a question.
 
-~~**Still needs a real iPhone to confirm.** Nothing here can be verified without one: that the long-press menu's Paste item actually appears once an image is copied, and that tapping it attaches the image with no "Allow Paste?" prompt at all. Reasoned from the engine source and covered by Dart-side unit tests (`composer_clipboard_image_test.dart`, `composer_clipboard_paste_test.dart`), not by a device run.~~
-Confirmed 2026-08-01: it does not appear, on this composer's field. See below.
+**Attempt three (0.24.2, PR #319, the one that works): force the system's own Paste item into the list, deliberately never a custom one.**
+A custom system-menu item was considered and ruled out by reading the engine source, not by trying it and finding out the hard way.
+`FlutterTextInputPlugin.mm` handles a `"custom"` entry by building a `UIAction` whose handler round-trips through a method channel into Dart *after* the tap is already dispatched natively.
+Apple's "Allow Paste?" exemption covers a pasteboard read that happens *inside* the system's own dispatch of a recognised paste gesture; a Dart callback firing afterward is not that, so a custom item was always going to prompt on every tap regardless of what it did once tapped, which is why the standard item is used instead.
+`systemContextMenuItemsWithForcedPaste` (`composer_context_menu.dart`) takes `SystemContextMenu`'s default item list and appends the platform's own `IOSSystemContextMenuItemPaste` whenever the clipboard holds an image and the item is not already there, checked only through the metadata-only `hasImage` call so nothing here ever raises the prompt on its own.
+This is still the platform's own Paste button - "title and action both handled by the platform" per its own doc comment - so tapping it dispatches native `paste:` directly with no Dart callback in between: the same swizzled `paste:` that was correct and complete from the day it shipped, reached for the first time because Dart finally asked for a `"paste"` entry to exist.
 
-## The edit-menu route was never reachable, and a fallback died on an unproven claim (2026-08-01)
-
-Reported by the owner on a real iPhone, client 0.21.3: copy an image, long-press the composer, and the edit menu offers "Scan text" with no Paste at all - and the "+" sheet's own "Paste image" row is also gone, so there was no way to paste an image at all.
-Read this before touching `composer_clipboard_paste.dart`, `ClipboardPasteBridge.{h,m}`, or `ClipboardImagePlugin.swift`.
-
-**The immediate bug: withdrawing a working affordance on a claim that was never checked.**
-`composerClipboardPasteAvailable()` hid the "+" sheet's row whenever `editMenuPasteAvailable()` (now `editMenuPasteSwizzleInstalled()`) answered true, on the theory that a true answer meant the native edit menu already handled paste with no prompt.
-That signal only ever proved the Objective-C swizzle installed, never that the menu item it targets actually appears - and on a real device it installs and the item still never appears, so the fallback was removed on evidence of nothing.
-Fixed by never gating the row on that signal again: `composerClipboardPasteAvailable()` is `hasClipboardImage()` alone now, unconditionally on mobile, and `composer_clipboard_paste_test.dart` carries a named regression guard (`the row still appears when the edit-menu swizzle is confirmed installed`) that fails if the gate comes back.
-
-**The mechanism, traced through the checked-out engine and framework source rather than assumed.**
-The composer's message field is a plain Material `TextField` with no `contextMenuBuilder` (`composer_extras.dart`'s `ComposerField`), so it takes Material's default, which on iOS 16+ auto-opts into Flutter's own `SystemContextMenu` whenever `SystemContextMenu.isSupportedByField()` (`packages/flutter/lib/src/material/text_field.dart:896-897`).
-That widget decides the menu's entire contents in Dart, before any native call happens: `SystemContextMenu.getDefaultItems` reads `EditableTextState.contextMenuButtonItems` (`system_context_menu.dart:159-184`), which includes `ContextMenuButtonType.paste` only when `pasteEnabled`, which is gated on `clipboardStatus.value == ClipboardStatus.pasteable` (`editable_text.dart:2660`, `:3220-3226`).
-`ClipboardStatusNotifier.update()` sets that from `Clipboard.hasStrings()` alone - text only, never images (`text_selection.dart:3782-3804`).
-So an image-only pasteboard never gets a `paste` entry into the list Dart sends native at all.
-That list travels as `ContextMenu.showSystemContextMenu` (`FlutterPlatformPlugin.mm:162-183`) into `FlutterTextInputPlugin`'s `showEditMenu:` (`:2766-2777`), which sets `FlutterTextInputView._editMenuItems` from exactly that list, nothing more.
-`editMenuInteraction:menuForConfiguration:suggestedActions:` (`FlutterTextInputPlugin.mm:952-1033`) only falls back to the raw, native-computed `suggestedActions` - the one place a swizzled `canPerformAction:` would matter - when `_editMenuItems` is nil, and it never is once `SystemContextMenu` is in play.
-`ClipboardPasteBridge.m`'s swizzle of `canPerformAction:`/`paste:` on `FlutterTextInputView` (see "The image-paste prompt was never once per install" above) is therefore architecturally unreachable for this exact field, on this exact Flutter version - not a future engine-upgrade risk, a present one, confirmed by reading the shipped source rather than by guessing.
-
-**Eliminated, not assumed away, per the three alternative explanations worth checking first.**
-The class-not-found and renamed-selector possibilities are both ruled out by the owner's own report: the fallback row *disappeared*, which only happens if `editMenuPasteSwizzleInstalled()` answered true, which only happens if `NSClassFromString(@"FlutterTextInputView")` and both selector lookups all succeeded.
-The real explanation is the third one named in the brief: "the menu is built by a delegate that filters items independently of `canPerformAction:`" - confirmed exactly, with the delegate being `SystemContextMenu` on the Dart side rather than anything native.
-
-~~**Not fixed, and said plainly rather than shipped as a second unproven claim.**~~
-Fixed 2026-08-01, and the plan below turned out to be the wrong shape for it: see "The edit-menu route is reachable now" for what actually landed and why a custom item was never going to work either.
-~~A real fix needs a custom `contextMenuBuilder` on the composer's field that appends a custom system-menu item wired to the existing clipboard-image channel, gated on an async "clipboard has image" check with its own cache-and-listen lifecycle mirroring `ClipboardStatusNotifier`'s.~~
-~~That is real new surface, not a patch to the existing swizzle, and it would need the one thing this run cannot provide: a real device to confirm the custom item actually renders and dispatches.~~
-~~Building it now and trusting it worked would repeat the exact mistake this entry documents.~~
-The swizzle stays in the tree - harmless, and still real for a non-Material field or iOS below 16, where `UIMenuController`'s older `canPerformAction:`-driven path is still what runs - but the composer's "Paste image" row is the only route proven to work, and nothing hides it again without evidence a native paste actually completed.
-
-## The edit-menu route is reachable now: forcing the system's own Paste item, not a custom one (2026-08-01)
-
-The owner reported this a third time: copy an image, long-press the composer, and the edit menu still offers only "Scan Text."
-The previous entry diagnosed the cause correctly and stopped there rather than shipping an unverified guess.
-This pass built the fix, traced through the checked-out engine source on both the Dart and Objective-C sides rather than assumed, and it does not need a device to be confident in the mechanism - only to confirm the last mile (the system menu actually painting the item on real hardware).
-Read this before touching `composer_context_menu.dart`, `ComposerField` in `composer_extras.dart`, or `ClipboardPasteBridge.m`.
-
-**The earlier plan (a custom system-menu item) would not have worked, and the reason is worth keeping.**
-`SystemContextMenu.items` does accept an explicit list including `IOSSystemContextMenuItemCustom`, so the API question from the previous entry has an answer: yes, custom items are supported.
-But `FlutterTextInputPlugin.mm`'s `editMenuInteraction:menuForConfiguration:suggestedActions:` handles a `"custom"` entry by building a `UIAction` whose handler calls `textInputDelegate flutterTextInputView:performContextMenuCustomActionWithActionID:` - a method-channel round trip into Dart, after the tap has already been dispatched natively.
-Apple's "Allow Paste?" exemption covers a pasteboard read that happens *inside* the system's own dispatch of a recognised paste gesture (a tap on the standard Paste item, Cmd-V, drag and drop); a custom item's Dart callback reading the pasteboard afterward is not that, so building it and having it prompt on every tap was the likely outcome - not verified by running it, but not needed to be: the dispatch shape alone rules out the exemption.
-
-**The fix instead forces the *standard* Paste item into the list, unconditionally, whenever the clipboard holds an image.**
-`SystemContextMenu.getDefaultItems` only includes `IOSSystemContextMenuItemPaste` when `EditableTextState.contextMenuButtonItems` does, which is gated on `Clipboard.hasStrings()` alone - the exact gap the previous entry traced.
-Nothing stops a caller building the item list by hand: `systemContextMenuItemsWithForcedPaste` (`composer_context_menu.dart`) takes the defaults and appends `const IOSSystemContextMenuItemPaste()` when it is not already there and the clipboard has an image, then `composerContextMenuBuilder` hands that list to `SystemContextMenu.editableText(items: ...)` instead of letting it compute its own.
-This is still the platform's own Paste button - "title and action both handled by the platform," per its own doc comment - so tapping it dispatches native `paste:` directly, with no Dart callback in between.
-
-**That single Dart-side change is what makes the already-shipped swizzle reachable for the first time, and nothing native had to change.**
-Traced through `FlutterTextInputPlugin.mm`: a requested `"paste"` entry is resolved by `addBasicEditingCommandToItems`, which calls `searchCommandWithSelector:element:suggestedMenu:` - a DFS search of the *native* `suggestedActions` tree (the one `UIEditMenuInteraction` hands the delegate, computed by UIKit from `canPerformAction:` on the responder) for a `UICommand` whose action is `paste:`.
-`ClipboardPasteBridge.m`'s swizzle already makes `canPerformAction:` return YES for `paste:` when `UIPasteboard.general.hasImages`, so that `UICommand` was always there in `suggestedActions` for an image - the swizzle was correct and complete from the day it shipped.
-What was missing is that Dart never asked for a `"paste"` entry to exist in `_editMenuItems` at all when `Clipboard.hasStrings()` was false, so `addBasicEditingCommandToItems` was never called for it and the search that would have found the swizzled command never ran.
-Forcing the item into the requested list is the whole fix; `ClipboardPasteBridge.m` is untouched.
-
-**Answering the two questions the previous entry left open, from source rather than a guess:**
-Yes, `SystemContextMenu` takes a custom item list (`items` parameter on both the private constructor and the `editableText` factory), so no fallback to `AdaptiveTextSelectionToolbar` was needed on iOS 16+; that widget is still what non-iOS and pre-16 iOS get, unchanged from `TextField`'s own default.
-And yes, this specific route avoids the prompt - not merely "should," but by construction: the tap is dispatched by iOS itself to the swizzled `paste:` on `FlutterTextInputView`, the exact call `ClipboardPasteBridge.m`'s doc comment already establishes is exempt, and no Dart code runs between the tap and the pasteboard read.
-
-**Where the clipboard-has-image state lives, and why `Composer` itself needed no change.**
-`ComposerField` (`composer_extras.dart`) became a `StatefulWidget` so it can own a `ClipboardImageStatusNotifier` (`composer_context_menu.dart`) directly: constructed with the field, refreshed on the field's own focus gain and on the app resuming, disposed with the field.
-It listens to `ComposerField.focusNode` as a *second* listener alongside `Composer`'s own focus handling, which `FocusNode` supports natively, so `composer.dart` - already at 496 of its 500-line hard cap - needed zero lines changed.
-`composer_extras.dart` grew from 375 to 428 lines instead, still under the hard cap and already over the 300 soft one before this change.
-
-**The notifier only ever calls the metadata-only `hasImage`, never the prompting `readImage`, and that is pinned by its own regression test.**
-Reusing the mechanism that reads the actual image bytes here would reintroduce the exact prompt this whole fix exists to avoid - `composer_context_menu_test.dart` asserts the method list a construction-plus-`update()` sequence calls is `hasImage` only.
-
-**Verified without a device, and named plainly what still needs one.**
-`dart analyze` and `dart format --set-exit-if-changed` are clean, and the full `flutter test` suite (1150 tests) passes with no regressions.
-`systemContextMenuItemsWithForcedPaste` is pure and unit-tested directly (adds the item, never duplicates one already present, leaves unrelated items alone) with no `SystemContextMenu` or platform channel involved.
-`ClipboardImageStatusNotifier` is proven at the same method channel the existing clipboard-image tests already drive: picks up state on construction, refreshes on `AppLifecycleState.resumed`, and the never-prompts guarantee above.
-What none of this can prove, because `SystemContextMenu.isSupportedByField` depends on a platform-channel capability query a widget test cannot make true, is that the system menu actually paints a Paste button on real iOS 16+ hardware and that tapping it lands the image with no prompt - the mechanism is traced through the exact shipped engine source rather than assumed, but only a real iPhone closes the loop the way the previous two attempts were each wrong about.
-
-**The "+" sheet fallback was checked independently, per the owner's report that he still could not paste at all.**
-`composerClipboardPasteAvailable()` is already `hasClipboardImage()` unconditionally (the previous entry's fix), and `ClipboardImagePlugin`'s registration in `AppDelegate.didInitializeImplicitFlutterEngine` follows the identical pattern the push-notification channel uses, which is independently confirmed working on a real device.
-No missing-registration or swallowed-`MissingPluginException` defect was found by reading the source; `ClipboardImagePlugin.handle`'s `"hasImage"` case is a direct `UIPasteboard.general.hasImages` read with no branch that could silently answer false for a present image.
-This cannot rule out a device- or source-app-specific pasteboard content-type quirk (an image copied under a UTI `hasImages` does not recognise), which is exactly the kind of thing only a real device and the owner's actual copy source can show.
+**Android's clipboard path is still unverified on a device.**
+Only the iOS long-press route has been confirmed on real hardware; `ClipboardImageChannel.kt` and the "+" sheet row on Android are reasoned from source and covered by unit tests only, the same unverified state every mobile surface here was in before this pass.
+Do not read this entry as proving the whole feature works on both platforms - iOS is closed, Android is not.
 
 ## The one-flag iOS screen share fix did not survive a real device (2026-07-31)
 
