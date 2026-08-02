@@ -233,6 +233,18 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.25.1',
+    headline: 'The jump-to-latest arrow no longer shows up unprompted',
+    points: [
+      WhatsNewPoint(
+        'It used to appear after switching channels even when you had not '
+        'scrolled at all, left over from wherever the previous channel was '
+        'scrolled to. It now only shows once you have actually scrolled '
+        'away from the newest message.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
