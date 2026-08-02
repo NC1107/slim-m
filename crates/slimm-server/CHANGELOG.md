@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.0](https://github.com/NC1107/slim-m/compare/server-v0.25.0...server-v0.26.0) (2026-08-02)
+
+
+### Features
+
+* a reply-count affordance on threaded messages ([#315](https://github.com/NC1107/slim-m/issues/315)) ([a5d0524](https://github.com/NC1107/slim-m/commit/a5d05245162cdd5decacde3d487dd13e5053c955))
+
 ## [0.25.0](https://github.com/NC1107/slim-m/compare/server-v0.24.0...server-v0.25.0) (2026-08-01)
 
 
