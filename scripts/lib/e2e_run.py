@@ -18,10 +18,13 @@ import e2e_admin
 import e2e_labels as L
 import e2e_messaging
 import e2e_markdown
+import e2e_dm_call
 import e2e_reconcile
+import e2e_replies
 import e2e_settings
 import e2e_coverage
 import e2e_sweep
+import e2e_threads
 import e2e_voice
 import e2e_api
 from e2e_api import Api
@@ -68,6 +71,12 @@ def scenarios(a, b, admin, member, room_id):
             L.TEXT_CHANNEL)),
         ("messaging: an attachment", lambda: e2e_messaging.attach(
             a, b, L.TEXT_CHANNEL, upload, admin)),
+        ("messaging: a reply, and a reply to a deleted message",
+         lambda: e2e_replies.reply_and_a_deleted_parent(
+             a, b, L.TEXT_CHANNEL, admin)),
+        ("messaging: a thread stays off the ordinary channel list",
+         lambda: e2e_threads.open_reply_and_stay_off_the_rail(
+             a, b, L.TEXT_CHANNEL, admin, member)),
         ("markdown: formatting applies without reaching the wire",
          lambda: e2e_markdown.formats_without_storing_the_markers(
              a, b, L.TEXT_CHANNEL, admin)),
@@ -109,6 +118,8 @@ def scenarios(a, b, admin, member, room_id):
         ("voice: mute reaches the server", lambda: e2e_voice.mute_propagates(
             a, b, room_id)),
         ("voice: leaving", lambda: e2e_voice.leave_call(a, b)),
+        ("voice: calling in a dm", lambda: e2e_dm_call.start_dm_and_call(
+            a, b, admin, member)),
     ]
 
 

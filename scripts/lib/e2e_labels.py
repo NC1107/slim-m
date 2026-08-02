@@ -47,6 +47,19 @@ STOP_SHARING = "Stop sharing"
 MUTE = "Mute"
 LEAVE_CALL = "Leave call"
 
+# Calling in a DM
+START_DM = "Message"
+DM_CALL = "Call"
+DM_CALL_BACK = "Back to messages"
+
+# Replies: only the rendered quote is reachable here, never "Reply" itself (see e2e_replies.py).
+REPLY_UNAVAILABLE = "Message unavailable"
+REPLY_UNAVAILABLE_QUOTE = "Reply to a message that is not available"
+JUMP_FAILED = "Could not find that message."
+
+# Threads: only the reply-count affordance is reachable, never "Reply in thread" itself (see e2e_threads.py).
+THREAD_HEADER = "Thread"
+
 # The fixture channels the seed creates
 TEXT_CHANNEL = "general"
 VOICE_CHANNEL = "lounge"
