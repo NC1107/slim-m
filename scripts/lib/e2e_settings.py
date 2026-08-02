@@ -27,7 +27,7 @@ def personal_settings_reachable(client):
     """The footer control opens personal settings, never Space settings."""
     client.click(L.PERSONAL_SETTINGS, settle=3)
     client.wait_url('#/settings')
-    client.wait_for(L.UPLOAD_PHOTO)
+    client.wait_for(L.CHANGE_AVATAR)
     assert not client.find(L.WHO_CAN_JOIN), \
         'personal settings is showing Space settings'
     client.shot('personal-settings')
@@ -87,7 +87,9 @@ def change_status(client, api):
 def upload_avatar(client, api, path):
     """Upload a picture and check the server serves it back."""
     _open_personal(client)
-    client.attach_file(L.UPLOAD_PHOTO, path)
+    # The badge opens a source sheet first; see avatar_settings_section.dart.
+    client.click(L.CHANGE_AVATAR, settle=2)
+    client.attach_file('Photo library', path)
     # A picked picture is cropped before it is uploaded, so the sheet has to be
     # answered; nothing reaches the server until it is.
     client.wait_for(L.CROP_TITLE)
@@ -113,7 +115,7 @@ def space_settings_reachable(client):
     client.wait_url('#/settings/space')
     for label in ('Reports', 'Invites', L.ROLES, L.WHO_CAN_JOIN):
         client.wait_for(label)
-    assert not client.find(L.UPLOAD_PHOTO), \
+    assert not client.find(L.CHANGE_AVATAR), \
         'Space settings is showing personal settings'
     client.shot('space-settings')
     print('  Space settings opens on its own, with all four sections')

@@ -9,6 +9,7 @@ would pass a run where nothing was persisted at all.
 import json
 import urllib.error
 import urllib.request
+import uuid
 
 # Every path this helper calls, so a run can report the coverage it truly had
 # rather than the coverage somebody once wrote down.
@@ -79,6 +80,22 @@ class Api:
             if needle in (m.get("content") or ""):
                 return m
         raise AssertionError(f"no message containing {needle!r}")
+
+    def send_message(self, channel_id, content, reply_to_id=None):
+        """A send with a client-generated id, the way any real client sends.
+
+        `reply_to_id` is the one field 'Reply' itself would attach through
+        the context menu this harness cannot open; see e2e_replies.py.
+        """
+        body = {"id": str(uuid.uuid4()), "content": content}
+        if reply_to_id is not None:
+            body["reply_to_id"] = reply_to_id
+        return self.call("POST", f"/channels/{channel_id}/messages", body)
+
+    def open_thread(self, channel_id, message_id):
+        """The API substitute for 'Reply in thread'; see e2e_threads.py."""
+        return self.call(
+            "POST", f"/channels/{channel_id}/messages/{message_id}/thread")
 
     def edit_message(self, channel_id, message_id, content):
         """Rewrites a message's content, the way another device would."""

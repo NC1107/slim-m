@@ -22,7 +22,7 @@ PERSONAL_SETTINGS = "Personal settings"
 # Personal settings. Nav entries first: a control needs its own pane selected.
 ACCOUNT_PANE = "Account & presence"
 APPEARANCE_PANE = "Appearance"
-UPLOAD_PHOTO = "Upload photo"
+CHANGE_AVATAR = "Change profile picture"
 CROP_TITLE = "Crop your picture"
 USE_PICTURE = "Use picture"
 THEME = "Theme"
@@ -46,6 +46,19 @@ SHARING_NOTICE = "You are sharing your screen"
 STOP_SHARING = "Stop sharing"
 MUTE = "Mute"
 LEAVE_CALL = "Leave call"
+
+# Calling in a DM
+START_DM = "Message"
+DM_CALL = "Call"
+DM_CALL_BACK = "Back to messages"
+
+# Replies: only the rendered quote is reachable here, never "Reply" itself (see e2e_replies.py).
+REPLY_UNAVAILABLE = "Message unavailable"
+REPLY_UNAVAILABLE_QUOTE = "Reply to a message that is not available"
+JUMP_FAILED = "Could not find that message."
+
+# Threads: only the reply-count affordance is reachable, never "Reply in thread" itself (see e2e_threads.py).
+THREAD_HEADER = "Thread"
 
 # The fixture channels the seed creates
 TEXT_CHANNEL = "general"

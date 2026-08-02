@@ -45,6 +45,14 @@ def click(label_json):
     rather than the last found: a channel row and its "Manage <name>" button
     both match the channel's own name, and taking the last opened the manage
     sheet every time.
+
+    Neither candidate is always named by an `aria-label` attribute, though:
+    a reply quote's own label renders as inline text rather than the
+    attribute, so its derived name is that text glued to its rendered
+    snippet - often longer than an enclosing row's own concise aria-label,
+    which used to make "shorter wins" favour the row over the quote it
+    contains. A tappable node nested inside another tappable match is always
+    the more specific one, so containment is checked before length.
     """
     return """
     (function(){
@@ -67,6 +75,8 @@ def click(label_json):
         if ((nx.toLowerCase()===want)!==(ny.toLowerCase()===want)) {
           return nx.toLowerCase()===want ? -1 : 1;
         }
+        if (x!==y && x.contains(y)) return 1;
+        if (x!==y && y.contains(x)) return -1;
         return nx.length-ny.length;
       });
       var target=tappable[0];
