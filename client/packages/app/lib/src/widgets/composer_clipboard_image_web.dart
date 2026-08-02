@@ -98,3 +98,23 @@ String _filenameFor(String mimeType) {
   };
   return 'pasted-image.$extension';
 }
+
+/// The web half of the seam's exception type.
+///
+/// Declared here as well as in the stub because the two are conditional-
+/// import siblings: a caller writing `on ClipboardImageReadException` must
+/// compile on every target, and a type that exists on one side only fails
+/// dart2js while passing `dart analyze` outright. That is exactly how the
+/// web build broke without any gate noticing.
+///
+/// Nothing on this target throws it - the browser paste event hands over
+/// bytes or nothing - but the type must exist for the catch to compile.
+class ClipboardImageReadException implements Exception {
+  const ClipboardImageReadException(this.message);
+
+  /// A sentence fit to show, not a raw platform error string.
+  final String message;
+
+  @override
+  String toString() => message;
+}
