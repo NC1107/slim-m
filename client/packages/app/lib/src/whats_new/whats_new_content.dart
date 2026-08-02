@@ -218,6 +218,21 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.25.0',
+    headline: 'A reply count under threaded messages',
+    points: [
+      WhatsNewPoint(
+        'A message with a thread now shows "N replies" underneath it, tap '
+        'through to open it. It used to be invisible unless you already '
+        'knew to look for it.',
+      ),
+      WhatsNewPoint(
+        'When there has been a reply, it also says when the most recent '
+        'one landed.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,

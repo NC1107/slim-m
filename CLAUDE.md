@@ -50,9 +50,36 @@ It now also keeps whatever the local table already has flagged as a thread (`par
 
 **Mutation-tested by hand, four separate single-line reverts, each restored immediately after**: dropping the `parent_message_id IS NULL` filter from `list_channels` failed the rail-exclusion test and nothing else; removing `permission_channel`'s substitution from `evaluate_channel_permissions` failed the view-inheritance test and nothing else; removing it from `viewers_among` failed the push-fan-out inheritance test and nothing else; reverting `delete_channel`'s guard to count threads failed the last-channel test and nothing else. See `crates/slimm-server/tests/threads.rs`.
 
-Deliberately not built, and named rather than silently missing: a live "thread opened" notification for someone already viewing the parent channel (see the discovery note above); a reply-count or "N replies" affordance on the parent message, which would need the same field surfaced in the message row rather than only used to gate the context-menu item; and any UI for deleting a thread specifically - the generic `DELETE /channels/{id}` route already reaches one for anyone holding deployment-wide `MANAGE_CHANNELS`, with the last-channel guard now correctly indifferent to it.
+Deliberately not built, and named rather than silently missing: a live "thread opened" notification for someone already viewing the parent channel (see the discovery note above); ~~a reply-count or "N replies" affordance on the parent message, which would need the same field surfaced in the message row rather than only used to gate the context-menu item~~ (built 2026-08-01, see "The reply-count affordance threads shipped without" below); and any UI for deleting a thread specifically - the generic `DELETE /channels/{id}` route already reaches one for anyone holding deployment-wide `MANAGE_CHANNELS`, with the last-channel guard now correctly indifferent to it.
 
-## Reconciling an edit nobody was online for (2026-07-31)
+## The reply-count affordance threads shipped without (2026-08-01)
+
+The last of the three things `docs/decisions/0005-threads.md` named as deliberately not built, and the one the owner asked for by name (Slack's "3 replies" line).
+Read this before touching `Store::thread_summaries_for_messages`, `MessageExtras`, or `ThreadReplySummary`.
+
+**One batch query, the same shape `thread_channel_id` itself already used.**
+`Store::thread_summaries_for_messages` (`store/threads.rs`) replaces the narrower `threads_for_messages` it grew out of: a single `LEFT JOIN` from `channels` to `messages`, grouped by the parent message id, bound over the whole page's ids in one `IN (...)` list.
+`message_enrich::with_reactions` calls it once per page, exactly where it already called the narrower version - no new query round trip, no per-message loop.
+A structural test (`tests/thread_reply_count.rs`, mirroring `canvas_index.rs`'s own technique of reading a function's body out of its real source) asserts exactly one `fetch_all` and zero `fetch_one`/`fetch_optional` inside the function, so a future edit that turns this back into N queries fails a test rather than only a code review.
+
+**A `LEFT JOIN`, not an `INNER` one, because a thread can be real and empty.**
+Opening a thread creates its channel before anything is sent into it, so `COUNT(m.id)` (not `COUNT(*)`, which would count the join's own null row) has to answer `0` for a thread nobody has replied to yet, distinct from no thread at all.
+Mutation-tested: swapping in `COUNT(*)` fails exactly the two zero-reply tests and nothing else; dropping the join's `m.deleted_at IS NULL` fails exactly the deleted-reply exclusion test and nothing else.
+
+**The permission story needed no new check, because it was already answered.**
+A thread's `VIEW_CHANNEL` resolves to the parent channel's (`Store::permission_channel`), so anyone who can fetch the parent's messages already has the exact same right the reply count would need - the batch query runs unconditionally on a page the caller was already authorized to read, the same trust `thread_channel_id` and `reactions` already carry.
+
+**Client-side, the count rides in `MessageExtras`, never on the persisted `Message` row - `thread_channel_id`'s own precedent, extended by three fields rather than reset.**
+`threadChannelId`/`threadReplyCount`/`threadLastReplyAt` merge with `??`, so a bare live `message.created`/`message.edited` frame (which carries none of the three, the same reason it carries no reactions) can only ever add to what a REST fetch already established, never blank it.
+`ThreadReplySummary` (`client/packages/app/lib/src/widgets/message_row_parts.dart`) renders nothing at all when the count is null, and nothing when it is a genuine `0` either - an opened, still-empty thread is real data the wire has to carry so the client can tell it apart from no thread, but it is not worth a "0 replies" row.
+Tapping it reuses `MessageActions.onOpenThread` exactly, the same call the context menu's "Reply in thread" item already made; when `canOpenThread` is false (view-only, or the channel is itself a thread) it renders as inert text with no `InkWell` and no tap semantics at all, the same "no handler rather than a button that would just 403" treatment `AppSegmentedOption.disabled` already established.
+
+**`messages.rs` crossed the 500-line hard ceiling a second time, the same way CLAUDE.md's own reconciliation entry already flagged it doing once.**
+The DTO itself - `MessageDto`, `AttachmentDto`, `ReactionDto`, and the two `impl` blocks - moved into a new `http/message_dto.rs`, re-exported from `messages.rs` (`pub(crate) use message_dto::{...}`) so every existing `super::messages::MessageDto` import elsewhere keeps working unchanged.
+`messages.rs` is 393 lines now; the split cost nothing beyond the new file.
+
+**A last-reply timestamp is carried because "3 replies" and "3 replies, last one yesterday" really are different signals**, and it was nearly free: the same `GROUP BY` that counts already has `MAX(m.created_at)` for a `null` cost.
+The client formats it with `formatMessageDay` when older than today and the exact `HH:mm` when today, reusing both existing formatters rather than adding a third time-formatting convention.
 
 The project's oldest recorded correctness debt, closed across four PRs: #235 (the op stream), #236 (the client's cursor and models), #237 (the wire), #238 (applying them).
 Read this before touching `/sync`, `message_ops`, or `SyncController`'s catch-up.

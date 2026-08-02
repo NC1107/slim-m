@@ -14,19 +14,20 @@ use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::{get, patch};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use uuid::Uuid;
 
 use super::AppState;
 use super::error::ApiError;
 use super::extract::{Authed, Json, Query, enforce};
-use super::polls::PollDto;
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::media;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{AttachmentSummary, Edited, MAX_ATTACHMENTS_PER_MESSAGE, Message};
+use crate::store::{Edited, MAX_ATTACHMENTS_PER_MESSAGE};
+
+pub(crate) use super::message_dto::{AttachmentDto, MessageDto, ReactionDto};
 
 /// Message bodies carry one text field; cap it generously but bounded.
 const MESSAGE_BODY_LIMIT: usize = 64 * 1024;
@@ -47,114 +48,7 @@ pub fn routes() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(MESSAGE_BODY_LIMIT))
 }
 
-// --- Wire types ---
-
-#[derive(Serialize)]
-pub(crate) struct MessageDto {
-    id: String,
-    channel_id: String,
-    author_id: Option<String>,
-    /// Null once the author's account is anonymized, which is also when
-    /// `author_id` goes null. Clients render their own fallback rather than
-    /// being handed a server-invented placeholder.
-    author_display_name: Option<String>,
-    seq: i64,
-    content: String,
-    created_at: i64,
-    edited_at: Option<i64>,
-    /// The message this one replies to, or `null`. Only ever the id: the
-    /// parent's own content, author and liveness are resolved by looking that
-    /// id up like any other message, never copied onto this row, or a client
-    /// caching this reply would go stale the moment the parent is edited or
-    /// deleted with no way to notice.
-    reply_to_id: Option<String>,
-    /// The thread opened from this message, or `null` if none has been
-    /// started yet. Always present as a key, the same "always there, empty
-    /// or null means genuinely none" convention `poll` and `reactions`
-    /// follow. Set by [`super::message_enrich::with_reactions`]'s batch
-    /// lookup, never by this conversion: a message can only grow a thread
-    /// after it already exists, so a freshly sent or edited one always
-    /// carries `null` here, exactly like a fresh message's `poll`.
-    pub(crate) thread_channel_id: Option<String>,
-    /// Empty unless the caller asked for a list, which is the only path that
-    /// batch-loads them; a single echoed message carries none because it
-    /// cannot have any yet.
-    #[serde(default)]
-    pub(crate) reactions: Vec<ReactionDto>,
-    /// The poll this message carries, if any. Always present as a key (never
-    /// omitted): `null` means this message is not a poll, the same "always
-    /// there, empty or null means genuinely none" convention `reactions`
-    /// already follows. Set by [`super::polls::attach_polls`], not by this
-    /// conversion, since a bare `Message` has nowhere to read poll data from.
-    pub(crate) poll: Option<PollDto>,
-    /// Always present, empty when there are none - same convention as
-    /// `reactions`. Unlike reactions and polls, a fresh send can carry these
-    /// immediately (they are uploaded before the send, then referenced in
-    /// it), so the send path reads them once and fills this in on both its
-    /// own response and the live frame, rather than leaving it empty the way
-    /// `reactions` is left empty for a message that cannot have any yet.
-    #[serde(default)]
-    pub(crate) attachments: Vec<AttachmentDto>,
-}
-
-/// One attachment as it appears on a message.
-#[derive(Serialize, Clone)]
-pub(crate) struct AttachmentDto {
-    id: String,
-    filename: String,
-    content_type: String,
-    size: i64,
-}
-
-impl From<AttachmentSummary> for AttachmentDto {
-    fn from(a: AttachmentSummary) -> Self {
-        Self {
-            id: a.id,
-            filename: a.filename,
-            content_type: a.content_type,
-            size: a.size,
-        }
-    }
-}
-
-/// One emoji on a message, with the asking user's own state.
-#[derive(Serialize)]
-pub(crate) struct ReactionDto {
-    pub(crate) emoji: String,
-    pub(crate) count: i64,
-    /// Whether the caller reacted with this emoji, so the client can render the
-    /// toggled state without a second request.
-    pub(crate) reacted: bool,
-}
-
-impl MessageDto {
-    /// Roughly what this row costs a `/sync` response, for the shared byte
-    /// budget. The body dominates; the fixed addend stands in for the ids and
-    /// timestamps around it rather than pretending to be exact.
-    pub(super) fn wire_cost(&self) -> usize {
-        self.content.len() + 128
-    }
-}
-
-impl From<Message> for MessageDto {
-    fn from(message: Message) -> Self {
-        Self {
-            id: message.id.to_string(),
-            channel_id: message.channel_id.to_string(),
-            author_id: message.author_id.map(|id| id.to_string()),
-            author_display_name: message.author_display_name,
-            seq: message.seq.0,
-            content: message.content,
-            created_at: message.created_at,
-            edited_at: message.edited_at,
-            reply_to_id: message.reply_to_id.map(|id| id.to_string()),
-            thread_channel_id: None,
-            reactions: Vec::new(),
-            poll: None,
-            attachments: Vec::new(),
-        }
-    }
-}
+// --- Request bodies (the response DTO lives in `message_dto.rs`) ---
 
 #[derive(Deserialize)]
 struct SendRequest {

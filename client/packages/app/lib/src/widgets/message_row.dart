@@ -54,6 +54,8 @@ class MessageRow extends StatelessWidget {
     this.reactions = const [],
     this.attachments = const [],
     this.poll,
+    this.threadReplyCount,
+    this.threadLastReplyAt,
     this.replyTo,
     this.onReplyTap,
   });
@@ -137,6 +139,16 @@ class MessageRow extends StatelessWidget {
 
   /// The poll this message carries, if it is a poll message.
   final api.Poll? poll;
+
+  /// Undeleted replies in this message's thread, from
+  /// `MessageExtras.threadReplyCount` - null (not zero) hides the row
+  /// entirely, since a message with no thread must never read as a
+  /// zero-reply one. See `ThreadReplySummary`.
+  final int? threadReplyCount;
+
+  /// When the thread's newest reply was sent, unix milliseconds. Null
+  /// whenever [threadReplyCount] is null or zero.
+  final int? threadLastReplyAt;
 
   /// The message [message] replies to, resolved by the transcript, or null
   /// when [message] is not a reply at all or its parent could not be
@@ -269,6 +281,14 @@ class MessageRow extends StatelessWidget {
                                       onReactionTap: onReactionTap,
                                       onPickReaction: onPickReaction,
                                       customEmoji: customEmoji,
+                                    ),
+                                  if ((threadReplyCount ?? 0) > 0)
+                                    ThreadReplySummary(
+                                      replyCount: threadReplyCount!,
+                                      lastReplyAt: threadLastReplyAt,
+                                      onTap: actions.canOpenThread
+                                          ? actions.onOpenThread
+                                          : null,
                                     ),
                                   if (message.failed)
                                     FailedRow(

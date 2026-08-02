@@ -122,37 +122,70 @@ impl Store {
         })
     }
 
-    /// Which of `message_ids` already has a live thread, and its channel id -
-    /// the batch lookup [`super::super::http::message_enrich`] attaches to
-    /// each message the same way it attaches reactions and attachments, so a
-    /// client that was never online for the thread's creation still learns
-    /// it exists the next time it lists, searches, or syncs the parent
-    /// channel, rather than depending on having seen a live event for it.
-    pub async fn threads_for_messages(
+    /// Which of `message_ids` already has a live thread, and how many
+    /// undeleted replies are in it - the batch lookup
+    /// [`super::super::http::message_enrich`] attaches to each message the
+    /// same way it attaches reactions and attachments, one query for the
+    /// whole page rather than one per message. A client that was never
+    /// online for the thread's creation (or a reply to it) still learns it
+    /// exists, and how busy it is, the next time it lists, searches, or
+    /// syncs the parent channel, rather than depending on having seen a live
+    /// event for either.
+    ///
+    /// A thread with no replies yet - opened but nothing sent into it -
+    /// still appears, with `reply_count` zero and `last_reply_at` `None`;
+    /// whether that is worth rendering as an affordance is the caller's
+    /// call, not this query's.
+    pub async fn thread_summaries_for_messages(
         &self,
         message_ids: &[MessageId],
-    ) -> anyhow::Result<Vec<(MessageId, ChannelId)>> {
+    ) -> anyhow::Result<Vec<(MessageId, ThreadSummary)>> {
         if message_ids.is_empty() {
             return Ok(Vec::new());
         }
+        // LEFT JOIN, not INNER: a zero-reply thread still produces a row.
         let mut builder = sqlx::QueryBuilder::new(
-            "SELECT parent_message_id, id FROM channels \
-             WHERE deleted_at IS NULL AND parent_message_id IN (",
+            "SELECT c.parent_message_id AS parent_message_id, c.id AS thread_channel_id, \
+             COUNT(m.id) AS reply_count, MAX(m.created_at) AS last_reply_at \
+             FROM channels c \
+             LEFT JOIN messages m ON m.channel_id = c.id AND m.deleted_at IS NULL \
+             WHERE c.deleted_at IS NULL AND c.parent_message_id IN (",
         );
         let mut separated = builder.separated(", ");
         for id in message_ids {
             separated.push_bind(*id);
         }
-        builder.push(")");
+        builder.push(") GROUP BY c.parent_message_id, c.id");
         let rows = builder.build().fetch_all(&self.pool).await?;
 
         use sqlx::Row;
         rows.into_iter()
             .map(|row| {
                 let parent: MessageId = row.try_get("parent_message_id")?;
-                let id: ChannelId = row.try_get("id")?;
-                Ok((parent, id))
+                let channel_id: ChannelId = row.try_get("thread_channel_id")?;
+                let reply_count: i64 = row.try_get("reply_count")?;
+                let last_reply_at: Option<i64> = row.try_get("last_reply_at")?;
+                Ok((
+                    parent,
+                    ThreadSummary {
+                        channel_id,
+                        reply_count,
+                        last_reply_at,
+                    },
+                ))
             })
             .collect()
     }
+}
+
+/// A thread's channel id plus how busy it is, batch-loaded onto whichever
+/// message opened it - see [`Store::thread_summaries_for_messages`].
+pub struct ThreadSummary {
+    pub channel_id: ChannelId,
+    /// Undeleted messages sent into the thread. Can be zero: opening a
+    /// thread creates its channel before anything is sent into it.
+    pub reply_count: i64,
+    /// When the newest undeleted reply was sent, unix milliseconds. `None`
+    /// exactly when `reply_count` is zero.
+    pub last_reply_at: Option<i64>,
 }

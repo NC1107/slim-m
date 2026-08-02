@@ -104,6 +104,8 @@ class Message {
     required this.editedAt,
     this.replyToId,
     this.threadChannelId,
+    this.threadReplyCount,
+    this.threadLastReplyAt,
     // Empty is the honest default and the common case; requiring these at
     // every construction site bought no safety and broke every caller.
     this.reactions = const [],
@@ -137,6 +139,17 @@ class Message {
   /// yet. Open (or reuse) it with [SlimmApiThreads.openThread].
   final String? threadChannelId;
 
+  /// Undeleted replies in this message's thread, or null exactly when
+  /// [threadChannelId] is null. Can be zero: opening a thread creates its
+  /// channel before the first reply lands in it, so a caller rendering a
+  /// reply-count affordance must check for a positive count, not merely a
+  /// non-null [threadChannelId].
+  final int? threadReplyCount;
+
+  /// When the thread's newest undeleted reply was sent, unix milliseconds,
+  /// or null when [threadReplyCount] is null or zero.
+  final int? threadLastReplyAt;
+
   /// Reaction summaries, one entry per distinct emoji, with `reacted` set
   /// from the calling user's point of view. Always present: an empty list
   /// means no reactions, never that the server omitted them.
@@ -168,6 +181,8 @@ class Message {
         editedAt: json['edited_at'] as int?,
         replyToId: json['reply_to_id'] as String?,
         threadChannelId: json['thread_channel_id'] as String?,
+        threadReplyCount: json['thread_reply_count'] as int?,
+        threadLastReplyAt: json['thread_last_reply_at'] as int?,
         // Not in the schema's `required` list despite its description promising
         // it is always sent; empty beats crashing on a conformant response.
         reactions: (json['reactions'] as List<dynamic>?)
