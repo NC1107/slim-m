@@ -10,6 +10,18 @@ name: client-ios-ci
 # the plugins that pull in CallKit and WebRTC, and the dependency set, which is
 # how a Dart-side change reaches an Xcode build. Push to main runs it whatever
 # changed, so main is never trusted on a filter alone.
+#
+# PR #292 shipped a category on a private engine class, an undefined-symbol
+# link error that "ios unit tests" (a simulator, Debug build) could not see
+# and `build ipa` (a device, Release archive) failed on, only at release
+# time. Two gates close that, at very different costs, so only one runs
+# unconditionally: pbxproj-registration is a grep with no Xcode involved, so
+# it always runs. The release-configuration device build below is real
+# compile time on an already-scarce macOS runner, so it is narrowed by the
+# `changes` job's own path filter rather than by the "main is never trusted
+# on a filter alone" doctrine above: unlike the XCTest job, nothing this
+# build can catch is reachable from a change outside that filter's paths,
+# since Dart code never participates in native linking at all.
 on:
   push:
     branches: [main]
@@ -34,10 +46,62 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # Narrows the release-configuration build below to changes that can
+  # actually affect linking, the dorny/paths-filter pattern main-builds.yml
+  # already uses for the same reason.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      native: ${{ steps.filter.outputs.native }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        id: filter
+        with:
+          filters: |
+            native:
+              - 'client/packages/app/ios/**'
+              - 'client/packages/rtc/**'
+              - 'client/packages/platform/**'
+              - 'client/pubspec.yaml'
+              - 'client/pubspec.lock'
+              - 'client/packages/app/pubspec.yaml'
+
+  # A source file that compiles cleanly on its own but is never added to a
+  # target's Sources build phase is skipped by xcodebuild with no error and
+  # no warning; a Dart test cannot see it either, since the native method
+  # channel handler it would provide simply never registers. No Xcode
+  # needed, so this runs on ubuntu ahead of the macOS jobs below.
+  pbxproj-registration:
+    name: ios sources are registered in project.pbxproj
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: every Runner .swift/.m file is in the Sources build phase
+        run: |
+          set -euo pipefail
+          pbx=client/packages/app/ios/Runner.xcodeproj/project.pbxproj
+          sources=$(awk '/Begin PBXSourcesBuildPhase section/{f=1}
+                          f{print}
+                          /End PBXSourcesBuildPhase section/{f=0}' "$pbx")
+          fail=0
+          for f in client/packages/app/ios/Runner/*.swift \
+                   client/packages/app/ios/Runner/*.m; do
+            [ -e "$f" ] || continue
+            name=$(basename "$f")
+            grep -qF "$name in Sources" <<<"$sources" || {
+              echo "::error file=$f::$name is not in Runner's Sources build phase"
+              fail=1
+            }
+          done
+          [ "$fail" -eq 0 ] && echo "every Runner .swift/.m file is registered"
+          exit $fail
+
   # The CallKit synchronous-report invariant is a termination risk, not a style
   # rule, so it gets a macOS runner. Simulator only; see docs/ci.md.
   ios-unit-tests:
     name: ios unit tests (callkit invariant)
+    needs: [changes]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -130,3 +194,11 @@ jobs:
             -only-testing:RunnerTests \
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty || exit ${PIPESTATUS[0]}
+
+      # PR #292's actual failure: a link error only `build ipa` (Release,
+      # device) hit, never the Debug simulator build above. This is that
+      # same linking path, unsigned, so it needs no store secrets to run.
+      - name: build for a real device in release configuration (no codesign)
+        if: needs.changes.outputs.native == 'true'
+        working-directory: client/packages/app
+        run: flutter build ios --release --no-codesign

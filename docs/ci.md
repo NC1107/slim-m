@@ -12,7 +12,7 @@ Each section below is named for its workflow file.
 | --- | --- | --- |
 | `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, tests, release build, binary size budget |
 | `client-ci` | changes under `client/` | dart analyze, format, every package's tests |
-| `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | the iOS CallKit XCTest on macOS, and the extension-embeds-no-frameworks check |
+| `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
 | `schema-ci` | changes under `schema/`, `redocly.yaml` | redocly lint, and the additive-only oasdiff gate on pull requests |
 | `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
 | `hygiene` | every push and pull request | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap |
@@ -51,8 +51,20 @@ The CallKit synchronous-report invariant is a real termination risk, not a style
 iOS kills an app that takes a VoIP push without reporting a call before the handler returns, and repeat offences cost it VoIP push entirely.
 That makes it worth a macOS runner of its own, because the ubuntu job runs Dart tests and cannot compile a line of Swift.
 
-It is simulator only, so it needs no signing identity and no secrets: it compiles the Swift and runs XCTest, it does not produce a shippable build.
+The XCTest run is simulator only, so it needs no signing identity and no secrets: it compiles the Swift and runs XCTest, it does not produce a shippable build.
 The signed device build stays in the release workflow.
+
+### The registration and release-configuration checks, and why PR #292 needed both
+
+Client 0.21.2 shipped a category on a private engine class from `ClipboardPasteBridge.m`, an undefined-symbol link error.
+`ios unit tests` passed, because it links a Debug, simulator build; `build ipa` failed, because only a Release, device archive takes the same linking path the App Store review needs.
+Separately, a new Swift file left out of `project.pbxproj`'s Sources build phase is skipped by `xcodebuild` with no error at all, so no test on either side can see it: not the native build (nothing failed) and not the Dart suite (it passes against a method channel that would have no handler).
+
+Two checks close this, at very different costs.
+`pbxproj-registration` is a grep over `project.pbxproj` with no Xcode involved, so it runs on `ubuntu-latest` unconditionally, ahead of the macOS jobs.
+The `ios-unit-tests` job gained a second build step, `flutter build ios --release --no-codesign`: a real, unsigned, device-target Release build, which is what takes the same linking path `build ipa` does.
+That step is narrowed to the `changes` job's `native` path filter rather than "main is never trusted on a filter alone": unlike the XCTest job, a linking failure can only come from a native source file, `project.pbxproj`, or a dependency version, since Dart code takes no part in native linking.
+Both checks are in `verify-client-ci`'s `required_checks`, since each can fail with the other green.
 
 It lives in `client-ios-ci.yml` rather than beside the Dart job because it is the expensive one by an order of magnitude: 14 minutes against 5, measured across recent runs, which made `client-ci` a median of 11 minutes when the Dart half finishes in a third of that.
 A GitHub workflow cannot path-filter one job, so the split is what lets it be gated on the paths that can actually change its answer: the iOS project, the plugins carrying CallKit and WebRTC, and the dependency set, which is how a Dart-side change reaches an Xcode build.
@@ -319,12 +331,17 @@ workflow_run cannot close this gap.
 It fires only when a named workflow completes for the event that triggered it, and none of `server-ci`, `client-ci`, `client-ios-ci`, `hygiene` or `licenses` trigger on a tag push at all, by design, so that a ref that already ran CI on `main` does not run it again.
 A tag push therefore raises no `workflow_run` event for any of them, which rules out the one mechanism that otherwise looks like the obvious fit.
 
-The gate instead polls `GET /repos/{owner}/{repo}/commits/{sha}/check-runs` for `github.sha` and requires each listed check-run name to show `status: completed` and `conclusion: success`, retrying for up to 30 minutes before failing on a timeout.
+The gate resolves the caller's `ref` (a tag on the release-please path, `github.sha` on the tag-push path) to a commit SHA once, then polls `GET /repos/{owner}/{repo}/commits/{sha}/check-runs` for that SHA and requires each listed check-run name to show `status: completed` and `conclusion: success`, retrying for up to 70 minutes before failing on a timeout.
 A check run is attached to the commit rather than to the event that produced it, so this answers both paths uniformly: the SHA a tag points at is normally already on `main` and already carries the check runs its original push or PR produced, so re-pushing a tag to the same SHA still finds them and still republishes, which is the documented re-publish capability above.
-A required name **absent** from the response is treated the same as one that failed, never as a pass, so a commit that never went through CI at all (never pushed to `main`, never opened as a PR) times out and fails closed instead of silently succeeding on an empty result.
+A required name **absent** from the response is treated the same as one that failed, never as a pass, so a commit that never went through CI at all (never pushed to `main`, never opened as a PR) times out and fails closed instead of silently succeeding on an empty result - unless something is still queued for that commit, in which case it keeps waiting past the grace period rather than giving up on a slow runner.
+A `cancelled` check is pinned as a hard failure too, on purpose: see client-ios-ci.yml's own header on the concurrency group that used to cancel it on every push to `main`.
+
+The polling loop itself is `scripts/verify-release-checks.sh`, not inlined in the workflow, so `scripts/lib/test_verify_release_checks.py` can drive it against a fake `gh`.
+It shipped three separate incidents before anything tested it: a cancelled check read as success, the release-please path verified `github.sha` instead of the commit it actually released, and a tag was passed to an endpoint that only accepts a SHA.
+All three are now regression tests, not just fixed code.
 
 `verify-server-ci` requires `check` (server-ci), `hygiene` and `cargo dependency licenses` (licenses).
-`verify-client-ci` requires `analyze, format check, test` (client-ci), `ios unit tests (callkit invariant)` (client-ios-ci), `hygiene` and `pub dependency licenses` (licenses).
+`verify-client-ci` requires `analyze, format check, test` (client-ci), `ios unit tests (callkit invariant)` and `ios sources are registered in project.pbxproj` (client-ios-ci), `hygiene` and `pub dependency licenses` (licenses).
 Those are exact check-run names (a job's `name:`, or its id when a job sets none), matched literally; renaming one of those jobs without updating the matching `required_checks` string silently reopens the gap this closes, since the renamed check is simply absent and the gate times out and fails rather than warns.
 `schema-ci` is not required: `tests/openapi_contract.rs` already runs inside `server-ci`'s `cargo test --all`, and `schema-ci`'s own job is a redocly lint of the document's syntax, not part of what either release actually ships.
 
