@@ -83,7 +83,7 @@ pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext, SweptTokens,
 };
 pub use space::JoinPolicy;
-pub use threads::OpenThreadError;
+pub use threads::{OpenThreadError, ThreadSummary};
 pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout};
 
 /// Unix milliseconds, `pub(crate)` so the push trigger path (outside this

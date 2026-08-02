@@ -39,6 +39,7 @@ mod escalation;
 mod extract;
 mod invites;
 mod members;
+mod message_dto;
 mod message_enrich;
 mod messages;
 mod overwrites;

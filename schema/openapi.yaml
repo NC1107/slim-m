@@ -4104,6 +4104,19 @@ components:
             started yet. Always present as a key, the same "null means
             genuinely none" convention `poll` follows. Open (or reuse) it
             with `openThread`.
+        thread_reply_count:
+          type: [integer, "null"]
+          format: int64
+          description: >-
+            Undeleted replies in this message's thread, or null exactly when
+            thread_channel_id is null. Can be 0: opening a thread creates its
+            channel before the first reply lands in it.
+        thread_last_reply_at:
+          type: [integer, "null"]
+          format: int64
+          description: >-
+            When the thread's newest undeleted reply was sent, unix
+            milliseconds, or null when thread_reply_count is null or 0.
         reactions:
           type: array
           description: >-

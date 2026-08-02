@@ -273,11 +273,21 @@ pub(super) async fn message_calls(c: &mut Contract, root: &str, channel: &str) -
         root,
     )
     .await;
-    c.bare(
-        "openThread",
+    let thread = c
+        .bare(
+            "openThread",
+            "POST",
+            &format!("{messages}/{message}/thread"),
+            root,
+        )
+        .await;
+    // A reply, so thread_reply_count/thread_last_reply_at below exercise a real value.
+    c.json(
+        "sendMessage",
         "POST",
-        &format!("{messages}/{message}/thread"),
+        &format!("/channels/{}/messages", text(&thread, "id")),
         root,
+        json!({ "id": Uuid::now_v7().to_string(), "content": "first reply" }),
     )
     .await;
     c.get(

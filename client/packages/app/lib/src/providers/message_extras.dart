@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Reactions, attachments, and polls, kept in memory rather than in the
-/// local database.
+/// Reactions, attachments, polls, and a thread reply summary, kept in memory
+/// rather than in the local database.
 ///
-/// `client/packages/data` has no columns for any of the three, and this is
+/// `client/packages/data` has no columns for any of the four, and this is
 /// deliberate rather than an oversight: every REST fetch that returns a
-/// [api.Message] (send, list, sync, search) already carries all three in
+/// [api.Message] (send, list, sync, search) already carries all four in
 /// full, so re-fetching the channel's recent messages on open (see
 /// [ChannelScreen]) re-hydrates this cache correctly after a restart without
 /// a schema migration. What would not survive a restart cleanly is any
@@ -14,11 +14,14 @@
 ///
 /// The one hazard this exists to guard against: the server builds a live
 /// `message.created`/`message.edited` frame from a bare DTO that omits
-/// reactions, attachments, and poll data (a known Phase 4 server gap this
-/// client must not try to fix). [applyMessage] merges rather than
+/// reactions, attachments, poll, and thread data (a known Phase 4 server gap
+/// this client must not try to fix). [applyMessage] merges rather than
 /// overwrites, so that omission can only ever fail to add new information -
 /// it can never erase a better answer this cache already has cached from a
-/// REST fetch.
+/// REST fetch. A thread reply count going stale until the next fetch of the
+/// parent channel is the same accepted gap `docs/decisions/0005-threads.md`
+/// already names for `thread_channel_id` itself: nothing publishes a live
+/// event for a thread opening or gaining a reply.
 ///
 /// Nothing prunes one entry at a time, deliberately. Every consumer selects
 /// the one id it is about, and there is no reachability answer to prune
@@ -46,18 +49,27 @@ import 'package:slimm_api/api.dart' as api;
 
 import 'live_events.dart';
 
-/// One message's reactions, attachments, and poll, however much of each is
-/// known so far.
+/// One message's reactions, attachments, poll, and thread reply summary,
+/// however much of each is known so far.
 class MessageExtras {
   const MessageExtras({
     this.reactions = const [],
     this.attachments = const [],
     this.poll,
+    this.threadChannelId,
+    this.threadReplyCount,
+    this.threadLastReplyAt,
   });
 
   final List<api.ReactionSummary> reactions;
   final List<api.Attachment> attachments;
   final api.Poll? poll;
+
+  /// The thread opened from this message, or null if none is known yet -
+  /// same three fields, same merge rule, as [api.Message] carries them.
+  final String? threadChannelId;
+  final int? threadReplyCount;
+  final int? threadLastReplyAt;
 
   MessageExtras copyWith({
     List<api.ReactionSummary>? reactions,
@@ -67,6 +79,9 @@ class MessageExtras {
     reactions: reactions ?? this.reactions,
     attachments: attachments ?? this.attachments,
     poll: poll ?? this.poll,
+    threadChannelId: threadChannelId,
+    threadReplyCount: threadReplyCount,
+    threadLastReplyAt: threadLastReplyAt,
   );
 
   static const empty = MessageExtras();
@@ -123,17 +138,24 @@ class MessageExtrasController
   }
 
   /// Whatever [message] carries, over whatever is already known. See the file
-  /// doc comment for why this can only ever add information.
-  MessageExtras _merged(api.Message message, MessageExtras? existing) =>
-      MessageExtras(
-        reactions: message.reactions.isNotEmpty
-            ? message.reactions
-            : existing?.reactions ?? const [],
-        attachments: message.attachments.isNotEmpty
-            ? message.attachments
-            : existing?.attachments ?? const [],
-        poll: message.poll ?? existing?.poll,
-      );
+  /// doc comment for why this can only ever add information; the three
+  /// thread fields follow [poll]'s own rule for the same reason - a bare live
+  /// frame carries none of them, so `??` can only add, never clobber.
+  MessageExtras _merged(
+    api.Message message,
+    MessageExtras? existing,
+  ) => MessageExtras(
+    reactions: message.reactions.isNotEmpty
+        ? message.reactions
+        : existing?.reactions ?? const [],
+    attachments: message.attachments.isNotEmpty
+        ? message.attachments
+        : existing?.attachments ?? const [],
+    poll: message.poll ?? existing?.poll,
+    threadChannelId: message.threadChannelId ?? existing?.threadChannelId,
+    threadReplyCount: message.threadReplyCount ?? existing?.threadReplyCount,
+    threadLastReplyAt: message.threadLastReplyAt ?? existing?.threadLastReplyAt,
+  );
 
   /// Replaces the cached tallies from a broadcast, carrying `reacted` over from
   /// what this client already knew: it is per-viewer and never broadcast (see

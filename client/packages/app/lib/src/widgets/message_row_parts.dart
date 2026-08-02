@@ -12,6 +12,7 @@ import '../routing/breakpoints.dart';
 
 import 'custom_emoji_image.dart';
 import 'emoji_picker.dart';
+import 'message_row_identity.dart' show formatMessageDay, formatMessageTime;
 
 /// 16, not the 13 the chip's text glyph uses: 13 is a font size, and an emoji
 /// face draws well inside its em box while an image fills whatever box it gets.
@@ -126,6 +127,86 @@ class ReactionsRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The "N replies" affordance under a message that has an opened thread,
+/// tapping through to it - Slack's shape, which is what the owner named.
+///
+/// Absent entirely for a message with no thread, and also for a thread with
+/// nobody in it yet: [Message.threadReplyCount] is `0` right after a thread
+/// is opened but before the first reply lands, and an empty "0 replies" row
+/// would read as a feature that broke rather than as nothing to show.
+///
+/// [onTap] is only ever wired when the caller's own [MessageActions.canOpenThread]
+/// is true; when it is false (view-only, or a rare race with the parent's own
+/// permissions changing) this renders as inert text rather than a button that
+/// would just 403 on tap, the same "no tap handler at all" treatment
+/// `AppSegmentedOption.disabled` already gives an unavailable choice.
+///
+/// Always its own `Semantics(container: true)`, tappable or not: static text
+/// still has to be its own stop for a screen reader, and without a boundary
+/// here it would merge into the row's own long-press semantics, reading an
+/// inert row as actionable.
+class ThreadReplySummary extends StatelessWidget {
+  const ThreadReplySummary({
+    super.key,
+    required this.replyCount,
+    this.lastReplyAt,
+    this.onTap,
+  });
+
+  final int replyCount;
+  final int? lastReplyAt;
+
+  /// Opens (or reuses) the thread and navigates to it. Null makes this
+  /// inert; see this class's own doc comment for when that happens.
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final enabled = onTap != null;
+    final color = enabled ? tokens.accent : tokens.textDisabled;
+    final countLabel = replyCount == 1 ? '1 reply' : '$replyCount replies';
+    final lastReplyAt = this.lastReplyAt;
+    final text = lastReplyAt == null
+        ? countLabel
+        : '$countLabel · Last reply ${_lastReplyLabel(lastReplyAt)}';
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(AppIcons.thread, size: 13, color: color),
+        const SizedBox(width: AppSpacing.s4),
+        Text(text, style: AppText.caption.copyWith(color: color)),
+      ],
+    );
+    final padded = Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.s4),
+      child: row,
+    );
+    // See this class's own doc comment for why `container` is always true.
+    return Semantics(
+      container: true,
+      button: enabled,
+      label: enabled ? '$text. Open thread.' : text,
+      child: enabled
+          ? InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(AppRadii.control),
+              child: padded,
+            )
+          : padded,
+    );
+  }
+}
+
+/// The exact time when the newest reply is from today (more useful than
+/// "Today" would be for a channel with any real traffic), the relative or
+/// absolute day otherwise - [formatMessageDay]'s own scale, reused rather
+/// than inventing a second one just for this row.
+String _lastReplyLabel(int epochMs) {
+  final day = formatMessageDay(epochMs);
+  return day == 'Today' ? formatMessageTime(epochMs) : day;
 }
 
 /// The design's bordered "not loaded" placeholder, using [AppTokens.stripe],

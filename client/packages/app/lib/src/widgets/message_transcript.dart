@@ -349,6 +349,8 @@ class _MessageTranscriptState extends State<MessageTranscript> {
               reactions: extras.reactions,
               attachments: extras.attachments,
               poll: extras.poll,
+              threadReplyCount: extras.threadReplyCount,
+              threadLastReplyAt: extras.threadLastReplyAt,
               replyTo: switch (message.replyToId) {
                 final String id => byId[id],
                 null => null,
