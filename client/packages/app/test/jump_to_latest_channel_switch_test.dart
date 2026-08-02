@@ -195,12 +195,7 @@ void main() {
 
     await _switchTo(tester, h.container, 'c2');
 
-    // Checked via the widget's own `visible` field, not `find.byKey`:
-    // `JumpToLatestButton` is always mounted (its own doc comment says
-    // so, for the fade to reverse against) and `AnimatedSwitcher` keeps
-    // the outgoing keyed child around mid-fade, so a key lookup right
-    // after the flag flips would still find it, correctly, and say
-    // nothing about whether the flag itself was reset in time.
+    // The widget's own `visible` field, not a key lookup: `AnimatedSwitcher` keeps the outgoing child mounted mid-fade, so a key would still find it.
     expect(
       tester
           .widget<JumpToLatestButton>(find.byType(JumpToLatestButton))

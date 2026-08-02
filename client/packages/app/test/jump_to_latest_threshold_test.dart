@@ -147,23 +147,19 @@ Future<void> _unmount(WidgetTester tester) async {
 void main() {
   const jumpButton = Key('jump-to-latest-tap-target');
 
-  testWidgets(
-    'a small nudge well under the viewport-relative threshold does not '
-    'show the arrow',
-    (tester) async {
-      await _mount(tester);
-      final scroll = _transcriptScroll(tester);
+  testWidgets('a small nudge well under the viewport-relative threshold does not '
+      'show the arrow', (tester) async {
+    await _mount(tester);
+    final scroll = _transcriptScroll(tester);
 
-      // Below both the 96px floor and 30% of any viewport this harness lays
-      // out: a single accidental drag, not a reader leaving the tail.
-      scroll.jumpTo(60);
-      await _flush(tester);
+    // Below both the 96px floor and 30% of this harness's viewport: a single accidental drag, not a reader leaving the tail.
+    scroll.jumpTo(60);
+    await _flush(tester);
 
-      expect(find.byKey(jumpButton), findsNothing);
+    expect(find.byKey(jumpButton), findsNothing);
 
-      await _unmount(tester);
-    },
-  );
+    await _unmount(tester);
+  });
 
   testWidgets(
     'scrolling past the viewport-relative threshold shows the arrow, and '
