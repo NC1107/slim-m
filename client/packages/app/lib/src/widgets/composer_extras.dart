@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import 'composer_context_menu.dart';
 import 'composer_markdown_shortcuts.dart';
 
 /// Whether this platform's primary text input is a soft keyboard, which has
@@ -39,7 +40,7 @@ bool usesSoftKeyboard(BuildContext context) =>
 /// Exactly one of those is live at a time. An iPad with a hardware keyboard
 /// is a soft-keyboard platform holding a real Enter key, so both would fire
 /// for one press, and the send would go out twice.
-class ComposerField extends StatelessWidget {
+class ComposerField extends StatefulWidget {
   const ComposerField({
     super.key,
     required this.controller,
@@ -57,12 +58,43 @@ class ComposerField extends StatelessWidget {
   final Future<void> Function() onSend;
   final ValueChanged<String> onTyping;
 
+  @override
+  State<ComposerField> createState() => _ComposerFieldState();
+}
+
+class _ComposerFieldState extends State<ComposerField> {
+  /// See `composer_context_menu.dart`'s doc comment for why the field's
+  /// context menu needs this at all: on iOS 16+ it is what makes the system
+  /// edit menu offer Paste for an image, which it never does on its own.
+  /// A second listener on [ComposerField.focusNode] rather than anything
+  /// `Composer` itself has to wire up, since that field is this widget's own
+  /// concern and nothing above it needs to know the notifier exists.
+  final ClipboardImageStatusNotifier _clipboardImageStatus =
+      ClipboardImageStatusNotifier();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_handleFocusChange);
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_handleFocusChange);
+    _clipboardImageStatus.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (widget.focusNode.hasFocus) unawaited(_clipboardImageStatus.update());
+  }
+
   /// Re-focusing before sending is what keeps the soft keyboard up:
   /// `_finalizeEditing` has already unfocused, and only re-opens the input
   /// connection if the callback focuses the field again.
   void _submit() {
-    focusNode.requestFocus();
-    unawaited(onSend());
+    widget.focusNode.requestFocus();
+    unawaited(widget.onSend());
   }
 
   /// The row's icon buttons are a fixed square (see [AppIconButton]'s own
@@ -81,28 +113,43 @@ class ComposerField extends StatelessWidget {
     return CallbackShortcuts(
       bindings: {
         if (!soft)
-          const SingleActivator(LogicalKeyboardKey.enter): () => onSend(),
+          const SingleActivator(LogicalKeyboardKey.enter): () =>
+              widget.onSend(),
         // Shift+Enter is a hardware-only combination, hence gated the same
         // as plain Enter above; it used to fall through to the field's own
         // newline untouched, which a list continuation now has to pre-empt.
         if (!soft)
           const SingleActivator(LogicalKeyboardKey.enter, shift: true): () =>
-              controller.value = applyListAwareEnter(controller.value),
+              widget.controller.value = applyListAwareEnter(
+                widget.controller.value,
+              ),
         const SingleActivator(LogicalKeyboardKey.keyB, control: true): () =>
-            controller.value = wrapSelectionWithMarker(controller.value, '**'),
+            widget.controller.value = wrapSelectionWithMarker(
+              widget.controller.value,
+              '**',
+            ),
         const SingleActivator(LogicalKeyboardKey.keyB, meta: true): () =>
-            controller.value = wrapSelectionWithMarker(controller.value, '**'),
+            widget.controller.value = wrapSelectionWithMarker(
+              widget.controller.value,
+              '**',
+            ),
         const SingleActivator(LogicalKeyboardKey.keyI, control: true): () =>
-            controller.value = wrapSelectionWithMarker(controller.value, '*'),
+            widget.controller.value = wrapSelectionWithMarker(
+              widget.controller.value,
+              '*',
+            ),
         const SingleActivator(LogicalKeyboardKey.keyI, meta: true): () =>
-            controller.value = wrapSelectionWithMarker(controller.value, '*'),
+            widget.controller.value = wrapSelectionWithMarker(
+              widget.controller.value,
+              '*',
+            ),
       },
       child: ConstrainedBox(
         constraints: BoxConstraints(minHeight: _minHeight(context)),
         child: Stack(
           alignment: Alignment.centerLeft,
           children: [
-            if (!hasText)
+            if (!widget.hasText)
               IgnorePointer(
                 child: Text.rich(
                   key: const Key('composer-hint'),
@@ -113,7 +160,7 @@ class ComposerField extends StatelessWidget {
                     children: [
                       const TextSpan(text: 'Message '),
                       TextSpan(
-                        text: '#$channelName',
+                        text: '#${widget.channelName}',
                         style: const TextStyle(fontFamily: AppFonts.mono),
                       ),
                     ],
@@ -121,9 +168,9 @@ class ComposerField extends StatelessWidget {
                 ),
               ),
             TextField(
-              controller: controller,
-              focusNode: focusNode,
-              onChanged: onTyping,
+              controller: widget.controller,
+              focusNode: widget.focusNode,
+              onChanged: widget.onTyping,
               minLines: 1,
               maxLines: 6,
               keyboardType: TextInputType.multiline,
@@ -131,6 +178,12 @@ class ComposerField extends StatelessWidget {
               onSubmitted: soft ? (_) => _submit() : null,
               style: AppText.body.copyWith(color: tokens.textPrimary),
               cursorColor: tokens.accent,
+              contextMenuBuilder: (context, state) =>
+                  composerContextMenuBuilder(
+                    context,
+                    state,
+                    clipboardHasImage: _clipboardImageStatus.value,
+                  ),
               decoration: const InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
