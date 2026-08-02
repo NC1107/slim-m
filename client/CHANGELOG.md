@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.1](https://github.com/NC1107/slim-m/compare/client-v0.24.0...client-v0.24.1) (2026-08-02)
+
+
+### Bug Fixes
+
+* **client:** stop the jump arrow appearing on a channel you have not scrolled ([#317](https://github.com/NC1107/slim-m/issues/317)) ([972f557](https://github.com/NC1107/slim-m/commit/972f5576bc75a959f17dc420373cbfecbab156f2))
+
 ## [0.24.0](https://github.com/NC1107/slim-m/compare/client-v0.23.0...client-v0.24.0) (2026-08-02)
 
 
