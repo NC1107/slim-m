@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.2](https://github.com/NC1107/slim-m/compare/client-v0.24.1...client-v0.24.2) (2026-08-02)
+
+
+### Bug Fixes
+
+* **client:** force the system edit menu's Paste item for a clipboard image ([#319](https://github.com/NC1107/slim-m/issues/319)) ([e62c3a9](https://github.com/NC1107/slim-m/commit/e62c3a9babf6c71bbcb53281c4ca3dd87959fff4))
+
 ## [0.24.1](https://github.com/NC1107/slim-m/compare/client-v0.24.0...client-v0.24.1) (2026-08-02)
 
 
