@@ -16,6 +16,21 @@ Direct-messages rail row with the identical text, and this harness's click()
 picks whichever tappable match sorts first - not something worth resting a
 scenario on when the server can just be asked for the id it already knows.
 
+Alice's own first click needs the identical care, for a reason worth writing
+down: the API sweep (`e2e_sweep.py`) opens a DM with Bob from alice's own
+account as a side effect of exercising the DMs route, and once anything
+prompts alice's client to refresh its channel list - a voice call's join or
+leave already does - that DM gets a rail row too, before this scenario ever
+runs. From there, "Bob" starts matching a rail row as well as the member
+pane's, and once alice is already sitting on that DM channel (whichever
+"Bob" click landed on it), "Message" (meant for the profile popover's own
+button) no longer matches anything on screen - except the header's pin icon,
+whose label, "Pinned messages", contains "message" as a substring. That
+opened the pinned-messages sheet over the composer instead of ever finding
+one, which reads as a missing composer with no clue that a sheet is why.
+Checking the API for what alice's own account already has sidesteps the
+whole ambiguity rather than trying to out-guess it with a choosier label.
+
 Run after the shared 'lounge' voice scenarios rather than beside them, so a
 call already open in one room can never collide with the other.
 """
@@ -27,14 +42,23 @@ from e2e_voice import sfu_participants, tracks_of
 
 def start_dm_and_call(a, b, admin_api, member_api):
     """Alice starts a DM with Bob, then both hold and leave a call in it."""
-    a.click('Bob', settle=2)
-    a.click(L.START_DM, settle=3)
-    a.wait_for(L.COMPOSER)
+    existing = next(
+        (c for c in admin_api.call('GET', '/dms')
+         if c['user']['display_name'] == 'Bob'), None)
+    if existing:
+        a.ev(f"location.hash = '#/channels/{existing['channel_id']}'")
+        a.wait_for(L.COMPOSER)
+        opened = 'reached the DM the API sweep already opened, by its id'
+    else:
+        a.click('Bob', settle=2)
+        a.click(L.START_DM, settle=3)
+        a.wait_for(L.COMPOSER)
+        opened = 'opened a DM with bob from the member list'
     text = f'hello over a fresh dm {int(time.time())}'
     a.type_into(L.COMPOSER, text)
     a.click(L.SEND, settle=2)
     a.wait_for(text)
-    print("  alice opened a DM with bob from the member list and sent a message")
+    print(f"  alice {opened} and sent a message")
 
     deadline = time.time() + 20
     conversation = None

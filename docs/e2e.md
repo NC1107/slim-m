@@ -54,19 +54,22 @@ tile is not a published track.
 | personal vs Space settings | the UI | that neither shows the other's rows |
 | who can join | the UI | `/space/settings` and `/version` |
 | creating a role | the UI | `GET /roles` |
+| a reply, and a reply to a deleted message | the UI (the send and the delete go over the API; see below) | `reply_to_id` stored, the quote naming its parent live, and the honest jump-failure notice once it is gone |
+| a thread stays off the ordinary channel list | opening it is the API (see below), reading and replying is the UI | the channel list excludes it, and the parent message's own reply-count affordance |
 | reporting, blocking | the API (see below) | the moderation queue, the block list |
 | the capability handshake | the API | that `/version` names the two routes the run just used |
 | permissions | the API | that a member is refused and an admin is not |
 | a voice call, mute, leaving | the UI | the SFU's participant and track list |
 | sharing a screen | the UI | a `SCREEN_SHARE` track on the SFU |
+| calling in a DM | the UI | the SFU's participant and track list, keyed by the DM's own channel id |
 | edit, delete, search, pins, polls, invites, DMs, channel admin, devices, read state, sync | the API | the effect of each, not its status code |
 
 The run ends by reporting how many documented API paths it actually touched,
 counted from what the harness and both browsers requested rather than from a
 list kept by hand, since a hand-kept list overstates coverage the moment a
-scenario changes. A full run currently reaches **37 of 64** documented paths
-(confirmed against a live CI run rather than assumed; the schema has grown
-since this number was first written, the harness's own reach has not).
+scenario changes. A full run currently reaches **38 of 66** documented paths
+(confirmed against a live run rather than assumed; the schema has grown
+since this number was first written, the harness's own reach has grown with it).
 
 What it does not reach divides into three: routes that need a second
 deployment or real hardware (push, the relay lifecycle, account recovery),
@@ -87,7 +90,7 @@ prints it every time so it cannot quietly grow.
 | `lib/e2e_js.py` | the browser-side half: reading and driving the semantics tree |
 | `lib/e2e_labels.py` | every accessible name the app is driven by, in one place |
 | `lib/e2e_api.py` | the server's own answer, for checking against |
-| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py`, `e2e_markdown.py`, `e2e_reconcile.py` | the scenarios |
+| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py`, `e2e_markdown.py`, `e2e_reconcile.py`, `e2e_replies.py`, `e2e_threads.py`, `e2e_dm_call.py` | the scenarios |
 | `lib/e2e_sweep.py` | the API-level routes the scenarios do not reach |
 | `lib/e2e_seed.py`, `e2e_fixtures.py` | the accounts and the two PNGs a run uploads |
 
@@ -110,7 +113,14 @@ Four things cost real time to learn, and each fails silently rather than loudly:
 - **The same label is painted onto a plain node and a tappable one**, and only
   the one carrying `flt-tappable` answers a click. The closest name wins, too:
   a channel row and its "Manage <name>" button both match the channel's name,
-  and taking the last match opened the manage sheet every time.
+  and taking the last match opened the manage sheet every time. Two tappable
+  matches with neither an exact name is resolved by nesting, not just length:
+  a reply's quote button renders its own accessible label as inline text
+  rather than an `aria-label` attribute, so its derived name is that text
+  glued to its rendered snippet, which came out longer than the message row
+  enclosing it - "shorter wins" then picked the row over the button it
+  contained. A tappable node nested inside another tappable match is always
+  the more specific one, so containment is checked before length.
 - **The file picker's `<input>` never enters the document.** Flutter builds it,
   clicks it, and drops it, so there is nothing for `DOM.setFileInputFiles` to
   find; `createElement` is wrapped to catch it, and it is handed a real `File`
@@ -120,7 +130,7 @@ Four things cost real time to learn, and each fails silently rather than loudly:
   affordance that has no label - the react button, which only exists while the
   pointer is over a message.
 
-## Two things it drives at the API, on purpose
+## What it drives at the API, on purpose
 
 Reporting and blocking live behind a context menu that opens on right-click or
 long-press.
@@ -134,6 +144,15 @@ So those two are driven at the API, and `scripts/lib/e2e_admin.py` says so in
 its docstring rather than implying the UI path was exercised.
 The underlying gap is recorded in `CLAUDE.md`; closing it would make the menu
 reachable for keyboard users and for this harness in the same change.
+
+Reply and "Reply in thread" sit behind the identical menu, so sending a reply
+and opening a thread are the same substitution, made in `e2e_replies.py` and
+`e2e_threads.py` for the same reason; each says so in its own docstring.
+Everything downstream of the send or the open - the rendered quote, its tap
+target, a deleted parent's honest placeholder, the channel list's exclusion of
+a thread, and the parent message's own reply-count affordance - is an ordinary
+`Semantics` node with no menu behind it, so all of that is driven and checked
+through the real UI.
 
 Permissions are checked at the API deliberately rather than reluctantly.
 Hiding a button is not access control; refusing the request is, and each body
