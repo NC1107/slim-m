@@ -67,6 +67,15 @@ jobs:
           done
           exit "$status"
 
+      # dart2js resolves conditional imports that `dart analyze` never does:
+      # a symbol present in one branch of a `dart.library.js_interop` export
+      # and missing from the other compiles fine here and fails only on web.
+      # That is exactly how main shipped a web build that could not compile,
+      # with analyze, format and every test green.
+      - name: web compiles
+        working-directory: client/packages/app
+        run: flutter build web --release
+
   # The iOS half lives in client-ios-ci.yml. It costs 14 minutes on a macOS
   # runner against 5 for everything here, so it is gated on the paths that can
   # actually change its answer rather than on any client change at all.
