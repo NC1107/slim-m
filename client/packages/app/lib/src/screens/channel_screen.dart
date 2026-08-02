@@ -43,6 +43,7 @@ import '../widgets/message_transcript.dart';
 import '../widgets/reply_banner.dart';
 import 'channel_message_actions.dart';
 import 'channel_read_marker.dart';
+import 'channel_transcript_scroll.dart';
 
 export '../ids.dart' show newMessageId;
 
@@ -58,7 +59,6 @@ class ChannelScreen extends ConsumerStatefulWidget {
 
 class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   final _composer = TextEditingController();
-  final _scroll = ScrollController();
 
   /// The query text only; the search itself (open, hits, failure) lives in
   /// [channelSearchProvider], which the compact app bar drives too.
@@ -75,31 +75,16 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
 
   late final ReadMarker _readMarker = ReadMarker(ref);
 
-  /// The channel's newest delivered seq and last-read marker as of the most
-  /// recent build, cached for [_onScrollChanged]: scrolling never rebuilds
-  /// the transcript's `StreamBuilder`, so nothing else keeps these current
-  /// for it.
-  int _latestSeq = 0;
-  int _lastReadSeq = 0;
-
-  /// Whether the transcript is scrolled away from the newest message, for the
-  /// "jump to latest" affordance alone. A [ValueNotifier] rather than a
-  /// `setState`-tracked field on purpose: rebuilding the whole screen on every
-  /// scroll frame that crosses the threshold would make the read marker's own
-  /// correctness depend on that rebuild reaching the transcript's gate, which
-  /// is exactly the coupling [_onScrollChanged] is not allowed to lean on.
-  final ValueNotifier<bool> _scrolledAway = ValueNotifier(false);
-
-  /// How close to [ScrollPosition.minScrollExtent] still counts as "at the
-  /// latest message", covering overscroll bounce and float rounding from
-  /// [_scrollToLatest]'s own animation landing.
-  static const double _atLatestSlop = 4;
+  /// The scroll controller, the jump-to-latest arrow's visibility, and the
+  /// read-marking that follows from both; see `channel_transcript_scroll.dart`.
+  late final TranscriptScrollTracker _scrollTracker = TranscriptScrollTracker(
+    markRead: _markReadUpToLatest,
+  );
 
   @override
   void initState() {
     super.initState();
     unawaited(_hydrateExtras());
-    _scroll.addListener(_onScrollChanged);
   }
 
   @override
@@ -113,6 +98,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       // replay against whichever channel is open next.
       ref.read(messageJumpProvider.notifier).cancelFor(oldWidget.channelId);
       _replyingTo = null;
+      _scrollTracker.resetForChannelSwitch();
     }
   }
 
@@ -131,10 +117,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   @override
   void dispose() {
     _composer.dispose();
-    _scroll
-      ..removeListener(_onScrollChanged)
-      ..dispose();
-    _scrolledAway.dispose();
+    _scrollTracker.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -223,38 +206,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   void _markReadUpToLatest(int seq, int lastReadSeq) =>
       _readMarker.advance(widget.channelId, seq: seq, lastReadSeq: lastReadSeq);
 
-  void _scrollToLatest() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scroll.hasClients) return;
-      _scroll.animateTo(
-        // The list is reversed, so the latest message sits at offset zero.
-        _scroll.position.minScrollExtent,
-        duration: AppMotion.reduced(context, AppMotion.slow),
-        curve: AppMotion.entrance,
-      );
-    });
-  }
-
-  /// True while the viewport shows the newest message: no scrollable has
-  /// attached yet (nothing has laid out to have scrolled away from, and the
-  /// list starts bottom-anchored so a first paint always begins there), or
-  /// the offset already sits within [_atLatestSlop] of
-  /// [ScrollPosition.minScrollExtent].
-  bool get _atLatest {
-    if (!_scroll.hasClients) return true;
-    final position = _scroll.position;
-    return position.pixels <= position.minScrollExtent + _atLatestSlop;
-  }
-
-  /// Scrolling never rebuilds the transcript's `StreamBuilder`, so returning
-  /// to the latest message needs its own trigger to re-mark read; this is it,
-  /// on its own, independent of whether the affordance below happens to
-  /// repaint.
-  void _onScrollChanged() {
-    final atLatest = _atLatest;
-    _scrolledAway.value = !atLatest;
-    if (atLatest) _markReadUpToLatest(_latestSeq, _lastReadSeq);
-  }
+  void _scrollToLatest() => _scrollTracker.scrollToLatest(
+    duration: AppMotion.reduced(context, AppMotion.slow),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -367,10 +321,12 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   ref,
                                   transcript.messages.map((m) => m.authorId),
                                 );
-                                _latestSeq = transcript.newestSeq;
-                                _lastReadSeq = lastReadSeq;
+                                _scrollTracker.updateKnownSeqs(
+                                  latestSeq: transcript.newestSeq,
+                                  lastReadSeq: lastReadSeq,
+                                );
                                 // Gated on the viewport: scrolled into history, this rebuild is a message arriving somewhere unread.
-                                if (_atLatest) {
+                                if (_scrollTracker.atLatest) {
                                   _markReadUpToLatest(
                                     transcript.newestSeq,
                                     lastReadSeq,
@@ -389,7 +345,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                       ? channelName
                                       : null,
                                   channelTopic: channel?.topic,
-                                  scrollController: _scroll,
+                                  scrollController: _scrollTracker.controller,
                                   lastReadSeq: lastReadSeq,
                                   editingId: _editingId,
                                   knownUsernames: knownUsernames,
@@ -454,7 +410,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                               bottom: 0,
                               child: Center(
                                 child: ValueListenableBuilder<bool>(
-                                  valueListenable: _scrolledAway,
+                                  valueListenable: _scrollTracker.scrolledAway,
                                   builder: (context, scrolledAway, _) =>
                                       JumpToLatestButton(
                                         visible: scrolledAway,
