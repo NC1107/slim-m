@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.3](https://github.com/NC1107/slim-m/compare/client-v0.24.2...client-v0.24.3) (2026-08-02)
+
+
+### Bug Fixes
+
+* **client:** make the web build compile again, and gate it in CI ([#324](https://github.com/NC1107/slim-m/issues/324)) ([1c809eb](https://github.com/NC1107/slim-m/commit/1c809eb7d15c3d775137b26a972866972c11c3f7))
+
 ## [0.24.2](https://github.com/NC1107/slim-m/compare/client-v0.24.1...client-v0.24.2) (2026-08-02)
 
 
