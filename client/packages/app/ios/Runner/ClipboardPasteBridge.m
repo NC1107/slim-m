@@ -32,19 +32,20 @@
 /// The replacements live on a **donor class of our own**, never in a category
 /// on the target.
 ///
-/// Confirmed on a real device 2026-08-01: this swizzle installs and is never
-/// consulted on this app's own composer field, a plain Material `TextField`.
-/// Flutter's default `contextMenuBuilder` on iOS 16+ routes through
-/// `SystemContextMenu`, which decides Paste's presence in Dart from
-/// `Clipboard.hasStrings()` alone and sends native a fixed item list that
-/// bypasses `canPerformAction:` entirely; see CLAUDE.md's "The edit-menu
-/// route was never reachable" entry for the full mechanism, file by file.
-/// No fix here reaches that - it is a Dart-side widget decision, not an
-/// engine bug. Left in place because it still applies to a non-Material
-/// field or an iOS below 16 (`UIMenuController`'s traditional
-/// `canPerformAction:`-driven path), and failing safe costs nothing; the
-/// composer's own "Paste image" row is the route that actually works and is
-/// never hidden on this swizzle installing.
+/// Installing this swizzle was never enough on its own: Flutter's default
+/// `contextMenuBuilder` on iOS 16+ routes through `SystemContextMenu`, which
+/// decided Paste's presence in Dart from `Clipboard.hasStrings()` alone and
+/// sent native a fixed item list that bypassed `canPerformAction:` entirely -
+/// confirmed on a real device 2026-08-01. `composer_context_menu.dart` closes
+/// that on the Dart side by forcing the platform's own Paste item into that
+/// list whenever the clipboard holds an image, which is what makes native
+/// ask `canPerformAction:` here in the first place. Confirmed working end to
+/// end on a real iPhone 2026-08-02: long-press the composer, tap Paste, the
+/// image attaches with no prompt. This swizzle needed no change either way -
+/// it was always correct, only unreached - and still applies on its own to a
+/// non-Material field or an iOS below 16 (`UIMenuController`'s traditional
+/// `canPerformAction:`-driven path). See CLAUDE.md's "Image paste on iPhone,
+/// confirmed working" entry for the full story across all three attempts.
 ///
 /// A category on `FlutterTextInputView` emits a link-time reference to
 /// `_OBJC_CLASS_$_FlutterTextInputView`, and the engine ships that class

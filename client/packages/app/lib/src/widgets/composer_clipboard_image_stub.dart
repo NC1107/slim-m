@@ -126,15 +126,17 @@ Future<Uint8List?> readClipboardImage() async {
 /// platform handler at all (Android, desktop) and false if a future Flutter
 /// engine upgrade moved the private class or selectors it depends on.
 ///
-/// This is **not** whether the system edit menu actually offers Paste for an
-/// image. Confirmed on a real device 2026-08-01: it does not, on this
-/// composer's plain Material `TextField`. Flutter's default
-/// `contextMenuBuilder` on iOS 16+ routes through `SystemContextMenu`, which
-/// decides the menu's contents in Dart from `Clipboard.hasStrings()` before
-/// any native call happens, so `FlutterTextInputView`'s swizzled
-/// `canPerformAction:` is never consulted for that field regardless of
-/// whether this returns true. See `composer_clipboard_paste.dart`'s doc
-/// comment and CLAUDE.md's "The edit-menu route was never reachable" entry.
+/// This is **not**, by itself, whether the system edit menu offers Paste for
+/// an image: Flutter's default `contextMenuBuilder` on iOS 16+ routes
+/// through `SystemContextMenu`, which decided the menu's contents in Dart
+/// from `Clipboard.hasStrings()` alone, before any native call happened -
+/// confirmed on a real device 2026-08-01 that this value could be true while
+/// the menu still offered no Paste. `composer_context_menu.dart` closes that
+/// gap by forcing the platform's own Paste item into the list whenever the
+/// clipboard holds an image, which is what makes native ask
+/// `canPerformAction:` at all; confirmed working end to end on a real
+/// iPhone 2026-08-02. See `composer_clipboard_paste.dart`'s doc comment and
+/// CLAUDE.md's "Image paste on iPhone, confirmed working" entry.
 Future<bool> editMenuPasteSwizzleInstalled() async {
   try {
     return await _clipboardImageChannel.invokeMethod<bool>(
