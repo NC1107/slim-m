@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bump-minor-pre-major": true,
+  "plugins": [
+    "cargo-workspace"
+  ],
+  "packages": {
+    "crates/slimm-server": {
+      "release-type": "rust",
+      "component": "server",
+      "package-name": "slimm-server"
+    }
+  }
+}

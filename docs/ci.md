@@ -304,8 +304,9 @@ release-please maintains release PRs on push to `main`.
 When a release PR is merged, that same push run cuts the GitHub Release plus tag and sets the per-package `release_created` outputs, which gate every downstream publish job.
 A direct tag push (`server-v*` or `client-v*`) is also honored, so a release can be re-published without another release-please run.
 
-The release-please job itself runs manifest mode against the existing `release-please-config.json` and `.release-please-manifest.json`, and only on main-branch pushes.
-On a tag push it is a no-op so downstream jobs can still resolve it via `needs`.
+The release-please job runs manifest mode twice, once per package, each against its own config and manifest file (`release-please-config.server.json` / `.release-please-manifest.server.json` for the server, the `.client.json` pair for the client), and only on main-branch pushes.
+Splitting the manifest is what stops one package's release commit from conflicting the other's still-open standing PR: both used to read and write one shared `.release-please-manifest.json`, so merging either PR moved that file underneath the other, on every merge that did not also carry releasable commits for it. See CLAUDE.md's release-PR-conflict entry for the incident history.
+On a tag push both invocations are a no-op so downstream jobs can still resolve their outputs via `needs`.
 
 Server (AGPL-3.0-only) and client (Apache-2.0) are versioned and released independently, each with its own tag and its own set of jobs.
 
@@ -478,7 +479,7 @@ A single `on.push.paths` list cannot tell a client-only merge from a server-only
 The brief allowed splitting this into two workflows with their own top-level `paths` instead; one workflow with one filter step was chosen because it keeps the concurrency group, the header, and this section in one place, and because the filter step is one checkout rather than two.
 
 The two client exclusions are load-bearing.
-A release-please release commit for the client touches exactly `.release-please-manifest.json`, `client/CHANGELOG.md` and `client/pubspec.yaml` (verified against the actual `chore(main): release client 0.16.0` commit).
+A release-please release commit for the client touches exactly `.release-please-manifest.client.json`, `client/CHANGELOG.md` and `client/pubspec.yaml` (verified against the actual `chore(main): release client 0.16.0` commit, back when the manifest was still the single shared file; the split manifest changed only which root-level file name that first one is).
 Without the exclusions, that commit would also match `client/**`, and this workflow would rebuild and re-upload the exact commit `release.yml` just shipped to TestFlight and Play, under the same version, racing a second altool upload against the first.
 No equivalent exclusion exists for the server side: a server release-please commit touches `crates/slimm-server/Cargo.toml` and `crates/slimm-server/CHANGELOG.md`, both under `crates/**`, so it still re-triggers `server-image` here.
 That is accepted rather than worked around: excluding `Cargo.toml` from the trigger would also hide a real dependency-bump PR that happens to touch only that file, and there is no path-only way to tell the two apart.

@@ -25,25 +25,39 @@ concurrency:
 jobs:
   # Opens and maintains release PRs, and cuts releases on merge. A no-op on a tag
   # push, so downstream jobs can still resolve it via `needs`. See docs/ci.md.
+  #
+  # Two independent invocations, one manifest file each, rather than one call
+  # sharing `.release-please-manifest.json` across both packages: a release
+  # commit for either package used to rewrite that one shared file, which
+  # conflicted the other package's still-open standing PR on every merge that
+  # didn't also touch it. Splitting the manifest removes the shared file
+  # rather than working around it, so there is nothing left for the two PRs
+  # to collide on. See docs/ci.md and CLAUDE.md's release-PR-conflict entry.
   release-please:
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
     outputs:
-      server_released: ${{ steps.rp.outputs['crates/slimm-server--release_created'] }}
-      server_tag: ${{ steps.rp.outputs['crates/slimm-server--tag_name'] }}
-      server_version: ${{ steps.rp.outputs['crates/slimm-server--version'] }}
-      client_released: ${{ steps.rp.outputs['client--release_created'] }}
-      client_tag: ${{ steps.rp.outputs['client--tag_name'] }}
-      client_version: ${{ steps.rp.outputs['client--version'] }}
+      server_released: ${{ steps.rp-server.outputs['crates/slimm-server--release_created'] }}
+      server_tag: ${{ steps.rp-server.outputs['crates/slimm-server--tag_name'] }}
+      server_version: ${{ steps.rp-server.outputs['crates/slimm-server--version'] }}
+      client_released: ${{ steps.rp-client.outputs['client--release_created'] }}
+      client_tag: ${{ steps.rp-client.outputs['client--tag_name'] }}
+      client_version: ${{ steps.rp-client.outputs['client--version'] }}
     steps:
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
-        id: rp
+        id: rp-server
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
-          manifest-file: .release-please-manifest.json
-          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.server.json
+          config-file: release-please-config.server.json
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
+        id: rp-client
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          manifest-file: .release-please-manifest.client.json
+          config-file: release-please-config.client.json
 
   # Requires server-ci, hygiene and the license gate to have passed on this
   # exact commit before any server publish job runs. See docs/ci.md.
