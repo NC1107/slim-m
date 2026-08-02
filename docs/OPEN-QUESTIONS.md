@@ -57,7 +57,7 @@ That was your explicit instruction and it is working, but it is worth stating on
 
 Carried forward from `CLAUDE.md`'s own owner list, unchanged by this run:
 
-- Whether to keep release-please's standing release PR or move to manual tag-based releases.
+- ~~Whether to keep release-please's standing release PR or move to manual tag-based releases.~~ Settled 2026-08-01 without needing to choose: see section 19. The standing PRs stayed; the conflict that made this question urgent was fixed at its source instead.
 - Where, if anywhere, a flatpak build should be published once the manifest exists.
 
 ## 7. The next client build wipes its own message cache, once
@@ -99,9 +99,10 @@ The new information is the cost, which the earlier entries did not state: a comp
 Server 0.22.1 is a test-only fix with nothing server-side queued behind it, so nothing was going to unstick it on its own.
 A conflicted PR also runs **no CI at all**, so the state is worse than it looks - not a slow queue, nothing running.
 
-*My recommendation, for your call:* switch to the manual tag-based flow already listed in section 6.
-It has no standing PR to go stale, it matches the zero-open-PRs preference recorded there, and the release jobs already keep their `refs/tags/client-v` and `refs/tags/server-v` branches, so hand-tagging is a supported path rather than a workaround.
-What it costs is that the changelog stops being generated for you, which is the thing release-please is actually buying.
+~~*My recommendation, for your call:* switch to the manual tag-based flow already listed in section 6.~~
+~~It has no standing PR to go stale, it matches the zero-open-PRs preference recorded there, and the release jobs already keep their `refs/tags/client-v` and `refs/tags/server-v` branches, so hand-tagging is a supported path rather than a workaround.~~
+~~What it costs is that the changelog stops being generated for you, which is the thing release-please is actually buying.~~
+**Superseded 2026-08-01, before you had to make that call.** The manual-tag switch would have paid for the fix with the changelog; it turned out not to be the only way to pay. See section 19: the two standing PRs were made to stop sharing the one file they were actually conflicting on, which removes the conflict without removing release-please.
 
 The original entry follows, kept because the reasoning is what made the fix predictable rather than lucky.
 
@@ -315,3 +316,16 @@ Replies shipped (`crates/slimm-server/migrations/0029_message_replies.sql`, `mes
 Threads, the "hidden sub-channel you click Reply in Thread to open" the owner described, did not, on purpose - see [docs/decisions/0005-threads.md](decisions/0005-threads.md) for the three ways to build it, what each costs in migrations and touched subsystems, and a recommendation.
 
 *Question:* pick a shape (the record recommends a thread as a channel with a parent), or say the cheap filtered-view version is good enough for now, knowing it does not match the Slack model named.
+
+## 19. The release-PR conflict is fixed by removing the shared file, not by removing release-please (2026-08-01)
+
+Section 6 and section 9 both pointed at the same recommendation: switch to manual tagging, because it has no standing PR left to conflict.
+That was the right call *given the premise* - that release-please forces both packages through one shared manifest file - but the premise turned out to be wrong, and it was worth five minutes with the tool's own docs to find out before spending the changelog to fix it.
+
+**The cause was one file, not the standing-PR mechanism.** `separate-pull-requests: true` was already on, which is why there were two PRs rather than one combined one. Both still read and wrote the same `.release-please-manifest.json`, because release-please's manifest mode keeps exactly one manifest file per config file, tracking every package that config lists. Merging either PR rewrote that file on the other's branch tip, which is the conflict.
+
+**The fix: two config files and two manifest files, each holding one package, so there is nothing left for the two PRs to share.** `release-please-action` takes `config-file` and `manifest-file` as independent inputs; nothing requires there to be only one pair per repository. `release.yml`'s `release-please` job now calls the action twice - once against `release-please-config.server.json` / `.release-please-manifest.server.json`, once against the `.client.json` pair - and each invocation only ever touches its own package's files. A server release commit cannot conflict a client PR it shares no file with, and vice versa, by construction rather than by timing.
+
+**What this keeps that the manual-tag switch would have given up:** the generated changelog, the standing PRs (so nobody has to remember to hand-tag), and the existing `refs/tags/server-v*` / `refs/tags/client-v*` triggers in `release.yml`, which needed no change - a tag push still bypasses `release-please` entirely and resolves version strings from the ref name, exactly as before.
+
+**What still needs a real release to confirm**, since nothing short of GitHub actually running the action can prove it: that `release-please-action` produces the same `<path>--release_created` / `--tag_name` / `--version` output keys when a config file lists only one package as when it listed two (verified against the action's own README, not by triggering a run), and that merging a server-only release no longer touches anything on the client's standing PR's branch. The next server-only and client-only merges are the test.

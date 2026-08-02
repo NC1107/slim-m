@@ -7,7 +7,7 @@ A lightweight, cross-platform, open source messaging platform with optional self
 ## Status
 
 Phases 0 through 4 (foundations, server and protocol core, client shell, push notifications, voice and screen share) are complete, and later phases are substantially underway: a first Voice Canvas write slice, the admin and moderation screens, the client capability handshake, and part of the motion, accessibility and audio-design polish pass have all shipped.
-Server `crates/slimm-server` is at 0.18.5 and the Flutter client at 0.13.3 (see `.release-please-manifest.json`), both with signed release artifacts and a running self-hosted instance.
+Server `crates/slimm-server` is at 0.18.5 and the Flutter client at 0.13.3 (see the `.release-please-manifest.*.json` files), both with signed release artifacts and a running self-hosted instance.
 See [CLAUDE.md](CLAUDE.md) for what has shipped most recently and the [roadmap](docs/ROADMAP.md) for phases and exit criteria.
 
 ## Layout

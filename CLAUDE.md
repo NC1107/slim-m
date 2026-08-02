@@ -272,7 +272,21 @@ It is not a repair, though, and every available shortcut (hand-resolving, deleti
 
 Worth naming the real cost: a component with no pending work stays unreleasable until unrelated work happens to touch it.
 Server 0.22.1 sat conflicted with nothing server-side pending to unstick it.
-`docs/OPEN-QUESTIONS.md` section 6 already lists switching to the manual tag-based flow, which has no standing PR to go stale; three recurrences is the evidence that question was waiting for.
+~~`docs/OPEN-QUESTIONS.md` section 6 already lists switching to the manual tag-based flow, which has no standing PR to go stale; three recurrences is the evidence that question was waiting for.~~
+
+**Fixed 2026-08-01, and not with the manual tag-based flow that recommendation pointed at.**
+The one shared file was the whole cause: two standing PRs, `separate-pull-requests: true` already on, but both still reading and writing the single `.release-please-manifest.json` release-please's manifest mode keeps by design, so either merge rewrote it underneath the other.
+Manual tagging would have removed the conflict by removing release-please, which also removes the generated changelog - the thing release-please is actually buying, per its own doc comment in `docs/OPEN-QUESTIONS.md`.
+That trade was never necessary: nothing in release-please ties one config file to one manifest file to one repo.
+`release-please-action` takes `config-file` and `manifest-file` as independent inputs, so `release.yml`'s `release-please` job now runs the action **twice**, each invocation scoped to its own package with its own pair of files - `release-please-config.server.json` / `.release-please-manifest.server.json` for the server (carrying the `cargo-workspace` plugin, which only ever touched Rust files anyway) and the `.client.json` pair for the client.
+The two invocations share nothing: no file either one writes is ever read or written by the other, so a merge of one's standing PR cannot conflict the other's, by construction rather than by luck or a workaround.
+Everything downstream is unchanged - `release-please-action`'s output prefix is the package's `path`, not which config file it was declared in, so `steps.rp-server.outputs['crates/slimm-server--release_created']` and its client equivalent read exactly as they did before, just off two step ids instead of one.
+`verify-server-ci` and `verify-client-ci` still gate every publish job on the commit's own CI exactly as before; nothing about the gating changed, only how the two standing PRs are kept from colliding.
+See `docs/ci.md`'s "How a release is cut" section and `docs/OPEN-QUESTIONS.md` section 6 and item 9 for the full before/after.
+
+**This could not be proven by anything short of watching the next few real releases.**
+The mechanism is straightforward (two independent file pairs cannot conflict on a file neither of them shares), and `python3 -m json.tool`/`yaml.safe_load` confirm every touched file still parses, but no local run can simulate release-please actually opening two PRs against a real GitHub repo and merging one while the other is pending.
+The next server-only and client-only releases are what actually close this out.
 
 ## The image-paste prompt was never once per install (2026-08-01)
 
@@ -1446,7 +1460,7 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
   So this was never a repair, it was withdrawing a licence SQLite reserves and does not currently exercise, which is the same argument `0015_canvas_rtree.sql` made for the R-Tree.
 
 - **Deploy the invite gate.** The live instance at `https://slim.npc-server.top` still accepts anonymous registration and will until it runs a build containing the gate. Watchtower tracks `latest`, so cutting a release is what closes it; nothing else needs doing on the host.
-- **Watch the next release PR.** `release-please-config.json` gained the `cargo-workspace` plugin so a version bump also updates `Cargo.lock`, which the new `--locked` builds require. That is the one change in the audit pass that could not be verified locally, and its failure mode is a red release PR, not a bad release.
+- ~~**Watch the next release PR.** `release-please-config.json` gained the `cargo-workspace` plugin so a version bump also updates `Cargo.lock`, which the new `--locked` builds require. That is the one change in the audit pass that could not be verified locally, and its failure mode is a red release PR, not a bad release.~~ Stale: many server releases have shipped cleanly since, so this watched fine. The file it names is `release-please-config.server.json` now (split 2026-08-01, see the release-PR-conflict entry); the plugin itself is untouched.
 - **`bump-minor-pre-major` is why the server stays on 0.x.** PR #42 landed as `feat!` (registration genuinely changed behaviour for a claimed deployment), and release-please read the breaking marker on a 0.x project as "go to 1.0.0" and opened exactly that PR. It was closed unmerged. The flag makes a breaking change bump the minor while under 1.0, so that reads 0.9.0 instead. 1.0 is a Phase 9 deliverable and the product is not even named yet (owner decision 9), so nothing should reach it by accident.
 - **Adding Play internal testers needs the owner.** There is no Play Developer API credential anywhere: `~/.secrets/slim-m/` holds only the Firebase/FCM service account, which is scoped to messaging and cannot touch Play. Tester lists live in Play Console > Test and release > Testing > Internal testing > Testers, and each tester must then accept the opt-in link before the build appears for them.
 - A real Android device test of the push path end-to-end (the last Phase 3 exit criterion with any work left).
