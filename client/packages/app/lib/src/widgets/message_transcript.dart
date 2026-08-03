@@ -280,11 +280,13 @@ class _MessageTranscriptState extends State<MessageTranscript> {
     final start = _topSlot();
 
     if (messages.isEmpty) {
-      // A brand-new channel is welcomed at the top; connecting and offline still say what they are.
+      // Reverse-anchored like the populated list below, so the welcome sits above the composer, not at the top of an empty pane.
       if (start != null && widget.syncStatus == SyncStatus.live) {
-        return SingleChildScrollView(
+        return ListView(
           controller: widget.scrollController,
-          child: start,
+          reverse: true,
+          padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+          children: [start],
         );
       }
       return EmptyMessages(syncStatus: widget.syncStatus);

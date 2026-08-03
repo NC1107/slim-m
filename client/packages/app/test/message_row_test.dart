@@ -346,7 +346,8 @@ void main() {
 
       await tester.tap(find.text('Vim'));
       expect(voted, isNull);
-      expect(find.text('3 votes - closed'), findsOneWidget);
+      expect(find.text('3 votes'), findsOneWidget);
+      expect(find.text('CLOSED'), findsOneWidget);
     });
   });
 

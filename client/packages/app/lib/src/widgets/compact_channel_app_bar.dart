@@ -49,9 +49,10 @@ class CompactChannelAppBar extends ConsumerWidget
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     final storeAsync = ref.watch(storeProvider);
     return storeAsync.maybeWhen(
-      orElse: () => _bar(null),
+      orElse: () => _bar(null, tokens),
       data: (store) => StreamBuilder<List<Channel>>(
         stream: store.watchChannels(),
         builder: (context, snapshot) => _bar(
@@ -59,15 +60,18 @@ class CompactChannelAppBar extends ConsumerWidget
               ?.where((c) => c.id == channelId)
               .cast<Channel?>()
               .firstOrNull,
+          tokens,
         ),
       ),
     );
   }
 
-  AppBar _bar(Channel? channel) {
+  // `ChannelHeader` and the wide voice header draw this hairline on a `Container`; a Material `AppBar` needs its own.
+  AppBar _bar(Channel? channel, AppTokens tokens) {
     final isVoice = channel?.kind == 'voice';
     return AppBar(
       toolbarHeight: height,
+      shape: Border(bottom: BorderSide(color: tokens.borderSubtle)),
       leading: IconButton(
         icon: const Icon(AppIcons.back),
         tooltip: 'Back to channels',
