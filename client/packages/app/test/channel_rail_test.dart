@@ -16,11 +16,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
+import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/presence_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
+import 'package:slimm_app/src/widgets/channel_rail.dart';
 import 'package:slimm_app/src/widgets/channel_rail_frame.dart';
 import 'package:slimm_app/src/widgets/presence_menu.dart';
 import 'package:slimm_app/src/widgets/user_avatar.dart';
@@ -61,10 +64,12 @@ class _StubSyncController extends SyncController {
 ({ProviderContainer container, List<http.Request> requests}) _setup(
   SyncStatus status, {
   int permissions = 0,
+  List<Override> extraOverrides = const [],
 }) {
   final requests = <http.Request>[];
   final container = ProviderContainer(
     overrides: [
+      ...extraOverrides,
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
       syncControllerProvider.overrideWith(
@@ -362,5 +367,121 @@ void main() {
     await _pumpHeader(tester, setup.container);
 
     expect(find.bySemanticsLabel('Space menu'), findsNothing);
+  });
+
+  // Must be the same source Personal settings reads, never a second call.
+  testWidgets('the header names this build\'s version, from the real '
+      'PackageInfo source', (tester) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'slim-m',
+      packageName: 'top.npcserver.slimm',
+      version: '9.9.9',
+      buildNumber: '42',
+      buildSignature: '',
+    );
+    final setup = _setup(SyncStatus.live);
+    addTearDown(setup.container.dispose);
+    await _pumpHeader(tester, setup.container);
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text && (widget.data?.contains('v9.9.9') ?? false),
+      ),
+      findsOneWidget,
+      reason: 'must show this install\'s real build, not a hardcoded string',
+    );
+  });
+
+  // Covers both an error and the empty string a failed web fetch answers with.
+  testWidgets('an unavailable version renders nothing, never a placeholder', (
+    tester,
+  ) async {
+    for (final override in [
+      appInfoProvider.overrideWith((ref) => Future<PackageInfo>.error('boom')),
+      appInfoProvider.overrideWith(
+        (ref) => Future.value(
+          PackageInfo(
+            appName: 'slim-m',
+            packageName: 'top.npcserver.slimm',
+            version: '',
+            buildNumber: '',
+          ),
+        ),
+      ),
+    ]) {
+      final setup = _setup(SyncStatus.live, extraOverrides: [override]);
+      await _pumpHeader(tester, setup.container);
+
+      expect(find.textContaining(' · v'), findsNothing);
+      expect(find.textContaining('unknown'), findsNothing);
+      expect(find.textContaining('0.0.0'), findsNothing);
+      setup.container.dispose();
+    }
+  });
+
+  // The rail is a fixed width; a long name plus a full subtitle must fit it.
+  testWidgets('the header does not overflow at the rail\'s narrowest width '
+      'with a long Space name and a full subtitle', (tester) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'slim-m',
+      packageName: 'top.npcserver.slimm',
+      version: '0.25.0',
+      buildNumber: '1',
+      buildSignature: '',
+    );
+    final members = List.generate(
+      12345,
+      (i) => api.UserProfile(
+        id: 'user-$i',
+        username: 'user$i',
+        displayName: 'User Number $i',
+        createdAt: 0,
+      ),
+    );
+    final setup = _setup(
+      SyncStatus.live,
+      extraOverrides: [
+        serverInfoProvider.overrideWith(
+          (ref) => Future.value(
+            const api.Version(
+              name: 'A Very Long Self-Hosted Community Space Name Indeed',
+              version: '0.30.0',
+              protocol: 1,
+            ),
+          ),
+        ),
+        membersProvider.overrideWith((ref) => Future.value(members)),
+      ],
+    );
+    addTearDown(setup.container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: setup.container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: ChannelRail.mediumWidth,
+                child: RailHeader(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getRect(find.byType(RailHeader)).width,
+      ChannelRail.mediumWidth,
+      reason:
+          'the header must stay inside the rail\'s fixed width rather than '
+          'a long name or a full subtitle pushing it wider',
+    );
   });
 }
