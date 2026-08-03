@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../../format.dart';
 import '../../providers/admin_providers.dart';
+import '../../providers/display_preferences.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
@@ -122,7 +123,7 @@ class _EmojiRowState extends ConsumerState<_EmojiRow>
                     ),
                     const SizedBox(height: AppSpacing.s4),
                     Text(
-                      'Added ${formatDateTime(emoji.createdAt)}',
+                      'Added ${formatDateTime(emoji.createdAt, use24Hour: watchUse24Hour(ref, context))}',
                       style: AppText.caption.copyWith(
                         color: tokens.textSecondary,
                       ),

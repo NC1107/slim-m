@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/display_preferences.dart';
 import '../providers/user_profiles.dart';
 import 'author_label.dart';
 import 'user_avatar.dart';
@@ -20,14 +21,20 @@ import 'user_avatar.dart';
 /// the design's 36px message-row avatar, named once so both agree.
 const double _avatarSize = 36;
 
-/// `HH:mm`, as the design uses throughout. Fixed width matters here: a
-/// grouped message puts its time in a 36px gutter, and "12:05 PM" wraps to two
-/// lines in it while "12:05" does not.
-String formatMessageTime(int epochMs) {
+/// `HH:mm` or a 12-hour equivalent, following [use24Hour]. Fixed width
+/// matters here: a grouped message puts its time in a 36px gutter, and a
+/// spelled-out "12:05 PM" wraps to two lines in it, which is why the 12-hour
+/// form drops the leading zero and the space before its suffix ("12:05p")
+/// rather than reusing `formatDateTime`'s longer one.
+String formatMessageTime(int epochMs, {required bool use24Hour}) {
   final dt = DateTime.fromMillisecondsSinceEpoch(epochMs);
-  final hour = dt.hour.toString().padLeft(2, '0');
   final minute = dt.minute.toString().padLeft(2, '0');
-  return '$hour:$minute';
+  if (use24Hour) {
+    return '${dt.hour.toString().padLeft(2, '0')}:$minute';
+  }
+  final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+  final suffix = dt.hour < 12 ? 'a' : 'p';
+  return '$hour12:$minute$suffix';
 }
 
 const List<String> _monthNames = [
@@ -67,7 +74,7 @@ String formatMessageDay(int epochMs, {DateTime? now}) {
 /// sent, a clock and "sending" while in flight, and a red "not sent" on
 /// failure - full strength, because a failed message is still the author's
 /// to act on (error grammar 01).
-class MessageTimeMark extends StatelessWidget {
+class MessageTimeMark extends ConsumerWidget {
   const MessageTimeMark({
     super.key,
     required this.message,
@@ -81,7 +88,7 @@ class MessageTimeMark extends StatelessWidget {
   final bool compact;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final mono = AppText.micro.copyWith(
       color: tokens.textSecondary,
@@ -105,7 +112,11 @@ class MessageTimeMark extends StatelessWidget {
               ],
             );
     }
-    return Text(formatMessageTime(message.createdAt), style: mono);
+    final use24Hour = watchUse24Hour(ref, context);
+    return Text(
+      formatMessageTime(message.createdAt, use24Hour: use24Hour),
+      style: mono,
+    );
   }
 }
 

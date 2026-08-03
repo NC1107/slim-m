@@ -5,9 +5,11 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/display_preferences.dart';
 import '../routing/breakpoints.dart';
 
 import 'custom_emoji_image.dart';
@@ -147,7 +149,7 @@ class ReactionsRow extends StatelessWidget {
 /// still has to be its own stop for a screen reader, and without a boundary
 /// here it would merge into the row's own long-press semantics, reading an
 /// inert row as actionable.
-class ThreadReplySummary extends StatelessWidget {
+class ThreadReplySummary extends ConsumerWidget {
   const ThreadReplySummary({
     super.key,
     required this.replyCount,
@@ -163,15 +165,17 @@ class ThreadReplySummary extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final enabled = onTap != null;
     final color = enabled ? tokens.accent : tokens.textDisabled;
     final countLabel = replyCount == 1 ? '1 reply' : '$replyCount replies';
     final lastReplyAt = this.lastReplyAt;
+    final use24Hour = watchUse24Hour(ref, context);
     final text = lastReplyAt == null
         ? countLabel
-        : '$countLabel · Last reply ${_lastReplyLabel(lastReplyAt)}';
+        : '$countLabel · Last reply '
+              '${_lastReplyLabel(lastReplyAt, use24Hour: use24Hour)}';
     final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -204,9 +208,11 @@ class ThreadReplySummary extends StatelessWidget {
 /// "Today" would be for a channel with any real traffic), the relative or
 /// absolute day otherwise - [formatMessageDay]'s own scale, reused rather
 /// than inventing a second one just for this row.
-String _lastReplyLabel(int epochMs) {
+String _lastReplyLabel(int epochMs, {required bool use24Hour}) {
   final day = formatMessageDay(epochMs);
-  return day == 'Today' ? formatMessageTime(epochMs) : day;
+  return day == 'Today'
+      ? formatMessageTime(epochMs, use24Hour: use24Hour)
+      : day;
 }
 
 /// The design's bordered "not loaded" placeholder, using [AppTokens.stripe],

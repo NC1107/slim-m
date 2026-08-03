@@ -51,56 +51,57 @@ class SpaceSettingsSection extends ConsumerWidget {
     final canManageServer = permissions.hasPermission(Perm.manageServer);
     final canBan = permissions.hasPermission(Perm.banMembers);
 
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    Widget chevron() => Icon(
+      AppIcons.chevronRight,
+      size: AppSizes.icon16,
+      color: tokens.textSecondary,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (canModerate)
-          ListTile(
+          AppListRow(
+            label: 'Reports',
             leading: const Icon(AppIcons.report),
-            title: const Text('Reports'),
-            subtitle: const Text('What members have flagged for review.'),
-            trailing: const Icon(AppIcons.chevronRight),
+            trailing: chevron(),
             onTap: () => context.push(Routes.adminReports),
           ),
         if (canInvite)
-          ListTile(
+          AppListRow(
+            label: 'Invites',
             leading: const Icon(AppIcons.invite),
-            title: const Text('Invites'),
-            subtitle: const Text('Codes that let someone join this Space.'),
-            trailing: const Icon(AppIcons.chevronRight),
+            trailing: chevron(),
             onTap: () => context.push(Routes.adminInvites),
           ),
         if (canManageRoles) ...[
-          ListTile(
+          AppListRow(
+            label: 'Roles',
             leading: const Icon(AppIcons.shield),
-            title: const Text('Roles'),
-            subtitle: const Text('Named groups and what they may do.'),
-            trailing: const Icon(AppIcons.chevronRight),
+            trailing: chevron(),
             onTap: () => context.push(Routes.adminRoles),
           ),
-          ListTile(
+          AppListRow(
+            label: 'Channel permissions',
             leading: const Icon(AppIcons.permissions),
-            title: const Text('Channel permissions'),
-            subtitle: const Text('Per-channel exceptions to the roles.'),
-            trailing: const Icon(AppIcons.chevronRight),
+            trailing: chevron(),
             onTap: () => context.push(Routes.adminOverwrites),
           ),
         ],
         if (canBan)
-          ListTile(
+          AppListRow(
+            label: 'Removed members',
             leading: const Icon(AppIcons.signOut),
-            title: const Text('Removed members'),
-            subtitle: const Text('Who cannot get back in, and letting them.'),
-            trailing: const Icon(AppIcons.chevronRight),
+            trailing: chevron(),
             onTap: () => context.push(Routes.adminRemovedMembers),
           ),
         if (canManageServer) const JoinPolicyRow(),
         if (canManageServer)
-          ListTile(
+          AppListRow(
+            label: 'Emoji',
             leading: const Icon(AppIcons.smile),
-            title: const Text('Emoji'),
-            subtitle: const Text('This Space\'s own custom emoji.'),
-            trailing: const Icon(AppIcons.chevronRight),
+            trailing: chevron(),
             onTap: () => context.push(Routes.adminEmoji),
           ),
       ],

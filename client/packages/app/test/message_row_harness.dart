@@ -72,7 +72,16 @@ const noActions = MessageActions(
 /// keyboard, so most callers exercise the phone path without asking for it.
 /// A test asserting the hardware-keyboard path passes a desktop platform
 /// explicitly, the way `composer_harness.dart` already does.
-Widget harness(Widget child, {TargetPlatform? platform}) => ProviderScope(
+///
+/// [overrides] is passed straight to the [ProviderScope]: empty by default,
+/// for the one suite here (the time-format row) that needs a deterministic
+/// answer rather than whatever the test binding's own platform reports.
+Widget harness(
+  Widget child, {
+  TargetPlatform? platform,
+  List<Override> overrides = const [],
+}) => ProviderScope(
+  overrides: overrides,
   child: MaterialApp(
     theme: platform == null
         ? buildTheme(Brightness.light, AppTokens.light)

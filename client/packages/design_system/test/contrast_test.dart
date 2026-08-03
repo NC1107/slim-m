@@ -203,6 +203,29 @@ void main() {
     });
   });
 
+  themes.forEach((name, t) {
+    test('$name applyHighContrast strengthens the border and disabled text',
+        () {
+      // See high_contrast.dart's own doc for why only these two roles move.
+      final boosted = applyHighContrast(t);
+      expect(
+        _contrast(boosted.borderSubtle, t.surfaceBase),
+        greaterThan(_contrast(t.borderSubtle, t.surfaceBase)),
+        reason: '$name boosted border must read stronger than the hairline',
+      );
+      expect(
+        _contrast(boosted.textDisabled, t.surfaceBase),
+        greaterThan(_contrast(t.textDisabled, t.surfaceBase)),
+        reason: '$name boosted disabled text must read stronger',
+      );
+      // Untouched: colour-blind safety must not depend on this toggle.
+      expect(boosted.accent, t.accent);
+      expect(boosted.status, t.status);
+      expect(boosted.dangerText, t.dangerText);
+      expect(boosted.warnText, t.warnText);
+    });
+  });
+
   test('canvas cursor hues are a closed set of six distinct values', () {
     // Categorical identity for remote participants: no two may read as the same
     // colour, which is the property worth pinning rather than any hex.

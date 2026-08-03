@@ -201,7 +201,6 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
               ),
             ),
           ),
-          const RailConnectionBar(),
           RailUserFooter(activeChannelId: selected),
         ],
       ),

@@ -89,3 +89,64 @@ class SettingsSectionHeader extends StatelessWidget {
     );
   }
 }
+
+/// A [SettingsSectionHeader] above an [AppCard] holding its rows, so a
+/// section reads as a bordered group rather than rows floating loose on the
+/// plain pane background - the flat, undifferentiated look the owner
+/// reported on a wide desktop window.
+///
+/// The header stays outside the card and keeps its own prominent styling
+/// (unlike [AppCard.title], which is a small uppercase micro-label meant for
+/// a nested panel): a settings section's name is the more important of the
+/// two things on screen, and this widget exists only to give what follows it
+/// a visible boundary, not to replace it.
+///
+/// The rows sit inside a [Material] of their own: a [ListTile] (several
+/// sections still use one) paints its background and ink splashes on the
+/// nearest [Material], and [AppCard]'s own filled, bordered box would
+/// otherwise sit between it and the Scaffold's, which is exactly the
+/// "background color or ink splashes may be invisible" assertion a tap on
+/// one of those rows used to raise.
+class SettingsSectionCard extends StatelessWidget {
+  const SettingsSectionCard({
+    super.key,
+    required this.title,
+    required this.children,
+    this.description,
+    this.crossAxisAlignment = CrossAxisAlignment.start,
+  });
+
+  final String title;
+  final String? description;
+  final List<Widget> children;
+
+  /// The card's own inner column, not `stretch`: a row widget (`AppListRow`,
+  /// `ListTile`, `SettingsSelectRow`) already fills whatever width it is
+  /// offered on its own, but non-row content (`MediaCapabilitySection`'s
+  /// button, `AvatarSettingsSection`'s centred picture) needs to keep
+  /// whichever alignment it had before this widget existed rather than being
+  /// stretched into a shape nothing here ever asked for.
+  final CrossAxisAlignment crossAxisAlignment;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SettingsSectionHeader(title, description: description),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+        child: AppCard(
+          padding: const EdgeInsets.all(AppSpacing.s8),
+          child: Material(
+            type: MaterialType.transparency,
+            child: Column(
+              crossAxisAlignment: crossAxisAlignment,
+              mainAxisSize: MainAxisSize.min,
+              children: children,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}

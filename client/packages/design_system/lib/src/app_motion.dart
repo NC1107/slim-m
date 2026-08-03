@@ -78,3 +78,27 @@ abstract final class AppMotion {
   static Duration reducedSize(BuildContext context, Duration full) =>
       isReduced(context) ? const Duration(milliseconds: 1) : full;
 }
+
+/// An install's own override of [AppMotion.isReduced]'s first signal, set
+/// from Personal settings rather than only ever inherited from the OS.
+///
+/// [system] is the default and every existing install's behaviour: nothing
+/// changes for someone who has never opened the control. [alwaysReduce] and
+/// [neverReduce] let a viewer disagree with their own OS setting - a shared
+/// or work device whose accessibility settings are not theirs to change, or
+/// someone who wants the pulse and the motion spec's transitions regardless.
+enum MotionOverride { system, alwaysReduce, neverReduce }
+
+/// Applies [MotionOverride] to [MediaQueryData.disableAnimations] only.
+///
+/// [MediaQueryData.accessibleNavigation] (a screen reader) is left untouched
+/// in every case, including [MotionOverride.neverReduce]: that flag is a
+/// second person's assistive technology being on, not a preference this
+/// install's owner is choosing away, so [AppMotion.isReduced] still reduces
+/// motion for a screen-reader user who asked this override for the opposite.
+MediaQueryData overrideMotion(MediaQueryData data, MotionOverride choice) =>
+    switch (choice) {
+      MotionOverride.system => data,
+      MotionOverride.alwaysReduce => data.copyWith(disableAnimations: true),
+      MotionOverride.neverReduce => data.copyWith(disableAnimations: false),
+    };
