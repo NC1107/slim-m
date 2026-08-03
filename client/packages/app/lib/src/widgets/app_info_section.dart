@@ -17,18 +17,12 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../diagnostics/debug_log.dart';
+import '../providers/providers.dart';
 import '../routing/routes.dart';
 import 'settings_section_header.dart';
-
-/// This build's version and build number, for a tester to read off the
-/// screen rather than guessing which build they are running.
-final appInfoProvider = FutureProvider.autoDispose<PackageInfo>(
-  (ref) => PackageInfo.fromPlatform(),
-);
 
 class AppInfoSection extends ConsumerWidget {
   const AppInfoSection({super.key});

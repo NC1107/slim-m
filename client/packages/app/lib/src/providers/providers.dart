@@ -11,6 +11,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_data/data.dart';
@@ -224,6 +225,15 @@ Future<void> restoreSession(ProviderContainer container) async {
 /// member pane's "message a member" affordance) need to know their own id.
 final meProvider = FutureProvider.autoDispose<Me>(
   (ref) => ref.watch(apiProvider).me(),
+);
+
+/// This install's own build: version and build number, read once off the
+/// platform. The one source for it in the app; a tester reads it in Personal
+/// settings and the rail header names it beside the Space, and both must
+/// answer from here rather than each calling [PackageInfo.fromPlatform]
+/// itself, or the two could disagree about what build is running.
+final appInfoProvider = FutureProvider.autoDispose<PackageInfo>(
+  (ref) => PackageInfo.fromPlatform(),
 );
 
 /// The API client for the current server.

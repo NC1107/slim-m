@@ -34,6 +34,8 @@ final serverInfoProvider = FutureProvider.autoDispose<api.Version>(
   (ref) => ref.watch(apiProvider).version(),
 );
 
+/// The subtitle carries this build's version ([appInfoProvider], never the
+/// server's own), leaving the name line its room for a long Space name.
 class RailHeader extends ConsumerWidget {
   const RailHeader({super.key});
 
@@ -42,7 +44,7 @@ class RailHeader extends ConsumerWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final server = ref.watch(serverInfoProvider);
     final members = ref.watch(membersProvider);
-
+    final version = ref.watch(appInfoProvider).valueOrNull?.version ?? '';
     // The decoration bleeds to the screen edge while [SafeArea] insets only
     // the content, so the rail's own colour fills the status-bar strip.
     return Container(
@@ -73,11 +75,14 @@ class RailHeader extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        members.maybeWhen(
-                          data: (list) =>
-                              '${list.length} members · self-hosted',
-                          orElse: () => 'self-hosted',
-                        ),
+                        [
+                          members.maybeWhen(
+                            data: (list) =>
+                                '${list.length} members · self-hosted',
+                            orElse: () => 'self-hosted',
+                          ),
+                          if (version.isNotEmpty) 'v$version',
+                        ].join(' · '),
                         overflow: TextOverflow.ellipsis,
                         style: AppText.micro.copyWith(
                           color: tokens.textSecondary,
