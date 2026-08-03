@@ -108,8 +108,7 @@ class AttachmentStagingController extends ChangeNotifier {
   /// Whether a send has to wait: something here has not resolved to a real
   /// attachment id yet, either because it is still uploading or because it
   /// failed and needs a retry or a removal before it stops claiming a slot.
-  bool get hasBlockingAttachment =>
-      _items.any((a) => a is! UploadedAttachment);
+  bool get hasBlockingAttachment => _items.any((a) => a is! UploadedAttachment);
 
   /// The ids a send may reference. Deliberately only the uploaded ones: a
   /// caller must also check [hasBlockingAttachment] first, or a send while

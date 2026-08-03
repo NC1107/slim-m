@@ -5,7 +5,6 @@ library;
 
 import 'dart:async';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -330,30 +329,15 @@ class _ComposerState extends ConsumerState<Composer> {
   void _pickFileFromButton() =>
       unawaited(_pickAttachment(AttachmentSource.fileBrowser));
 
-  /// Re-focuses the field on every exit, including a cancelled pick: the
-  /// native picker takes focus with it, and without this the caret never
-  /// comes back and typing goes nowhere.
-  Future<void> _pickAttachment(AttachmentSource source) async {
-    final FilePickerResult? result;
-    try {
-      result = await ref.read(attachmentPickerProvider(source))();
-    } catch (e) {
-      if (!mounted) return;
-      _focus.requestFocus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the file picker.')),
-      );
-      return;
-    }
-    if (!mounted) return;
-    _focus.requestFocus();
-    final files = result?.files ?? const <PlatformFile>[];
-    if (files.isEmpty) return;
-    final file = files.first;
-    // readAsBytes streams from disk; file_picker 12 deprecated withData and
-    // PlatformFile.bytes because eager loading OOMs on a large pick.
-    await _stageAttachment(await file.readAsBytes(), file.name);
-  }
+  Future<void> _pickAttachment(AttachmentSource source) => runAttachmentPick(
+    pick: ref.read(attachmentPickerProvider(source)),
+    focus: _focus,
+    isMounted: () => mounted,
+    onPickerFailed: () => ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open the file picker.')),
+    ),
+    stage: _stageAttachment,
+  );
 
   /// Stages bytes from wherever they came from: visible immediately (see
   /// [AttachmentStagingController.stage]), with the upload itself running in
