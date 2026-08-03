@@ -18,8 +18,37 @@ import 'package:slimm_rtc/rtc.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_roster.dart';
 import '../routing/routes.dart';
+import 'context_menu_region.dart';
 import 'manage_channel_sheet.dart';
 import 'user_avatar.dart';
+
+/// The right-click/long-press menu every channel row gets: opening it always,
+/// managing it (rename, topic, delete) only for the caller [canManage] already
+/// lets use the row's own kebab - the same gate, reused rather than repeated.
+List<Widget> _channelMenuItems(
+  BuildContext context,
+  VoidCallback close,
+  Channel channel,
+  bool canManage,
+) => [
+  AppMenuItem(
+    label: 'Open channel',
+    leading: AppIcons.hash,
+    onTap: () {
+      close();
+      context.go(Routes.channel(channel.id));
+    },
+  ),
+  if (canManage)
+    AppMenuItem(
+      label: 'Manage channel...',
+      leading: AppIcons.settings,
+      onTap: () {
+        close();
+        showManageChannelSheet(context, channel);
+      },
+    ),
+];
 
 /// Pairs a channel row with its manage-sheet trigger, handed to
 /// [AppListRow.trailingExtra] (via [row]'s own builder) rather than composed
@@ -51,9 +80,18 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
   bool _hovered = false;
   bool _kebabFocused = false;
 
+  List<Widget> _menuItems(BuildContext context, VoidCallback close) =>
+      _channelMenuItems(context, close, widget.channel, widget.canManage);
+
   @override
   Widget build(BuildContext context) {
-    if (!widget.canManage) return widget.row(null);
+    if (!widget.canManage) {
+      return ContextMenuRegion(
+        itemsBuilder: _menuItems,
+        ownsFocusNode: false,
+        child: widget.row(null),
+      );
+    }
     // Mirrors _SectionLabel's own trailing inset so this glyph and the
     // section's add glyph share a right edge; both are AppIconButtonSize.sm.
     final touch = AppTouchTargets.of(context);
@@ -93,10 +131,14 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
       ),
     );
     // Inside the row's trailing slot, so no combined height to float against.
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: widget.row(kebab),
+    return ContextMenuRegion(
+      itemsBuilder: _menuItems,
+      ownsFocusNode: false,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: widget.row(kebab),
+      ),
     );
   }
 }

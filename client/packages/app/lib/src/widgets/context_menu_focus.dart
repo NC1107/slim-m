@@ -38,19 +38,31 @@ const Map<ShortcutActivator, Intent> _openShortcuts = {
 /// The ring's box is mounted whether or not it is drawn, because inserting a
 /// widget above [child] on focus would re-inflate the row and drop the state
 /// of everything under it.
+///
+/// [ownsFocusNode] is false for a [child] that is already its own tab stop
+/// (an [AppListRow], say): a second [FocusableActionDetector] around one of
+/// those would add a second, redundant stop that Tab has to pass through
+/// before Enter reaches the row's own activation again, and the context-menu
+/// key still has to reach that same, single node either way. `false` instead
+/// binds the shortcut through a plain [Shortcuts]/[Actions] pair, which asks
+/// nothing of the focus tree at all and rides whatever [child] already made
+/// focusable.
 class ContextMenuFocus extends StatefulWidget {
   const ContextMenuFocus({
     super.key,
     required this.onOpen,
     required this.child,
     this.focusNode,
+    this.ownsFocusNode = true,
   });
 
   final VoidCallback onOpen;
 
   /// Supplied by a caller that drives focus itself; one is created here when
-  /// it is null.
+  /// it is null. Meaningless when [ownsFocusNode] is false.
   final FocusNode? focusNode;
+
+  final bool ownsFocusNode;
 
   final Widget child;
 
@@ -61,21 +73,29 @@ class ContextMenuFocus extends StatefulWidget {
 class _ContextMenuFocusState extends State<ContextMenuFocus> {
   bool _focused = false;
 
+  Map<Type, Action<Intent>> get _actions => <Type, Action<Intent>>{
+    OpenContextMenuIntent: CallbackAction<OpenContextMenuIntent>(
+      onInvoke: (_) {
+        widget.onOpen();
+        return null;
+      },
+    ),
+  };
+
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
+    if (!widget.ownsFocusNode) {
+      return Shortcuts(
+        shortcuts: _openShortcuts,
+        child: Actions(actions: _actions, child: widget.child),
+      );
+    }
 
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     return FocusableActionDetector(
       focusNode: widget.focusNode,
       shortcuts: _openShortcuts,
-      actions: <Type, Action<Intent>>{
-        OpenContextMenuIntent: CallbackAction<OpenContextMenuIntent>(
-          onInvoke: (_) {
-            widget.onOpen();
-            return null;
-          },
-        ),
-      },
+      actions: _actions,
       onShowFocusHighlight: (value) => setState(() => _focused = value),
       child: DecoratedBox(
         position: DecorationPosition.foreground,

@@ -49,6 +49,8 @@ class CallParticipantTile extends StatelessWidget {
       child: ExcludeSemantics(
         child: GestureDetector(
           onTap: onTap,
+          // Right-click reaches the same profile a tap already opens.
+          onSecondaryTapDown: onTap == null ? null : (_) => onTap!(),
           child: SizedBox(
             width: 112,
             child: Column(

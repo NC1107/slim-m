@@ -15,6 +15,7 @@ import 'channel_grouping.dart';
 import 'channel_rail_channel_rows.dart';
 import 'channel_rail_reorder.dart';
 import 'create_channel_sheet.dart';
+import 'dm_row.dart';
 import 'personal_space_row.dart';
 
 class _SectionLabel extends StatelessWidget {
@@ -119,13 +120,7 @@ class DirectMessagesSection extends StatelessWidget {
           )
         else
           for (final channel in others)
-            AppListRow(
-              label: channel.name,
-              selected: channel.id == selectedId,
-              unread: channel.cursor > channel.lastReadSeq,
-              leading: AppAvatar(name: channel.name, size: 20),
-              onTap: () => context.go(Routes.channel(channel.id)),
-            ),
+            DmRow(channel: channel, selected: channel.id == selectedId),
       ],
     );
   }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Where an open message context menu lands, split out of
-/// `message_context_menu.dart` to keep that file inside the review budget.
+/// Where an open context menu lands - originally split out of
+/// `message_context_menu.dart` to keep that file inside the review budget,
+/// now shared by every caller of `context_menu_region.dart`.
 library;
 
 import 'dart:math' as math;
