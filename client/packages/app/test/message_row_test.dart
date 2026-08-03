@@ -181,6 +181,66 @@ void main() {
     expect(discarded, isTrue);
   });
 
+  testWidgets('a failed send names why, not just that it failed', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      harness(
+        MessageRow(
+          message: message(
+            failed: true,
+            failureReason:
+                'Could not send the message. '
+                'message is 37 characters over the 4000-character limit.',
+          ),
+          grouped: false,
+          showNewDivider: false,
+          knownUsernames: const {},
+          onRetry: () {},
+          onDiscard: () {},
+          onPickReaction: (_) {},
+          onReactionTap: (_) {},
+          onVote: (_) {},
+          actions: noActions,
+          editing: false,
+          onSubmitEdit: (_) {},
+          onCancelEdit: () {},
+        ),
+      ),
+    );
+
+    expect(
+      find.textContaining('37 characters over the 4000-character limit'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a failed send with no recorded reason shows none, rather than a '
+      'placeholder', (tester) async {
+    await tester.pumpWidget(
+      harness(
+        MessageRow(
+          message: message(failed: true),
+          grouped: false,
+          showNewDivider: false,
+          knownUsernames: const {},
+          onRetry: () {},
+          onDiscard: () {},
+          onPickReaction: (_) {},
+          onReactionTap: (_) {},
+          onVote: (_) {},
+          actions: noActions,
+          editing: false,
+          onSubmitEdit: (_) {},
+          onCancelEdit: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.textContaining('character limit'), findsNothing);
+  });
+
   group('reactions', () {
     testWidgets('a chip shows the real count and reflects whether you reacted', (
       tester,

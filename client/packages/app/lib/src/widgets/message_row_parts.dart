@@ -240,6 +240,7 @@ class FailedRow extends StatelessWidget {
     required this.onRetry,
     required this.onDiscard,
     this.onEdit,
+    this.reason,
   });
 
   final VoidCallback onRetry;
@@ -249,29 +250,52 @@ class FailedRow extends StatelessWidget {
   /// the action is simply not offered.
   final VoidCallback? onEdit;
 
+  /// Why the send failed, already a plain sentence from `describeApiFailure`
+  /// - never shown at all for an older local row that predates this field,
+  /// rather than a placeholder claiming to know something it does not.
+  final String? reason;
+
   @override
   Widget build(BuildContext context) {
-    // The time slot already says "not sent" in red (MessageTimeMark), so this
-    // row is only the way forward: Retry outlined in danger, the neutral
-    // verbs beside it (error grammar: red is outlined, never filled, and
-    // always ships a verb).
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    // The time slot already says "not sent" in red (MessageTimeMark), so
+    // these buttons are only the way forward: Retry outlined in danger, the
+    // neutral verbs beside it (error grammar: red is outlined, never filled,
+    // and always ships a verb).
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.s8),
-      child: Wrap(
-        spacing: AppSpacing.s8,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppButton(
-            label: 'Retry',
-            size: AppButtonSize.sm,
-            variant: AppButtonVariant.danger,
-            onPressed: onRetry,
-          ),
-          if (onEdit != null)
-            AppButton(label: 'Edit', size: AppButtonSize.sm, onPressed: onEdit),
-          AppButton(
-            label: 'Discard',
-            size: AppButtonSize.sm,
-            onPressed: onDiscard,
+          if (reason != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.s4),
+              child: Text(
+                reason!,
+                style: AppText.label.copyWith(color: tokens.dangerText),
+              ),
+            ),
+          Wrap(
+            spacing: AppSpacing.s8,
+            children: [
+              AppButton(
+                label: 'Retry',
+                size: AppButtonSize.sm,
+                variant: AppButtonVariant.danger,
+                onPressed: onRetry,
+              ),
+              if (onEdit != null)
+                AppButton(
+                  label: 'Edit',
+                  size: AppButtonSize.sm,
+                  onPressed: onEdit,
+                ),
+              AppButton(
+                label: 'Discard',
+                size: AppButtonSize.sm,
+                onPressed: onDiscard,
+              ),
+            ],
           ),
         ],
       ),

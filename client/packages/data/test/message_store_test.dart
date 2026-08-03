@@ -145,12 +145,13 @@ void main() {
       authorId: 'user-1',
       content: 'important',
     );
-    await store.markFailed('local-1');
+    await store.markFailed('local-1', reason: 'the server refused it');
 
     final rows = await store.watchChannel('chan-1').first;
     expect(rows.single.failed, isTrue);
     expect(rows.single.pending, isFalse);
     expect(rows.single.content, 'important');
+    expect(rows.single.failureReason, 'the server refused it');
 
     await store.discard('local-1');
     expect(await store.watchChannel('chan-1').first, isEmpty);
@@ -401,7 +402,7 @@ void main() {
     final rows = await store.watchChannel('chan-1').first;
     expect(rows.map((m) => m.id), ['m1', 'm2', 'p1']);
 
-    await store.markFailed('p1');
+    await store.markFailed('p1', reason: 'unreachable');
     final afterFailure = await store.watchChannel('chan-1').first;
     expect(
       afterFailure.map((m) => m.id),

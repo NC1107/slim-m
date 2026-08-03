@@ -355,12 +355,20 @@ async fn edit(
 /// attachments, where the file is the message and the text is genuinely
 /// optional; every other caller passes false, so the relaxation cannot spread
 /// by being the default.
+///
+/// The over-limit reply names how far over and what the limit is, rather
+/// than a bare "too long": a client composing a long paste (logs, say) needs
+/// the number to trim by, not just the fact that it failed.
 fn validate_content(content: &str, empty_ok: bool) -> Result<&str, ApiError> {
     if !empty_ok && content.trim().is_empty() {
         return Err(ApiError::BadRequest("message content must not be empty"));
     }
-    if content.chars().count() > MESSAGE_MAX_CHARS {
-        return Err(ApiError::BadRequest("message content is too long"));
+    let len = content.chars().count();
+    if len > MESSAGE_MAX_CHARS {
+        return Err(ApiError::BadRequestDetail(format!(
+            "message is {} characters over the {MESSAGE_MAX_CHARS}-character limit",
+            len - MESSAGE_MAX_CHARS,
+        )));
     }
     Ok(content)
 }

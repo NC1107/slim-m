@@ -295,6 +295,7 @@ class MessageRow extends StatelessWidget {
                                       onRetry: onRetry,
                                       onEdit: onEditFailed,
                                       onDiscard: onDiscard,
+                                      reason: message.failureReason,
                                     ),
                                 ],
                               ),

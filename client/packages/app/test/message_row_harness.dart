@@ -22,6 +22,7 @@ Message message({
   int? editedAt,
   bool pending = false,
   bool failed = false,
+  String? failureReason,
   String content = 'hello there',
 }) => Message(
   id: id,
@@ -34,6 +35,7 @@ Message message({
   editedAt: editedAt,
   pending: pending,
   failed: failed,
+  failureReason: failureReason,
 );
 
 void noop() {}

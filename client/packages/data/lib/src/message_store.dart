@@ -356,16 +356,22 @@ class MessageStore {
             createdAt: DateTime.now().millisecondsSinceEpoch,
             pending: const Value(true),
             failed: const Value(false),
+            failureReason: const Value(null),
             replyToId: Value(replyToId),
           ),
         );
   }
 
-  /// Marks a pending send as failed so the UI can offer a retry. The row is kept
-  /// rather than dropped, so the user does not silently lose what they typed.
-  Future<void> markFailed(String id) async {
-    await (db.update(db.messages)..where((m) => m.id.equals(id))).write(
-        const MessagesCompanion(pending: Value(false), failed: Value(true)));
+  /// Marks a pending send as failed so the UI can offer a retry, naming why
+  /// so a retry against the same doomed content is not the user's only clue.
+  /// The row is kept rather than dropped, so nothing typed is silently lost.
+  Future<void> markFailed(String id, {required String reason}) async {
+    await (db.update(db.messages)..where((m) => m.id.equals(id)))
+        .write(MessagesCompanion(
+      pending: const Value(false),
+      failed: const Value(true),
+      failureReason: Value(reason),
+    ));
   }
 
   /// Drops one message's local row: a pending or failed send the user chose

@@ -7,12 +7,49 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'composer_attachments.dart';
 import 'composer_context_menu.dart';
 import 'composer_markdown_shortcuts.dart';
 import 'staged_attachment_tile.dart';
+
+/// How many characters past [kMessageMaxChars] the given [length] sits, or
+/// null when it is within the limit. Runs before the send goes out, so the
+/// composer can refuse a doomed request rather than let it fail on the wire.
+int? messageLengthOverage(int length) =>
+    length > kMessageMaxChars ? length - kMessageMaxChars : null;
+
+/// Below this margin a count is not worth showing at all: an ordinary short
+/// message generates no counter.
+const _counterWarnMargin = 500;
+
+/// Whether the composer's live character counter is worth showing [length].
+bool messageCounterVisible(int length) =>
+    length >= kMessageMaxChars - _counterWarnMargin;
+
+/// The composer's live character count, shown only once close enough to
+/// [kMessageMaxChars] to matter, so the limit is learned while typing rather
+/// than only from the failure a send past it would otherwise be.
+class MessageLengthCounter extends StatelessWidget {
+  const MessageLengthCounter({super.key, required this.length});
+
+  final int length;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!messageCounterVisible(length)) return const SizedBox.shrink();
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final over = length > kMessageMaxChars;
+    return Text(
+      '$length / $kMessageMaxChars',
+      style: AppText.code.copyWith(
+        color: over ? tokens.dangerText : tokens.textSecondary,
+      ),
+    );
+  }
+}
 
 /// Whether this platform's primary text input is a soft keyboard, which has
 /// no shift key and turns the return key into whatever `textInputAction`
@@ -203,16 +240,14 @@ class _ComposerFieldState extends State<ComposerField> {
   }
 }
 
-/// A dismissible inline failure, in the composer's own vertical rhythm.
+/// An inline failure, in the composer's own vertical rhythm. Dismissible only
+/// when [onDismiss] is given; the over-limit band below has nothing to
+/// dismiss to, since editing the text back under the limit is what clears it.
 class ComposerInlineError extends StatelessWidget {
-  const ComposerInlineError({
-    super.key,
-    required this.message,
-    required this.onDismiss,
-  });
+  const ComposerInlineError({super.key, required this.message, this.onDismiss});
 
   final String message;
-  final VoidCallback onDismiss;
+  final VoidCallback? onDismiss;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -232,6 +267,7 @@ class ComposerBanners extends StatelessWidget {
     super.key,
     required this.clipboardPasteError,
     required this.onDismissClipboardPasteError,
+    required this.overLimitBy,
     required this.stagedAttachments,
     required this.onRemoveAttachment,
     required this.onRetryAttachment,
@@ -239,6 +275,11 @@ class ComposerBanners extends StatelessWidget {
 
   final String? clipboardPasteError;
   final VoidCallback onDismissClipboardPasteError;
+
+  /// How many characters over [kMessageMaxChars] the composed text sits, or
+  /// null when it is within the limit. Non-null both disables the send
+  /// button and shows this band, so the refusal is never silent.
+  final int? overLimitBy;
   final List<StagedAttachment> stagedAttachments;
   final ValueChanged<String> onRemoveAttachment;
   final ValueChanged<String> onRetryAttachment;
@@ -246,6 +287,7 @@ class ComposerBanners extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final error = clipboardPasteError;
+    final overBy = overLimitBy;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -253,6 +295,12 @@ class ComposerBanners extends StatelessWidget {
           ComposerInlineError(
             message: error,
             onDismiss: onDismissClipboardPasteError,
+          ),
+        if (overBy != null)
+          ComposerInlineError(
+            message:
+                'Message is $overBy characters over the '
+                '$kMessageMaxChars-character limit.',
           ),
         if (stagedAttachments.isNotEmpty)
           Padding(

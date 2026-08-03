@@ -18,6 +18,7 @@ import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/typing_controller.dart';
 import 'attachment_picker.dart';
+import 'composer_action_bar.dart';
 import 'composer_attachments.dart';
 import 'composer_autocomplete.dart';
 import 'composer_autocomplete_items.dart';
@@ -75,6 +76,12 @@ class _ComposerState extends ConsumerState<Composer> {
   String? _clipboardPasteError;
   late final FocusNode _focus = FocusNode(onKeyEvent: _onKey);
 
+  /// The composed text's own length and how far over [kMessageMaxChars] it
+  /// sits, if at all. Tracked alongside [_hasText] rather than read fresh in
+  /// [build], so [_handleChange] can decide when a rebuild is worth it.
+  int _charCount = 0;
+  int? _overBy;
+
   /// Captured once rather than read from `ref` in [dispose]: by then
   /// Riverpod has already detached this element's `ref`, and reading it
   /// throws "Cannot use ref after the widget was disposed". Every write to
@@ -98,9 +105,13 @@ class _ComposerState extends ConsumerState<Composer> {
   /// server accepts an empty body precisely when attachments ride along.
   /// Blocked while anything staged is still uploading or has failed, or a
   /// send would go out missing whatever has not resolved to an id yet.
+  /// Also blocked over the character limit, so a doomed request never
+  /// reaches the wire at all; see [ComposerBanners]'s `overLimitBy` band for
+  /// where that refusal is explained.
   bool get _canSend =>
       (_hasSendableText || !_attachments.isEmpty) &&
-      !_attachments.hasBlockingAttachment;
+      !_attachments.hasBlockingAttachment &&
+      _overBy == null;
 
   @override
   void initState() {
@@ -111,6 +122,8 @@ class _ComposerState extends ConsumerState<Composer> {
     )..addListener(_handleAttachmentsChange);
     _hasText = widget.controller.text.isNotEmpty;
     _hasSendableText = widget.controller.text.trim().isNotEmpty;
+    _charCount = widget.controller.text.runes.length;
+    _overBy = messageLengthOverage(_charCount);
     widget.controller.addListener(_handleChange);
     _focus.addListener(_handleFocusChange);
     // See [_focusRegistry]'s doc comment for why this waits a frame.
@@ -175,16 +188,27 @@ class _ComposerState extends ConsumerState<Composer> {
   void _handleChange() {
     final hasText = widget.controller.text.isNotEmpty;
     final sendable = widget.controller.text.trim().isNotEmpty;
+    final charCount = widget.controller.text.runes.length;
+    final overBy = messageLengthOverage(charCount);
     final query = autocompleteQueryAt(
       widget.controller.text,
       widget.controller.selection.baseOffset,
     );
+    // True while the counter is or was on screen, so its own value keeps redrawing.
+    final countMatters =
+        messageCounterVisible(charCount) || messageCounterVisible(_charCount);
     final changed =
-        hasText != _hasText || sendable != _hasSendableText || query != _query;
+        hasText != _hasText ||
+        sendable != _hasSendableText ||
+        query != _query ||
+        overBy != _overBy ||
+        (countMatters && charCount != _charCount);
     if (!changed) return;
     setState(() {
       _hasText = hasText;
       _hasSendableText = sendable;
+      _charCount = charCount;
+      _overBy = overBy;
       if (query != _query) {
         _query = query;
         // Back to row one, so Enter takes whatever now ranks first.
@@ -372,7 +396,6 @@ class _ComposerState extends ConsumerState<Composer> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final touch = AppTouchTargets.of(context);
     // In build because both sources are watched and can arrive late.
     _suggestions = _buildSuggestions();
@@ -397,6 +420,7 @@ class _ComposerState extends ConsumerState<Composer> {
               clipboardPasteError: _clipboardPasteError,
               onDismissClipboardPasteError: () =>
                   setState(() => _clipboardPasteError = null),
+              overLimitBy: _overBy,
               stagedAttachments: _attachments.items,
               onRemoveAttachment: _removeAttachment,
               onRetryAttachment: _retryAttachment,
@@ -412,75 +436,34 @@ class _ComposerState extends ConsumerState<Composer> {
               padding: const EdgeInsets.only(left: 4, bottom: 2),
               child: TypingIndicator(channelId: widget.channelId),
             ),
-            Container(
-              key: const Key('composer-action-bar'),
-              padding: const EdgeInsets.fromLTRB(12, 5, 10, 5),
-              decoration: BoxDecoration(
-                color: tokens.surfaceRaised,
-                border: Border.all(color: tokens.borderSubtle),
-                borderRadius: BorderRadius.circular(AppRadii.card),
-              ),
-              child: Row(
-                // Top, not centred: a centred icon drifts as the field grows.
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppIconButton(
-                    icon: AppIcons.add,
-                    semanticLabel: touch ? 'More actions' : 'Attach a file',
-                    tooltip: touch ? 'More actions' : 'Attach a file',
-                    onPressed: touch ? _openActions : _pickFileFromButton,
-                  ),
-                  const SizedBox(width: AppSpacing.s8),
-                  Expanded(
-                    child: ComposerField(
-                      controller: widget.controller,
-                      focusNode: _focus,
-                      channelName: widget.channelName,
-                      hasText: _hasText,
-                      onSend: _send,
-                      onTyping: _onTyping,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.s8),
-                  // Behind the add button at touch density, where the row has
-                  // no room for them; see [showComposerActionsSheet].
-                  if (!touch) ...[
-                    AppIconButton(
-                      icon: AppIcons.poll,
-                      semanticLabel: 'Create a poll',
-                      tooltip: 'Create a poll',
-                      onPressed: () =>
-                          showPollComposerSheet(context, widget.channelId),
-                    ),
-                    AppIconButton(
-                      icon: AppIcons.code,
-                      semanticLabel: 'Insert code',
-                      tooltip: 'Insert code',
-                      onPressed: _insertCodeFence,
-                    ),
-                  ],
-                  AppIconButton(
-                    icon: AppIcons.smile,
-                    semanticLabel: 'Insert emoji',
-                    tooltip: 'Insert emoji',
-                    onPressed: _pickEmoji,
-                  ),
-                  // Always rendered, only disabled when empty: revealing it on
-                  // the first keystroke would reflow the field.
-                  AppIconButton(
-                    icon: AppIcons.send,
-                    semanticLabel: 'Send message',
-                    tooltip: 'Send message',
-                    onPressed: _canSend ? _sendFromButton : null,
-                  ),
-                ],
-              ),
+            ComposerActionBar(
+              touch: touch,
+              controller: widget.controller,
+              focusNode: _focus,
+              channelId: widget.channelId,
+              channelName: widget.channelName,
+              hasText: _hasText,
+              canSend: _canSend,
+              onSend: _send,
+              onTyping: _onTyping,
+              onOpenActions: _openActions,
+              onPickFile: _pickFileFromButton,
+              onSendPressed: _sendFromButton,
+              onInsertCode: _insertCodeFence,
+              onPickEmoji: _pickEmoji,
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(4, 4, 4, 0),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: NewlineHint(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: MessageLengthCounter(length: _charCount),
+                    ),
+                  ),
+                  const NewlineHint(),
+                ],
               ),
             ),
           ],

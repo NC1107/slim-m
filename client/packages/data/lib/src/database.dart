@@ -106,6 +106,11 @@ class Messages extends Table {
   /// True when the send failed and the user can retry it.
   BoolColumn get failed => boolean().withDefault(const Constant(false))();
 
+  /// Why [failed] is true, in the server's own words (its `error` body, or a
+  /// transport failure's own message) - never a generic "send failed" with
+  /// nothing behind it. Null whenever [failed] is false.
+  TextColumn get failureReason => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -115,7 +120,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -170,6 +175,11 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// v10 adds `channels.parentMessageId` in place, the same shape as v9:
   /// threads are new on both sides in the same release, so there is no
   /// existing row this column could ever need to backfill for.
+  ///
+  /// v11 adds `messages.failureReason` in place, the same shape as v9 and
+  /// v10 again: a failed send is local-only state a server was never asked
+  /// about, so an existing failed row simply keeps rendering the generic
+  /// retry it always had until the user retries or discards it.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -198,6 +208,9 @@ class SlimmDatabase extends _$SlimmDatabase {
           }
           if (from < 10) {
             await m.addColumn(channels, channels.parentMessageId);
+          }
+          if (from < 11) {
+            await m.addColumn(messages, messages.failureReason);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

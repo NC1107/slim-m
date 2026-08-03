@@ -21,6 +21,7 @@ import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 
+import '../api_failure.dart';
 import '../providers/message_actions.dart';
 import '../providers/message_extras.dart';
 import '../providers/pins_controller.dart';
@@ -88,8 +89,11 @@ Future<void> sendOptimistically(
     // Lands on the same row, because it carries the same id.
     await store.applyMessage(sent);
     ref.read(messageExtrasProvider.notifier).applyMessage(sent);
-  } on api.ApiException {
-    await store.markFailed(id);
+  } on api.ApiException catch (e) {
+    await store.markFailed(
+      id,
+      reason: describeApiFailure('send the message', e),
+    );
   }
 }
 
