@@ -73,8 +73,8 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
       WhatsNewPoint('Your profile picture picker got the same choice.'),
       WhatsNewPoint(
-        'Copied an image? The attach button now offers Paste image too. '
-        '(iOS may ask permission once - that is expected.)',
+        'If you have copied an image, the attach button now offers Paste '
+        'image as well.',
       ),
     ],
   ),
@@ -182,6 +182,16 @@ const List<WhatsNewEntry> whatsNewEntries = [
       WhatsNewPoint(
         'A thread works just like a regular channel, and anyone who can '
         'read the parent channel can read and post in it too.',
+      ),
+    ],
+  ),
+  WhatsNewEntry(
+    version: '0.24.2',
+    headline: 'Pasting an image on iPhone works from the text box',
+    points: [
+      WhatsNewPoint(
+        'Press and hold the message box and pick Paste. iOS no longer asks '
+        'for permission each time.',
       ),
     ],
   ),
