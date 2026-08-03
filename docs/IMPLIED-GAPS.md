@@ -40,6 +40,10 @@ So a person who calls a DM contact has no way to reach them unless that contact 
 
 ## 3. The report queue does not enforce per-channel moderator exclusion for a message inside a thread
 
+**Fixed 2026-08-02.** `channel_scopes_moderation` now resolves a thread to its parent through `Store::permission_channel` before deciding scoping, and `hidden_channels` was taught about the report-referenced channel ids `list_channels` never carries.
+See `CLAUDE.md`'s "Moderation reaching only the channel kind it was written for" and `crates/slimm-server/tests/report_thread_scoping.rs`.
+The rest of this entry is kept for the record of what the gap was.
+
 **What is missing.** `channel_scopes_moderation` (`crates/slimm-server/src/store/channels.rs`) returns `false` for a thread's own channel, the same as it does for a DM:
 
 ```rust

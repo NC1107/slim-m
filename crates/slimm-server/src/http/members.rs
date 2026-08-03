@@ -279,7 +279,17 @@ async fn authorize(
     escalation_guard(caller_granted, target_granted)
 }
 
-/// Drops a member from every voice room, best effort.
+/// Drops a member from every voice room they could currently be connected
+/// to, best effort: every `voice`-kind channel, shared by the whole
+/// deployment, plus every DM they are a party to. A DM call is a room the
+/// same way a voice channel is - `store/dms.rs`'s own `DM_BASE` grants
+/// `CONNECT` and `SPEAK` there - so this routine's whole reason to exist
+/// (a LiveKit token is a bearer credential nothing else can revoke) applies
+/// to it identically. It did not, until this fixed it: `evict_from_voice`
+/// was written three days before a DM channel could hold a call at all, and
+/// nothing revisited it once one could, so a removed or timed-out member
+/// stayed on a DM call with a third party they had just lost every other
+/// right to reach.
 ///
 /// Best effort on purpose: the moderation act itself has already committed,
 /// and there is nothing useful a caller could do with a failure here that
@@ -292,8 +302,20 @@ async fn evict_from_voice(state: &AppState, target: UserId) {
             return;
         }
     };
-    for channel in channels.into_iter().filter(|c| c.kind == "voice") {
-        match state.voice.remove_participant(channel.id, target).await {
+    let dm_channel_ids: Vec<_> = match state.store.list_dm_conversations(target).await {
+        Ok(conversations) => conversations.into_iter().map(|c| c.channel_id).collect(),
+        Err(err) => {
+            tracing::warn!(%err, "could not list a moderated member's DMs to evict them from");
+            Vec::new()
+        }
+    };
+    let rooms = channels
+        .into_iter()
+        .filter(|c| c.kind == "voice")
+        .map(|c| c.id)
+        .chain(dm_channel_ids);
+    for channel_id in rooms {
+        match state.voice.remove_participant(channel_id, target).await {
             // No SFU configured at all: there is no call to evict anyone from.
             Ok(()) | Err(VoiceError::Unavailable) => {}
             Err(VoiceError::Internal(err)) => {

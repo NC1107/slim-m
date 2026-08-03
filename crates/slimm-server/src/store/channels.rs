@@ -106,19 +106,24 @@ impl Store {
     /// back to the base check they already passed rather than a per-channel
     /// check that a DM or a gone channel grants to nobody.
     ///
-    /// A thread answers false for the same reason a DM does: it holds no
-    /// `channel_overwrites` bucket of its own (see [`Store::permission_channel`]),
-    /// and it never appears in [`Store::list_channels`] for `hidden_channels`
-    /// (`http::reports`) to have excluded it from in the first place, so
-    /// scoping it per-channel here would let a report queue that never
-    /// restricted a thread's visibility go on to refuse acting on it.
+    /// A thread resolves to the channel its parent message lives in, through
+    /// [`Store::permission_channel`] - the same resolution every other
+    /// permission check in this codebase already applies, rather than a
+    /// second copy of it. It answered `false` unconditionally here until this
+    /// was fixed, the same as a DM: a thread carries no `channel_overwrites`
+    /// bucket of its own, so asking about it directly had nothing to
+    /// evaluate. That let a moderator explicitly denied `MANAGE_MESSAGES` on
+    /// a channel by overwrite still see, and resolve, reports about messages
+    /// inside that channel's threads - the report queue's per-channel
+    /// exclusion was never applied to them at all.
     pub async fn channel_scopes_moderation(&self, id: ChannelId) -> anyhow::Result<bool> {
-        Ok(match self.channel(id).await? {
-            Some(channel) => {
-                channel.kind != super::dms::DM_CHANNEL_KIND && channel.parent_message_id.is_none()
-            }
-            None => false,
-        })
+        let Some(channel) = self.channel(id).await? else {
+            return Ok(false);
+        };
+        let Some(channel) = self.permission_channel(channel).await? else {
+            return Ok(false);
+        };
+        Ok(channel.kind != super::dms::DM_CHANNEL_KIND)
     }
 
     /// Fetches a channel by id whether or not it is deleted. The delete

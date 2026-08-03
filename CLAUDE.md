@@ -30,7 +30,10 @@ A thread opened on a message that is itself inside a thread would have resolved 
 `Store::list_channels` gained `AND parent_message_id IS NULL` beside its existing `kind != 'dm'` exclusion.
 `Store::reorder_channels` had its *own* copy of that same query (not a call to `list_channels`) and needed the identical fix - the kind of duplicate-query drift this project's history already flags as the recurring shape of these bugs.
 `Store::delete_channel`'s last-channel guard counts `WHERE kind != 'dm'`; without also excluding threads, a deployment holding a handful of threads on its one real channel could have that channel deleted while the count still read above one, exactly the bug the decision record predicted by name.
-`channel_scopes_moderation` now treats a thread like a DM (returns false): it has no `channel_overwrites` bucket of its own for a per-channel moderation check to mean anything, and it is invisible to the report queue's own list-based exclusion (`http::reports::hidden_channels`) for the same reason a DM is, so scoping it per-channel there would have let the queue refuse to act on a report it never restricted seeing in the first place.
+~~`channel_scopes_moderation` now treats a thread like a DM (returns false): it has no `channel_overwrites` bucket of its own for a per-channel moderation check to mean anything, and it is invisible to the report queue's own list-based exclusion (`http::reports::hidden_channels`) for the same reason a DM is, so scoping it per-channel there would have let the queue refuse to act on a report it never restricted seeing in the first place.~~
+Wrong, fixed 2026-08-02: "has no overwrite bucket of its own" was taken to mean "cannot be scoped," when the right answer was to resolve to the channel that does carry one, the same as every other permission check does.
+Until fixed, a moderator denied `MANAGE_MESSAGES` on a channel by overwrite still saw reports about messages inside that channel's threads.
+See "Moderation reaching only the channel kind it was written for" below.
 Push fan-out (`viewers_among`) and the plain per-user path (`permissions_in_channel`) both needed the same `permission_channel` substitution independently, since `viewers_among` carries its own inlined copy of the overwrite evaluation for batching - mutation-tested separately, and each kills exactly one of the two tests written for it, not both.
 
 **Discovery is a batch-loaded field, not a live event, and that was a deliberate reach for the project's own established pattern over the more obvious one.**
@@ -51,6 +54,35 @@ It now also keeps whatever the local table already has flagged as a thread (`par
 **Mutation-tested by hand, four separate single-line reverts, each restored immediately after**: dropping the `parent_message_id IS NULL` filter from `list_channels` failed the rail-exclusion test and nothing else; removing `permission_channel`'s substitution from `evaluate_channel_permissions` failed the view-inheritance test and nothing else; removing it from `viewers_among` failed the push-fan-out inheritance test and nothing else; reverting `delete_channel`'s guard to count threads failed the last-channel test and nothing else. See `crates/slimm-server/tests/threads.rs`.
 
 Deliberately not built, and named rather than silently missing: ~~a live "thread opened" notification for someone already viewing the parent channel (see the discovery note above)~~ (built 2026-08-02, see "A live signal for a thread opening, or gaining a reply" below); ~~a reply-count or "N replies" affordance on the parent message, which would need the same field surfaced in the message row rather than only used to gate the context-menu item~~ (built 2026-08-01, see "The reply-count affordance threads shipped without" below); and any UI for deleting a thread specifically - the generic `DELETE /channels/{id}` route already reaches one for anyone holding deployment-wide `MANAGE_CHANNELS`, with the last-channel guard now correctly indifferent to it.
+
+## Moderation reaching only the channel kind it was written for (2026-08-02)
+
+Two independent review findings, the same shape: a moderation routine was written against the channel kinds that existed at the time, a new kind arrived days later that the same act should reach, and nothing revisited the routine when it did.
+Neither bug would show up in a diff of the PR that added the new kind - `evict_from_voice` and `channel_scopes_moderation` did not change; DM calls and threads did.
+Read this before adding a fourth channel kind, or before assuming an existing moderation check already covers one it has never been told about.
+
+**A LiveKit token is a bearer credential the server cannot revoke, and `evict_from_voice` only ever walked `voice`-kind channels.**
+`http/members.rs`'s `evict_from_voice` was written in PR #136 on 2026-07-29, three days before calling in a DM gave a DM channel anything to evict anyone from (PR #306).
+So a member timed out or removed for cause stayed on a DM call with a third party they had just lost every other right to reach - the exact failure this routine exists to prevent, on a channel kind it never learned about.
+Fixed by also walking `store.list_dm_conversations(target)`'s channel ids, best effort, alongside the existing `voice`-kind walk.
+`tests/member_moderation_evicts_dm_calls.rs` drives a real `RemoveParticipant` call against a fake room service (the `tests/voice_sweep.rs` shape); mutation-tested, dropping the DM walk fails exactly the two tests written for it.
+
+**Blocking had the same gap in a milder, self-service form, and it was worth closing anyway.**
+`store/dms.rs`'s `BLOCKED_DENY` already stopped a new DM call being started or joined in either direction, but nothing ended one already under way when the block landed.
+A reviewer noted the blocker can always hang up themselves, which is true and reads like an argument against bothering - but that only covers the blocker's own remedy, not whether the block takes effect for the party who has none.
+Chosen: blocking now evicts the blocked party, never the blocker, from the one DM call the two of them share, since the blocker already holds the hang-up remedy and a block is one person's choice about future contact, not grounds to end a call the other side may still want to be on.
+`tests/block_evicts_shared_call.rs` covers the eviction, that the blocker is never the one evicted, and the no-op case where the pair never opened a DM at all.
+
+**The report queue's per-channel exclusion never reached a thread, because a thread never reached the channel list the exclusion was built from.**
+`store/channels.rs`'s `channel_scopes_moderation` treated a thread exactly like a DM - opaque, unscoped, falling back to the deployment-wide bit - when a thread's permissions are not opaque at all: they resolve live to the parent channel's overwrites through `Store::permission_channel`, the same mechanism this function itself declined to use.
+A moderator explicitly denied `MANAGE_MESSAGES` on a channel by overwrite still saw, and could resolve, reports about messages inside that channel's threads, content snapshot included - the same visibility leak this file's own "Read bounds" section above already closed once for the parent-channel case, reopened by threads being modelled on the DM branch instead of the general one.
+Fixed by resolving through `permission_channel` before deciding scoping, and by teaching `http/reports.rs`'s batched `hidden_channels` about the report-referenced channel ids `list_channels` never carries (a thread is excluded from that list by design) - reusing `report_visible_in` for each one rather than a second resolve-then-check.
+`tests/report_thread_scoping.rs` covers the denial, the positive case (a moderator who can still moderate the parent), and the property that must not regress: a report with no channel, one about a DM, and one about a deleted channel all stay visible to a *restricted* moderator on the deployment-wide bit alone, not only to an administrator who was never going to be filtered anyway.
+Mutation-tested: reverting the resolution fails exactly the one test built for it.
+
+**The lesson worth keeping is the shape, not the two fixes.**
+Both routines were correct when written, against the channel kinds that existed then.
+Whenever a channel gains a new `kind` (or a new resolution, the way a thread resolves to its parent), grep for every place that already special-cases `kind == "voice"`, `kind != 'dm'`, or an unconditional `true`/`false` per kind, and ask whether the new kind belongs in that list - rather than trusting that an existing check already generalizes to it.
 
 ## A live signal for a thread opening, or gaining a reply (2026-08-02)
 

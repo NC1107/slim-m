@@ -259,6 +259,27 @@ impl Store {
         Ok(pair.map(|p| (p.user_a, p.user_b)))
     }
 
+    /// The DM channel between two specific accounts, if the pair has ever
+    /// opened one. Read-only, unlike [`Store::open_dm`]: a caller checking
+    /// whether there is a call to act on must not create a channel just by
+    /// asking, so this answers `None` rather than opening one.
+    pub(crate) async fn dm_channel_for_pair(
+        &self,
+        a: UserId,
+        b: UserId,
+    ) -> anyhow::Result<Option<ChannelId>> {
+        let (user_a, user_b) = normalize_pair(a, b);
+        let channel_id = sqlx::query_scalar!(
+            r#"SELECT channel_id AS "channel_id!: ChannelId"
+               FROM dm_channels WHERE user_a = ? AND user_b = ?"#,
+            user_a,
+            user_b
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(channel_id)
+    }
+
     pub(crate) async fn dm_permissions(
         &self,
         user_id: UserId,

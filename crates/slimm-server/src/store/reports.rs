@@ -214,6 +214,23 @@ impl Store {
             .collect()
     }
 
+    /// The distinct channel ids named by a currently open report, thread or
+    /// not.
+    ///
+    /// `http::reports::hidden_channels` needs this because a thread never
+    /// appears in [`Store::list_channels`], so the exclusion it batches from
+    /// that list cannot see one; this hands back exactly the ids worth
+    /// resolving individually rather than every channel in the deployment.
+    pub async fn open_report_channel_ids(&self) -> anyhow::Result<Vec<ChannelId>> {
+        let rows = sqlx::query_scalar!(
+            r#"SELECT DISTINCT channel_id AS "channel_id!: ChannelId"
+               FROM reports WHERE resolved_at IS NULL AND channel_id IS NOT NULL"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// The channel an open report is about, if it is about a message at all.
     ///
     /// `Ok(None)` means no open report by that id; `Ok(Some(None))` means one
