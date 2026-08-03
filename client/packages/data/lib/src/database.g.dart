@@ -724,6 +724,12 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("failed" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _failureReasonMeta =
+      const VerificationMeta('failureReason');
+  @override
+  late final GeneratedColumn<String> failureReason = GeneratedColumn<String>(
+      'failure_reason', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -736,7 +742,8 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
         editedAt,
         replyToId,
         pending,
-        failed
+        failed,
+        failureReason
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -803,6 +810,12 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
       context.handle(_failedMeta,
           failed.isAcceptableOrUnknown(data['failed']!, _failedMeta));
     }
+    if (data.containsKey('failure_reason')) {
+      context.handle(
+          _failureReasonMeta,
+          failureReason.isAcceptableOrUnknown(
+              data['failure_reason']!, _failureReasonMeta));
+    }
     return context;
   }
 
@@ -834,6 +847,8 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
           .read(DriftSqlType.bool, data['${effectivePrefix}pending'])!,
       failed: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}failed'])!,
+      failureReason: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}failure_reason']),
     );
   }
 
@@ -871,6 +886,11 @@ class Message extends DataClass implements Insertable<Message> {
 
   /// True when the send failed and the user can retry it.
   final bool failed;
+
+  /// Why [failed] is true, in the server's own words (its `error` body, or a
+  /// transport failure's own message) - never a generic "send failed" with
+  /// nothing behind it. Null whenever [failed] is false.
+  final String? failureReason;
   const Message(
       {required this.id,
       required this.channelId,
@@ -882,7 +902,8 @@ class Message extends DataClass implements Insertable<Message> {
       this.editedAt,
       this.replyToId,
       required this.pending,
-      required this.failed});
+      required this.failed,
+      this.failureReason});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -905,6 +926,9 @@ class Message extends DataClass implements Insertable<Message> {
     }
     map['pending'] = Variable<bool>(pending);
     map['failed'] = Variable<bool>(failed);
+    if (!nullToAbsent || failureReason != null) {
+      map['failure_reason'] = Variable<String>(failureReason);
+    }
     return map;
   }
 
@@ -929,6 +953,9 @@ class Message extends DataClass implements Insertable<Message> {
           : Value(replyToId),
       pending: Value(pending),
       failed: Value(failed),
+      failureReason: failureReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(failureReason),
     );
   }
 
@@ -948,6 +975,7 @@ class Message extends DataClass implements Insertable<Message> {
       replyToId: serializer.fromJson<String?>(json['replyToId']),
       pending: serializer.fromJson<bool>(json['pending']),
       failed: serializer.fromJson<bool>(json['failed']),
+      failureReason: serializer.fromJson<String?>(json['failureReason']),
     );
   }
   @override
@@ -965,6 +993,7 @@ class Message extends DataClass implements Insertable<Message> {
       'replyToId': serializer.toJson<String?>(replyToId),
       'pending': serializer.toJson<bool>(pending),
       'failed': serializer.toJson<bool>(failed),
+      'failureReason': serializer.toJson<String?>(failureReason),
     };
   }
 
@@ -979,7 +1008,8 @@ class Message extends DataClass implements Insertable<Message> {
           Value<int?> editedAt = const Value.absent(),
           Value<String?> replyToId = const Value.absent(),
           bool? pending,
-          bool? failed}) =>
+          bool? failed,
+          Value<String?> failureReason = const Value.absent()}) =>
       Message(
         id: id ?? this.id,
         channelId: channelId ?? this.channelId,
@@ -994,6 +1024,8 @@ class Message extends DataClass implements Insertable<Message> {
         replyToId: replyToId.present ? replyToId.value : this.replyToId,
         pending: pending ?? this.pending,
         failed: failed ?? this.failed,
+        failureReason:
+            failureReason.present ? failureReason.value : this.failureReason,
       );
   Message copyWithCompanion(MessagesCompanion data) {
     return Message(
@@ -1010,6 +1042,9 @@ class Message extends DataClass implements Insertable<Message> {
       replyToId: data.replyToId.present ? data.replyToId.value : this.replyToId,
       pending: data.pending.present ? data.pending.value : this.pending,
       failed: data.failed.present ? data.failed.value : this.failed,
+      failureReason: data.failureReason.present
+          ? data.failureReason.value
+          : this.failureReason,
     );
   }
 
@@ -1026,14 +1061,26 @@ class Message extends DataClass implements Insertable<Message> {
           ..write('editedAt: $editedAt, ')
           ..write('replyToId: $replyToId, ')
           ..write('pending: $pending, ')
-          ..write('failed: $failed')
+          ..write('failed: $failed, ')
+          ..write('failureReason: $failureReason')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, channelId, authorId, authorDisplayName,
-      seq, content, createdAt, editedAt, replyToId, pending, failed);
+  int get hashCode => Object.hash(
+      id,
+      channelId,
+      authorId,
+      authorDisplayName,
+      seq,
+      content,
+      createdAt,
+      editedAt,
+      replyToId,
+      pending,
+      failed,
+      failureReason);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1048,7 +1095,8 @@ class Message extends DataClass implements Insertable<Message> {
           other.editedAt == this.editedAt &&
           other.replyToId == this.replyToId &&
           other.pending == this.pending &&
-          other.failed == this.failed);
+          other.failed == this.failed &&
+          other.failureReason == this.failureReason);
 }
 
 class MessagesCompanion extends UpdateCompanion<Message> {
@@ -1063,6 +1111,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   final Value<String?> replyToId;
   final Value<bool> pending;
   final Value<bool> failed;
+  final Value<String?> failureReason;
   final Value<int> rowid;
   const MessagesCompanion({
     this.id = const Value.absent(),
@@ -1076,6 +1125,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     this.replyToId = const Value.absent(),
     this.pending = const Value.absent(),
     this.failed = const Value.absent(),
+    this.failureReason = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessagesCompanion.insert({
@@ -1090,6 +1140,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     this.replyToId = const Value.absent(),
     this.pending = const Value.absent(),
     this.failed = const Value.absent(),
+    this.failureReason = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         channelId = Value(channelId),
@@ -1107,6 +1158,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Expression<String>? replyToId,
     Expression<bool>? pending,
     Expression<bool>? failed,
+    Expression<String>? failureReason,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1121,6 +1173,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       if (replyToId != null) 'reply_to_id': replyToId,
       if (pending != null) 'pending': pending,
       if (failed != null) 'failed': failed,
+      if (failureReason != null) 'failure_reason': failureReason,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1137,6 +1190,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       Value<String?>? replyToId,
       Value<bool>? pending,
       Value<bool>? failed,
+      Value<String?>? failureReason,
       Value<int>? rowid}) {
     return MessagesCompanion(
       id: id ?? this.id,
@@ -1150,6 +1204,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       replyToId: replyToId ?? this.replyToId,
       pending: pending ?? this.pending,
       failed: failed ?? this.failed,
+      failureReason: failureReason ?? this.failureReason,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1190,6 +1245,9 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     if (failed.present) {
       map['failed'] = Variable<bool>(failed.value);
     }
+    if (failureReason.present) {
+      map['failure_reason'] = Variable<String>(failureReason.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1210,6 +1268,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
           ..write('replyToId: $replyToId, ')
           ..write('pending: $pending, ')
           ..write('failed: $failed, ')
+          ..write('failureReason: $failureReason, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1516,6 +1575,7 @@ typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   Value<String?> replyToId,
   Value<bool> pending,
   Value<bool> failed,
+  Value<String?> failureReason,
   Value<int> rowid,
 });
 typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
@@ -1530,6 +1590,7 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
   Value<String?> replyToId,
   Value<bool> pending,
   Value<bool> failed,
+  Value<String?> failureReason,
   Value<int> rowid,
 });
 
@@ -1575,6 +1636,9 @@ class $$MessagesTableFilterComposer
 
   ColumnFilters<bool> get failed => $composableBuilder(
       column: $table.failed, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get failureReason => $composableBuilder(
+      column: $table.failureReason, builder: (column) => ColumnFilters(column));
 }
 
 class $$MessagesTableOrderingComposer
@@ -1619,6 +1683,10 @@ class $$MessagesTableOrderingComposer
 
   ColumnOrderings<bool> get failed => $composableBuilder(
       column: $table.failed, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get failureReason => $composableBuilder(
+      column: $table.failureReason,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$MessagesTableAnnotationComposer
@@ -1662,6 +1730,9 @@ class $$MessagesTableAnnotationComposer
 
   GeneratedColumn<bool> get failed =>
       $composableBuilder(column: $table.failed, builder: (column) => column);
+
+  GeneratedColumn<String> get failureReason => $composableBuilder(
+      column: $table.failureReason, builder: (column) => column);
 }
 
 class $$MessagesTableTableManager extends RootTableManager<
@@ -1698,6 +1769,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             Value<String?> replyToId = const Value.absent(),
             Value<bool> pending = const Value.absent(),
             Value<bool> failed = const Value.absent(),
+            Value<String?> failureReason = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               MessagesCompanion(
@@ -1712,6 +1784,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             replyToId: replyToId,
             pending: pending,
             failed: failed,
+            failureReason: failureReason,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -1726,6 +1799,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             Value<String?> replyToId = const Value.absent(),
             Value<bool> pending = const Value.absent(),
             Value<bool> failed = const Value.absent(),
+            Value<String?> failureReason = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               MessagesCompanion.insert(
@@ -1740,6 +1814,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             replyToId: replyToId,
             pending: pending,
             failed: failed,
+            failureReason: failureReason,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

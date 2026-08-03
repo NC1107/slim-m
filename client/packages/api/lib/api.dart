@@ -70,4 +70,5 @@ export 'src/events.dart'
         TypingStopped,
         protocolVersion;
 export 'src/exceptions.dart';
+export 'src/limits.dart' show kMessageMaxChars;
 export 'src/models.dart';
