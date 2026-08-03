@@ -207,6 +207,10 @@ String? _presenceDescription(AppPresence status) => switch (status) {
 /// A row is muted (dimmed, per [AppListRow.muted]) only once fully offline;
 /// away and do-not-disturb still read as present, matching the grouping
 /// rule above.
+///
+/// A right-click reaches the same profile popover a tap already does, rather
+/// than a second, narrower menu: every verb this row could offer already
+/// lives there, gated exactly as it already is.
 class _MemberRow extends ConsumerWidget {
   const _MemberRow({
     required this.profile,
@@ -227,6 +231,10 @@ class _MemberRow extends ConsumerWidget {
     // Only the first: a row that grew with role count would push the name out of a 236px pane.
     final badge = profile.roles.isEmpty ? null : profile.roles.first;
 
+    void open() => unawaited(
+      showMemberProfile(context, ref, profile: profile, status: status),
+    );
+
     final row = AppListRow(
       // Taller than a channel row: a 26px avatar's corner status dot crops at the default height.
       height: 36,
@@ -246,10 +254,8 @@ class _MemberRow extends ConsumerWidget {
         status: status,
       ),
       // Opens the profile, which is where every verb about a member lives now.
-      onTap: () => unawaited(
-        showMemberProfile(context, ref, profile: profile, status: status),
-      ),
+      onTap: open,
     );
-    return row;
+    return GestureDetector(onSecondaryTapDown: (_) => open(), child: row);
   }
 }

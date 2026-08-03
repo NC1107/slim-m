@@ -9,18 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import '../routing/breakpoints.dart';
-import 'context_menu_focus.dart';
+import 'context_menu_region.dart';
 import 'hover_reveal.dart';
-import 'message_context_menu_layout.dart';
-
-/// Where the menu's top-left sits relative to the row's own top-left, from
-/// the design.
-const Offset _menuInset = Offset(24, 12);
-
-/// Kept off the viewport edges on top of whatever the safe area already
-/// reserves, so a clamped menu does not sit flush against the screen.
-const double _screenMargin = 8;
 
 /// What the menu can do for one message. The caller (which knows authorship
 /// and permissions; the menu deliberately does not) decides each `can*`
@@ -81,25 +71,19 @@ class MessageActions {
 }
 
 /// Wraps [child] so a right-click or long-press over it opens a menu for
-/// [content] and [actions], anchored to this region.
+/// [content] and [actions] - the message-specific skin on [ContextMenuRegion],
+/// which owns the gesture, the anchor, and the compact-sheet/wide-floating
+/// split every context menu in the app now shares.
 ///
 /// This is the only add-reaction affordance a finger has: the picker button
 /// beside a message is revealed by a [MouseRegion] that touch never fires, so
 /// [onAddReaction] is what makes reacting reachable at all on a phone.
-///
-/// A keyboard reaches the same menu through [ContextMenuFocus], which makes
-/// the row a tab stop and binds the platform's context-menu keys.
 ///
 /// The row tints across a hold, showing visible progress toward the threshold
 /// instead of a dead finger (motion spec 10). It runs over the framework's own
 /// long-press timeout rather than the spec's 350ms, because the gesture stays
 /// a [GestureDetector] (the thing that publishes `SemanticsAction.longPress`)
 /// and the tint has to end when the gesture it tracks does.
-///
-/// On a compact layout the menu is a bottom sheet, Discord-style, rather than
-/// the floating follower: a floating menu opened by a long-press sits right
-/// under the thumb that opened it. Wider layouts keep the floating overlay
-/// unchanged, since a mouse anchors the menu to where it clicked instead.
 class MessageContextMenuRegion extends StatefulWidget {
   const MessageContextMenuRegion({
     super.key,
@@ -126,93 +110,14 @@ class MessageContextMenuRegion extends StatefulWidget {
 }
 
 class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
-  final _controller = OverlayPortalController();
-
   /// True from finger-down until the long press commits or cancels; drives
   /// the hold-progress tint.
   bool _holding = false;
 
-  /// The list this row sits in, subscribed to only while the menu is open.
-  ScrollPosition? _watched;
-
-  /// The menu's preferred top-left in the overlay's coordinates, read when it
-  /// opens. It does not follow the row, because every scroll closes it: a
-  /// drag through [TapRegion.onTapOutside], and a wheel or a trackpad through
-  /// [_closeOnScroll], which is what a pointer signal reaches instead. A
-  /// signal fires no pointer down, so the tap region never sees it.
-  Offset _anchor = Offset.zero;
-
-  /// Whether the compact bottom sheet is currently showing; the wide
-  /// floating overlay tracks its own visibility on [_controller] instead.
-  bool _sheetOpen = false;
-
-  @override
-  void dispose() {
-    _watched?.removeListener(_closeOnScroll);
-    super.dispose();
-  }
-
-  /// [pinRow] keeps the row's hover-revealed controls mounted so it does not
-  /// reflow under an open menu. A long-press passes false: touch reveals
-  /// nothing, so pinning would only mount a control the menu itself covers.
-  void _setOpen(bool open, {bool pinRow = true}) {
-    if (pinRow || !open) HoverRevealScope.maybeOf(context)?.pin(open);
-    if (LayoutClass.of(context) == LayoutClass.compact) {
-      _setSheetOpen(open);
-      return;
-    }
-    if (open) _anchor = _anchorOffset();
-    _watchScroll(open);
-    open ? _controller.show() : _controller.hide();
-  }
-
-  /// The compact half of [_setOpen]: a bottom sheet rather than the floating
-  /// follower. Neither the anchor nor the scroll-close tracking applies here:
-  /// the sheet is not placed against the row at all, and its own modal
-  /// barrier already stops the row underneath from scrolling while it shows.
-  void _setSheetOpen(bool open) {
-    if (!open) {
-      if (_sheetOpen) Navigator.of(context).maybePop();
-      return;
-    }
-    if (_sheetOpen) return;
-    _sheetOpen = true;
-    showAppSheet<void>(
-      context,
-      bare: true,
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: AppSheetMenu(
-          children: _items(() => Navigator.of(sheetContext).pop()),
-        ),
-      ),
-    ).whenComplete(() => _sheetOpen = false);
-  }
-
-  void _closeOnScroll() {
-    if (_controller.isShowing) _setOpen(false);
-  }
-
-  void _watchScroll(bool open) {
-    final position = open ? Scrollable.maybeOf(context)?.position : null;
-    if (identical(position, _watched)) return;
-    _watched?.removeListener(_closeOnScroll);
-    _watched = position;
-    _watched?.addListener(_closeOnScroll);
-  }
-
-  Offset _anchorOffset() {
-    final box = context.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    if (box == null || overlay == null) return _menuInset;
-    return box.localToGlobal(_menuInset, ancestor: overlay);
-  }
-
   /// The item list both the floating menu and the bottom sheet render,
   /// parameterised on how each closes itself: hiding the overlay controller
   /// for one, popping the sheet's own route for the other.
-  List<Widget> _items(VoidCallback close) {
+  List<Widget> _items(BuildContext context, VoidCallback close) {
     final actions = widget.actions;
     void run(VoidCallback action) {
       close();
@@ -286,55 +191,20 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
 
   @override
   Widget build(BuildContext context) {
-    return OverlayPortal(
-      controller: _controller,
-      overlayChildBuilder: (context) => Positioned.fill(
-        child: CustomSingleChildLayout(
-          delegate: MessageMenuLayout(
-            anchor: _anchor,
-            padding:
-                MediaQuery.paddingOf(context) +
-                const EdgeInsets.all(_screenMargin),
-          ),
-          child: TapRegion(
-            onTapOutside: (_) => _setOpen(false),
-            child: ContextMenuKeyboardScope(
-              onDismiss: () => _setOpen(false),
-              // Scrolls rather than overflowing where the whole menu cannot fit, which a landscape phone at a large text scale reaches.
-              child: SingleChildScrollView(
-                child: AppMenu(
-                  width: 200,
-                  children: _items(() => _setOpen(false)),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-      child: ContextMenuFocus(
-        onOpen: () => _setOpen(true),
-        child: GestureDetector(
-          onSecondaryTapDown: (_) => _setOpen(true),
-          // GestureDetector, never a raw recognizer: it is what publishes SemanticsAction.longPress, which context_menu_reachability_test guards.
-          onLongPressDown: (_) => setState(() => _holding = true),
-          onLongPressCancel: () => setState(() => _holding = false),
-          onLongPress: () {
-            setState(() => _holding = false);
-            _setOpen(true, pinRow: false);
-          },
-          child: AnimatedContainer(
-            duration: _holding
-                ? AppMotion.reduced(context, kLongPressTimeout)
-                : AppMotion.reduced(context, AppMotion.fast),
-            curve: Curves.linear,
-            color: _holding
-                ? Theme.of(
-                    context,
-                  ).extension<AppTokens>()!.accentSoft.withValues(alpha: 0.5)
-                : Colors.transparent,
-            child: widget.child,
-          ),
-        ),
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return ContextMenuRegion(
+      itemsBuilder: _items,
+      onOpenChanged: (open) => HoverRevealScope.maybeOf(context)?.pin(open),
+      onHoldChanged: (holding) => setState(() => _holding = holding),
+      child: AnimatedContainer(
+        duration: _holding
+            ? AppMotion.reduced(context, kLongPressTimeout)
+            : AppMotion.reduced(context, AppMotion.fast),
+        curve: Curves.linear,
+        color: _holding
+            ? tokens.accentSoft.withValues(alpha: 0.5)
+            : Colors.transparent,
+        child: widget.child,
       ),
     );
   }
