@@ -20,6 +20,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../ids.dart';
 import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
+import '../providers/channel_drafts.dart';
 import '../providers/channel_history.dart';
 import '../providers/channel_search_controller.dart';
 import '../providers/emoji_catalog_provider.dart';
@@ -81,10 +82,19 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     markRead: _markReadUpToLatest,
   );
 
+  /// Captured once rather than read from `ref` in [dispose]: by then the
+  /// element has already detached, and `ref.read` there throws "Cannot use
+  /// ref after the widget was disposed" (see `composer.dart`'s own note on
+  /// the same trap). The controller itself needs no further `ref` access
+  /// once resolved, so holding it plainly is enough.
+  late final ChannelDraftsController _drafts = ref.read(channelDraftsProvider);
+
   @override
   void initState() {
     super.initState();
     unawaited(_hydrateExtras());
+    // Fresh or reused (see [ReadMarker]), this must open on this channel's own draft.
+    _composer.text = _drafts.draftFor(widget.channelId);
   }
 
   @override
@@ -99,6 +109,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       ref.read(messageJumpProvider.notifier).cancelFor(oldWidget.channelId);
       _replyingTo = null;
       _scrollTracker.resetForChannelSwitch();
+      _drafts.save(oldWidget.channelId, _composer.text);
+      _composer.text = _drafts.draftFor(widget.channelId);
     }
   }
 
@@ -116,6 +128,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
 
   @override
   void dispose() {
+    // Last chance to save unsent text before a torn-down State (voice, a DM call, canvas) loses it.
+    _drafts.save(widget.channelId, _composer.text);
     _composer.dispose();
     _scrollTracker.dispose();
     _searchController.dispose();
@@ -132,6 +146,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     // text nor attachment is the one to drop.
     if (text.isEmpty && attachmentIds.isEmpty) return;
     _composer.clear();
+    _drafts.clear(widget.channelId);
     // Read and cleared before the first await, same as the composer text.
     final replyToId = _replyingTo?.id;
     setState(() => _replyingTo = null);

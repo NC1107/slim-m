@@ -5,20 +5,18 @@ library;
 
 import 'dart:async';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../api_failure.dart';
 import '../providers/admin_providers.dart';
 import '../providers/composer_focus.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/typing_controller.dart';
 import 'attachment_picker.dart';
+import 'composer_attachments.dart';
 import 'composer_autocomplete.dart';
 import 'composer_autocomplete_items.dart';
 import 'composer_autocomplete_query.dart';
@@ -62,15 +60,13 @@ class Composer extends ConsumerStatefulWidget {
   ConsumerState<Composer> createState() => _ComposerState();
 }
 
-class _ComposerState extends ConsumerState<Composer> {
+class _ComposerState extends ConsumerState<Composer>
+    with ComposerAttachments<Composer> {
   /// Two flags, one purpose each. [_hasText] drives the placeholder and is
   /// deliberately untrimmed, so typed spaces hide it; [_hasSendableText] is
   /// trimmed, because the send path drops whitespace-only text.
   bool _hasText = false;
   bool _hasSendableText = false;
-  bool _uploading = false;
-  final List<api.Attachment> _pendingAttachments = [];
-  String? _clipboardPasteError;
   late final FocusNode _focus = FocusNode(onKeyEvent: _onKey);
 
   /// Captured once rather than read from `ref` in [dispose]: by then
@@ -94,7 +90,7 @@ class _ComposerState extends ConsumerState<Composer> {
 
   /// A staged file is sendable on its own: a photo needs no caption, and the
   /// server accepts an empty body precisely when attachments ride along.
-  bool get _canSend => _hasSendableText || _pendingAttachments.isNotEmpty;
+  bool get _canSend => _hasSendableText || pendingAttachments.isNotEmpty;
 
   @override
   void initState() {
@@ -110,6 +106,13 @@ class _ComposerState extends ConsumerState<Composer> {
       registry.state = _focus;
       _focusRegistry = registry;
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant Composer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // See [ComposerAttachments.resetForChannelSwitch]'s own doc comment.
+    if (oldWidget.channelId != widget.channelId) resetForChannelSwitch();
   }
 
   @override
@@ -274,13 +277,15 @@ class _ComposerState extends ConsumerState<Composer> {
   void _openActions() => unawaited(
     showComposerActionsSheet(
       context,
-      onPhotoLibrary: () =>
-          unawaited(_pickAttachment(AttachmentSource.photoLibrary)),
-      onBrowseFiles: () =>
-          unawaited(_pickAttachment(AttachmentSource.fileBrowser)),
+      onPhotoLibrary: () => unawaited(
+        pickAttachment(AttachmentSource.photoLibrary, focus: _focus),
+      ),
+      onBrowseFiles: () => unawaited(
+        pickAttachment(AttachmentSource.fileBrowser, focus: _focus),
+      ),
       canPasteImage: composerClipboardPasteAvailable(),
       onPasteImage: () => unawaited(
-        pasteClipboardImage(_stageAttachment, _setClipboardPasteError),
+        pasteClipboardImage(stageAttachment, setClipboardPasteError),
       ),
       onPoll: () => showPollComposerSheet(context, widget.channelId),
       onCode: _insertCodeFence,
@@ -297,79 +302,22 @@ class _ComposerState extends ConsumerState<Composer> {
   /// Desktop has no photo-versus-files split (see `attachment_picker.dart`),
   /// so its single tap goes straight to the document picker.
   void _pickFileFromButton() =>
-      unawaited(_pickAttachment(AttachmentSource.fileBrowser));
-
-  /// Re-focuses the field on every exit, including a cancelled pick: the
-  /// native picker takes focus with it, and without this the caret never
-  /// comes back and typing goes nowhere.
-  Future<void> _pickAttachment(AttachmentSource source) async {
-    final FilePickerResult? result;
-    try {
-      result = await ref.read(attachmentPickerProvider(source))();
-    } catch (e) {
-      if (!mounted) return;
-      _focus.requestFocus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the file picker.')),
-      );
-      return;
-    }
-    if (!mounted) return;
-    _focus.requestFocus();
-    final files = result?.files ?? const <PlatformFile>[];
-    if (files.isEmpty) return;
-    final file = files.first;
-    // readAsBytes streams from disk; file_picker 12 deprecated withData and
-    // PlatformFile.bytes because eager loading OOMs on a large pick.
-    await _stageAttachment(await file.readAsBytes(), file.name);
-  }
-
-  /// Uploads bytes from wherever they came from and, on success, stages the
-  /// resulting attachment. Shared by the file picker and a pasted image so
-  /// neither invents its own way onto the send path.
-  Future<void> _stageAttachment(Uint8List bytes, String filename) async {
-    if (!mounted) return;
-    setState(() => _uploading = true);
-    try {
-      final attachment = await ref
-          .read(apiProvider)
-          .uploadAttachment(bytes, filename: filename);
-      if (!mounted) return;
-      setState(() {
-        _pendingAttachments.add(attachment);
-        _uploading = false;
-      });
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _uploading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(describeApiFailure('attach the file', e))),
-      );
-    }
-  }
+      unawaited(pickAttachment(AttachmentSource.fileBrowser, focus: _focus));
 
   /// Handed to [Composer.clipboardPasteStart] as the callback a pasted
   /// image reaches; it goes through the exact same staging path a picked
   /// file does, never a second attachment mechanism.
   void _handlePastedImage(Uint8List bytes, String filename) =>
-      unawaited(_stageAttachment(bytes, filename));
-
-  void _setClipboardPasteError(String? message) {
-    if (mounted) setState(() => _clipboardPasteError = message);
-  }
-
-  void _removeAttachment(api.Attachment attachment) {
-    setState(() => _pendingAttachments.remove(attachment));
-  }
+      unawaited(stageAttachment(bytes, filename));
 
   void _onTyping(String _) => ref
       .read(typingControllerProvider(widget.channelId).notifier)
       .notifyTyping();
 
   Future<void> _send() async {
-    final ids = _pendingAttachments.map((a) => a.id).toList(growable: false);
+    final ids = pendingAttachments.map((a) => a.id).toList(growable: false);
     await widget.onSend(ids);
-    if (mounted) setState(() => _pendingAttachments.clear());
+    clearSentAttachments();
   }
 
   @override
@@ -396,11 +344,10 @@ class _ComposerState extends ConsumerState<Composer> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ComposerBanners(
-              clipboardPasteError: _clipboardPasteError,
-              onDismissClipboardPasteError: () =>
-                  setState(() => _clipboardPasteError = null),
-              pendingAttachments: _pendingAttachments,
-              onRemoveAttachment: _removeAttachment,
+              clipboardPasteError: clipboardPasteError,
+              onDismissClipboardPasteError: () => setClipboardPasteError(null),
+              pendingAttachments: pendingAttachments,
+              onRemoveAttachment: removeAttachment,
             ),
             // Above the field, never below: that is the send row and keyboard.
             ComposerAutocomplete(
@@ -428,10 +375,10 @@ class _ComposerState extends ConsumerState<Composer> {
                   AppIconButton(
                     icon: AppIcons.add,
                     semanticLabel: touch ? 'More actions' : 'Attach a file',
-                    tooltip: _uploading
+                    tooltip: uploading
                         ? 'Uploading...'
                         : (touch ? 'More actions' : 'Attach a file'),
-                    onPressed: _uploading
+                    onPressed: uploading
                         ? null
                         : (touch ? _openActions : _pickFileFromButton),
                   ),

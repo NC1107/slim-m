@@ -259,6 +259,17 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.26.0',
+    headline: 'The composer remembers what you were typing',
+    points: [
+      WhatsNewPoint(
+        'Typing a message, switching to another channel, and coming back '
+        'used to lose it. Every channel now keeps its own unsent draft for '
+        'as long as the app stays open, and sending clears it.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
