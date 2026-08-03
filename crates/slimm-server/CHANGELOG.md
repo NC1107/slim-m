@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.0](https://github.com/NC1107/slim-m/compare/server-v0.26.0...server-v0.27.0) (2026-08-03)
+
+
+### Features
+
+* live signal for a thread opening or gaining a reply ([#329](https://github.com/NC1107/slim-m/issues/329)) ([2fe2c9f](https://github.com/NC1107/slim-m/commit/2fe2c9ff3084701575bbacf41c27f27ae81d2e88))
+
 ## [0.26.0](https://github.com/NC1107/slim-m/compare/server-v0.25.0...server-v0.26.0) (2026-08-02)
 
 
