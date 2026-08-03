@@ -134,17 +134,33 @@ async fn list(
     Ok(Json(reports.into_iter().map(ReportDto::from).collect()))
 }
 
-/// The live non-DM channels this caller may not read reports from: everything
-/// [`crate::store::Store::list_channels`] returns, minus what they can moderate.
+/// The channels this caller may not read reports from: every live non-DM
+/// channel [`crate::store::Store::list_channels`] returns that they cannot
+/// moderate, plus every thread reported against that resolves to one of
+/// those.
 ///
 /// The complement rather than the allowed set, because the three kinds of report
 /// that are *not* about a live non-DM channel - one with no channel, one about a
 /// DM, one about a since-deleted channel - must stay visible on the caller's
 /// deployment-wide bit alone, and none of them appears in `list_channels`. An
-/// allowed-set predicate would hide all three. This is the batched form of what
-/// [`report_visible_in`] answers for one report, which [`resolve`] still needs.
+/// allowed-set predicate would hide all three.
+///
+/// A thread is the fourth kind absent from `list_channels`, but unlike the
+/// other three it is not exempt - it resolves to a real, moderatable parent
+/// channel (see [`crate::store::Store::channel_scopes_moderation`]), so a
+/// report about one has to be excluded exactly when that parent is. The batch
+/// above cannot see that resolution, since it never asks about a thread at
+/// all; this loop asks only about the channels open reports actually name and
+/// `list_channels` did not already answer for, reusing [`report_visible_in`]
+/// rather than a second copy of its resolve-then-check logic.
 async fn hidden_channels(state: &AppState, user_id: UserId) -> Result<Vec<ChannelId>, ApiError> {
-    let all = state.store.list_channels().await?;
+    let all_ids: std::collections::HashSet<ChannelId> = state
+        .store
+        .list_channels()
+        .await?
+        .into_iter()
+        .map(|channel| channel.id)
+        .collect();
     let moderatable: std::collections::HashSet<ChannelId> = state
         .store
         .channels_where(user_id, Permissions::MANAGE_MESSAGES)
@@ -152,11 +168,18 @@ async fn hidden_channels(state: &AppState, user_id: UserId) -> Result<Vec<Channe
         .into_iter()
         .map(|channel| channel.id)
         .collect();
-    Ok(all
-        .into_iter()
-        .map(|channel| channel.id)
+
+    let mut hidden: Vec<ChannelId> = all_ids
+        .iter()
+        .copied()
         .filter(|id| !moderatable.contains(id))
-        .collect())
+        .collect();
+    for channel_id in state.store.open_report_channel_ids().await? {
+        if !all_ids.contains(&channel_id) && !report_visible_in(state, user_id, channel_id).await {
+            hidden.push(channel_id);
+        }
+    }
+    Ok(hidden)
 }
 
 /// Closes a report as resolved or dismissed. The claim is a conditional

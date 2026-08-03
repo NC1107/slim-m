@@ -21,6 +21,7 @@ use crate::hub::Event;
 use crate::ids::{DeviceId, MessageId, UserId};
 use crate::ratelimit::Class;
 use crate::store::{Device, ReportError, ReportSubject};
+use crate::voice::VoiceError;
 
 const BODY_LIMIT: usize = 8 * 1024;
 const MAX_REASON_CHARS: usize = 2000;
@@ -142,6 +143,14 @@ async fn list_blocks(
 
 /// Blocks someone. Idempotent, and silent by design: the blocked user is never
 /// notified, because telling them turns blocking into a provocation.
+///
+/// Also ends the blocked party's presence on the one call blocking can reach:
+/// the DM shared with the blocker, if the pair ever opened one and a call is
+/// live on it right now. `store/dms.rs`'s `BLOCKED_DENY` already stops a new
+/// one being started or joined in either direction; without this, a call
+/// already under way when the block landed kept running until somebody chose
+/// to hang up, which is the same "a bearer credential cannot be revoked"
+/// reason `members::evict_from_voice` exists at all.
 async fn block(
     Authed(ctx): Authed,
     parts: Parts,
@@ -159,7 +168,28 @@ async fn block(
         return Err(ApiError::NotFound("that user was not found"));
     }
     state.store.block_user(ctx.user_id, target).await?;
+    evict_blocked_from_shared_call(&state, ctx.user_id, target).await;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// [`block`]'s eviction half, best effort like [`super::members`]'s own: the
+/// block has already committed by the time this runs, so a failure here has
+/// nothing useful for a retry to do differently.
+///
+/// Only `blocked` is evicted, never `blocker`: the blocker already holds
+/// their own remedy for an ongoing call (hang up), and a block is one
+/// person's choice about future contact, not grounds to end a call the other
+/// side may still want to be on.
+async fn evict_blocked_from_shared_call(state: &AppState, blocker: UserId, blocked: UserId) {
+    let Ok(Some(channel_id)) = state.store.dm_channel_for_pair(blocker, blocked).await else {
+        return;
+    };
+    match state.voice.remove_participant(channel_id, blocked).await {
+        Ok(()) | Err(VoiceError::Unavailable) => {}
+        Err(VoiceError::Internal(err)) => {
+            tracing::warn!(%err, "could not evict a blocked party from a shared call");
+        }
+    }
 }
 
 async fn unblock(
