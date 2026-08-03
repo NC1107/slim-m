@@ -1,9 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-/// A voice channel: the join step, and the call once you are in it.
+/// A voice channel: joining, and the call once you are in it.
 ///
-/// Joining is never silent. A voice channel opens on a preview with the mic and
-/// camera pre-toggles and an explicit Join, because connecting the moment
-/// somebody clicks a channel means an open microphone they did not ask for.
+/// Clicking a voice channel joins it directly. There used to be a lobby
+/// screen with a mic/camera pre-toggle and an explicit Join button; the
+/// owner asked twice for it to be gone, so a channel arrival auto-joins
+/// (`_VoiceScreenState._maybeAutoJoin`) rather than waiting on a tap. The mic
+/// and camera still open however `VoiceState.microphoneEnabled` /
+/// `cameraEnabled` were last left (see `voice_controller.dart`'s `leave`,
+/// which now carries those two fields across the reset), so muting before
+/// leaving still means the next join opens muted.
+///
+/// The one case that still needs an explicit decision is switching calls:
+/// arriving at a different voice channel while already connected elsewhere
+/// shows `VoiceSwitchPrompt` instead of silently hanging up the first call.
 library;
 
 import 'package:flutter/material.dart';
@@ -15,6 +24,7 @@ import '../providers/member_presence.dart' show membersProvider, presenceOf;
 import '../providers/presence_controller.dart';
 import '../providers/voice_controller.dart';
 import '../widgets/call_participant_tiles.dart';
+import '../widgets/camera_self_preview.dart';
 import '../widgets/member_profile.dart';
 import '../widgets/local_screen_share_banner.dart';
 import '../widgets/screen_share_stage.dart';
@@ -22,39 +32,107 @@ import '../widgets/user_avatar.dart';
 import 'voice_call_controls.dart';
 import 'voice_join_preview.dart';
 
-class VoiceScreen extends ConsumerWidget {
+/// Whether [voice] describes a live call somewhere other than [channelId]:
+/// the one case an arrival still has to ask about before joining.
+bool _busyElsewhere(VoiceState voice, String channelId) =>
+    voice.channelId != null &&
+    voice.channelId != channelId &&
+    (voice.state == VoiceSessionState.connected ||
+        voice.state == VoiceSessionState.connecting);
+
+class VoiceScreen extends ConsumerStatefulWidget {
   const VoiceScreen({required this.channelId, this.isDm = false, super.key});
 
   final String channelId;
 
   /// Whether this is a DM's call rather than a real voice channel's, so the
-  /// join preview can say "Call" instead of "Voice channel". The in-call
-  /// surface below needs no equivalent: nothing on it names a channel kind.
+  /// rejoin screen can say "Call" instead of "Voice channel".
   final bool isDm;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VoiceScreen> createState() => _VoiceScreenState();
+}
+
+class _VoiceScreenState extends ConsumerState<VoiceScreen> {
+  /// The channel id an automatic join has already been requested for, so a
+  /// failure - or an explicit hang-up, which leaves this same screen still
+  /// mounted - does not retry itself on every rebuild. Cleared only when
+  /// [widget]'s own channel changes, which is what makes revisiting the same
+  /// channel a fresh attempt again.
+  String? _autoJoinedFor;
+
+  @override
+  void didUpdateWidget(covariant VoiceScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.channelId != widget.channelId) _autoJoinedFor = null;
+  }
+
+  void _maybeAutoJoin(VoiceController controller) {
+    if (_autoJoinedFor == widget.channelId) return;
+    _autoJoinedFor = widget.channelId;
+    final channelId = widget.channelId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) controller.join(channelId);
+    });
+  }
+
+  /// The switch prompt's own confirm action: marked as attempted the same
+  /// way an automatic join is, so a failure lands on the rejoin screen
+  /// rather than looping back into another switch prompt.
+  void _switchNow(VoiceController controller) {
+    _autoJoinedFor = widget.channelId;
+    controller.join(widget.channelId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final voice = ref.watch(voiceControllerProvider);
+    final controller = ref.read(voiceControllerProvider.notifier);
+    final channelId = widget.channelId;
     final inThisChannel = voice.channelId == channelId;
+    final connectedHere =
+        inThisChannel && voice.state == VoiceSessionState.connected;
+    final connectingHere =
+        inThisChannel && voice.state == VoiceSessionState.connecting;
+    final busyElsewhere = _busyElsewhere(voice, channelId);
+    final attemptedThis = _autoJoinedFor == channelId;
 
-    // Keyed by branch so each step of joining - preview, connecting, in-call - fades through rather than snapping.
-    final stage = switch (voice.state) {
-      VoiceSessionState.connected when inThisChannel => 'in-call',
-      VoiceSessionState.connecting when inThisChannel => 'connecting',
-      _ => 'preview',
-    };
+    // `join` never clears `channelId` on error, so an error only ever belongs here.
+    final errorMessage =
+        inThisChannel && voice.state == VoiceSessionState.failed
+        ? voice.error
+        : null;
+    final canRetry = errorMessage == null || voice.retryable;
+
+    final stage = connectedHere
+        ? 'call'
+        : connectingHere
+        ? 'connecting'
+        : busyElsewhere
+        ? 'switch'
+        : attemptedThis
+        ? 'left'
+        : 'joining';
+
+    if (stage == 'joining') _maybeAutoJoin(controller);
+
     return Container(
       color: tokens.surfaceBase,
       child: AppFadeIn(
-        key: ValueKey('voice-$stage'),
-        child: switch (voice.state) {
-          VoiceSessionState.connected when inThisChannel => _InCall(
+        // 'joining' reads as 'connecting' here, so a fresh arrival never fades through a stage nobody would see.
+        key: ValueKey('voice-${stage == 'joining' ? 'connecting' : stage}'),
+        child: switch (stage) {
+          'call' => _InCall(channelId: channelId),
+          'connecting' || 'joining' => const VoiceConnecting(),
+          'switch' => VoiceSwitchPrompt(onSwitch: () => _switchNow(controller)),
+          _ => VoiceRejoinScreen(
             channelId: channelId,
+            isDm: widget.isDm,
+            errorMessage: errorMessage,
+            canRetry: canRetry,
+            onRetry: () => controller.join(channelId),
           ),
-          VoiceSessionState.connecting when inThisChannel =>
-            const VoiceConnecting(),
-          _ => VoiceJoinPreview(channelId: channelId, isDm: isDm),
         },
       ),
     );
@@ -73,12 +151,8 @@ class _InCall extends ConsumerWidget {
     final voice = ref.watch(voiceControllerProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
 
-    // The first remote share gets the stage; your own is not echoed back
-    // (the banner already says so), and two at once is not worth a grid at
-    // this product's size - the second waits its turn.
-    final sharer = voice.participants
-        .where((p) => p.isScreenSharing && !p.isLocal)
-        .firstOrNull;
+    final sharer = _stageSharer(voice.participants);
+    final me = voice.participants.where((p) => p.isLocal).firstOrNull;
 
     return Column(
       children: [
@@ -105,6 +179,7 @@ class _InCall extends ConsumerWidget {
               ),
               child: ScreenShareStage(
                 sharerName: sharer.name,
+                isLocal: sharer.isLocal,
                 child: controller.screenShareViewFor(sharer.identity),
               ),
             ),
@@ -131,6 +206,13 @@ class _InCall extends ConsumerWidget {
                   ],
                 ],
               ),
+              if (me != null && me.isCameraOn)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.s16),
+                  child: CameraSelfPreview(
+                    child: controller.cameraViewFor(me.identity),
+                  ),
+                ),
               const SizedBox(height: AppSpacing.s12),
               // Tiles centred like a call when the pane is theirs; compact
               // rows when a share stage has taken the room.
@@ -165,6 +247,20 @@ class _InCall extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// The participant whose screen takes the stage: a remote sharer if any is
+/// live, or your own if you are the only one - unlike an earlier version
+/// that excluded the local participant outright and so never showed a
+/// share to somebody sharing alone.
+VoiceParticipant? _stageSharer(List<VoiceParticipant> participants) {
+  VoiceParticipant? own;
+  for (final p in participants) {
+    if (!p.isScreenSharing) continue;
+    if (!p.isLocal) return p;
+    own = p;
+  }
+  return own;
 }
 
 /// Opens a caller's profile from their tile, which is the only route to the

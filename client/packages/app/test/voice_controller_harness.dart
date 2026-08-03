@@ -49,14 +49,19 @@ class FakeSession implements VoiceSession {
   FakeSession({
     this.joinOutcome = VoiceSessionState.connected,
     this.microphoneGranted = true,
+    this.cameraGranted = true,
     this.screenShareOutcome = ScreenShareOutcome.started,
     this.deafenGranted = true,
     this.needsSource = false,
     this.sources = const [],
+    this.canFlipCamera = false,
+    this.cameraNeedsSelection = false,
+    this.cameraDeviceList = const [],
   });
 
   final VoiceSessionState joinOutcome;
   final bool microphoneGranted;
+  final bool cameraGranted;
 
   /// What a request to start sharing reports back. Every branch the
   /// controller has to tell apart is one of these.
@@ -66,6 +71,21 @@ class FakeSession implements VoiceSession {
   /// Whether this platform makes a share name a screen first.
   final bool needsSource;
   final List<ScreenShareSource> sources;
+
+  @override
+  final bool canFlipCamera;
+
+  @override
+  final bool cameraNeedsSelection;
+
+  /// What [cameraDevices] answers with.
+  final List<CameraDevice> cameraDeviceList;
+
+  /// What the controller actually passed through, so a test can assert the
+  /// chosen camera reached the session.
+  CameraDevice? lastSelectedCamera;
+  int flipCameraCalls = 0;
+  bool? askedForCameraOnToggle;
 
   /// What the controller actually passed through, so a test can assert the
   /// chosen screen reached the session rather than being dropped.
@@ -130,6 +150,25 @@ class FakeSession implements VoiceSession {
   Widget screenShareViewFor(String identity) =>
       SizedBox.shrink(key: Key('fake-share-view-$identity'));
 
+  @override
+  Widget cameraViewFor(String identity) =>
+      SizedBox.shrink(key: Key('fake-camera-view-$identity'));
+
+  @override
+  Future<List<CameraDevice>> cameraDevices() async => cameraDeviceList;
+
+  @override
+  Future<bool> flipCamera() async {
+    flipCameraCalls++;
+    return cameraGranted;
+  }
+
+  @override
+  Future<bool> selectCameraDevice(CameraDevice device) async {
+    lastSelectedCamera = device;
+    return cameraGranted;
+  }
+
   /// Drives a drop the SFU decided on, the way a real room event would.
   void dropWith(VoiceDisconnect reason) {
     lastDisconnect = reason;
@@ -167,6 +206,12 @@ class FakeSession implements VoiceSession {
 
   @override
   Future<bool> setMicrophoneEnabled(bool enabled) async => microphoneGranted;
+
+  @override
+  Future<bool> setCameraEnabled(bool enabled) async {
+    askedForCameraOnToggle = enabled;
+    return cameraGranted;
+  }
 
   @override
   Future<ScreenShareOutcome> setScreenShareEnabled(

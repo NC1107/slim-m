@@ -139,6 +139,25 @@ class _FakeSession implements VoiceSession {
       SizedBox.shrink(key: Key('fake-share-view-$identity'));
 
   @override
+  Widget cameraViewFor(String identity) =>
+      SizedBox.shrink(key: Key('fake-camera-view-$identity'));
+
+  @override
+  bool get canFlipCamera => false;
+
+  @override
+  bool get cameraNeedsSelection => false;
+
+  @override
+  Future<List<CameraDevice>> cameraDevices() async => const [];
+
+  @override
+  Future<bool> flipCamera() async => false;
+
+  @override
+  Future<bool> selectCameraDevice(CameraDevice device) async => false;
+
+  @override
   Future<void> join({
     required String url,
     required String token,
@@ -157,6 +176,9 @@ class _FakeSession implements VoiceSession {
 
   @override
   Future<bool> setMicrophoneEnabled(bool enabled) async => true;
+
+  @override
+  Future<bool> setCameraEnabled(bool enabled) async => true;
 
   @override
   Future<ScreenShareOutcome> setScreenShareEnabled(

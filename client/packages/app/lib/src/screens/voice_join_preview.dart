@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The step before a voice call: connecting, and the join preview itself.
+/// The non-connected states of a voice screen: connecting, needing to
+/// confirm a switch between two calls, and needing an explicit rejoin.
 ///
 /// Split out of `voice_screen.dart` to keep that file under the review
-/// budget; these three widgets are the pre-call screen and share no state
-/// with the in-call surface that stayed behind.
+/// budget; these widgets share no state with the in-call surface that
+/// stayed behind. This file used to hold the join lobby (a mic/camera
+/// pre-toggle behind an explicit Join button) that `voice_screen.dart`'s own
+/// doc now explains was removed: clicking a voice channel joins directly,
+/// and these are what a screen shows when direct joining is not the answer.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
-import 'package:slimm_rtc/rtc.dart';
 
-import '../providers/voice_controller.dart';
 import '../providers/voice_roster.dart';
 import '../widgets/user_avatar.dart';
 
@@ -38,31 +40,85 @@ class VoiceConnecting extends StatelessWidget {
   }
 }
 
-/// The step before the mic and camera open.
-class VoiceJoinPreview extends ConsumerWidget {
-  const VoiceJoinPreview({
-    required this.channelId,
-    this.isDm = false,
+/// Shown instead of an automatic join when the caller is already connected
+/// (or connecting) somewhere else: switching has to leave that call, so it
+/// asks first rather than silently moving them, the one place a voice
+/// channel arrival still needs an explicit decision.
+class VoiceSwitchPrompt extends StatelessWidget {
+  const VoiceSwitchPrompt({super.key, required this.onSwitch});
+
+  final VoidCallback onSwitch;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.s24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Icon(AppIcons.voice, size: 32, color: tokens.textSecondary),
+              const SizedBox(height: AppSpacing.s16),
+              Text(
+                'Already in a call',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: tokens.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s8),
+              Text(
+                "You're in a call somewhere else. Switching leaves it and "
+                'joins this one instead.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: tokens.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: AppSpacing.s16),
+              FilledButton(
+                onPressed: onSwitch,
+                style: FilledButton.styleFrom(
+                  backgroundColor: tokens.accentFill,
+                  foregroundColor: tokens.accentOn,
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s16),
+                ),
+                child: const Text('Switch to this call'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown after a hang-up (no error, just left) or a failed automatic join
+/// (an error the caller can read and, if [canRetry], act on). The only
+/// remaining manual step in a voice channel's whole flow.
+class VoiceRejoinScreen extends StatelessWidget {
+  const VoiceRejoinScreen({
     super.key,
+    required this.channelId,
+    required this.isDm,
+    required this.canRetry,
+    required this.onRetry,
+    this.errorMessage,
   });
 
   final String channelId;
-
-  /// See [VoiceScreen.isDm]: swaps the heading and icon for a DM's call.
   final bool isDm;
+  final bool canRetry;
+  final VoidCallback onRetry;
+  final String? errorMessage;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final voice = ref.watch(voiceControllerProvider);
-    final controller = ref.read(voiceControllerProvider.notifier);
-
-    // One controller for the whole app: an error is whichever channel tried last, so it must not leak here.
-    final showingLastAttempt = voice.channelId == channelId;
-    final error = showingLastAttempt ? voice.error : null;
-    final canRetry = !showingLastAttempt || voice.retryable;
-
-    // Scroll-safe and centred: a short viewport (landscape phone) scrolls, a tall one centres via the min-height floor.
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
         child: ConstrainedBox(
@@ -91,52 +147,30 @@ class VoiceJoinPreview extends ConsumerWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.s8),
-                    Text(
-                      'Joining connects you and opens your microphone. '
-                      'Nothing is sent before you join.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: tokens.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
                     const SizedBox(height: AppSpacing.s16),
                     _WhoIsHere(channelId: channelId),
                     const SizedBox(height: AppSpacing.s16),
-                    _PreToggle(
-                      icon: voice.microphoneEnabled
-                          ? AppIcons.mic
-                          : AppIcons.micOff,
-                      label: 'Microphone',
-                      value: voice.microphoneEnabled ? 'on' : 'muted',
-                      enabled: voice.microphoneEnabled,
-                      onChanged: controller.setMicrophonePreference,
-                    ),
-                    const SizedBox(height: AppSpacing.s8),
-                    _PreToggle(
-                      icon: voice.cameraEnabled
-                          ? AppIcons.camera
-                          : AppIcons.cameraOff,
-                      label: 'Camera',
-                      value: voice.cameraEnabled ? 'on' : 'off',
-                      enabled: voice.cameraEnabled,
-                      onChanged: controller.setCameraPreference,
-                    ),
-                    const SizedBox(height: AppSpacing.s16),
-                    if (error != null)
+                    if (errorMessage != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.s12),
-                        child: AppErrorState(message: error),
+                        child: AppErrorState(message: errorMessage!),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+                        child: Text(
+                          'You left this call.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: tokens.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
                       ),
-                    // No button for a failure a retry cannot fix, rather than one that only invites the same failure again.
+                    // No button for a failure a retry cannot fix.
                     if (canRetry)
                       FilledButton(
-                        onPressed:
-                            showingLastAttempt &&
-                                voice.state == VoiceSessionState.connecting
-                            ? null
-                            : () => controller.join(channelId),
+                        onPressed: onRetry,
                         style: FilledButton.styleFrom(
                           backgroundColor: tokens.accentFill,
                           foregroundColor: tokens.accentOn,
@@ -144,7 +178,9 @@ class VoiceJoinPreview extends ConsumerWidget {
                             vertical: AppSpacing.s16,
                           ),
                         ),
-                        child: const Text('Join call'),
+                        child: Text(
+                          errorMessage != null ? 'Try again' : 'Rejoin call',
+                        ),
                       ),
                   ],
                 ),
@@ -157,11 +193,7 @@ class VoiceJoinPreview extends ConsumerWidget {
   }
 }
 
-/// Who is already in the call, above the button that joins it.
-///
-/// The rail has shown this for a channel you have not joined since the
-/// per-channel roster landed; the preview, which is the screen you are
-/// actually looking at when deciding whether to join, did not.
+/// Who is already in the call, above the rejoin button.
 ///
 /// The three answers the roster can give are rendered as three different
 /// things, because collapsing them lies. Not known yet draws nothing rather
@@ -212,52 +244,6 @@ class _WhoIsHere extends ConsumerWidget {
               : '${roster.length} people in this call: $names',
         ),
       ],
-    );
-  }
-}
-
-class _PreToggle extends StatelessWidget {
-  const _PreToggle({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return InkWell(
-      onTap: () => onChanged(!enabled),
-      borderRadius: BorderRadius.circular(AppRadii.control),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s16,
-          vertical: AppSpacing.s12,
-        ),
-        decoration: BoxDecoration(
-          border: Border.all(color: tokens.borderSubtle),
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          color: tokens.surfaceRaised,
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: tokens.textSecondary),
-            const SizedBox(width: AppSpacing.s12),
-            Expanded(
-              child: Text(label, style: TextStyle(color: tokens.textPrimary)),
-            ),
-            Text(value, style: TextStyle(color: tokens.textSecondary)),
-          ],
-        ),
-      ),
     );
   }
 }

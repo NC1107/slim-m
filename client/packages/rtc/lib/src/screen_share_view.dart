@@ -11,6 +11,10 @@
 /// a subscribed track (the e2e run proves that at the SFU) and then nothing
 /// anywhere rendered it - the viewer saw a glyph on a roster row and no
 /// screen. This is the missing half.
+///
+/// [_participant] checks the local participant too, not only remote ones: an
+/// earlier version only ever found a remote share, so a lone caller who
+/// started sharing saw the same nothing this whole widget exists to fix.
 library;
 
 import 'package:flutter/material.dart';
@@ -56,15 +60,27 @@ class _ScreenShareViewState extends State<ScreenShareView> {
     super.dispose();
   }
 
+  /// Checked as two concretely-typed branches, not one lookup returning the
+  /// abstract `Participant`: see `camera_view.dart`'s own copy of this note.
   lk.VideoTrack? _shareTrack() {
-    final participants = widget.room.remoteParticipants.values;
-    for (final p in participants) {
+    final local = widget.room.localParticipant;
+    if (local != null && local.identity == widget.identity) {
+      return _shareTrackFrom(local.videoTrackPublications);
+    }
+    for (final p in widget.room.remoteParticipants.values) {
       if (p.identity != widget.identity) continue;
-      for (final pub in p.videoTrackPublications) {
-        if (pub.source != lk.TrackSource.screenShareVideo) continue;
-        final track = pub.track;
-        if (pub.subscribed && !pub.muted && track != null) return track;
-      }
+      return _shareTrackFrom(p.videoTrackPublications);
+    }
+    return null;
+  }
+
+  static lk.VideoTrack? _shareTrackFrom(
+    List<lk.TrackPublication<lk.VideoTrack>> publications,
+  ) {
+    for (final pub in publications) {
+      if (pub.source != lk.TrackSource.screenShareVideo) continue;
+      final track = pub.track;
+      if (pub.subscribed && !pub.muted && track != null) return track;
     }
     return null;
   }

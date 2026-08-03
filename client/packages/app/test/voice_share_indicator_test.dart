@@ -123,7 +123,7 @@ void main() {
       await controller.leave();
     });
 
-    testWidgets('your own share gets the banner, never an echo stage', (
+    testWidgets('your own share gets the banner, and the stage too', (
       tester,
     ) async {
       final session = FakeSession();
@@ -147,10 +147,73 @@ void main() {
       ]);
       await tester.pump();
 
+      // Alone in the call used to show nothing; the stage now falls back to your own share, alongside the banner.
       expect(find.text('You are sharing your screen.'), findsOneWidget);
-      expect(find.byKey(const Key('fake-share-view-me')), findsNothing);
+      expect(find.byKey(const Key('fake-share-view-me')), findsOneWidget);
+      expect(find.text('Your screen'), findsOneWidget);
       await controller.leave();
     });
+  });
+
+  group('the camera self preview', () {
+    testWidgets('shows nothing when the camera is off', (tester) async {
+      final session = FakeSession();
+      final controller = harness.controllerWith(session, voiceApi());
+      await controller.join('channel-1');
+      session.emitState(VoiceSessionState.connected);
+
+      await tester.pumpWidget(
+        _harness(const VoiceScreen(channelId: 'channel-1'), harness.container),
+      );
+      await tester.pump();
+      session.emitParticipants(const [
+        VoiceParticipant(
+          identity: 'me',
+          name: 'Me',
+          isSpeaking: false,
+          isMuted: false,
+          isLocal: true,
+          isScreenSharing: false,
+        ),
+      ]);
+      await tester.pump();
+
+      expect(find.byKey(const Key('fake-camera-view-me')), findsNothing);
+      await controller.leave();
+    });
+
+    testWidgets(
+      'shows your own camera alone in the call, the exact gap reported',
+      (tester) async {
+        final session = FakeSession();
+        final controller = harness.controllerWith(session, voiceApi());
+        await controller.join('channel-1');
+        session.emitState(VoiceSessionState.connected);
+
+        await tester.pumpWidget(
+          _harness(
+            const VoiceScreen(channelId: 'channel-1'),
+            harness.container,
+          ),
+        );
+        await tester.pump();
+        session.emitParticipants(const [
+          VoiceParticipant(
+            identity: 'me',
+            name: 'Me',
+            isSpeaking: false,
+            isMuted: false,
+            isLocal: true,
+            isScreenSharing: false,
+            isCameraOn: true,
+          ),
+        ]);
+        await tester.pump();
+
+        expect(find.byKey(const Key('fake-camera-view-me')), findsOneWidget);
+        await controller.leave();
+      },
+    );
   });
 
   // The strip only ever mounts at compact width, so every test pins that viewport.
