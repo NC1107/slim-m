@@ -77,6 +77,9 @@ Each can be revisited if the product's direction changes, but the default answer
 - Soundboard for short audio clips: clip storage, call mixing, and upload moderation is non-essential ritual against the not-a-clone principle.
 - Heavy machine-learning noise suppression: a native DSP or ML dependency adds CPU cost while gaming; enable WebRTC's built-in echo cancellation and basic noise filter instead.
 - Client plugin or scripting system: a heavy maintenance and security surface with no viable sideloaded-code story under App Store rules; webhooks and the future bot API are the sanctioned path.
+  Note this is about code running inside the *app*, and does not cover server-side extensions an operator runs themselves; see [0007](decisions/0007-extensions-and-untrusted-execution.md).
+- Running user-submitted code on the server as a built-in: declined 2026-08-03, because a built-in is opt-out per operator and this needs to be opt-in per install.
+  Not declined as an idea - [0007](decisions/0007-extensions-and-untrusted-execution.md) records the extension-broker shape it would have to take, where the server brokers and never executes, an extension is always a separate process, and a marketplace is a directory an operator chooses from rather than anything that pushes code at a running deployment.
 - Slash-command registration framework: Slack-app-platform scope creep; the command palette and webhooks cover the real need.
 - Server-side link previews and URL unfurling: a lightweight self-host fetching arbitrary URLs can leak access to its internal network; only ever add as an opt-in, egress-sandboxed fetcher.
 - Events with RSVP and a calendar subsystem: a real subsystem beyond chat; polls, pins, scheduled messages, and a webhook calendar integration cover the coordination need.
