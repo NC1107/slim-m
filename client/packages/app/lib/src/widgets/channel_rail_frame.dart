@@ -204,7 +204,14 @@ class RailUserFooter extends ConsumerWidget {
         top: false,
         right: !_railHasNeighbour(context),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
+          key: const Key('rail-footer-padding'),
+          // Slimmed from fromLTRB(12, 8, 10, 8) on the owner's own request:
+          // AppSpacing has no step between s4 and s8, so s4 is the nearest
+          // real reduction rather than a new number.
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s8,
+            vertical: AppSpacing.s4,
+          ),
           // The call-elsewhere row grows the footer rather than sharing the identity row's width; see RailCallSummary's own doc for why.
           child: AnimatedSize(
             duration: AppMotion.reducedSize(context, AppMotion.base),

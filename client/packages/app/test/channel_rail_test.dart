@@ -302,6 +302,43 @@ void main() {
     }
   });
 
+  // The owner's own request: "reduce x and y padding a bit" on the footer.
+  testWidgets('the footer padding is trimmed to the spacing scale, not '
+      'reinflated back toward its old values', (tester) async {
+    final setup = _setup(SyncStatus.live);
+    addTearDown(setup.container.dispose);
+    await _pumpFooter(tester, setup.container);
+
+    final padding = tester
+        .widget<Padding>(find.byKey(const Key('rail-footer-padding')))
+        .padding;
+    expect(
+      padding,
+      const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s8,
+        vertical: AppSpacing.s4,
+      ),
+    );
+  });
+
+  // Padding may shrink, but the mic, deafen and settings hit targets must not.
+  testWidgets('the footer\'s mic, deafen and settings controls keep their '
+      'pointer-density hit target after the padding trim', (tester) async {
+    final setup = _setup(SyncStatus.live);
+    addTearDown(setup.container.dispose);
+    await _pumpFooter(tester, setup.container, width: 1400);
+
+    final buttons = find.descendant(
+      of: find.byType(RailUserFooter),
+      matching: find.byType(AppIconButton),
+    );
+    expect(buttons, findsNWidgets(3), reason: 'mic, deafen, settings');
+    for (final element in buttons.evaluate()) {
+      final size = tester.getSize(find.byWidget(element.widget));
+      expect(size.shortestSide, greaterThanOrEqualTo(AppSizes.rowPointer));
+    }
+  });
+
   // One deployment is a Space. The header's chevron opens what that Space is
   // and how it is run, so "Server menu" named the machine behind it instead.
   testWidgets('the header menu is announced as the Space menu, and opens '

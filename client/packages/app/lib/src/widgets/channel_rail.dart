@@ -36,12 +36,18 @@ String? channelIdInPath(String path) {
 /// pushed on the root navigator must read [channelIdInPath] off
 /// Whether the channel rail is shown beside the conversation.
 ///
-/// Defaults open; the channel header's rail toggle flips it. Collapsing gives
-/// the transcript the rail's width back, which is the point - on a laptop the
-/// rail is a fifth of the window and most of it is empty most of the time.
+/// Defaults open; `RailDragHandle` flips it at the rail's own edge now,
+/// rather than a header button. Collapsing gives the transcript the rail's
+/// width back, which is the point - on a laptop the rail is a fifth of the
+/// window and most of it is empty most of the time.
 ///
 /// [HomeShell] unmounts the rail rather than holding it at zero width: it
 /// polls voice rosters while built, and a hidden pane must not keep fetching.
+///
+/// In-memory only, like the layout state around it: it resets to open on
+/// every fresh launch rather than surviving a restart, which is the same
+/// thing this provider already did before `RailDragHandle` replaced its
+/// header button.
 final channelRailVisibleProvider = StateProvider<bool>((ref) => true);
 
 /// `GoRouter.of(context).state` instead, or [GoRouterState.of] throws a

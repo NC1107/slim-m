@@ -173,3 +173,24 @@ This is a product decision with real schema consequences - `canvas_objects` is c
   Both `SyncTestServer.start` and `.close` must be called through `tester.runAsync`; the fix is recorded on the class itself so the next caller does not rediscover it by hanging.
 - ~~**Two channels overlay each other while switching.**~~ Fixed in #253: `fadeThroughPage` was a cross-fade, not a fade-through - it faded the incoming pane in while the outgoing sat at full opacity, so both were legible at once.
 - ~~**One image fills the desktop.**~~ Fixed in #253: the inline preview was capped at the full message column on width and had no height bound at all, so a tall image took the screen. `kInlineImageMax` is half the column on both axes.
+
+### A frameless window with our own title bar
+
+The owner asked whether the OS title bar can be replaced with a compact custom one the way Discord does.
+The answer is yes and it is worth doing, deliberately deferred rather than declined.
+
+**What it buys:** the desktop currently stacks the OS title bar above the channel header, two bars where Discord has one.
+On a laptop that is real vertical space.
+
+**What it costs:** window dragging, double-click-to-maximise, edge snapping and the system menu all have to be reimplemented, and they are easy to do badly.
+Three platforms want three different things: macOS traffic lights top-left with specific insets, Windows controls top-right, Linux depending on the desktop environment.
+A single custom bar that ignores that feels foreign on at least two of them.
+Window controls also have to stay reachable by keyboard and to a screen reader, which the OS provides for free.
+
+Note that on Wayland, which is this project's Linux target, client-side decorations are already the norm, so this fits the platform rather than fighting it.
+
+**A separate, smaller bug found alongside it, and fixed here since it was a one-liner.**
+The Linux window title read `slimm_app`, the binary name, rather than `slim-m`.
+iOS, Android and the web build all already show `slim-m` (`CFBundleDisplayName`, `android:label`, and the web `<title>`); only `client/packages/app/linux/runner/my_application.cc` had never been updated to match, in both the GNOME header-bar branch and the plain-titlebar branch.
+Fixed to `slim-m` in both places.
+Neither branch reads the current Space name: that would need a runtime Dart-to-native bridge that does not exist yet, so it is out of scope for a one-liner and belongs with the frameless-window work above if it is ever built.

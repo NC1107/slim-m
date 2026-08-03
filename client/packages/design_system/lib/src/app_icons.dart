@@ -19,6 +19,11 @@ abstract final class AppIcons {
   /// The collapsible channel rail, drawn as a panel rather than a hamburger:
   /// it toggles one region of a visible layout rather than opening a drawer.
   static const IconData sidebar = LucideIcons.panelLeft300;
+
+  /// The rail's own edge-drag handle: a grip reads as "pull this" rather
+  /// than a directional arrow, which would be wrong half the time (it drags
+  /// left to collapse, right to restore).
+  static const IconData dragHandle = LucideIcons.gripVertical300;
   static const IconData back = LucideIcons.arrowLeft300;
   static const IconData add = LucideIcons.plus300;
   static const IconData search = LucideIcons.search300;
