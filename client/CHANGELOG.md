@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/NC1107/slim-m/compare/client-v0.24.3...client-v0.25.0) (2026-08-03)
+
+
+### Features
+
+* live signal for a thread opening or gaining a reply ([#329](https://github.com/NC1107/slim-m/issues/329)) ([2fe2c9f](https://github.com/NC1107/slim-m/commit/2fe2c9ff3084701575bbacf41c27f27ae81d2e88))
+
 ## [0.24.3](https://github.com/NC1107/slim-m/compare/client-v0.24.2...client-v0.24.3) (2026-08-02)
 
 
