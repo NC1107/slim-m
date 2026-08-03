@@ -56,6 +56,31 @@ pub enum Event {
         channel_id: ChannelId,
         message_id: MessageId,
     },
+    /// A thread's reply summary changed: it was just opened, or gained a
+    /// reply. Carries the current `reply_count`/`last_reply_at` rather than a
+    /// delta, the "whole current answer" shape [`Event::PollVoted`] already
+    /// uses, so a client that missed a frame cannot drift.
+    ///
+    /// `channel_id` is the *parent* channel, not the thread's own: that is
+    /// the channel a bystander's connection is actually gated on, per
+    /// [`crate::store::Store::permission_channel`]'s own resolution, and it
+    /// is what lets the ordinary channel-scoped check in `http::ws::authorize`
+    /// apply here unchanged rather than needing a thread-aware branch.
+    ///
+    /// Unlike [`Event::ReactionsChanged`], the count is carried directly
+    /// rather than re-derived per receiving connection: the batch load a REST
+    /// fetch already uses
+    /// ([`crate::store::Store::thread_summaries_for_messages`]) answers the
+    /// same count to every viewer regardless of blocking, so precomputing it
+    /// here does not create the per-viewer inconsistency that made an
+    /// unfiltered reaction tally a bug.
+    ThreadUpdated {
+        channel_id: ChannelId,
+        parent_message_id: MessageId,
+        thread_channel_id: ChannelId,
+        reply_count: i64,
+        last_reply_at: Option<i64>,
+    },
     /// A message was pinned in a channel.
     MessagePinned {
         channel_id: ChannelId,

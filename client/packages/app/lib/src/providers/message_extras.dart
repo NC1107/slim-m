@@ -18,10 +18,10 @@
 /// this client must not try to fix). [applyMessage] merges rather than
 /// overwrites, so that omission can only ever fail to add new information -
 /// it can never erase a better answer this cache already has cached from a
-/// REST fetch. A thread reply count going stale until the next fetch of the
-/// parent channel is the same accepted gap `docs/decisions/0005-threads.md`
-/// already names for `thread_channel_id` itself: nothing publishes a live
-/// event for a thread opening or gaining a reply.
+/// REST fetch. A thread opening, or gaining a reply, reaches an already-open
+/// channel live through `Event::ThreadUpdated` instead - see
+/// [_applyThreadUpdated] - which closes the gap
+/// `docs/decisions/0005-threads.md` once named for `thread_channel_id`.
 ///
 /// Nothing prunes one entry at a time, deliberately. Every consumer selects
 /// the one id it is about, and there is no reachability answer to prune
@@ -109,6 +109,18 @@ class MessageExtrasController
         _applyReactionsChanged(messageId, reactions);
       case api.PollVoted(:final messageId, :final options):
         _applyPollTally(messageId, options);
+      case api.ThreadUpdated(
+        :final parentMessageId,
+        :final threadChannelId,
+        :final replyCount,
+        :final lastReplyAt,
+      ):
+        _applyThreadUpdated(
+          parentMessageId,
+          threadChannelId: threadChannelId,
+          replyCount: replyCount,
+          lastReplyAt: lastReplyAt,
+        );
       default:
         break;
     }
@@ -177,6 +189,32 @@ class MessageExtrasController
         ),
     ];
     _set(messageId, extrasFor(messageId).copyWith(reactions: next));
+  }
+
+  /// A thread just opened, or gained a reply: what makes the "N replies"
+  /// affordance appear, or its count move, on a screen nobody reloaded.
+  /// Never reduces `replyCount`: the server publishes this only for a fresh
+  /// open or a fresh send, both of which move the count forward, and a
+  /// delete does not currently republish one - see
+  /// `docs/decisions/0005-threads.md`.
+  void _applyThreadUpdated(
+    String parentMessageId, {
+    required String threadChannelId,
+    required int replyCount,
+    required int? lastReplyAt,
+  }) {
+    final existing = extrasFor(parentMessageId);
+    _set(
+      parentMessageId,
+      MessageExtras(
+        reactions: existing.reactions,
+        attachments: existing.attachments,
+        poll: existing.poll,
+        threadChannelId: threadChannelId,
+        threadReplyCount: replyCount,
+        threadLastReplyAt: lastReplyAt,
+      ),
+    );
   }
 
   /// Applies the caller's own reaction toggle immediately, ahead of the

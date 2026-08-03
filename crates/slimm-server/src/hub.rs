@@ -85,6 +85,7 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::MessageEdited { .. }
         | Event::MessageDeleted { .. }
         | Event::ReactionsChanged { .. }
+        | Event::ThreadUpdated { .. }
         | Event::MessagePinned { .. }
         | Event::MessageUnpinned { .. }
         | Event::PollVoted { .. }

@@ -55,6 +55,34 @@ class ReactionTally {
       );
 }
 
+/// A thread's reply summary changed: it was just opened, or gained a reply.
+/// Carries the current count rather than a delta, the same "whole current
+/// answer" shape [PollVoted] already uses, so a client that missed a frame
+/// cannot drift.
+///
+/// [channelId] is the *parent* channel, not the thread's own - the channel a
+/// receiving connection's gate is actually about. Unlike [ReactionsChanged]
+/// the count is the same for every viewer regardless of blocking (the batch
+/// reply-count load a REST fetch already uses is not per-viewer filtered
+/// either), so it travels here directly rather than needing a re-derive.
+class ThreadUpdated extends ServerEvent {
+  const ThreadUpdated({
+    required this.channelId,
+    required this.parentMessageId,
+    required this.threadChannelId,
+    required this.replyCount,
+    this.lastReplyAt,
+  });
+
+  final String channelId;
+  final String parentMessageId;
+  final String threadChannelId;
+  final int replyCount;
+
+  /// Unix milliseconds, or null exactly when [replyCount] is zero.
+  final int? lastReplyAt;
+}
+
 /// A message was pinned.
 class MessagePinned extends ServerEvent {
   const MessagePinned({

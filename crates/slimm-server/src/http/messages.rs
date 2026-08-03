@@ -174,6 +174,8 @@ async fn send(
             sent.message.id,
             sent.message.seq,
         );
+        // A no-op for an ordinary channel; see `threads::notify_reply`.
+        super::threads::notify_reply(&state, channel_id).await;
     }
 
     let mut dto: MessageDto = sent.message.into();

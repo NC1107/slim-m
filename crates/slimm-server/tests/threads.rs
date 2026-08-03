@@ -415,7 +415,11 @@ async fn blocking_still_holds_inside_a_thread() {
         .send_message(channel, bob, MessageId::generate(), "root", &[], None)
         .await
         .unwrap();
-    let thread = store.open_thread(channel, parent.message.id).await.unwrap();
+    let thread = store
+        .open_thread(channel, parent.message.id)
+        .await
+        .unwrap()
+        .channel;
 
     let before = slimm_server::push::message_recipients(&store, thread.id, bob)
         .await
@@ -465,7 +469,11 @@ async fn a_view_denial_on_the_parent_excludes_a_push_recipient_from_the_thread()
         .send_message(channel, alice, MessageId::generate(), "root", &[], None)
         .await
         .unwrap();
-    let thread = store.open_thread(channel, parent.message.id).await.unwrap();
+    let thread = store
+        .open_thread(channel, parent.message.id)
+        .await
+        .unwrap()
+        .channel;
 
     let before = slimm_server::push::message_recipients(&store, thread.id, alice)
         .await

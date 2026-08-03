@@ -63,6 +63,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::MessageEdited { .. }
         | Event::MessageDeleted { .. }
         | Event::ReactionsChanged { .. }
+        | Event::ThreadUpdated { .. }
         | Event::MessagePinned { .. }
         | Event::MessageUnpinned { .. }
         | Event::PollVoted { .. }
@@ -164,6 +165,7 @@ pub(super) async fn authorize(
         }
         Event::MessageDeleted { channel_id, .. } => *channel_id,
         Event::ReactionsChanged { channel_id, .. } => *channel_id,
+        Event::ThreadUpdated { channel_id, .. } => *channel_id,
         Event::MessagePinned { channel_id, .. } => *channel_id,
         Event::MessageUnpinned { channel_id, .. } => *channel_id,
         Event::PollVoted { channel_id, .. } => *channel_id,
@@ -288,6 +290,19 @@ pub(super) async fn authorize(
                     .collect(),
             }
         }
+        Event::ThreadUpdated {
+            channel_id,
+            parent_message_id,
+            thread_channel_id,
+            reply_count,
+            last_reply_at,
+        } => ServerFrame::ThreadUpdated {
+            channel_id: channel_id.to_string(),
+            parent_message_id: parent_message_id.to_string(),
+            thread_channel_id: thread_channel_id.to_string(),
+            reply_count,
+            last_reply_at,
+        },
         Event::MessagePinned {
             channel_id,
             message_id,
