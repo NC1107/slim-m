@@ -1,0 +1,213 @@
+// SPDX-License-Identifier: Apache-2.0
+/// The tile a staged attachment renders into: a thumbnail or file glyph, its
+/// name, its upload state, and the controls to remove or retry it.
+///
+/// Split out of `composer_attachments.dart`, which holds the model this
+/// draws rather than any widget, so that file stays usable from a plain
+/// unit test with no Flutter binding at all.
+library;
+
+import 'package:flutter/material.dart';
+import 'package:slimm_design_system/design_system.dart';
+
+import 'composer_attachments.dart';
+import 'image_decode.dart';
+
+/// The square a thumbnail or a generic-file glyph draws into.
+const double _thumbnailSize = AppSpacing.s40;
+
+/// One staged attachment: a thumbnail or file glyph, its name, its upload
+/// state, and the controls to remove or retry it.
+///
+/// One widget for every kind of attachment and every state, rather than a
+/// chip for a ready file and something else for a pending or failed one, so
+/// a state change is a rebuild in place instead of a different widget
+/// mounting where the old one was.
+class StagedAttachmentTile extends StatelessWidget {
+  const StagedAttachmentTile({
+    super.key,
+    required this.attachment,
+    required this.onRemove,
+    required this.onRetry,
+  });
+
+  final StagedAttachment attachment;
+  final VoidCallback onRemove;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final a = attachment;
+    final failed = a is FailedAttachment;
+    Widget? statusLine;
+    if (a is UploadingAttachment) {
+      statusLine = Text(
+        'Uploading...',
+        style: AppText.caption.copyWith(color: tokens.textSecondary),
+      );
+    } else if (a is FailedAttachment) {
+      statusLine = Text(
+        a.message,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: AppText.caption.copyWith(color: tokens.dangerText),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.only(
+        left: 4,
+        top: 4,
+        bottom: 4,
+        right: AppSpacing.s8,
+      ),
+      decoration: BoxDecoration(
+        color: tokens.surfaceRaised,
+        border: Border.all(
+          color: failed ? tokens.dangerBorder : tokens.borderSubtle,
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _AttachmentThumbnail(attachment: a),
+          const SizedBox(width: AppSpacing.s8),
+          // A fixed cap, not `Flexible`: a `Wrap` child gets unbounded width, and flex would throw.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 160),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  a.filename,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption.copyWith(
+                    color: failed ? tokens.dangerText : tokens.textPrimary,
+                  ),
+                ),
+                if (statusLine != null) statusLine,
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.s8),
+          if (failed)
+            _TileButton(
+              icon: AppIcons.retry,
+              semanticLabel: 'Retry attaching ${a.filename}',
+              onTap: onRetry,
+            ),
+          _TileButton(
+            icon: AppIcons.dismiss,
+            semanticLabel: 'Remove attachment ${a.filename}',
+            onTap: onRemove,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttachmentThumbnail extends StatelessWidget {
+  const _AttachmentThumbnail({required this.attachment});
+
+  final StagedAttachment attachment;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final showImage = looksLikeImage(attachment.filename);
+    return SizedBox(
+      width: _thumbnailSize,
+      height: _thumbnailSize,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadii.control),
+              child: ColoredBox(
+                color: tokens.surfaceBase,
+                child: showImage
+                    ? Image.memory(
+                        attachment.bytes,
+                        fit: BoxFit.cover,
+                        cacheWidth: decodeEdge(context, _thumbnailSize),
+                        cacheHeight: decodeEdge(context, _thumbnailSize),
+                        errorBuilder: (_, _, _) => _fileGlyph(tokens),
+                      )
+                    : _fileGlyph(tokens),
+              ),
+            ),
+          ),
+          if (attachment is UploadingAttachment)
+            _scrim(
+              tokens,
+              child: const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          if (attachment is FailedAttachment)
+            _scrim(
+              tokens,
+              child: Icon(
+                AppIcons.failed,
+                size: AppSizes.icon20,
+                color: tokens.dangerText,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _fileGlyph(AppTokens tokens) => Center(
+    child: Icon(
+      AppIcons.attachFile,
+      size: AppSizes.icon16,
+      color: tokens.textSecondary,
+    ),
+  );
+
+  Widget _scrim(AppTokens tokens, {required Widget child}) => Positioned.fill(
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: tokens.surfaceBase.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Center(child: child),
+    ),
+  );
+}
+
+/// A small icon-only control on a tile: remove always, retry once failed.
+class _TileButton extends StatelessWidget {
+  const _TileButton({
+    required this.icon,
+    required this.semanticLabel,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String semanticLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: Icon(icon, size: AppSizes.icon16, color: tokens.textSecondary),
+        ),
+      ),
+    );
+  }
+}

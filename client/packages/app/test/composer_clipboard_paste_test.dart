@@ -126,8 +126,8 @@ void main() {
       await tester.tap(find.text('Paste image'));
       await tester.pumpAndSettle();
 
-      // composer_harness.dart's fake upload route always echoes this name.
-      expect(find.text('holiday.png'), findsOneWidget);
+      // `pasteClipboardImage` names every pasted image this, unconditionally.
+      expect(find.text('pasted-image.png'), findsOneWidget);
     },
   );
 

@@ -44,9 +44,9 @@ Future<bool> composerClipboardPasteAvailable() => hasClipboardImage();
 
 /// Runs the whole "Paste image" action: clears [setError] up front, so a
 /// retry that succeeds does not leave a stale failure on screen, then reads
-/// the clipboard and either [stage]s the bytes (the same shape as
-/// `ComposerAttachments.stageAttachment`, handed over directly rather than
-/// wrapped) or reports a genuine read failure back through [setError].
+/// the clipboard and either [stage]s the bytes (the composer's own
+/// `_stageAttachment`, handed over directly rather than wrapped) or reports
+/// a genuine read failure back through [setError].
 /// Neither runs when the clipboard simply held no image - that is a silent
 /// no-op, not a failure, the same way a cancelled file pick reports nothing.
 Future<void> pasteClipboardImage(

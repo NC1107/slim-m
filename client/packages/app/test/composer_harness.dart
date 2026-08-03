@@ -8,6 +8,7 @@
 /// none of which either suite is actually about.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -130,6 +131,13 @@ final _png = Uint8List.fromList(
 api.CustomEmoji custom(String name) =>
     api.CustomEmoji(id: 'e-$name', name: name, uploaderId: 'u1', createdAt: 1);
 
+/// The real server echoes back whatever `filename` a caller uploaded with
+/// (sanitised, but these names all already are), never a fixed one; every
+/// fake upload route below does the same, or a test asserting on the name
+/// the composer shows would pass no matter what was actually picked.
+String _echoedFilename(http.Request request) =>
+    request.url.queryParameters['filename'] ?? 'upload.bin';
+
 /// An api whose only live route is the attachment upload the composer makes.
 api.SlimmApi _uploadingApi(Ref ref) => api.SlimmApi(
   baseUrl: Uri.parse('http://localhost:8080'),
@@ -139,7 +147,7 @@ api.SlimmApi _uploadingApi(Ref ref) => api.SlimmApi(
       return http.Response(
         jsonEncode({
           'id': 'a1',
-          'filename': 'holiday.png',
+          'filename': _echoedFilename(request),
           'content_type': 'image/png',
           'size': 4,
         }),
@@ -151,6 +159,75 @@ api.SlimmApi _uploadingApi(Ref ref) => api.SlimmApi(
   }),
 );
 
+/// Like [_uploadingApi], except the upload answers nothing until [gate]
+/// completes - so a test can observe the pending state deterministically
+/// rather than racing a fake network's own timing.
+api.SlimmApi Function(Ref) gatedUploadApi(Completer<void> gate) =>
+    (ref) => api.SlimmApi(
+      baseUrl: Uri.parse('http://localhost:8080'),
+      session: ref.watch(sessionProvider),
+      httpClient: MockClient((request) async {
+        if (request.method == 'POST' && request.url.path == '/attachments') {
+          await gate.future;
+          return http.Response(
+            jsonEncode({
+              'id': 'a1',
+              'filename': _echoedFilename(request),
+              'content_type': 'image/png',
+              'size': 4,
+            }),
+            201,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(
+          '{}',
+          404,
+          headers: {'content-type': 'text/plain'},
+        );
+      }),
+    );
+
+/// An api whose attachment upload fails once, a 507 (the ceiling a full
+/// volume answers with, never confused for a bad file), then succeeds - so
+/// a test can drive a real failure-then-retry-then-success cycle
+/// deterministically. A fresh closure per call, so two tests never share
+/// the attempt count.
+api.SlimmApi Function(Ref) flakyUploadApi() {
+  var attempts = 0;
+  return (ref) => api.SlimmApi(
+    baseUrl: Uri.parse('http://localhost:8080'),
+    session: ref.watch(sessionProvider),
+    httpClient: MockClient((request) async {
+      if (request.method != 'POST' || request.url.path != '/attachments') {
+        return http.Response(
+          '{}',
+          404,
+          headers: {'content-type': 'text/plain'},
+        );
+      }
+      attempts += 1;
+      if (attempts == 1) {
+        return http.Response(
+          jsonEncode({'error': 'the server has no space left for uploads'}),
+          507,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      return http.Response(
+        jsonEncode({
+          'id': 'a1',
+          'filename': _echoedFilename(request),
+          'content_type': 'image/png',
+          'size': 4,
+        }),
+        201,
+        headers: {'content-type': 'application/json'},
+      );
+    }),
+  );
+}
+
 /// [customEmoji] null leaves the list provider alone, which is the state a
 /// suite that has nothing to do with emoji sees: an unfetchable list.
 Widget composerHarness({
@@ -160,12 +237,13 @@ Widget composerHarness({
   String channelId = 'c1',
   List<api.CustomEmoji>? customEmoji,
   FakeClipboardPaste? clipboardPaste,
+  api.SlimmApi Function(Ref)? apiBuilder,
 }) {
   return ProviderScope(
     overrides: [
       typingControllerProvider.overrideWith((ref, channelId) => NoopTyping()),
       sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-      apiProvider.overrideWith(_uploadingApi),
+      apiProvider.overrideWith(apiBuilder ?? _uploadingApi),
       if (customEmoji != null)
         customEmojiProvider.overrideWith((ref) => customEmoji),
       customEmojiImageProvider.overrideWith((ref, id) => _png),

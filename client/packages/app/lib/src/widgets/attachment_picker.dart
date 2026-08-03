@@ -16,7 +16,10 @@
 /// choice with only one real answer.
 library;
 
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Which native picker a request should open.
@@ -49,3 +52,36 @@ final attachmentPickerProvider =
         AttachmentSource.fileBrowser => _pickFileBrowser,
       },
     );
+
+/// Runs [pick], stages whatever it returns, and re-focuses [focus] on every
+/// exit including a cancelled or failed pick - the native picker takes focus
+/// with it, and without this the caret never comes back and typing goes
+/// nowhere.
+///
+/// [isMounted] is read after every await, since the widget that started this
+/// can be gone by the time either the picker or the stage resolves. Split out
+/// of `composer.dart`, which had no line budget left for it.
+Future<void> runAttachmentPick({
+  required AttachmentPicker pick,
+  required FocusNode focus,
+  required bool Function() isMounted,
+  required VoidCallback onPickerFailed,
+  required Future<void> Function(Uint8List bytes, String filename) stage,
+}) async {
+  final FilePickerResult? result;
+  try {
+    result = await pick();
+  } catch (e) {
+    if (!isMounted()) return;
+    focus.requestFocus();
+    onPickerFailed();
+    return;
+  }
+  if (!isMounted()) return;
+  focus.requestFocus();
+  final files = result?.files ?? const <PlatformFile>[];
+  if (files.isEmpty) return;
+  final file = files.first;
+  // readAsBytes streams from disk; eager PlatformFile.bytes OOMs on a large pick.
+  await stage(await file.readAsBytes(), file.name);
+}

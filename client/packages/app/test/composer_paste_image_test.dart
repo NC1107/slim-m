@@ -15,7 +15,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:slimm_app/src/widgets/composer_extras.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'composer_harness.dart';
@@ -59,7 +58,7 @@ void main() {
     clipboardPaste.paste(_bytes, 'screenshot.png');
     await tester.pumpAndSettle();
 
-    expect(find.byType(StagedAttachmentChip), findsOneWidget);
+    expect(find.text('screenshot.png'), findsOneWidget);
     expect(
       tester.widget<AppIconButton>(sendButton).onPressed,
       isNotNull,
@@ -119,6 +118,6 @@ void main() {
     clipboardPaste.paste(_bytes, 'screenshot.png');
     await tester.pumpAndSettle();
 
-    expect(find.byType(StagedAttachmentChip), findsNothing);
+    expect(find.text('screenshot.png'), findsNothing);
   });
 }
