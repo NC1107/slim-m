@@ -76,10 +76,9 @@ class RailHeader extends ConsumerWidget {
                       ),
                       Text(
                         [
-                          members.maybeWhen(
-                            data: (list) =>
-                                '${list.length} members · self-hosted',
-                            orElse: () => 'self-hosted',
+                          ?members.maybeWhen(
+                            data: (list) => '${list.length} members',
+                            orElse: () => null,
                           ),
                           if (version.isNotEmpty) 'v$version',
                         ].join(' · '),
