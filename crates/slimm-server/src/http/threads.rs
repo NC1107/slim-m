@@ -16,6 +16,7 @@ use super::channels::ChannelDto;
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
+use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
@@ -56,7 +57,7 @@ async fn open(
     }
 
     let thread = match state.store.open_thread(channel_id, message_id).await {
-        Ok(channel) => channel,
+        Ok(thread) => thread,
         Err(OpenThreadError::UnknownMessage) => {
             return Err(ApiError::NotFound("message not found"));
         }
@@ -67,5 +68,49 @@ async fn open(
         }
         Err(OpenThreadError::Internal(e)) => return Err(e.into()),
     };
-    Ok(Json(thread.into()))
+    // A race loser or a reopen of an existing thread sends nothing new; see `OpenedThread::fresh`.
+    if thread.fresh {
+        state.hub.publish(Event::ThreadUpdated {
+            channel_id,
+            parent_message_id: message_id,
+            thread_channel_id: thread.channel.id,
+            reply_count: 0,
+            last_reply_at: None,
+        });
+    }
+    Ok(Json(thread.channel.into()))
+}
+
+/// Publishes a `ThreadUpdated` frame when `channel_id` is a thread's own
+/// channel, so a bystander watching the parent sees the reply count move
+/// live. Called from the message send path; best-effort, since the send it
+/// rides on has already succeeded and must not be failed by this lookup.
+pub(super) async fn notify_reply(state: &AppState, channel_id: ChannelId) {
+    let parent = match state.store.thread_parent(channel_id).await {
+        Ok(parent) => parent,
+        Err(err) => {
+            tracing::warn!(error = %err, "failed to resolve a thread's parent for a live update");
+            return;
+        }
+    };
+    let Some(parent) = parent else { return };
+    let summary = match state
+        .store
+        .thread_summaries_for_messages(&[parent.parent_message_id])
+        .await
+    {
+        Ok(rows) => rows.into_iter().next(),
+        Err(err) => {
+            tracing::warn!(error = %err, "failed to resolve a thread's reply summary for a live update");
+            return;
+        }
+    };
+    let Some((_, summary)) = summary else { return };
+    state.hub.publish(Event::ThreadUpdated {
+        channel_id: parent.parent_channel_id,
+        parent_message_id: parent.parent_message_id,
+        thread_channel_id: channel_id,
+        reply_count: summary.reply_count,
+        last_reply_at: summary.last_reply_at,
+    });
 }

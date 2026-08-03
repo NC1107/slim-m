@@ -45,6 +45,15 @@ pub(super) enum ServerFrame {
         message_id: String,
         reactions: Vec<ReactionCountDto>,
     },
+    #[serde(rename = "thread.updated")]
+    ThreadUpdated {
+        channel_id: String,
+        parent_message_id: String,
+        thread_channel_id: String,
+        reply_count: i64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        last_reply_at: Option<i64>,
+    },
     #[serde(rename = "message.pinned")]
     MessagePinned {
         channel_id: String,

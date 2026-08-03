@@ -272,7 +272,7 @@ async fn thread_summaries_resolve_a_whole_page_of_messages_in_one_call() {
             .message;
         // Only even-indexed messages get a thread, so the batch answer must report both.
         if i % 2 == 0 {
-            let thread = store.open_thread(channel, parent.id).await.unwrap();
+            let thread = store.open_thread(channel, parent.id).await.unwrap().channel;
             for r in 0..(i / 2) {
                 store
                     .send_message(

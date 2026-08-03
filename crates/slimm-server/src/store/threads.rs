@@ -43,6 +43,23 @@ impl From<anyhow::Error> for OpenThreadError {
     }
 }
 
+/// [`Store::open_thread`]'s answer: the channel, and whether this call is
+/// what created it. A caller uses `fresh` to decide whether a live
+/// "thread opened" notification is warranted - a race loser or a later
+/// "reply in thread" on one that already existed must not send a second one.
+pub struct OpenedThread {
+    pub channel: Channel,
+    pub fresh: bool,
+}
+
+/// What a live "a reply landed" notification needs, resolved from a thread's
+/// own channel id: the real channel to broadcast into, and the message whose
+/// reply summary just changed.
+pub struct ThreadParent {
+    pub parent_channel_id: ChannelId,
+    pub parent_message_id: MessageId,
+}
+
 impl Store {
     /// Opens the thread hanging off `message_id`, creating it on first use.
     ///
@@ -55,7 +72,7 @@ impl Store {
         &self,
         channel_id: ChannelId,
         message_id: MessageId,
-    ) -> Result<Channel, OpenThreadError> {
+    ) -> Result<OpenedThread, OpenThreadError> {
         let mut tx = self.begin_write().await?;
 
         let row = sqlx::query!(
@@ -83,8 +100,13 @@ impl Store {
         .await?
         {
             tx.commit().await?;
-            return self.channel(existing).await?.ok_or_else(|| {
-                anyhow::anyhow!("thread channel row exists but is not live").into()
+            let channel = self
+                .channel(existing)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("thread channel row exists but is not live"))?;
+            return Ok(OpenedThread {
+                channel,
+                fresh: false,
             });
         }
 
@@ -110,16 +132,44 @@ impl Store {
         .await?;
         tx.commit().await?;
 
-        Ok(Channel {
-            id,
-            name: String::new(),
-            kind: "text".to_owned(),
-            topic: None,
-            // Never read: a thread is excluded from every position-ordered query.
-            position: 0,
-            parent_message_id: Some(message_id),
-            created_at: now,
+        Ok(OpenedThread {
+            channel: Channel {
+                id,
+                name: String::new(),
+                kind: "text".to_owned(),
+                topic: None,
+                // Never read: a thread is excluded from every position-ordered query.
+                position: 0,
+                parent_message_id: Some(message_id),
+                created_at: now,
+            },
+            fresh: true,
         })
+    }
+
+    /// Whether `channel_id` is a thread's own channel and, if so, the real
+    /// channel its parent message lives in plus the parent message's id.
+    ///
+    /// Reuses [`Store::permission_channel`]'s own resolution rather than
+    /// repeating its join, so a channel this considers a thread is a channel
+    /// every permission check already considers one too.
+    pub async fn thread_parent(
+        &self,
+        channel_id: ChannelId,
+    ) -> anyhow::Result<Option<ThreadParent>> {
+        let Some(channel) = self.channel(channel_id).await? else {
+            return Ok(None);
+        };
+        let Some(parent_message_id) = channel.parent_message_id else {
+            return Ok(None);
+        };
+        let Some(parent_channel) = self.permission_channel(channel).await? else {
+            return Ok(None);
+        };
+        Ok(Some(ThreadParent {
+            parent_channel_id: parent_channel.id,
+            parent_message_id,
+        }))
     }
 
     /// Which of `message_ids` already has a live thread, and how many

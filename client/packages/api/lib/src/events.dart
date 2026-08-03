@@ -60,6 +60,18 @@ sealed class ServerEvent {
               .map((r) => ReactionTally.fromJson(r as Map<String, dynamic>))
               .toList(growable: false),
         ),
+      'thread.updated'
+          when decoded['channel_id'] is String &&
+              decoded['parent_message_id'] is String &&
+              decoded['thread_channel_id'] is String &&
+              decoded['reply_count'] is int =>
+        ThreadUpdated(
+          channelId: decoded['channel_id'] as String,
+          parentMessageId: decoded['parent_message_id'] as String,
+          threadChannelId: decoded['thread_channel_id'] as String,
+          replyCount: decoded['reply_count'] as int,
+          lastReplyAt: decoded['last_reply_at'] as int?,
+        ),
       'message.pinned'
           when decoded['channel_id'] is String &&
               decoded['message_id'] is String &&

@@ -4637,6 +4637,7 @@ components:
         - $ref: "#/components/schemas/MessageEdited"
         - $ref: "#/components/schemas/MessageDeleted"
         - $ref: "#/components/schemas/ReactionsChanged"
+        - $ref: "#/components/schemas/ThreadUpdated"
         - $ref: "#/components/schemas/MessagePinned"
         - $ref: "#/components/schemas/MessageUnpinned"
         - $ref: "#/components/schemas/PollVoted"
@@ -4864,6 +4865,45 @@ components:
           type: string
         count:
           type: integer
+          format: int64
+
+    ThreadUpdated:
+      type: object
+      required:
+        [
+          type,
+          channel_id,
+          parent_message_id,
+          thread_channel_id,
+          reply_count,
+        ]
+      description: >
+        A thread's reply summary changed: it was just opened, or gained a
+        reply. Carries the current count rather than a delta, so a client
+        that missed a frame cannot drift. `channel_id` is the parent
+        channel, not the thread's own - the one a bystander's connection is
+        actually gated on. Unlike ReactionsChanged the count is the same for
+        every viewer regardless of blocking, matching the batch reply-count
+        load a REST fetch already uses, so it is carried directly rather
+        than re-derived per connection.
+      properties:
+        type:
+          type: string
+          enum: [thread.updated]
+        channel_id:
+          type: string
+          format: uuid
+        parent_message_id:
+          type: string
+          format: uuid
+        thread_channel_id:
+          type: string
+          format: uuid
+        reply_count:
+          type: integer
+          format: int64
+        last_reply_at:
+          type: [integer, "null"]
           format: int64
 
     MessagePinned:

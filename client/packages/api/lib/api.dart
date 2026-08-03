@@ -65,6 +65,7 @@ export 'src/events.dart'
         ReactionTally,
         RoleChanged,
         ServerEvent,
+        ThreadUpdated,
         TypingStarted,
         TypingStopped,
         protocolVersion;

@@ -50,7 +50,35 @@ It now also keeps whatever the local table already has flagged as a thread (`par
 
 **Mutation-tested by hand, four separate single-line reverts, each restored immediately after**: dropping the `parent_message_id IS NULL` filter from `list_channels` failed the rail-exclusion test and nothing else; removing `permission_channel`'s substitution from `evaluate_channel_permissions` failed the view-inheritance test and nothing else; removing it from `viewers_among` failed the push-fan-out inheritance test and nothing else; reverting `delete_channel`'s guard to count threads failed the last-channel test and nothing else. See `crates/slimm-server/tests/threads.rs`.
 
-Deliberately not built, and named rather than silently missing: a live "thread opened" notification for someone already viewing the parent channel (see the discovery note above); ~~a reply-count or "N replies" affordance on the parent message, which would need the same field surfaced in the message row rather than only used to gate the context-menu item~~ (built 2026-08-01, see "The reply-count affordance threads shipped without" below); and any UI for deleting a thread specifically - the generic `DELETE /channels/{id}` route already reaches one for anyone holding deployment-wide `MANAGE_CHANNELS`, with the last-channel guard now correctly indifferent to it.
+Deliberately not built, and named rather than silently missing: ~~a live "thread opened" notification for someone already viewing the parent channel (see the discovery note above)~~ (built 2026-08-02, see "A live signal for a thread opening, or gaining a reply" below); ~~a reply-count or "N replies" affordance on the parent message, which would need the same field surfaced in the message row rather than only used to gate the context-menu item~~ (built 2026-08-01, see "The reply-count affordance threads shipped without" below); and any UI for deleting a thread specifically - the generic `DELETE /channels/{id}` route already reaches one for anyone holding deployment-wide `MANAGE_CHANNELS`, with the last-channel guard now correctly indifferent to it.
+
+## A live signal for a thread opening, or gaining a reply (2026-08-02)
+
+Closes the gap this section's own "Deliberately not built" line named: a bystander already viewing the parent channel when somebody opened a thread on a message there, or replied into one already open, learned nothing until they reloaded.
+Read this before touching `Event::ThreadUpdated`, `http/threads.rs`, or `MessageExtrasController`.
+
+**One event covers both triggers, because both are "the reply summary changed" from a viewer's point of view.**
+`Event::ThreadUpdated` carries the *parent* channel's id (not the thread's own), the parent message id, the thread's channel id, and the current `reply_count`/`last_reply_at` - the whole current answer rather than a delta, the shape `PollVoted` already uses, so a client that missed a frame cannot drift.
+It is published from two places: `http/threads.rs`'s `open` handler, only when `Store::open_thread` reports the channel was freshly created (`OpenedThread::fresh`, new, since the store previously returned only the channel and had no way to say so) rather than reused by an idempotent reopen; and a new `threads::notify_reply`, called from `http/messages.rs`'s `send` whenever the channel a message just landed in turns out to be a thread's own channel (`Store::thread_parent`, resolved by reusing `Store::permission_channel` rather than repeating its join).
+Both publish sites are best-effort past the point the real work already succeeded: a lookup failure in `notify_reply` only logs, since the send it rides on has already committed and must not be failed by a live-notification side query.
+
+**Carrying the count directly, rather than re-deriving it per receiving connection the way `ReactionsChanged` does its tally, was a deliberate departure from that precedent, checked rather than assumed.**
+`ReactionsChanged` learned the hard way that a precomputed tally fanned out unfiltered put a blocked person's reaction back on every viewer's screen, so the instinct here was to copy that shape.
+Checked first: `Store::thread_summaries_for_messages`, the batch load a REST fetch already uses for this exact number, is not per-viewer filtered either - it counts every undeleted reply regardless of blocking, and a thread reply from a blocked author already inflates the count on a REST fetch today.
+So precomputing the count into the live event does not create a new inconsistency; it matches what a fetch already answers.
+Whether that count-includes-blocked-authors behaviour is itself correct is a separate, pre-existing question this work did not open.
+
+**The permission gate is the same channel-scoped `VIEW_CHANNEL` check every other channel event already goes through in `http::ws::authorize`, not a new one**, keyed on the parent channel's id specifically so the ordinary check applies with no thread-aware branch.
+Because a thread's permissions always resolve to its parent's (`Store::permission_channel`), gating on the thread's own id instead would have evaluated identically - the two ids are permission-equivalent by construction - which is worth recording so a future reviewer does not go looking for a leak that structurally cannot occur that way.
+The leak shape that *can* happen, and the one `tests/live_thread_events.rs` mutation-tests directly, is skipping the gate entirely - folding `ThreadUpdated` into the earlier deployment-wide match `PresenceChanged` and friends use, which delivers unconditionally.
+Applying that mutation by hand and re-running the denial test fails it immediately, on the exact assertion; reverting restores green.
+
+**An offline client needs no catch-up machinery of its own.**
+`thread_channel_id` and the reply count were already batch-loaded onto `MessageDto` before this (see "The reply-count affordance threads shipped without" below), so a client that was disconnected when the frame went out learns the same answer on its next list, search, or sync of the parent channel - this work only had to confirm that held, not build anything new for it.
+
+**Client-side, the event lands in the same cache the REST-fetched fields already populate.**
+`MessageExtrasController._onEvent` gained a `ThreadUpdated` case calling a new `_applyThreadUpdated`, which replaces a message's cached thread fields outright (unlike the `??`-merge `applyMessage` uses for a bare `message.created`/`message.edited` frame, this one always carries a real answer) while leaving reactions, attachments and poll untouched.
+The transcript needed no new wiring: `ThreadReplySummary` already renders whatever `MessageExtras` holds for a message, so a live update reaching the cache is a live update reaching the screen.
 
 ## The reply-count affordance threads shipped without (2026-08-01)
 
