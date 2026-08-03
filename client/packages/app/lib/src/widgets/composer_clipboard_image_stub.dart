@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The mobile bridge: iOS and Android both expose a real image clipboard
-/// that `package:flutter/services.dart`'s own [Clipboard] cannot reach (see
-/// `composer_clipboard_image.dart`'s doc comment for why that path is a dead
-/// end), so this reaches it through a hand-written platform channel instead
-/// - `ClipboardImagePlugin.swift` on iOS, `ClipboardImageChannel.kt` on
-/// Android.
+/// The mobile-and-Linux-desktop bridge: iOS, Android and Linux each expose a
+/// real image clipboard that `package:flutter/services.dart`'s own
+/// [Clipboard] cannot reach (see `composer_clipboard_image.dart`'s doc
+/// comment for why that path is a dead end), so this reaches it through a
+/// hand-written platform channel instead - `ClipboardImagePlugin.swift` on
+/// iOS, `ClipboardImageChannel.kt` on Android,
+/// `linux/runner/clipboard_image_channel.cc` on Linux (GTK's
+/// `gtk_clipboard_wait_for_image`, encoded to PNG before it crosses the
+/// channel).
 ///
 /// Two distinct routes share this one channel, and only iOS has both.
 ///
@@ -24,8 +27,8 @@
 /// has focus (see `Composer._handleFocusChange`) is what makes this the same
 /// seam `composer_clipboard_image_web.dart`'s live paste-event listener
 /// already is, even though the two triggers (a DOM event, a native menu tap)
-/// share nothing else. It is inert on Android and desktop: nothing there
-/// ever calls `pastedImage`, so registering the handler costs nothing.
+/// share nothing else. It is inert on Android and Linux: nothing there ever
+/// calls `pastedImage`, so registering the handler costs nothing.
 ///
 /// [editMenuPasteSwizzleInstalled] reports only whether that swizzle
 /// installed, never whether the menu it targets actually offers Paste -
@@ -33,15 +36,17 @@
 /// see `composer_clipboard_paste.dart`'s doc comment for why nothing here
 /// gates the fallback row on it any more.
 ///
-/// Desktop (Linux, Windows, macOS) and Android (for the swizzle-only calls)
-/// register no platform-side handler at all, so a call here simply finds
+/// Windows and macOS register no platform-side handler at all, and neither
+/// does Android for the swizzle-only calls, so a call here simply finds
 /// nothing to answer it. That is treated as "not supported" rather than
 /// surfaced as a crash: every function below catches [MissingPluginException]
 /// and answers false or null. It is also what makes this file exercisable in
 /// a plain `flutter test` run on any host: mocking the channel stands in for
-/// the platform side on every target, mobile or not.
+/// the platform side on every target, whether or not that target has a real
+/// one.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// False here; see `composer_clipboard_image_web.dart` for the one platform
@@ -49,6 +54,22 @@ import 'package:flutter/services.dart';
 /// route [startClipboardImagePaste] backs on iOS is a menu action, not a
 /// keystroke, so it is not what this flag is about.
 const bool clipboardImagePasteSupported = false;
+
+/// Whether a Ctrl+V keystroke should ask the image clipboard itself, rather
+/// than waiting to be handed an image by [startClipboardImagePaste].
+///
+/// True everywhere except iOS. It is not a claim that the platform has an
+/// image clipboard: [hasClipboardImage] already answers false wherever no
+/// handler is registered, so this being true on Windows and macOS costs one
+/// channel call that finds nothing.
+///
+/// iOS is the one exclusion, and for a specific reason rather than caution:
+/// [readClipboardImage] raises the "Allow Paste?" prompt on **every** call
+/// there, so polling it from a keystroke would prompt on every paste of
+/// plain text. iOS already has the route that avoids that entirely, the
+/// edit-menu swizzle behind [startClipboardImagePaste].
+bool get pasteKeystrokeReadsClipboardImage =>
+    defaultTargetPlatform != TargetPlatform.iOS;
 
 const MethodChannel _clipboardImageChannel = MethodChannel(
   'top.npcserver.slimm/clipboard_image',
@@ -81,8 +102,9 @@ Future<void> _handlePastedImageCall(MethodCall call) async {
 
 /// Thrown by [readClipboardImage] when the clipboard holds an image but the
 /// platform could not read it - on Android, most often a `content://` URI
-/// whose source app never granted read access. Never thrown for "there is no
-/// image"; [readClipboardImage] answers that with null instead.
+/// whose source app never granted read access; on Linux, a PNG encode
+/// failure after a real `GdkPixbuf` was already in hand. Never thrown for
+/// "there is no image"; [readClipboardImage] answers that with null instead.
 class ClipboardImageReadException implements Exception {
   const ClipboardImageReadException(this.message);
 

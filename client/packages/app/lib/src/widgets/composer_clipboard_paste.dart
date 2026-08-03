@@ -19,14 +19,46 @@
 /// mocking a channel it has no reason to know about.
 library;
 
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
 
 import 'composer_clipboard_image.dart';
 
+/// Whether [event] is the paste chord, Ctrl+V or Cmd+V.
+///
+/// Deliberately not `KeyRepeatEvent`: holding the keys down should attach one
+/// image, not one per repeat.
+bool isClipboardPasteChord(KeyEvent event) {
+  if (event is! KeyDownEvent) return false;
+  if (event.logicalKey != LogicalKeyboardKey.keyV) return false;
+  final keyboard = HardwareKeyboard.instance;
+  return keyboard.isControlPressed || keyboard.isMetaPressed;
+}
+
+/// The Ctrl+V half, for the platforms with no event-driven route of their own.
+///
+/// **Never consumes the keystroke**, and the caller must not either: text
+/// paste is Flutter's own and has to keep working untouched, so this only
+/// ever runs alongside it. A clipboard holding text and no image reaches
+/// [hasClipboardImage], gets false, and stops - the field's own paste is
+/// what the person sees, exactly as before.
+///
+/// [hasClipboardImage] is asked first rather than reading straight away, so
+/// a plain text paste stays a true no-op: [pasteClipboardImage] clears the
+/// error banner as its first act, and every Ctrl+V wiping a failure the
+/// person had not read yet would be its own small bug.
+Future<void> pasteClipboardImageFromKeystroke(
+  Future<void> Function(Uint8List bytes, String filename) stage,
+  void Function(String? message) setError,
+) async {
+  if (!pasteKeystrokeReadsClipboardImage) return;
+  if (!await hasClipboardImage()) return;
+  await pasteClipboardImage(stage, setError);
+}
+
 /// Whether the "+" sheet's own "Paste image" row is worth offering.
 ///
-/// Answers [hasClipboardImage] alone, on every platform - Android's only
-/// route, and iOS's too, unconditionally.
+/// Answers [hasClipboardImage] alone, on every platform - Android's and
+/// Linux desktop's only route, and iOS's too, unconditionally.
 ///
 /// This used to also answer false whenever [editMenuPasteSwizzleInstalled]
 /// reported true, on the theory that the iOS long-press edit menu's own

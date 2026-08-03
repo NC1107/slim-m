@@ -258,7 +258,19 @@ class _ComposerState extends ConsumerState<Composer> {
   /// It has to be this node rather than an ancestor: text editing handles the
   /// arrows through `Actions` installed above the field, so a handler higher
   /// up would run after the caret had already moved.
+  ///
+  /// The paste check sits above the autocomplete guard on purpose, since it
+  /// has to run whether or not a mention list happens to be open, and it
+  /// never returns `handled`, so Flutter's own text paste is untouched.
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (isClipboardPasteChord(event)) {
+      unawaited(
+        pasteClipboardImageFromKeystroke(
+          _stageAttachment,
+          _setClipboardPasteError,
+        ),
+      );
+    }
     if (_query == null || _suggestions.isEmpty) return KeyEventResult.ignored;
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;

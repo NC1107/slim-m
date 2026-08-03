@@ -32,6 +32,13 @@ import 'package:web/web.dart' as web;
 /// bytes on this target.
 const bool clipboardImagePasteSupported = true;
 
+/// False here, and deliberately the inverse of [clipboardImagePasteSupported]
+/// rather than a coincidence: the browser hands the bytes over on its own
+/// `paste` event, so a keystroke that also polled would stage the same image
+/// twice. [hasClipboardImage] answers false on web anyway, so this is belt
+/// and braces rather than the only thing stopping it.
+const bool pasteKeystrokeReadsClipboardImage = false;
+
 void Function(Uint8List bytes, String filename)? _onImage;
 JSFunction? _listener;
 
