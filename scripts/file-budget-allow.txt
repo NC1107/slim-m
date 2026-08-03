@@ -18,4 +18,3 @@ crates/slimm-server/tests/polls.rs 602 # create, vote, close and the permission 
 crates/slimm-server/tests/dms.rs 591 # pair membership, the deliberately skipped ADMINISTRATOR bypass, and fan-out
 client/packages/app/test/session_persistence_test.dart 588 # restore, refresh and revocation paths
 crates/slimm-server/tests/message_endpoints.rs 534 # send, list, edit and delete with their permission cases
-client/packages/app/test/message_row_test.dart 509 # the message row plus its whole context menu

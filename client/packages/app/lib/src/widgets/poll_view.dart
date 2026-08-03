@@ -9,6 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+/// Wide enough for "100%" at [AppText.caption], so every option's percentage
+/// lines up in a column regardless of its own digit count.
+const double _percentColumnWidth = 34;
+
 class PollView extends StatelessWidget {
   const PollView({super.key, required this.poll, required this.onVote});
 
@@ -31,12 +35,24 @@ class PollView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            poll.question,
-            style: AppText.body.copyWith(
-              color: tokens.textPrimary,
-              fontWeight: AppWeights.semi,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  poll.question,
+                  style: AppText.body.copyWith(
+                    color: tokens.textPrimary,
+                    fontWeight: AppWeights.semi,
+                  ),
+                ),
+              ),
+              // A closed poll used to say so only in the fine print below the options; this is the glance-able version.
+              if (poll.closed) ...[
+                const SizedBox(width: AppSpacing.s8),
+                const AppBadge(variant: AppBadgeVariant.tag, label: 'Closed'),
+              ],
+            ],
           ),
           const SizedBox(height: AppSpacing.s8),
           for (final option in poll.options) ...[
@@ -46,11 +62,10 @@ class PollView extends StatelessWidget {
               selected: poll.votedOption == option.position,
               onTap: canVote ? () => onVote(option.position) : null,
             ),
-            const SizedBox(height: AppSpacing.s4),
+            const SizedBox(height: AppSpacing.s8),
           ],
           Text(
-            '${poll.totalVotes} vote${poll.totalVotes == 1 ? '' : 's'}'
-            '${poll.closed ? ' - closed' : ''}',
+            '${poll.totalVotes} vote${poll.totalVotes == 1 ? '' : 's'}',
             style: AppText.caption.copyWith(color: tokens.textSecondary),
           ),
         ],
@@ -107,6 +122,15 @@ class _PollOptionRow extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
                 child: Row(
                   children: [
+                    // The vote is never colour alone: a check beside the label carries it too, like presence elsewhere.
+                    if (selected) ...[
+                      Icon(
+                        AppIcons.check,
+                        size: AppSizes.icon16,
+                        color: tokens.accentFill,
+                      ),
+                      const SizedBox(width: AppSpacing.s4),
+                    ],
                     Expanded(
                       child: Text(
                         option.label,
@@ -119,11 +143,16 @@ class _PollOptionRow extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Text(
-                      '$percent%',
-                      style: AppText.caption.copyWith(
-                        color: tokens.textSecondary,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                    // Fixed and right-aligned, so a run of options lines its percentages up rather than each shifting by digit count.
+                    SizedBox(
+                      width: _percentColumnWidth,
+                      child: Text(
+                        '$percent%',
+                        textAlign: TextAlign.right,
+                        style: AppText.caption.copyWith(
+                          color: tokens.textSecondary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ),
                   ],

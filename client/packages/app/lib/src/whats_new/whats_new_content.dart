@@ -58,9 +58,8 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'Opening a DM with someone you have blocked now says so',
     points: [
       WhatsNewPoint(
-        'It used to just look empty, with a composer that would fail if you '
-        'tried to use it. Now it explains what is going on and gives you an '
-        'Unblock button right there.',
+        'It used to look empty and silently fail to send. Now it explains '
+        'why and offers an Unblock button.',
       ),
     ],
   ),
@@ -69,19 +68,13 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'Attaching and pasting a photo on iPhone and Android',
     points: [
       WhatsNewPoint(
-        'The attach button on a phone used to only open the Files browser, '
-        'which cannot see your camera roll at all. It now asks whether you '
-        'want your photo library or files, the same choice you get '
-        'attaching a photo anywhere else.',
+        'The attach button on a phone now offers your photo library, not '
+        'just the Files browser.',
       ),
+      WhatsNewPoint('Your profile picture picker got the same choice.'),
       WhatsNewPoint(
-        'Your profile picture picker got the same choice, so a photo that '
-        'arrived by download or AirDrop is no longer stuck.',
-      ),
-      WhatsNewPoint(
-        'If you have copied an image, the same attach button now offers a '
-        'Paste image action. iOS may ask once whether this app can read '
-        'your clipboard; that is expected and only asks the first time.',
+        'If you have copied an image, the attach button now offers Paste '
+        'image as well.',
       ),
     ],
   ),
@@ -90,15 +83,12 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'Renaming yourself now reaches your old messages too',
     points: [
       WhatsNewPoint(
-        'Changing your display name used to leave every message you had '
-        'already sent showing the old one on everyone else\'s screen, '
-        'sometimes for good. It now updates live while everyone is '
-        'connected, and catches up the moment a device reconnects.',
+        'Changing your display name now updates it on messages you have '
+        'already sent, not just new ones.',
       ),
       WhatsNewPoint(
-        'The composer\'s placeholder text now sits level with the icons '
-        'beside it at rest, instead of pinned to the top of a box taller '
-        'than the line of text in it.',
+        'The message box\'s placeholder text is now vertically centred '
+        'instead of stuck at the top.',
       ),
     ],
   ),
@@ -107,15 +97,12 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'Fixes from using the app on a phone',
     points: [
       WhatsNewPoint(
-        'Save and Cancel used to overflow off the edge of a phone screen '
-        'while editing, leaving no way to finish or back out of an edit. '
-        'Both are reachable now, and a hardware keyboard\'s Enter and '
-        'Escape shortcuts still work exactly as before.',
+        'Save and Cancel no longer run off the edge of the screen while '
+        'editing a message.',
       ),
       WhatsNewPoint(
-        'The message context menu, who can join, and the role granted on '
-        'an invite all opened as a narrow floating card nested inside the '
-        'sheet on a phone. They now span the full width, as one sheet.',
+        'The message menu and a few settings sheets now use the full '
+        'width on a phone instead of a cramped floating card.',
       ),
     ],
   ),
@@ -124,11 +111,8 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'Paste image is back on iOS',
     points: [
       WhatsNewPoint(
-        'The last update hid the composer\'s Paste image action on iOS in '
-        'favor of the system edit menu\'s own Paste item, which turned out '
-        'not to work for images at all - so there was briefly no way to '
-        'paste an image on iOS. The composer\'s own action is back and no '
-        'longer hides itself.',
+        'Pasting an image on iOS briefly stopped working after the last '
+        'update. It is fixed - the Paste image button is back.',
         warn: true,
       ),
     ],
@@ -138,33 +122,25 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'Swipe from the left edge to open the channel list',
     points: [
       WhatsNewPoint(
-        'Reports can be acted on. Jump straight to the message, and delete '
-        'it, time the author out or remove them, without leaving the queue. '
-        'The card also says plainly who was reported and who reported them.',
+        'Moderators can now act on a report directly: jump to the '
+        'message, delete it, or time out or remove the author.',
       ),
       WhatsNewPoint(
-        'Your profile picture is centred with a camera badge, so it is '
-        'obvious you can tap it to change.',
+        'Your profile picture now shows a camera badge, so it is obvious '
+        'you can tap to change it.',
       ),
       WhatsNewPoint(
-        'The jump-to-latest button is out of the way, reactions sit closer '
-        'to their message, and opening a direct message from the member '
-        'list closes the list behind you.',
+        'The jump-to-latest button is less intrusive, and reactions sit '
+        'closer to their message.',
       ),
       WhatsNewPoint(
-        'On a phone, swiping in from the left edge of a conversation now '
-        'pulls the channel list over it, the gesture every other messaging '
-        'app already trains you to reach for. Swipe it shut again or tap '
-        'outside it, and picking a different channel closes it for you.',
+        'On a phone, swipe in from the left edge to open the channel '
+        'list, the way most messaging apps work. Swipe or tap outside to '
+        'close it.',
       ),
       WhatsNewPoint(
-        'The back button at the top still works exactly as it did; this is '
-        'a second way to the same place, not a replacement for it.',
-      ),
-      WhatsNewPoint(
-        'You can reply to a specific message now. Open its menu and pick '
-        'Reply, and a compact quote of it rides above what you send; tap '
-        'the quote on either message to jump straight to the original.',
+        'You can now reply to a specific message. Pick Reply from its '
+        'menu; tap the quote to jump to the original.',
       ),
     ],
   ),
@@ -173,32 +149,24 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'Calling someone in a direct message',
     points: [
       WhatsNewPoint(
-        'A direct message now has a Call button in its header, right next '
-        'to search and pinned messages. It opens the same join preview a '
-        'voice channel does, mic and camera off until you actually join.',
+        'A direct message now has a Call button in its header. Mic and '
+        'camera stay off until you join.',
       ),
       WhatsNewPoint(
-        'Stepping away to read messages does not hang up. The call keeps '
-        'running, with the same collapsed strip and "back to the call" '
-        'a voice channel already gives you.',
+        'Stepping away to read messages does not hang up - the call keeps '
+        'running in a collapsed strip.',
       ),
       WhatsNewPoint(
         'Blocking someone stops a call the same way it already stops a '
         'message: neither of you can ring the other.',
       ),
       WhatsNewPoint(
-        'Opening the canvas over a call or a channel used to swap the whole '
-        'view instantly. It now fades through, the same way switching '
-        'channels or opening settings already did.',
+        'Opening the canvas now fades in smoothly instead of snapping '
+        'into view.',
       ),
       WhatsNewPoint(
-        'Confirming a server\'s identity, the screen you see the first time '
-        'you connect somewhere new, now uses that same motion instead of '
-        'a plain platform default.',
-      ),
-      WhatsNewPoint(
-        'Your status avatar in the rail footer now presses down like every '
-        'other button in the app, instead of doing nothing until it opens.',
+        'Two small animations were polished: the first-connection '
+        'identity screen and your sidebar status avatar.',
       ),
     ],
   ),
@@ -207,14 +175,23 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'Threads',
     points: [
       WhatsNewPoint(
-        'A message\'s context menu now offers Reply in thread. It opens a '
-        'hidden side conversation attached to that one message, so a '
-        'tangent stays out of the main channel instead of burying it.',
+        'A message\'s menu now offers Reply in thread: it opens a side '
+        'conversation attached to that message, keeping tangents out of '
+        'the main channel.',
       ),
       WhatsNewPoint(
-        'A thread sends and reads exactly like any other channel - the '
-        'same composer, the same transcript - and anyone who could already '
-        'read the parent channel can read and post in the thread too.',
+        'A thread works just like a regular channel, and anyone who can '
+        'read the parent channel can read and post in it too.',
+      ),
+    ],
+  ),
+  WhatsNewEntry(
+    version: '0.24.2',
+    headline: 'Pasting an image on iPhone works from the text box',
+    points: [
+      WhatsNewPoint(
+        'Press and hold the message box and pick Paste. iOS no longer asks '
+        'for permission each time.',
       ),
     ],
   ),
@@ -223,9 +200,8 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'A reply count under threaded messages',
     points: [
       WhatsNewPoint(
-        'A message with a thread now shows "N replies" underneath it, tap '
-        'through to open it. It used to be invisible unless you already '
-        'knew to look for it.',
+        'A message with a thread now shows "N replies" underneath it - '
+        'tap to open.',
       ),
       WhatsNewPoint(
         'When there has been a reply, it also says when the most recent '
@@ -238,23 +214,20 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'The jump-to-latest arrow no longer shows up unprompted',
     points: [
       WhatsNewPoint(
-        'It used to appear after switching channels even when you had not '
-        'scrolled at all, left over from wherever the previous channel was '
-        'scrolled to. It now only shows once you have actually scrolled '
-        'away from the newest message.',
+        'It no longer appears just from switching channels - only after '
+        'you have actually scrolled away from the newest message.',
       ),
     ],
   ),
   WhatsNewEntry(
     version: '0.25.2',
-    headline: 'A thread no longer shows two bars stacked on top of each other',
+    headline: 'Threads no longer show two header bars stacked together',
     points: [
       WhatsNewPoint(
-        'Opening a thread used to carry its own title bar and, underneath '
-        'it, the full channel header again - pin, canvas and the member '
-        'and channel-list toggles included. Some of those acted on the '
-        'conversation behind the thread rather than the thread itself. '
-        'It is one bar now: back, the title, and search.',
+        'Opening a thread used to show two header bars stacked on top of '
+        'each other, and some of those buttons acted on the wrong '
+        'conversation. It is one simple bar now: back, the title, and '
+        'search.',
         warn: true,
       ),
     ],
@@ -264,22 +237,20 @@ const List<WhatsNewEntry> whatsNewEntries = [
     headline: 'The composer remembers what you were typing',
     points: [
       WhatsNewPoint(
-        'Typing a message, switching to another channel, and coming back '
-        'used to lose it. Every channel now keeps its own unsent draft for '
-        'as long as the app stays open, and sending clears it.',
+        'Switching channels no longer loses what you were typing - each '
+        'channel keeps its own draft.',
       ),
       WhatsNewPoint(
-        'Attaching a file used to vanish from the composer until its '
-        'upload finished, so on a slow connection it looked like nothing '
-        'had happened and you\'d pick it again. It now appears the instant '
-        'you pick it, uploading in the background.',
+        'An attached file now shows up immediately instead of vanishing '
+        'until the upload finishes.',
       ),
       WhatsNewPoint(
-        'A picked photo gets a small thumbnail preview, not just a filename.',
+        'A picked photo gets a small thumbnail preview, not just a '
+        'filename.',
       ),
       WhatsNewPoint(
-        'If an upload fails, it now says so and lets you retry or remove '
-        'it, instead of disappearing with no explanation.',
+        'If an upload fails, you can now retry or remove it instead of it '
+        'disappearing silently.',
       ),
     ],
   ),

@@ -10,18 +10,17 @@ import 'whats_new_content.dart';
 const List<WhatsNewEntry> whatsNewArchiveEntries = [
   WhatsNewEntry(
     version: '0.17.2',
-    headline: 'Message history now reconciles instead of only appending',
+    headline: 'Message history now stays in sync across devices',
     points: [
       WhatsNewPoint(
-        'This update rebuilds your local message cache once. Right after '
-        'installing it you will see only the newest 50 messages in each '
-        'channel; nothing was deleted on the server, and scrolling up '
-        'reloads the rest exactly as it always has.',
+        'This update resets your local message cache once. You will see '
+        'only the newest 50 messages per channel at first - nothing was '
+        'deleted, and scrolling up reloads the rest.',
         warn: true,
       ),
       WhatsNewPoint(
-        'That rebuild is also what fixes messages silently drifting out of '
-        'sync between devices, which is what this change was for.',
+        'It also fixes messages silently drifting out of sync between your '
+        'devices.',
       ),
     ],
   ),
@@ -30,28 +29,26 @@ const List<WhatsNewEntry> whatsNewArchiveEntries = [
     headline: 'A round of fixes from using the app on real devices',
     points: [
       WhatsNewPoint(
-        'Avatars and images no longer reload every time you switch channel. '
-        'They were only ever held while something was on screen looking at '
-        'them, so leaving a channel threw them away.',
+        'Avatars and images no longer reload every time you switch '
+        'channels.',
       ),
       WhatsNewPoint(
-        'Message rows no longer jump when the pointer crosses them, two '
-        'channels no longer overlay each other while switching, and one '
-        'image can no longer fill the whole window.',
+        'Fixed message rows jumping under your cursor, channels briefly '
+        'overlapping when switching, and one oversized image filling the '
+        'whole window.',
       ),
       WhatsNewPoint(
-        'On a phone, a long press now raises a sheet from the bottom rather '
-        'than a menu floating under your thumb.',
+        'On a phone, long-pressing a message opens a bottom sheet instead '
+        'of a floating menu under your thumb.',
       ),
       WhatsNewPoint(
-        'The channel list collapses, notes to self reads as a direct message '
-        'with You, and you can hide it and find it again by searching your '
-        'own name.',
+        'The channel list can now collapse, and Notes to Self reads as a '
+        'direct message with "You" - hide it or find it again by searching '
+        'your own name.',
       ),
       WhatsNewPoint(
-        'Pasting an image into the composer works in the browser build. '
-        'Flutter has no image clipboard on desktop or mobile, so there it '
-        'still only pastes text.',
+        'Pasting an image now works in the browser version. Desktop and '
+        'mobile still only paste text.',
       ),
     ],
   ),
@@ -61,22 +58,16 @@ const List<WhatsNewEntry> whatsNewArchiveEntries = [
     points: [
       WhatsNewPoint(
         'Messages take **bold**, *italic*, ~~strikethrough~~ and '
-        '||spoiler|| markers. A spoiler stays covered until it is tapped.',
+        '||spoiler|| markers. A spoiler stays covered until tapped.',
       ),
       WhatsNewPoint(
-        'Bullet and numbered lists, quotes and headings render as what they '
-        'are rather than as the characters you typed. Pressing Enter inside '
-        'a list carries the marker to the next line, and pressing it on an '
-        'empty item ends the list.',
+        'Bullet and numbered lists, quotes and headings now render '
+        'properly instead of showing the raw characters you typed.',
       ),
+      WhatsNewPoint('Ctrl+B and Ctrl+I wrap whatever text you have selected.'),
       WhatsNewPoint(
-        'Ctrl+B and Ctrl+I wrap whatever you have selected, or drop the '
-        'markers where the caret is.',
-      ),
-      WhatsNewPoint(
-        'Text that only looks like formatting is left alone: snake_case '
-        'names, a lone asterisk between spaces, and anything inside a code '
-        'span or a code fence.',
+        'Text that only looks like formatting, like snake_case names, is '
+        'left alone.',
       ),
     ],
   ),
@@ -85,29 +76,21 @@ const List<WhatsNewEntry> whatsNewArchiveEntries = [
     headline: 'Jump straight to a message, and reorder your channels',
     points: [
       WhatsNewPoint(
-        'Tapping a search result, a pinned message, or a message hit in the '
-        'quick switcher scrolls straight to it and briefly highlights it, '
-        'instead of leaving you to go find it yourself.',
+        'Tapping a search result, a pinned message, or a quick-switcher '
+        'hit now jumps straight to it and briefly highlights it.',
       ),
       WhatsNewPoint(
-        'If the message is further back than what has loaded, it pages in '
-        'the history it needs first. If it genuinely cannot be found, you '
-        'are told so rather than being left scrolled to nowhere.',
+        'If the message has not loaded yet, it fetches the history it '
+        'needs first. If it truly cannot be found, you are told so.',
       ),
       WhatsNewPoint(
-        'If you manage channels, press and hold a text or voice channel to '
-        'drag it to a new spot. The order is shared by the whole Space, not '
-        'just your device, so everyone sees channels in the same place.',
+        'If you manage channels, press and hold one to drag it to a new '
+        'spot. The new order shows for everyone in the Space.',
       ),
+      WhatsNewPoint('If a reorder fails to save, you are told and can retry.'),
       WhatsNewPoint(
-        'If a reorder cannot be saved, the sidebar says so and lets you '
-        'retry rather than quietly snapping back with no explanation.',
-      ),
-      WhatsNewPoint(
-        'On a computer you can drag across message text to select part of '
-        'it, or several messages at once. On a phone a long press still '
-        'opens the message actions, which is what that gesture is for '
-        'there.',
+        'On a computer, you can now drag to select message text. On a '
+        'phone, a long press still opens message actions.',
       ),
     ],
   ),
@@ -116,10 +99,8 @@ const List<WhatsNewEntry> whatsNewArchiveEntries = [
     headline: 'The day divider no longer flashes when you send',
     points: [
       WhatsNewPoint(
-        'Sending a message into a channel that had not finished loading its '
-        'history put a Today divider above it for a moment and then took it '
-        'away again. The divider now waits until enough history is known '
-        'for it to mean anything.',
+        'Fixed a "Today" divider briefly flashing above a message you had '
+        'just sent, in a channel still loading its history.',
       ),
     ],
   ),
