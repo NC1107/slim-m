@@ -108,25 +108,6 @@ class ChannelCategory {
       );
 }
 
-/// `listChannels`'s response: the caller's visible channels alongside every
-/// live category, fetched together since a category has no listing route of
-/// its own.
-class ChannelsPage {
-  const ChannelsPage({required this.channels, required this.categories});
-
-  final List<Channel> channels;
-  final List<ChannelCategory> categories;
-
-  factory ChannelsPage.fromJson(Map<String, dynamic> json) => ChannelsPage(
-        channels: (json['channels'] as List<dynamic>)
-            .map((c) => Channel.fromJson(c as Map<String, dynamic>))
-            .toList(growable: false),
-        categories: (json['categories'] as List<dynamic>)
-            .map((c) => ChannelCategory.fromJson(c as Map<String, dynamic>))
-            .toList(growable: false),
-      );
-}
-
 /// One rail section's ordered contents, as a drag produces: the category it
 /// names (null for the implicit uncategorised section) and every channel now
 /// filed under it, in display order. The request shape

@@ -54,6 +54,18 @@ extension SlimmApiChannelAdmin on SlimmApi {
         .toList(growable: false);
   }
 
+  /// Every live category. Unfiltered by any permission: a category carries
+  /// none of its own, so any authenticated caller may read the list. Its own
+  /// route, not folded into [SlimmApi.listChannels]'s response: that would
+  /// reshape an existing response, which the wire's additive-only rule does
+  /// not allow.
+  Future<List<ChannelCategory>> listCategories() async {
+    final json = await _send('GET', '/categories');
+    return (json as List<dynamic>)
+        .map((c) => ChannelCategory.fromJson(c as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   /// Creates a category, appended after every live one. Requires
   /// MANAGE_CHANNELS.
   Future<ChannelCategory> createCategory(String name) async {

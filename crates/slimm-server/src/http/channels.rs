@@ -22,7 +22,6 @@ use axum::routing::{get, patch};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
-use super::categories::CategoryDto;
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
@@ -95,16 +94,6 @@ impl From<Channel> for ChannelDto {
     }
 }
 
-/// `GET /channels`'s response shape: the caller's visible channels alongside
-/// every live category, so a client learns both in the one request it already
-/// makes at startup and after every category-list live event, rather than a
-/// second round trip existing only for this.
-#[derive(Serialize)]
-struct ChannelsPageDto {
-    channels: Vec<ChannelDto>,
-    categories: Vec<CategoryDto>,
-}
-
 #[derive(Deserialize)]
 struct CreateRequest {
     name: String,
@@ -126,34 +115,27 @@ struct UpdateChannelRequest {
     topic: Option<String>,
 }
 
-/// Lists the channels the caller can view, alongside every live category.
-/// One batched store call for the channels: the per-channel has_permission
-/// loop this replaces cost 1 + 4C queries. Categories carry no permission of
-/// their own (see docs/IMPLIED-GAPS.md), so the list is unfiltered - a
-/// category with nothing visible inside it is not a leak, since its own name
-/// and position are not privileged.
+/// Lists the channels the caller can view. One batched store call: the
+/// per-channel has_permission loop this replaces cost 1 + 4C queries.
+///
+/// Answers a plain array, exactly as it always has: the wire is
+/// additive-only, and a live deployment auto-updating from `latest` while
+/// its phones update on their own TestFlight/Play schedule means reshaping
+/// this response would break every client that has not updated yet. Every
+/// live category is at `GET /categories` instead - a new route is additive,
+/// folding the list into this one's body is not.
 async fn list(
     Authed(ctx): Authed,
     State(state): State<AppState>,
-) -> Result<Json<ChannelsPageDto>, ApiError> {
-    let channels = state
+) -> Result<Json<Vec<ChannelDto>>, ApiError> {
+    let visible = state
         .store
         .visible_channels(ctx.user_id)
         .await?
         .into_iter()
         .map(ChannelDto::from)
         .collect();
-    let categories = state
-        .store
-        .list_categories()
-        .await?
-        .into_iter()
-        .map(CategoryDto::from)
-        .collect();
-    Ok(Json(ChannelsPageDto {
-        channels,
-        categories,
-    }))
+    Ok(Json(visible))
 }
 
 /// Creates a channel. Requires MANAGE_CHANNELS at the deployment level.

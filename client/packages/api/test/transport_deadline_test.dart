@@ -44,7 +44,7 @@ void main() {
       unawaited(
         _neverAnswers().listChannels().catchError((Object e) {
           thrown = e;
-          return const ChannelsPage(channels: [], categories: []);
+          return const <Channel>[];
         }),
       );
 

@@ -313,3 +313,73 @@ async fn reorder_refuses_an_unknown_category_id() {
     assert!(error.contains("unknown"));
     assert!(error.contains(&bogus));
 }
+
+/// A body naming neither `channel_ids` nor `categories` cannot mean anything,
+/// so it is a 400 rather than silently matching one shape or the other.
+#[tokio::test]
+async fn reorder_refuses_a_body_naming_neither_shape() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    store.create_channel("a", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let response = app
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(json!({})),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = json_body(response).await;
+    assert!(
+        body["error"]
+            .as_str()
+            .unwrap()
+            .contains("channel_ids or categories")
+    );
+}
+
+/// A body naming both shapes at once is refused too, rather than one
+/// silently winning over the other with no way for the caller to tell which.
+#[tokio::test]
+async fn reorder_refuses_a_body_naming_both_shapes() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let a = store.create_channel("a", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let response = app
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(json!({
+                "channel_ids": [a.id.to_string()],
+                "categories": [{ "category_id": Value::Null, "channel_ids": [a.id.to_string()] }],
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = json_body(response).await;
+    assert!(body["error"].as_str().unwrap().contains("not both"));
+}

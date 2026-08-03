@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Channel category routes: create, rename/reposition, and soft-delete.
+//! Channel category routes: list, create, rename/reposition, and soft-delete.
 //!
-//! Gated on MANAGE_CHANNELS at the deployment level, the same bit
-//! `http::channels` already uses for channel create/rename/delete - a
-//! category is part of the same rail-management surface, not a new
-//! permission of its own. See docs/decisions/0006-channel-categories.md.
+//! Every mutation is gated on MANAGE_CHANNELS at the deployment level, the
+//! same bit `http::channels` already uses for channel create/rename/delete -
+//! a category is part of the same rail-management surface, not a new
+//! permission of its own. `list` is not: a category carries no permission of
+//! its own at all, so any authenticated caller may read the list, the same
+//! openness `GET /channels` used to answer it with before it moved here.
+//! See docs/decisions/0006-channel-categories.md.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
-use axum::routing::{patch, post};
+use axum::routing::{get, patch};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
@@ -29,15 +32,13 @@ const CATEGORY_NAME_MAX_CHARS: usize = 64;
 /// The category routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/categories", post(create))
+        .route("/categories", get(list).post(create))
         .route("/categories/{category_id}", patch(update).delete(delete))
         .layer(DefaultBodyLimit::max(CATEGORY_BODY_LIMIT))
 }
 
-/// `pub(crate)` so `http::channels` can embed the category list in
-/// `GET /channels`'s response, the way `ChannelDto` is already shared.
 #[derive(Serialize)]
-pub(crate) struct CategoryDto {
+struct CategoryDto {
     id: String,
     name: String,
     position: i64,
@@ -68,6 +69,24 @@ struct UpdateCategoryRequest {
     name: Option<String>,
     #[serde(default)]
     position: Option<i64>,
+}
+
+/// Lists every live category. Unfiltered by any permission, the same as the
+/// list this used to ride inside `GET /channels`'s own response: a category
+/// carries no permission of its own (see docs/IMPLIED-GAPS.md), so its name
+/// and position are not privileged for anyone who can already authenticate.
+async fn list(
+    Authed(_ctx): Authed,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<CategoryDto>>, ApiError> {
+    let categories = state
+        .store
+        .list_categories()
+        .await?
+        .into_iter()
+        .map(CategoryDto::from)
+        .collect();
+    Ok(Json(categories))
 }
 
 async fn create(

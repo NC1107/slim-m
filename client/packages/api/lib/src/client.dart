@@ -136,11 +136,15 @@ class SlimmApi {
 
   // --- Channels ---
 
-  /// The caller's visible channels alongside every live category, fetched
-  /// together since a category has no listing route of its own.
-  Future<ChannelsPage> listChannels() async {
+  /// The caller's visible channels. A plain array, unchanged since before
+  /// channel categories: the wire is additive-only, and reshaping this
+  /// response would break every client that has not updated yet. The
+  /// category list is [SlimmApiChannelAdmin.listCategories] instead.
+  Future<List<Channel>> listChannels() async {
     final json = await _send('GET', '/channels');
-    return ChannelsPage.fromJson(json as Map<String, dynamic>);
+    return (json as List<dynamic>)
+        .map((c) => Channel.fromJson(c as Map<String, dynamic>))
+        .toList(growable: false);
   }
 
   /// Creates a channel. Requires the manage-channels permission.

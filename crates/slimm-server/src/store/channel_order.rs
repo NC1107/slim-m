@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Setting the deployment's channel order and category placement in one
-//! caller-supplied, category-grouped list, applied atomically - so a drag
-//! between two rail sections reassigns and repositions in one request rather
-//! than a move followed by a reorder that could half-apply. See
-//! docs/decisions/0006-channel-categories.md.
+//! Setting the deployment's channel order, in the two shapes
+//! `PUT /channels/order` accepts. [`Store::reorder_channels_flat`] is the
+//! pre-category shape every client sent before docs/decisions/
+//! 0006-channel-categories.md - a plain ordered list, positions only, every
+//! channel's `category_id` left exactly as it was - kept working because the
+//! wire is additive-only and reshaping an existing request is not additive.
+//! [`Store::reorder_channels`] is the grouped shape that shape's decision
+//! record adds: the whole rail, grouped by category, applied atomically so a
+//! drag between two rail sections reassigns and repositions in one request
+//! rather than a move followed by a reorder that could half-apply.
 
 use std::collections::{HashMap, HashSet};
 
@@ -22,11 +27,11 @@ pub struct ChannelOrderGroup {
 /// Why setting the channel order failed.
 #[derive(Debug)]
 pub enum ReorderChannelsError {
-    /// The channel ids named across every group did not add up to exactly
-    /// the live, non-DM, non-thread channels: some were repeated, some live
-    /// channels were left out, or some named ids are not live channels at
-    /// all. `missing` and `extra` are each empty unless that half of the
-    /// mismatch applies.
+    /// The channel ids named (flattened, across every group for the grouped
+    /// shape) did not add up to exactly the live, non-DM, non-thread
+    /// channels: some were repeated, some live channels were left out, or
+    /// some named ids are not live channels at all. `missing` and `extra`
+    /// are each empty unless that half of the mismatch applies.
     Mismatch {
         missing: Vec<ChannelId>,
         extra: Vec<ChannelId>,
@@ -59,7 +64,97 @@ pub struct ReorderOutcome {
     pub moved: Vec<ChannelId>,
 }
 
+/// Every live, non-DM, non-thread channel's id, category and position - the
+/// one read both reorder shapes validate against and diff their target
+/// arrangement from.
+async fn live_channels(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+) -> Result<Vec<(ChannelId, Option<ChannelCategoryId>, i64)>, sqlx::Error> {
+    let rows = sqlx::query!(
+        r#"SELECT id AS "id!: ChannelId",
+                  category_id AS "category_id: ChannelCategoryId",
+                  position AS "position!: i64"
+           FROM channels
+           WHERE deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL"#
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.id, r.category_id, r.position))
+        .collect())
+}
+
+/// Refuses `ordered` unless it names exactly the ids in `live` - no more, no
+/// fewer, no repeats - so a caller always knows whether its drag took
+/// effect. Shared by both reorder shapes, since a flat list and a
+/// flattened, grouped one are validated identically.
+fn validate_live_set(
+    live: &[(ChannelId, Option<ChannelCategoryId>, i64)],
+    ordered: &[ChannelId],
+) -> Result<(), ReorderChannelsError> {
+    let live_set: HashSet<ChannelId> = live.iter().map(|(id, ..)| *id).collect();
+    let given_set: HashSet<ChannelId> = ordered.iter().copied().collect();
+    if given_set.len() != ordered.len() || live_set != given_set {
+        return Err(ReorderChannelsError::Mismatch {
+            missing: live_set.difference(&given_set).copied().collect(),
+            extra: given_set.difference(&live_set).copied().collect(),
+        });
+    }
+    Ok(())
+}
+
 impl Store {
+    /// Sets the deployment's channel order to exactly `ordered`, position `i`
+    /// for the channel at index `i`, leaving every channel's existing
+    /// `category_id` completely untouched.
+    ///
+    /// This is the pre-category shape, kept working rather than replaced:
+    /// a global monotonic index still expresses each category's own relative
+    /// order correctly, because `list_channels`'s `ORDER BY category
+    /// position, channel position` only ever compares two channels sharing a
+    /// category, and a monotonic index preserves relative order within any
+    /// subsequence of itself. So an old client that has never heard of
+    /// categories can still drag a channel's position within whichever
+    /// category it already sits in.
+    ///
+    /// Refuses a list that is not exactly the live, non-DM, non-thread
+    /// channels, the same validation [`Store::reorder_channels`] applies to
+    /// its own flattened set.
+    pub async fn reorder_channels_flat(
+        &self,
+        ordered: &[ChannelId],
+    ) -> Result<ReorderOutcome, ReorderChannelsError> {
+        let mut tx = self.begin_write().await?;
+        let live = live_channels(&mut tx).await?;
+        validate_live_set(&live, ordered)?;
+
+        let before_position: HashMap<ChannelId, i64> = live
+            .into_iter()
+            .map(|(id, _, position)| (id, position))
+            .collect();
+
+        let mut moved = Vec::new();
+        for (position, id) in ordered.iter().enumerate() {
+            let position = position as i64;
+            if before_position.get(id) == Some(&position) {
+                continue;
+            }
+            moved.push(*id);
+            sqlx::query!(
+                "UPDATE channels SET position = ? WHERE id = ?",
+                position,
+                id
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+
+        let channels = self.list_channels().await?;
+        Ok(ReorderOutcome { channels, moved })
+    }
+
     /// Sets the deployment's channel order and category placement to exactly
     /// `groups`: position `i` and `group.category_id` for the channel at
     /// index `i` of `group.channel_ids`. Refuses a set of groups whose
@@ -78,32 +173,13 @@ impl Store {
         groups: &[ChannelOrderGroup],
     ) -> Result<ReorderOutcome, ReorderChannelsError> {
         let mut tx = self.begin_write().await?;
-
-        let live: Vec<(ChannelId, Option<ChannelCategoryId>, i64)> = sqlx::query!(
-            r#"SELECT id AS "id!: ChannelId",
-                      category_id AS "category_id: ChannelCategoryId",
-                      position AS "position!: i64"
-               FROM channels
-               WHERE deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL"#
-        )
-        .fetch_all(&mut *tx)
-        .await?
-        .into_iter()
-        .map(|r| (r.id, r.category_id, r.position))
-        .collect();
+        let live = live_channels(&mut tx).await?;
 
         let ordered: Vec<ChannelId> = groups
             .iter()
             .flat_map(|group| group.channel_ids.iter().copied())
             .collect();
-        let live_set: HashSet<ChannelId> = live.iter().map(|(id, ..)| *id).collect();
-        let given_set: HashSet<ChannelId> = ordered.iter().copied().collect();
-        if given_set.len() != ordered.len() || live_set != given_set {
-            return Err(ReorderChannelsError::Mismatch {
-                missing: live_set.difference(&given_set).copied().collect(),
-                extra: given_set.difference(&live_set).copied().collect(),
-            });
-        }
+        validate_live_set(&live, &ordered)?;
 
         let named_categories: HashSet<ChannelCategoryId> = groups
             .iter()

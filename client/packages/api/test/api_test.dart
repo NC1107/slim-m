@@ -204,12 +204,12 @@ void main() {
           // First protected call is expired; the replay succeeds.
           served++;
           if (served == 1) return http.Response('{"error":"expired"}', 401);
-          return http.Response('{"channels":[],"categories":[]}', 200);
+          return http.Response('[]', 200);
         }),
       );
 
-      final page = await api.listChannels();
-      expect(page.channels, isEmpty);
+      final channels = await api.listChannels();
+      expect(channels, isEmpty);
       expect(calls, [
         'GET /channels',
         'POST /auth/refresh',
@@ -242,7 +242,7 @@ void main() {
           protectedCalls++;
           // Every call before the rotation lands is expired.
           if (refreshes == 0) return http.Response('{"error":"expired"}', 401);
-          return http.Response('{"channels":[],"categories":[]}', 200);
+          return http.Response('[]', 200);
         }),
       );
 

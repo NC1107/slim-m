@@ -946,14 +946,23 @@ paths:
     get:
       operationId: listChannels
       tags: [channels]
-      summary: List the channels the caller can view, alongside every live category.
+      summary: List the channels the caller can view.
+      description: >
+        A plain array, unchanged since before channel categories: the wire is
+        additive-only, and a live deployment auto-updating from `latest`
+        while its phones update on their own TestFlight/Play schedule means
+        reshaping this response would break every client that has not
+        updated yet. `category_id` is a new field on each channel (additive);
+        the category list itself is `listCategories` instead.
       responses:
         "200":
-          description: The visible channels and every live category.
+          description: The visible channels.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ChannelsPage"
+                type: array
+                items:
+                  $ref: "#/components/schemas/Channel"
         "401":
           $ref: "#/components/responses/Unauthorized"
     post:
@@ -1043,16 +1052,19 @@ paths:
     put:
       operationId: reorderChannels
       tags: [channels]
-      summary: Set the deployment's channel order and category placement.
+      summary: Set the deployment's channel order, and optionally its category placement.
       description: >
         Requires MANAGE_CHANNELS at the deployment level, the same check
         `createChannel` uses. Deployment-wide, not a per-device preference:
         one deployment is one community, and everyone seeing the same order
-        is the point. Takes the whole rail, grouped by category, that a drag
-        produced, applied atomically - a channel of any kind may be placed
+        is the point. Takes exactly one of `channel_ids` (the flat,
+        pre-category shape: reorders positions and leaves every channel's
+        `category_id` untouched) or `categories` (the whole rail grouped by
+        category, applied atomically - a channel of any kind may be placed
         in any category, since a category only decides placement, never
-        behaviour. The channel ids named across every group must add up to
-        exactly the live, non-DM, non-thread channels - no more, no fewer, no
+        behaviour). Sending neither, or both, is a 400. The channel ids
+        named - flattened, for the grouped shape - must add up to exactly
+        the live, non-DM, non-thread channels - no more, no fewer, no
         repeats - and every named category id must be a live category, or
         the request is refused with a 400 naming what was wrong; a partial
         list is never applied. Submitting the arrangement already in effect
@@ -1080,6 +1092,28 @@ paths:
           $ref: "#/components/responses/Forbidden"
 
   /categories:
+    get:
+      operationId: listCategories
+      tags: [channels]
+      summary: List every live channel category.
+      description: >
+        Unfiltered by any permission: a category carries none of its own
+        (see docs/IMPLIED-GAPS.md), so its name and position are not
+        privileged for any authenticated caller. Split out of
+        `listChannels`'s own response, which used to embed this list until
+        that reshaped an existing response the wire's additive-only rule
+        does not allow; a new route is additive.
+      responses:
+        "200":
+          description: Every live category.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChannelCategory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
     post:
       operationId: createCategory
       tags: [channels]
@@ -3790,23 +3824,6 @@ components:
           format: int64
           description: Unix milliseconds.
 
-    ChannelsPage:
-      type: object
-      required: [channels, categories]
-      description: >
-        `listChannels`'s response: the caller's visible channels alongside
-        every live category, fetched together since a category has no
-        listing route of its own.
-      properties:
-        channels:
-          type: array
-          items:
-            $ref: "#/components/schemas/Channel"
-        categories:
-          type: array
-          items:
-            $ref: "#/components/schemas/ChannelCategory"
-
     CreateCategoryRequest:
       type: object
       required: [name]
@@ -3864,8 +3881,23 @@ components:
 
     ReorderChannelsRequest:
       type: object
-      required: [categories]
+      description: >
+        Exactly one of `channel_ids` and `categories` must be present;
+        sending neither, or both, is a 400. Both are optional here so the
+        pre-category shape (`channel_ids` alone) keeps validating for a
+        client that has never heard of categories, the same "additive, never
+        reshaped" rule the rest of this wire follows.
       properties:
+        channel_ids:
+          type: array
+          description: >
+            Every live, non-DM, non-thread channel id, in the desired order.
+            Must name exactly that set - no more, no fewer, no repeats.
+            Reorders positions only; every channel's `category_id` is left
+            exactly as it was.
+          items:
+            type: string
+            format: uuid
         categories:
           type: array
           description: >

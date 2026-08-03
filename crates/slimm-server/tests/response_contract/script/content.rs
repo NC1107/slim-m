@@ -85,8 +85,10 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
     )
     .await;
 
+    c.get("listCategories", "/categories", root).await;
+
     let live = c.get("listChannels", "/channels", root).await;
-    let mut order: Vec<String> = live["channels"]
+    let mut order: Vec<String> = live
         .as_array()
         .unwrap()
         .iter()

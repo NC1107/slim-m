@@ -145,7 +145,7 @@ async fn opening_a_thread_returns_a_channel_absent_from_list_channels() {
             .unwrap(),
     )
     .await;
-    let ids: Vec<String> = listed["channels"]
+    let ids: Vec<String> = listed
         .as_array()
         .unwrap()
         .iter()

@@ -17,7 +17,7 @@ use slimm_server::hub::Hub;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{ChannelOrderGroup, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -98,8 +98,7 @@ async fn channels_of(app: &Router, token: &str) -> Value {
             .await
             .unwrap(),
     )
-    .await["channels"]
-        .clone()
+    .await
 }
 
 /// One group, `category_id: null`, naming every channel - the plain flat
@@ -107,6 +106,14 @@ async fn channels_of(app: &Router, token: &str) -> Value {
 /// category placement.
 fn flat_order(channel_ids: &[String]) -> Value {
     json!({ "categories": [{ "category_id": Value::Null, "channel_ids": channel_ids }] })
+}
+
+/// The pre-category wire shape every client sent before docs/decisions/
+/// 0006-channel-categories.md: a flat list, with no `categories` key at all -
+/// what [`flat_order`] emulates through the grouped shape's own null-category
+/// group, and what an old client actually still sends.
+fn old_shape(channel_ids: &[String]) -> Value {
+    json!({ "channel_ids": channel_ids })
 }
 
 #[tokio::test]
@@ -327,4 +334,78 @@ async fn a_cross_category_drag_reassigns_and_repositions_atomically() {
         .find(|c| c["id"] == a.id.to_string())
         .unwrap();
     assert_eq!(persisted_a["category_id"], text_cat.id.to_string());
+}
+
+/// A client that has never heard of categories keeps working against a
+/// server that has: `channel_ids` alone reorders positions and never
+/// touches any channel's `category_id`. The wire is additive-only, so this
+/// pre-category shape must keep validating and applying forever, not just
+/// until the next client update reaches every phone.
+#[tokio::test]
+async fn an_old_client_sending_channel_ids_alone_still_reorders_and_keeps_categories() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let text_cat = store.create_category("Text").await.unwrap();
+    let a = store.create_channel("a", "text").await.unwrap();
+    let b = store.create_channel("b", "voice").await.unwrap();
+    // Both in one category: `list_channels` sorts by category position first, so two channels in different categories could never swap order by position alone.
+    store
+        .reorder_channels(&[ChannelOrderGroup {
+            category_id: Some(text_cat.id),
+            channel_ids: vec![a.id, b.id],
+        }])
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let new_order = vec![b.id.to_string(), a.id.to_string()];
+    let response = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(old_shape(&new_order)),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    assert_eq!(ids(&body), new_order);
+
+    let category_of = |list: &Value, id: &str| -> Option<String> {
+        list.as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["id"] == id)
+            .unwrap()["category_id"]
+            .as_str()
+            .map(str::to_owned)
+    };
+    assert_eq!(
+        category_of(&body, &a.id.to_string()),
+        Some(text_cat.id.to_string()),
+        "an old client's reorder must not touch category_id"
+    );
+    assert_eq!(
+        category_of(&body, &b.id.to_string()),
+        Some(text_cat.id.to_string()),
+        "an old client's reorder must not touch category_id"
+    );
+
+    // Persisted, not just echoed back.
+    let listed = channels_of(&app, &token).await;
+    assert_eq!(ids(&listed), new_order);
+    assert_eq!(
+        category_of(&listed, &a.id.to_string()),
+        Some(text_cat.id.to_string())
+    );
 }

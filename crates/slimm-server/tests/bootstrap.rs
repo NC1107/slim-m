@@ -126,7 +126,7 @@ async fn first_account_claims_the_deployment_and_can_message() {
             .unwrap(),
     )
     .await;
-    let channels = channels["channels"].as_array().unwrap();
+    let channels = channels.as_array().unwrap();
     assert_eq!(channels.len(), 1);
     assert_eq!(channels[0]["name"], "general");
     let channel_id = channels[0]["id"].as_str().unwrap().to_owned();
