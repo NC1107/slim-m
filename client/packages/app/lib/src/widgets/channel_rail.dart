@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The left rail: server header, search, the three channel sections, and
-/// the signed-in user's footer bar.
+/// The left rail: server header, search, direct messages, every channel
+/// category, and the signed-in user's footer bar.
 library;
 
 import 'dart:async';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -16,7 +18,6 @@ import '../providers/channel_order_controller.dart';
 import '../providers/dms.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
-import 'channel_grouping.dart';
 import 'channel_rail_frame.dart';
 import 'channel_rail_sections.dart';
 import 'command_palette.dart';
@@ -148,54 +149,39 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                   const Center(child: Text('Could not load channels.')),
               data: (store) => StreamBuilder<List<Channel>>(
                 stream: store.watchChannels(),
-                builder: (context, snapshot) {
-                  final channels = _withPendingOrder(
-                    snapshot.data ?? const <Channel>[],
-                    orderState.pendingOrder,
-                  );
-                  final nonDm = channels
-                      .where((c) => c.kind != dmChannelKind)
-                      .toList(growable: false);
-                  return ListView(
-                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-                    children: [
-                      DirectMessagesSection(
-                        channels: channels
-                            .where((c) => c.kind == dmChannelKind)
-                            .toList(),
-                        selectedId: selected,
-                      ),
-                      TextChannelsSection(
-                        channels: nonDm.where((c) => c.kind == 'text').toList(),
-                        selectedId: selected,
-                        canManage: canManageChannels,
-                        onReorder: (newOrder) => unawaited(
-                          orderController.reorder(
-                            spliceKindOrder(
-                              fullOrder: nonDm,
-                              kind: 'text',
-                              newKindOrder: newOrder,
-                            ),
+                builder: (context, channelSnapshot) {
+                  return StreamBuilder<List<ChannelCategoryRow>>(
+                    stream: store.watchCategories(),
+                    builder: (context, categorySnapshot) {
+                      final categories =
+                          categorySnapshot.data ?? const <ChannelCategoryRow>[];
+                      final channels = _withPendingOrder(
+                        channelSnapshot.data ?? const <Channel>[],
+                        orderState.pendingOrder,
+                      );
+                      final nonDm = channels
+                          .where((c) => c.kind != dmChannelKind)
+                          .toList(growable: false);
+                      return ListView(
+                        padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+                        children: [
+                          DirectMessagesSection(
+                            channels: channels
+                                .where((c) => c.kind == dmChannelKind)
+                                .toList(),
+                            selectedId: selected,
                           ),
-                        ),
-                      ),
-                      VoiceChannelsSection(
-                        channels: nonDm
-                            .where((c) => c.kind == 'voice')
-                            .toList(),
-                        selectedId: selected,
-                        canManage: canManageChannels,
-                        onReorder: (newOrder) => unawaited(
-                          orderController.reorder(
-                            spliceKindOrder(
-                              fullOrder: nonDm,
-                              kind: 'voice',
-                              newKindOrder: newOrder,
-                            ),
+                          ChannelCategorySections(
+                            channels: nonDm,
+                            categories: categories,
+                            selectedId: selected,
+                            canManage: canManageChannels,
+                            onReorder: (groups) =>
+                                unawaited(orderController.reorder(groups)),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      );
+                    },
                   );
                 },
               ),
@@ -209,18 +195,32 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
 }
 
 /// Renders [pending] (a reorder this client is waiting on, or has just had
-/// refused) over [channels], rather than the plain order the local store
-/// still holds - the store is not rewritten until the server confirms it.
-/// Anything [pending] does not name (every DM, or a channel that arrived
-/// concurrently) keeps its place among the rest, appended after.
-List<Channel> _withPendingOrder(List<Channel> channels, List<String>? pending) {
+/// refused) over [channels], rather than the plain arrangement the local
+/// store still holds - the store is not rewritten until the server confirms
+/// it. A channel [pending] does not name (a DM, or one that arrived
+/// concurrently) keeps its stored category and position.
+List<Channel> _withPendingOrder(
+  List<Channel> channels,
+  List<api.ChannelOrderGroup>? pending,
+) {
   if (pending == null) return channels;
   final byId = {for (final channel in channels) channel.id: channel};
-  final named = pending.toSet();
+  final named = <String>{};
+  final overridden = <Channel>[];
+  for (final group in pending) {
+    for (var i = 0; i < group.channelIds.length; i++) {
+      final original = byId[group.channelIds[i]];
+      if (original == null) continue;
+      named.add(original.id);
+      overridden.add(_repositioned(original, group.categoryId, i));
+    }
+  }
   return [
-    for (final id in pending)
-      if (byId.containsKey(id)) byId[id]!,
+    ...overridden,
     for (final channel in channels)
       if (!named.contains(channel.id)) channel,
   ];
 }
+
+Channel _repositioned(Channel channel, String? categoryId, int position) =>
+    channel.copyWith(position: position, categoryId: Value(categoryId));

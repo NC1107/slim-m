@@ -12,7 +12,7 @@
 
 use sqlx::SqlitePool;
 
-use crate::ids::{ChannelId, MessageId, Seq, UserId};
+use crate::ids::{ChannelCategoryId, ChannelId, MessageId, Seq, UserId};
 
 mod account_deletion;
 mod attachments;
@@ -20,6 +20,7 @@ mod bootstrap;
 mod canvas;
 mod canvas_ops;
 mod canvas_ops_write;
+mod categories;
 mod channel_order;
 mod channels;
 mod dms;
@@ -58,7 +59,7 @@ pub use canvas_ops::{
     CANVAS_OP_GAP, CANVAS_OP_PAGE_BYTES, CanvasOpBody, CanvasOpEntry, CanvasOpsPage,
 };
 pub use canvas_ops_write::{CanvasOpRequest, MAX_REMOVE_IDS_PER_OP, SubmitOpError, SubmittedOp};
-pub use channel_order::{ReorderChannelsError, ReorderOutcome};
+pub use channel_order::{ChannelOrderGroup, ReorderChannelsError, ReorderOutcome};
 pub use channels::DeleteChannelError;
 pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};
@@ -120,6 +121,27 @@ pub struct Channel {
     /// docs/decisions/0005-threads.md. A thread never appears in
     /// [`Store::list_channels`].
     pub parent_message_id: Option<MessageId>,
+    /// The rail section this channel is filed under, or `None` for
+    /// uncategorised - rendered as an implicit section above every named
+    /// one. Decides placement only, never behaviour: see
+    /// docs/decisions/0006-channel-categories.md. A category carries no
+    /// permissions of its own, so this column is never consulted by
+    /// [`Store::permission_channel`] or anything it calls.
+    pub category_id: Option<ChannelCategoryId>,
+    pub created_at: i64,
+}
+
+/// A rail section: a channel of any kind may be filed under one, per
+/// docs/decisions/0006-channel-categories.md. Organisational only - it
+/// grants and denies no permission, see docs/IMPLIED-GAPS.md.
+#[derive(Debug, Clone)]
+pub struct ChannelCategory {
+    pub id: ChannelCategoryId,
+    pub name: String,
+    /// Sort key among the deployment's live categories: lower sorts first.
+    /// Uncategorised channels render above every named category regardless
+    /// of this value, since they carry no category row to hold one.
+    pub position: i64,
     pub created_at: i64,
 }
 

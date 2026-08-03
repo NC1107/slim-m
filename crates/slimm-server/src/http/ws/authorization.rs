@@ -80,7 +80,8 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::ProfileChanged(_)
         | Event::RoleChanged { .. }
         | Event::MemberRoleChanged { .. }
-        | Event::ChannelDeleted { .. } => None,
+        | Event::ChannelDeleted { .. }
+        | Event::CategoryChanged => None,
     }
 }
 
@@ -138,6 +139,9 @@ pub(super) async fn authorize(
                 user_id: user_id.to_string(),
             }));
         }
+        Event::CategoryChanged => {
+            return Authorization::Deliver(Box::new(ServerFrame::CategoryChanged));
+        }
         _ => {}
     }
 
@@ -186,7 +190,8 @@ pub(super) async fn authorize(
         | Event::ProfileChanged(_)
         | Event::RoleChanged { .. }
         | Event::MemberRoleChanged { .. }
-        | Event::ChannelDeleted { .. } => return Authorization::Withhold,
+        | Event::ChannelDeleted { .. }
+        | Event::CategoryChanged => return Authorization::Withhold,
     };
     // The one event whose subject may have just lost this very view.
     let held_it_before = matches!(
@@ -402,6 +407,7 @@ pub(super) async fn authorize(
         | Event::ProfileChanged(_)
         | Event::RoleChanged { .. }
         | Event::MemberRoleChanged { .. }
-        | Event::ChannelDeleted { .. } => return Authorization::Withhold,
+        | Event::ChannelDeleted { .. }
+        | Event::CategoryChanged => return Authorization::Withhold,
     }))
 }

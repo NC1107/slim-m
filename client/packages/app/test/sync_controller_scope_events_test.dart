@@ -175,6 +175,9 @@ void main() {
           if (request.method == 'GET' && request.url.path == '/channels') {
             return _json([_channelJson(id: 'new', name: 'new-channel')]);
           }
+          if (request.method == 'GET' && request.url.path == '/categories') {
+            return _json(<Object>[]);
+          }
           if (request.method == 'GET' && request.url.path == '/dms') {
             return _json(<Object>[]);
           }

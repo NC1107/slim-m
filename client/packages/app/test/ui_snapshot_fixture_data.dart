@@ -190,12 +190,25 @@ MockClient fixtureClient() => MockClient((request) async {
   );
 });
 
+/// The two categories the backfill (migration 0031) would have created for
+/// any pre-existing deployment: see docs/decisions/0006-channel-categories.md.
+const fixtureCategories = [
+  api.ChannelCategory(id: 'cat-text', name: 'Text', position: 0, createdAt: 0),
+  api.ChannelCategory(
+    id: 'cat-voice',
+    name: 'Voice',
+    position: 1,
+    createdAt: 0,
+  ),
+];
+
 const fixtureChannels = [
   api.Channel(
     id: 'c-general',
     name: 'general',
     kind: 'text',
     createdAt: 0,
+    categoryId: 'cat-text',
     topic:
         'General chat for the whole Space - keep it friendly, and keep '
         'call logistics in #main instead of here.',
@@ -205,9 +218,16 @@ const fixtureChannels = [
     name: 'design',
     kind: 'text',
     createdAt: 0,
+    categoryId: 'cat-text',
     topic: 'tokens, type and the shell',
   ),
-  api.Channel(id: 'c-main', name: 'main', kind: 'voice', createdAt: 0),
+  api.Channel(
+    id: 'c-main',
+    name: 'main',
+    kind: 'voice',
+    createdAt: 0,
+    categoryId: 'cat-voice',
+  ),
   // A thread's own channel row, hanging off m-1: the stacked-header render.
   api.Channel(
     id: 'c-thread',

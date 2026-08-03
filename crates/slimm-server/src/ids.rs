@@ -47,6 +47,10 @@ uuid_id!(
     FamilyId,
     "A refresh-token family identity: rotation keeps the id, reuse revokes it."
 );
+uuid_id!(
+    ChannelCategoryId,
+    "A channel category identity: a rail section a channel of any kind may be placed in."
+);
 
 /// A per-scope monotonic order key. Deliberately a distinct type from identity:
 /// it answers "in what order", not "which one".

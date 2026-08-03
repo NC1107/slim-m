@@ -1,0 +1,385 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! `PUT /channels/order`'s all-or-nothing validation: a missing, unknown, or
+//! duplicated channel id, an unknown category id, and a DM refused the same
+//! way an unknown id is. Split out of `channel_order.rs` (the happy-path
+//! reorder and category-placement tests) to stay under the file budget. See
+//! docs/decisions/0006-channel-categories.md.
+
+use axum::Router;
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use serde_json::{Value, json};
+use slimm_server::auth::Auth;
+use slimm_server::config::Config;
+use slimm_server::db;
+use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
+use slimm_server::permissions::Permissions;
+use slimm_server::push::PushSender;
+use slimm_server::ratelimit::RateLimiter;
+use slimm_server::store::Store;
+use tower::ServiceExt;
+use uuid::Uuid;
+
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-channel-order-validation-test");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    (Store::new(pool), guard)
+}
+
+fn app(store: Store) -> Router {
+    http::router(AppState {
+        store,
+        auth: Auth::new(2).unwrap(),
+        hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
+    })
+}
+
+fn request(method: &str, uri: &str, token: Option<&str>, body: Option<Value>) -> Request<Body> {
+    let mut builder = Request::builder().method(method).uri(uri);
+    if let Some(token) = token {
+        builder = builder.header("authorization", format!("Bearer {token}"));
+    }
+    match body {
+        Some(value) => builder
+            .header("content-type", "application/json")
+            .body(Body::from(value.to_string()))
+            .unwrap(),
+        None => builder.body(Body::empty()).unwrap(),
+    }
+}
+
+async fn json_body(response: axum::response::Response) -> Value {
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    serde_json::from_slice(&bytes).unwrap()
+}
+
+/// A member with a session, built straight through the store. See
+/// `tests/channels.rs`'s own copy of this for why it bypasses `/auth/register`.
+async fn register(store: &Store, username: &str) -> String {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(account.id).await.unwrap();
+    store
+        .open_session(account.id, "cli")
+        .await
+        .unwrap()
+        .access_token
+}
+
+/// One group, `category_id: null`, naming every channel - the plain flat
+/// shape most of these tests need, since they are about validation rather
+/// than category placement.
+fn flat_order(channel_ids: &[String]) -> Value {
+    json!({ "categories": [{ "category_id": Value::Null, "channel_ids": channel_ids }] })
+}
+
+/// A list missing a live channel is refused with a 400 naming it, rather than
+/// silently leaving a gap in the order.
+#[tokio::test]
+async fn reorder_refuses_a_list_missing_a_live_channel() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let a = store.create_channel("a", "text").await.unwrap();
+    let b = store.create_channel("b", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(flat_order(&[a.id.to_string()])),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = json_body(response).await;
+    let error = body["error"].as_str().unwrap();
+    assert!(error.contains("missing"));
+    assert!(error.contains(&b.id.to_string()));
+}
+
+/// An id that names no live channel is refused, distinctly from a missing one.
+#[tokio::test]
+async fn reorder_refuses_an_unknown_channel_id() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let a = store.create_channel("a", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let bogus = Uuid::now_v7().to_string();
+    let response = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(flat_order(&[a.id.to_string(), bogus.clone()])),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = json_body(response).await;
+    let error = body["error"].as_str().unwrap();
+    assert!(error.contains("unknown"));
+    assert!(error.contains(&bogus));
+}
+
+/// Repeating one channel and leaving another out entirely is refused, not
+/// silently accepted with the repeat's last position winning.
+#[tokio::test]
+async fn reorder_refuses_a_duplicate_that_also_omits_a_channel() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let a = store.create_channel("a", "text").await.unwrap();
+    let b = store.create_channel("b", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(flat_order(&[a.id.to_string(), a.id.to_string()])),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = json_body(response).await;
+    assert!(body["error"].as_str().unwrap().contains(&b.id.to_string()));
+}
+
+/// A duplicate that still names every live channel at least once is refused
+/// too: the length itself has to match, or a duplicate could silently pin
+/// one channel's position while displacing nothing else's slot count. Split
+/// across two groups, so this also covers a repeat spanning categories.
+#[tokio::test]
+async fn reorder_refuses_a_duplicate_that_names_every_channel() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let a = store.create_channel("a", "text").await.unwrap();
+    let b = store.create_channel("b", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(json!({
+                "categories": [
+                    { "category_id": Value::Null, "channel_ids": [a.id.to_string(), b.id.to_string()] },
+                    { "category_id": Value::Null, "channel_ids": [a.id.to_string()] },
+                ]
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+/// A DM is never in the ordered set: naming it is refused the same way an
+/// unknown id is, and it never has to appear in a valid list.
+#[tokio::test]
+async fn reorder_never_names_a_dm_channel() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let a = store.create_channel("a", "text").await.unwrap();
+    let alice = store.create_user("alice", "alice").await.unwrap();
+    let bob = store.create_user("bob", "bob").await.unwrap();
+    let dm = store.open_dm(alice.id, bob.id).await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "carol").await;
+
+    // The DM is not required alongside `a`.
+    let response = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(flat_order(&[a.id.to_string()])),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Naming it anyway is refused, like any other unknown id.
+    let response = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(flat_order(&[a.id.to_string(), dm.id.to_string()])),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+/// A category id that names no live category is refused, the same shape an
+/// unknown channel id already is - checked before anything is written.
+#[tokio::test]
+async fn reorder_refuses_an_unknown_category_id() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let a = store.create_channel("a", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let bogus = Uuid::now_v7().to_string();
+    let response = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(json!({
+                "categories": [{ "category_id": bogus.clone(), "channel_ids": [a.id.to_string()] }]
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = json_body(response).await;
+    let error = body["error"].as_str().unwrap();
+    assert!(error.contains("unknown"));
+    assert!(error.contains(&bogus));
+}
+
+/// A body naming neither `channel_ids` nor `categories` cannot mean anything,
+/// so it is a 400 rather than silently matching one shape or the other.
+#[tokio::test]
+async fn reorder_refuses_a_body_naming_neither_shape() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    store.create_channel("a", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let response = app
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(json!({})),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = json_body(response).await;
+    assert!(
+        body["error"]
+            .as_str()
+            .unwrap()
+            .contains("channel_ids or categories")
+    );
+}
+
+/// A body naming both shapes at once is refused too, rather than one
+/// silently winning over the other with no way for the caller to tell which.
+#[tokio::test]
+async fn reorder_refuses_a_body_naming_both_shapes() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let a = store.create_channel("a", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let response = app
+        .oneshot(request(
+            "PUT",
+            "/channels/order",
+            Some(&token),
+            Some(json!({
+                "channel_ids": [a.id.to_string()],
+                "categories": [{ "category_id": Value::Null, "channel_ids": [a.id.to_string()] }],
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = json_body(response).await;
+    assert!(body["error"].as_str().unwrap().contains("not both"));
+}

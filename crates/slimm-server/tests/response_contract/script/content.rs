@@ -50,6 +50,43 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
     )
     .await;
 
+    let category = c
+        .json(
+            "createCategory",
+            "POST",
+            "/categories",
+            root,
+            json!({ "name": "extras" }),
+        )
+        .await;
+    let category_id = text(&category, "id");
+    c.json(
+        "updateCategory",
+        "PATCH",
+        &format!("/categories/{category_id}"),
+        root,
+        json!({ "name": "extras", "position": 0 }),
+    )
+    .await;
+    let scratch_category = c
+        .json(
+            "createCategory",
+            "POST",
+            "/categories",
+            root,
+            json!({ "name": "scratch" }),
+        )
+        .await;
+    c.bare(
+        "deleteCategory",
+        "DELETE",
+        &format!("/categories/{}", text(&scratch_category, "id")),
+        root,
+    )
+    .await;
+
+    c.get("listCategories", "/categories", root).await;
+
     let live = c.get("listChannels", "/channels", root).await;
     let mut order: Vec<String> = live
         .as_array()
@@ -63,7 +100,9 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         "PUT",
         "/channels/order",
         root,
-        json!({ "channel_ids": order }),
+        json!({
+            "categories": [{ "category_id": category_id, "channel_ids": order }]
+        }),
     )
     .await;
 

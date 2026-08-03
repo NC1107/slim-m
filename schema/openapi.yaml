@@ -947,6 +947,13 @@ paths:
       operationId: listChannels
       tags: [channels]
       summary: List the channels the caller can view.
+      description: >
+        A plain array, unchanged since before channel categories: the wire is
+        additive-only, and a live deployment auto-updating from `latest`
+        while its phones update on their own TestFlight/Play schedule means
+        reshaping this response would break every client that has not
+        updated yet. `category_id` is a new field on each channel (additive);
+        the category list itself is `listCategories` instead.
       responses:
         "200":
           description: The visible channels.
@@ -1045,19 +1052,23 @@ paths:
     put:
       operationId: reorderChannels
       tags: [channels]
-      summary: Set the deployment's channel order.
+      summary: Set the deployment's channel order, and optionally its category placement.
       description: >
         Requires MANAGE_CHANNELS at the deployment level, the same check
         `createChannel` uses. Deployment-wide, not a per-device preference:
         one deployment is one community, and everyone seeing the same order
-        is the point. Takes the whole ordered list of channel ids a drag
-        produced, applied atomically, rather than a position PATCH per
-        channel that could interleave with another admin's drag and leave
-        the order neither of them asked for. The list must name exactly the
-        live, non-DM channels - no more, no fewer, no repeats - or the
-        request is refused with a 400 naming which channels were missing or
-        unrecognized; a partial list is never applied. Submitting the order
-        already in effect is not an error and changes nothing.
+        is the point. Takes exactly one of `channel_ids` (the flat,
+        pre-category shape: reorders positions and leaves every channel's
+        `category_id` untouched) or `categories` (the whole rail grouped by
+        category, applied atomically - a channel of any kind may be placed
+        in any category, since a category only decides placement, never
+        behaviour). Sending neither, or both, is a 400. The channel ids
+        named - flattened, for the grouped shape - must add up to exactly
+        the live, non-DM, non-thread channels - no more, no fewer, no
+        repeats - and every named category id must be a live category, or
+        the request is refused with a 400 naming what was wrong; a partial
+        list is never applied. Submitting the arrangement already in effect
+        is not an error and changes nothing.
       requestBody:
         required: true
         content:
@@ -1075,6 +1086,108 @@ paths:
                   $ref: "#/components/schemas/Channel"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [channels]
+      summary: List every live channel category.
+      description: >
+        Unfiltered by any permission: a category carries none of its own
+        (see docs/IMPLIED-GAPS.md), so its name and position are not
+        privileged for any authenticated caller. Split out of
+        `listChannels`'s own response, which used to embed this list until
+        that reshaped an existing response the wire's additive-only rule
+        does not allow; a new route is additive.
+      responses:
+        "200":
+          description: Every live category.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChannelCategory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createCategory
+      tags: [channels]
+      summary: Create a channel category.
+      description: >
+        Requires MANAGE_CHANNELS at the deployment level, the same check
+        `createChannel` uses. Appended after every live category.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryRequest"
+      responses:
+        "200":
+          description: The created category.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelCategory"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /categories/{categoryId}:
+    parameters:
+      - name: categoryId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: updateCategory
+      tags: [channels]
+      summary: Rename and/or reposition a category.
+      description: >
+        Requires MANAGE_CHANNELS at the deployment level, the same check
+        `updateChannel` uses.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCategoryRequest"
+      responses:
+        "200":
+          description: The updated category.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelCategory"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteCategory
+      tags: [channels]
+      summary: Soft-delete a category.
+      description: >
+        Requires MANAGE_CHANNELS at the deployment level. Its channels are
+        never deleted with it - they fall back to uncategorised. Deleting an
+        already-deleted category is not an error.
+      responses:
+        "204":
+          description: The category was deleted (or was already gone).
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -3674,10 +3787,66 @@ components:
             message's own channel, resolved live rather than copied. A
             thread never appears in `listChannels`; reach one through
             `openThread`.
+        category_id:
+          type: [string, "null"]
+          format: uuid
+          description: >
+            The rail section this channel is filed under, or null for
+            uncategorised - rendered as an implicit section above every named
+            category. Decides placement only, never behaviour: `kind` still
+            decides that. Absent on servers older than this field, which a
+            client must treat as unknown rather than assuming uncategorised.
         created_at:
           type: integer
           format: int64
           description: Unix milliseconds.
+
+    ChannelCategory:
+      type: object
+      required: [id, name, position, created_at]
+      description: >
+        A rail section a channel of any kind may be filed under. Carries no
+        permission of its own; see docs/decisions/0006-channel-categories.md.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        position:
+          type: integer
+          format: int64
+          description: >
+            Sort key among the deployment's live categories: lower sorts
+            first.
+        created_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds.
+
+    CreateCategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+
+    UpdateCategoryRequest:
+      type: object
+      description: >
+        At least one of `name` and `position` must be present; a request
+        with neither is a 400. Each is independent, the same convention
+        `UpdateChannelRequest` follows for its own two optional fields.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        position:
+          type: integer
+          format: int64
 
     CreateChannelRequest:
       type: object
@@ -3712,16 +3881,44 @@ components:
 
     ReorderChannelsRequest:
       type: object
-      required: [channel_ids]
+      description: >
+        Exactly one of `channel_ids` and `categories` must be present;
+        sending neither, or both, is a 400. Both are optional here so the
+        pre-category shape (`channel_ids` alone) keeps validating for a
+        client that has never heard of categories, the same "additive, never
+        reshaped" rule the rest of this wire follows.
       properties:
         channel_ids:
           type: array
+          description: >
+            Every live, non-DM, non-thread channel id, in the desired order.
+            Must name exactly that set - no more, no fewer, no repeats.
+            Reorders positions only; every channel's `category_id` is left
+            exactly as it was.
           items:
             type: string
             format: uuid
+        categories:
+          type: array
           description: >
-            Every live, non-DM channel id, in the desired order. Must name
-            exactly that set - no more, no fewer, no repeats.
+            The whole rail, grouped by section, in display order. The
+            channel ids named across every group's `channel_ids`, flattened,
+            must be exactly the live, non-DM, non-thread channels - no more,
+            no fewer, no repeats.
+          items:
+            type: object
+            required: [channel_ids]
+            properties:
+              category_id:
+                type: [string, "null"]
+                format: uuid
+                description: The section's category id, or null for the implicit uncategorised section.
+              channel_ids:
+                type: array
+                items:
+                  type: string
+                  format: uuid
+                description: This section's channels, in the desired order.
 
     DmConversation:
       type: object
@@ -4653,6 +4850,7 @@ components:
         - $ref: "#/components/schemas/ChannelUpdated"
         - $ref: "#/components/schemas/ChannelDeleted"
         - $ref: "#/components/schemas/OverwriteChanged"
+        - $ref: "#/components/schemas/CategoryChanged"
         - $ref: "#/components/schemas/CanvasObjectPlaced"
         - $ref: "#/components/schemas/CanvasObjectsRemoved"
         - $ref: "#/components/schemas/CanvasCleared"
@@ -5184,6 +5382,21 @@ components:
         channel_id:
           type: string
           format: uuid
+
+    CategoryChanged:
+      type: object
+      required: [type]
+      description: >
+        A channel category was created, renamed, repositioned, or deleted.
+        Carries no fields at all: a category is organisational only (see
+        docs/decisions/0006-channel-categories.md), so there is nothing
+        privileged to withhold and nothing per-viewer to resolve. A receiving
+        client re-fetches `listChannels`, the same path a `channel.created`,
+        `channel.updated`, or `channel.deleted` frame already drives.
+      properties:
+        type:
+          type: string
+          enum: [category.changed]
 
     ServerPong:
       type: object

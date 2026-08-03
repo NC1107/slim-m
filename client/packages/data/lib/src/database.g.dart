@@ -85,6 +85,12 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
   late final GeneratedColumn<String> parentMessageId = GeneratedColumn<String>(
       'parent_message_id', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _categoryIdMeta =
+      const VerificationMeta('categoryId');
+  @override
+  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
+      'category_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -98,7 +104,8 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
         dmParticipantId,
         position,
         opCursor,
-        parentMessageId
+        parentMessageId,
+        categoryId
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -173,6 +180,12 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           parentMessageId.isAcceptableOrUnknown(
               data['parent_message_id']!, _parentMessageIdMeta));
     }
+    if (data.containsKey('category_id')) {
+      context.handle(
+          _categoryIdMeta,
+          categoryId.isAcceptableOrUnknown(
+              data['category_id']!, _categoryIdMeta));
+    }
     return context;
   }
 
@@ -206,6 +219,8 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           .read(DriftSqlType.int, data['${effectivePrefix}op_cursor']),
       parentMessageId: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}parent_message_id']),
+      categoryId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}category_id']),
     );
   }
 
@@ -264,6 +279,15 @@ class Channel extends DataClass implements Insertable<Channel> {
   /// ordinary one when deciding what the rail shows and what a full channel
   /// refresh may prune.
   final String? parentMessageId;
+
+  /// The rail section this channel is filed under, or null for
+  /// uncategorised. Decides placement only, mirroring the server's
+  /// `channels.category_id` - see docs/decisions/0006-channel-categories.md.
+  /// Not a foreign key here: [ChannelCategories] is replaced on its own path
+  /// ([MessageStore.replaceCategories]), never joined against this table for
+  /// referential integrity, the same reason `dmParticipantId` names a user
+  /// id with no local `Users` table to reference.
+  final String? categoryId;
   const Channel(
       {required this.id,
       required this.name,
@@ -276,7 +300,8 @@ class Channel extends DataClass implements Insertable<Channel> {
       this.dmParticipantId,
       required this.position,
       this.opCursor,
-      this.parentMessageId});
+      this.parentMessageId,
+      this.categoryId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -299,6 +324,9 @@ class Channel extends DataClass implements Insertable<Channel> {
     }
     if (!nullToAbsent || parentMessageId != null) {
       map['parent_message_id'] = Variable<String>(parentMessageId);
+    }
+    if (!nullToAbsent || categoryId != null) {
+      map['category_id'] = Variable<String>(categoryId);
     }
     return map;
   }
@@ -324,6 +352,9 @@ class Channel extends DataClass implements Insertable<Channel> {
       parentMessageId: parentMessageId == null && nullToAbsent
           ? const Value.absent()
           : Value(parentMessageId),
+      categoryId: categoryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categoryId),
     );
   }
 
@@ -343,6 +374,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       position: serializer.fromJson<int>(json['position']),
       opCursor: serializer.fromJson<int?>(json['opCursor']),
       parentMessageId: serializer.fromJson<String?>(json['parentMessageId']),
+      categoryId: serializer.fromJson<String?>(json['categoryId']),
     );
   }
   @override
@@ -361,6 +393,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       'position': serializer.toJson<int>(position),
       'opCursor': serializer.toJson<int?>(opCursor),
       'parentMessageId': serializer.toJson<String?>(parentMessageId),
+      'categoryId': serializer.toJson<String?>(categoryId),
     };
   }
 
@@ -376,7 +409,8 @@ class Channel extends DataClass implements Insertable<Channel> {
           Value<String?> dmParticipantId = const Value.absent(),
           int? position,
           Value<int?> opCursor = const Value.absent(),
-          Value<String?> parentMessageId = const Value.absent()}) =>
+          Value<String?> parentMessageId = const Value.absent(),
+          Value<String?> categoryId = const Value.absent()}) =>
       Channel(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -394,6 +428,7 @@ class Channel extends DataClass implements Insertable<Channel> {
         parentMessageId: parentMessageId.present
             ? parentMessageId.value
             : this.parentMessageId,
+        categoryId: categoryId.present ? categoryId.value : this.categoryId,
       );
   Channel copyWithCompanion(ChannelsCompanion data) {
     return Channel(
@@ -416,6 +451,8 @@ class Channel extends DataClass implements Insertable<Channel> {
       parentMessageId: data.parentMessageId.present
           ? data.parentMessageId.value
           : this.parentMessageId,
+      categoryId:
+          data.categoryId.present ? data.categoryId.value : this.categoryId,
     );
   }
 
@@ -433,7 +470,8 @@ class Channel extends DataClass implements Insertable<Channel> {
           ..write('dmParticipantId: $dmParticipantId, ')
           ..write('position: $position, ')
           ..write('opCursor: $opCursor, ')
-          ..write('parentMessageId: $parentMessageId')
+          ..write('parentMessageId: $parentMessageId, ')
+          ..write('categoryId: $categoryId')
           ..write(')'))
         .toString();
   }
@@ -451,7 +489,8 @@ class Channel extends DataClass implements Insertable<Channel> {
       dmParticipantId,
       position,
       opCursor,
-      parentMessageId);
+      parentMessageId,
+      categoryId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -467,7 +506,8 @@ class Channel extends DataClass implements Insertable<Channel> {
           other.dmParticipantId == this.dmParticipantId &&
           other.position == this.position &&
           other.opCursor == this.opCursor &&
-          other.parentMessageId == this.parentMessageId);
+          other.parentMessageId == this.parentMessageId &&
+          other.categoryId == this.categoryId);
 }
 
 class ChannelsCompanion extends UpdateCompanion<Channel> {
@@ -483,6 +523,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
   final Value<int> position;
   final Value<int?> opCursor;
   final Value<String?> parentMessageId;
+  final Value<String?> categoryId;
   final Value<int> rowid;
   const ChannelsCompanion({
     this.id = const Value.absent(),
@@ -497,6 +538,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.position = const Value.absent(),
     this.opCursor = const Value.absent(),
     this.parentMessageId = const Value.absent(),
+    this.categoryId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChannelsCompanion.insert({
@@ -512,6 +554,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.position = const Value.absent(),
     this.opCursor = const Value.absent(),
     this.parentMessageId = const Value.absent(),
+    this.categoryId = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         name = Value(name),
@@ -530,6 +573,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     Expression<int>? position,
     Expression<int>? opCursor,
     Expression<String>? parentMessageId,
+    Expression<String>? categoryId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -545,6 +589,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       if (position != null) 'position': position,
       if (opCursor != null) 'op_cursor': opCursor,
       if (parentMessageId != null) 'parent_message_id': parentMessageId,
+      if (categoryId != null) 'category_id': categoryId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -562,6 +607,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       Value<int>? position,
       Value<int?>? opCursor,
       Value<String?>? parentMessageId,
+      Value<String?>? categoryId,
       Value<int>? rowid}) {
     return ChannelsCompanion(
       id: id ?? this.id,
@@ -576,6 +622,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       position: position ?? this.position,
       opCursor: opCursor ?? this.opCursor,
       parentMessageId: parentMessageId ?? this.parentMessageId,
+      categoryId: categoryId ?? this.categoryId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -619,6 +666,9 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     if (parentMessageId.present) {
       map['parent_message_id'] = Variable<String>(parentMessageId.value);
     }
+    if (categoryId.present) {
+      map['category_id'] = Variable<String>(categoryId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -640,6 +690,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
           ..write('position: $position, ')
           ..write('opCursor: $opCursor, ')
           ..write('parentMessageId: $parentMessageId, ')
+          ..write('categoryId: $categoryId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1275,16 +1326,249 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   }
 }
 
+class $ChannelCategoriesTable extends ChannelCategories
+    with TableInfo<$ChannelCategoriesTable, ChannelCategoryRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ChannelCategoriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _positionMeta =
+      const VerificationMeta('position');
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+      'position', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  @override
+  List<GeneratedColumn> get $columns => [id, name, position];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'channel_categories';
+  @override
+  VerificationContext validateIntegrity(Insertable<ChannelCategoryRow> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('position')) {
+      context.handle(_positionMeta,
+          position.isAcceptableOrUnknown(data['position']!, _positionMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ChannelCategoryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ChannelCategoryRow(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      position: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}position'])!,
+    );
+  }
+
+  @override
+  $ChannelCategoriesTable createAlias(String alias) {
+    return $ChannelCategoriesTable(attachedDatabase, alias);
+  }
+}
+
+class ChannelCategoryRow extends DataClass
+    implements Insertable<ChannelCategoryRow> {
+  final String id;
+  final String name;
+
+  /// Sort key among the deployment's live categories: lower sorts first.
+  final int position;
+  const ChannelCategoryRow(
+      {required this.id, required this.name, required this.position});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['position'] = Variable<int>(position);
+    return map;
+  }
+
+  ChannelCategoriesCompanion toCompanion(bool nullToAbsent) {
+    return ChannelCategoriesCompanion(
+      id: Value(id),
+      name: Value(name),
+      position: Value(position),
+    );
+  }
+
+  factory ChannelCategoryRow.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ChannelCategoryRow(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      position: serializer.fromJson<int>(json['position']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'position': serializer.toJson<int>(position),
+    };
+  }
+
+  ChannelCategoryRow copyWith({String? id, String? name, int? position}) =>
+      ChannelCategoryRow(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        position: position ?? this.position,
+      );
+  ChannelCategoryRow copyWithCompanion(ChannelCategoriesCompanion data) {
+    return ChannelCategoryRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      position: data.position.present ? data.position.value : this.position,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChannelCategoryRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('position: $position')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, position);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ChannelCategoryRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.position == this.position);
+}
+
+class ChannelCategoriesCompanion extends UpdateCompanion<ChannelCategoryRow> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> position;
+  final Value<int> rowid;
+  const ChannelCategoriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.position = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ChannelCategoriesCompanion.insert({
+    required String id,
+    required String name,
+    this.position = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        name = Value(name);
+  static Insertable<ChannelCategoryRow> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? position,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (position != null) 'position': position,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ChannelCategoriesCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? name,
+      Value<int>? position,
+      Value<int>? rowid}) {
+    return ChannelCategoriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      position: position ?? this.position,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChannelCategoriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('position: $position, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$SlimmDatabase extends GeneratedDatabase {
   _$SlimmDatabase(QueryExecutor e) : super(e);
   $SlimmDatabaseManager get managers => $SlimmDatabaseManager(this);
   late final $ChannelsTable channels = $ChannelsTable(this);
   late final $MessagesTable messages = $MessagesTable(this);
+  late final $ChannelCategoriesTable channelCategories =
+      $ChannelCategoriesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [channels, messages];
+  List<DatabaseSchemaEntity> get allSchemaEntities =>
+      [channels, messages, channelCategories];
 }
 
 typedef $$ChannelsTableCreateCompanionBuilder = ChannelsCompanion Function({
@@ -1300,6 +1584,7 @@ typedef $$ChannelsTableCreateCompanionBuilder = ChannelsCompanion Function({
   Value<int> position,
   Value<int?> opCursor,
   Value<String?> parentMessageId,
+  Value<String?> categoryId,
   Value<int> rowid,
 });
 typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
@@ -1315,6 +1600,7 @@ typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
   Value<int> position,
   Value<int?> opCursor,
   Value<String?> parentMessageId,
+  Value<String?> categoryId,
   Value<int> rowid,
 });
 
@@ -1365,6 +1651,9 @@ class $$ChannelsTableFilterComposer
   ColumnFilters<String> get parentMessageId => $composableBuilder(
       column: $table.parentMessageId,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => ColumnFilters(column));
 }
 
 class $$ChannelsTableOrderingComposer
@@ -1414,6 +1703,9 @@ class $$ChannelsTableOrderingComposer
   ColumnOrderings<String> get parentMessageId => $composableBuilder(
       column: $table.parentMessageId,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => ColumnOrderings(column));
 }
 
 class $$ChannelsTableAnnotationComposer
@@ -1460,6 +1752,9 @@ class $$ChannelsTableAnnotationComposer
 
   GeneratedColumn<String> get parentMessageId => $composableBuilder(
       column: $table.parentMessageId, builder: (column) => column);
+
+  GeneratedColumn<String> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => column);
 }
 
 class $$ChannelsTableTableManager extends RootTableManager<
@@ -1497,6 +1792,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<int> position = const Value.absent(),
             Value<int?> opCursor = const Value.absent(),
             Value<String?> parentMessageId = const Value.absent(),
+            Value<String?> categoryId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ChannelsCompanion(
@@ -1512,6 +1808,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             position: position,
             opCursor: opCursor,
             parentMessageId: parentMessageId,
+            categoryId: categoryId,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -1527,6 +1824,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<int> position = const Value.absent(),
             Value<int?> opCursor = const Value.absent(),
             Value<String?> parentMessageId = const Value.absent(),
+            Value<String?> categoryId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ChannelsCompanion.insert(
@@ -1542,6 +1840,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             position: position,
             opCursor: opCursor,
             parentMessageId: parentMessageId,
+            categoryId: categoryId,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -1836,6 +2135,153 @@ typedef $$MessagesTableProcessedTableManager = ProcessedTableManager<
     (Message, BaseReferences<_$SlimmDatabase, $MessagesTable, Message>),
     Message,
     PrefetchHooks Function()>;
+typedef $$ChannelCategoriesTableCreateCompanionBuilder
+    = ChannelCategoriesCompanion Function({
+  required String id,
+  required String name,
+  Value<int> position,
+  Value<int> rowid,
+});
+typedef $$ChannelCategoriesTableUpdateCompanionBuilder
+    = ChannelCategoriesCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<int> position,
+  Value<int> rowid,
+});
+
+class $$ChannelCategoriesTableFilterComposer
+    extends Composer<_$SlimmDatabase, $ChannelCategoriesTable> {
+  $$ChannelCategoriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get position => $composableBuilder(
+      column: $table.position, builder: (column) => ColumnFilters(column));
+}
+
+class $$ChannelCategoriesTableOrderingComposer
+    extends Composer<_$SlimmDatabase, $ChannelCategoriesTable> {
+  $$ChannelCategoriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get position => $composableBuilder(
+      column: $table.position, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ChannelCategoriesTableAnnotationComposer
+    extends Composer<_$SlimmDatabase, $ChannelCategoriesTable> {
+  $$ChannelCategoriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+}
+
+class $$ChannelCategoriesTableTableManager extends RootTableManager<
+    _$SlimmDatabase,
+    $ChannelCategoriesTable,
+    ChannelCategoryRow,
+    $$ChannelCategoriesTableFilterComposer,
+    $$ChannelCategoriesTableOrderingComposer,
+    $$ChannelCategoriesTableAnnotationComposer,
+    $$ChannelCategoriesTableCreateCompanionBuilder,
+    $$ChannelCategoriesTableUpdateCompanionBuilder,
+    (
+      ChannelCategoryRow,
+      BaseReferences<_$SlimmDatabase, $ChannelCategoriesTable,
+          ChannelCategoryRow>
+    ),
+    ChannelCategoryRow,
+    PrefetchHooks Function()> {
+  $$ChannelCategoriesTableTableManager(
+      _$SlimmDatabase db, $ChannelCategoriesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ChannelCategoriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ChannelCategoriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ChannelCategoriesTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<int> position = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ChannelCategoriesCompanion(
+            id: id,
+            name: name,
+            position: position,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String name,
+            Value<int> position = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ChannelCategoriesCompanion.insert(
+            id: id,
+            name: name,
+            position: position,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ChannelCategoriesTableProcessedTableManager = ProcessedTableManager<
+    _$SlimmDatabase,
+    $ChannelCategoriesTable,
+    ChannelCategoryRow,
+    $$ChannelCategoriesTableFilterComposer,
+    $$ChannelCategoriesTableOrderingComposer,
+    $$ChannelCategoriesTableAnnotationComposer,
+    $$ChannelCategoriesTableCreateCompanionBuilder,
+    $$ChannelCategoriesTableUpdateCompanionBuilder,
+    (
+      ChannelCategoryRow,
+      BaseReferences<_$SlimmDatabase, $ChannelCategoriesTable,
+          ChannelCategoryRow>
+    ),
+    ChannelCategoryRow,
+    PrefetchHooks Function()>;
 
 class $SlimmDatabaseManager {
   final _$SlimmDatabase _db;
@@ -1844,4 +2290,6 @@ class $SlimmDatabaseManager {
       $$ChannelsTableTableManager(_db, _db.channels);
   $$MessagesTableTableManager get messages =>
       $$MessagesTableTableManager(_db, _db.messages);
+  $$ChannelCategoriesTableTableManager get channelCategories =>
+      $$ChannelCategoriesTableTableManager(_db, _db.channelCategories);
 }

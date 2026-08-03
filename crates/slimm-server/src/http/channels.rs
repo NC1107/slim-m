@@ -69,6 +69,13 @@ pub(crate) struct ChannelDto {
     /// docs/decisions/0005-threads.md. A thread never appears in
     /// `listChannels`; reach one through `openThread`.
     parent_message_id: Option<String>,
+    /// The rail section this channel is filed under, or `null` for
+    /// uncategorised - rendered as an implicit section above every named
+    /// category. Decides placement only: see
+    /// docs/decisions/0006-channel-categories.md. Absent on servers older
+    /// than this field, which a client must treat as unknown rather than
+    /// assuming uncategorised.
+    category_id: Option<String>,
     created_at: i64,
 }
 
@@ -81,6 +88,7 @@ impl From<Channel> for ChannelDto {
             topic: channel.topic,
             position: channel.position,
             parent_message_id: channel.parent_message_id.map(|id| id.to_string()),
+            category_id: channel.category_id.map(|id| id.to_string()),
             created_at: channel.created_at,
         }
     }
@@ -109,6 +117,13 @@ struct UpdateChannelRequest {
 
 /// Lists the channels the caller can view. One batched store call: the
 /// per-channel has_permission loop this replaces cost 1 + 4C queries.
+///
+/// Answers a plain array, exactly as it always has: the wire is
+/// additive-only, and a live deployment auto-updating from `latest` while
+/// its phones update on their own TestFlight/Play schedule means reshaping
+/// this response would break every client that has not updated yet. Every
+/// live category is at `GET /categories` instead - a new route is additive,
+/// folding the list into this one's body is not.
 async fn list(
     Authed(ctx): Authed,
     State(state): State<AppState>,

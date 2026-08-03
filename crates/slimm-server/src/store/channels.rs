@@ -69,6 +69,8 @@ impl Store {
             topic: None,
             position,
             parent_message_id: None,
+            // Uncategorised until dragged; there is no default (docs/decisions/0006).
+            category_id: None,
             created_at: now,
         })
     }
@@ -79,6 +81,7 @@ impl Store {
             r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
                       position AS "position!: i64",
                       parent_message_id AS "parent_message_id: crate::ids::MessageId",
+                      category_id AS "category_id: crate::ids::ChannelCategoryId",
                       created_at AS "created_at!"
                FROM channels WHERE id = ? AND deleted_at IS NULL"#,
             id
@@ -92,6 +95,7 @@ impl Store {
             topic: r.topic,
             position: r.position,
             parent_message_id: r.parent_message_id,
+            category_id: r.category_id,
             created_at: r.created_at,
         }))
     }
@@ -139,6 +143,7 @@ impl Store {
             r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
                       position AS "position!: i64",
                       parent_message_id AS "parent_message_id: crate::ids::MessageId",
+                      category_id AS "category_id: crate::ids::ChannelCategoryId",
                       created_at AS "created_at!"
                FROM channels WHERE id = ?"#,
             id
@@ -152,6 +157,7 @@ impl Store {
             topic: r.topic,
             position: r.position,
             parent_message_id: r.parent_message_id,
+            category_id: r.category_id,
             created_at: r.created_at,
         }))
     }

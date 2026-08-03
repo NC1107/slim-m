@@ -50,7 +50,7 @@ Channel _channel(
   isPersonalSpace: false,
 );
 
-/// [TextChannelsSection] and [ManagedChannelRow] read no provider at all
+/// [ChannelCategorySections] and [ManagedChannelRow] read no provider at all
 /// (only the kebab's own `onPressed`, never invoked here, eventually would),
 /// so a bare scope is enough for the first two tests below.
 Widget _harness(Widget child) => ProviderScope(
@@ -90,8 +90,9 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         _harness(
-          TextChannelsSection(
+          ChannelCategorySections(
             channels: [_channel('c1', 'general')],
+            categories: const [],
             selectedId: null,
             canManage: true,
             onReorder: (_) {},
@@ -118,8 +119,9 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         _harness(
-          TextChannelsSection(
+          ChannelCategorySections(
             channels: [_channel('c1', 'general', cursor: 5, lastReadSeq: 2)],
+            categories: const [],
             selectedId: null,
             canManage: true,
             onReorder: (_) {},

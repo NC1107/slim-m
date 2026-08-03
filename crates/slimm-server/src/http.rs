@@ -30,6 +30,7 @@ mod canvas_ops;
 mod canvas_ops_write;
 mod canvas_write;
 pub mod capability;
+mod categories;
 mod channel_order;
 mod channels;
 mod dms;
@@ -112,6 +113,7 @@ pub fn router(state: AppState) -> Router {
         .route("/version", get(version))
         .merge(auth::routes())
         .merge(canvas::routes())
+        .merge(categories::routes())
         .merge(channels::routes())
         .merge(channel_order::routes())
         .merge(emoji::routes())

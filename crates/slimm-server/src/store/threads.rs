@@ -141,6 +141,8 @@ impl Store {
                 // Never read: a thread is excluded from every position-ordered query.
                 position: 0,
                 parent_message_id: Some(message_id),
+                // Never read: a thread is excluded from every category grouping.
+                category_id: None,
                 created_at: now,
             },
             fresh: true,

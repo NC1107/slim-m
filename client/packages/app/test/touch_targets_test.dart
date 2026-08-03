@@ -9,6 +9,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
 import 'package:slimm_data/data.dart';
@@ -29,7 +30,7 @@ Channel _channel(String id, String name) => Channel(
 );
 
 Finder _createButton() => find.byWidgetPredicate(
-  (w) => w is AppIconButton && w.semanticLabel == 'Create a text channel',
+  (w) => w is AppIconButton && w.semanticLabel == 'Create a channel',
 );
 
 Future<void> _pumpRail(WidgetTester tester, Size size) async {
@@ -38,14 +39,17 @@ Future<void> _pumpRail(WidgetTester tester, Size size) async {
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(
-    MaterialApp(
-      theme: buildTheme(Brightness.dark, AppTokens.dark),
-      home: Scaffold(
-        body: TextChannelsSection(
-          channels: [_channel('c1', 'general'), _channel('c2', 'random')],
-          selectedId: 'c1',
-          canManage: true,
-          onReorder: (_) {},
+    ProviderScope(
+      child: MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: Scaffold(
+          body: ChannelCategorySections(
+            channels: [_channel('c1', 'general'), _channel('c2', 'random')],
+            categories: const [],
+            selectedId: 'c1',
+            canManage: true,
+            onReorder: (_) {},
+          ),
         ),
       ),
     ),

@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT c.id AS \"id!: ChannelId\", c.name AS \"name!\", c.kind AS \"kind!\", c.topic,\n                      c.position AS \"position!: i64\",\n                      c.parent_message_id AS \"parent_message_id: crate::ids::MessageId\",\n                      c.category_id AS \"category_id: crate::ids::ChannelCategoryId\",\n                      c.created_at AS \"created_at!\"\n               FROM channels c\n               LEFT JOIN channel_categories cc ON cc.id = c.category_id\n               WHERE c.deleted_at IS NULL AND c.kind != 'dm' AND c.parent_message_id IS NULL\n               ORDER BY CASE WHEN c.category_id IS NULL THEN -1 ELSE cc.position END,\n                        c.position, c.created_at",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "name!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "kind!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "topic",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "position!: i64",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "parent_message_id: crate::ids::MessageId",
+        "ordinal": 5,
+        "type_info": "Blob"
+      },
+      {
+        "name": "category_id: crate::ids::ChannelCategoryId",
+        "ordinal": 6,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 7,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "f0f97cb3b1cb387720f8b19f69dbde114ebcbb71c1a9f6b2c9755090e7ca7ff5"
+}

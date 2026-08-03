@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Tests for `ChannelOrderController`: the order renders the instant a drag
-/// completes, and only the round trip decides whether it sticks.
+/// Tests for `ChannelOrderController`: the arrangement renders the instant a
+/// drag completes, and only the round trip decides whether it sticks.
 library;
 
 import 'dart:convert';
@@ -31,6 +31,13 @@ Map<String, dynamic> _channelJson(String id, String name, int position) => {
   'position': position,
 };
 
+/// One flat group, `categoryId: null` - the shape most of these tests need,
+/// since they are about the request/response round trip rather than
+/// category placement.
+List<ChannelOrderGroup> _flat(List<String> channelIds) => [
+  ChannelOrderGroup(categoryId: null, channelIds: channelIds),
+];
+
 ProviderContainer _container(http.Response Function(http.Request) handler) {
   final container = ProviderContainer(
     overrides: [
@@ -57,28 +64,38 @@ ProviderContainer _container(http.Response Function(http.Request) handler) {
 }
 
 void main() {
-  test('the requested order renders before the request answers', () async {
-    final container = _container(
-      (request) => http.Response(
-        jsonEncode([_channelJson('b', 'b', 0), _channelJson('a', 'a', 1)]),
-        200,
-      ),
-    );
-    final controller = container.read(channelOrderControllerProvider.notifier);
+  test(
+    'the requested arrangement renders before the request answers',
+    () async {
+      final container = _container(
+        (request) => http.Response(
+          jsonEncode([_channelJson('b', 'b', 0), _channelJson('a', 'a', 1)]),
+          200,
+        ),
+      );
+      final controller = container.read(
+        channelOrderControllerProvider.notifier,
+      );
 
-    final future = controller.reorder(['b', 'a']);
-    expect(
-      container.read(channelOrderControllerProvider).pendingOrder,
-      ['b', 'a'],
-      reason:
-          'the drag already happened; nothing should wait for the server '
-          'to say so before the rail reflects it',
-    );
+      final future = controller.reorder(_flat(['b', 'a']));
+      final pending = container
+          .read(channelOrderControllerProvider)
+          .pendingOrder;
+      expect(
+        pending,
+        isNotNull,
+        reason:
+            'the drag already happened; nothing should wait for the server '
+            'to say so before the rail reflects it',
+      );
+      expect(pending!.single.categoryId, isNull);
+      expect(pending.single.channelIds, ['b', 'a']);
 
-    await future;
-    expect(container.read(channelOrderControllerProvider).pendingOrder, null);
-    expect(container.read(channelOrderControllerProvider).error, null);
-  });
+      await future;
+      expect(container.read(channelOrderControllerProvider).pendingOrder, null);
+      expect(container.read(channelOrderControllerProvider).error, null);
+    },
+  );
 
   test(
     'a successful reorder persists the confirmed positions locally',
@@ -93,7 +110,7 @@ void main() {
         channelOrderControllerProvider.notifier,
       );
 
-      await controller.reorder(['b', 'a']);
+      await controller.reorder(_flat(['b', 'a']));
 
       final store = await container.read(storeProvider.future);
       final rows = await store.allChannels();
@@ -111,7 +128,7 @@ void main() {
     );
     final controller = container.read(channelOrderControllerProvider.notifier);
 
-    await controller.reorder(['a', 'b']);
+    await controller.reorder(_flat(['a', 'b']));
 
     final state = container.read(channelOrderControllerProvider);
     expect(
@@ -124,7 +141,7 @@ void main() {
     expect(state.error, contains('missing live channel(s): c'));
   });
 
-  test('retry resubmits the same order that last failed', () async {
+  test('retry resubmits the same arrangement that last failed', () async {
     var calls = 0;
     final container = _container((request) {
       calls++;
@@ -138,7 +155,7 @@ void main() {
     });
     final controller = container.read(channelOrderControllerProvider.notifier);
 
-    await controller.reorder(['a', 'b']);
+    await controller.reorder(_flat(['a', 'b']));
     expect(container.read(channelOrderControllerProvider).error, isNotNull);
 
     await controller.retry();
@@ -152,7 +169,7 @@ void main() {
     );
     final controller = container.read(channelOrderControllerProvider.notifier);
 
-    await controller.reorder(['a', 'b']);
+    await controller.reorder(_flat(['a', 'b']));
     expect(container.read(channelOrderControllerProvider).error, isNotNull);
 
     controller.dismiss();

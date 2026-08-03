@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The rail's three scrollable sections: direct messages, text channels, and
-/// voice channels.
+/// The rail's sections: direct messages, and every channel category (plus
+/// the implicit uncategorised one) grouped and reordered as one list. See
+/// docs/decisions/0006-channel-categories.md.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:slimm_api/api.dart' show ChannelOrderGroup;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -41,17 +43,21 @@ class _SectionLabel extends StatelessWidget {
           Expanded(
             // Announced in its natural case and as a heading: the uppercase is
             // a visual treatment, and some screen readers spell such a word out.
-            child: Semantics(
-              container: true,
-              header: true,
-              label: text,
-              child: ExcludeSemantics(
-                child: Text(
-                  text.toUpperCase(),
-                  style: AppText.label.copyWith(color: tokens.textSecondary),
-                ),
-              ),
-            ),
+            child: text.isEmpty
+                ? const SizedBox.shrink()
+                : Semantics(
+                    container: true,
+                    header: true,
+                    label: text,
+                    child: ExcludeSemantics(
+                      child: Text(
+                        text.toUpperCase(),
+                        style: AppText.label.copyWith(
+                          color: tokens.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
           ),
           if (onAdd != null)
             AppIconButton(
@@ -67,12 +73,11 @@ class _SectionLabel extends StatelessWidget {
 }
 
 /// A DM is stored locally as an ordinary [Channel] under `kind == 'dm'` (see
-/// `providers/dms.dart`), so this reads the same channel stream
-/// [TextChannelsSection] and [VoiceChannelsSection] do, filtered the same
-/// way they filter to their own kind. There is still no way to start a new
-/// DM with someone else from here directly; that lives on a member's row in
-/// [AppMemberPane], which is where a person already is when they decide to
-/// message someone.
+/// `providers/dms.dart`), so this reads the same channel stream the
+/// category sections do, filtered to that one kind. There is still no way to
+/// start a new DM with someone else from here directly; that lives on a
+/// member's row in [AppMemberPane], which is where a person already is when
+/// they decide to message someone.
 ///
 /// A DM with yourself - your personal space - is the one exception: it gets
 /// its own always-present [PersonalSpaceRow] rather than being something you
@@ -126,115 +131,102 @@ class DirectMessagesSection extends StatelessWidget {
   }
 }
 
-class TextChannelsSection extends StatelessWidget {
-  const TextChannelsSection({
+/// Every non-DM channel, grouped by category and reorderable across every
+/// section in one drag - a channel of any kind may be filed under any
+/// category, since a category decides placement only (see
+/// docs/decisions/0006-channel-categories.md). The implicit uncategorised
+/// section carries the one "create a channel" affordance, unlabelled since
+/// it is not a named section; every category above it is exactly the ones
+/// [SpaceSettingsSection]'s "Channel categories" screen manages.
+class ChannelCategorySections extends ConsumerWidget {
+  const ChannelCategorySections({
     super.key,
     required this.channels,
+    required this.categories,
     required this.selectedId,
     required this.onReorder,
     this.canManage = false,
   });
 
   final List<Channel> channels;
-  final String? selectedId;
-
-  /// Whether the signed-in member holds MANAGE_CHANNELS (read from `GET
-  /// /me` by the caller). Gates every create/manage affordance below,
-  /// including whether a row can be dragged at all.
-  final bool canManage;
-
-  /// Called with every text channel's id, in the order a drag within this
-  /// section produced. The caller (`ChannelRail`) is the one that knows
-  /// where the voice section's channels sit in the server's shared order,
-  /// so it is the one that splices this back into a full submission.
-  final ValueChanged<List<String>> onReorder;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel(
-          'Text',
-          onAdd: canManage
-              ? () => showCreateChannelSheet(context, initialKind: 'text')
-              : null,
-          addSemanticLabel: 'Create a text channel',
-        ),
-        ReorderableChannelRows(
-          channels: channels,
-          canManage: canManage,
-          onReorder: onReorder,
-          rowBuilder: (channel) => ManagedChannelRow(
-            canManage: canManage,
-            channel: channel,
-            row: (kebab) => AppListRow(
-              label: channel.name,
-              selected: channel.id == selectedId,
-              unread: channel.cursor > channel.lastReadSeq,
-              leading: Icon(
-                AppIcons.hash,
-                size: AppSizes.icon16,
-                color: channel.id == selectedId
-                    ? tokens.accent
-                    : tokens.textSecondary,
-              ),
-              trailingExtra: kebab,
-              onTap: () => context.go(Routes.channel(channel.id)),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class VoiceChannelsSection extends ConsumerWidget {
-  const VoiceChannelsSection({
-    super.key,
-    required this.channels,
-    required this.selectedId,
-    required this.onReorder,
-    this.canManage = false,
-  });
-
-  final List<Channel> channels;
+  final List<ChannelCategoryRow> categories;
   final String? selectedId;
   final bool canManage;
 
-  /// See [TextChannelsSection.onReorder].
-  final ValueChanged<List<String>> onReorder;
+  /// Called with the whole rail's new arrangement, grouped by category, once
+  /// a drag settles.
+  final ValueChanged<List<ChannelOrderGroup>> onReorder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final voice = ref.watch(voiceControllerProvider);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel(
-          'Voice',
-          onAdd: canManage
-              ? () => showCreateChannelSheet(context, initialKind: 'voice')
-              : null,
-          addSemanticLabel: 'Create a voice channel',
-        ),
-        ReorderableChannelRows(
-          channels: channels,
-          canManage: canManage,
-          onReorder: onReorder,
-          rowBuilder: (channel) => ManagedChannelRow(
-            canManage: canManage,
-            channel: channel,
-            row: (kebab) => VoiceChannelRow(
+    final byCategory = channelsByCategory(channels);
+    final sections = <ChannelSection>[
+      (null, byCategory[null] ?? const []),
+      for (final category in categories)
+        (category, byCategory[category.id] ?? const []),
+    ];
+
+    Widget row(Channel channel) => ManagedChannelRow(
+      canManage: canManage,
+      channel: channel,
+      row: (kebab) => channel.kind == 'voice'
+          ? VoiceChannelRow(
               channel: channel,
               selected: channel.id == selectedId,
               voice: voice,
               trailingExtra: kebab,
+            )
+          : _TextChannelRow(
+              channel: channel,
+              selected: channel.id == selectedId,
+              trailingExtra: kebab,
             ),
-          ),
-        ),
-      ],
+    );
+
+    Widget header(ChannelCategoryRow? category) => _SectionLabel(
+      category?.name ?? '',
+      onAdd: canManage && category == null
+          ? () => showCreateChannelSheet(context, initialKind: 'text')
+          : null,
+      addSemanticLabel: 'Create a channel',
+    );
+
+    return ReorderableChannelRows(
+      sections: sections,
+      canManage: canManage,
+      onReorder: onReorder,
+      rowBuilder: row,
+      headerBuilder: header,
+    );
+  }
+}
+
+class _TextChannelRow extends StatelessWidget {
+  const _TextChannelRow({
+    required this.channel,
+    required this.selected,
+    this.trailingExtra,
+  });
+
+  final Channel channel;
+  final bool selected;
+  final Widget? trailingExtra;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return AppListRow(
+      label: channel.name,
+      selected: selected,
+      unread: channel.cursor > channel.lastReadSeq,
+      leading: Icon(
+        AppIcons.hash,
+        size: AppSizes.icon16,
+        color: selected ? tokens.accent : tokens.textSecondary,
+      ),
+      trailingExtra: trailingExtra,
+      onTap: () => context.go(Routes.channel(channel.id)),
     );
   }
 }

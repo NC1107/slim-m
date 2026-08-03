@@ -72,6 +72,37 @@ class Channels extends Table {
   /// refresh may prune.
   TextColumn get parentMessageId => text().nullable()();
 
+  /// The rail section this channel is filed under, or null for
+  /// uncategorised. Decides placement only, mirroring the server's
+  /// `channels.category_id` - see docs/decisions/0006-channel-categories.md.
+  /// Not a foreign key here: [ChannelCategories] is replaced on its own path
+  /// ([MessageStore.replaceCategories]), never joined against this table for
+  /// referential integrity, the same reason `dmParticipantId` names a user
+  /// id with no local `Users` table to reference.
+  TextColumn get categoryId => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Locally cached channel categories: a rail section a channel of any kind
+/// may be filed under. Replaced wholesale on its own path
+/// ([MessageStore.replaceCategories]), never pruned by [Channels]'s own
+/// replace - a category is not a channel and never appears in that list, the
+/// same shape a thread needed exempting from `replaceChannels`'s pruning.
+///
+/// `@DataClassName('ChannelCategoryRow')`: drift's default singular name for
+/// this table would be `ChannelCategory`, which collides with `slimm_api`'s
+/// own wire model of that exact name - the two would be indistinguishable by
+/// name in any file that imports both.
+@DataClassName('ChannelCategoryRow')
+class ChannelCategories extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+
+  /// Sort key among the deployment's live categories: lower sorts first.
+  IntColumn get position => integer().withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -115,12 +146,12 @@ class Messages extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [Channels, Messages])
+@DriftDatabase(tables: [Channels, Messages, ChannelCategories])
 class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -180,6 +211,13 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// v10 again: a failed send is local-only state a server was never asked
   /// about, so an existing failed row simply keeps rendering the generic
   /// retry it always had until the user retries or discards it.
+  ///
+  /// v12 adds `channels.categoryId` in place and creates [ChannelCategories]
+  /// fresh, the same "new on both sides in the same release, nothing to
+  /// backfill" shape as v9 and v10: every existing row's `categoryId` reads
+  /// null until the next channel refresh fills it in, and the empty
+  /// categories table is populated by that same refresh
+  /// ([ChannelRefresher.refresh] calling [MessageStore.replaceCategories]).
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -211,6 +249,10 @@ class SlimmDatabase extends _$SlimmDatabase {
           }
           if (from < 11) {
             await m.addColumn(messages, messages.failureReason);
+          }
+          if (from < 12) {
+            await m.addColumn(channels, channels.categoryId);
+            await m.createTable(channelCategories);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

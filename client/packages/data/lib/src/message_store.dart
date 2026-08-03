@@ -194,6 +194,7 @@ class MessageStore {
             isPersonalSpace: Value(channel.isPersonalSpace),
             dmParticipantId: Value(channel.dmParticipantId),
             parentMessageId: Value(channel.parentMessageId),
+            categoryId: Value(channel.categoryId),
           ),
           onConflict: DoUpdate(
             (_) => ChannelsCompanion.custom(
@@ -204,6 +205,7 @@ class MessageStore {
               isPersonalSpace: Variable(channel.isPersonalSpace),
               dmParticipantId: Variable(channel.dmParticipantId),
               parentMessageId: Variable(channel.parentMessageId),
+              categoryId: Variable(channel.categoryId),
             ),
           ),
         );

@@ -136,6 +136,10 @@ class SlimmApi {
 
   // --- Channels ---
 
+  /// The caller's visible channels. A plain array, unchanged since before
+  /// channel categories: the wire is additive-only, and reshaping this
+  /// response would break every client that has not updated yet. The
+  /// category list is [SlimmApiChannelAdmin.listCategories] instead.
   Future<List<Channel>> listChannels() async {
     final json = await _send('GET', '/channels');
     return (json as List<dynamic>)

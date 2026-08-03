@@ -7,6 +7,10 @@
 /// first. Cycling and the rail agreed only when the personal space happened
 /// to sort first already, so a channel opened for the first time after some
 /// other DM cycled to a different channel than the one shown on screen.
+///
+/// Grouping is by category now, not by kind - see docs/decisions/
+/// 0006-channel-categories.md - so a channel of any kind may sit in any
+/// category, and `currentOrderGroups` replaces the old `spliceKindOrder`.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -17,16 +21,22 @@ Channel _channel(
   String id, {
   String kind = 'text',
   bool isPersonalSpace = false,
+  String? categoryId,
+  int position = 0,
 }) => Channel(
   id: id,
   name: id,
   kind: kind,
   createdAt: 0,
-  position: 0,
+  position: position,
   cursor: 0,
   lastReadSeq: 0,
   isPersonalSpace: isPersonalSpace,
+  categoryId: categoryId,
 );
+
+ChannelCategoryRow _category(String id, {int position = 0}) =>
+    ChannelCategoryRow(id: id, name: id, position: position);
 
 void main() {
   group('splitPersonalSpace', () {
@@ -49,14 +59,21 @@ void main() {
   });
 
   group('orderedChannels', () {
-    test('groups direct messages, text, then voice', () {
-      final ordered = orderedChannels([
-        _channel('voice1', kind: 'voice'),
-        _channel('text1'),
-        _channel('dm1', kind: 'dm'),
-      ]);
+    test('groups direct messages first, then uncategorised, then each '
+        'category in its own position order', () {
+      final voiceCat = _category('voice-cat', position: 1);
+      final textCat = _category('text-cat', position: 0);
+      final ordered = orderedChannels(
+        [
+          _channel('voice1', kind: 'voice', categoryId: 'voice-cat'),
+          _channel('text1', categoryId: 'text-cat'),
+          _channel('loose', categoryId: null),
+          _channel('dm1', kind: 'dm'),
+        ],
+        [textCat, voiceCat],
+      );
 
-      expect(ordered.map((c) => c.id), ['dm1', 'text1', 'voice1']);
+      expect(ordered.map((c) => c.id), ['dm1', 'loose', 'text1', 'voice1']);
     });
 
     /// The bug: the personal space was opened after another DM, so it
@@ -67,7 +84,7 @@ void main() {
       final dm = _channel('dm1', kind: 'dm');
       final personal = _channel('personal', kind: 'dm', isPersonalSpace: true);
 
-      final ordered = orderedChannels([dm, personal]);
+      final ordered = orderedChannels([dm, personal], const []);
 
       expect(
         ordered.map((c) => c.id).first,
@@ -77,45 +94,43 @@ void main() {
             'above every other DM, whatever order they were opened in',
       );
     });
+
+    test('a channel of any kind may sit in any category', () {
+      final textCat = _category('text-cat');
+      final ordered = orderedChannels(
+        [_channel('v1', kind: 'voice', categoryId: 'text-cat')],
+        [textCat],
+      );
+      expect(ordered.single.categoryId, 'text-cat');
+    });
   });
 
-  group('spliceKindOrder', () {
-    test(
-      'rewrites only the named kind, leaving every other slot untouched',
-      () {
-        final fullOrder = [
-          _channel('t1'),
-          _channel('v1', kind: 'voice'),
-          _channel('t2'),
-          _channel('v2', kind: 'voice'),
-        ];
-
-        final result = spliceKindOrder(
-          fullOrder: fullOrder,
-          kind: 'text',
-          newKindOrder: ['t2', 't1'],
-        );
-
-        expect(
-          result,
-          ['t2', 'v1', 't1', 'v2'],
-          reason:
-              'the voice channels keep the exact slots they held; only '
-              'the text channels move, in the order given',
-        );
-      },
-    );
-
-    test('an unchanged kind order is a no-op', () {
-      final fullOrder = [_channel('a'), _channel('b', kind: 'voice')];
-
-      final result = spliceKindOrder(
-        fullOrder: fullOrder,
-        kind: 'text',
-        newKindOrder: ['a'],
+  group('currentOrderGroups', () {
+    test('answers one group per category plus the implicit uncategorised '
+        'one, each in position order', () {
+      final textCat = _category('text-cat', position: 0);
+      final voiceCat = _category('voice-cat', position: 1);
+      final groups = currentOrderGroups(
+        [
+          _channel('t2', categoryId: 'text-cat', position: 1),
+          _channel('t1', categoryId: 'text-cat', position: 0),
+          _channel('v1', kind: 'voice', categoryId: 'voice-cat'),
+          _channel('loose'),
+        ],
+        [textCat, voiceCat],
       );
 
-      expect(result, ['a', 'b']);
+      expect(groups.map((g) => g.categoryId), [null, 'text-cat', 'voice-cat']);
+      expect(groups[0].channelIds, ['loose']);
+      expect(groups[1].channelIds, ['t1', 't2']);
+      expect(groups[2].channelIds, ['v1']);
+    });
+
+    test('a DM never appears in any group', () {
+      final groups = currentOrderGroups([
+        _channel('dm1', kind: 'dm'),
+      ], const []);
+      expect(groups.single.channelIds, isEmpty);
     });
   });
 }

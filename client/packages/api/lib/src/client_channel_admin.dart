@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 part of 'client.dart';
 
-/// Channel renaming and deletion: the rest of the `channels` tag that
-/// [SlimmApi.listChannels] and [SlimmApi.createChannel] do not cover.
+/// Channel renaming, deletion and reordering, plus channel-category CRUD:
+/// the rest of the `channels` tag that [SlimmApi.listChannels] and
+/// [SlimmApi.createChannel] do not cover. See
+/// docs/decisions/0006-channel-categories.md for the category half.
 extension SlimmApiChannelAdmin on SlimmApi {
   /// Renames a channel and/or replaces its topic. Requires MANAGE_CHANNELS at
   /// the deployment level, the same check creating a channel uses. At least
@@ -31,20 +33,67 @@ extension SlimmApiChannelAdmin on SlimmApi {
   Future<void> deleteChannel(String channelId) =>
       _send('DELETE', '/channels/$channelId', expectNoContent: true);
 
-  /// Sets the deployment's channel order. Requires MANAGE_CHANNELS.
-  /// [channelIds] must name exactly the live, non-DM channels, in the
-  /// desired order; a partial or wrong list is refused with a 400 naming
-  /// what was missing or unrecognized rather than silently leaving a gap.
-  /// Deployment-wide, not a per-device preference: everyone sees the same
-  /// order. Returns every live, non-DM channel in its new order.
-  Future<List<Channel>> reorderChannels(List<String> channelIds) async {
+  /// Sets the deployment's channel order and category placement. Requires
+  /// MANAGE_CHANNELS. [groups] must, flattened, name exactly the live,
+  /// non-DM, non-thread channel ids - no more, no fewer, no repeats - and
+  /// every non-null `categoryId` it names must be a live category; a wrong
+  /// or partial submission is refused with a 400 naming what was wrong
+  /// rather than silently leaving a gap. Deployment-wide, not a per-device
+  /// preference: everyone sees the same order. Returns every live, non-DM
+  /// channel in its new arrangement.
+  Future<List<Channel>> reorderChannels(List<ChannelOrderGroup> groups) async {
     final json = await _send(
       'PUT',
       '/channels/order',
-      body: {'channel_ids': channelIds},
+      body: {
+        'categories': groups.map((g) => g.toJson()).toList(growable: false),
+      },
     );
     return (json as List<dynamic>)
         .map((c) => Channel.fromJson(c as Map<String, dynamic>))
         .toList(growable: false);
   }
+
+  /// Every live category. Unfiltered by any permission: a category carries
+  /// none of its own, so any authenticated caller may read the list. Its own
+  /// route, not folded into [SlimmApi.listChannels]'s response: that would
+  /// reshape an existing response, which the wire's additive-only rule does
+  /// not allow.
+  Future<List<ChannelCategory>> listCategories() async {
+    final json = await _send('GET', '/categories');
+    return (json as List<dynamic>)
+        .map((c) => ChannelCategory.fromJson(c as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  /// Creates a category, appended after every live one. Requires
+  /// MANAGE_CHANNELS.
+  Future<ChannelCategory> createCategory(String name) async {
+    final json = await _send('POST', '/categories', body: {'name': name});
+    return ChannelCategory.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Renames and/or repositions a category. At least one of [name] and
+  /// [position] must be given. Requires MANAGE_CHANNELS.
+  Future<ChannelCategory> updateCategory({
+    required String categoryId,
+    String? name,
+    int? position,
+  }) async {
+    final json = await _send(
+      'PATCH',
+      '/categories/$categoryId',
+      body: {
+        if (name != null) 'name': name,
+        if (position != null) 'position': position,
+      },
+    );
+    return ChannelCategory.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Soft-deletes a category. Requires MANAGE_CHANNELS. Its channels are
+  /// never deleted with it - they fall back to uncategorised. Deleting an
+  /// already-deleted category is not an error.
+  Future<void> deleteCategory(String categoryId) =>
+      _send('DELETE', '/categories/$categoryId', expectNoContent: true);
 }

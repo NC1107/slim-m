@@ -128,15 +128,26 @@ impl Store {
     /// reason and by the same mechanism: a thread is a hidden sub-channel
     /// reached from the message it was opened on, never a rail entry - see
     /// docs/decisions/0005-threads.md.
+    ///
+    /// Ordered by category first, then by position within it -
+    /// `channels.position` is a sort key within a category, not across the
+    /// whole rail, since docs/decisions/0006-channel-categories.md made a
+    /// category the thing that orders sections. An uncategorised channel
+    /// (`category_id IS NULL`) sorts before every named category regardless
+    /// of that category's own position, rendering as the implicit section
+    /// the decision record describes.
     pub async fn list_channels(&self) -> anyhow::Result<Vec<super::Channel>> {
         let rows = sqlx::query!(
-            r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
-                      position AS "position!: i64",
-                      parent_message_id AS "parent_message_id: crate::ids::MessageId",
-                      created_at AS "created_at!"
-               FROM channels
-               WHERE deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL
-               ORDER BY position, created_at"#
+            r#"SELECT c.id AS "id!: ChannelId", c.name AS "name!", c.kind AS "kind!", c.topic,
+                      c.position AS "position!: i64",
+                      c.parent_message_id AS "parent_message_id: crate::ids::MessageId",
+                      c.category_id AS "category_id: crate::ids::ChannelCategoryId",
+                      c.created_at AS "created_at!"
+               FROM channels c
+               LEFT JOIN channel_categories cc ON cc.id = c.category_id
+               WHERE c.deleted_at IS NULL AND c.kind != 'dm' AND c.parent_message_id IS NULL
+               ORDER BY CASE WHEN c.category_id IS NULL THEN -1 ELSE cc.position END,
+                        c.position, c.created_at"#
         )
         .fetch_all(&self.pool)
         .await?;
@@ -149,6 +160,7 @@ impl Store {
                 topic: r.topic,
                 position: r.position,
                 parent_message_id: r.parent_message_id,
+                category_id: r.category_id,
                 created_at: r.created_at,
             })
             .collect())
