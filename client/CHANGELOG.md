@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.26.0](https://github.com/NC1107/slim-m/compare/client-v0.25.0...client-v0.26.0) (2026-08-03)
+
+
+### Features
+
+* **client:** a per-channel draft for unsent composer text ([#341](https://github.com/NC1107/slim-m/issues/341)) ([52cc70c](https://github.com/NC1107/slim-m/commit/52cc70c5b53faf80afb051d09cef92eb8023860a))
+* **client:** replace the sidebar collapse button with an edge drag handle ([#340](https://github.com/NC1107/slim-m/issues/340)) ([a7655d4](https://github.com/NC1107/slim-m/commit/a7655d4a3e604af1421dc0d45e2fdd8f892983d2))
+* **client:** show a picked attachment immediately, with a thumbnail ([#342](https://github.com/NC1107/slim-m/issues/342)) ([b514871](https://github.com/NC1107/slim-m/commit/b514871e2d855f21073168fbaa70efebdb1d84e8))
+* **client:** show this build's version in the Space header ([#343](https://github.com/NC1107/slim-m/issues/343)) ([87c8d7a](https://github.com/NC1107/slim-m/commit/87c8d7a6dc0a3502572cb1c65e196dad08be4f1e))
+
+
+### Bug Fixes
+
+* **client:** a thread carried the channel header stacked under its own bar ([#338](https://github.com/NC1107/slim-m/issues/338)) ([ac8d2fa](https://github.com/NC1107/slim-m/commit/ac8d2fa8b5c2deb923589868c3999bd7f5834ad4))
+* **client:** drop the static self-hosted label from the Space header ([#344](https://github.com/NC1107/slim-m/issues/344)) ([95eb34b](https://github.com/NC1107/slim-m/commit/95eb34bd7ebc9cd3e9b28c1529cb26d95a9b5d72))
+
 ## [0.25.0](https://github.com/NC1107/slim-m/compare/client-v0.24.3...client-v0.25.0) (2026-08-03)
 
 
