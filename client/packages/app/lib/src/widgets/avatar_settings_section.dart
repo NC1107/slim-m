@@ -148,16 +148,12 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
     final hasAvatar = me?.avatarUpdatedAt != null;
     final enabled = me != null && !_busy;
 
-    return Column(
+    return SettingsSectionCard(
+      title: 'Avatar',
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const SettingsSectionHeader('Avatar'),
         Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s16,
-            0,
-            AppSpacing.s16,
-            AppSpacing.s16,
-          ),
+          padding: const EdgeInsets.all(AppSpacing.s8),
           child: Column(
             children: [
               Semantics(

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Who can join this Space: the one Space setting with no screen of its own.
 ///
-/// Rendered as a [ListTile] rather than [SettingsSelectRow]'s own
-/// [AppListRow] presentation, to match the plain [ListTile] rows either side
-/// of it on [SpaceSettingsScreen] (leading icon, larger type, more height);
-/// the current value still shows, as a subtitle, since seeing it without
-/// opening the row is the point.
+/// [AppListRow], matching every row either side of it on
+/// [SpaceSettingsScreen] since 2026-08-03 (`space_settings_section.dart` was
+/// bare [ListTile]s until then, whose type did not match the rest of the
+/// app - this row was written to match its siblings and had to change with
+/// them). The current value still shows, as [AppListRow.meta], since seeing
+/// it without opening the row is the point.
 library;
 
 import 'package:flutter/material.dart';
@@ -64,34 +65,33 @@ class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         policy.when(
-          loading: () => const ListTile(
+          loading: () => const AppListRow(
+            label: 'Who can join',
             leading: Icon(AppIcons.members),
-            title: Text('Who can join'),
-            subtitle: Text('Loading…'),
+            meta: 'Loading…',
           ),
           // A fixed sentence, never the exception itself: a raw parse error
           // was rendering Dart type names into this row, which reads as a
           // crash and tells nobody anything actionable.
-          error: (e, _) => ListTile(
+          error: (e, _) => AppListRow(
+            label: 'Who can join',
             leading: const Icon(AppIcons.members),
-            title: const Text('Who can join'),
-            subtitle: Text(
-              'Could not load who can join.',
-              style: TextStyle(color: tokens.dangerText),
-            ),
+            meta: 'Could not load',
             trailing: TextButton(
               onPressed: () => ref.invalidate(joinPolicyProvider),
               child: const Text('Retry'),
             ),
           ),
-          data: (current) => ListTile(
+          data: (current) => AppListRow(
+            label: 'Who can join',
             leading: const Icon(AppIcons.members),
-            title: const Text('Who can join'),
-            subtitle: Text(
-              _labelFor(current),
-              style: TextStyle(color: tokens.textSecondary),
+            meta: _labelFor(current),
+            semanticLabel: 'Who can join, currently ${_labelFor(current)}',
+            trailing: Icon(
+              AppIcons.chevronRight,
+              size: AppSizes.icon16,
+              color: tokens.textSecondary,
             ),
-            trailing: const Icon(AppIcons.chevronRight),
             onTap: _saving ? null : () => _open(context, current),
           ),
         ),

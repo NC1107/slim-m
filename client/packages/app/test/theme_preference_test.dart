@@ -126,7 +126,8 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Theme'), findsOneWidget);
-    expect(find.text('System'), findsOneWidget);
+    // Theme, Clock and Motion all default to "System" now (#38's new rows).
+    expect(find.text('System'), findsNWidgets(3));
   });
 
   testWidgets('tapping a segment is what actually changes the theme', (

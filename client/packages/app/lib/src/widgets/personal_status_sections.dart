@@ -37,10 +37,9 @@ class _PresenceSectionState extends ConsumerState<PresenceSection>
   Widget build(BuildContext context) {
     final selected = ref.watch(presenceVisibilityDisplayProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SettingsSectionCard(
+      title: 'Presence',
       children: [
-        const SettingsSectionHeader('Presence'),
         SettingsSelectRow<api.PresenceVisibility>(
           label: 'Status',
           sheetTitle: 'Presence',
@@ -54,9 +53,9 @@ class _PresenceSectionState extends ConsumerState<PresenceSection>
         if (actionError != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s16,
+              AppSpacing.s8,
               0,
-              AppSpacing.s16,
+              AppSpacing.s8,
               AppSpacing.s8,
             ),
             child: AppErrorState(
@@ -82,10 +81,9 @@ class NotificationsSection extends ConsumerWidget {
     final registered = status == PushStatus.registered;
     final blocked = status == PushStatus.registeredNotificationsBlocked;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SettingsSectionCard(
+      title: 'Notifications',
       children: [
-        const SettingsSectionHeader('Notifications'),
         ListTile(
           leading: Icon(
             registered ? AppIcons.notificationsOn : AppIcons.notificationsOff,

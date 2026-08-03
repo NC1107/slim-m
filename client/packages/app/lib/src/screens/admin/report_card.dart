@@ -26,6 +26,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../format.dart';
 import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
+import '../../providers/display_preferences.dart';
 import '../../providers/emoji_catalog_provider.dart';
 import '../../providers/member_presence.dart' show membersProvider;
 import '../../providers/providers.dart';
@@ -232,7 +233,10 @@ class _ReportCardState extends ConsumerState<ReportCard>
               ),
               const Spacer(),
               Text(
-                formatDateTime(report.createdAt),
+                formatDateTime(
+                  report.createdAt,
+                  use24Hour: watchUse24Hour(ref, context),
+                ),
                 style: AppText.caption.copyWith(color: tokens.textSecondary),
               ),
             ],

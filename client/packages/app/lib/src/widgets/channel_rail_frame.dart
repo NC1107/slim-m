@@ -36,6 +36,14 @@ final serverInfoProvider = FutureProvider.autoDispose<api.Version>(
 
 /// The subtitle carries this build's version ([appInfoProvider], never the
 /// server's own), leaving the name line its room for a long Space name.
+///
+/// The name line also carries [SpaceConnectionDot] now (owner request,
+/// 2026-08-03): the Space's own connection used to show only in the profile
+/// footer below, by way of [RailUserFooter] overriding the person's own
+/// presence with the socket's state - which conflated "is this device
+/// connected" with "what did I set my status to" in the one place a person's
+/// own identity lives. It is a dedicated indicator beside the Space's name
+/// instead, the same place a member list gives a person their own status.
 class RailHeader extends ConsumerWidget {
   const RailHeader({super.key});
 
@@ -45,6 +53,7 @@ class RailHeader extends ConsumerWidget {
     final server = ref.watch(serverInfoProvider);
     final members = ref.watch(membersProvider);
     final version = ref.watch(appInfoProvider).valueOrNull?.version ?? '';
+    final syncStatus = ref.watch(syncControllerProvider);
     // The decoration bleeds to the screen edge while [SafeArea] insets only
     // the content, so the rail's own colour fills the status-bar strip.
     return Container(
@@ -66,13 +75,22 @@ class RailHeader extends ConsumerWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        server.valueOrNull?.name ?? 'slim-m',
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.body.copyWith(
-                          color: tokens.textPrimary,
-                          fontWeight: AppWeights.semi,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SpaceConnectionDot(status: syncStatus),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              server.valueOrNull?.name ?? 'slim-m',
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.body.copyWith(
+                                color: tokens.textPrimary,
+                                fontWeight: AppWeights.semi,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       Text(
                         [
@@ -101,9 +119,69 @@ class RailHeader extends ConsumerWidget {
   }
 }
 
-/// Says plainly whether messages are arriving. Silently going stale is worse
-/// than admitting the connection dropped; unchanged from the shell this rail
-/// replaces, since the design has no equivalent state to model it on.
+/// The Space's connection to the server, shown beside its name in
+/// [RailHeader]. Built directly on [AppStatusDotPainter] rather than
+/// [AppStatusDot]: that widget's own accessible label always names a
+/// person's presence ("Online", "Away"), which is the wrong claim to make
+/// about a link to a server, so this carries its own label instead.
+///
+/// The three shapes mirror [AppStatusDot.shapeOf]'s own vocabulary
+/// (`filledDisc`/`triangle`/`hollowRing`) for the same reason that one
+/// exists: a screenshot in a bug report, or a colour-blind viewer, still has
+/// to be able to tell live from offline with the colour removed.
+///
+/// The colour choice mirrors the retired `RailConnectionBar`'s own: offline
+/// is the one state that has actually stopped, so it alone carries the warn
+/// tone, while connecting is transient and stays neutral.
+class SpaceConnectionDot extends StatelessWidget {
+  const SpaceConnectionDot({super.key, required this.status});
+
+  final SyncStatus status;
+
+  static const Map<SyncStatus, AppStatusShape> _shapeOf = {
+    SyncStatus.live: AppStatusShape.filledDisc,
+    SyncStatus.connecting: AppStatusShape.triangle,
+    SyncStatus.offline: AppStatusShape.hollowRing,
+  };
+
+  static const Map<SyncStatus, String> _labelOf = {
+    SyncStatus.live: 'Connected to the server',
+    SyncStatus.connecting: 'Connecting to the server',
+    SyncStatus.offline: 'Offline, retrying',
+  };
+
+  static const double _size = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final color = switch (status) {
+      SyncStatus.live => tokens.status.online,
+      SyncStatus.connecting => tokens.textSecondary,
+      SyncStatus.offline => tokens.warnText,
+    };
+    final label = _labelOf[status]!;
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        label: label,
+        child: CustomPaint(
+          size: const Size.square(_size),
+          painter: AppStatusDotPainter(
+            shape: _shapeOf[status]!,
+            color: color,
+            backgroundColor: tokens.surfaceSunken,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Says plainly whether messages are arriving, under the compact app bar
+/// where there is no Space name for [SpaceConnectionDot] to sit beside
+/// (`home_shell.dart`'s narrow layout swaps the whole rail for a channel app
+/// bar). The wide rail no longer mounts this: see [RailHeader]'s own doc.
 class RailConnectionBar extends ConsumerWidget {
   const RailConnectionBar({super.key});
 
@@ -173,13 +251,18 @@ class RailUserFooter extends ConsumerWidget {
   /// call-elsewhere row (name, duration, leave) is gated on this; mic and
   /// deafen are not, since they control whichever call is live regardless of
   /// which channel is on screen.
+  ///
+  /// This row's status line is always the person's own chosen presence now,
+  /// whatever the socket is doing: the Space's connection is
+  /// [SpaceConnectionDot]'s job in [RailHeader], not this one's, and
+  /// conflating the two here used to blank a chosen status behind
+  /// "connecting"/"offline" for the whole time a reconnect was in flight.
   final String? activeChannelId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final me = ref.watch(meProvider);
-    final syncStatus = ref.watch(syncControllerProvider);
     final visibility = ref.watch(presenceVisibilityDisplayProvider);
     final voice = ref.watch(voiceControllerProvider);
     final voiceController = ref.read(voiceControllerProvider.notifier);
@@ -189,13 +272,7 @@ class RailUserFooter extends ConsumerWidget {
     final inCallElsewhere =
         inCall && callChannelId != null && callChannelId != activeChannelId;
 
-    // A disconnected device reports its connection instead of the chosen
-    // status: claiming "online" while nothing is arriving would be a lie.
-    final (statusLabel, presence) = switch (syncStatus) {
-      SyncStatus.live => presenceDisplayOf(visibility),
-      SyncStatus.connecting => ('connecting', AppPresence.away),
-      SyncStatus.offline => ('offline', AppPresence.offline),
-    };
+    final (statusLabel, presence) = presenceDisplayOf(visibility);
 
     // Mirrors [RailHeader]: the raised bar and its top border bleed to the
     // screen edge while [SafeArea] lifts the content off the home indicator.

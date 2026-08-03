@@ -253,8 +253,9 @@ void main() {
     expect(find.text('online'), findsNothing);
   });
 
-  testWidgets('a device that is not live reports its connection, not the '
-      'chosen status', (tester) async {
+  // The Space's connection is SpaceConnectionDot's job in the header now.
+  testWidgets('the footer keeps reporting the chosen status regardless of '
+      'the socket\'s own connection', (tester) async {
     final setup = _setup(SyncStatus.offline);
     addTearDown(setup.container.dispose);
     setup.container.read(presenceVisibilityDisplayProvider.notifier).state =
@@ -262,12 +263,13 @@ void main() {
     await _pumpFooter(tester, setup.container);
 
     expect(
-      find.text('offline'),
+      find.text('online'),
       findsOneWidget,
       reason:
-          'claiming a chosen status while nothing is arriving would '
-          'be a lie about the connection',
+          'the header\'s SpaceConnectionDot is what reports the socket now, '
+          'so this row must not blank out a person\'s own chosen status',
     );
+    expect(find.text('offline'), findsNothing);
   });
 
   testWidgets('the footer keeps its content clear of the home indicator '
@@ -484,4 +486,6 @@ void main() {
           'a long name or a full subtitle pushing it wider',
     );
   });
+
+  // SpaceConnectionDot's own tests are channel_rail_connection_dot_test.dart.
 }

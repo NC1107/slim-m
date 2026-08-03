@@ -178,6 +178,11 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
 
 /// A pane's own content, keyed by its id so switching panes does not carry the
 /// previous one's scroll offset or form state across.
+///
+/// Capped at [AppContentColumn]'s own width and centred, or a pane's rows
+/// stretch across whatever the window happens to be - the owner's own "very
+/// flat" report on a wide desktop window, where the nav's 240px left nothing
+/// else bounding it.
 class _PaneBody extends StatelessWidget {
   const _PaneBody({required this.pane});
 
@@ -186,9 +191,11 @@ class _PaneBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) => KeyedSubtree(
     key: ValueKey(pane.id),
-    child: ListView(
-      padding: const EdgeInsets.all(AppSpacing.s16),
-      children: [Builder(builder: pane.builder)],
+    child: AppContentColumn(
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        children: [Builder(builder: pane.builder)],
+      ),
     ),
   );
 }

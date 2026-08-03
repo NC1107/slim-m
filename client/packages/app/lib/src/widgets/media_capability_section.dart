@@ -75,54 +75,41 @@ class _MediaCapabilitySectionState
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SettingsSectionCard(
+      title: 'Device capabilities',
+      description:
+          'Whether this build can actually open a microphone or '
+          'capture your screen here. Checking may prompt for '
+          'permission, so nothing runs until you ask.',
       children: [
-        const SettingsSectionHeader(
-          'Device capabilities',
-          description:
-              'Whether this build can actually open a microphone or '
-              'capture your screen here. Checking may prompt for '
-              'permission, so nothing runs until you ask.',
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-          child: AppButton(
-            label: _buttonLabel(),
-            onPressed: _status == _CheckStatus.running ? null : _run,
-          ),
+        AppButton(
+          label: _buttonLabel(),
+          onPressed: _status == _CheckStatus.running ? null : _run,
         ),
         if (_status == _CheckStatus.unknown) ...[
           const SizedBox(height: AppSpacing.s12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-            child: AppErrorState(
-              message: 'Could not tell what this device supports.',
-              detail: '$_failure',
-            ),
+          AppErrorState(
+            message: 'Could not tell what this device supports.',
+            detail: '$_failure',
           ),
         ],
         if (_status == _CheckStatus.done) ...[
           const SizedBox(height: AppSpacing.s12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: AppSpacing.s12,
-              children: [
-                _CapabilityRow(
-                  label: 'Microphone',
-                  result: _results['microphone']!,
-                ),
-                _CapabilityRow(
-                  label: 'Screen capture',
-                  result: _results['screen_capture']!,
-                ),
-              ],
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: AppSpacing.s12,
+            children: [
+              _CapabilityRow(
+                label: 'Microphone',
+                result: _results['microphone']!,
+              ),
+              _CapabilityRow(
+                label: 'Screen capture',
+                result: _results['screen_capture']!,
+              ),
+            ],
           ),
         ],
-        const SizedBox(height: AppSpacing.s16),
       ],
     );
   }

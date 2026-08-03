@@ -71,9 +71,8 @@ void main() {
 
     expect(find.byType(AppAvatar), findsNothing);
     expect(find.text('Priya'), findsNothing);
-    // The gutter still carries a time, formatted the same way the header
-    // line's own timestamp is.
-    expect(find.text(formatMessageTime(1700000000000)), findsOneWidget);
+    // The exact text is message_row_time_format_test.dart's job.
+    expect(find.byType(MessageTimeMark), findsOneWidget);
   });
 
   testWidgets('the "New" divider only appears when asked for', (tester) async {

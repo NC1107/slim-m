@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../api_failure.dart';
 import '../../format.dart';
 import '../../providers/admin_providers.dart';
+import '../../providers/display_preferences.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../../widgets/run_guarded.dart';
@@ -313,7 +314,7 @@ class _InviteRowState extends ConsumerState<_InviteRow>
         : '${invite.uses}/${invite.maxUses} uses';
     final expiryLabel = invite.expiresAt == null
         ? 'Never expires'
-        : 'Expires ${formatDateTime(invite.expiresAt!)}';
+        : 'Expires ${formatDateTime(invite.expiresAt!, use24Hour: watchUse24Hour(ref, context))}';
     final badge = _inviteBadge(invite, DateTime.now().millisecondsSinceEpoch);
     // Watched only for a role-granting invite, the one row needing the roles list at all.
     final roleGrantLabel = invite.roleGrant == null

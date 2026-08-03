@@ -37,24 +37,23 @@ class DevicesSection extends ConsumerWidget {
     final devices = ref.watch(devicesProvider);
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SettingsSectionCard(
+      title: 'Devices',
       children: [
-        const SettingsSectionHeader('Devices'),
         devices.when(
           loading: () => const Padding(
-            padding: EdgeInsets.all(AppSpacing.s16),
+            padding: EdgeInsets.all(AppSpacing.s8),
             child: LinearProgressIndicator(),
           ),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(AppSpacing.s16),
+          error: (e, _) => const Padding(
+            padding: EdgeInsets.all(AppSpacing.s8),
             child: Text('Could not load devices.'),
           ),
-          // Named like Blocked's empty state below: a bare section header
-          // over nothing reads as a loading glitch, not an intentional state.
+          // Named like Blocked's empty state below: an empty card reads as a
+          // loading glitch, not an intentional state.
           data: (list) => list.isEmpty
               ? Padding(
-                  padding: const EdgeInsets.all(AppSpacing.s16),
+                  padding: const EdgeInsets.all(AppSpacing.s8),
                   child: Text(
                     'No devices signed in.',
                     style: TextStyle(color: tokens.textSecondary),
@@ -151,24 +150,21 @@ class BlockedSection extends ConsumerWidget {
     final blocks = ref.watch(blocksProvider);
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SettingsSectionCard(
+      title: 'Blocked',
+      description:
+          'They are not told. You stop seeing their messages, reactions '
+          'and typing, and stop being notified about them. They stay in '
+          'the member list. Unblocking restores everything.',
       children: [
-        const SettingsSectionHeader(
-          'Blocked',
-          description:
-              'They are not told. You stop seeing their messages, reactions '
-              'and typing, and stop being notified about them. They stay in '
-              'the member list. Unblocking restores everything.',
-        ),
         if (!blocks.settled)
           const Padding(
-            padding: EdgeInsets.all(AppSpacing.s16),
+            padding: EdgeInsets.all(AppSpacing.s8),
             child: LinearProgressIndicator(),
           )
         else if (blocks.error case final error?)
           Padding(
-            padding: const EdgeInsets.all(AppSpacing.s16),
+            padding: const EdgeInsets.all(AppSpacing.s8),
             child: AppErrorState(
               message: 'Could not load the block list.',
               detail: error,
@@ -178,7 +174,7 @@ class BlockedSection extends ConsumerWidget {
         else if (blocks.ids.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s16,
+              horizontal: AppSpacing.s8,
               vertical: AppSpacing.s8,
             ),
             child: Text(
@@ -256,10 +252,9 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SettingsSectionCard(
+      title: 'Account',
       children: [
-        const SettingsSectionHeader('Account'),
         ListTile(
           leading: Icon(
             AppIcons.failed,
@@ -277,10 +272,10 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
         if (_deleteError case final error?)
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s16,
+              AppSpacing.s8,
               0,
-              AppSpacing.s16,
-              AppSpacing.s16,
+              AppSpacing.s8,
+              AppSpacing.s8,
             ),
             child: AppErrorState(
               message:

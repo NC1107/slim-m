@@ -292,4 +292,45 @@ void main() {
       },
     );
   });
+
+  group('overrideMotion', () {
+    test('system leaves the OS signal exactly alone', () {
+      for (final disableAnimations in [false, true]) {
+        final data = MediaQueryData(disableAnimations: disableAnimations);
+        expect(
+          overrideMotion(data, MotionOverride.system).disableAnimations,
+          disableAnimations,
+        );
+      }
+    });
+
+    test('alwaysReduce forces the OS signal on regardless of its own value',
+        () {
+      for (final disableAnimations in [false, true]) {
+        final data = MediaQueryData(disableAnimations: disableAnimations);
+        expect(
+          overrideMotion(data, MotionOverride.alwaysReduce).disableAnimations,
+          isTrue,
+        );
+      }
+    });
+
+    test(
+        'neverReduce forces the OS signal off, but never the screen-reader '
+        'one', () {
+      const data = MediaQueryData(
+        disableAnimations: true,
+        accessibleNavigation: true,
+      );
+      final overridden = overrideMotion(data, MotionOverride.neverReduce);
+
+      expect(overridden.disableAnimations, isFalse);
+      expect(
+        overridden.accessibleNavigation,
+        isTrue,
+        reason: 'a screen reader being on is not this install\'s preference '
+            'to override away',
+      );
+    });
+  });
 }

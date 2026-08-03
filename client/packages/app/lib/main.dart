@@ -10,6 +10,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
 import 'src/diagnostics/debug_log.dart';
+import 'src/providers/display_preferences.dart';
 import 'src/providers/providers.dart';
 import 'src/providers/push_controller.dart';
 import 'src/providers/sync_controller.dart';
@@ -41,6 +42,9 @@ Future<void> main() async {
   // Awaited for the same reason, and free: restoreSession has already
   // resolved the preference store this reads from.
   await container.read(themeControllerProvider.notifier).restore();
+  await container.read(timeFormatControllerProvider.notifier).restore();
+  await container.read(motionPreferenceControllerProvider.notifier).restore();
+  await container.read(highContrastControllerProvider.notifier).restore();
 
   /// These react to session changes for their whole lives: push retries on
   /// resume, sync starts and stops with the session. Reading them here keeps
@@ -94,12 +98,19 @@ class SlimMApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final choice = ref.watch(themeControllerProvider);
+    final highContrast = ref.watch(highContrastControllerProvider);
+    final lightTokens = highContrast
+        ? applyHighContrast(AppTokens.light)
+        : AppTokens.light;
+    final darkTokens = highContrast
+        ? applyHighContrast(_darkTokensFor(choice))
+        : _darkTokensFor(choice);
 
     return MaterialApp.router(
       title: 'slim-m',
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(Brightness.light, AppTokens.light),
-      darkTheme: buildTheme(Brightness.dark, _darkTokensFor(choice)),
+      theme: buildTheme(Brightness.light, lightTokens),
+      darkTheme: buildTheme(Brightness.dark, darkTokens),
       // Without this line MaterialApp's own ThemeMode.system default applies,
       // and no choice the user makes can reach the theme; that is what shipped.
       themeMode: _themeModeFor(choice),
@@ -123,11 +134,25 @@ class SlimMApp extends ConsumerWidget {
 /// is what previously let the harness render every desktop settings and
 /// admin screen at touch density, silently, because it had drifted from what
 /// this file actually wraps the router in.
-Widget appChromeBuilder(BuildContext context, Widget? child) =>
-    ListTileTheme.merge(
+///
+/// This is also where [MotionPreferenceController]'s choice reaches
+/// [AppMotion.isReduced]: a [Consumer] wrapping the whole routed tree in a
+/// [MediaQuery] carrying [overrideMotion]'s answer, rather than a change to
+/// [AppMotion] itself, which stays a pure read of whatever `MediaQuery` it is
+/// given - the same choke point every animated widget already asks.
+Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
+  builder: (context, ref, _) {
+    final densityWrapped = ListTileTheme.merge(
       dense: !AppTouchTargets.of(context),
       child: child ?? const SizedBox.shrink(),
     );
+    final motionChoice = ref.watch(motionPreferenceControllerProvider);
+    return MediaQuery(
+      data: overrideMotion(MediaQuery.of(context), motionChoice),
+      child: densityWrapped,
+    );
+  },
+);
 
 ThemeMode _themeModeFor(AppThemeChoice choice) => switch (choice) {
   AppThemeChoice.system => ThemeMode.system,
