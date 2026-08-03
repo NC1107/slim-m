@@ -245,6 +245,20 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.25.2',
+    headline: 'A thread no longer shows two bars stacked on top of each other',
+    points: [
+      WhatsNewPoint(
+        'Opening a thread used to carry its own title bar and, underneath '
+        'it, the full channel header again - pin, canvas and the member '
+        'and channel-list toggles included. Some of those acted on the '
+        'conversation behind the thread rather than the thread itself. '
+        'It is one bar now: back, the title, and search.',
+        warn: true,
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,

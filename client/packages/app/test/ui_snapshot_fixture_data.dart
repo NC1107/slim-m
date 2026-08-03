@@ -208,6 +208,14 @@ const fixtureChannels = [
     topic: 'tokens, type and the shell',
   ),
   api.Channel(id: 'c-main', name: 'main', kind: 'voice', createdAt: 0),
+  // A thread's own channel row, hanging off m-1: the stacked-header render.
+  api.Channel(
+    id: 'c-thread',
+    name: '',
+    kind: 'text',
+    createdAt: 0,
+    parentMessageId: 'm-1',
+  ),
 ];
 
 api.Message _message(
@@ -227,6 +235,19 @@ api.Message _message(
   reactions: reactions,
 );
 
+/// A reply inside `c-thread`, the thread hanging off [_message]'s `m-1`.
+api.Message _threadMessage(int seq, String author, String content) =>
+    api.Message(
+      id: 'mt-$seq',
+      channelId: 'c-thread',
+      authorId: author,
+      authorDisplayName: author == 'user-nick' ? 'Nick' : 'Ada Lovelace',
+      seq: seq,
+      content: content,
+      createdAt: 1753600000000 + (100 + seq) * 60000,
+      editedAt: null,
+    );
+
 final fixtureMessages = [
   _message(1, 'user-ada', 'The rail rows line up again at every width.'),
   _message(
@@ -244,4 +265,6 @@ final fixtureMessages = [
     'Long enough to wrap on a phone and prove the composer still clears '
         'the home indicator underneath it.',
   ),
+  _threadMessage(1, 'user-ada', 'Good catch - filed as #341.'),
+  _threadMessage(2, 'user-nick', 'Thanks, verifying the fix now.'),
 ];
