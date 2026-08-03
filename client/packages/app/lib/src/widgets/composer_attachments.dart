@@ -1,113 +1,205 @@
 // SPDX-License-Identifier: Apache-2.0
-/// A composer's staged attachments: files already uploaded, awaiting only
-/// the send that will point them at a channel.
+/// A picked attachment from the moment it appears in the composer, through
+/// its upload, to whichever of ready or failed resolves.
 ///
-/// Split out of `composer.dart`, which had no line budget left for it once
-/// it also had to stop a stale attachment carrying across a channel switch
-/// (see [ComposerAttachments.resetForChannelSwitch]). A mixin rather than a
-/// plain helper object: the picking and upload paths already needed
-/// `_ComposerState`'s own `ref`, `context` and `setState` at every step, and
-/// a helper object would only have re-invented them behind a bag of
-/// callbacks.
+/// Split out of `composer.dart`, already near its line budget: a picked file
+/// has to be visible the instant it is picked, never only once its upload
+/// succeeds, which needs a real model for "still uploading" and "failed,
+/// retryable" rather than the plain `Attachment` list plus an `uploading`
+/// bool a first version of this file held. `staged_attachment_tile.dart` is
+/// the widget this model renders into, split out on its own for the same
+/// line-budget reason.
 library;
 
 import 'dart:async';
-import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import 'package:slimm_api/api.dart' as api;
 
 import '../api_failure.dart';
-import '../providers/providers.dart';
-import 'attachment_picker.dart';
 
-/// Mixed into a composer's own `State` to hold and stage attachments.
+/// One attachment as the composer sees it, from the moment its bytes are
+/// picked. [bytes] and [filename] never change once staged; a retry restages
+/// the same bytes rather than asking wherever they came from for a fresh
+/// read, since a picker or a clipboard cannot be replayed on demand.
+sealed class StagedAttachment {
+  const StagedAttachment({
+    required this.localId,
+    required this.filename,
+    required this.bytes,
+  });
+
+  /// A client-only id: nothing here is uploaded yet when one is minted, so
+  /// it cannot be the server's own content hash.
+  final String localId;
+  final String filename;
+  final Uint8List bytes;
+}
+
+/// Picked, and the upload has not yet resolved either way.
+class UploadingAttachment extends StagedAttachment {
+  const UploadingAttachment({
+    required super.localId,
+    required super.filename,
+    required super.bytes,
+  });
+}
+
+/// Uploaded: [attachment] is what a send may reference.
+class UploadedAttachment extends StagedAttachment {
+  const UploadedAttachment({
+    required super.localId,
+    required super.filename,
+    required super.bytes,
+    required this.attachment,
+  });
+
+  final api.Attachment attachment;
+}
+
+/// The upload failed. [message] is already a plain sentence from
+/// [describeApiFailure], never the raw exception.
+class FailedAttachment extends StagedAttachment {
+  const FailedAttachment({
+    required super.localId,
+    required super.filename,
+    required super.bytes,
+    required this.message,
+  });
+
+  final String message;
+}
+
+/// A small, deliberately client-only guess at whether [filename] is worth a
+/// thumbnail.
 ///
-/// `on ConsumerState<T>` rather than a narrower bound: it needs `ref` for the
-/// upload, `context` for the failure `SnackBar`s, and `setState`, all of
-/// which `ConsumerState` already supplies to whatever widget mixes this in.
-mixin ComposerAttachments<T extends ConsumerStatefulWidget>
-    on ConsumerState<T> {
-  bool uploading = false;
-  final List<api.Attachment> pendingAttachments = [];
-  String? clipboardPasteError;
+/// The server sniffs the real content type after upload (see `media.rs`);
+/// this only decides what is worth *trying* to draw before that answer
+/// exists, and `StagedAttachmentTile`'s `errorBuilder` is what a wrong guess
+/// falls back to.
+bool looksLikeImage(String filename) {
+  final dot = filename.lastIndexOf('.');
+  if (dot == -1) return false;
+  const imageExtensions = {'.png', '.jpg', '.jpeg', '.gif', '.webp'};
+  return imageExtensions.contains(filename.substring(dot).toLowerCase());
+}
+
+/// Stages attachments for one composer: a pick is visible the moment it
+/// happens, its upload runs in the background, and a failure stays in place
+/// until it is retried or removed rather than vanishing.
+///
+/// A [ChangeNotifier] rather than Riverpod state: this is scoped to one
+/// composer instance exactly the way its `TextEditingController` already is,
+/// and nothing outside that composer ever needs to read it.
+class AttachmentStagingController extends ChangeNotifier {
+  AttachmentStagingController({required this.upload});
+
+  /// Uploads bytes and answers the stored attachment, or throws
+  /// [api.ApiException] on failure, the same contract
+  /// `SlimmApiAttachments.uploadAttachment` already has.
+  final Future<api.Attachment> Function(Uint8List bytes, String filename)
+  upload;
+
+  final List<StagedAttachment> _items = [];
+  List<StagedAttachment> get items => List.unmodifiable(_items);
+
+  bool get isEmpty => _items.isEmpty;
+
+  /// Whether a send has to wait: something here has not resolved to a real
+  /// attachment id yet, either because it is still uploading or because it
+  /// failed and needs a retry or a removal before it stops claiming a slot.
+  bool get hasBlockingAttachment =>
+      _items.any((a) => a is! UploadedAttachment);
+
+  /// The ids a send may reference. Deliberately only the uploaded ones: a
+  /// caller must also check [hasBlockingAttachment] first, or a send while
+  /// something is still pending would go out short of what was staged.
+  List<String> get readyIds => _items
+      .whereType<UploadedAttachment>()
+      .map((a) => a.attachment.id)
+      .toList(growable: false);
+
+  int _nextLocalId = 0;
+
+  /// Stages [bytes] and returns once it is in [items], before the upload
+  /// this starts has any chance to resolve - a caller awaiting this sees the
+  /// pending entry, never a gap where nothing is staged at all.
+  Future<void> stage(Uint8List bytes, String filename) async {
+    final localId = 'staged-${_nextLocalId++}';
+    _items.add(
+      UploadingAttachment(localId: localId, filename: filename, bytes: bytes),
+    );
+    notifyListeners();
+    unawaited(_runUpload(localId, bytes, filename));
+  }
+
+  /// Restages a failed upload's own bytes, rather than asking the caller
+  /// for a fresh pick: a browser or file-system picker cannot be replayed
+  /// on its own initiative.
+  void retry(String localId) {
+    final index = _items.indexWhere((a) => a.localId == localId);
+    final current = index == -1 ? null : _items[index];
+    if (current is! FailedAttachment) return;
+    _items[index] = UploadingAttachment(
+      localId: localId,
+      filename: current.filename,
+      bytes: current.bytes,
+    );
+    notifyListeners();
+    unawaited(_runUpload(localId, current.bytes, current.filename));
+  }
+
+  void remove(String localId) {
+    _items.removeWhere((a) => a.localId == localId);
+    notifyListeners();
+  }
+
+  void clear() {
+    _items.clear();
+    notifyListeners();
+  }
 
   /// A staged attachment is already uploaded, server-side, real cost, and
-  /// unlike a composer's text (see `channel_drafts.dart`) nothing here
-  /// restores it for a later return to this channel. Carrying it silently
-  /// into whatever channel comes up next would risk sending it there by
-  /// mistake instead - the exact "stale target" shape a draft must not
-  /// reintroduce.
-  void resetForChannelSwitch() {
-    setState(() {
-      pendingAttachments.clear();
-      clipboardPasteError = null;
-    });
-  }
+  /// unlike the composer's text (see `channel_drafts.dart`) nothing restores
+  /// it for a later return to this channel, so carrying it silently into
+  /// whatever channel comes up next would risk sending it there by mistake.
+  void resetForChannelSwitch() => clear();
 
-  void removeAttachment(api.Attachment attachment) {
-    setState(() => pendingAttachments.remove(attachment));
-  }
-
-  void setClipboardPasteError(String? message) {
-    if (mounted) setState(() => clipboardPasteError = message);
-  }
-
-  /// Called once a send has actually gone out with these ids.
-  void clearSentAttachments() {
-    if (mounted) setState(() => pendingAttachments.clear());
-  }
-
-  /// Re-focuses [focus] on every exit, including a cancelled pick: the
-  /// native picker takes focus with it, and without this the caret never
-  /// comes back and typing goes nowhere.
-  Future<void> pickAttachment(
-    AttachmentSource source, {
-    required FocusNode focus,
-  }) async {
-    final FilePickerResult? result;
+  Future<void> _runUpload(
+    String localId,
+    Uint8List bytes,
+    String filename,
+  ) async {
     try {
-      result = await ref.read(attachmentPickerProvider(source))();
-    } catch (e) {
-      if (!mounted) return;
-      focus.requestFocus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the file picker.')),
+      final attachment = await upload(bytes, filename);
+      _replace(
+        localId,
+        UploadedAttachment(
+          localId: localId,
+          // The server's own name: content addressing can answer with a different one.
+          filename: attachment.filename,
+          bytes: bytes,
+          attachment: attachment,
+        ),
       );
-      return;
-    }
-    if (!mounted) return;
-    focus.requestFocus();
-    final files = result?.files ?? const <PlatformFile>[];
-    if (files.isEmpty) return;
-    final file = files.first;
-    // readAsBytes streams from disk; eager PlatformFile.bytes OOMs on a large pick.
-    await stageAttachment(await file.readAsBytes(), file.name);
-  }
-
-  /// Uploads bytes from wherever they came from and, on success, stages the
-  /// resulting attachment. Shared by the file picker and a pasted image so
-  /// neither invents its own way onto the send path.
-  Future<void> stageAttachment(Uint8List bytes, String filename) async {
-    if (!mounted) return;
-    setState(() => uploading = true);
-    try {
-      final attachment = await ref
-          .read(apiProvider)
-          .uploadAttachment(bytes, filename: filename);
-      if (!mounted) return;
-      setState(() {
-        pendingAttachments.add(attachment);
-        uploading = false;
-      });
     } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => uploading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(describeApiFailure('attach the file', e))),
+      _replace(
+        localId,
+        FailedAttachment(
+          localId: localId,
+          filename: filename,
+          bytes: bytes,
+          message: describeApiFailure('attach the file', e),
+        ),
       );
     }
+  }
+
+  /// A no-op if [localId] was removed while its upload was still in flight.
+  void _replace(String localId, StagedAttachment next) {
+    final index = _items.indexWhere((a) => a.localId == localId);
+    if (index == -1) return;
+    _items[index] = next;
+    notifyListeners();
   }
 }

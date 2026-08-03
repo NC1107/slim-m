@@ -268,6 +268,19 @@ const List<WhatsNewEntry> whatsNewEntries = [
         'used to lose it. Every channel now keeps its own unsent draft for '
         'as long as the app stays open, and sending clears it.',
       ),
+      WhatsNewPoint(
+        'Attaching a file used to vanish from the composer until its '
+        'upload finished, so on a slow connection it looked like nothing '
+        'had happened and you\'d pick it again. It now appears the instant '
+        'you pick it, uploading in the background.',
+      ),
+      WhatsNewPoint(
+        'A picked photo gets a small thumbnail preview, not just a filename.',
+      ),
+      WhatsNewPoint(
+        'If an upload fails, it now says so and lets you retry or remove '
+        'it, instead of disappearing with no explanation.',
+      ),
     ],
   ),
 ];

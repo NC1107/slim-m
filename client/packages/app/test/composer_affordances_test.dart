@@ -11,10 +11,16 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:slimm_app/src/widgets/composer_extras.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'composer_harness.dart';
+
+/// The staged-attachment tile's remove control, found by its accessibility
+/// label rather than a widget type, since [Semantics] is a proxy the tree
+/// already carries regardless of whether a test enables the semantics tree.
+Finder removeAttachmentButton(String filename) => find.byWidgetPredicate(
+  (w) => w is Semantics && w.properties.label == 'Remove attachment $filename',
+);
 
 void main() {
   late TextEditingController controller;
@@ -94,7 +100,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.widget<AppIconButton>(sendButton).onPressed, isNotNull);
 
-      await tester.tap(find.byType(StagedAttachmentChip));
+      await tester.tap(removeAttachmentButton('holiday.png'));
       await tester.pump();
 
       expect(tester.widget<AppIconButton>(sendButton).onPressed, isNull);
@@ -149,7 +155,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(picker.calls, 1);
-      expect(find.byType(StagedAttachmentChip), findsNothing);
+      expect(removeAttachmentButton('holiday.png'), findsNothing);
       expect(
         fieldHasFocus(tester),
         isTrue,

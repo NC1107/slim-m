@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The composer's smaller pieces: the text field itself, its markdown key
-/// bindings, and a staged attachment's removable chip.
+/// bindings, and the banners above the action bar.
 library;
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import 'composer_attachments.dart';
 import 'composer_context_menu.dart';
 import 'composer_markdown_shortcuts.dart';
+import 'staged_attachment_tile.dart';
 
 /// Whether this platform's primary text input is a soft keyboard, which has
 /// no shift key and turns the return key into whatever `textInputAction`
@@ -220,58 +221,8 @@ class ComposerInlineError extends StatelessWidget {
   );
 }
 
-/// One attachment uploaded but not yet sent. The whole chip is the tap
-/// target for removing it, since [AppChip.operator] is deliberately
-/// non-interactive and there is no dedicated "remove" glyph in
-/// [AppIcons] to reach for instead.
-class StagedAttachmentChip extends StatelessWidget {
-  const StagedAttachmentChip({
-    super.key,
-    required this.filename,
-    required this.onRemove,
-  });
-
-  final String filename;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Semantics(
-      label: 'Remove attachment $filename',
-      button: true,
-      child: GestureDetector(
-        onTap: onRemove,
-        child: Container(
-          height: 24,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
-          decoration: BoxDecoration(
-            color: tokens.surfaceRaised,
-            border: Border.all(color: tokens.borderSubtle),
-            borderRadius: BorderRadius.circular(AppRadii.full),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                filename,
-                style: AppText.caption.copyWith(color: tokens.textPrimary),
-              ),
-              const SizedBox(width: AppSpacing.s4),
-              Text(
-                'x',
-                style: AppText.caption.copyWith(color: tokens.textSecondary),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// The composer's two optional bands above the action bar: a clipboard-paste
-/// failure, if there is one to show, and the staged-attachment chips.
+/// failure, if there is one to show, and the staged-attachment tiles.
 ///
 /// One widget rather than two calls at the build site, since both are
 /// "nothing, unless" content and `composer.dart` has no line budget left to
@@ -281,14 +232,16 @@ class ComposerBanners extends StatelessWidget {
     super.key,
     required this.clipboardPasteError,
     required this.onDismissClipboardPasteError,
-    required this.pendingAttachments,
+    required this.stagedAttachments,
     required this.onRemoveAttachment,
+    required this.onRetryAttachment,
   });
 
   final String? clipboardPasteError;
   final VoidCallback onDismissClipboardPasteError;
-  final List<api.Attachment> pendingAttachments;
-  final ValueChanged<api.Attachment> onRemoveAttachment;
+  final List<StagedAttachment> stagedAttachments;
+  final ValueChanged<String> onRemoveAttachment;
+  final ValueChanged<String> onRetryAttachment;
 
   @override
   Widget build(BuildContext context) {
@@ -301,17 +254,19 @@ class ComposerBanners extends StatelessWidget {
             message: error,
             onDismiss: onDismissClipboardPasteError,
           ),
-        if (pendingAttachments.isNotEmpty)
+        if (stagedAttachments.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.s8),
             child: Wrap(
               spacing: AppSpacing.s8,
               runSpacing: AppSpacing.s8,
               children: [
-                for (final attachment in pendingAttachments)
-                  StagedAttachmentChip(
-                    filename: attachment.filename,
-                    onRemove: () => onRemoveAttachment(attachment),
+                for (final attachment in stagedAttachments)
+                  StagedAttachmentTile(
+                    key: ValueKey(attachment.localId),
+                    attachment: attachment,
+                    onRemove: () => onRemoveAttachment(attachment.localId),
+                    onRetry: () => onRetryAttachment(attachment.localId),
                   ),
               ],
             ),

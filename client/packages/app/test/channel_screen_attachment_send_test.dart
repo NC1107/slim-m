@@ -25,7 +25,6 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/screens/channel_screen.dart';
-import 'package:slimm_app/src/widgets/composer_extras.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -178,7 +177,7 @@ void main() {
     await _flush(tester);
 
     expect(
-      find.byType(StagedAttachmentChip),
+      find.text('holiday.png'),
       findsOneWidget,
       reason: 'the pick must be staged before the send means anything',
     );
