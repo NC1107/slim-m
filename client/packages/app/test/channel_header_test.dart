@@ -135,4 +135,32 @@ void main() {
     expect(find.text('Pinned messages'), findsOneWidget);
     expect(find.text('hello'), findsOneWidget);
   });
+
+  testWidgets('the header no longer offers a rail-collapse button - '
+      '`RailDragHandle` replaced it', (tester) async {
+    final container = _containerWithPins([]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: ChannelHeader(
+              channelId: 'c1',
+              name: 'general',
+              isVoice: false,
+              searchOpen: false,
+              onToggleSearch: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Toggle channel list'), findsNothing);
+    expect(find.byIcon(AppIcons.sidebar), findsNothing);
+  });
 }

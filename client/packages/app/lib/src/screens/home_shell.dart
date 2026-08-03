@@ -27,6 +27,7 @@ import '../widgets/channel_rail_frame.dart';
 import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/member_pane.dart';
+import '../widgets/rail_drag_handle.dart';
 import '../widgets/voice_strip_indicator.dart';
 import '../widgets/whats_new_gate.dart';
 import 'canvas/canvas_open_button.dart';
@@ -90,7 +91,8 @@ class HomeShell extends ConsumerWidget {
                     : const SizedBox.shrink(),
               ),
             ),
-            if (showRail) const VerticalDivider(width: 1),
+            // Always present, even collapsed - it is the only way back.
+            const RailDragHandle(),
             // Its own semantics node, or the modal barrier inside this pane's
             // navigator blocks everything painted before it, which is the
             // whole rail: no channel row, section or search field reached a
