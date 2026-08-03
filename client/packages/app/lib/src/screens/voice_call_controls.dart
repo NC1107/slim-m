@@ -1,20 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The in-call control bar: mute, screen share and leave, plus the quality
-/// picker sharing opens.
+/// The in-call control bar: mute, screen share and leave.
+///
+/// Sharing has no quality dialog of its own: the ceiling is whatever Voice
+/// settings already has saved (`voice_settings_screen.dart`'s
+/// `voiceSettingsControllerProvider`), applied directly rather than asked
+/// again on every share, which is what the owner reported as the setting
+/// "not mattering".
 ///
 /// Its own file because `voice_screen.dart` was over this repo's hard file
 /// limit, and the bar is the one part of that screen with no dependency on
 /// which channel is being looked at.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
-import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
 import '../widgets/screen_source_sheet.dart';
+import 'voice_settings_screen.dart' show voiceSettingsControllerProvider;
 
-class CallControls extends StatelessWidget {
+class CallControls extends ConsumerStatefulWidget {
   const CallControls({
     super.key,
     required this.controller,
@@ -25,8 +33,20 @@ class CallControls extends StatelessWidget {
   final VoiceState voice;
 
   @override
+  ConsumerState<CallControls> createState() => _CallControlsState();
+}
+
+class _CallControlsState extends ConsumerState<CallControls> {
+  /// Guards a fast double-tap from opening two source-selection sheets: the
+  /// enumeration and its own sheet run entirely inside [_share], before
+  /// [VoiceController.setScreenShare] is ever called, so nothing further down
+  /// the stack can catch a re-entrant tap.
+  bool _shareRequestInFlight = false;
+
+  @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final voice = widget.voice;
     // Decoration outside, SafeArea inside, the same shape the rail's bars use:
     // insetting the bar itself would leave a scaffold-coloured band below it.
     return Container(
@@ -45,7 +65,7 @@ class CallControls extends StatelessWidget {
                 icon: voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
                 tooltip: voice.microphoneEnabled ? 'Mute' : 'Unmute',
                 active: voice.microphoneEnabled,
-                onPressed: controller.toggleMicrophone,
+                onPressed: widget.controller.toggleMicrophone,
               ),
               const SizedBox(width: AppSpacing.s12),
               _ControlButton(
@@ -55,7 +75,10 @@ class CallControls extends StatelessWidget {
                 // Pending is its own look, never the active one: the lit
                 // button over a share nobody could see was the whole bug.
                 pending: voice.awaitingBroadcast,
-                onPressed: () => _share(context, controller, voice),
+                onPressed: () {
+                  if (_shareRequestInFlight) return;
+                  unawaited(_share(context));
+                },
               ),
               const SizedBox(width: AppSpacing.s12),
               _ControlButton(
@@ -63,7 +86,7 @@ class CallControls extends StatelessWidget {
                 tooltip: 'Leave call',
                 active: false,
                 destructive: true,
-                onPressed: controller.leave,
+                onPressed: widget.controller.leave,
               ),
             ],
           ),
@@ -80,38 +103,44 @@ class CallControls extends StatelessWidget {
     return 'Share a screen';
   }
 
-  Future<void> _share(
-    BuildContext context,
-    VoiceController controller,
-    VoiceState voice,
-  ) async {
+  Future<void> _share(BuildContext context) async {
+    final controller = widget.controller;
+    final voice = widget.voice;
     // Cancelling a request that never became a broadcast goes down the same
     // path as stopping a live one, which is also what ends the recording.
     if (voice.screenSharing || voice.awaitingBroadcast) {
       await controller.setScreenShare(false);
       return;
     }
-    final quality = await showDialog<ScreenShareQuality>(
-      context: context,
-      builder: (context) => const _ShareQualityDialog(),
-    );
-    if (quality == null) return;
+    setState(() => _shareRequestInFlight = true);
+    try {
+      // The saved ceiling, applied directly rather than asked again.
+      final quality = ref
+          .read(voiceSettingsControllerProvider)
+          .screenShareQuality;
 
-    String? sourceId;
-    if (controller.screenShareNeedsSource) {
-      // Mandatory: capture cannot find a source nothing asked to list.
-      final sources = await controller.screenShareSources();
-      if (sources.isEmpty) return;
-      if (sources.length == 1) {
-        sourceId = sources.first.id;
-      } else {
-        if (!context.mounted) return;
-        final chosen = await showScreenSourceSheet(context, sources);
-        if (chosen == null) return;
-        sourceId = chosen.id;
+      String? sourceId;
+      if (controller.screenShareNeedsSource) {
+        // Mandatory: capture cannot find a source nothing asked to list.
+        final sources = await controller.screenShareSources();
+        if (sources.isEmpty) return;
+        if (sources.length == 1) {
+          sourceId = sources.first.id;
+        } else {
+          if (!context.mounted) return;
+          final chosen = await showScreenSourceSheet(context, sources);
+          if (chosen == null) return;
+          sourceId = chosen.id;
+        }
       }
+      await controller.setScreenShare(
+        true,
+        quality: quality,
+        sourceId: sourceId,
+      );
+    } finally {
+      if (mounted) setState(() => _shareRequestInFlight = false);
     }
-    await controller.setScreenShare(true, quality: quality, sourceId: sourceId);
   }
 }
 
@@ -190,51 +219,4 @@ class _ControlButton extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Quality is a ceiling, not a preference, so the dialog says what each costs.
-class _ShareQualityDialog extends StatelessWidget {
-  const _ShareQualityDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return AlertDialog(
-      title: const Text('Share a screen'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'You will be asked which screen to share next.',
-            style: TextStyle(color: tokens.textSecondary, fontSize: 13),
-          ),
-          const SizedBox(height: AppSpacing.s16),
-          for (final q in ScreenShareQuality.values)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(_label(q)),
-              subtitle: Text(
-                '${q.width}x${q.height} · ${q.fps}fps · '
-                'about ${(q.maxBitrate / 1000000).toStringAsFixed(1)} Mbit/s up',
-                style: TextStyle(color: tokens.textSecondary, fontSize: 12),
-              ),
-              onTap: () => Navigator.of(context).pop(q),
-            ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-      ],
-    );
-  }
-
-  static String _label(ScreenShareQuality q) => switch (q) {
-    ScreenShareQuality.smooth => 'Smooth, for anything moving',
-    ScreenShareQuality.balanced => 'Balanced',
-    ScreenShareQuality.crisp => 'Crisp, for reading code',
-  };
 }

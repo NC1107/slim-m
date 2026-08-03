@@ -40,8 +40,9 @@ typedef ScreenSharePublish = Future<void> Function(
 /// that gap is to republish automatically the moment broadcasting begins,
 /// using `RoomOptions.defaultScreenShareCaptureOptions` - fixed at room
 /// construction - rather than whatever quality this call was asked for. Left
-/// alone, that means the quality picker `_ShareQualityDialog` shows before
-/// every share is a control that cannot change anything on iOS.
+/// alone, that means the quality ceiling the app applies to every share (see
+/// `voice_call_controls.dart`) is a setting that cannot change anything on
+/// iOS.
 ///
 /// The fix is LiveKit's own documented escape hatch,
 /// `BroadcastManager.shouldPublishTrack`. [setEnabled] sets it false before
