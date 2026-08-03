@@ -24,12 +24,15 @@
 /// behaviour rather than silently swallowing a keystroke nothing backs.
 ///
 /// [hasClipboardImage]/[readClipboardImage] are the older poll-and-tap
-/// half, real on iOS and Android through a hand-written platform channel
-/// (see `composer_clipboard_image_stub.dart`) and a no-op on web and
-/// desktop. A composer offers a "Paste image" action rather than a
-/// keystroke there, because Android's `ClipboardManager` reaches a Flutter
-/// app only when deliberately invoked. It is offered unconditionally on
-/// mobile whenever the clipboard holds an image - see
+/// half, real on iOS, Android and Linux desktop through a hand-written
+/// platform channel (see `composer_clipboard_image_stub.dart`) and a no-op
+/// on web, Windows and macOS. A composer offers a "Paste image" action
+/// rather than a keystroke there, because none of the three has an
+/// equivalent of iOS's edit-menu swizzle: Android's `ClipboardManager`
+/// reaches a Flutter app only when deliberately invoked, and Linux has no
+/// framework hook into GTK's own context menu the way the swizzle reaches
+/// iOS's. It is offered unconditionally on every platform the channel
+/// answers whenever the clipboard holds an image - see
 /// `composer_clipboard_paste.dart`'s doc comment for why the swizzle above
 /// installing is not evidence it is redundant.
 library;
