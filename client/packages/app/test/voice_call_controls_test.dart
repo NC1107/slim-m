@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Tests that the share control never claims a share that is not happening.
+/// Tests that the share control never claims a share that is not happening,
+/// applies the quality already chosen in Voice settings without asking
+/// again, and cannot be re-entered by a fast double-tap while it is still
+/// enumerating sources.
 ///
 /// On iOS, asking to share only asks the system to offer a broadcast picker.
 /// Capture runs in a separate ReplayKit extension process, and nothing is
@@ -13,16 +16,51 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/voice_call_controls.dart';
+import 'package:slimm_app/src/screens/voice_settings_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+/// Mirrors `voice_settings_screen.dart`'s own private key: that screen's
+/// `VoiceSettingsController` is the real one under test here too, loaded from
+/// [SharedPreferences] exactly as it is in the app, rather than swapped for a
+/// fake - the bug this covers is that a saved value was never read back.
+const _qualityKey = 'slimm.voice.screen_share_quality';
+
 /// The controls take their [VoiceState] as a parameter, so the session behind
 /// the controller never has to reach any of these states itself.
 class _InertSession implements VoiceSession {
+  _InertSession({
+    bool needsSource = false,
+    Future<List<ScreenShareSource>>? sources,
+    ScreenShareOutcome outcome = ScreenShareOutcome.started,
+  }) : _needsSource = needsSource,
+       _sources = sources ?? Future.value(const []),
+       _outcome = outcome;
+
+  final bool _needsSource;
+  final Future<List<ScreenShareSource>> _sources;
+
+  /// Desktop starts sharing outright; `pendingBroadcast` is the iOS-only
+  /// shape and is what would arm `VoiceController`'s 30-second broadcast
+  /// deadline timer, which a test tapping share has to either not trigger or
+  /// clean up before its own body ends.
+  final ScreenShareOutcome _outcome;
+
+  /// How many times a source list was actually requested, so a test can
+  /// assert a fast double-tap only enumerated once.
+  int sourceFetchCount = 0;
+
+  /// Every call `setScreenShareEnabled` received, in order, so a test can
+  /// assert on the quality it was actually given rather than only on the
+  /// outcome.
+  final List<({bool enabled, ScreenShareQuality quality, String? sourceId})>
+  screenShareCalls = [];
+
   @override
   bool get supportsParticipantVolume => true;
 
@@ -61,10 +99,13 @@ class _InertSession implements VoiceSession {
   VoiceDisconnect? get lastDisconnect => null;
 
   @override
-  bool get screenShareNeedsSource => false;
+  bool get screenShareNeedsSource => _needsSource;
 
   @override
-  Future<List<ScreenShareSource>> screenShareSources() async => const [];
+  Future<List<ScreenShareSource>> screenShareSources() {
+    sourceFetchCount += 1;
+    return _sources;
+  }
 
   final Set<String> _locallyMuted = {};
 
@@ -102,7 +143,14 @@ class _InertSession implements VoiceSession {
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
-  }) async => ScreenShareOutcome.pendingBroadcast;
+  }) async {
+    screenShareCalls.add((
+      enabled: enabled,
+      quality: quality,
+      sourceId: sourceId,
+    ));
+    return _outcome;
+  }
 
   @override
   Future<void> dispose() async {
@@ -112,12 +160,18 @@ class _InertSession implements VoiceSession {
 }
 
 void main() {
-  Future<void> pumpControls(WidgetTester tester, VoiceState voice) async {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  Future<ProviderContainer> pumpControls(
+    WidgetTester tester,
+    VoiceState voice, {
+    _InertSession? session,
+  }) async {
     final container = ProviderContainer(
       overrides: [
         keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
         voiceControllerProvider.overrideWith(
-          (ref) => VoiceController(ref, session: _InertSession()),
+          (ref) => VoiceController(ref, session: session ?? _InertSession()),
         ),
       ],
     );
@@ -140,6 +194,7 @@ void main() {
     // pump, not pumpAndSettle: the pending state runs a progress indicator,
     // which never settles.
     await tester.pump();
+    return container;
   }
 
   testWidgets('a share awaiting a broadcast reads as waiting, not as on', (
@@ -172,5 +227,73 @@ void main() {
     expect(find.byIcon(AppIcons.screenShare), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.bySemanticsLabel('Stop sharing'), findsOneWidget);
+  });
+
+  testWidgets(
+    'sharing applies the quality already saved in Voice settings, asking nothing',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        _qualityKey: ScreenShareQuality.crisp.name,
+      });
+      final session = _InertSession();
+      final container = await pumpControls(
+        tester,
+        const VoiceState(state: VoiceSessionState.connected),
+        session: session,
+      );
+
+      // Warms the async load, or the tap would only see the default state.
+      container.read(voiceSettingsControllerProvider);
+      await container.read(preferencesProvider.future);
+      await tester.pump();
+      expect(
+        container.read(voiceSettingsControllerProvider).screenShareQuality,
+        ScreenShareQuality.crisp,
+      );
+
+      await tester.tap(find.byTooltip('Share a screen'));
+      await tester.pumpAndSettle();
+
+      // The setting is authoritative, not a pre-fill for one more question.
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(session.screenShareCalls, hasLength(1));
+      expect(session.screenShareCalls.single.quality, ScreenShareQuality.crisp);
+    },
+  );
+
+  testWidgets('a fast double-tap on share enumerates sources only once', (
+    tester,
+  ) async {
+    final sourcesCompleter = Completer<List<ScreenShareSource>>();
+    final session = _InertSession(
+      needsSource: true,
+      sources: sourcesCompleter.future,
+    );
+    await pumpControls(
+      tester,
+      const VoiceState(state: VoiceSessionState.connected),
+      session: session,
+    );
+
+    final shareButton = find.byTooltip('Share a screen');
+    // Both taps land before the source lookup they raced to start answers.
+    await tester.tap(shareButton);
+    await tester.pump();
+    await tester.tap(shareButton);
+    await tester.pump();
+
+    sourcesCompleter.complete(const [
+      ScreenShareSource(id: '1', name: 'Screen 1'),
+      ScreenShareSource(id: '2', name: 'Screen 2'),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(session.sourceFetchCount, 1);
+    // The sheet's own body copy: its tooltip is also "Share a screen".
+    expect(
+      find.text('Everyone in the call will see it until you stop sharing.'),
+      findsOneWidget,
+    );
   });
 }
