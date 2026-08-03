@@ -31,6 +31,7 @@ import 'package:slimm_app/src/screens/onboarding_screen.dart';
 import 'package:slimm_app/src/screens/personal_settings_screen.dart';
 import 'package:slimm_app/src/screens/sign_in_screen.dart';
 import 'package:slimm_app/src/screens/space_settings_screen.dart';
+import 'package:slimm_app/src/screens/thread_screen.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -183,7 +184,10 @@ Future<({ProviderContainer container, SlimmDatabase db})> fixtureContainer({
 /// `Navigator.of(context).canPop()` reads true exactly as it would in the
 /// app - floating shadow, scrim and all - rather than the "opened cold"
 /// presentation a bare `initialLocation` at the route itself would produce.
-bool isModalFixtureRoute(String location) => location.startsWith('/settings');
+/// A thread is pushed the same way, over the parent channel, from the
+/// message context menu.
+bool isModalFixtureRoute(String location) =>
+    location.startsWith('/settings') || location.startsWith('/thread/');
 
 /// The shell, on the real routes, at [location].
 ///
@@ -238,6 +242,13 @@ GoRouter fixtureRouter(String location) => GoRouter(
     GoRoute(
       path: '/settings/emoji',
       pageBuilder: (context, state) => modalPage(context, const EmojiScreen()),
+    ),
+    GoRoute(
+      path: '/thread/:channelId',
+      pageBuilder: (context, state) => modalPage(
+        context,
+        ThreadScreen(channelId: state.pathParameters['channelId']!),
+      ),
     ),
     ShellRoute(
       builder: (context, state, child) => HomeShell(child: child),

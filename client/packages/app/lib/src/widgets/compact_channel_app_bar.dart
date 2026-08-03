@@ -82,7 +82,7 @@ class CompactChannelAppBar extends ConsumerWidget
       // A voice channel has neither a message to find nor a message to pin,
       // so those two would be controls that cannot do anything.
       actions: [
-        if (!isVoice) _SearchAction(channelId: channelId),
+        if (!isVoice) ChannelSearchAction(channelId: channelId),
         if (!isVoice) _PinsAction(channelId: channelId),
         DmCallButton(channelId: channelId),
         CanvasOpenButton(channelId: channelId),
@@ -148,8 +148,10 @@ class _Title extends StatelessWidget {
   }
 }
 
-class _SearchAction extends ConsumerWidget {
-  const _SearchAction({required this.channelId});
+/// The search toggle, shared with `thread_screen.dart`'s `ThreadScreen`
+/// since a thread's messages are searchable the same way a real channel's are.
+class ChannelSearchAction extends ConsumerWidget {
+  const ChannelSearchAction({super.key, required this.channelId});
 
   final String channelId;
 

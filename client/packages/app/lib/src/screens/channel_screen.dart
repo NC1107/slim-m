@@ -262,7 +262,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
 
           return Column(
             children: [
-              if (layout.showsBothPanes)
+              // A thread supplies its own bar at every width; see thread_screen.dart.
+              if (layout.showsBothPanes && channel?.parentMessageId == null)
                 ChannelHeader(
                   channelId: widget.channelId,
                   name: channelName,

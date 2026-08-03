@@ -146,6 +146,16 @@ const _surfaces = <String, ({String route, List<String> viewports})>{
     route: '/settings/emoji',
     viewports: [..._phoneAndDesktop, ..._compactBracket],
   ),
+  // The stacked-header bug only ever showed past kCompactWidth; the compact bracket proves it stays clean there too.
+  'thread': (
+    route: '/thread/c-thread',
+    viewports: [
+      ..._phoneAndDesktop,
+      ..._compactBracket,
+      'expanded-999',
+      'expanded-1000',
+    ],
+  ),
 };
 
 /// The canvas replaces the whole conversation body, header included, at
