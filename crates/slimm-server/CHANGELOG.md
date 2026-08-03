@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.1](https://github.com/NC1107/slim-m/compare/server-v0.27.0...server-v0.27.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* moderation and blocking reach DM calls and thread reports ([#336](https://github.com/NC1107/slim-m/issues/336)) ([968bdfe](https://github.com/NC1107/slim-m/commit/968bdfe801daadff08c233f79d8d520c412ea4cc))
+
 ## [0.27.0](https://github.com/NC1107/slim-m/compare/server-v0.26.0...server-v0.27.0) (2026-08-03)
 
 
