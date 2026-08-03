@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: ChannelId\",\n                      category_id AS \"category_id: ChannelCategoryId\",\n                      position AS \"position!: i64\"\n               FROM channels\n               WHERE deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "category_id: ChannelCategoryId",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "position!: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "e81134e30b8b4f828d9693b7d5275c46af9dd6b69f7cde987899a38baf098e17"
+}

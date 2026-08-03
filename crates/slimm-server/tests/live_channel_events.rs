@@ -426,3 +426,42 @@ async fn an_overwrite_that_revokes_view_reaches_the_person_it_revoked() {
         "the frame says a channel changed, never what the overwrite was: {frame}"
     );
 }
+
+/// A category carries no permission of its own (see docs/decisions/
+/// 0006-channel-categories.md), so its change reaches every connection with
+/// no view check at all, unlike every other event in this file. Bob holds no
+/// `VIEW_CHANNEL` anywhere and still learns a category changed - the
+/// property that fails if `CategoryChanged` is ever folded into the
+/// channel-scoped match instead of the deployment-wide one.
+#[tokio::test]
+async fn category_changed_reaches_a_connection_with_no_view_permission_at_all() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role("everyone", Permissions::SEND_MESSAGES, true)
+        .await
+        .unwrap();
+    let state = state_for(&store);
+
+    let (alice_access, _alice_ticket, alice) = user_ticket(&store, "alice").await;
+    let (_bob_access, bob_ticket, _bob) = user_ticket(&store, "bob").await;
+    make_admin(&store, alice).await;
+
+    let addr = serve(state.clone()).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    let response = http::router(state.clone())
+        .oneshot(req(
+            "POST",
+            "/categories",
+            &alice_access,
+            Some(json!({ "name": "extras" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let frame = tokio::time::timeout(Duration::from_secs(2), read_frame(&mut bob_ws))
+        .await
+        .expect("bob must be told a category changed despite holding no VIEW_CHANNEL");
+    assert_eq!(frame["type"], "category.changed");
+}

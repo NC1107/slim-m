@@ -334,7 +334,7 @@ async fn dm_channel_is_excluded_from_the_ordinary_channel_list() {
         .unwrap();
     assert_eq!(listed.status(), StatusCode::OK);
     let channels = json_body(listed).await;
-    let ids: Vec<&str> = channels
+    let ids: Vec<&str> = channels["channels"]
         .as_array()
         .unwrap()
         .iter()
@@ -569,7 +569,7 @@ async fn a_dm_does_not_let_the_last_real_channel_be_deleted() {
             .unwrap(),
     )
     .await;
-    let only = channels.as_array().unwrap();
+    let only = channels["channels"].as_array().unwrap();
     assert_eq!(only.len(), 1, "bootstrap seeds exactly one channel");
     let general = only[0]["id"].as_str().unwrap().to_owned();
 

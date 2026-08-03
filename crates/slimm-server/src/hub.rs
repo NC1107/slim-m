@@ -97,7 +97,9 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::CanvasObjectsRemoved { .. }
         | Event::CanvasCleared { .. }
         | Event::CanvasObjectsRestored { .. }
-        | Event::SessionRevoked(_) => false,
+        | Event::SessionRevoked(_)
+        // A category grants and denies nothing (docs/decisions/0006).
+        | Event::CategoryChanged => false,
     }
 }
 

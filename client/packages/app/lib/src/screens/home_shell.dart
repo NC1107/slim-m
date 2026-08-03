@@ -216,7 +216,10 @@ class HomeShell extends ConsumerWidget {
   ) async {
     final store = ref.read(storeProvider).valueOrNull;
     if (store == null) return;
-    final ordered = orderedChannels(await store.allChannels());
+    final ordered = orderedChannels(
+      await store.allChannels(),
+      await store.allCategories(),
+    );
     if (ordered.isEmpty || !context.mounted) return;
     final current = selectedChannelId(context);
     final index = ordered.indexWhere((c) => c.id == current);

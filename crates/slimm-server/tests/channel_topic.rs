@@ -133,7 +133,7 @@ async fn manager_can_set_a_topic_and_it_round_trips_through_the_list() {
             .unwrap(),
     )
     .await;
-    let listed = listed.as_array().unwrap();
+    let listed = listed["channels"].as_array().unwrap();
     let general = listed
         .iter()
         .find(|c| c["id"] == channel.id.to_string())
@@ -164,7 +164,7 @@ async fn a_fresh_channel_has_no_topic() {
             .unwrap(),
     )
     .await;
-    let general = listed
+    let general = listed["channels"]
         .as_array()
         .unwrap()
         .iter()

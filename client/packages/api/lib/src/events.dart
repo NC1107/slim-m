@@ -151,6 +151,7 @@ sealed class ServerEvent {
         ChannelDeleted(channelId: decoded['channel_id'] as String),
       'overwrite.changed' when decoded['channel_id'] is String =>
         OverwriteChanged(channelId: decoded['channel_id'] as String),
+      'category.changed' => const CategoryChanged(),
       'canvas.object.placed'
           when decoded['channel_id'] is String &&
               decoded['object'] is Map<String, dynamic> =>

@@ -22,6 +22,7 @@ use axum::routing::{get, patch};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
+use super::categories::CategoryDto;
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
@@ -69,6 +70,13 @@ pub(crate) struct ChannelDto {
     /// docs/decisions/0005-threads.md. A thread never appears in
     /// `listChannels`; reach one through `openThread`.
     parent_message_id: Option<String>,
+    /// The rail section this channel is filed under, or `null` for
+    /// uncategorised - rendered as an implicit section above every named
+    /// category. Decides placement only: see
+    /// docs/decisions/0006-channel-categories.md. Absent on servers older
+    /// than this field, which a client must treat as unknown rather than
+    /// assuming uncategorised.
+    category_id: Option<String>,
     created_at: i64,
 }
 
@@ -81,9 +89,20 @@ impl From<Channel> for ChannelDto {
             topic: channel.topic,
             position: channel.position,
             parent_message_id: channel.parent_message_id.map(|id| id.to_string()),
+            category_id: channel.category_id.map(|id| id.to_string()),
             created_at: channel.created_at,
         }
     }
+}
+
+/// `GET /channels`'s response shape: the caller's visible channels alongside
+/// every live category, so a client learns both in the one request it already
+/// makes at startup and after every category-list live event, rather than a
+/// second round trip existing only for this.
+#[derive(Serialize)]
+struct ChannelsPageDto {
+    channels: Vec<ChannelDto>,
+    categories: Vec<CategoryDto>,
 }
 
 #[derive(Deserialize)]
@@ -107,20 +126,34 @@ struct UpdateChannelRequest {
     topic: Option<String>,
 }
 
-/// Lists the channels the caller can view. One batched store call: the
-/// per-channel has_permission loop this replaces cost 1 + 4C queries.
+/// Lists the channels the caller can view, alongside every live category.
+/// One batched store call for the channels: the per-channel has_permission
+/// loop this replaces cost 1 + 4C queries. Categories carry no permission of
+/// their own (see docs/IMPLIED-GAPS.md), so the list is unfiltered - a
+/// category with nothing visible inside it is not a leak, since its own name
+/// and position are not privileged.
 async fn list(
     Authed(ctx): Authed,
     State(state): State<AppState>,
-) -> Result<Json<Vec<ChannelDto>>, ApiError> {
-    let visible = state
+) -> Result<Json<ChannelsPageDto>, ApiError> {
+    let channels = state
         .store
         .visible_channels(ctx.user_id)
         .await?
         .into_iter()
         .map(ChannelDto::from)
         .collect();
-    Ok(Json(visible))
+    let categories = state
+        .store
+        .list_categories()
+        .await?
+        .into_iter()
+        .map(CategoryDto::from)
+        .collect();
+    Ok(Json(ChannelsPageDto {
+        channels,
+        categories,
+    }))
 }
 
 /// Creates a channel. Requires MANAGE_CHANNELS at the deployment level.

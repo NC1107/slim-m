@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Setting the deployment's channel order: `PUT /channels/order` takes the
-//! whole ordered list of live, non-DM channel ids a drag produced, applied
-//! atomically, rather than a position PATCH per channel that could interleave
-//! with another admin's drag and leave the order neither of them asked for.
+//! Setting the deployment's channel order and category placement:
+//! `PUT /channels/order` takes the whole rail, grouped by category, that a
+//! drag produced, applied atomically - so a move between two rail sections
+//! reassigns and repositions in one request rather than a move followed by a
+//! reorder that could half-apply. See
+//! docs/decisions/0006-channel-categories.md.
 
 use axum::Router;
 use axum::extract::State;
@@ -16,10 +18,10 @@ use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
-use crate::ids::ChannelId;
+use crate::ids::{ChannelCategoryId, ChannelId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::ReorderChannelsError;
+use crate::store::{ChannelOrderGroup, ReorderChannelsError};
 
 /// The channel-ordering route, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
@@ -27,13 +29,21 @@ pub fn routes() -> Router<AppState> {
 }
 
 #[derive(Deserialize)]
-struct ReorderRequest {
+struct ReorderGroupRequest {
+    /// `null` for the implicit uncategorised section.
+    category_id: Option<String>,
     channel_ids: Vec<String>,
 }
 
-/// Sets the deployment's channel order. Requires MANAGE_CHANNELS at the
-/// deployment level, the same gate `createChannel`, `updateChannel` and
-/// `deleteChannel` use. Charged the same [`Class::Write`] budget as those.
+#[derive(Deserialize)]
+struct ReorderRequest {
+    categories: Vec<ReorderGroupRequest>,
+}
+
+/// Sets the deployment's channel order and category placement. Requires
+/// MANAGE_CHANNELS at the deployment level, the same gate `createChannel`,
+/// `updateChannel` and `deleteChannel` use. Charged the same [`Class::Write`]
+/// budget as those.
 ///
 /// Publishes `ChannelUpdated` only for a channel `outcome.moved` names: a
 /// no-op submission answers 200 with nothing published, or every other
@@ -54,13 +64,28 @@ async fn reorder(
         return Err(ApiError::Forbidden);
     }
 
-    let ordered = req
-        .channel_ids
+    let groups = req
+        .categories
         .iter()
-        .map(|id| parse_uuid(id).map(ChannelId))
+        .map(|group| {
+            let category_id = group
+                .category_id
+                .as_deref()
+                .map(|id| parse_uuid(id).map(ChannelCategoryId))
+                .transpose()?;
+            let channel_ids = group
+                .channel_ids
+                .iter()
+                .map(|id| parse_uuid(id).map(ChannelId))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok::<_, ApiError>(ChannelOrderGroup {
+                category_id,
+                channel_ids,
+            })
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
-    match state.store.reorder_channels(&ordered).await {
+    match state.store.reorder_channels(&groups).await {
         Ok(outcome) => {
             for channel in &outcome.channels {
                 if outcome.moved.contains(&channel.id) {
@@ -74,6 +99,16 @@ async fn reorder(
         Err(ReorderChannelsError::Mismatch { missing, extra }) => Err(ApiError::BadRequestDetail(
             mismatch_message(&missing, &extra),
         )),
+        Err(ReorderChannelsError::UnknownCategory(unknown)) => {
+            let ids = unknown
+                .iter()
+                .map(ChannelCategoryId::to_string)
+                .collect::<Vec<_>>()
+                .join(", ");
+            Err(ApiError::BadRequestDetail(format!(
+                "named unknown category(s): {ids}"
+            )))
+        }
         Err(ReorderChannelsError::Internal(e)) => Err(e.into()),
     }
 }

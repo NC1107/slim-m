@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Setting the deployment's channel order from the rail: `PUT
-/// /channels/order` ([api.SlimmApiChannelAdmin.reorderChannels]).
+/// Setting the deployment's channel order and category placement from the
+/// rail: `PUT /channels/order` ([api.SlimmApiChannelAdmin.reorderChannels]).
 ///
-/// Optimistic, the same shape `BlocksController.block` uses: the new order
-/// renders the instant a drag completes, and the round trip only decides
-/// whether it sticks. The local store is never rewritten ahead of the
-/// server's answer - `pendingOrder` is what the rail renders meanwhile,
+/// Optimistic, the same shape `BlocksController.block` uses: the new
+/// arrangement renders the instant a drag completes, and the round trip only
+/// decides whether it sticks. The local store is never rewritten ahead of
+/// the server's answer - `pendingOrder` is what the rail renders meanwhile,
 /// because the server is what assigns the real position values, and every
 /// other client with this rail open has to agree on the same ones.
 library;
@@ -20,12 +20,12 @@ import 'providers.dart';
 class ChannelOrderState {
   const ChannelOrderState({this.pendingOrder, this.error});
 
-  /// Every live, non-DM channel id, in the order this client asked for and
-  /// has not yet heard confirmed or refused. Null once the request settles
-  /// either way: on success the local store already holds the confirmed
-  /// order, and on failure the rail falls back to showing the order it had
+  /// The whole rail, grouped by category, this client asked for and has not
+  /// yet heard confirmed or refused. Null once the request settles either
+  /// way: on success the local store already holds the confirmed
+  /// arrangement, and on failure the rail falls back to showing what it had
   /// before this attempt.
-  final List<String>? pendingOrder;
+  final List<api.ChannelOrderGroup>? pendingOrder;
 
   /// What to show if the last attempt failed, or null.
   final String? error;
@@ -35,19 +35,17 @@ class ChannelOrderController extends StateNotifier<ChannelOrderState> {
   ChannelOrderController(this._ref) : super(const ChannelOrderState());
 
   final Ref _ref;
-  List<String>? _lastAttempt;
+  List<api.ChannelOrderGroup>? _lastAttempt;
 
-  /// Submits [fullOrder] - every live, non-DM channel id, in the order a
-  /// drag produced - and renders it immediately. [fullOrder] must be the
-  /// server's own combined order across every kind, not just one section's:
-  /// `position` is one shared sequence, so a drag confined to one section
-  /// still has to carry the other kind's channels along unchanged (see
-  /// `channel_grouping.dart`'s `spliceKindOrder`).
-  Future<void> reorder(List<String> fullOrder) async {
-    _lastAttempt = fullOrder;
-    state = ChannelOrderState(pendingOrder: fullOrder);
+  /// Submits [groups] - the whole rail, grouped by category, in the
+  /// arrangement a drag produced - and renders it immediately. A channel of
+  /// any kind may be named in any group: a category decides placement only,
+  /// never behaviour (docs/decisions/0006-channel-categories.md).
+  Future<void> reorder(List<api.ChannelOrderGroup> groups) async {
+    _lastAttempt = groups;
+    state = ChannelOrderState(pendingOrder: groups);
     try {
-      final updated = await _ref.read(apiProvider).reorderChannels(fullOrder);
+      final updated = await _ref.read(apiProvider).reorderChannels(groups);
       final store = await _ref.read(storeProvider.future);
       await store.upsertChannels(updated);
       if (mounted) state = const ChannelOrderState();
@@ -59,13 +57,13 @@ class ChannelOrderController extends StateNotifier<ChannelOrderState> {
     }
   }
 
-  /// Retries the order that last failed, or does nothing if none did.
+  /// Retries the arrangement that last failed, or does nothing if none did.
   Future<void> retry() {
     final attempt = _lastAttempt;
     return attempt == null ? Future<void>.value() : reorder(attempt);
   }
 
-  /// Clears a failure without retrying, accepting the reverted order.
+  /// Clears a failure without retrying, accepting the reverted arrangement.
   void dismiss() {
     if (mounted) state = const ChannelOrderState();
   }

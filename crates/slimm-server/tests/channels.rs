@@ -279,7 +279,7 @@ async fn manager_can_delete_a_channel_idempotently() {
             .unwrap(),
     )
     .await;
-    let names: Vec<&str> = listed
+    let names: Vec<&str> = listed["channels"]
         .as_array()
         .unwrap()
         .iter()
@@ -326,7 +326,7 @@ async fn the_last_channel_cannot_be_deleted() {
             .unwrap(),
     )
     .await;
-    assert_eq!(listed.as_array().unwrap().len(), 1);
+    assert_eq!(listed["channels"].as_array().unwrap().len(), 1);
 }
 
 /// A channel id that was never real is a plain 404 for a manager, distinct

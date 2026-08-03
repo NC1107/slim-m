@@ -187,6 +187,8 @@ impl Store {
             // Never read: a DM is excluded from every position-ordered query.
             position: 0,
             parent_message_id: None,
+            // Never read: a DM is excluded from every category grouping.
+            category_id: None,
             created_at: now,
         })
     }

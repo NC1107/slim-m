@@ -1,7 +1,8 @@
 # 0006 - Channel categories are containers, not the channel's type
 
-Status: proposed, 2026-08-03.
+Status: accepted, 2026-08-03.
 Raised by the owner in the `backlog` channel (item #34).
+The one call that needed confirming was the permission question below, and the owner confirmed it: "no permissions for categories is fine".
 
 ## The report
 

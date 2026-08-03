@@ -27,6 +27,13 @@ class ChannelRefresher {
   /// lists, so one whose view was just revoked leaves the rail rather than
   /// sitting there until sign-out.
   ///
+  /// Also replaces the local category list from the same `GET /channels`
+  /// response, on its own path ([MessageStore.replaceCategories]) rather
+  /// than folded into [MessageStore.replaceChannels]: a category is not a
+  /// channel and never appears in that list, so pruning it there would wipe
+  /// every category on the very first refresh - see docs/decisions/
+  /// 0006-channel-categories.md.
+  ///
   /// Also hydrates each channel's read marker from the server. `ScopeDelta`
   /// carries no read state, so `/sync` can never do this, and
   /// `MessageStore.clear()` wipes the local marker on every sign-out; without
@@ -44,15 +51,16 @@ class ChannelRefresher {
     MessageStore store, {
     required bool Function() isCurrent,
   }) async {
-    final channels = await api.listChannels();
+    final page = await api.listChannels();
     final dms = await api.listDirectMessages();
     if (!isCurrent()) return;
     final selfId = api.session.tokens?.userId;
     final all = [
-      ...channels,
+      ...page.channels,
       ...dms.map((dm) => channelFromDm(dm, selfId: selfId)),
     ];
     await store.replaceChannels(all);
+    await store.replaceCategories(page.categories);
 
     /// Per channel: the server has no bulk read-state endpoint, and one
     /// channel's failure must not stop the rest from hydrating.

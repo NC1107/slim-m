@@ -134,7 +134,14 @@ void main() {
 
     final syncGate = Completer<void>();
     final router = RestRouter()
-      ..on('GET', '/channels', (_) => jsonResponse([_channelJson()]))
+      ..on(
+        'GET',
+        '/channels',
+        (_) => jsonResponse({
+          'channels': [_channelJson()],
+          'categories': const <dynamic>[],
+        }),
+      )
       ..on('GET', '/dms', (_) => jsonResponse(const <dynamic>[]))
       ..on(
         'GET',

@@ -26,6 +26,7 @@ bool spaceSettingsReachable(int permissions) =>
     permissions.hasPermission(Perm.createInvite) ||
     permissions.hasPermission(Perm.manageRoles) ||
     permissions.hasPermission(Perm.manageServer) ||
+    permissions.hasPermission(Perm.manageChannels) ||
     permissions.hasPermission(Perm.banMembers);
 
 /// Each row is gated on the server bit its screen requires, per `GET /me`'s
@@ -49,6 +50,7 @@ class SpaceSettingsSection extends ConsumerWidget {
     final canInvite = permissions.hasPermission(Perm.createInvite);
     final canManageRoles = permissions.hasPermission(Perm.manageRoles);
     final canManageServer = permissions.hasPermission(Perm.manageServer);
+    final canManageChannels = permissions.hasPermission(Perm.manageChannels);
     final canBan = permissions.hasPermission(Perm.banMembers);
 
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -89,6 +91,13 @@ class SpaceSettingsSection extends ConsumerWidget {
             onTap: () => context.push(Routes.adminOverwrites),
           ),
         ],
+        if (canManageChannels)
+          AppListRow(
+            label: 'Channel categories',
+            leading: const Icon(AppIcons.hash),
+            trailing: chevron(),
+            onTap: () => context.push(Routes.adminCategories),
+          ),
         if (canBan)
           AppListRow(
             label: 'Removed members',

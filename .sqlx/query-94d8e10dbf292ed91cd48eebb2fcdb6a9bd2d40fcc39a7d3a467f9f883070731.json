@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: ChannelId\", name AS \"name!\", kind AS \"kind!\", topic,\n                      position AS \"position!: i64\",\n                      parent_message_id AS \"parent_message_id: crate::ids::MessageId\",\n                      created_at AS \"created_at!\"\n               FROM channels\n               WHERE deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL\n               ORDER BY position, created_at",
+  "query": "SELECT id AS \"id!: ChannelId\", name AS \"name!\", kind AS \"kind!\", topic,\n                      position AS \"position!: i64\",\n                      parent_message_id AS \"parent_message_id: crate::ids::MessageId\",\n                      category_id AS \"category_id: crate::ids::ChannelCategoryId\",\n                      created_at AS \"created_at!\"\n               FROM channels WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -34,13 +34,18 @@
         "type_info": "Blob"
       },
       {
-        "name": "created_at!",
+        "name": "category_id: crate::ids::ChannelCategoryId",
         "ordinal": 6,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 7,
         "type_info": "Integer"
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -49,8 +54,9 @@
       true,
       false,
       true,
+      true,
       false
     ]
   },
-  "hash": "fd9a01ad39c077b74919c40357005c0f021b7240126318e7ffdb9ee5c554375b"
+  "hash": "94d8e10dbf292ed91cd48eebb2fcdb6a9bd2d40fcc39a7d3a467f9f883070731"
 }

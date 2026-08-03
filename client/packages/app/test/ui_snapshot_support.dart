@@ -38,7 +38,7 @@ import 'package:slimm_platform/platform.dart';
 import 'ui_snapshot_fixture_data.dart';
 
 export 'ui_snapshot_fixture_data.dart'
-    show fixtureChannels, fixtureClient, fixtureMessages;
+    show fixtureCategories, fixtureChannels, fixtureClient, fixtureMessages;
 
 /// Where PNGs land. Gitignored: these are for looking at, not for diffing.
 const snapshotDir = 'build/ui-snapshots';
@@ -167,6 +167,7 @@ Future<({ProviderContainer container, SlimmDatabase db})> fixtureContainer({
   );
   final store = await container.read(storeProvider.future);
   await store.upsertChannels(fixtureChannels);
+  await store.replaceCategories(fixtureCategories);
   await store.applyMessages(fixtureMessages);
   // Reactions, attachments and polls live in an in-memory controller rather
   // than the store, so seeding the store alone renders none of them.

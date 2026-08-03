@@ -136,11 +136,11 @@ class SlimmApi {
 
   // --- Channels ---
 
-  Future<List<Channel>> listChannels() async {
+  /// The caller's visible channels alongside every live category, fetched
+  /// together since a category has no listing route of its own.
+  Future<ChannelsPage> listChannels() async {
     final json = await _send('GET', '/channels');
-    return (json as List<dynamic>)
-        .map((c) => Channel.fromJson(c as Map<String, dynamic>))
-        .toList(growable: false);
+    return ChannelsPage.fromJson(json as Map<String, dynamic>);
   }
 
   /// Creates a channel. Requires the manage-channels permission.

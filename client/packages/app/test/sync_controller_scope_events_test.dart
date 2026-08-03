@@ -173,7 +173,10 @@ void main() {
       final harness = _harness(
         handle: (request) async {
           if (request.method == 'GET' && request.url.path == '/channels') {
-            return _json([_channelJson(id: 'new', name: 'new-channel')]);
+            return _json({
+              'channels': [_channelJson(id: 'new', name: 'new-channel')],
+              'categories': <Object>[],
+            });
           }
           if (request.method == 'GET' && request.url.path == '/dms') {
             return _json(<Object>[]);

@@ -4,8 +4,14 @@
 /// `orderedChannels` and `DirectMessagesSection` once did: this used to
 /// duplicate the personal-space split inline, in raw `createdAt` order, so
 /// cycling landed on a different channel than the one the rail showed first.
+///
+/// Grouping is by category, not by kind, per docs/decisions/
+/// 0006-channel-categories.md: `kind` decides a channel's behaviour (a
+/// transcript or a call), `categoryId` decides which rail section it renders
+/// in, and a channel of any kind may sit in any category.
 library;
 
+import 'package:slimm_api/api.dart' show ChannelOrderGroup;
 import 'package:slimm_data/data.dart';
 
 import '../providers/dms.dart';
@@ -29,45 +35,65 @@ import '../providers/dms.dart';
   return (personal: personal, others: others);
 }
 
+/// [channels] (already restricted to live, non-DM, non-thread ones) bucketed
+/// by category id, each bucket sorted by `position` - `null` for the
+/// implicit uncategorised section, which always sorts first regardless of
+/// where it falls among [categories].
+Map<String?, List<Channel>> channelsByCategory(List<Channel> channels) {
+  final sorted = [...channels]
+    ..sort((a, b) => a.position.compareTo(b.position));
+  final byCategory = <String?, List<Channel>>{};
+  for (final channel in sorted) {
+    (byCategory[channel.categoryId] ??= []).add(channel);
+  }
+  return byCategory;
+}
+
 /// [channels] grouped and ordered the way the rail renders them: direct
 /// messages (the personal space first, then every other DM in listing
-/// order), then text channels, then voice channels, each in its own
-/// relative order.
-List<Channel> orderedChannels(List<Channel> channels) {
+/// order), then every non-DM channel bucketed by category - uncategorised
+/// first, then each of [categories] in its own position order - mixed kind
+/// within a bucket, ordered by the channel's own position.
+List<Channel> orderedChannels(
+  List<Channel> channels,
+  List<ChannelCategoryRow> categories,
+) {
   final dms = splitPersonalSpace(
     channels.where((c) => c.kind == dmChannelKind).toList(),
+  );
+  final byCategory = channelsByCategory(
+    channels
+        .where((c) => c.kind != dmChannelKind && c.parentMessageId == null)
+        .toList(),
   );
   return [
     if (dms.personal != null) dms.personal!,
     ...dms.others,
-    ...channels.where((c) => c.kind == 'text'),
-    ...channels.where((c) => c.kind == 'voice'),
+    ...byCategory[null] ?? const [],
+    for (final category in categories) ...byCategory[category.id] ?? const [],
   ];
 }
 
-/// Rewrites [fullOrder] (every live, non-DM channel, in the server's one
-/// shared position order) so [kind]'s channels take [newKindOrder] while
-/// every channel of another kind keeps its exact slot.
-///
-/// The rail shows text and voice channels as two separate sections, but the
-/// server's `position` is one sequence across both, so a drag confined to
-/// one section is not itself a valid reorder request - it has to be spliced
-/// back into the full order the other section's channels still occupy, or
-/// submitting it would silently move every voice channel too.
-List<String> spliceKindOrder({
-  required List<Channel> fullOrder,
-  required String kind,
-  required List<String> newKindOrder,
-}) {
-  var next = 0;
-  final result = <String>[];
-  for (final channel in fullOrder) {
-    if (channel.kind == kind) {
-      result.add(newKindOrder[next]);
-      next++;
-    } else {
-      result.add(channel.id);
-    }
-  }
-  return result;
+/// The whole rail's current arrangement, as [ChannelOrderGroup]s in category
+/// order - the baseline a drag mutates before submitting. Every live,
+/// non-DM, non-thread channel appears exactly once, across all groups.
+List<ChannelOrderGroup> currentOrderGroups(
+  List<Channel> channels,
+  List<ChannelCategoryRow> categories,
+) {
+  final byCategory = channelsByCategory(
+    channels
+        .where((c) => c.kind != dmChannelKind && c.parentMessageId == null)
+        .toList(),
+  );
+  Iterable<String> idsIn(String? categoryId) =>
+      (byCategory[categoryId] ?? const []).map((c) => c.id);
+  return [
+    ChannelOrderGroup(categoryId: null, channelIds: idsIn(null).toList()),
+    for (final category in categories)
+      ChannelOrderGroup(
+        categoryId: category.id,
+        channelIds: idsIn(category.id).toList(),
+      ),
+  ];
 }

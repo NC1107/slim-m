@@ -97,7 +97,7 @@ void main() {
     final harness = _harness(
       handle: (request) async {
         if (request.method == 'GET' && request.url.path == '/channels') {
-          return _json(<Object>[]);
+          return _json({'channels': <Object>[], 'categories': <Object>[]});
         }
         if (request.method == 'GET' && request.url.path == '/dms') {
           return _json(dmsResponse);
@@ -160,7 +160,7 @@ void main() {
       final harness = _harness(
         handle: (request) async {
           if (request.method == 'GET' && request.url.path == '/channels') {
-            return _json(<Object>[]);
+            return _json({'channels': <Object>[], 'categories': <Object>[]});
           }
           if (request.method == 'GET' && request.url.path == '/dms') {
             refreshes++;

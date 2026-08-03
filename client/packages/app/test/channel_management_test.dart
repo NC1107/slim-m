@@ -118,8 +118,9 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _harness(
-          TextChannelsSection(
+          ChannelCategorySections(
             channels: [_channel('c1', 'general')],
+            categories: const [],
             selectedId: null,
             onReorder: (_) {},
           ),
@@ -127,7 +128,7 @@ void main() {
         ),
       );
 
-      expect(find.bySemanticsLabel('Create a text channel'), findsNothing);
+      expect(find.bySemanticsLabel('Create a channel'), findsNothing);
       expect(find.bySemanticsLabel('Manage general'), findsNothing);
     });
 
@@ -136,8 +137,9 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           _harness(
-            TextChannelsSection(
+            ChannelCategorySections(
               channels: [_channel('c1', 'general')],
+              categories: const [],
               selectedId: null,
               canManage: true,
               onReorder: (_) {},
@@ -146,7 +148,7 @@ void main() {
           ),
         );
 
-        expect(find.bySemanticsLabel('Create a text channel'), findsOneWidget);
+        expect(find.bySemanticsLabel('Create a channel'), findsOneWidget);
         expect(find.bySemanticsLabel('Manage general'), findsOneWidget);
       },
     );
@@ -159,8 +161,9 @@ void main() {
       final requests = <http.Request>[];
       await tester.pumpWidget(
         _harness(
-          TextChannelsSection(
+          ChannelCategorySections(
             channels: const [],
+            categories: const [],
             selectedId: null,
             canManage: true,
             onReorder: (_) {},
@@ -181,7 +184,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.bySemanticsLabel('Create a text channel'));
+      await tester.tap(find.bySemanticsLabel('Create a channel'));
       await tester.pumpAndSettle();
       expect(find.text('Create a channel'), findsOneWidget);
 
@@ -207,8 +210,9 @@ void main() {
         'showing the bare server error', (tester) async {
       await tester.pumpWidget(
         _harness(
-          TextChannelsSection(
+          ChannelCategorySections(
             channels: [_channel('c1', 'general')],
+            categories: const [],
             selectedId: null,
             canManage: true,
             onReorder: (_) {},
@@ -245,8 +249,9 @@ void main() {
       final requests = <http.Request>[];
       await tester.pumpWidget(
         _harness(
-          TextChannelsSection(
+          ChannelCategorySections(
             channels: [_channel('c1', 'general'), _channel('c2', 'random')],
+            categories: const [],
             selectedId: 'c1',
             canManage: true,
             onReorder: (_) {},
@@ -290,8 +295,9 @@ void main() {
       final requests = <http.Request>[];
       await tester.pumpWidget(
         _harness(
-          TextChannelsSection(
+          ChannelCategorySections(
             channels: [_channel('c1', 'general'), _channel('c2', 'random')],
+            categories: const [],
             selectedId: 'c1',
             canManage: true,
             onReorder: (_) {},
@@ -334,8 +340,9 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _harness(
-          TextChannelsSection(
+          ChannelCategorySections(
             channels: [_channel('c1', 'general'), _channel('c2', 'random')],
+            categories: const [],
             selectedId: 'c1',
             canManage: true,
             onReorder: (_) {},

@@ -14,6 +14,7 @@ class Channel {
     this.isPersonalSpace = false,
     this.dmParticipantId,
     this.parentMessageId,
+    this.categoryId,
   });
 
   final String id;
@@ -55,6 +56,14 @@ class Channel {
   /// [SlimmApiThreads.openThread] or a message's own `threadChannelId`.
   final String? parentMessageId;
 
+  /// The rail section this channel is filed under, or null for
+  /// uncategorised - rendered as an implicit section above every named
+  /// category. Decides placement only, never behaviour: see
+  /// docs/decisions/0006-channel-categories.md. Absent on a server too old
+  /// to send it, which reads the same as uncategorised on this client, since
+  /// there is nothing older to distinguish it from.
+  final String? categoryId;
+
   bool get isVoice => kind == 'voice';
 
   /// Whether this row is a thread rather than an ordinary channel - see
@@ -69,5 +78,67 @@ class Channel {
         topic: json['topic'] as String?,
         position: json['position'] as int? ?? 0,
         parentMessageId: json['parent_message_id'] as String?,
+        categoryId: json['category_id'] as String?,
       );
+}
+
+/// A rail section a channel of any kind may be filed under. Carries no
+/// permission of its own - see docs/decisions/0006-channel-categories.md.
+class ChannelCategory {
+  const ChannelCategory({
+    required this.id,
+    required this.name,
+    required this.position,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String name;
+
+  /// Sort key among the deployment's live categories: lower sorts first.
+  final int position;
+  final int createdAt;
+
+  factory ChannelCategory.fromJson(Map<String, dynamic> json) =>
+      ChannelCategory(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        position: json['position'] as int,
+        createdAt: json['created_at'] as int,
+      );
+}
+
+/// `listChannels`'s response: the caller's visible channels alongside every
+/// live category, fetched together since a category has no listing route of
+/// its own.
+class ChannelsPage {
+  const ChannelsPage({required this.channels, required this.categories});
+
+  final List<Channel> channels;
+  final List<ChannelCategory> categories;
+
+  factory ChannelsPage.fromJson(Map<String, dynamic> json) => ChannelsPage(
+        channels: (json['channels'] as List<dynamic>)
+            .map((c) => Channel.fromJson(c as Map<String, dynamic>))
+            .toList(growable: false),
+        categories: (json['categories'] as List<dynamic>)
+            .map((c) => ChannelCategory.fromJson(c as Map<String, dynamic>))
+            .toList(growable: false),
+      );
+}
+
+/// One rail section's ordered contents, as a drag produces: the category it
+/// names (null for the implicit uncategorised section) and every channel now
+/// filed under it, in display order. The request shape
+/// [SlimmApiChannelAdmin.reorderChannels] sends.
+class ChannelOrderGroup {
+  const ChannelOrderGroup({required this.categoryId, required this.channelIds});
+
+  final String? categoryId;
+  final List<String> channelIds;
+
+  Map<String, dynamic> toJson() => {
+        'category_id': categoryId,
+        'channel_ids': channelIds,
+      };
 }

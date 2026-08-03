@@ -31,8 +31,9 @@ GoRouter _router(Channel channel, {required bool canManage}) => GoRouter(
     GoRoute(
       path: '/',
       builder: (context, state) => Scaffold(
-        body: TextChannelsSection(
+        body: ChannelCategorySections(
           channels: [channel],
+          categories: const [],
           selectedId: null,
           canManage: canManage,
           onReorder: (_) {},

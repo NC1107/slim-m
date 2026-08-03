@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
+import '../screens/admin/categories_screen.dart';
 import '../screens/admin/channel_overwrites_screen.dart';
 import '../screens/admin/emoji_screen.dart';
 import '../screens/admin/invites_screen.dart';
@@ -115,6 +116,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.adminOverwrites,
         pageBuilder: (context, state) =>
             modalPage(context, const ChannelOverwritesScreen()),
+      ),
+      GoRoute(
+        path: Routes.adminCategories,
+        pageBuilder: (context, state) =>
+            modalPage(context, const CategoriesScreen()),
       ),
       GoRoute(
         path: Routes.adminEmoji,

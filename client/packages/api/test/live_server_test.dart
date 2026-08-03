@@ -87,9 +87,10 @@ void main() {
   test('register, send, read back, and edit', () async {
     expect(api.session.isSignedIn, isTrue);
 
-    final channels = await api.listChannels();
-    expect(channels, isNotEmpty, reason: 'bootstrap seeds a general channel');
-    final channel = channels.first;
+    final page = await api.listChannels();
+    expect(page.channels, isNotEmpty,
+        reason: 'bootstrap seeds a general channel');
+    final channel = page.channels.first;
 
     final id = _uuidV7();
     final sent = await api.sendMessage(
@@ -122,7 +123,7 @@ void main() {
   });
 
   test('read state and catch-up sync agree with what was sent', () async {
-    final channel = (await api.listChannels()).first;
+    final channel = (await api.listChannels()).channels.first;
 
     await api.sendMessage(
       channelId: channel.id,
@@ -147,7 +148,7 @@ void main() {
   });
 
   test('the websocket delivers a message sent over rest', () async {
-    final channel = (await api.listChannels()).first;
+    final channel = (await api.listChannels()).channels.first;
 
     final ticket = await api.webSocketTicket();
     final connection = await EventConnection.connect(

@@ -96,6 +96,8 @@ pub(super) enum ServerFrame {
     ChannelDeleted { channel_id: String },
     #[serde(rename = "overwrite.changed")]
     OverwriteChanged { channel_id: String },
+    #[serde(rename = "category.changed")]
+    CategoryChanged,
     #[serde(rename = "canvas.object.placed")]
     CanvasObjectPlaced {
         channel_id: String,

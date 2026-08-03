@@ -263,6 +263,16 @@ class OverwriteChanged extends ServerEvent {
   final String channelId;
 }
 
+/// A channel category was created, renamed, repositioned, or deleted.
+/// Carries no fields at all: a category is organisational only (see
+/// docs/decisions/0006-channel-categories.md), so there is nothing
+/// privileged to withhold and nothing per-viewer to resolve. A receiver
+/// re-fetches `listChannels`, the same path [ChannelCreated],
+/// [ChannelUpdated] and [ChannelDeleted] already drive.
+class CategoryChanged extends ServerEvent {
+  const CategoryChanged();
+}
+
 /// An object was placed on a channel's canvas.
 ///
 /// Carries the whole row, so a live stroke needs no viewport read to render.

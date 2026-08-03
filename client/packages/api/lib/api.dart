@@ -40,6 +40,7 @@ export 'src/events.dart'
         CanvasObjectPlaced,
         CanvasObjectsRemoved,
         CanvasObjectsRestored,
+        CategoryChanged,
         ChannelCreated,
         ChannelDeleted,
         ChannelUpdated,
