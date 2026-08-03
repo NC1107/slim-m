@@ -157,6 +157,7 @@ Widget composerHarness({
   required TextEditingController controller,
   required Sends sends,
   required TargetPlatform platform,
+  String channelId = 'c1',
   List<api.CustomEmoji>? customEmoji,
   FakeClipboardPaste? clipboardPaste,
 }) {
@@ -180,7 +181,7 @@ Widget composerHarness({
             const Spacer(),
             Composer(
               controller: controller,
-              channelId: 'c1',
+              channelId: channelId,
               channelName: 'general',
               onSend: sends.call,
               clipboardPasteStart:
