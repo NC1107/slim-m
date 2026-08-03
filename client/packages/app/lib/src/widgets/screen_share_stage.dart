@@ -21,9 +21,14 @@ class ScreenShareStage extends StatelessWidget {
     super.key,
     required this.sharerName,
     required this.child,
+    this.isLocal = false,
   });
 
   final String sharerName;
+
+  /// Whether this is the local caller's own share, so the caption reads
+  /// "Your screen" rather than the caller's own name reflected back.
+  final bool isLocal;
 
   /// The live share view, from `VoiceController.screenShareViewFor`.
   final Widget child;
@@ -54,7 +59,7 @@ class ScreenShareStage extends StatelessWidget {
             const SizedBox(width: AppSpacing.s8),
             Expanded(
               child: Text(
-                "$sharerName's screen",
+                isLocal ? 'Your screen' : "$sharerName's screen",
                 overflow: TextOverflow.ellipsis,
                 style: AppText.caption.copyWith(color: tokens.textSecondary),
               ),

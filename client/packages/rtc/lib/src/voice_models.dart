@@ -82,10 +82,9 @@ class VoiceParticipant {
   final bool isLocal;
   final bool isScreenSharing;
 
-  /// Whether this participant has a camera track published. There is no
-  /// viewer for it yet - see `voice_screen.dart`'s library doc - so this is
-  /// only ever rendered as a small badge, the same way [isScreenSharing] was
-  /// before its own viewer existed.
+  /// Whether this participant has a camera track published. Watched live
+  /// through `VoiceSession.cameraViewFor`, the same way [isScreenSharing] is
+  /// watched through `screenShareViewFor`.
   final bool isCameraOn;
 
   @override
@@ -109,4 +108,17 @@ class VoiceParticipant {
         isScreenSharing,
         isCameraOn,
       );
+}
+
+/// A camera this desktop offers, for the picker several webcams makes
+/// necessary. Mobile never lists these: the OS owns which camera answers
+/// "the camera", and flipping it is [VoiceSession.flipCamera]'s job.
+class CameraDevice {
+  const CameraDevice({required this.id, required this.label});
+
+  /// Opaque to us, and the only thing a device switch matches on.
+  final String id;
+
+  /// The platform's own device label.
+  final String label;
 }

@@ -17,7 +17,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/screens/dm_call_pane.dart';
-import 'package:slimm_app/src/screens/voice_join_preview.dart';
+import 'package:slimm_app/src/screens/voice_join_preview.dart'
+    show VoiceRejoinScreen;
 import 'package:slimm_app/src/widgets/channel_rail.dart';
 import 'package:slimm_app/src/widgets/channel_search.dart';
 import 'package:slimm_app/src/widgets/member_pane.dart';
@@ -211,7 +212,7 @@ void main() {
     (tester) async {
       final s = await _pumpDmCallOpen(tester, width: 1400, kind: 'dm');
 
-      expect(find.byType(VoiceJoinPreview), findsOneWidget);
+      expect(find.byType(VoiceRejoinScreen), findsOneWidget);
 
       await teardown(tester, s.container, s.db);
     },
@@ -224,7 +225,7 @@ void main() {
   ) async {
     final s = await _pumpDmCallOpen(tester, width: 500, kind: 'dm');
 
-    expect(find.byType(VoiceJoinPreview), findsOneWidget);
+    expect(find.byType(VoiceRejoinScreen), findsOneWidget);
     expect(find.bySemanticsLabel('Back to messages'), findsOneWidget);
     expect(find.bySemanticsLabel('Search messages'), findsNothing);
 
@@ -241,7 +242,7 @@ void main() {
     final s = await _pumpDmCallOpen(tester, width: 1400, kind: 'text');
 
     expect(find.byType(DmCallPane), findsNothing);
-    expect(find.byType(VoiceJoinPreview), findsNothing);
+    expect(find.byType(VoiceRejoinScreen), findsNothing);
 
     await teardown(tester, s.container, s.db);
   });

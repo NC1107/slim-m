@@ -14,6 +14,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/widgets.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
@@ -21,11 +22,16 @@ import 'audio_gain.dart' as rtc_gain;
 import 'local_audio.dart';
 
 import 'broadcast_bridge.dart';
+import 'camera_devices.dart';
+import 'camera_switching.dart';
+import 'camera_view.dart';
 import 'desktop_sources.dart';
 import 'screen_share.dart';
 import 'screen_share_control.dart';
 import 'screen_share_view.dart';
+import 'voice_disconnect_reason.dart';
 import 'voice_models.dart';
+import 'voice_roster_snapshot.dart';
 
 /// Builds the LiveKit room a session drives. The injection seam.
 typedef RoomFactory = lk.Room Function();
@@ -41,9 +47,12 @@ class VoiceSession {
     RoomFactory? roomFactory,
     BroadcastBridge? broadcast,
     DesktopSources? desktopSources,
+    CameraDevices? cameraDevices,
   })  : _roomFactory = roomFactory ?? _defaultRoomFactory,
         _broadcast = broadcast ?? const MethodChannelBroadcastBridge(),
-        _desktopSources = desktopSources ?? const WebrtcDesktopSources() {
+        _desktopSources = desktopSources ?? const WebrtcDesktopSources(),
+        _cameraSwitching =
+            CameraSwitching(cameraDevices ?? const HardwareCameraDevices()) {
     _screenShare = ScreenShareControl(_broadcast);
   }
 
@@ -59,6 +68,7 @@ class VoiceSession {
   final RoomFactory _roomFactory;
   final BroadcastBridge _broadcast;
   final DesktopSources _desktopSources;
+  final CameraSwitching _cameraSwitching;
   late final ScreenShareControl _screenShare;
 
   lk.Room? _room;
@@ -259,6 +269,12 @@ class VoiceSession {
     }
   }
 
+  /// Enables or disables the local camera live, mid-call. The [join]-time
+  /// `cameraEnabled` parameter is only the pre-toggle for before you connect;
+  /// this is the same call `toggleMicrophone`'s equivalent already used, now
+  /// reachable while already in the call.
+  Future<bool> setCameraEnabled(bool enabled) => _trySetCamera(enabled);
+
   /// Publishes (or stops) a camera track. Failure is swallowed exactly as
   /// [_trySetMicrophone]'s is: a camera pre-toggle a device cannot honour
   /// (permission denied, no hardware) must not fail the join, since a call
@@ -302,7 +318,7 @@ class VoiceSession {
           screenShareCaptureOptions: options,
         );
       },
-      isSharing: () => _isSharing(room.localParticipant),
+      isSharing: () => isSharingScreen(room.localParticipant),
       onSettled: (error) {
         if (error != null) _lastError = error;
         _refreshParticipants();
@@ -311,19 +327,6 @@ class VoiceSession {
     _refreshParticipants();
     return outcome;
   }
-
-  /// A published screen track is the only thing that means anybody can see a
-  /// screen, so it is what both the roster and the outcome above read.
-  static bool _isSharing(lk.Participant? p) =>
-      p?.videoTrackPublications
-          .any((t) => t.source == lk.TrackSource.screenShareVideo) ??
-      false;
-
-  /// Whether a camera track is published, the same track-presence check
-  /// [_isSharing] uses for a screen share.
-  static bool _hasCameraTrack(lk.Participant? p) =>
-      p?.videoTrackPublications.any((t) => t.source == lk.TrackSource.camera) ??
-      false;
 
   /// The widget that renders [identity]'s shared screen, live.
   ///
@@ -336,6 +339,60 @@ class VoiceSession {
     final room = _room;
     if (room == null) return const SizedBox.shrink();
     return ScreenShareView(room: room, identity: identity);
+  }
+
+  /// The widget that renders [identity]'s live camera feed, [screenShareViewFor]'s
+  /// exact counterpart: a plain [Widget] backed by [CameraView], working for
+  /// the local participant exactly as it works for anyone else, which is
+  /// what makes a self camera preview possible.
+  Widget cameraViewFor(String identity) {
+    final room = _room;
+    if (room == null) return const SizedBox.shrink();
+    return CameraView(room: room, identity: identity);
+  }
+
+  /// Whether flipping needs no chosen device; see [CameraSwitching.canFlip].
+  bool get canFlipCamera => _cameraSwitching.canFlip;
+
+  /// Whether picking a camera needs one named first; see
+  /// [CameraSwitching.needsSelection].
+  bool get cameraNeedsSelection => _cameraSwitching.needsSelection;
+
+  /// The cameras this desktop (or browser) offers, for the picker. Calling
+  /// this is what makes a later [selectCameraDevice] able to find anything,
+  /// the same reason [screenShareSources] has to run first.
+  Future<List<CameraDevice>> cameraDevices() async {
+    try {
+      return await _cameraSwitching.devices();
+    } catch (e) {
+      _lastError = e;
+      return const [];
+    }
+  }
+
+  /// Flips the published camera between front and back, mobile only.
+  Future<bool> flipCamera() async {
+    try {
+      return await _cameraSwitching.flip(_room?.localParticipant);
+    } catch (e) {
+      _lastError = e;
+      return false;
+    }
+  }
+
+  /// Switches the published camera to [device], desktop's answer to
+  /// [flipCamera] where more than one webcam can exist.
+  Future<bool> selectCameraDevice(CameraDevice device) async {
+    final room = _room;
+    if (room == null) return false;
+    try {
+      await _cameraSwitching.select(room, device);
+      _refreshParticipants();
+      return true;
+    } catch (e) {
+      _lastError = e;
+      return false;
+    }
   }
 
   /// Silences (or restores) every remote participant's audio locally, by
@@ -381,20 +438,7 @@ class VoiceSession {
   void _onDisconnected(lk.DisconnectReason? reason) {
     if (_disposed) return;
     if (reason == lk.DisconnectReason.clientInitiated) return;
-    _lastDisconnect = switch (reason) {
-      lk.DisconnectReason.duplicateIdentity =>
-        VoiceDisconnect.replacedByOtherDevice,
-      lk.DisconnectReason.participantRemoved ||
-      lk.DisconnectReason.roomDeleted ||
-      lk.DisconnectReason.serverShutdown =>
-        VoiceDisconnect.removed,
-      lk.DisconnectReason.signalingConnectionFailure ||
-      lk.DisconnectReason.reconnectAttemptsExceeded ||
-      lk.DisconnectReason.joinFailure ||
-      lk.DisconnectReason.disconnected =>
-        VoiceDisconnect.connectionLost,
-      _ => VoiceDisconnect.unknown,
-    };
+    _lastDisconnect = mapDisconnectReason(reason);
     _participants = const [];
     if (!_participantsController.isClosed) {
       _participantsController.add(_participants);
@@ -410,46 +454,14 @@ class VoiceSession {
     // track appearing after deafening starts is silenced too.
     unawaited(_applyLocalAudioState(room));
 
-    final next = <VoiceParticipant>[];
-    final local = room.localParticipant;
-    if (local != null) {
-      next.add(_toParticipant(local, isLocal: true));
-    }
-    for (final remote in room.remoteParticipants.values) {
-      next.add(_toParticipant(remote, isLocal: false));
-    }
-
+    final next = snapshotParticipants(room);
     // Only emit on a real change: the events stream is chatty (audio levels
     // arrive constantly) and rebuilding the roster each time is how it janks.
-    if (_listEquals(next, _participants)) return;
+    if (listEquals(next, _participants)) return;
     _participants = List.unmodifiable(next);
     if (!_participantsController.isClosed) {
       _participantsController.add(_participants);
     }
-  }
-
-  VoiceParticipant _toParticipant(lk.Participant p, {required bool isLocal}) {
-    final audio = p.audioTrackPublications;
-    final muted = audio.isEmpty || audio.every((t) => t.muted);
-    return VoiceParticipant(
-      identity: p.identity,
-      // Falls back to the identity rather than showing an empty row: a
-      // participant with no name is still somebody in the call.
-      name: p.name.isEmpty ? p.identity : p.name,
-      isSpeaking: p.isSpeaking,
-      isMuted: muted,
-      isLocal: isLocal,
-      isScreenSharing: _isSharing(p),
-      isCameraOn: _hasCameraTrack(p),
-    );
-  }
-
-  static bool _listEquals(List<VoiceParticipant> a, List<VoiceParticipant> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
   }
 
   Future<void> _teardown() async {

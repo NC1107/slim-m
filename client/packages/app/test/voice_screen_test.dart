@@ -89,6 +89,25 @@ class _NoopSession implements VoiceSession {
       SizedBox.shrink(key: Key('fake-share-view-$identity'));
 
   @override
+  Widget cameraViewFor(String identity) =>
+      SizedBox.shrink(key: Key('fake-camera-view-$identity'));
+
+  @override
+  bool get canFlipCamera => false;
+
+  @override
+  bool get cameraNeedsSelection => false;
+
+  @override
+  Future<List<CameraDevice>> cameraDevices() async => const [];
+
+  @override
+  Future<bool> flipCamera() async => false;
+
+  @override
+  Future<bool> selectCameraDevice(CameraDevice device) async => false;
+
+  @override
   Future<void> join({
     required String url,
     required String token,
@@ -101,6 +120,9 @@ class _NoopSession implements VoiceSession {
 
   @override
   Future<bool> setMicrophoneEnabled(bool enabled) async => true;
+
+  @override
+  Future<bool> setCameraEnabled(bool enabled) async => true;
 
   @override
   Future<ScreenShareOutcome> setScreenShareEnabled(
@@ -141,6 +163,38 @@ http.Client _tokenApi(int status) => MockClient((request) async {
     headers: {'content-type': 'application/json'},
   );
 });
+
+/// Answers a channel's own `voice/token` request with whatever status
+/// [statusByChannel] names for it, 200 for any channel left out - what makes
+/// a genuine per-channel leak test possible now that arriving at a voice
+/// channel joins it automatically rather than waiting on a tap.
+http.Client _perChannelTokenApi(Map<String, int> statusByChannel) =>
+    MockClient((request) async {
+      final match = RegExp(
+        r'/channels/([^/]+)/voice/token',
+      ).firstMatch(request.url.path);
+      final status = statusByChannel[match?.group(1)] ?? 200;
+      if (status == 200) {
+        return http.Response(
+          jsonEncode({
+            'url': 'wss://sfu.example.com',
+            'room': match?.group(1),
+            'token': 'jwt',
+            'expires_at': 0,
+            'can_publish': true,
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      return http.Response(
+        jsonEncode({
+          'error': {'code': 'nope', 'message': 'refused'},
+        }),
+        status,
+        headers: {'content-type': 'application/json'},
+      );
+    });
 
 Widget _harness(Widget child, ProviderContainer container) =>
     UncontrolledProviderScope(
@@ -213,7 +267,8 @@ void main() {
             final api = SlimmApi(
               baseUrl: Uri.parse('http://localhost:8080'),
               session: ref.watch(sessionProvider),
-              httpClient: _tokenApi(403),
+              // channel-b is left out, so its own automatic join succeeds.
+              httpClient: _perChannelTokenApi({'channel-a': 403}),
             );
             ref.onDispose(api.close);
             return api;
@@ -227,8 +282,7 @@ void main() {
 
       await container.read(voiceControllerProvider.notifier).join('channel-a');
 
-      // Now looking at a different voice channel this account was never
-      // refused: its join preview must start clean.
+      // channel-b arrives fresh: its own automatic join must start clean.
       await tester.pumpWidget(
         _harness(const VoiceScreen(channelId: 'channel-b'), container),
       );
@@ -237,9 +291,9 @@ void main() {
       expect(
         find.text('You do not have permission to join this channel.'),
         findsNothing,
-        reason: 'channel-a\'s denial must not leak into channel-b\'s preview',
+        reason: "channel-a's denial must not leak into channel-b's screen",
       );
-      expect(find.widgetWithText(FilledButton, 'Join call'), findsOneWidget);
+      expect(find.byType(AppErrorState), findsNothing);
     },
   );
 }

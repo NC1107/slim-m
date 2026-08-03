@@ -91,6 +91,9 @@ abstract final class AppIcons {
   static const IconData speakerOff = LucideIcons.volumeX300;
   static const IconData camera = LucideIcons.video300;
   static const IconData cameraOff = LucideIcons.videoOff300;
+
+  /// Flipping between front/back on mobile, or picking a webcam on desktop.
+  static const IconData switchCamera = LucideIcons.switchCamera300;
   static const IconData screenShare = LucideIcons.monitorUp300;
   static const IconData leaveCall = LucideIcons.phoneOff300;
 

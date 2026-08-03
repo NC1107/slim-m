@@ -16,46 +16,10 @@ import 'package:slimm_rtc/rtc.dart';
 
 import '../api_failure.dart';
 import '../diagnostics/debug_log.dart';
-import '../server_scheme_policy.dart' show isLocalAddress;
 import 'providers.dart';
 import 'voice_call_heartbeat.dart';
-
-/// Refuses a plaintext SFU address unless it is on a LAN.
-///
-/// `token.url` is `SLIMM_LIVEKIT_URL` off the wire, verbatim and
-/// unauthenticated as a value: the server already permits `ws://` for a
-/// self-hosted LAN SFU, exactly the case [isLocalAddress] carves out for the
-/// server address itself, so joining a call is not the place to add a
-/// stricter rule than connecting already applies. What it must not do is let
-/// an operator's plaintext LAN setting quietly reach a *public* deployment,
-/// which would send a user's microphone and screen share unencrypted with
-/// nothing on screen to say so. This stays in the app package rather than
-/// the `rtc` package: [isLocalAddress] is one of the app's own connection
-/// rules - the same one `server_scheme_policy.dart` applies to a server
-/// address - and `rtc` has no dependency on the app to reuse it from.
-String? _insecureSfuReason(String rawUrl) {
-  final uri = Uri.tryParse(rawUrl);
-  if (uri != null) {
-    if (_secureSfuSchemes.contains(uri.scheme)) return null;
-    if (_plaintextSfuSchemes.contains(uri.scheme) && isLocalAddress(uri)) {
-      return null;
-    }
-  }
-  return "This Space's voice server (SLIMM_LIVEKIT_URL) is not using an "
-      'encrypted address, so joining would send microphone and screen-share '
-      'media across the network in the clear. Ask whoever runs this Space to '
-      'fix that setting.';
-}
-
-/// The four schemes `SLIMM_LIVEKIT_URL` accepts, split by whether they encrypt.
-///
-/// All four are the server's, not a guess: `voice/mod.rs`'s `http_url_for`
-/// takes `wss`, `ws`, `https` and `http`, and LiveKit serves signalling on both
-/// pairs, so checking only for `wss` would refuse a perfectly secure
-/// `https://` deployment. An unparseable url falls through to the refusal,
-/// which fails closed.
-const _secureSfuSchemes = {'wss', 'https'};
-const _plaintextSfuSchemes = {'ws', 'http'};
+import 'voice_call_lifecycle_report.dart';
+import 'voice_sfu_security.dart';
 
 /// Everything a voice surface needs to render, in one value.
 class VoiceState {
@@ -84,9 +48,9 @@ class VoiceState {
   /// without SPEAK cannot open a microphone however the toggle is set.
   final bool microphoneEnabled;
 
-  /// The camera pre-toggle: applied once, on the next [VoiceController.join],
-  /// the same way [microphoneEnabled] is. There is no live in-call camera
-  /// toggle yet, only the choice made before joining.
+  /// What the user has asked for, the same double duty [microphoneEnabled]
+  /// carries: a pre-toggle before [VoiceController.join], and the live truth
+  /// once in a call, kept in step by [VoiceController]'s participant listener.
   final bool cameraEnabled;
   final bool screenSharing;
 
@@ -162,7 +126,7 @@ class VoiceController extends StateNotifier<VoiceState> {
       unawaited(leave());
     });
     _states = _session.states.listen((s) {
-      _reportCallLifecycle(s);
+      reportCallLifecycle(_callLifecycle, s, channelId: state.channelId);
       // A drop the SFU decided on: the reason is the only thing that can tell
       // "you joined elsewhere" from "your network went".
       final dropped = _session.lastDisconnect;
@@ -202,10 +166,12 @@ class VoiceController extends StateNotifier<VoiceState> {
       // Trust the session's view of the local participant over the local
       // toggle: the SFU is what actually decides whether a track is live.
       final sharing = p.any((x) => x.isLocal && x.isScreenSharing);
+      final camera = p.any((x) => x.isLocal && x.isCameraOn);
       if (sharing) _cancelBroadcastDeadline();
       state = state.copyWith(
         participants: p,
         screenSharing: sharing,
+        cameraEnabled: camera,
         awaitingBroadcast: sharing ? false : state.awaitingBroadcast,
       );
     });
@@ -225,30 +191,6 @@ class VoiceController extends StateNotifier<VoiceState> {
   late final StreamSubscription<void> _endCallRequests;
   Timer? _broadcastDeadline;
 
-  /// Reports this call's start, connection and end to CallKit on iOS; a
-  /// no-op everywhere else. Keyed off [VoiceSession]'s own state transitions
-  /// rather than a second copy of the join/leave call sites, so every path
-  /// that reaches `connecting`, `connected`, `idle` or `failed` - including
-  /// an SFU-initiated drop - reports the same way.
-  void _reportCallLifecycle(VoiceSessionState s) {
-    switch (s) {
-      case VoiceSessionState.connecting:
-        final channelId = state.channelId;
-        if (channelId == null) return;
-        unawaited(
-          _callLifecycle.callStarted(
-            callId: channelId,
-            displayName: 'Voice call',
-          ),
-        );
-      case VoiceSessionState.connected:
-        unawaited(_callLifecycle.callConnected());
-      case VoiceSessionState.idle:
-      case VoiceSessionState.failed:
-        unawaited(_callLifecycle.callEnded());
-    }
-  }
-
   /// Sets the microphone preference before joining. Has no effect on a live
   /// call; use [toggleMicrophone] for that.
   void setMicrophonePreference(bool enabled) {
@@ -256,8 +198,8 @@ class VoiceController extends StateNotifier<VoiceState> {
   }
 
   /// Sets the camera preference before joining, applied once on the next
-  /// [join] exactly the way [setMicrophonePreference] is. There is no live
-  /// in-call equivalent yet: this is a pre-toggle, not a call control.
+  /// [join] exactly the way [setMicrophonePreference] is; use [toggleCamera]
+  /// for the live in-call control.
   void setCameraPreference(bool enabled) {
     state = state.copyWith(cameraEnabled: enabled);
   }
@@ -266,7 +208,7 @@ class VoiceController extends StateNotifier<VoiceState> {
     state = state.copyWith(channelId: channelId, clearError: true);
     try {
       final token = await _ref.read(apiProvider).voiceToken(channelId);
-      final insecureReason = _insecureSfuReason(token.url);
+      final insecureReason = insecureSfuReason(token.url);
       if (insecureReason != null) {
         state = state.copyWith(
           state: VoiceSessionState.failed,
@@ -308,6 +250,14 @@ class VoiceController extends StateNotifier<VoiceState> {
         error: describeApiFailure('join the call', e),
         retryable: true,
       );
+    } catch (e) {
+      // Joining is automatic now, so nothing asks first; an exception no other clause names must still fail cleanly.
+      _log('Join failed with an unexpected error', detail: e);
+      state = state.copyWith(
+        state: VoiceSessionState.failed,
+        error: 'Could not join the call.',
+        retryable: true,
+      );
     }
   }
 
@@ -318,7 +268,11 @@ class VoiceController extends StateNotifier<VoiceState> {
     await _session.leave();
     // Best-effort and fire-and-forget: this client already disconnected.
     if (channelId != null) unawaited(_heartbeat.forget(channelId));
-    state = const VoiceState();
+    // The mic/camera preference survives the reset: there is no lobby left to re-set them on.
+    state = VoiceState(
+      microphoneEnabled: state.microphoneEnabled,
+      cameraEnabled: state.cameraEnabled,
+    );
   }
 
   Future<void> toggleMicrophone() async {
@@ -331,6 +285,20 @@ class VoiceController extends StateNotifier<VoiceState> {
       error: got
           ? null
           : 'Could not ${want ? 'unmute' : 'mute'} the microphone.',
+      clearError: got,
+    );
+  }
+
+  /// Enables or disables the local camera mid-call, [toggleMicrophone]'s
+  /// exact counterpart. The participant listener above corrects this from
+  /// the session's own truth regardless, so a refusal here still repaints
+  /// as off rather than lying that the toggle worked.
+  Future<void> toggleCamera() async {
+    final want = !state.cameraEnabled;
+    final got = await _session.setCameraEnabled(want);
+    state = state.copyWith(
+      cameraEnabled: got ? want : state.cameraEnabled,
+      error: got ? null : 'Could not turn the camera ${want ? 'on' : 'off'}.',
       clearError: got,
     );
   }
@@ -387,6 +355,40 @@ class VoiceController extends StateNotifier<VoiceState> {
   /// [VoiceSession.screenShareViewFor].
   Widget screenShareViewFor(String identity) =>
       _session.screenShareViewFor(identity);
+
+  /// The live view of [identity]'s camera feed; see
+  /// [VoiceSession.cameraViewFor].
+  Widget cameraViewFor(String identity) => _session.cameraViewFor(identity);
+
+  /// Whether switching cameras is a bare flip (mobile) rather than a picker.
+  bool get canFlipCamera => _session.canFlipCamera;
+
+  /// Whether switching cameras needs one named first (desktop and web).
+  bool get cameraNeedsSelection => _session.cameraNeedsSelection;
+
+  /// The cameras available to pick from; see [VoiceSession.cameraDevices].
+  Future<List<CameraDevice>> cameraDevices() => _session.cameraDevices();
+
+  /// Flips the published camera between front and back, mobile only.
+  Future<bool> flipCamera() async {
+    final ok = await _session.flipCamera();
+    state = state.copyWith(
+      error: ok ? null : 'Could not switch the camera.',
+      clearError: ok,
+    );
+    return ok;
+  }
+
+  /// Switches the published camera to [device], desktop's picker equivalent
+  /// of [flipCamera].
+  Future<bool> selectCameraDevice(CameraDevice device) async {
+    final ok = await _session.selectCameraDevice(device);
+    state = state.copyWith(
+      error: ok ? null : 'Could not switch to that camera.',
+      clearError: ok,
+    );
+    return ok;
+  }
 
   Future<void> setScreenShare(
     bool enabled, {

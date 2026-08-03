@@ -122,6 +122,37 @@ class _InertSession implements VoiceSession {
       SizedBox.shrink(key: Key('fake-share-view-$identity'));
 
   @override
+  Widget cameraViewFor(String identity) =>
+      SizedBox.shrink(key: Key('fake-camera-view-$identity'));
+
+  /// Every camera-switching call this session received, in order, so a test
+  /// can assert on how the control chose between flipping and picking.
+  final List<String> cameraSwitchCalls = [];
+
+  @override
+  bool canFlipCamera = false;
+
+  @override
+  bool cameraNeedsSelection = false;
+
+  List<CameraDevice> cameraDeviceList = const [];
+
+  @override
+  Future<List<CameraDevice>> cameraDevices() async => cameraDeviceList;
+
+  @override
+  Future<bool> flipCamera() async {
+    cameraSwitchCalls.add('flip');
+    return true;
+  }
+
+  @override
+  Future<bool> selectCameraDevice(CameraDevice device) async {
+    cameraSwitchCalls.add('select:${device.id}');
+    return true;
+  }
+
+  @override
   Future<void> join({
     required String url,
     required String token,
@@ -134,6 +165,16 @@ class _InertSession implements VoiceSession {
 
   @override
   Future<bool> setMicrophoneEnabled(bool enabled) async => true;
+
+  /// Every call `setCameraEnabled` received, so a test can assert the
+  /// toggle button actually reached the session.
+  final List<bool> setCameraCalls = [];
+
+  @override
+  Future<bool> setCameraEnabled(bool enabled) async {
+    setCameraCalls.add(enabled);
+    return true;
+  }
 
   @override
   Future<bool> setDeafened(bool value) async => true;
@@ -295,5 +336,85 @@ void main() {
       find.text('Everyone in the call will see it until you stop sharing.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('the camera button is on the same row as hang up', (
+    tester,
+  ) async {
+    final session = _InertSession();
+    await pumpControls(
+      tester,
+      const VoiceState(state: VoiceSessionState.connected),
+      session: session,
+    );
+
+    expect(find.byTooltip('Turn on camera'), findsOneWidget);
+    expect(find.byTooltip('Leave call'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Turn on camera'));
+    await tester.pump();
+
+    expect(session.setCameraCalls, [true]);
+  });
+
+  testWidgets('the switch-camera control only appears once the camera is on', (
+    tester,
+  ) async {
+    await pumpControls(
+      tester,
+      const VoiceState(state: VoiceSessionState.connected),
+    );
+    expect(find.byTooltip('Switch camera'), findsNothing);
+
+    await pumpControls(
+      tester,
+      const VoiceState(state: VoiceSessionState.connected, cameraEnabled: true),
+    );
+    expect(find.byTooltip('Switch camera'), findsOneWidget);
+  });
+
+  testWidgets('switching cameras flips directly on a platform with no picker', (
+    tester,
+  ) async {
+    final session = _InertSession()..canFlipCamera = true;
+    await pumpControls(
+      tester,
+      const VoiceState(state: VoiceSessionState.connected, cameraEnabled: true),
+      session: session,
+    );
+
+    await tester.tap(find.byTooltip('Switch camera'));
+    await tester.pumpAndSettle();
+
+    expect(session.cameraSwitchCalls, ['flip']);
+    // No sheet: the mobile flip needs nobody to choose anything.
+    expect(find.text('Choose a camera'), findsNothing);
+  });
+
+  testWidgets('switching cameras opens a picker on a platform that needs one', (
+    tester,
+  ) async {
+    final session = _InertSession()
+      ..cameraNeedsSelection = true
+      ..cameraDeviceList = const [
+        CameraDevice(id: 'cam-1', label: 'Built-in webcam'),
+        CameraDevice(id: 'cam-2', label: 'USB webcam'),
+      ];
+    await pumpControls(
+      tester,
+      const VoiceState(state: VoiceSessionState.connected, cameraEnabled: true),
+      session: session,
+    );
+
+    await tester.tap(find.byTooltip('Switch camera'));
+    // pump, not pumpAndSettle: the switch button's pending spinner never settles while the sheet awaits a choice.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('USB webcam'), findsOneWidget);
+    await tester.tap(find.text('USB webcam'));
+    await tester.pumpAndSettle();
+
+    expect(session.cameraSwitchCalls, ['select:cam-2']);
   });
 }

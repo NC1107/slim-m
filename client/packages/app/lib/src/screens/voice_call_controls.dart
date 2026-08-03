@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The in-call control bar: mute, screen share and leave.
+/// The in-call control bar: mute, camera, screen share and leave.
 ///
 /// Sharing has no quality dialog of its own: the ceiling is whatever Voice
 /// settings already has saved (`voice_settings_screen.dart`'s
 /// `voiceSettingsControllerProvider`), applied directly rather than asked
 /// again on every share, which is what the owner reported as the setting
 /// "not mattering".
+///
+/// The camera button is the same row as hang up, which is where the owner
+/// asked for it: no separate toggle lived anywhere in a call before this.
+/// Switching cameras once one is on is a bare flip on mobile
+/// (`VoiceController.flipCamera`, no device list to show) and a picker on
+/// desktop (`camera_source_sheet.dart`), the same fork `screenShareNeedsSource`
+/// already draws for sharing.
 ///
 /// Its own file because `voice_screen.dart` was over this repo's hard file
 /// limit, and the bar is the one part of that screen with no dependency on
@@ -19,6 +26,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/voice_controller.dart';
+import '../widgets/camera_source_sheet.dart';
 import '../widgets/screen_source_sheet.dart';
 import 'voice_settings_screen.dart' show voiceSettingsControllerProvider;
 
@@ -42,6 +50,9 @@ class _CallControlsState extends ConsumerState<CallControls> {
   /// [VoiceController.setScreenShare] is ever called, so nothing further down
   /// the stack can catch a re-entrant tap.
   bool _shareRequestInFlight = false;
+
+  /// The same guard as [_shareRequestInFlight], for [_switchCamera].
+  bool _cameraSwitchInFlight = false;
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +78,30 @@ class _CallControlsState extends ConsumerState<CallControls> {
                 active: voice.microphoneEnabled,
                 onPressed: widget.controller.toggleMicrophone,
               ),
+              const SizedBox(width: AppSpacing.s12),
+              _ControlButton(
+                icon: voice.cameraEnabled
+                    ? AppIcons.camera
+                    : AppIcons.cameraOff,
+                tooltip: voice.cameraEnabled
+                    ? 'Turn off camera'
+                    : 'Turn on camera',
+                active: voice.cameraEnabled,
+                onPressed: () => unawaited(widget.controller.toggleCamera()),
+              ),
+              if (voice.cameraEnabled) ...[
+                const SizedBox(width: AppSpacing.s12),
+                _ControlButton(
+                  icon: AppIcons.switchCamera,
+                  tooltip: 'Switch camera',
+                  active: false,
+                  pending: _cameraSwitchInFlight,
+                  onPressed: () {
+                    if (_cameraSwitchInFlight) return;
+                    unawaited(_switchCamera(context));
+                  },
+                ),
+              ],
               const SizedBox(width: AppSpacing.s12),
               _ControlButton(
                 icon: AppIcons.screenShare,
@@ -140,6 +175,28 @@ class _CallControlsState extends ConsumerState<CallControls> {
       );
     } finally {
       if (mounted) setState(() => _shareRequestInFlight = false);
+    }
+  }
+
+  /// Flips on mobile with no picker at all, and asks on desktop, mirroring
+  /// [_share]'s own fork between "the OS decides" and "list, then choose".
+  Future<void> _switchCamera(BuildContext context) async {
+    final controller = widget.controller;
+    setState(() => _cameraSwitchInFlight = true);
+    try {
+      if (controller.canFlipCamera) {
+        await controller.flipCamera();
+        return;
+      }
+      if (!controller.cameraNeedsSelection) return;
+      final devices = await controller.cameraDevices();
+      if (devices.isEmpty) return;
+      if (!context.mounted) return;
+      final chosen = await showCameraDeviceSheet(context, devices);
+      if (chosen == null) return;
+      await controller.selectCameraDevice(chosen);
+    } finally {
+      if (mounted) setState(() => _cameraSwitchInFlight = false);
     }
   }
 }

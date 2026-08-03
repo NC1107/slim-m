@@ -49,18 +49,15 @@ void main() {
     expect(controller.state.error, isNull);
   });
 
-  test(
-    'the camera stays off by default and is a pre-toggle, not a live call',
-    () async {
-      final session = FakeSession();
-      final controller = harness.controllerWith(session, voiceApi());
+  test('the camera stays off by default before joining', () async {
+    final session = FakeSession();
+    final controller = harness.controllerWith(session, voiceApi());
 
-      expect(controller.state.cameraEnabled, isFalse);
-      await controller.join('channel-1');
+    expect(controller.state.cameraEnabled, isFalse);
+    await controller.join('channel-1');
 
-      expect(session.askedForCameraOnJoin, isFalse);
-    },
-  );
+    expect(session.askedForCameraOnJoin, isFalse);
+  });
 
   test('a camera pre-toggle set before joining reaches the session', () async {
     final session = FakeSession();
@@ -324,6 +321,31 @@ void main() {
     expect(controller.state.error, isNull);
   });
 
+  test('toggling the camera mid-call reaches the session', () async {
+    final session = FakeSession();
+    final controller = harness.controllerWith(session, voiceApi());
+
+    await controller.join('channel-1');
+    expect(controller.state.cameraEnabled, isFalse);
+
+    await controller.toggleCamera();
+
+    expect(controller.state.cameraEnabled, isTrue);
+    expect(session.askedForCameraOnToggle, isTrue);
+  });
+
+  test('a refused camera toggle leaves the button where it was', () async {
+    final session = FakeSession(cameraGranted: false);
+    final controller = harness.controllerWith(session, voiceApi());
+
+    await controller.join('channel-1');
+    await controller.toggleCamera();
+
+    // The SFU refused, so the button must not claim the camera turned on.
+    expect(controller.state.cameraEnabled, isFalse);
+    expect(controller.state.error, isNotNull);
+  });
+
   test(
     'a desktop that refuses the capture is reported, not shown as sharing',
     () async {
@@ -402,6 +424,29 @@ void main() {
     expect(controller.state.channelId, isNull);
     expect(controller.state.state, VoiceSessionState.idle);
   });
+
+  /// Since a voice channel now joins on arrival rather than behind a lobby
+  /// with its own pre-toggles (see `voice_screen.dart`), the only place left
+  /// to set "join muted" is whatever was last chosen mid-call - so leaving
+  /// must not reset it back to the defaults.
+  test(
+    'leaving preserves the mic and camera preference for the next join',
+    () async {
+      final session = FakeSession();
+      final controller = harness.controllerWith(session, voiceApi());
+
+      await controller.join('channel-1');
+      await controller.toggleMicrophone();
+      await controller.toggleCamera();
+      expect(controller.state.microphoneEnabled, isFalse);
+      expect(controller.state.cameraEnabled, isTrue);
+
+      await controller.leave();
+
+      expect(controller.state.microphoneEnabled, isFalse);
+      expect(controller.state.cameraEnabled, isTrue);
+    },
+  );
 
   test('a drop the SFU decided on is reported, not silently idle', () async {
     final session = FakeSession();

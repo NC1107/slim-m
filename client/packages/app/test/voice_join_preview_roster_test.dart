@@ -1,53 +1,83 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The join preview says who is already in the call.
+/// The rejoin screen (shown after a failed automatic join, or after hanging
+/// up) says who is already in the call.
 ///
-/// The rail has shown this since the per-channel roster landed; the preview,
-/// which is the screen you are actually on when deciding whether to join, did
-/// not, and that was the last piece of the roadmap's voice-UX item.
+/// A voice channel used to open on a lobby with this same roster above an
+/// explicit Join button; the lobby is gone (`voice_screen.dart`'s own doc
+/// explains why), but the roster is still worth showing wherever a person
+/// is looking at a channel they are not currently connected to.
 ///
-/// The three answers the roster can give have to stay three different things.
-/// A deployment with no SFU configured never leaves "not known", so rendering
-/// that as an empty room would claim this client checked when it never did.
+/// The three answers the roster can give have to stay three different
+/// things. A deployment with no SFU configured never leaves "not known", so
+/// rendering that as an empty room would claim this client checked when it
+/// never did.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/providers/voice_roster.dart';
 import 'package:slimm_app/src/screens/voice_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
+
+import 'voice_controller_harness.dart';
 
 const _channel = 'c-lounge';
 
+/// A 501 (no voice configured) fails the automatic join deterministically at
+/// the token fetch, landing on the rejoin screen without depending on
+/// [FakeSession]'s own join outcome at all.
 Future<void> _pump(
   WidgetTester tester,
   AsyncValue<List<api.VoiceRosterParticipant>> roster,
 ) async {
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(api.SessionStore(tokens: tokens)),
+      apiProvider.overrideWith((ref) {
+        final client = api.SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: voiceApi(status: 501),
+        );
+        ref.onDispose(client.close);
+        return client;
+      }),
+      voiceControllerProvider.overrideWith(
+        (ref) => VoiceController(ref, session: FakeSession()),
+      ),
+      voiceRosterProvider(_channel).overrideWith(
+        (ref) => switch (roster) {
+          AsyncData(:final value) => Stream.value(value),
+          _ => const Stream<List<api.VoiceRosterParticipant>>.empty(),
+        },
+      ),
+    ],
+  );
+  addTearDown(container.dispose);
+
   await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        voiceRosterProvider(_channel).overrideWith(
-          (ref) => switch (roster) {
-            AsyncData(:final value) => Stream.value(value),
-            _ => const Stream<List<api.VoiceRosterParticipant>>.empty(),
-          },
-        ),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: MaterialApp(
         theme: buildTheme(Brightness.dark, AppTokens.dark),
         home: const Scaffold(body: VoiceScreen(channelId: _channel)),
       ),
     ),
   );
-  await tester.pump();
+  await tester.pumpAndSettle();
 }
 
 void main() {
   testWidgets('a roster that has not answered claims nothing', (tester) async {
     await _pump(tester, const AsyncLoading());
 
-    expect(find.text('Join call'), findsOneWidget);
+    expect(find.text('This Space has no voice configured.'), findsOneWidget);
     expect(find.textContaining('Nobody is in this call'), findsNothing);
     expect(find.textContaining('here'), findsNothing);
   });
