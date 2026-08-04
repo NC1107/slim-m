@@ -17,6 +17,14 @@
 /// The platform is the right question rather than the window width: a narrow
 /// desktop window still has a mouse, and a tablet in a wide layout still has
 /// no right button.
+///
+/// A right-click also raises [SelectionArea]'s own platform text-selection
+/// menu, independently of `ContextMenuRegion`'s `onSecondaryTapDown` -
+/// reported directly by the owner as two popups at once, our own menu with a
+/// stray "Select all" drawn over it. [_suppressedContextMenu] answers that
+/// menu with nothing, since `MessageContextMenuRegion` (which already carries
+/// a "Copy text" item wired to the clipboard directly, not to this toolbar)
+/// is the one menu a right-click on a message should open.
 library;
 
 import 'package:flutter/material.dart';
@@ -24,6 +32,11 @@ import 'package:flutter/material.dart';
 /// True where a press-and-drag is not already the context-menu gesture.
 bool supportsTextSelection(TargetPlatform platform) =>
     platform != TargetPlatform.iOS && platform != TargetPlatform.android;
+
+/// Built in place of [SelectionArea]'s own toolbar; selection itself is
+/// unaffected, only the popup announcing it.
+Widget _suppressedContextMenu(BuildContext context, SelectableRegionState _) =>
+    const SizedBox.shrink();
 
 /// Wraps [child] in a [SelectionArea] on the platforms that can take one, and
 /// returns it untouched on the platforms that cannot.
@@ -35,6 +48,9 @@ class TranscriptSelection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!supportsTextSelection(Theme.of(context).platform)) return child;
-    return SelectionArea(child: child);
+    return SelectionArea(
+      contextMenuBuilder: _suppressedContextMenu,
+      child: child,
+    );
   }
 }
