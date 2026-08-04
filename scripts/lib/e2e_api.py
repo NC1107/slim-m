@@ -15,6 +15,9 @@ import uuid
 # rather than the coverage somebody once wrote down.
 TOUCHED = set()
 
+# Cloudflare 403s ("error code: 1010") a default urllib UA; see CLAUDE.md.
+USER_AGENT = "Mozilla/5.0 (compatible; slim-m-scripts/1.0)"
+
 
 class Api:
     """One signed-in caller's view of the server."""
@@ -24,7 +27,7 @@ class Api:
         self.token = token
 
     def call(self, method, path, body=None, raw=None, content_type=None):
-        headers = {}
+        headers = {"User-Agent": USER_AGENT}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         data = raw

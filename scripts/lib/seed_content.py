@@ -7,6 +7,12 @@ this is testable with no network at all. Markdown syntax matches
 `message_inline.dart` and `message_markdown_blocks.dart`: `**bold**`,
 `*italic*`, `~~strikethrough~~`, `||spoiler||`, `> quote`, `# heading`, and a
 fenced code block.
+
+Every generator below also takes an optional `pool`: a shaped list from
+`seed_ollama.Corpus`, drawn from when non-empty, so a `--ollama` run reads
+less templated. `pool` is `None` (or empty) for a plain run, and every
+function falls back to its own canned content exactly as before - the two
+paths are the same functions, not a parallel implementation to drift from.
 """
 
 MAX_MESSAGE_CHARS = 4000
@@ -63,27 +69,44 @@ def persona(index, tag=""):
     return f"{prefix}{name.lower()}{suffix}", f"{name}{f' {generation}' if suffix else ''}"
 
 
-def short_message(rng):
+_MARKDOWN_WRAPPERS = (
+    lambda text: f"**{text}**",
+    lambda text: f"*{text}*",
+    lambda text: f"> {text}",
+    lambda text: f"||{text}||",
+    lambda text: f"~~{text}~~",
+    lambda text: f"# {text}",
+)
+
+
+def short_message(rng, pool=None):
+    if pool:
+        return rng.choice(pool)
     return f"{rng.choice(_REACTS)}."
 
 
-def long_message(rng):
+def long_message(rng, pool=None):
+    if pool:
+        return rng.choice(pool)
     sentences = [f"{rng.choice(_REACTS)}, especially about {rng.choice(_TOPICS)}."
                  for _ in range(rng.randint(6, 14))]
     return " ".join(sentences)
 
 
-def emoji_message(rng):
+def emoji_message(rng, pool=None):
     picked = "".join(rng.choice(EMOJI) for _ in range(rng.randint(2, 5)))
-    return f"{rng.choice(_REACTS)} {picked}"
+    text = rng.choice(pool) if pool else rng.choice(_REACTS)
+    return f"{text} {picked}"
 
 
-def code_block_message(rng):
-    lang, code = rng.choice(_CODE_SNIPPETS)
+def code_block_message(rng, pool=None):
+    lang, code = rng.choice(pool) if pool else rng.choice(_CODE_SNIPPETS)
     return f"here's what I mean:\n```{lang or ''}\n{code}\n```"
 
 
-def markdown_message(rng):
+def markdown_message(rng, pool=None):
+    if pool:
+        return rng.choice(_MARKDOWN_WRAPPERS)(rng.choice(pool))
     templates = (
         lambda: f"**{rng.choice(_ADJECTIVES)}** day for {rng.choice(_TOPICS)}",
         lambda: f"*{rng.choice(_ADJECTIVES)}*, honestly",
@@ -95,20 +118,23 @@ def markdown_message(rng):
     return rng.choice(templates)()
 
 
-def mention_message(rng, usernames):
+def mention_message(rng, usernames, pool=None):
     """Assumes `usernames` is non-empty; callers fall back otherwise."""
+    if pool:
+        return f"@{rng.choice(usernames)} {rng.choice(pool)}"
     return f"@{rng.choice(usernames)} {rng.choice(_REACTS)} about {rng.choice(_TOPICS)}"
 
 
-def near_limit_message(rng):
+def near_limit_message(rng, pool=None):
     """Exactly `MAX_MESSAGE_CHARS`, the length the server's own cap allows."""
+    sentences = pool if pool else None
     body = f"({rng.choice(_TOPICS)}) "
     while len(body) < MAX_MESSAGE_CHARS:
-        body += f"{rng.choice(_REACTS)}. "
+        body += f"{rng.choice(sentences)} " if sentences else f"{rng.choice(_REACTS)}. "
     return body[:MAX_MESSAGE_CHARS]
 
 
-def poll(rng):
+def poll(rng, pool=None):
     """A (question, options) pair for `sendPollMessage`."""
-    question, options = rng.choice(_POLLS)
+    question, options = rng.choice(pool) if pool else rng.choice(_POLLS)
     return question, list(options)

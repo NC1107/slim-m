@@ -74,6 +74,17 @@ def _parse_args(argv):
                          help="namespaces seed account usernames; random per "
                               "run if omitted, so re-seeding the same "
                               "deployment never collides on username")
+    parser.add_argument("--ollama", action="store_true",
+                         help="generate message content with a local Ollama "
+                              "model instead of the canned templates; off "
+                              "by default, and any failure here (unreachable, "
+                              "missing model, a bad response) just falls "
+                              "back to the canned content rather than "
+                              "aborting the run")
+    parser.add_argument("--ollama-model", default=None,
+                         help="overrides the model asked of Ollama "
+                              "(default qwen3:8b); has no effect without "
+                              "--ollama")
     args = parser.parse_args(argv)
     if args.admin_username and not args.admin_password:
         parser.error("--admin-username needs --admin-password")

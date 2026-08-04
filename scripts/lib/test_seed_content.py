@@ -74,5 +74,54 @@ class MessageGeneratorsTest(unittest.TestCase):
             self.assertLessEqual(len(options), 4)
 
 
+class PoolDrawingTest(unittest.TestCase):
+    """A non-empty `pool` is drawn from; an empty or absent one falls back."""
+
+    def test_short_message_draws_from_a_given_pool(self):
+        rng = random.Random(1)
+        got = seed_content.short_message(rng, pool=["only-this-one"])
+        self.assertEqual(got, "only-this-one")
+
+    def test_short_message_falls_back_on_an_empty_pool(self):
+        rng = random.Random(1)
+        got = seed_content.short_message(rng, pool=[])
+        self.assertTrue(got.endswith("."))
+
+    def test_long_message_draws_from_a_given_pool(self):
+        rng = random.Random(1)
+        got = seed_content.long_message(rng, pool=["a long generated paragraph"])
+        self.assertEqual(got, "a long generated paragraph")
+
+    def test_code_block_message_draws_lang_and_code_from_a_given_pool(self):
+        rng = random.Random(2)
+        got = seed_content.code_block_message(rng, pool=[("dart", "1+1;")])
+        self.assertIn("```dart\n1+1;\n```", got)
+
+    def test_markdown_message_wraps_pooled_text_in_a_recognised_marker(self):
+        markers = ("**", "*", "> ", "||", "~~", "# ")
+        rng = random.Random(3)
+        for _ in range(30):
+            got = seed_content.markdown_message(rng, pool=["pooled line"])
+            self.assertIn("pooled line", got)
+            self.assertTrue(any(m in got for m in markers), got)
+
+    def test_mention_message_uses_the_pooled_text_verbatim(self):
+        rng = random.Random(4)
+        got = seed_content.mention_message(rng, ["bob"], pool=["pooled reply"])
+        self.assertEqual(got, "@bob pooled reply")
+
+    def test_near_limit_message_is_still_exactly_the_ceiling_from_a_pool(self):
+        rng = random.Random(1)
+        got = seed_content.near_limit_message(rng, pool=["short pooled line"])
+        self.assertEqual(len(got), seed_content.MAX_MESSAGE_CHARS)
+
+    def test_poll_draws_the_pooled_question_and_options(self):
+        rng = random.Random(5)
+        question, options = seed_content.poll(
+            rng, pool=[("pooled question?", ["A", "B", "C"])])
+        self.assertEqual(question, "pooled question?")
+        self.assertEqual(options, ["A", "B", "C"])
+
+
 if __name__ == "__main__":
     unittest.main()

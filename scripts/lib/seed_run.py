@@ -19,6 +19,7 @@ import tempfile
 import e2e_fixtures
 import seed_accounts
 import seed_guard
+import seed_ollama
 import seed_state
 import seed_worker
 
@@ -81,6 +82,11 @@ def run(args):
     concurrency = args.concurrency or len(workers)
     base_seed = args.seed if args.seed is not None else secrets.randbits(32)
 
+    corpus = None
+    if args.ollama:
+        corpus = seed_ollama.load_or_generate(
+            args.ollama_model or seed_ollama.DEFAULT_MODEL, base_seed)
+
     with tempfile.TemporaryDirectory(prefix="slimm-seed-") as scratch:
         fixtures = _build_fixtures(scratch)
         state = seed_state.SeedState()
@@ -91,7 +97,7 @@ def run(args):
                 rng=random.Random(f"{base_seed}-{index}"),
                 other_usernames=[u for u in usernames if u != worker["username"]],
                 is_privileged=(worker["username"] == privileged_username),
-                fixtures=fixtures)
+                fixtures=fixtures, corpus=corpus)
             for index, worker in enumerate(workers)
         ]
 
@@ -105,11 +111,24 @@ def run(args):
             for future in concurrent.futures.as_completed(futures):
                 results.append(future.result())
 
-    _report(base_url, channel, channel_name, usernames, password, state, results)
+    _report(base_url, channel, channel_name, usernames, password, state, results, corpus)
     return 0
 
 
-def _report(base_url, channel, channel_name, usernames, password, state, results):
+def _describe_corpus(corpus):
+    """One line on whether ollama content was actually used, not just asked
+    for - a run with `--ollama` and an unreachable server still succeeds, so
+    the report is where that silence would otherwise go unnoticed."""
+    if corpus is None:
+        return "ollama content: not requested"
+    if corpus.is_empty():
+        return "ollama content: requested but unavailable, used canned content"
+    return (f"ollama content: {len(corpus.short)} short, {len(corpus.long)} long, "
+            f"{len(corpus.code)} code, {len(corpus.polls)} poll pool entries")
+
+
+def _report(base_url, channel, channel_name, usernames, password, state, results,
+            corpus=None):
     totals = {}
     failures = []
     for stats, worker_failures in results:
@@ -121,6 +140,7 @@ def _report(base_url, channel, channel_name, usernames, password, state, results
     print(f"channel: {channel_name!r} ({channel['id']})")
     print(f"accounts ({len(usernames)}): {', '.join(usernames)}")
     print(f"shared password: {password}")
+    print(_describe_corpus(corpus))
     print(f"created: {state.counts()}")
     print("actions performed:")
     for name in sorted(totals):

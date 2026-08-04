@@ -13,6 +13,7 @@ import os
 import time
 import urllib.request
 
+import e2e_api
 import e2e_labels as L
 
 
@@ -33,11 +34,13 @@ def sfu_participants(room):
     sig = b64(hmac.new(secret, f"{header}.{payload}".encode(),
                        hashlib.sha256).digest())
     url = os.environ.get("LIVEKIT_HTTP", "http://localhost:7880")
+    # e2e_api.py's Cloudflare UA workaround applies here too, if ever pointed off-localhost.
     req = urllib.request.Request(
         f"{url}/twirp/livekit.RoomService/ListParticipants",
         data=json.dumps({"room": room}).encode(),
         headers={"Authorization": f"Bearer {header}.{payload}.{sig}",
-                 "Content-Type": "application/json"})
+                 "Content-Type": "application/json",
+                 "User-Agent": e2e_api.USER_AGENT})
     return json.load(urllib.request.urlopen(req)).get("participants", [])
 
 
