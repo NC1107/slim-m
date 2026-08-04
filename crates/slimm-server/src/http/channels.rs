@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, enforce};
+use super::extract::{Authed, AuthedLimited, Json, READ, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::ChannelId;
@@ -125,7 +125,7 @@ struct UpdateChannelRequest {
 /// live category is at `GET /categories` instead - a new route is additive,
 /// folding the list into this one's body is not.
 async fn list(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ChannelDto>>, ApiError> {
     let visible = state

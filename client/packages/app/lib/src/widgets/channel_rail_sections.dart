@@ -11,7 +11,6 @@ import 'package:slimm_api/api.dart' show ChannelOrderGroup;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import 'channel_grouping.dart';
 import 'channel_rail_channel_rows.dart';
@@ -159,7 +158,6 @@ class ChannelCategorySections extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final voice = ref.watch(voiceControllerProvider);
     final byCategory = channelsByCategory(channels);
     final sections = <ChannelSection>[
       (null, byCategory[null] ?? const []),
@@ -174,7 +172,6 @@ class ChannelCategorySections extends ConsumerWidget {
           ? VoiceChannelRow(
               channel: channel,
               selected: channel.id == selectedId,
-              voice: voice,
               trailingExtra: kebab,
             )
           : _TextChannelRow(

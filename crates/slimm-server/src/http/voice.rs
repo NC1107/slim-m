@@ -25,10 +25,12 @@
 //!
 //! The heartbeat pair is also where [`Event::VoiceActivityChanged`] is
 //! published: on the first heartbeat for a `(user, channel)` pair (a join)
-//! and on a real forget (a clean hangup), each read-before-write against
-//! [`crate::voice::VoiceService::has_heartbeat`] so a routine refresh never
-//! republishes. The third publish site, the stale-heartbeat sweep, lives in
-//! `lib.rs` rather than here.
+//! and on a real forget (a clean hangup), each a single lock-held
+//! check-and-write against [`crate::voice::VoiceService::record_heartbeat_reporting_new`]
+//! / [`crate::voice::VoiceService::forget_heartbeat_reporting_removed`] so a
+//! routine refresh never republishes and two concurrent first heartbeats
+//! cannot both publish either. The third publish site, the stale-heartbeat
+//! sweep, lives in `lib.rs` rather than here.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -172,9 +174,10 @@ async fn heartbeat(
         return Err(ApiError::Forbidden);
     }
 
-    let already_on_the_call = state.voice.has_heartbeat(ctx.user_id, channel_id);
-    state.voice.record_heartbeat(ctx.user_id, channel_id);
-    if !already_on_the_call {
+    let is_a_real_join = state
+        .voice
+        .record_heartbeat_reporting_new(ctx.user_id, channel_id);
+    if is_a_real_join {
         state
             .hub
             .publish(Event::VoiceActivityChanged { channel_id });
@@ -206,9 +209,10 @@ async fn forget_heartbeat(
 ) -> Result<StatusCode, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
-    let was_on_the_call = state.voice.has_heartbeat(ctx.user_id, channel_id);
-    state.voice.forget_heartbeat(ctx.user_id, channel_id);
-    if was_on_the_call {
+    let was_really_on_the_call = state
+        .voice
+        .forget_heartbeat_reporting_removed(ctx.user_id, channel_id);
+    if was_really_on_the_call {
         state
             .hub
             .publish(Event::VoiceActivityChanged { channel_id });

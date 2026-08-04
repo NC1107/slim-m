@@ -245,31 +245,46 @@ impl VoiceService {
         })
     }
 
-    /// Records that `user_id` is still on `channel_id`'s call as of now; see
+    /// Records that `user_id` is still on `channel_id`'s call as of now,
+    /// reporting whether this was the first heartbeat recorded for this
+    /// `(user, channel)` pair - a real join rather than a routine refresh.
+    /// `http::voice`'s handler uses this rather than a separate
+    /// [`Self::has_heartbeat`] check followed by a plain record: two
+    /// concurrent first heartbeats for the same pair could otherwise both
+    /// observe "not present yet" across the gap between those two calls and
+    /// both publish [`crate::hub::Event::VoiceActivityChanged`]. See
     /// [`CallHeartbeats`] for what refreshing this staves off.
-    pub fn record_heartbeat(&self, user_id: UserId, channel_id: ChannelId) {
-        self.heartbeats.record(user_id, channel_id);
+    pub fn record_heartbeat_reporting_new(&self, user_id: UserId, channel_id: ChannelId) -> bool {
+        self.heartbeats.record_reporting_new(user_id, channel_id)
     }
 
-    /// Drops `user_id`'s heartbeat entry for `channel_id` outright.
+    /// Drops `user_id`'s heartbeat entry for `channel_id` outright,
+    /// reporting whether there really was something to forget - the same
+    /// single lock-held check-and-remove [`Self::record_heartbeat_reporting_new`]
+    /// uses for a join, so two concurrent clean hangups for the same pair
+    /// cannot both observe "still present" and both publish.
     ///
     /// Called when a client reports leaving a call cleanly: it has already
     /// disconnected from the SFU on its own, so there is nothing left for the
     /// sweep to usefully evict, only a wasted [`Self::remove_participant`]
     /// call and a misleading "removed a voice participant with no recent
     /// heartbeat" log line waiting to happen forty seconds later.
-    pub fn forget_heartbeat(&self, user_id: UserId, channel_id: ChannelId) {
-        self.heartbeats.forget(user_id, channel_id);
+    pub fn forget_heartbeat_reporting_removed(
+        &self,
+        user_id: UserId,
+        channel_id: ChannelId,
+    ) -> bool {
+        self.heartbeats
+            .forget_reporting_removed(user_id, channel_id)
     }
 
-    /// Whether a heartbeat is on record for this `(user, channel)`.
-    ///
-    /// Read by `http::voice`'s heartbeat and forget-heartbeat handlers before
-    /// they touch [`CallHeartbeats`], so a first join or a real hangup can be
-    /// told from a routine refresh and published as
-    /// [`crate::hub::Event::VoiceActivityChanged`] only on the transition; a
-    /// test also uses it to confirm a handler actually reached
-    /// [`Self::record_heartbeat`].
+    /// Whether a heartbeat is on record for this `(user, channel)`. A test's
+    /// tool for confirming a handler actually reached
+    /// [`Self::record_heartbeat_reporting_new`] after the fact; a live
+    /// caller deciding whether to publish a signal wants
+    /// [`Self::record_heartbeat_reporting_new`] or
+    /// [`Self::forget_heartbeat_reporting_removed`] instead, which answer
+    /// the same question without the race a separate read-then-write opens.
     pub fn has_heartbeat(&self, user_id: UserId, channel_id: ChannelId) -> bool {
         self.heartbeats.contains(user_id, channel_id)
     }

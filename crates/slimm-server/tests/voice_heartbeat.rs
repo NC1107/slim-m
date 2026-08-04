@@ -79,8 +79,8 @@ async fn member(store: &Store, username: &str) -> (UserId, String) {
 }
 
 /// The route actually has to reach the tracker, not just answer 204: a
-/// handler that returns success without calling `record_heartbeat` would
-/// pass every status-code assertion in this file and still leave a
+/// handler that returns success without calling `record_heartbeat_reporting_new`
+/// would pass every status-code assertion in this file and still leave a
 /// terminated app's ghost participant unbounded.
 #[tokio::test]
 async fn a_heartbeat_is_recorded_against_the_caller_and_channel() {

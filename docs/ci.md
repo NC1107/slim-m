@@ -13,7 +13,7 @@ Each section below is named for its workflow file.
 | `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, tests, release build, binary size budget |
 | `client-ci` | changes under `client/` | dart analyze, format, every package's tests |
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
-| `schema-ci` | changes under `schema/`, `redocly.yaml` | redocly lint, and the additive-only oasdiff gate on pull requests |
+| `schema-ci` | changes under `schema/`, `redocly.yaml` on pull requests; every push to `main` unconditionally | redocly lint, the additive-only oasdiff gate against a PR's base on pull requests, and the same gate against the immediate parent commit on every push to `main` (required for a release; see below) |
 | `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
 | `hygiene` | every push and pull request | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap |
 | `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main` | every Rust crate's and every pub package's license is in the one allowlist |
@@ -79,17 +79,21 @@ A hardcoded `iPhone 16` broke the first time this ran, and it would break again 
 
 ## schema-ci
 
-The breaking-change gate runs only for `pull_request` events.
-Diffing only makes sense against a PR's base branch, and a push to `main` has no other side to diff against; a push to `main` is covered by the lint job and skips the diff entirely.
-
-The PR's head commit is checked out explicitly rather than the default merge-ref checkout, so `HEAD:schema/openapi.yaml` is exactly the schema the PR proposes with no synthetic merge commit in between.
-
-oasdiff also needs the base branch's schema content, but that checkout only fetched the PR head commit.
-The workflow fetches just that one base commit, shallowly, by its exact SHA from the `pull_request` event payload, so it lands in the local object database without cloning the base branch's history.
-oasdiff then reads it straight out of git as `<base-sha>:schema/openapi.yaml`.
-
 `oasdiff breaking` reports only changes that break existing clients: removed paths and fields, narrowed types, newly required properties, and similar.
 Purely additive changes such as a new optional field or a new endpoint are not breaking and pass, which is what makes this gate additive-only by construction.
+
+Two jobs run it, against two different bases, because one commit needs both.
+
+`breaking-change-gate` runs on `pull_request` and diffs the PR's base against its head - the meaningful comparison for a reviewer, and the one that can catch a breaking change before it ever reaches `main`.
+The PR's head commit is checked out explicitly rather than the default merge-ref checkout, so `HEAD:schema/openapi.yaml` is exactly the schema the PR proposes with no synthetic merge commit in between.
+oasdiff also needs the base branch's schema content, but that checkout only fetched the PR head commit, so the workflow fetches just that one base commit, shallowly, by its exact SHA from the `pull_request` event payload, landing it in the local object database without cloning the base branch's history.
+oasdiff then reads it straight out of git as `<base-sha>:schema/openapi.yaml`.
+
+`breaking-change-gate-main` runs on every push to `main` instead, diffing `HEAD~1` against `HEAD`.
+This is not redundant with the PR-time gate: `verify-release-checks.yml` (see below) polls check-runs on the exact commit a release verifies, a squash-merge mints a brand-new SHA that the PR-time gate's check-run was never attached to, and a release-please commit never touches `schema/**` at all - so `breaking-change-gate` structurally cannot ever appear on the commit a release actually checks, no matter how the required-checks list is written.
+`breaking-change-gate-main` is what can: it is unconditioned on any path filter and runs on literally every push to `main`, trivially passing (an empty diff) on the overwhelming majority that never touch `schema/openapi.yaml` at all.
+This relies on this repo's squash-merge-only convention (see "Contribution conventions" in `CLAUDE.md`): `HEAD~1` is exactly the one commit a merged PR added.
+A direct multi-commit push to `main` bypassing that convention would only diff the last of them; not a concern under the convention this repo actually follows, and not worth the added complexity of walking further back for a case that should not happen.
 
 ### The one OpenAPI 3.0 `nullable` in the schema
 
@@ -340,10 +344,15 @@ The polling loop itself is `scripts/verify-release-checks.sh`, not inlined in th
 It shipped three separate incidents before anything tested it: a cancelled check read as success, the release-please path verified `github.sha` instead of the commit it actually released, and a tag was passed to an endpoint that only accepts a SHA.
 All three are now regression tests, not just fixed code.
 
-`verify-server-ci` requires `check` (server-ci), `hygiene` and `cargo dependency licenses` (licenses).
-`verify-client-ci` requires `analyze, format check, test` (client-ci), `ios unit tests (callkit invariant)` and `ios sources are registered in project.pbxproj` (client-ios-ci), `hygiene` and `pub dependency licenses` (licenses).
+`verify-server-ci` requires `check` (server-ci), `hygiene`, `cargo dependency licenses` (licenses) and `breaking-change gate (additive-only, push to main)` (schema-ci).
+`verify-client-ci` requires `analyze, format check, test` (client-ci), `ios unit tests (callkit invariant)` and `ios sources are registered in project.pbxproj` (client-ios-ci), `hygiene`, `pub dependency licenses` (licenses) and the same schema-ci gate.
 Those are exact check-run names (a job's `name:`, or its id when a job sets none), matched literally; renaming one of those jobs without updating the matching `required_checks` string silently reopens the gap this closes, since the renamed check is simply absent and the gate times out and fails rather than warns.
-`schema-ci` is not required: `tests/openapi_contract.rs` already runs inside `server-ci`'s `cargo test --all`, and `schema-ci`'s own job is a redocly lint of the document's syntax, not part of what either release actually ships.
+
+~~`schema-ci` is not required: `tests/openapi_contract.rs` already runs inside `server-ci`'s `cargo test --all`, and `schema-ci`'s own job is a redocly lint of the document's syntax, not part of what either release actually ships.~~
+Wrong, and corrected once checked rather than assumed: `tests/openapi_contract.rs` gates the route surface - method and path - against the router, but never the shape of a response body, which is exactly what a breaking `oasdiff` change (a removed field, a narrowed type, a newly required property) reshapes.
+Every already-installed client, on a self-host that auto-updates from `latest` or a phone on its own store-review schedule, is trusting that the wire only ever grows.
+Nothing enforced that at the release gate before this: `breaking-change-gate`, the job that actually checks additive-only-ness, ran on pull requests alone, which protects a reviewed PR but not a release cut from whatever is on `main` regardless of how it got there - and branch protection requiring it on `main` is an owner-only repository setting, not something this gate can lean on.
+`breaking-change-gate-main` (schema-ci) is what closes that: see its own section above for why the PR-time job could never be the one `required_checks` points at.
 
 Every job that pushes to GHCR, signs, attaches release assets, or touches TestFlight runs under a reviewer-gated GitHub Environment and requests only the permissions it needs.
 Secrets are referenced by name only and never invented; jobs stay inert, showing a visible warning and producing no fake artifact, until the corresponding secrets and packaging inputs exist.

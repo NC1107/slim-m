@@ -291,6 +291,17 @@ http.Client voiceApi({
   });
 }
 
+/// A [VoiceController] pinned to [fixed], for a test that renders against a
+/// known [VoiceState] without driving a real join through it. `state` is
+/// only settable from within a [VoiceController] subclass, never from
+/// outside one, which is why this exists rather than a plain field assign.
+class FixedVoiceController extends VoiceController {
+  FixedVoiceController(super.ref, VoiceState fixed)
+    : super(session: FakeSession()) {
+    state = fixed;
+  }
+}
+
 /// Owns the container so a suite can tear it down in one place.
 class VoiceHarness {
   ProviderContainer? _container;

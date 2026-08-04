@@ -74,7 +74,7 @@ jobs:
     uses: ./.github/workflows/verify-release-checks.yml
     with:
       ref: ${{ needs.release-please.outputs.server_tag }}
-      required_checks: "check|hygiene|cargo dependency licenses"
+      required_checks: "check|hygiene|cargo dependency licenses|breaking-change gate (additive-only, push to main)"
 
   # Requires client-ci, client-ios-ci, hygiene and the license gate to have
   # passed on this exact commit before any client publish job runs.
@@ -90,7 +90,7 @@ jobs:
     uses: ./.github/workflows/verify-release-checks.yml
     with:
       ref: ${{ needs.release-please.outputs.client_tag }}
-      required_checks: "analyze, format check, test|ios unit tests (callkit invariant)|ios sources are registered in project.pbxproj|hygiene|pub dependency licenses"
+      required_checks: "analyze, format check, test|ios unit tests (callkit invariant)|ios sources are registered in project.pbxproj|hygiene|pub dependency licenses|breaking-change gate (additive-only, push to main)"
 
   # One single-arch image per architecture, built on a NATIVE runner and pushed
   # to GHCR by digest. No QEMU, and no stored key material. See docs/ci.md.

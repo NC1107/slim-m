@@ -3,6 +3,7 @@
 /// drag completes, and only the round trip decides whether it sticks.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/native.dart';
@@ -38,7 +39,9 @@ List<ChannelOrderGroup> _flat(List<String> channelIds) => [
   ChannelOrderGroup(categoryId: null, channelIds: channelIds),
 ];
 
-ProviderContainer _container(http.Response Function(http.Request) handler) {
+ProviderContainer _container(
+  FutureOr<http.Response> Function(http.Request) handler,
+) {
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
@@ -175,4 +178,101 @@ void main() {
     controller.dismiss();
     expect(container.read(channelOrderControllerProvider).error, null);
   });
+
+  test('a stale reorder response does not overwrite a newer one that already '
+      'landed', () async {
+    final gate1 = Completer<void>();
+    final gate2 = Completer<void>();
+    var callIndex = 0;
+    final container = _container((request) async {
+      final index = callIndex++;
+      if (index == 0) {
+        await gate1.future;
+        return http.Response(
+          jsonEncode([_channelJson('a', 'a', 0), _channelJson('b', 'b', 1)]),
+          200,
+        );
+      }
+      await gate2.future;
+      return http.Response(
+        jsonEncode([_channelJson('c', 'c', 0), _channelJson('d', 'd', 1)]),
+        200,
+      );
+    });
+    final controller = container.read(channelOrderControllerProvider.notifier);
+
+    final firstCall = controller.reorder(_flat(['a', 'b']));
+    // Lets the first drag's request reach the mock before the second fires.
+    await Future<void>.delayed(Duration.zero);
+    final secondCall = controller.reorder(_flat(['c', 'd']));
+
+    // The newer, second drag resolves first.
+    gate2.complete();
+    await secondCall;
+    expect(container.read(channelOrderControllerProvider).pendingOrder, null);
+
+    // The stale first response settles after it.
+    gate1.complete();
+    await firstCall;
+
+    final store = await container.read(storeProvider.future);
+    final rows = await store.allChannels();
+    expect(
+      rows.map((c) => c.id),
+      ['c', 'd'],
+      reason:
+          'the stale first response must not overwrite the newer '
+          'arrangement the second drag already confirmed',
+    );
+    expect(
+      container.read(channelOrderControllerProvider).pendingOrder,
+      null,
+      reason:
+          'a stale response settling after the newer one must not reopen '
+          'pending state either',
+    );
+  });
+
+  test(
+    'a stale reorder response does not clear a still-pending newer reorder',
+    () async {
+      final gate1 = Completer<void>();
+      var callIndex = 0;
+      final container = _container((request) async {
+        final index = callIndex++;
+        if (index == 0) {
+          await gate1.future;
+          return http.Response(
+            jsonEncode([_channelJson('a', 'a', 0), _channelJson('b', 'b', 1)]),
+            200,
+          );
+        }
+        // The second drag's own request never resolves in this test.
+        return Completer<http.Response>().future;
+      });
+      final controller = container.read(
+        channelOrderControllerProvider.notifier,
+      );
+
+      final firstCall = controller.reorder(_flat(['a', 'b']));
+      await Future<void>.delayed(Duration.zero);
+      unawaited(controller.reorder(_flat(['c', 'd'])));
+      await Future<void>.delayed(Duration.zero);
+
+      gate1.complete();
+      await firstCall;
+
+      expect(
+        container
+            .read(channelOrderControllerProvider)
+            .pendingOrder
+            ?.single
+            .channelIds,
+        ['c', 'd'],
+        reason:
+            'the stale response for the earlier drag must not clear the '
+            'still-in-flight newer one',
+      );
+    },
+  );
 }

@@ -29,17 +29,20 @@ impl Store {
     /// Creates a channel and seeds its message and canvas sequence counters.
     ///
     /// Appended to the end of the deployment's channel order: one more than
-    /// the highest position among live, non-DM channels, computed inside this
-    /// same transaction so two concurrent creates cannot both claim the last
-    /// slot. A DM's position is left at its schema default (0) and never
-    /// read, since a DM is excluded from every position-ordered query.
+    /// the highest position among live, non-DM, non-thread channels,
+    /// computed inside this same transaction so two concurrent creates
+    /// cannot both claim the last slot. A DM's or a thread's position is
+    /// left at its schema default (0) and never read, since both are
+    /// excluded from every position-ordered query - the same exclusion
+    /// [`super::bootstrap::Store::list_channels`] and
+    /// [`super::channel_order::Store::reorder_channels`] already apply.
     pub async fn create_channel(&self, name: &str, kind: &str) -> anyhow::Result<Channel> {
         let id = ChannelId::generate();
         let now = now_ms();
         let mut tx = self.begin_write().await?;
         let position = sqlx::query_scalar!(
             r#"SELECT COALESCE(MAX(position), -1) + 1 AS "next!: i64" FROM channels
-               WHERE deleted_at IS NULL AND kind != 'dm'"#
+               WHERE deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL"#
         )
         .fetch_one(&mut *tx)
         .await?;

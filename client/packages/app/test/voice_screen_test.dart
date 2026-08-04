@@ -296,4 +296,78 @@ void main() {
       expect(find.byType(AppErrorState), findsNothing);
     },
   );
+
+  testWidgets(
+    'arriving at another channel while a join is still awaiting its token '
+    'shows the switch prompt rather than silently starting a second join',
+    (tester) async {
+      final tokenGate = Completer<void>();
+      final container = ProviderContainer(
+        overrides: [
+          voiceRosterProvider.overrideWith(
+            (ref, channelId) =>
+                const Stream<List<VoiceRosterParticipant>>.empty(),
+          ),
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((request) async {
+                final match = RegExp(
+                  r'/channels/([^/]+)/voice/token',
+                ).firstMatch(request.url.path);
+                // channel-a's token request never resolves, holding the join in the window this fix covers.
+                if (match?.group(1) == 'channel-a') {
+                  await tokenGate.future;
+                }
+                return http.Response(
+                  jsonEncode({
+                    'url': 'wss://sfu.example.com',
+                    'room': match?.group(1),
+                    'token': 'jwt',
+                    'expires_at': 0,
+                    'can_publish': true,
+                  }),
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }),
+            );
+            ref.onDispose(api.close);
+            return api;
+          }),
+          voiceControllerProvider.overrideWith(
+            (ref) => VoiceController(ref, session: _NoopSession()),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(() {
+        if (!tokenGate.isCompleted) tokenGate.complete();
+      });
+
+      // Not awaited: left suspended, the same as a real arrival still waiting on its token.
+      unawaited(
+        container.read(voiceControllerProvider.notifier).join('channel-a'),
+      );
+
+      await tester.pumpWidget(
+        _harness(const VoiceScreen(channelId: 'channel-b'), container),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Already in a call'),
+        findsOneWidget,
+        reason:
+            'a join still awaiting its token is a call already in progress '
+            'and must still gate a switch to another channel',
+      );
+
+      tokenGate.complete();
+      await tester.pumpAndSettle();
+    },
+  );
 }

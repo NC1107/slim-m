@@ -11,6 +11,7 @@ import 'package:slimm_data/data.dart';
 
 import 'channel_history.dart';
 import 'channel_refresher.dart';
+import 'dm_call_activity.dart';
 import 'message_ops_sync.dart';
 import 'message_extras.dart';
 import 'providers.dart';
@@ -121,6 +122,8 @@ class SyncController extends StateNotifier<SyncStatus> {
     state = SyncStatus.connecting;
     // No cursor over a rename to catch up from, so forget every cached name on a fresh connect.
     _ref.read(batchProfilesControllerProvider.notifier).clear();
+    // A missed voice.activity frame while disconnected is otherwise unrecoverable.
+    _ref.read(dmCallActivityProvider.notifier).clear();
 
     try {
       final api = _ref.read(apiProvider);
