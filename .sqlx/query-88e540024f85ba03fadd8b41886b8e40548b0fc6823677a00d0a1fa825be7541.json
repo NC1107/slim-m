@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT author_id AS \"author_id: UserId\" FROM messages WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "author_id: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "88e540024f85ba03fadd8b41886b8e40548b0fc6823677a00d0a1fa825be7541"
+}

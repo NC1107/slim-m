@@ -184,7 +184,7 @@ async fn a_blocker_is_not_a_push_recipient_for_the_author_they_blocked() {
             .unwrap();
     }
 
-    let before = slimm_server::push::message_recipients(&store, channel, bob)
+    let before = slimm_server::push::message_recipients(&store, channel, bob, "hello")
         .await
         .unwrap();
     assert!(
@@ -198,7 +198,7 @@ async fn a_blocker_is_not_a_push_recipient_for_the_author_they_blocked() {
 
     store.block_user(alice, bob).await.unwrap();
 
-    let after = slimm_server::push::message_recipients(&store, channel, bob)
+    let after = slimm_server::push::message_recipients(&store, channel, bob, "hello")
         .await
         .unwrap();
     assert!(
@@ -210,7 +210,7 @@ async fn a_blocker_is_not_a_push_recipient_for_the_author_they_blocked() {
         "carol did not block anyone and is unaffected"
     );
 
-    let reverse = slimm_server::push::message_recipients(&store, channel, alice)
+    let reverse = slimm_server::push::message_recipients(&store, channel, alice, "hello")
         .await
         .unwrap();
     assert!(

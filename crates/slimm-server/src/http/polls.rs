@@ -212,10 +212,13 @@ async fn create(
         });
         state.push.notify_message(
             state.store.clone(),
-            channel_id,
-            ctx.user_id,
-            sent.message.id,
-            sent.message.seq,
+            crate::push::SentMessage {
+                channel_id,
+                author_id: ctx.user_id,
+                message_id: sent.message.id,
+                seq: sent.message.seq,
+                content: sent.message.content.clone(),
+            },
         );
     }
 

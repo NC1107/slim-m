@@ -169,10 +169,13 @@ async fn send(
         // this function.
         state.push.notify_message(
             state.store.clone(),
-            channel_id,
-            ctx.user_id,
-            sent.message.id,
-            sent.message.seq,
+            crate::push::SentMessage {
+                channel_id,
+                author_id: ctx.user_id,
+                message_id: sent.message.id,
+                seq: sent.message.seq,
+                content: sent.message.content.clone(),
+            },
         );
         // A no-op for an ordinary channel; see `threads::notify_reply`.
         super::threads::notify_reply(&state, channel_id).await;

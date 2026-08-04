@@ -77,6 +77,45 @@ impl Store {
         Ok(users)
     }
 
+    /// The live ids behind a batch of usernames, case-insensitively, for
+    /// resolving a message's `@name` mentions to accounts. This deliberately
+    /// disagrees with login's exact-case comparison: `channel_screen.dart`
+    /// builds `knownUsernames` lowercased and `message_text.dart` matches a
+    /// typed `@name` against it lowercased too, so a mention chip renders
+    /// for any case a reader typed, and the wake it triggers has to agree or
+    /// it silently fails for every case but the one stored. A name with
+    /// nobody live behind it - never registered, or deleted - is simply
+    /// absent, the same contract [`Store::user_profiles`] has for an id.
+    ///
+    /// `users_username_live` has no `COLLATE NOCASE`, so `nick` and `Nick`
+    /// really can both be live accounts at once; a mention of either then
+    /// resolves to both. That is correct rather than ambiguous: the client
+    /// renders a mention chip off the same lowered comparison for whichever
+    /// account it resolves `knownUsernames` against, so both are equally
+    /// "the person mentioned" to anyone reading. This does not touch that
+    /// index or registration's case handling, which would change behaviour
+    /// for every existing account rather than fix this mismatch.
+    pub async fn user_ids_for_usernames(
+        &self,
+        usernames: &[String],
+    ) -> anyhow::Result<Vec<UserId>> {
+        if usernames.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut builder = QueryBuilder::new(
+            "SELECT id FROM users WHERE deleted_at IS NULL AND LOWER(username) IN (",
+        );
+        let mut separated = builder.separated(", ");
+        for name in usernames {
+            separated.push_bind(name.to_lowercase());
+        }
+        builder.push(")");
+
+        let ids: Vec<UserId> = builder.build_query_scalar().fetch_all(&self.pool).await?;
+        Ok(ids)
+    }
+
     /// Updates the caller's own display name. Username is not updatable
     /// here: it backs the live per-account uniqueness index
     /// (`users_username_live`), and changing it needs a dedicated flow that
