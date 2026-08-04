@@ -9,6 +9,12 @@ Checked against `docs/BACKLOG.md`'s out-of-scope section and the decision record
 
 ## 1. A thread reply pushes everyone who can view the parent channel, not the thread's participants
 
+**Fixed 2026-08-04.** `push::message_recipients` now narrows a thread's push audience to the thread's own participants - the parent message's author plus everyone who has posted into it - derived from existing rows with no new table, and always intersected with the already-permission-checked viewer set so the narrowing can only remove a bystander, never grant a view.
+Mentions cut through, and turned out not to exist server-side at all before this: `@name` was purely client rendering.
+See PR #357 and `crates/slimm-server/tests/thread_push_narrowing.rs`.
+Still not built, and named rather than missing: an explicit follow concept, so somebody who only read a thread and was never mentioned gets nothing.
+The rest of this entry is kept for the record of what the gap was.
+
 **What is missing.** Threads were built by reusing the ordinary channel machinery wholesale, which is the whole point of the design (`crates/slimm-server/src/store/threads.rs`'s own module doc: "every other feature ... keeps working unchanged").
 Push fan-out is one of those reused things, and reuse here is the bug.
 `push::message_recipients` (`crates/slimm-server/src/push/recipients.rs`) computes who gets woken with `store.viewers_among(channel_id, &candidates)`, and `viewers_among` resolves a thread's permissions to its parent's through `Store::permission_channel` (`crates/slimm-server/src/store/permissions.rs`) exactly the way every other permission check does.
@@ -24,6 +30,12 @@ The current build inherits the opposite behaviour by construction, silently, bec
 **Rough cost.** This is the "looked small and was not" shape. `message_recipients` would need to know whether `channel_id` is a thread's own channel and, if so, narrow candidates to thread participants (authors of messages already in it, or a separate follow list) rather than the parent's whole viewership - which is new state, not a filter over existing state. It touches push, and needs a decision about the fallback (nobody has replied yet, or the parent's own author) that has no existing structure to reuse the way `permission_channel` did for permissions.
 
 ## 2. A DM call has no ring, no push, and no passive signal anywhere the callee is not already looking
+
+**Half fixed 2026-08-04.** The in-app half is built: `Event::VoiceActivityChanged` carries a channel id and nothing else (naming a joiner would hand every viewer what `GET .../voice/roster` deliberately refuses them for a hidden participant), published on a first heartbeat, a real hangup, and a stale sweep, gated on the ordinary channel-scoped view check.
+A DM row now shows a call in progress and opens straight into it.
+See PR #358 and `crates/slimm-server/tests/live_voice_events.rs`.
+**The ring half is still open** and is issue #212's CallKit/VoIP bridge: nothing wakes a backgrounded or closed app, so this only reaches somebody who already has it open.
+The rest of this entry is kept for the record of what the gap was.
 
 **The in-app half is fixed.** `Event::VoiceActivityChanged` (`crates/slimm-server/src/hub/event.rs`) carries only a channel id, published from three sites - `http/voice.rs`'s `heartbeat` (a first heartbeat for a `(user, channel)` pair, never a repeat) and `forget_heartbeat` (a real forget only), and `lib.rs`'s stale-heartbeat sweep - each read-before-write against `VoiceService::has_heartbeat` so a routine refresh never republishes. Gated through the ordinary channel-scoped `VIEW_CHANNEL` check in `http::ws::authorize`, the same one every other channel event uses, which for a DM resolves to exactly its two participants. `voiceRosterProvider` (`client/packages/app/lib/src/providers/voice_roster.dart`) now nudges its poll on that event instead of only its 15-second timer, and `DmRow` (`client/packages/app/lib/src/widgets/dm_row.dart`) watches it to show a call-in-progress icon, tapping which opens straight into the call pane. See `crates/slimm-server/tests/live_voice_events.rs` and `crates/slimm-server/tests/voice_sweep.rs`'s `a_swept_stale_heartbeat_publishes_voice_activity_changed`. The real ring - waking a backgrounded or closed app - is still issue #212, deliberately not built here.
 
