@@ -12,6 +12,77 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## A gate nobody is watching says nothing: e2e was red for a day (2026-08-04)
+
+Found while seeding the live instance, not by any alert.
+`e2e` had failed on **every** run since PR #338 on 2026-08-03, roughly 35 consecutive runs including docs-only ones, and four client releases shipped green over the top of it.
+Read this before trusting a green release, and before assuming a red workflow is somebody's problem.
+
+**`e2e` is not among the checks `verify-release-checks` gates on, so the release pipeline cannot see it.**
+That is the same shape as "A release can succeed and still ship no store build" below, one layer out: there the required check was cancelled and read as failed, here the check is not required at all.
+Both fail the same way, silently, with the only evidence being something nobody looks at.
+Whether `e2e` should join the release gate is a real trade - it is a twelve minute job that stands up an SFU, a server and two browsers, so making it required makes every release wait on the flakiest thing in the repo - and it is deliberately not decided here.
+
+**Two independent root causes, and only one was a bug.**
+
+The first was real, and it is the more valuable half.
+`ChannelScreen` decided "am I a thread" by reading the channel row out of the local drift store and testing `parentMessageId`.
+A thread is excluded from `GET /channels` and `GET /dms` by design (`docs/decisions/0005-threads.md`), so a client reaching one **by URL** - a deep link, a reload while inside a thread, or the e2e navigating straight to `#/thread/{id}` - has never fetched that row at all, the store answers null, and the entire parent-channel header comes back: pinned messages, the canvas button, and the member-list toggle.
+That last one is the control the owner reported by hand, the one that flips `memberPaneVisibleProvider` for whatever channel `HomeShell` has selected *behind* the thread.
+So #338 fixed it for a thread opened from a message and left it wide open for a thread opened by URL.
+`ThreadScreen` passes an `isThread` flag down now - it always knows what it opened, so no store round trip and nothing to race - ORed with the row check rather than replacing it, so `ConversationPane`'s route is untouched.
+Two other call sites were reading the same broken derivation: the start header (whether to say "Welcome to #" for a deliberately empty name) and the message actions (whether to offer "reply in thread" inside a thread).
+**Every existing thread widget test passed while the browser showed the opposite, because they all seeded the channel row directly.** The regression test seeds no row at all, which is the case none of them covered.
+
+The second was a stale test, and it is a class worth naming.
+`d190a71` removed the join lobby - clicking a voice channel joins directly now, and `voice_join_preview.dart`'s own doc comment says so - so the string "Join call" does not exist anywhere in the client, while `e2e_labels.py` still had `JOIN_CALL = "Join call"` and two scenarios still clicked it.
+A harness that drives a UI by literal strings drifts the moment the UI is reworded, and nothing connects the two.
+
+**An `AppBar` title is not its own semantics node, and the e2e can only see leaves.**
+`AppBar(title: Text('Thread'))` merges the title upward into the bar's own node, so "Thread" was reachable only inside a blob shared with the back button's tooltip - worse for a screen reader, and invisible to `e2e_js.NODES`, which keeps leaves deliberately (widening it would let two nodes answer one `find()` across every other scenario).
+`Semantics(container: true, header: true)` around the title is what forces the boundary.
+Proven by dumping the live page's real `flt-semantics` tree over CDP, which is also how both root causes were found at all - reading the widget tree said nothing, and the failure screenshot's console log held only WebGL warnings and two 404 avatars.
+
+## Attachments were five types, and mentions could not name half the usernames (2026-08-04)
+
+Both found by seeding the live instance with realistic data and *looking at it*, which is worth more than it sounds: neither had a failing test, and both had been shipped for months.
+
+**A mention could not name a username containing `.` or `-`.**
+`validate_username` (`http/auth.rs`) accepts letters, digits, `_`, `.` and `-`, while `_mentionPattern` (`message_inline.dart`) and `mentioned_usernames` (`push/recipients.rs`) both matched `@[A-Za-z0-9_]+`.
+So `nick-c` could never be mentioned by anybody: `@nick-c` matched only `@nick`, resolved to nobody, rendered as plain text, and notified nobody either.
+Both sides are widened together to `@[A-Za-z0-9_][A-Za-z0-9_.-]*` with trailing `.`/`-` stripped, so `thanks @nick.` does not swallow the full stop.
+The cost, stated in both doc comments: a username genuinely *ending* in `.` or `-` is unmentionable, and registration still allows one.
+The two implementations are held together by one shared fixture, `crates/slimm-server/tests/fixtures/mention_charset_cases.json`, which **both sides read** - the Rust test through `CARGO_MANIFEST_DIR`, the Dart one by walking to the repo root - so a one-sided edit fails rather than drifting.
+The Dart side extracts through `parseInline`'s real node tree rather than re-running a regex, so it cannot pass by agreeing with a copy of what it tests.
+Checked and deliberately left alone: the composer's autocomplete is already charset-agnostic and always inserts a trailing space, and custom emoji are not the same shape - `emoji::normalize_name` filters a shortcode to alphanumerics and `_` at *creation* time, so what can be stored is already a subset of what the pattern matches.
+
+**`ALLOWED_TYPES` was exactly five entries**, so a source file, a log, a csv, an archive and any video were all a 400.
+Eight added: mp4, webm, mp3, ogg, wav, zip, gzip, and plain text.
+The invariant is unchanged and is why widening was safe: the type comes from the bytes, never the filename or the upload's header, and every new type is `inline: false`, so the serving path gives it `Content-Disposition: attachment` beside the `nosniff` it already sent.
+**Video is deliberately not inline** - `attachment_view.dart` keeps its own explicit four-type inline list and has no player, so inline would buy nothing and only widen what a browser is handed; flipping it is gated on real client work.
+Signatures that needed more than a magic number: webm is matched on the `webm` doctype inside the EBML header so an mkv is refused rather than mislabelled, and wav needs `RIFF` at 0 *and* `WAVE` at 8 or a RIFF avi comes back as audio.
+Plain text is the one awkward one, since text has no signature at all: it is a last resort after every magic check fails, accepting valid UTF-8 with no control characters but tab/newline/CR, which does make the list "almost anything textual" in practice - accepted because the type it funnels into has no rendering surface, with a test asserting html and svg sniffed as text still come back as forced downloads.
+One residual, measured rather than waved at: a UTF-16LE BOM is `FF FE`, which also satisfies the mpeg frame sync, so such a file stores as `audio/mpeg`.
+Validating the frame header's four reserved fields does **not** close it (the BOM fixes version and layer to valid values regardless of what follows, so about 70% of possible next bytes still pass); requiring an ID3 tag would close it and would also refuse real mp3s that have none, which is the worse trade.
+There is a test named for the residual so nobody reads the tightening as having fixed it.
+
+## Seeding a deployment with data worth looking at (2026-08-04)
+
+`scripts/seed-data.py` exists so there is something real to look at on a deployment.
+Three things learned running it against the live instance, all of which made the output read as fake.
+
+**Concurrency below the account count makes one person monologue.**
+Workers run in waves, so `--concurrency 5` with 11 accounts ran 5, then 5, then one account alone posting eighty messages back to back.
+Leave concurrency at its default (the account count) unless throttling is the actual goal; the owner spotted the monologue immediately.
+
+**Ollama-generated content was tried and judged worse than the hand-written corpus.**
+`--ollama` with qwen3:8b produced 60 short and only 23 long entries, and the long ones drifted into generic two-person dialogue ("She's been asking about you") with nothing grounding them in this product.
+Kept as a flag, not the default.
+The lever if it is revisited is a prompt carrying real context, not a bigger model.
+
+**Attachments were present and invisible**: three flat-colour PNGs at 32x32 to 200x80 read as featureless swatches.
+Now five varied images including one near the per-upload ceiling, a hand-built PDF with a real xref table (a file merely *named* `.pdf` is refused, since the type is sniffed), real 6-22 line functions across seven languages instead of hello-worlds, and a `message_link` action carrying youtube, article, image and repo urls.
+
 ## Three left-rail items from the backlog channel: 54, 55, 56 (2026-08-04)
 
 **54, the resize bar.** The owner: "the resize bar is huge... keep the normal line... settle with a simple toggle instead of sliding."
