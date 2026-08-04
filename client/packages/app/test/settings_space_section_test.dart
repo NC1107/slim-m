@@ -13,6 +13,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/permissions.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 import 'settings_harness.dart';
 
@@ -106,5 +107,19 @@ void main() {
     expect(find.text('Channel permissions'), findsOneWidget);
     expect(find.text('Who can join'), findsOneWidget);
     expect(find.text('Emoji'), findsOneWidget);
+  });
+
+  /// The screen used to zero out its own padding, which sat its bare rows
+  /// flush against the edges of the content column - a tighter margin than
+  /// any personal settings pane, whose `ListView` keeps the scaffold's
+  /// default `s16` on every side. Pinned here since nothing about the
+  /// grouped-card layout above would fail if the padding regressed back to
+  /// zero.
+  testWidgets('the screen keeps the same outer padding a personal settings '
+      'pane uses, not zero', (tester) async {
+    await pumpSpaceSettings(tester, allPermissionBits);
+
+    final listView = tester.widget<ListView>(find.byType(ListView));
+    expect(listView.padding, const EdgeInsets.all(AppSpacing.s16));
   });
 }
