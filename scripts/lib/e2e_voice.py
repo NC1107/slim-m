@@ -147,6 +147,16 @@ def share_screen(client, other, room_id):
 
 
 def mute_propagates(a, b, room_id):
+    """One side mutes and the SFU reflects it, then the mute is undone.
+
+    Muting is a persisted preference, not a per-call toggle: leaving a call
+    muted carries `microphoneEnabled: false` into VoiceController's next
+    `join` (see voice_screen.dart's own doc comment), so a mute left standing
+    here would silently carry into whatever call this same client joins
+    next, publishing no microphone track at all rather than a muted one.
+    Unmuting before returning is this scenario cleaning up after itself, the
+    same shape leave_call's own trailing leave already does for the rail.
+    """
     a.click(L.MUTE)
     time.sleep(4)
     muted = {p["identity"][:13]: p["tracks"][0].get("muted", False)
@@ -155,6 +165,13 @@ def mute_propagates(a, b, room_id):
     assert not all(muted.values()), f"both read as muted: {muted}"
     b.shot("peer-muted")
     print(f"  exactly one side muted: {muted}")
+
+    a.click(L.UNMUTE)
+    time.sleep(4)
+    unmuted = {p["identity"][:13]: p["tracks"][0].get("muted", False)
+               for p in sfu_participants(room_id) if p.get("tracks")}
+    assert not any(unmuted.values()), f"still reads as muted: {unmuted}"
+    print("  and unmuting clears it, so the next call this client joins starts unmuted")
 
 
 def leave_call(a, b):

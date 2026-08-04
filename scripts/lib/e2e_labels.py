@@ -43,6 +43,7 @@ SHARE_SCREEN = "Share a screen"
 SHARING_NOTICE = "You are sharing your screen"
 STOP_SHARING = "Stop sharing"
 MUTE = "Mute"
+UNMUTE = "Unmute"
 LEAVE_CALL = "Leave call"
 
 # Calling in a DM
