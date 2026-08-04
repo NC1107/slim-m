@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.30.0](https://github.com/NC1107/slim-m/compare/server-v0.29.0...server-v0.30.0) (2026-08-04)
+
+
+### Features
+
+* **server:** accept video, audio, archives and text as attachments ([#378](https://github.com/NC1107/slim-m/issues/378)) ([76a68bd](https://github.com/NC1107/slim-m/commit/76a68bd82f8939f9ac498bdd271af3fd7a98cd60))
+
+
+### Bug Fixes
+
+* widen the mention charset to match what a username can be ([#374](https://github.com/NC1107/slim-m/issues/374)) ([901e712](https://github.com/NC1107/slim-m/commit/901e712e54788f75a3a066c08a2844c126bf6ad9))
+
 ## [0.29.0](https://github.com/NC1107/slim-m/compare/server-v0.28.0...server-v0.29.0) (2026-08-04)
 
 
