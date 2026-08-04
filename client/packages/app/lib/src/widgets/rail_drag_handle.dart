@@ -25,7 +25,15 @@ import 'channel_rail.dart';
 /// bar, which is the visual half of item 54's fix. The clickable region
 /// around it is wider than the line itself purely for hit-testing (the same
 /// [AppSizes.rowPointer]/[AppSizes.rowTouch] step every other control uses),
-/// and paints nothing of its own.
+/// a mouse-only affordance since the compact drawer covers touch instead.
+///
+/// That wide region used to sit uncoloured, which read as a gap rather than
+/// a seam: the rail is [AppTokens.surfaceSunken] and the conversation is
+/// [AppTokens.surfaceBase], a deliberate step so the panes do not bleed into
+/// each other (see the token's own doc), and a neutral strip between the two
+/// belonged to neither. Each side of the line is filled to match the surface
+/// it actually borders now, so the reserved width disappears into its
+/// neighbours and only the hairline itself remains visible.
 ///
 /// Collapsed, this is the *only* way back: there is no button anywhere else
 /// that restores the rail, so it always renders a real, hittable
@@ -80,15 +88,21 @@ class _RailDragHandleState extends ConsumerState<RailDragHandle> {
           onTap: _toggle,
           child: SizedBox(
             width: hitWidth,
-            child: Center(
-              child: visible
-                  ? VerticalDivider(width: 1, color: lineColor)
-                  : Icon(
+            child: visible
+                ? Row(
+                    children: [
+                      Expanded(child: Container(color: tokens.surfaceSunken)),
+                      VerticalDivider(width: 1, color: lineColor),
+                      Expanded(child: Container(color: tokens.surfaceBase)),
+                    ],
+                  )
+                : Center(
+                    child: Icon(
                       AppIcons.sidebar,
                       size: AppSizes.icon16,
                       color: lineColor,
                     ),
-            ),
+                  ),
           ),
         ),
       ),

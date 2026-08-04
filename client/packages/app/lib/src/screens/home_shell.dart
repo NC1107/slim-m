@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The signed-in shell: channel rail beside, or instead of, a conversation,
-/// plus the member pane at expanded width.
+/// plus the member pane wherever it has room to dock
+/// ([LayoutClass.fitsMemberPane]).
 library;
 
 import 'dart:async';
@@ -48,6 +49,7 @@ class HomeShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final layout = LayoutClass.of(context);
+    final width = MediaQuery.sizeOf(context).width;
     final selected = selectedChannelId(context);
     // With the shell, or the first surface to consult it filters against none.
     ref.watch(blocksProvider);
@@ -57,10 +59,10 @@ class HomeShell extends ConsumerWidget {
     // DmCallBar is the same: a DM's call pane replaces the header too.
     final dmCallOpen =
         selected != null && ref.watch(dmCallOpenProvider) == selected;
-    // Never below expanded width, whatever the header toggle says: it can only
-    // hide the pane, not summon room for it that is not there.
-    final showMembers =
-        layout == LayoutClass.expanded && ref.watch(memberPaneVisibleProvider);
+    // Whatever the header toggle says: it can only hide the pane, not summon
+    // room for it that is not there (see LayoutClass.fitsMemberPane's doc).
+    final membersFit = layout.fitsMemberPane(width);
+    final showMembers = membersFit && ref.watch(memberPaneVisibleProvider);
     final showRail = ref.watch(channelRailVisibleProvider);
 
     final railWidth = layout == LayoutClass.expanded
@@ -105,7 +107,7 @@ class HomeShell extends ConsumerWidget {
             // opacity zero - it fetches while built, and home_shell_test pins
             // exactly that - so the exit is the gap closing over the panel
             // duration while the entrance gets the full slide.
-            if (layout == LayoutClass.expanded)
+            if (membersFit)
               ClipRect(
                 child: AnimatedContainer(
                   duration: AppMotion.reduced(context, AppMotion.base),
