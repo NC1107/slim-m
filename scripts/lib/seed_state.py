@@ -105,6 +105,21 @@ class SeedState:
         with self._lock:
             return bool(self._threads)
 
+    def newest_top_messages(self, count):
+        """A fixed snapshot of the newest `count` top-level messages.
+
+        Unlike `random_top_message`, this is not a draw: it is the settle
+        pass's window, taken once so a fixed set of targets stays fixed
+        while the pass runs, rather than sliding under it as replies land.
+        """
+        with self._lock:
+            return list(self._top_messages[-count:])
+
+    def newest_threads(self, count):
+        """A fixed snapshot of the newest `count` opened threads."""
+        with self._lock:
+            return list(self._threads[-count:])
+
     def counts(self):
         with self._lock:
             return {

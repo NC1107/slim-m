@@ -65,6 +65,25 @@ class SeedStateTest(unittest.TestCase):
         state.add_thread("m1", "thread-1")
         self.assertEqual(state.counts(), {"top_messages": 2, "threads": 1})
 
+    def test_newest_top_messages_is_a_fixed_tail_slice(self):
+        state = seed_state.SeedState()
+        for i in range(10):
+            state.add_top_message(f"m{i}", "c1", "alice")
+        newest = state.newest_top_messages(3)
+        self.assertEqual([m["id"] for m in newest], ["m7", "m8", "m9"])
+
+    def test_newest_top_messages_is_never_more_than_the_whole_pool(self):
+        state = seed_state.SeedState()
+        state.add_top_message("m1", "c1", "alice")
+        self.assertEqual(len(state.newest_top_messages(100)), 1)
+
+    def test_newest_threads_is_a_fixed_tail_slice(self):
+        state = seed_state.SeedState()
+        for i in range(5):
+            state.add_thread(f"parent-{i}", f"thread-{i}")
+        newest = state.newest_threads(2)
+        self.assertEqual(newest, [("parent-3", "thread-3"), ("parent-4", "thread-4")])
+
 
 class RecencyChoiceTest(unittest.TestCase):
     """`_recency_choice` in isolation: no lock, no `SeedState`, just the
