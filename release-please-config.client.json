@@ -1,11 +1,26 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "bump-minor-pre-major": true,
+  "plugins": [
+    {
+      "type": "linked-versions",
+      "groupName": "client",
+      "components": ["client", "client-app"]
+    }
+  ],
   "packages": {
     "client": {
       "release-type": "dart",
       "component": "client",
       "package-name": "slim_m_workspace"
+    },
+    "client/packages/app": {
+      "release-type": "dart",
+      "component": "client-app",
+      "package-name": "slimm_app",
+      "skip-github-release": true,
+      "skip-changelog": true,
+      "always-update": true
     }
   }
 }

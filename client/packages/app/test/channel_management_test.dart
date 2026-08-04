@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Tests for channel creation, rename/topic, and deletion from the rail:
-/// gating on `canManage`, and the create sheet's round trip through the API
-/// and the local store.
+/// Tests for channel rename/topic and deletion from the rail: gating on
+/// `canManage`, and the manage sheet's round trip through the API and the
+/// local store. Creation moved to `SpaceMenuButton` (backlog item 55); its
+/// own round trip through the create sheet is `space_menu_button_test.dart`.
 library;
 
 import 'dart:convert';
@@ -112,6 +113,48 @@ Widget _harness(
 }
 
 void main() {
+  group('section header (backlog item 55)', () {
+    testWidgets('the uncategorised section reads CHANNELS, the same treatment '
+        'DirectMessagesSection gives its own header - it used to be a blank '
+        'label with a floating "+" and no explanation', (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          ChannelCategorySections(
+            channels: [_channel('c1', 'general')],
+            categories: const [],
+            selectedId: null,
+            onReorder: (_) {},
+          ),
+          handler: (_) => http.Response('{}', 200),
+        ),
+      );
+
+      expect(find.text('CHANNELS'), findsOneWidget);
+      expect(find.bySemanticsLabel('Channels'), findsOneWidget);
+    });
+
+    testWidgets('a named category keeps showing its own name above it', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _harness(
+          ChannelCategorySections(
+            channels: [_channel('c1', 'general')],
+            categories: const [
+              ChannelCategoryRow(id: 'cat-1', name: 'Text', position: 0),
+            ],
+            selectedId: null,
+            onReorder: (_) {},
+          ),
+          handler: (_) => http.Response('{}', 200),
+        ),
+      );
+
+      expect(find.text('CHANNELS'), findsOneWidget);
+      expect(find.text('TEXT'), findsOneWidget);
+    });
+  });
+
   group('gating on canManage', () {
     testWidgets('a member without MANAGE_CHANNELS sees a read-only list', (
       tester,
@@ -128,80 +171,24 @@ void main() {
         ),
       );
 
-      expect(find.bySemanticsLabel('Create a channel'), findsNothing);
       expect(find.bySemanticsLabel('Manage general'), findsNothing);
     });
 
-    testWidgets(
-      'a manager sees the section add button and a per-row manage button',
-      (tester) async {
-        await tester.pumpWidget(
-          _harness(
-            ChannelCategorySections(
-              channels: [_channel('c1', 'general')],
-              categories: const [],
-              selectedId: null,
-              canManage: true,
-              onReorder: (_) {},
-            ),
-            handler: (_) => http.Response('{}', 200),
-          ),
-        );
-
-        expect(find.bySemanticsLabel('Create a channel'), findsOneWidget);
-        expect(find.bySemanticsLabel('Manage general'), findsOneWidget);
-      },
-    );
-  });
-
-  group('create channel sheet', () {
-    testWidgets('creating a channel posts the name and kind, then closes', (
-      tester,
-    ) async {
-      final requests = <http.Request>[];
+    testWidgets('a manager sees a per-row manage button', (tester) async {
       await tester.pumpWidget(
         _harness(
           ChannelCategorySections(
-            channels: const [],
+            channels: [_channel('c1', 'general')],
             categories: const [],
             selectedId: null,
             canManage: true,
             onReorder: (_) {},
           ),
-          handler: (request) {
-            requests.add(request);
-            return http.Response(
-              jsonEncode({
-                'id': 'new-1',
-                'name': 'roadmap',
-                'kind': 'text',
-                'topic': null,
-                'created_at': 1,
-              }),
-              200,
-            );
-          },
+          handler: (_) => http.Response('{}', 200),
         ),
       );
 
-      await tester.tap(find.bySemanticsLabel('Create a channel'));
-      await tester.pumpAndSettle();
-      expect(find.text('Create a channel'), findsOneWidget);
-
-      await tester.enterText(find.byType(TextField).first, 'roadmap');
-      await tester.pump();
-      await tester.tap(find.widgetWithText(AppButton, 'Create channel'));
-      await tester.pumpAndSettle();
-
-      expect(requests, hasLength(1));
-      expect(requests.single.method, 'POST');
-      expect(requests.single.url.path, '/channels');
-      expect(jsonDecode(requests.single.body), {
-        'name': 'roadmap',
-        'kind': 'text',
-      });
-      // The sheet closes on success rather than lingering over a done form.
-      expect(find.text('Create a channel'), findsNothing);
+      expect(find.bySemanticsLabel('Manage general'), findsOneWidget);
     });
   });
 

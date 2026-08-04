@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Tests for the drag handle that replaced the header's rail-collapse
-/// button (#256's toggle, removed here): drag the rail's own edge instead of
-/// tapping a chrome button.
+/// Tests for the handle that replaced the header's rail-collapse button
+/// (#256's toggle) and then replaced drag-to-resize with a plain click
+/// (backlog item 54): tap the rail's own edge to open or close it.
 ///
 /// The hard requirement is discoverability: a collapsed rail with nothing
-/// visible to grab is a trap, so the collapsed-state test below asserts the
-/// pill both renders and actually restores the rail through its published
+/// visible to click is a trap, so the collapsed-state test below asserts the
+/// glyph both renders and actually restores the rail through its published
 /// semantic action, not merely that an icon exists somewhere on screen.
 ///
 /// The header's own "the button is gone" regression lives beside its other
@@ -26,40 +26,44 @@ import 'package:slimm_design_system/design_system.dart';
 import 'home_shell_harness.dart';
 
 void main() {
-  testWidgets('dragging the handle left collapses the rail, and dragging '
-      'it right restores it', (tester) async {
+  testWidgets('clicking the handle collapses the rail, and clicking it '
+      'again restores it', (tester) async {
     final s = setup();
     await pumpAtWidth(tester, s.container, 1400);
     expect(find.byType(ChannelRail), findsOneWidget);
 
-    await tester.drag(find.byType(RailDragHandle), const Offset(-60, 0));
+    await tester.tap(find.byType(RailDragHandle));
     await tester.pumpAndSettle();
-    expect(
-      find.byType(ChannelRail),
-      findsNothing,
-      reason: 'a 60px leftward drag is well past the collapse threshold',
-    );
+    expect(find.byType(ChannelRail), findsNothing);
 
-    await tester.drag(find.byType(RailDragHandle), const Offset(60, 0));
+    await tester.tap(find.byType(RailDragHandle));
     await tester.pumpAndSettle();
     expect(find.byType(ChannelRail), findsOneWidget);
 
     await teardown(tester, s.container, s.db);
   });
 
-  testWidgets('a short drag under the threshold does nothing', (tester) async {
+  testWidgets('the visible line is a plain hairline divider, never a filled '
+      'bar', (tester) async {
     final s = setup();
     await pumpAtWidth(tester, s.container, 1400);
 
-    await tester.drag(find.byType(RailDragHandle), const Offset(-10, 0));
-    await tester.pumpAndSettle();
-    expect(find.byType(ChannelRail), findsOneWidget);
+    final divider = tester.widget<VerticalDivider>(
+      find.byType(VerticalDivider),
+    );
+    expect(
+      divider.width,
+      1,
+      reason:
+          'backlog item 54: a thick grab bar reads as a resize handle, '
+          'not a toggle',
+    );
 
     await teardown(tester, s.container, s.db);
   });
 
   testWidgets(
-    'collapsed, a real grip stays on screen, and the semantic action a '
+    'collapsed, a real glyph stays on screen, and the semantic action a '
     'screen reader or the keyboard would use really restores the rail - '
     'the mutation that matters is deleting either half of this',
     (tester) async {
@@ -72,7 +76,7 @@ void main() {
       expect(find.byType(ChannelRail), findsNothing);
 
       // Discoverable: a real, labelled control is on screen, not a blank gap.
-      expect(find.byIcon(AppIcons.dragHandle), findsOneWidget);
+      expect(find.byIcon(AppIcons.sidebar), findsOneWidget);
       expect(find.bySemanticsLabel('Expand channel list'), findsOneWidget);
 
       // Functional: the published action is what actually restores the rail, not merely a label sitting on an inert node.
@@ -98,7 +102,7 @@ void main() {
     final s = setup();
     await pumpAtWidth(tester, s.container, 1400);
 
-    await tester.drag(find.byType(RailDragHandle), const Offset(-60, 0));
+    await tester.tap(find.byType(RailDragHandle));
     await tester.pumpAndSettle();
     expect(find.byType(ChannelRail), findsNothing);
 
@@ -110,7 +114,7 @@ void main() {
   });
 
   testWidgets(
-    'the compact drawer from #301 is untouched: no drag handle at compact '
+    'the compact drawer from #301 is untouched: no rail handle at compact '
     'width, and the edge-swipe drawer still opens the rail',
     (tester) async {
       final s = setup(httpClient: quietClient(), signedIn: true);
@@ -126,7 +130,7 @@ void main() {
       expect(
         find.byType(RailDragHandle),
         findsNothing,
-        reason: 'compact never docks the rail, so there is no edge to drag',
+        reason: 'compact never docks the rail, so there is no edge to click',
       );
 
       // Off-screen until dragged (#301's own suite covers the drag itself).

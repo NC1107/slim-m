@@ -98,6 +98,31 @@ void main() {
     expect(relaunch.read(whatsNewControllerProvider), isEmpty);
   });
 
+  test(
+    'a device that recorded the pre-fix frozen version (backlog item 56) is '
+    're-baselined silently rather than flooded with the whole backlog',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        lastSeenWhatsNewVersionKey: '0.1.0',
+      });
+      _mockVersion('0.26.0');
+      final container = _container(fresh: false);
+      await pumpEventQueue();
+
+      expect(
+        container.read(whatsNewControllerProvider),
+        isEmpty,
+        reason:
+            'every real build before the version-source fix reported 0.1.0, '
+            'so this device never really saw any of the backlog and must '
+            'not be shown all of it at once now that the version is real',
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(lastSeenWhatsNewVersionKey), '0.26.0');
+    },
+  );
+
   test('marking seen before anything is shown is a no-op, so a stray call '
       'cannot advance the recorded version early', () async {
     _mockVersion('0.17.2');

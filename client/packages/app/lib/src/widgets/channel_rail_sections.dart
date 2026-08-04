@@ -15,58 +15,34 @@ import '../routing/routes.dart';
 import 'channel_grouping.dart';
 import 'channel_rail_channel_rows.dart';
 import 'channel_rail_reorder.dart';
-import 'create_channel_sheet.dart';
 import 'dm_row.dart';
 import 'personal_space_row.dart';
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text, {this.onAdd, this.addSemanticLabel});
+  const _SectionLabel(this.text);
 
   final String text;
-
-  /// Present only for a section a caller may create into; absent hides the
-  /// affordance entirely rather than showing it disabled.
-  final VoidCallback? onAdd;
-  final String? addSemanticLabel;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    // The add button's hit box grows around a glyph that does not, so the
-    // trailing padding comes off to leave the glyph where the design puts it.
-    final addPad = AppTouchTargets.of(context) ? 0.0 : 4.0;
     return Padding(
-      padding: EdgeInsets.fromLTRB(8, 10, onAdd != null ? addPad : 8, 6),
-      child: Row(
-        children: [
-          Expanded(
-            // Announced in its natural case and as a heading: the uppercase is
-            // a visual treatment, and some screen readers spell such a word out.
-            child: text.isEmpty
-                ? const SizedBox.shrink()
-                : Semantics(
-                    container: true,
-                    header: true,
-                    label: text,
-                    child: ExcludeSemantics(
-                      child: Text(
-                        text.toUpperCase(),
-                        style: AppText.label.copyWith(
-                          color: tokens.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-          ),
-          if (onAdd != null)
-            AppIconButton(
-              icon: AppIcons.add,
-              semanticLabel: addSemanticLabel ?? 'Create channel',
-              size: AppIconButtonSize.sm,
-              onPressed: onAdd,
+      padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
+      // Announced in its natural case and as a heading: the uppercase is a
+      // visual treatment, and some screen readers spell such a word out.
+      child: text.isEmpty
+          ? const SizedBox.shrink()
+          : Semantics(
+              container: true,
+              header: true,
+              label: text,
+              child: ExcludeSemantics(
+                child: Text(
+                  text.toUpperCase(),
+                  style: AppText.label.copyWith(color: tokens.textSecondary),
+                ),
+              ),
             ),
-        ],
-      ),
     );
   }
 }
@@ -134,9 +110,12 @@ class DirectMessagesSection extends StatelessWidget {
 /// section in one drag - a channel of any kind may be filed under any
 /// category, since a category decides placement only (see
 /// docs/decisions/0006-channel-categories.md). The implicit uncategorised
-/// section carries the one "create a channel" affordance, unlabelled since
-/// it is not a named section; every category above it is exactly the ones
-/// [SpaceSettingsSection]'s "Channel categories" screen manages.
+/// section is labelled "Channels", the same treatment
+/// [DirectMessagesSection] gives its own header (backlog item 55: a "+"
+/// with no header above it read as unexplained chrome). Creating a channel
+/// or a category is [SpaceMenuButton]'s job now, not a header button here;
+/// every named category is exactly the ones [SpaceSettingsSection]'s
+/// "Channel categories" screen manages.
 class ChannelCategorySections extends ConsumerWidget {
   const ChannelCategorySections({
     super.key,
@@ -181,13 +160,8 @@ class ChannelCategorySections extends ConsumerWidget {
             ),
     );
 
-    Widget header(ChannelCategoryRow? category) => _SectionLabel(
-      category?.name ?? '',
-      onAdd: canManage && category == null
-          ? () => showCreateChannelSheet(context, initialKind: 'text')
-          : null,
-      addSemanticLabel: 'Create a channel',
-    );
+    Widget header(ChannelCategoryRow? category) =>
+        _SectionLabel(category?.name ?? 'Channels');
 
     return ReorderableChannelRows(
       sections: sections,
