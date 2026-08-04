@@ -213,6 +213,21 @@ pub enum Event {
         /// overwrite.
         previously_visible_to: Vec<UserId>,
     },
+    /// Someone's presence on a channel's voice call changed: a first
+    /// heartbeat for a `(user, channel)` pair (a join), a clean hangup's
+    /// forgotten heartbeat, or the stale-heartbeat sweep evicting someone.
+    /// Carries only the channel id, never who.
+    ///
+    /// This is a deliberate departure from [`Event::ThreadUpdated`], which
+    /// carries its whole current answer: a thread's reply count is the same
+    /// for every viewer, while a voice roster is not.
+    /// `GET .../voice/roster` drops a participant whose
+    /// `presence_visibility` is hidden from every viewer but themselves, and
+    /// an id-only event is what keeps that guarantee structural rather than
+    /// something a future edit to this event's payload could get wrong. A
+    /// receiving connection re-fetches the roster, which already applies
+    /// that per-viewer filtering, instead of being told who moved.
+    VoiceActivityChanged { channel_id: ChannelId },
     /// An object was placed on a channel's canvas.
     ///
     /// Carries the whole row for the same reason [`Event::MessageCreated`]

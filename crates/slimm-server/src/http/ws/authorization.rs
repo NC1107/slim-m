@@ -72,6 +72,8 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::ChannelCreated(_)
         | Event::ChannelUpdated(_)
         | Event::OverwriteChanged { .. }
+        // The same VIEW_CHANNEL gate the roster read route itself uses.
+        | Event::VoiceActivityChanged { .. }
         // Handled earlier in `authorize` and never reach this call.
         | Event::SessionRevoked(_)
         | Event::PresenceChanged(_)
@@ -182,6 +184,7 @@ pub(super) async fn authorize(
         Event::CanvasObjectsRemoved { channel_id, .. } => *channel_id,
         Event::CanvasCleared { channel_id, .. } => *channel_id,
         Event::CanvasObjectsRestored { channel_id, .. } => *channel_id,
+        Event::VoiceActivityChanged { channel_id } => *channel_id,
         // Control events are handled in the loop; the rest already returned above.
         Event::SessionRevoked(_)
         | Event::PresenceChanged(_)
@@ -398,6 +401,9 @@ pub(super) async fn authorize(
             seq: seq.0,
             op_id: op_id.to_string(),
             object_ids: object_ids.iter().map(ToString::to_string).collect(),
+        },
+        Event::VoiceActivityChanged { channel_id } => ServerFrame::VoiceActivityChanged {
+            channel_id: channel_id.to_string(),
         },
         // The deployment-wide and channel-deletion cases already returned above.
         Event::SessionRevoked(_)

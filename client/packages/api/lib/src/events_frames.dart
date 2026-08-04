@@ -273,6 +273,19 @@ class CategoryChanged extends ServerEvent {
   const CategoryChanged();
 }
 
+/// Someone's presence on a channel's voice call changed: a join, a clean
+/// hangup, or the stale-heartbeat sweep evicting someone. Carries only the
+/// channel id, never who - unlike [ThreadUpdated]'s reply count, a voice
+/// roster is per-viewer (`listVoiceRoster` drops a hidden participant from
+/// every viewer but themselves), so naming a joiner here would be a second,
+/// unfiltered way to learn who is on a call. A receiver re-fetches the
+/// roster, which already applies that filtering.
+class VoiceActivityChanged extends ServerEvent {
+  const VoiceActivityChanged({required this.channelId});
+
+  final String channelId;
+}
+
 /// An object was placed on a channel's canvas.
 ///
 /// Carries the whole row, so a live stroke needs no viewport read to render.

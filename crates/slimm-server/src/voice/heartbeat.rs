@@ -60,9 +60,11 @@ impl CallHeartbeats {
         lock(&self.state).insert((user_id, channel_id), now);
     }
 
-    /// Whether an entry exists at all, regardless of freshness. Production
-    /// code only ever needs [`Self::sweep_stale_at`]; this is for a test to
-    /// confirm a heartbeat was actually recorded.
+    /// Whether an entry exists at all, regardless of freshness. Read before
+    /// [`Self::record`] or [`Self::forget`] to tell a real join or hangup
+    /// (the entry's presence actually changed) from a routine refresh, which
+    /// is what lets the caller publish a live signal only on the transition
+    /// rather than on every heartbeat tick.
     pub fn contains(&self, user_id: UserId, channel_id: ChannelId) -> bool {
         lock(&self.state).contains_key(&(user_id, channel_id))
     }

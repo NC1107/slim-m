@@ -15,6 +15,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/dms.dart';
+import 'package:slimm_app/src/providers/live_events.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
 import 'package:slimm_data/data.dart';
@@ -48,44 +49,54 @@ Channel _dm(
 /// A container wired with a signed-in session and, when [onOpen] is given, an
 /// API client answering `POST /dms/self`. Tests that never tap the personal
 /// space row before it exists have nothing to answer, so [onOpen] stays null.
-ProviderContainer _container({void Function(http.Request request)? onOpen}) =>
-    ProviderContainer(
-      overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-        databaseProvider.overrideWith((ref) async {
-          final db = SlimmDatabase(NativeDatabase.memory());
-          ref.onDispose(db.close);
-          return db;
-        }),
-        apiProvider.overrideWith((ref) {
-          final client = api.SlimmApi(
-            baseUrl: Uri.parse('http://localhost:8080'),
-            session: ref.watch(sessionProvider),
-            httpClient: MockClient((request) async {
-              onOpen?.call(request);
-              return http.Response(
-                jsonEncode({
-                  'channel_id': 'dm-self',
-                  'user': {
-                    'id': 'self',
-                    'username': 'nick',
-                    'display_name': 'Nick',
-                    'created_at': 0,
-                  },
-                  'unread': 0,
-                  'created_at': 0,
-                }),
-                200,
-                headers: {'content-type': 'application/json'},
-              );
+ProviderContainer _container({
+  void Function(http.Request request)? onOpen,
+}) => ProviderContainer(
+  overrides: [
+    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+    sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+    // Without this, DmRow's voiceRosterProvider pulls in the real SyncController.
+    liveEventsProvider.overrideWithValue(const Stream.empty()),
+    databaseProvider.overrideWith((ref) async {
+      final db = SlimmDatabase(NativeDatabase.memory());
+      ref.onDispose(db.close);
+      return db;
+    }),
+    apiProvider.overrideWith((ref) {
+      final client = api.SlimmApi(
+        baseUrl: Uri.parse('http://localhost:8080'),
+        session: ref.watch(sessionProvider),
+        httpClient: MockClient((request) async {
+          onOpen?.call(request);
+          if (request.url.path.endsWith('/voice/roster')) {
+            return http.Response(
+              jsonEncode({'participants': <Object>[]}),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'channel_id': 'dm-self',
+              'user': {
+                'id': 'self',
+                'username': 'nick',
+                'display_name': 'Nick',
+                'created_at': 0,
+              },
+              'unread': 0,
+              'created_at': 0,
             }),
+            200,
+            headers: {'content-type': 'application/json'},
           );
-          ref.onDispose(client.close);
-          return client;
         }),
-      ],
-    );
+      );
+      ref.onDispose(client.close);
+      return client;
+    }),
+  ],
+);
 
 Widget _harness({
   required ProviderContainer container,
@@ -113,7 +124,6 @@ void main() {
     'the personal space row is always present, even with no DMs at all',
     (tester) async {
       final container = _container();
-      addTearDown(container.dispose);
       await tester.pumpWidget(_harness(container: container, channels: []));
 
       expect(
@@ -125,12 +135,13 @@ void main() {
         find.textContaining('Start one from the member list'),
         findsOneWidget,
       );
+      // Explicit: addTearDown runs after flutter_test's own pending-timer check.
+      container.dispose();
     },
   );
 
   testWidgets('a real DM channel renders as a row', (tester) async {
     final container = _container();
-    addTearDown(container.dispose);
     await tester.pumpWidget(
       _harness(container: container, channels: [_dm('dm-1', 'Priya')]),
     );
@@ -138,6 +149,7 @@ void main() {
     expect(find.text('Priya'), findsOneWidget);
     expect(find.text(personalSpaceName), findsOneWidget);
     expect(find.textContaining('Start one from the member list'), findsNothing);
+    container.dispose();
   });
 
   testWidgets(
@@ -145,7 +157,6 @@ void main() {
     'duplicated in the ordinary DM list',
     (tester) async {
       final container = _container();
-      addTearDown(container.dispose);
       await tester.pumpWidget(
         _harness(
           container: container,
@@ -158,6 +169,7 @@ void main() {
 
       expect(find.text(personalSpaceName), findsOneWidget);
       expect(find.text('Priya'), findsOneWidget);
+      container.dispose();
     },
   );
 
@@ -165,7 +177,6 @@ void main() {
       'personal space sentinel is not rendered, or navigable, as the '
       'personal space', (tester) async {
     final container = _container();
-    addTearDown(container.dispose);
 
     final router = GoRouter(
       initialLocation: '/',
@@ -206,11 +217,11 @@ void main() {
           'tapping the impostor row must open their own channel, never '
           'the caller\'s personal space',
     );
+    container.dispose();
   });
 
   testWidgets('an unread DM shows the unread marker', (tester) async {
     final container = _container();
-    addTearDown(container.dispose);
     await tester.pumpWidget(
       _harness(
         container: container,
@@ -219,11 +230,11 @@ void main() {
     );
 
     expect(find.byKey(AppListRow.unreadDotKey), findsOneWidget);
+    container.dispose();
   });
 
   testWidgets('tapping a DM opens its channel route', (tester) async {
     final container = _container();
-    addTearDown(container.dispose);
     final router = GoRouter(
       initialLocation: '/',
       routes: [
@@ -253,13 +264,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('channel:dm-1'), findsOneWidget);
+    container.dispose();
   });
 
   testWidgets('tapping the personal space row before it exists opens it and '
       'navigates straight there', (tester) async {
     final requests = <http.Request>[];
     final container = _container(onOpen: requests.add);
-    addTearDown(container.dispose);
 
     final router = GoRouter(
       initialLocation: '/',
@@ -289,13 +300,13 @@ void main() {
     expect(requests, hasLength(1));
     expect(requests.single.url.path, '/dms/self');
     expect(find.text('channel:dm-self'), findsOneWidget);
+    container.dispose();
   });
 
   testWidgets('tapping the personal space row once it already exists navigates '
       'straight there without opening it again', (tester) async {
     final requests = <http.Request>[];
     final container = _container(onOpen: requests.add);
-    addTearDown(container.dispose);
 
     final router = GoRouter(
       initialLocation: '/',
@@ -333,5 +344,6 @@ void main() {
       reason: 'an already-open personal space needs no round trip',
     );
     expect(find.text('channel:dm-self'), findsOneWidget);
+    container.dispose();
   });
 }

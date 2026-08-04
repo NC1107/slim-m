@@ -98,6 +98,8 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::CanvasCleared { .. }
         | Event::CanvasObjectsRestored { .. }
         | Event::SessionRevoked(_)
+        // Who is on a call changes no permission's answer.
+        | Event::VoiceActivityChanged { .. }
         // A category grants and denies nothing (docs/decisions/0006).
         | Event::CategoryChanged => false,
     }
@@ -260,6 +262,9 @@ mod epoch_tests {
             op_seq: None,
             channel_id: ChannelId::generate(),
             message_id: crate::ids::MessageId::generate(),
+        });
+        hub.publish(Event::VoiceActivityChanged {
+            channel_id: ChannelId::generate(),
         });
         assert_eq!(hub.permissions_epoch(), before);
     }

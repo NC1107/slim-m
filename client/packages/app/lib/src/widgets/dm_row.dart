@@ -2,6 +2,12 @@
 /// One direct-message row in the rail: open on tap, and a right-click or
 /// long-press menu to report or block the person on the other end of it.
 ///
+/// Also the in-app half of `docs/IMPLIED-GAPS.md` #2: a call already
+/// happening in this DM shows as an icon, kept current by
+/// `voiceRosterProvider`'s `voice.activity`-nudged poll, and tapping the row
+/// while it is lit opens straight into the call pane rather than the plain
+/// transcript.
+///
 /// There is deliberately no "close" or "hide this conversation" item here.
 /// Nothing backs one: `store/dms.rs` has no concept of leaving or archiving a
 /// DM, only `channel_scopes_moderation` and the generic channel routes this
@@ -22,7 +28,9 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/blocks_controller.dart';
+import '../providers/voice_roster.dart';
 import '../routing/routes.dart';
+import '../screens/dm_call_pane.dart' show dmCallOpenProvider;
 import 'context_menu_region.dart';
 import 'safety_actions.dart';
 
@@ -95,6 +103,11 @@ class DmRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    // The same per-channel roster VoiceChannelRow polls; self is already dropped.
+    final inCall =
+        ref.watch(voiceRosterProvider(channel.id)).valueOrNull?.isNotEmpty ??
+        false;
     return ContextMenuRegion(
       itemsBuilder: (menuContext, close) => _menuItems(menuContext, ref, close),
       // AppListRow is already its own tab stop; see ContextMenuFocus.ownsFocusNode.
@@ -104,7 +117,19 @@ class DmRow extends ConsumerWidget {
         selected: selected,
         unread: channel.cursor > channel.lastReadSeq,
         leading: AppAvatar(name: channel.name, size: 20),
-        onTap: () => context.go(Routes.channel(channel.id)),
+        trailing: inCall
+            ? Icon(
+                AppIcons.startCall,
+                size: AppSizes.icon16,
+                color: tokens.accent,
+              )
+            : null,
+        stateDescription: inCall ? 'call in progress' : null,
+        onTap: () {
+          // Opens straight into the call pane, the same double action RailCallSummary uses.
+          if (inCall) ref.read(dmCallOpenProvider.notifier).state = channel.id;
+          context.go(Routes.channel(channel.id));
+        },
       ),
     );
   }

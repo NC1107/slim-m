@@ -96,7 +96,7 @@ async fn forgetting_a_recorded_heartbeat_drops_it() {
         ))
         .await
         .unwrap();
-    assert!(voice.has_heartbeat_for_test(user_id, channel.id));
+    assert!(voice.has_heartbeat(user_id, channel.id));
 
     let response = app
         .oneshot(request(
@@ -107,7 +107,7 @@ async fn forgetting_a_recorded_heartbeat_drops_it() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
-    assert!(!voice.has_heartbeat_for_test(user_id, channel.id));
+    assert!(!voice.has_heartbeat(user_id, channel.id));
 }
 
 #[tokio::test]

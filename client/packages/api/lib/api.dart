@@ -69,6 +69,7 @@ export 'src/events.dart'
         ThreadUpdated,
         TypingStarted,
         TypingStopped,
+        VoiceActivityChanged,
         protocolVersion;
 export 'src/exceptions.dart';
 export 'src/limits.dart' show kMessageMaxChars;
