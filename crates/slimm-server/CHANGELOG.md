@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.28.0](https://github.com/NC1107/slim-m/compare/server-v0.27.1...server-v0.28.0) (2026-08-04)
+
+
+### Features
+
+* channel categories you can drag any channel into ([#355](https://github.com/NC1107/slim-m/issues/355)) ([b34cd78](https://github.com/NC1107/slim-m/commit/b34cd786656c10d9b6de150f947642cdb81ceb53))
+
+
+### Bug Fixes
+
+* **client:** name why a message failed to send, and refuse it before it does ([#345](https://github.com/NC1107/slim-m/issues/345)) ([e20e9ab](https://github.com/NC1107/slim-m/commit/e20e9ab922f8eb20889cb1aaff4ffb0fddcf13e8))
+
 ## [0.27.1](https://github.com/NC1107/slim-m/compare/server-v0.27.0...server-v0.27.1) (2026-08-03)
 
 
