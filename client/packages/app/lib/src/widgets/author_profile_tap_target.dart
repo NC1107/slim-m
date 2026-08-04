@@ -70,13 +70,13 @@ class AuthorProfileTapTarget extends ConsumerWidget {
       ),
     );
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: Semantics(
-        button: true,
-        label: semanticLabel,
-        excludeSemantics: true,
-        onTap: open,
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      excludeSemantics: true,
+      onTap: open,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
         child: GestureDetector(
           onTap: open,
           excludeFromSemantics: true,

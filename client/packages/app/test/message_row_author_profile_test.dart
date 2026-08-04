@@ -56,9 +56,7 @@ void main() {
   testWidgets('tapping the avatar opens the author\'s profile popover', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      harness(_row(), overrides: _resolvedProfile()),
-    );
+    await tester.pumpWidget(harness(_row(), overrides: _resolvedProfile()));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byType(AuthorAvatar));
@@ -68,9 +66,7 @@ void main() {
   });
 
   testWidgets('tapping the name opens the same popover', (tester) async {
-    await tester.pumpWidget(
-      harness(_row(), overrides: _resolvedProfile()),
-    );
+    await tester.pumpWidget(harness(_row(), overrides: _resolvedProfile()));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Priya').first);
@@ -131,30 +127,43 @@ void main() {
 
         await tester.pumpWidget(
           harness(
-            Column(
-              children: [_row(), const Text('Unrelated sibling text')],
-            ),
+            Column(children: [_row(), const Text('Unrelated sibling text')]),
             overrides: _resolvedProfile(),
           ),
         );
         await tester.pumpAndSettle();
 
         // ignore: deprecated_member_use
-        final dump = tester.binding.pipelineOwner.semanticsOwner!
+        final dump = tester
+            .binding
+            .pipelineOwner
+            .semanticsOwner!
             .rootSemanticsNode!
             .toStringDeep();
 
+        final avatarNode = tester.getSemantics(
+          find.byType(AuthorProfileTapTarget).at(0),
+        );
+        final nameNode = tester.getSemantics(
+          find.byType(AuthorProfileTapTarget).at(1),
+        );
+
         expect(
-          'View profile'.allMatches(dump).length,
-          1,
+          avatarNode.label,
+          'View profile',
           reason:
-              'exactly the avatar, one node - a second occurrence would '
-              'mean it (or the name) bled its label somewhere else',
+              'a merge with AppAvatar\'s own "Priya" label would still '
+              'contain this substring, which is why this checks the whole '
+              'label rather than merely that it appears',
+        );
+        expect(nameNode.label, 'Priya, view profile');
+        expect(
+          avatarNode.getSemanticsData().hasAction(SemanticsAction.tap),
+          isTrue,
         );
         expect(
-          'Priya, view profile'.allMatches(dump).length,
-          1,
-          reason: 'exactly the name, one node',
+          nameNode.getSemanticsData().hasAction(SemanticsAction.tap),
+          isTrue,
         );
         expect(
           dump,
@@ -163,18 +172,6 @@ void main() {
               'the sibling keeps its own untouched label rather than losing '
               'it to a merge, the exact shape "54, the resize bar" found',
         );
-        expect(
-          dump.contains('Unrelated sibling textView profile') ||
-              dump.contains('Unrelated sibling textPriya, view profile'),
-          isFalse,
-          reason: 'the bled-label shape itself: a foreign label appended '
-              'onto this unrelated node',
-        );
-
-        final avatarNode = tester.getSemantics(
-          find.byType(AuthorProfileTapTarget).first,
-        );
-        expect(avatarNode.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
 
         semantics.dispose();
       },

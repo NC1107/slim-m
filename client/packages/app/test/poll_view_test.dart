@@ -171,31 +171,31 @@ void main() {
         await tester.pumpWidget(_app(_poll(votes: const [0, 0])));
 
         final layers = _fillLayers(tester, 'Option 0');
-        expect(layers.map((c) => c.color), contains(AppTokens.light.borderSubtle));
+        expect(
+          layers.map((c) => c.color),
+          contains(AppTokens.light.borderSubtle),
+        );
       },
     );
 
-    test(
-      'the track and an ordinary fill differ enough in greyscale luma to '
-      'read by contrast alone, in every theme',
-      () {
-        for (final tokens in [
-          AppTokens.light,
-          AppTokens.dark,
-          AppTokens.trueBlack,
-        ]) {
-          final delta = (_luma(tokens.borderStrong) - _luma(tokens.borderSubtle))
-              .abs();
-          expect(
-            delta,
-            greaterThan(0.03),
-            reason:
-                'below this a fill reads the same as its track to anyone who '
-                'cannot use the hue difference, which is exactly the '
-                'complaint the percentage-only bars drew',
-          );
-        }
-      },
-    );
+    test('the track and an ordinary fill differ enough in greyscale luma to '
+        'read by contrast alone, in every theme', () {
+      for (final tokens in [
+        AppTokens.light,
+        AppTokens.dark,
+        AppTokens.trueBlack,
+      ]) {
+        final delta = (_luma(tokens.borderStrong) - _luma(tokens.borderSubtle))
+            .abs();
+        expect(
+          delta,
+          greaterThan(0.03),
+          reason:
+              'below this a fill reads the same as its track to anyone who '
+              'cannot use the hue difference, which is exactly the '
+              'complaint the percentage-only bars drew',
+        );
+      }
+    });
   });
 }
