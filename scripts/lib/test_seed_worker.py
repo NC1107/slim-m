@@ -15,9 +15,16 @@ from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import seed_actions  # noqa: E402
 import seed_ollama  # noqa: E402
 import seed_state  # noqa: E402
 import seed_worker  # noqa: E402
+
+
+class HandlersTest(unittest.TestCase):
+    def test_every_weighted_action_has_a_handler(self):
+        names = {name for name, _weight in seed_actions.ACTIONS}
+        self.assertEqual(names, set(seed_worker.HANDLERS))
 
 
 def _ctx(corpus=None, api=None):
@@ -79,6 +86,14 @@ class HandlerDrawsFromCorpusTest(unittest.TestCase):
         seed_worker.handle_message_code_block(ctx)
         sent = ctx.api.send_message.call_args[0][1]
         self.assertIn("```", sent)
+
+
+class LinkHandlerTest(unittest.TestCase):
+    def test_sends_a_message_containing_a_link(self):
+        ctx = _ctx()
+        seed_worker.handle_message_link(ctx)
+        sent = ctx.api.send_message.call_args[0][1]
+        self.assertIn("https://", sent)
 
 
 if __name__ == "__main__":

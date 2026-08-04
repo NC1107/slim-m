@@ -16,28 +16,65 @@ import secrets
 import sys
 import tempfile
 
-import e2e_fixtures
 import seed_accounts
 import seed_guard
+import seed_media
 import seed_ollama
 import seed_state
 import seed_worker
 
-_FIXTURE_VARIANTS = (
-    ("seed-photo.png", 120, 80, (27, 111, 145)),
-    ("seed-diagram.png", 200, 60, (216, 88, 55)),
-    ("seed-icon.png", 32, 32, (88, 216, 120)),
-)
 _PACE_RANGE = (0.3, 1.5)
 
+# Wide, tall, small, a medium "screenshot", then one near the upload ceiling.
+_IMAGE_SPECS = (
+    ("seed-banner.png", lambda p, rng: seed_media.gradient_png(
+        p, 1600, 360, (27, 111, 145), (216, 88, 55), axis="x")),
+    ("seed-poster.png", lambda p, rng: seed_media.gradient_png(
+        p, 360, 1600, (88, 180, 216), (33, 33, 46), axis="y")),
+    ("seed-icon.png", lambda p, rng: seed_media.checkerboard_png(
+        p, 40, 40, (88, 216, 120), (20, 40, 30), cell=5)),
+    ("seed-screenshot.png", lambda p, rng: seed_media.rings_png(
+        p, 640, 360, (216, 88, 55), (245, 230, 200), ring_width=18)),
+    ("seed-large-photo.png", lambda p, rng: seed_media.noise_png(
+        p, 2000, 1400, rng)),
+)
+_PDF_TITLE = "Release notes - overnight sync"
+_PDF_LINES = (
+    "Fixed the reconnect loop dropping the last few messages.",
+    "Added retry with backoff on the push relay client.",
+    "Bumped the SQLite busy timeout to 5 seconds.",
+    "Known issue: screen share on Wayland still needs a manual source id.",
+    "Next up: paginate the report queue past 200 entries.",
+)
 
-def _build_fixtures(scratch_dir):
+
+def _build_fixtures(scratch_dir, seed):
+    """Every attachment fixture the run may pick from `send_attachment`:
+    five PNGs (see `_IMAGE_SPECS`) plus one PDF.
+
+    `seed-large-photo.png` targets roughly 8 MiB (80% of
+    `default_attachment_max_bytes` in `crates/slimm-server/src/config.rs`),
+    near a live deployment's per-upload ceiling without risking a 413 on one
+    that has not raised `SLIMM_ATTACHMENT_MAX_BYTES` past that default.
+    Nothing here is a file the server would refuse: see
+    `scripts/seed-data.py`'s module doc for the real allowed set, sniffed
+    from bytes rather than filename or declared type, and why a log, a CSV,
+    or an archive cannot join this pool as a genuine attachment.
+
+    `seed` makes the noise image reproducible under `--seed`, the same as
+    every other generated fixture and every generated message.
+    """
+    rng = random.Random(f"{seed}-fixtures")
     fixtures = []
-    for filename, width, height, rgb in _FIXTURE_VARIANTS:
+    for filename, build in _IMAGE_SPECS:
         path = os.path.join(scratch_dir, filename)
-        e2e_fixtures.png(path, width, height, rgb)
+        build(path, rng)
         with open(path, "rb") as handle:
             fixtures.append((handle.read(), "image/png", filename))
+    pdf_path = os.path.join(scratch_dir, "seed-notes.pdf")
+    seed_media.pdf(pdf_path, _PDF_TITLE, _PDF_LINES)
+    with open(pdf_path, "rb") as handle:
+        fixtures.append((handle.read(), "application/pdf", "seed-notes.pdf"))
     return fixtures
 
 
@@ -88,7 +125,7 @@ def run(args):
             args.ollama_model or seed_ollama.DEFAULT_MODEL, base_seed)
 
     with tempfile.TemporaryDirectory(prefix="slimm-seed-") as scratch:
-        fixtures = _build_fixtures(scratch)
+        fixtures = _build_fixtures(scratch, base_seed)
         state = seed_state.SeedState()
         contexts = [
             seed_worker.WorkerContext(

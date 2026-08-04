@@ -15,6 +15,7 @@ ACTIONS = (
     ("message_code_block", 5),
     ("message_mention", 8),
     ("message_near_limit", 2),
+    ("message_link", 6),
     ("burst", 6),
     ("reply", 10),
     ("open_thread", 4),
