@@ -77,6 +77,31 @@ impl Store {
         Ok(users)
     }
 
+    /// The live ids behind a batch of usernames, exact case-sensitive match
+    /// (the same comparison a login already makes), for resolving a message's
+    /// `@name` mentions to accounts. A name with nobody live behind it -
+    /// never registered, or deleted - is simply absent, the same contract
+    /// [`Store::user_profiles`] has for an id.
+    pub async fn user_ids_for_usernames(
+        &self,
+        usernames: &[String],
+    ) -> anyhow::Result<Vec<UserId>> {
+        if usernames.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut builder =
+            QueryBuilder::new("SELECT id FROM users WHERE deleted_at IS NULL AND username IN (");
+        let mut separated = builder.separated(", ");
+        for name in usernames {
+            separated.push_bind(name);
+        }
+        builder.push(")");
+
+        let ids: Vec<UserId> = builder.build_query_scalar().fetch_all(&self.pool).await?;
+        Ok(ids)
+    }
+
     /// Updates the caller's own display name. Username is not updatable
     /// here: it backs the live per-account uniqueness index
     /// (`users_username_live`), and changing it needs a dedicated flow that

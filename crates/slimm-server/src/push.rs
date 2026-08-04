@@ -148,27 +148,24 @@ impl PushSender {
     /// the caller. The debounce is not decided here: it needs to know who the
     /// recipients are first, so it is evaluated inside that task instead (see
     /// [`Debounce`]).
-    pub fn notify_message(
-        &self,
-        store: Store,
-        channel_id: ChannelId,
-        author_id: UserId,
-        message_id: MessageId,
-        seq: Seq,
-    ) {
+    pub fn notify_message(&self, store: Store, sent: SentMessage) {
         let Some(enabled) = self.inner.clone() else {
             return;
         };
-        tokio::spawn(deliver(
-            enabled,
-            self.debounce.clone(),
-            store,
-            channel_id,
-            author_id,
-            message_id,
-            seq,
-        ));
+        tokio::spawn(deliver(enabled, self.debounce.clone(), store, sent));
     }
+}
+
+/// What [`PushSender::notify_message`] needs to know about a message that was
+/// just committed, bundled rather than five positional arguments: `content`
+/// is read only to resolve `@`-mentions for [`message_recipients`]'s thread
+/// narrowing, and is never itself put on the wire to a relay.
+pub struct SentMessage {
+    pub channel_id: ChannelId,
+    pub author_id: UserId,
+    pub message_id: MessageId,
+    pub seq: Seq,
+    pub content: String,
 }
 
 /// The background half of [`PushSender::notify_message`]. Every error path
@@ -197,16 +194,15 @@ impl PushSender {
 /// the status vocabulary. It is handled as any other inactionable status rather
 /// than crashing or misrouting, but logged, since it should never happen
 /// against a relay built from the documented contract.
-async fn deliver(
-    enabled: Arc<Enabled>,
-    debounce: Arc<Debounce>,
-    store: Store,
-    channel_id: ChannelId,
-    author_id: UserId,
-    message_id: MessageId,
-    seq: Seq,
-) {
-    let recipients = match message_recipients(&store, channel_id, author_id).await {
+async fn deliver(enabled: Arc<Enabled>, debounce: Arc<Debounce>, store: Store, sent: SentMessage) {
+    let SentMessage {
+        channel_id,
+        author_id,
+        message_id,
+        seq,
+        content,
+    } = sent;
+    let recipients = match message_recipients(&store, channel_id, author_id, &content).await {
         Ok(recipients) => recipients,
         Err(err) => {
             tracing::warn!(error = %err, %channel_id, "push: failed to resolve recipients");

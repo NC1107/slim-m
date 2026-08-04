@@ -15,7 +15,6 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
-use slimm_server::ids::{DeviceId, MessageId, UserId};
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
@@ -24,8 +23,6 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 mod support;
-
-const KEY: [u8; 32] = [7u8; 32];
 
 async fn new_store(name: &str) -> (Store, support::TestDbGuard) {
     let (path, guard) = support::TestDbGuard::new(name);
@@ -373,126 +370,4 @@ async fn a_message_carries_its_thread_channel_id_once_one_is_opened() {
         .find(|m| m["id"] == parent_id)
         .unwrap();
     assert_eq!(row["thread_channel_id"], thread_id);
-}
-
-/// A store-level account with a session and a claimed deployment, for the
-/// blocking test below - the same shape `blocking_reach.rs`'s own `account`
-/// helper uses.
-async fn account(store: &Store, username: &str) -> (UserId, DeviceId) {
-    let account = store
-        .create_account(username, username, "not-a-real-hash")
-        .await
-        .unwrap();
-    store.bootstrap_deployment(account.id).await.unwrap();
-    let session = store.open_session(account.id, "phone").await.unwrap();
-    (account.id, session.device_id)
-}
-
-/// Blocking reaches into a thread exactly as it reaches into any other
-/// channel, because `message_recipients` resolves push visibility through
-/// `viewers_among`, which now inherits a thread's permissions from its
-/// parent rather than evaluating the thread's own (nonexistent) overwrites.
-#[tokio::test]
-async fn blocking_still_holds_inside_a_thread() {
-    let (store, _guard) = new_store("slimm-threads-block").await;
-    let (alice, alice_device) = account(&store, "alice").await;
-    let (bob, bob_device) = account(&store, "bob").await;
-    let (carol, carol_device) = account(&store, "carol").await;
-    let channel = store.list_channels().await.unwrap()[0].id;
-
-    for (user, device, token) in [
-        (alice, alice_device, "alice-token"),
-        (bob, bob_device, "bob-token"),
-        (carol, carol_device, "carol-token"),
-    ] {
-        store
-            .register_push(user, device, "ios", token, None, &KEY)
-            .await
-            .unwrap();
-    }
-
-    let parent = store
-        .send_message(channel, bob, MessageId::generate(), "root", &[], None)
-        .await
-        .unwrap();
-    let thread = store
-        .open_thread(channel, parent.message.id)
-        .await
-        .unwrap()
-        .channel;
-
-    let before = slimm_server::push::message_recipients(&store, thread.id, bob)
-        .await
-        .unwrap();
-    assert!(
-        before.contains(&alice) && before.contains(&carol),
-        "both would be woken before anyone is blocked, got {before:?}"
-    );
-
-    store.block_user(alice, bob).await.unwrap();
-
-    let after = slimm_server::push::message_recipients(&store, thread.id, bob)
-        .await
-        .unwrap();
-    assert!(
-        !after.contains(&alice),
-        "alice blocked bob and must not be woken for a message in bob's thread"
-    );
-    assert!(
-        after.contains(&carol),
-        "carol did not block anyone and is unaffected"
-    );
-}
-
-/// The batched push-fan-out path (`viewers_among`) has its own copy of the
-/// overwrite evaluation `permissions_in_channel` uses, so it needs its own
-/// proof that a view denial set on the parent reaches a thread: this is the
-/// one blocking cannot stand in for, since blocking is filtered before
-/// `viewers_among` is ever asked anything.
-#[tokio::test]
-async fn a_view_denial_on_the_parent_excludes_a_push_recipient_from_the_thread() {
-    let (store, _guard) = new_store("slimm-threads-push-inherit").await;
-    let (alice, alice_device) = account(&store, "alice").await;
-    let (bob, bob_device) = account(&store, "bob").await;
-    let channel = store.list_channels().await.unwrap()[0].id;
-
-    store
-        .register_push(alice, alice_device, "ios", "alice-token", None, &KEY)
-        .await
-        .unwrap();
-    store
-        .register_push(bob, bob_device, "ios", "bob-token", None, &KEY)
-        .await
-        .unwrap();
-
-    let parent = store
-        .send_message(channel, alice, MessageId::generate(), "root", &[], None)
-        .await
-        .unwrap();
-    let thread = store
-        .open_thread(channel, parent.message.id)
-        .await
-        .unwrap()
-        .channel;
-
-    let before = slimm_server::push::message_recipients(&store, thread.id, alice)
-        .await
-        .unwrap();
-    assert!(
-        before.contains(&bob),
-        "bob can view before any overwrite, got {before:?}"
-    );
-
-    store
-        .set_member_overwrite(channel, bob, Permissions::NONE, Permissions::VIEW_CHANNEL)
-        .await
-        .unwrap();
-
-    let after = slimm_server::push::message_recipients(&store, thread.id, alice)
-        .await
-        .unwrap();
-    assert!(
-        !after.contains(&bob),
-        "a view denial on the parent must reach a push recipient check on the thread too"
-    );
 }

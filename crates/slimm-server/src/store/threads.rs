@@ -13,8 +13,10 @@
 //! there is no synthesized overwrite and no copy of the parent's bits to go
 //! stale.
 
+use std::collections::HashSet;
+
 use super::{Channel, Store, now_ms};
-use crate::ids::{ChannelId, MessageId};
+use crate::ids::{ChannelId, MessageId, UserId};
 
 /// Why opening a thread failed.
 #[derive(Debug)]
@@ -172,6 +174,43 @@ impl Store {
             parent_channel_id: parent_channel.id,
             parent_message_id,
         }))
+    }
+
+    /// Who has a stake in `thread_channel_id`'s own conversation, derived
+    /// entirely from rows that already exist: the parent message's author
+    /// (even before anyone has replied, so the very first reply still wakes
+    /// somebody) and every distinct author who has ever sent into the
+    /// thread's own channel, including one whose only message there was
+    /// later deleted - deleting content does not undo having taken part.
+    /// This is push's own notion of audience, not a permission: read access
+    /// still resolves through [`Store::permission_channel`] exactly as
+    /// before, this only ever narrows who is woken among people already
+    /// allowed to see the thread.
+    pub async fn thread_participants(
+        &self,
+        thread_channel_id: ChannelId,
+        parent_message_id: MessageId,
+    ) -> anyhow::Result<HashSet<UserId>> {
+        let mut participants = HashSet::new();
+        let parent_author: Option<UserId> = sqlx::query_scalar!(
+            r#"SELECT author_id AS "author_id: UserId" FROM messages WHERE id = ?"#,
+            parent_message_id
+        )
+        .fetch_optional(&self.pool)
+        .await?
+        .flatten();
+        participants.extend(parent_author);
+
+        let repliers: Vec<UserId> = sqlx::query_scalar!(
+            r#"SELECT DISTINCT author_id AS "author_id!: UserId" FROM messages
+               WHERE channel_id = ? AND author_id IS NOT NULL"#,
+            thread_channel_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        participants.extend(repliers);
+
+        Ok(participants)
     }
 
     /// Which of `message_ids` already has a live thread, and how many
