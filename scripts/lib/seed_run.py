@@ -20,6 +20,7 @@ import seed_accounts
 import seed_guard
 import seed_media
 import seed_ollama
+import seed_settle
 import seed_state
 import seed_worker
 
@@ -46,11 +47,23 @@ _PDF_LINES = (
     "Known issue: screen share on Wayland still needs a manual source id.",
     "Next up: paginate the report queue past 200 entries.",
 )
+_LOG_LINES = (
+    "2026-08-04T02:11:03Z INFO  slimm_server: listening on 0.0.0.0:8080",
+    "2026-08-04T02:11:04Z INFO  slimm_server::db: applied 24 migrations",
+    "2026-08-04T02:14:22Z WARN  slimm_server::push: relay unreachable, retrying in 5s",
+    "2026-08-04T02:14:27Z INFO  slimm_server::push: relay reachable again",
+    "2026-08-04T02:20:11Z INFO  slimm_server::voice: sweep removed 1 stale participant",
+)
+_ARCHIVE_ENTRIES = (
+    ("README.txt", b"Overnight sync notes.\nSee CHANGELOG for details.\n"),
+    ("config.json", b'{"retries": 3, "timeout_ms": 5000}\n'),
+)
 
 
 def _build_fixtures(scratch_dir, seed):
     """Every attachment fixture the run may pick from `send_attachment`:
-    five PNGs (see `_IMAGE_SPECS`) plus one PDF.
+    five PNGs (see `_IMAGE_SPECS`), one PDF, a text log, a zip archive, a
+    WAV tone, and - when ffmpeg is on `PATH` - a short real mp4 clip.
 
     `seed-large-photo.png` targets roughly 8 MiB (80% of
     `default_attachment_max_bytes` in `crates/slimm-server/src/config.rs`),
@@ -58,11 +71,12 @@ def _build_fixtures(scratch_dir, seed):
     that has not raised `SLIMM_ATTACHMENT_MAX_BYTES` past that default.
     Nothing here is a file the server would refuse: see
     `scripts/seed-data.py`'s module doc for the real allowed set, sniffed
-    from bytes rather than filename or declared type, and why a log, a CSV,
-    or an archive cannot join this pool as a genuine attachment.
+    from bytes rather than filename or declared type. Everything but the
+    mp4 is stdlib-only and so always present; the mp4 is skipped with a
+    printed reason, never a failure, when ffmpeg is not installed.
 
-    `seed` makes the noise image reproducible under `--seed`, the same as
-    every other generated fixture and every generated message.
+    `seed` makes the noise image and the wav tone reproducible under
+    `--seed`, the same as every other generated fixture and message.
     """
     rng = random.Random(f"{seed}-fixtures")
     fixtures = []
@@ -71,10 +85,35 @@ def _build_fixtures(scratch_dir, seed):
         build(path, rng)
         with open(path, "rb") as handle:
             fixtures.append((handle.read(), "image/png", filename))
+
     pdf_path = os.path.join(scratch_dir, "seed-notes.pdf")
     seed_media.pdf(pdf_path, _PDF_TITLE, _PDF_LINES)
     with open(pdf_path, "rb") as handle:
         fixtures.append((handle.read(), "application/pdf", "seed-notes.pdf"))
+
+    log_path = os.path.join(scratch_dir, "server.log")
+    seed_media.plain_text(log_path, _LOG_LINES)
+    with open(log_path, "rb") as handle:
+        fixtures.append((handle.read(), "text/plain", "server.log"))
+
+    zip_path = os.path.join(scratch_dir, "sync-notes.zip")
+    seed_media.zip_archive(zip_path, _ARCHIVE_ENTRIES)
+    with open(zip_path, "rb") as handle:
+        fixtures.append((handle.read(), "application/zip", "sync-notes.zip"))
+
+    wav_path = os.path.join(scratch_dir, "seed-tone.wav")
+    seed_media.wav_tone(wav_path, rng)
+    with open(wav_path, "rb") as handle:
+        fixtures.append((handle.read(), "audio/wav", "seed-tone.wav"))
+
+    if seed_media.ffmpeg_available():
+        mp4_path = os.path.join(scratch_dir, "seed-clip.mp4")
+        seed_media.mp4_clip(mp4_path)
+        with open(mp4_path, "rb") as handle:
+            fixtures.append((handle.read(), "video/mp4", "seed-clip.mp4"))
+    else:
+        print("seed-data: ffmpeg not on PATH, skipping the video/mp4 fixture")
+
     return fixtures
 
 
@@ -148,6 +187,8 @@ def run(args):
             for future in concurrent.futures.as_completed(futures):
                 results.append(future.result())
 
+        results.append(seed_settle.run(contexts, state, random.Random(f"{base_seed}-settle")))
+
     _report(base_url, channel, channel_name, usernames, password, state, results, corpus)
     return 0
 
@@ -173,12 +214,24 @@ def _report(base_url, channel, channel_name, usernames, password, state, results
             totals[name] = totals.get(name, 0) + count
         failures.extend(worker_failures)
 
+    coverage_hits = totals.pop("settle_coverage_hits", None)
+    coverage_targets = totals.pop("settle_coverage_targets", None)
+
     print(f"seeded {base_url}")
     print(f"channel: {channel_name!r} ({channel['id']})")
     print(f"accounts ({len(usernames)}): {', '.join(usernames)}")
     print(f"shared password: {password}")
     print(_describe_corpus(corpus))
     print(f"created: {state.counts()}")
+    recency = state.recency_stats()
+    if recency["rate"] is not None:
+        print(f"target selection favoured recent messages/threads "
+              f"{recency['rate']:.0%} of the time "
+              f"({recency['from_recent_window']}/{recency['draws']} draws), "
+              f"see seed_state.RECENCY_BIAS")
+    if coverage_targets:
+        print(f"settle pass: {coverage_hits}/{coverage_targets} of the newest "
+              f"messages carry a reaction ({coverage_hits / coverage_targets:.0%})")
     print("actions performed:")
     for name in sorted(totals):
         print(f"  {name}: {totals[name]}")

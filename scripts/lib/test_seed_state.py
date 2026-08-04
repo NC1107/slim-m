@@ -65,6 +65,95 @@ class SeedStateTest(unittest.TestCase):
         state.add_thread("m1", "thread-1")
         self.assertEqual(state.counts(), {"top_messages": 2, "threads": 1})
 
+    def test_newest_top_messages_is_a_fixed_tail_slice(self):
+        state = seed_state.SeedState()
+        for i in range(10):
+            state.add_top_message(f"m{i}", "c1", "alice")
+        newest = state.newest_top_messages(3)
+        self.assertEqual([m["id"] for m in newest], ["m7", "m8", "m9"])
+
+    def test_newest_top_messages_is_never_more_than_the_whole_pool(self):
+        state = seed_state.SeedState()
+        state.add_top_message("m1", "c1", "alice")
+        self.assertEqual(len(state.newest_top_messages(100)), 1)
+
+    def test_newest_threads_is_a_fixed_tail_slice(self):
+        state = seed_state.SeedState()
+        for i in range(5):
+            state.add_thread(f"parent-{i}", f"thread-{i}")
+        newest = state.newest_threads(2)
+        self.assertEqual(newest, [("parent-3", "thread-3"), ("parent-4", "thread-4")])
+
+
+class RecencyChoiceTest(unittest.TestCase):
+    """`_recency_choice` in isolation: no lock, no `SeedState`, just the
+    weighting a caller with a plain list can check directly."""
+
+    def test_an_empty_pool_offers_nothing(self):
+        entry, from_recent = seed_state._recency_choice(random.Random(0), [])
+        self.assertIsNone(entry)
+        self.assertFalse(from_recent)
+
+    def test_most_draws_land_in_the_recent_window_not_a_hard_cutoff(self):
+        pool = list(range(500))
+        rng = random.Random(7)
+        picks = [seed_state._recency_choice(rng, pool)[0] for _ in range(4000)]
+        in_window = sum(1 for p in picks if p >= 500 - seed_state.RECENT_WINDOW)
+        rate = in_window / len(picks)
+        self.assertGreater(rate, 0.7)
+        self.assertLess(rate, 0.95)
+
+    def test_the_long_tail_can_still_revive_old_entries(self):
+        """Not a hard cutoff: over enough draws, plenty of entries older
+        than the recent window still get picked at least once each - no
+        single old id is guaranteed by any one draw, so this checks the
+        tail as a whole rather than pinning one index."""
+        pool = list(range(500))
+        cutoff = 500 - seed_state.RECENT_WINDOW
+        rng = random.Random(7)
+        picks = {seed_state._recency_choice(rng, pool)[0] for _ in range(4000)}
+        old_picks = {p for p in picks if p < cutoff}
+        self.assertGreater(len(old_picks), cutoff // 2)
+
+
+class RecencyStatsTest(unittest.TestCase):
+    def test_a_fresh_state_reports_no_draws_yet(self):
+        state = seed_state.SeedState()
+        self.assertEqual(
+            state.recency_stats(), {"draws": 0, "from_recent_window": 0, "rate": None})
+
+    def test_every_real_pick_is_counted_and_the_rate_matches_the_hits(self):
+        state = seed_state.SeedState()
+        for i in range(200):
+            state.add_top_message(f"m{i}", "c1", "alice")
+        rng = random.Random(3)
+        for _ in range(300):
+            state.random_top_message(rng)
+        stats = state.recency_stats()
+        self.assertEqual(stats["draws"], 300)
+        self.assertGreater(stats["from_recent_window"], 0)
+        self.assertAlmostEqual(
+            stats["rate"], stats["from_recent_window"] / stats["draws"])
+
+    def test_a_draw_against_an_empty_pool_is_not_counted(self):
+        state = seed_state.SeedState()
+        rng = random.Random(0)
+        state.random_top_message(rng)  # nothing to draw yet
+        self.assertEqual(state.recency_stats()["draws"], 0)
+
+    def test_reply_in_thread_favours_recently_opened_threads(self):
+        """`random_thread` biases the same way as messages, which is what
+        keeps a `reply_in_thread` draw landing on a thread that just opened
+        rather than one from early in the run."""
+        state = seed_state.SeedState()
+        for i in range(80):
+            state.add_thread(f"parent-{i}", f"thread-{i}")
+        rng = random.Random(11)
+        picks = [state.random_thread(rng)[1] for _ in range(2000)]
+        recent_ids = {f"thread-{i}" for i in range(80 - seed_state.RECENT_WINDOW, 80)}
+        recent_hits = sum(1 for p in picks if p in recent_ids)
+        self.assertGreater(recent_hits / len(picks), 0.7)
+
 
 if __name__ == "__main__":
     unittest.main()

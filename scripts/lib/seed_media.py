@@ -3,8 +3,9 @@
 
 Everything here is a real, structurally valid file, generated in-process
 rather than committed as a binary: the server sniffs content type from bytes
-(`crates/slimm-server/src/media.rs`), never from a filename or a declared
-Content-Type, so anything not a genuine PNG or PDF is simply refused.
+(`crates/slimm-server/src/media/content_type.rs`), never from a filename or a
+declared Content-Type, so anything not genuinely one of the allowed types is
+simply refused.
 
 Every PNG below is a real RGB8, non-interlaced image with actual pixel
 variation - a gradient, a checkerboard, concentric rings, or noise - never a
@@ -12,9 +13,18 @@ single flat fill, so a transcript of several reads as visibly different
 attachments rather than four identical swatches. The PDF is a minimal but
 real one: a Catalog, a Pages tree, one Page, a Type1 font, a content stream,
 and a byte-accurate xref table, not just a `%PDF-` prefix glued onto other
-bytes.
+bytes. `plain_text` and `zip_archive` are stdlib-only and always available;
+`wav_tone` is a real PCM sine wave, also stdlib-only (Python's own `wave`
+module writes a valid `RIFF`/`WAVE` header, no encoder needed). `mp4_clip`
+is the one generator that needs an external tool - see its own doc comment
+for why that is safe to depend on here and not elsewhere in this project.
 """
+import math
+import shutil
 import struct
+import subprocess
+import wave
+import zipfile
 import zlib
 from pathlib import Path
 
@@ -158,3 +168,69 @@ def pdf(path, title, lines):
 
     Path(path).write_bytes(bytes(out))
     return len(out)
+
+
+def plain_text(path, lines):
+    """A real UTF-8 text file - the server's own last-resort content-type
+    fallback for anything with no magic bytes of its own (see
+    `content_type.rs`'s `is_plain_text`), so this is the one fixture that
+    needs no structure beyond being genuinely readable text."""
+    data = "\n".join(lines).encode("utf-8")
+    Path(path).write_bytes(data)
+    return len(data)
+
+
+def zip_archive(path, entries):
+    """A real zip archive: `entries` is `[(name, content_bytes), ...]`."""
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, content in entries:
+            archive.writestr(name, content)
+    return Path(path).stat().st_size
+
+
+def wav_tone(path, rng, seconds=2, sample_rate=8000, freq=440):
+    """A real, structurally valid mono 16-bit PCM WAV: a sine tone with a
+    little per-sample jitter so it is not one repeating cycle.
+
+    Stdlib-only: the `wave` module writes a real `RIFF`/`WAVE` header and
+    frame data with no external encoder, unlike the compressed formats
+    (`audio/mpeg`, `audio/ogg`) the server also allows.
+    """
+    amplitude = 12000
+    frames = bytearray()
+    for i in range(int(seconds * sample_rate)):
+        t = i / sample_rate
+        sample = amplitude * math.sin(2 * math.pi * freq * t) + rng.uniform(-200, 200)
+        frames += struct.pack("<h", int(max(-32768, min(32767, sample))))
+    with wave.open(str(path), "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(bytes(frames))
+    return Path(path).stat().st_size
+
+
+def ffmpeg_available():
+    """Whether an `ffmpeg` binary is on `PATH`, checked once so `mp4_clip`
+    can be skipped cleanly rather than raising past a caller expecting it."""
+    return shutil.which("ffmpeg") is not None
+
+
+def mp4_clip(path, seconds=2, width=320, height=240):
+    """A short, genuinely valid H.264 mp4 via ffmpeg's own synthetic test
+    source - no committed binary, no video codec written by hand.
+
+    This is the one generator here with an external dependency, and it is
+    a system binary invoked through `subprocess`, never a Python package:
+    CLAUDE.md's stdlib-only rule for these scripts is about not adding a
+    pip step to CI, which a subprocess call does not do. Callers must check
+    `ffmpeg_available()` first and skip with a printed reason when it is
+    absent, since a self-host running this script may not have ffmpeg
+    installed and that must not fail the run.
+    """
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i",
+         f"testsrc=duration={seconds}:size={width}x{height}:rate=15",
+         "-pix_fmt", "yuv420p", "-t", str(seconds), str(path)],
+        check=True, capture_output=True)
+    return Path(path).stat().st_size

@@ -7,25 +7,33 @@ acting in parallel: short and long messages, emoji, markdown, real code
 functions across several languages, links (video, article, image, repo),
 mentions, polls, attachments, replies, threads, reactions, edits, deletes,
 and pins, picked at random from a weighted set so the result reads like an
-uneven real conversation rather than a uniform sample. Drives plain REST,
+uneven real conversation rather than a uniform sample. Target selection for
+reactions and threads is recency-weighted (see scripts/lib/seed_state.py)
+and a settle pass at the end (scripts/lib/seed_settle.py) puts fresh
+activity on the newest slice specifically, so the screenful anyone actually
+opens a channel to look at is not the barest part of it. Drives plain REST,
 reusing scripts/lib/e2e_api.py rather than a second HTTP client.
 
 The server's attachment upload sniffs content type from the bytes it is
 given, never from a filename or a declared Content-Type header (see
-crates/slimm-server/src/media.rs's ALLOWED_TYPES) - and the real allowed
-set is exactly five entries: image/png, image/jpeg, image/gif, image/webp,
-and application/pdf. Nothing else can be attached at all: a plain-text
-file, a CSV, a log, an archive, or source code sent raw all get a 400
-"unsupported attachment type" regardless of extension. scripts/lib/
-seed_media.py generates real, varied PNGs (wide, tall, small, a medium
-"screenshot", and one near the default per-upload ceiling) and one
-genuinely structured PDF; there is deliberately no attempt at any other
-file kind, and large code and log-shaped reference content instead rides
-message text as fenced code blocks, which the server has no format
-restriction on at all. Video is covered by links only (see
-scripts/lib/seed_links.py) rather than a generated file: this script has
-no video codec available without a new dependency, and CLAUDE.md asks for
-that tradeoff to be stated rather than silently skipped.
+crates/slimm-server/src/media/content_type.rs's ALLOWED_TYPES) - 13 entries
+as of the 2026-08-04 widening: the original five images and pdf, plus
+video/mp4, video/webm, audio/mpeg, audio/ogg, audio/wav, application/zip,
+application/gzip and text/plain. Nothing outside that set can be attached
+at all: anything else gets a 400 "unsupported attachment type" regardless
+of extension. scripts/lib/seed_media.py generates real, varied PNGs (wide,
+tall, small, a medium "screenshot", and one near the default per-upload
+ceiling), one genuinely structured PDF, a plain-text log, a real zip
+archive, and a real PCM WAV tone - all stdlib-only, so always present - plus
+a short, genuinely valid mp4 clip via ffmpeg's synthetic test source when
+ffmpeg is on PATH, skipped with a printed reason rather than a failure when
+it is not. webm and ogg are not generated: ffmpeg can produce both, but one
+real video and one real audio fixture already exercises the new types
+without doubling the generator surface for no visible difference in the
+transcript. Large code and log-shaped reference content still mostly rides
+message text as fenced code blocks too, which the server has no format
+restriction on at all. Video beyond the one generated clip is still covered
+by links (see scripts/lib/seed_links.py) rather than more generated files.
 
 Two things it does not do. It cannot fabricate a message's timestamp - the
 server stamps every write with its own clock - so a single run cannot force

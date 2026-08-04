@@ -12,8 +12,11 @@ import struct
 import sys
 import tempfile
 import unittest
+import wave
+import zipfile
 import zlib
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -163,6 +166,79 @@ class PdfTest(unittest.TestCase):
         path = _tmp_path(self, ".pdf")
         reported = seed_media.pdf(path, "Title", ["one"])
         self.assertEqual(reported, len(path.read_bytes()))
+
+
+class PlainTextTest(unittest.TestCase):
+    def test_writes_real_utf8_text_joined_by_newlines(self):
+        path = _tmp_path(self, ".log")
+        seed_media.plain_text(path, ["first line", "second line"])
+        self.assertEqual(path.read_text("utf-8"), "first line\nsecond line")
+
+    def test_reported_length_matches_the_written_file(self):
+        path = _tmp_path(self, ".log")
+        reported = seed_media.plain_text(path, ["one", "two"])
+        self.assertEqual(reported, len(path.read_bytes()))
+
+
+class ZipArchiveTest(unittest.TestCase):
+    def test_writes_a_real_zip_with_every_entry_readable(self):
+        path = _tmp_path(self, ".zip")
+        seed_media.zip_archive(
+            path, [("a.txt", b"hello"), ("b.json", b'{"x": 1}')])
+        with zipfile.ZipFile(path) as archive:
+            self.assertEqual(archive.read("a.txt"), b"hello")
+            self.assertEqual(archive.read("b.json"), b'{"x": 1}')
+
+    def test_reported_length_matches_the_written_file(self):
+        path = _tmp_path(self, ".zip")
+        reported = seed_media.zip_archive(path, [("a.txt", b"hello")])
+        self.assertEqual(reported, len(path.read_bytes()))
+
+
+class WavToneTest(unittest.TestCase):
+    def test_writes_a_real_mono_16_bit_pcm_wav(self):
+        path = _tmp_path(self, ".wav")
+        seed_media.wav_tone(path, random.Random(1), seconds=0.1, sample_rate=8000)
+        with wave.open(str(path), "rb") as wav_file:
+            self.assertEqual(wav_file.getnchannels(), 1)
+            self.assertEqual(wav_file.getsampwidth(), 2)
+            self.assertEqual(wav_file.getframerate(), 8000)
+            self.assertGreater(wav_file.getnframes(), 0)
+
+    def test_is_reproducible_under_the_same_rng_seed(self):
+        path_a, path_b = _tmp_path(self, ".wav"), _tmp_path(self, ".wav")
+        seed_media.wav_tone(path_a, random.Random(7), seconds=0.05)
+        seed_media.wav_tone(path_b, random.Random(7), seconds=0.05)
+        self.assertEqual(path_a.read_bytes(), path_b.read_bytes())
+
+    def test_reported_length_matches_the_written_file(self):
+        path = _tmp_path(self, ".wav")
+        reported = seed_media.wav_tone(path, random.Random(1), seconds=0.05)
+        self.assertEqual(reported, len(path.read_bytes()))
+
+
+class Mp4ClipTest(unittest.TestCase):
+    """No real ffmpeg here: a CI runner or a contributor's machine may not
+    have it, and `ffmpeg_available()` exists exactly so callers can skip
+    cleanly rather than this module assuming it is always present."""
+
+    def test_available_reflects_whether_ffmpeg_is_on_path(self):
+        with patch("shutil.which", return_value="/usr/bin/ffmpeg"):
+            self.assertTrue(seed_media.ffmpeg_available())
+        with patch("shutil.which", return_value=None):
+            self.assertFalse(seed_media.ffmpeg_available())
+
+    def test_invokes_ffmpeg_with_a_synthetic_source_and_no_prompt(self):
+        path = _tmp_path(self, ".mp4")
+        with patch("seed_media.subprocess.run") as run:
+            run.return_value.returncode = 0
+            path.write_bytes(b"stand-in bytes")
+            seed_media.mp4_clip(path, seconds=1, width=64, height=48)
+        args = run.call_args[0][0]
+        self.assertIn("-f", args)
+        self.assertIn("lavfi", args)
+        self.assertIn("testsrc=duration=1:size=64x48:rate=15", args)
+        self.assertTrue(run.call_args.kwargs.get("check"))
 
 
 if __name__ == "__main__":
