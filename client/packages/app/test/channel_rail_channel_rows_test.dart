@@ -26,6 +26,8 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import 'voice_controller_harness.dart';
+
 const _tokens = api.TokenPair(
   userId: 'u-me',
   accessToken: 'access',
@@ -64,24 +66,32 @@ Widget _harness(Widget child) => ProviderScope(
 /// read providers (a profile lookup, an avatar-bytes cache), so the voice
 /// test below needs a real session and API client the way
 /// `channel_rail_voice_roster_test.dart` already does for the same widget.
-Widget _voiceHarness(Widget child) => ProviderScope(
-  overrides: [
-    sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-    apiProvider.overrideWith((ref) {
-      final client = api.SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: ref.watch(sessionProvider),
-        httpClient: MockClient((_) async => http.Response('', 404)),
-      );
-      ref.onDispose(client.close);
-      return client;
-    }),
-  ],
-  child: MaterialApp(
-    theme: buildTheme(Brightness.light, AppTokens.light),
-    home: Scaffold(body: child),
-  ),
-);
+/// [voice] overrides [voiceControllerProvider] directly now that the row
+/// watches it itself rather than taking it as a constructor parameter (see
+/// the finding about `ChannelCategorySections` rebuilding every row on
+/// every voice-room event).
+Widget _voiceHarness(Widget child, {required VoiceState voice}) =>
+    ProviderScope(
+      overrides: [
+        sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final client = api.SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((_) async => http.Response('', 404)),
+          );
+          ref.onDispose(client.close);
+          return client;
+        }),
+        voiceControllerProvider.overrideWith(
+          (ref) => FixedVoiceController(ref, voice),
+        ),
+      ],
+      child: MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: Scaffold(body: child),
+      ),
+    );
 
 void main() {
   testWidgets(
@@ -163,21 +173,21 @@ void main() {
               channel: channel,
               selected: false,
               trailingExtra: kebab,
-              voice: const VoiceState(
-                channelId: 'v1',
-                state: VoiceSessionState.connected,
-                participants: [
-                  VoiceParticipant(
-                    identity: 'u-1',
-                    name: 'Alice',
-                    isSpeaking: false,
-                    isMuted: false,
-                    isLocal: true,
-                    isScreenSharing: false,
-                  ),
-                ],
-              ),
             ),
+          ),
+          voice: const VoiceState(
+            channelId: 'v1',
+            state: VoiceSessionState.connected,
+            participants: [
+              VoiceParticipant(
+                identity: 'u-1',
+                name: 'Alice',
+                isSpeaking: false,
+                isMuted: false,
+                isLocal: true,
+                isScreenSharing: false,
+              ),
+            ],
           ),
         ),
       );

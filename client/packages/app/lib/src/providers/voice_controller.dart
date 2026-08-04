@@ -26,6 +26,7 @@ class VoiceState {
   const VoiceState({
     this.channelId,
     this.state = VoiceSessionState.idle,
+    this.joining = false,
     this.participants = const [],
     this.microphoneEnabled = true,
     this.cameraEnabled = false,
@@ -43,6 +44,13 @@ class VoiceState {
   final String? channelId;
   final VoiceSessionState state;
   final List<VoiceParticipant> participants;
+
+  /// True for the whole span of a [VoiceController.join] call, set before
+  /// its first `await` and cleared in a `finally`. [state] does not reach
+  /// [VoiceSessionState.connecting] until the token round trip already
+  /// answered, so this is what tells a screen arriving elsewhere that a
+  /// join is under way during that gap; see `voice_screen.dart`'s `_busyElsewhere`.
+  final bool joining;
 
   /// What the user has asked for, which is not always what they got: a token
   /// without SPEAK cannot open a microphone however the toggle is set.
@@ -83,6 +91,7 @@ class VoiceState {
   VoiceState copyWith({
     String? channelId,
     VoiceSessionState? state,
+    bool? joining,
     List<VoiceParticipant>? participants,
     bool? microphoneEnabled,
     bool? cameraEnabled,
@@ -98,6 +107,7 @@ class VoiceState {
   }) => VoiceState(
     channelId: channelId ?? this.channelId,
     state: state ?? this.state,
+    joining: joining ?? this.joining,
     participants: participants ?? this.participants,
     microphoneEnabled: microphoneEnabled ?? this.microphoneEnabled,
     cameraEnabled: cameraEnabled ?? this.cameraEnabled,
@@ -205,7 +215,12 @@ class VoiceController extends StateNotifier<VoiceState> {
   }
 
   Future<void> join(String channelId) async {
-    state = state.copyWith(channelId: channelId, clearError: true);
+    // Set before the first await, so an arrival elsewhere reads this as busy; see VoiceState.joining.
+    state = state.copyWith(
+      channelId: channelId,
+      clearError: true,
+      joining: true,
+    );
     try {
       final token = await _ref.read(apiProvider).voiceToken(channelId);
       final insecureReason = insecureSfuReason(token.url);
@@ -258,6 +273,8 @@ class VoiceController extends StateNotifier<VoiceState> {
         error: 'Could not join the call.',
         retryable: true,
       );
+    } finally {
+      state = state.copyWith(joining: false);
     }
   }
 

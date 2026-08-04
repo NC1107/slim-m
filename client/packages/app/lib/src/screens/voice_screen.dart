@@ -34,11 +34,19 @@ import 'voice_join_preview.dart';
 
 /// Whether [voice] describes a live call somewhere other than [channelId]:
 /// the one case an arrival still has to ask about before joining.
+///
+/// `voice.joining` covers the window a join has already claimed
+/// [VoiceState.channelId] but has not yet moved [VoiceState.state] off
+/// whatever it was before (the token round trip in
+/// [VoiceController.join] carries no state transition of its own) - without
+/// it, an arrival during that window read the controller as idle and
+/// auto-joined a second call with no [VoiceSwitchPrompt] at all.
 bool _busyElsewhere(VoiceState voice, String channelId) =>
     voice.channelId != null &&
     voice.channelId != channelId &&
     (voice.state == VoiceSessionState.connected ||
-        voice.state == VoiceSessionState.connecting);
+        voice.state == VoiceSessionState.connecting ||
+        voice.joining);
 
 class VoiceScreen extends ConsumerStatefulWidget {
   const VoiceScreen({required this.channelId, this.isDm = false, super.key});

@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, enforce};
+use super::extract::{Authed, AuthedLimited, Json, READ, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::ChannelCategoryId;
@@ -76,7 +76,7 @@ struct UpdateCategoryRequest {
 /// carries no permission of its own (see docs/IMPLIED-GAPS.md), so its name
 /// and position are not privileged for anyone who can already authenticate.
 async fn list(
-    Authed(_ctx): Authed,
+    AuthedLimited(_ctx): AuthedLimited<READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<CategoryDto>>, ApiError> {
     let categories = state

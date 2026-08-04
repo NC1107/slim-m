@@ -148,32 +148,33 @@ class VoiceChannelRow extends ConsumerWidget {
     super.key,
     required this.channel,
     required this.selected,
-    required this.voice,
     this.trailingExtra,
   });
 
   final Channel channel;
   final bool selected;
-  final VoiceState voice;
 
   /// The kebab [ManagedChannelRow] hands down, rendered in the same
   /// trailing slot as the participant count so both sit inside the row's
   /// own press/hover highlight rather than beside it.
   final Widget? trailingExtra;
 
-  bool get _inCall =>
+  bool _inCall(VoiceState voice) =>
       voice.state == VoiceSessionState.connected &&
       voice.channelId == channel.id;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final iconColor = _inCall
+    // Watched here, not by the section that lays out every row, so a room event rebuilds only voice rows.
+    final voice = ref.watch(voiceControllerProvider);
+    final inCall = _inCall(voice);
+    final iconColor = inCall
         ? tokens.accent
         : tokens.textSecondary.withValues(alpha: 0.7);
 
     // A joined call already has this live; an unjoined one polls for it below.
-    final participants = _inCall
+    final participants = inCall
         ? voice.participants
         : ref
                   .watch(voiceRosterProvider(channel.id))
@@ -188,7 +189,7 @@ class VoiceChannelRow extends ConsumerWidget {
         AppListRow(
           label: channel.name,
           selected: selected,
-          unread: _inCall,
+          unread: inCall,
           leading: Icon(
             AppIcons.voice,
             size: AppSizes.icon16,

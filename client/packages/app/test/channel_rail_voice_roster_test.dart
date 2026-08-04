@@ -23,6 +23,8 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import 'voice_controller_harness.dart';
+
 const _tokens = api.TokenPair(
   userId: 'u-me',
   accessToken: 'access',
@@ -51,12 +53,16 @@ Widget _harness({required http.Client httpClient, required VoiceState voice}) {
   );
   addTearDown(apiClient.close);
   return ProviderScope(
-    overrides: [apiProvider.overrideWithValue(apiClient)],
+    overrides: [
+      apiProvider.overrideWithValue(apiClient),
+      // The row watches voiceControllerProvider itself now; see channel_rail_voice_watch_scope_test.dart.
+      voiceControllerProvider.overrideWith(
+        (ref) => FixedVoiceController(ref, voice),
+      ),
+    ],
     child: MaterialApp(
       theme: buildTheme(Brightness.light, AppTokens.light),
-      home: Scaffold(
-        body: VoiceChannelRow(channel: _channel, selected: false, voice: voice),
-      ),
+      home: Scaffold(body: VoiceChannelRow(channel: _channel, selected: false)),
     ),
   );
 }

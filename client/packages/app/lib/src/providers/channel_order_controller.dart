@@ -37,20 +37,31 @@ class ChannelOrderController extends StateNotifier<ChannelOrderState> {
   final Ref _ref;
   List<api.ChannelOrderGroup>? _lastAttempt;
 
+  /// Bumped by every [reorder] call, so a response arriving after a newer
+  /// drag has already superseded it is dropped rather than applying a stale
+  /// arrangement over the store or clearing `pendingOrder` out from under a
+  /// still-in-flight newer attempt. The same shape `BlocksController`'s
+  /// session-race fix uses.
+  int _generation = 0;
+
   /// Submits [groups] - the whole rail, grouped by category, in the
   /// arrangement a drag produced - and renders it immediately. A channel of
   /// any kind may be named in any group: a category decides placement only,
   /// never behaviour (docs/decisions/0006-channel-categories.md).
   Future<void> reorder(List<api.ChannelOrderGroup> groups) async {
     _lastAttempt = groups;
+    final generation = ++_generation;
     state = ChannelOrderState(pendingOrder: groups);
     try {
       final updated = await _ref.read(apiProvider).reorderChannels(groups);
+      if (!mounted || generation != _generation) return;
       final store = await _ref.read(storeProvider.future);
+      if (!mounted || generation != _generation) return;
       await store.upsertChannels(updated);
-      if (mounted) state = const ChannelOrderState();
+      if (!mounted || generation != _generation) return;
+      state = const ChannelOrderState();
     } on api.ApiException catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       state = ChannelOrderState(
         error: describeApiFailure('reorder channels', e),
       );

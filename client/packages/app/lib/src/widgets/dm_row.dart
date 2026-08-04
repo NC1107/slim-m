@@ -3,10 +3,14 @@
 /// long-press menu to report or block the person on the other end of it.
 ///
 /// Also the in-app half of `docs/IMPLIED-GAPS.md` #2: a call already
-/// happening in this DM shows as an icon, kept current by
-/// `voiceRosterProvider`'s `voice.activity`-nudged poll, and tapping the row
-/// while it is lit opens straight into the call pane rather than the plain
-/// transcript.
+/// happening in this DM shows as an icon, and tapping the row while it is
+/// lit opens straight into the call pane rather than the plain transcript.
+/// Kept current by `dmCallActivityProvider` (`providers/dm_call_activity.dart`)
+/// rather than `voiceRosterProvider`'s own per-channel poll: every DM row
+/// mounts at once (`DirectMessagesSection` renders the whole list), and one
+/// independent 15-second poller per row multiplied with the DM list and
+/// burst the write-class rate budget the instant the rail rendered. See that
+/// provider's own doc comment for the fix.
 ///
 /// There is deliberately no "close" or "hide this conversation" item here.
 /// Nothing backs one: `store/dms.rs` has no concept of leaving or archiving a
@@ -28,7 +32,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/blocks_controller.dart';
-import '../providers/voice_roster.dart';
+import '../providers/dm_call_activity.dart';
 import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart' show dmCallOpenProvider;
 import 'context_menu_region.dart';
@@ -104,10 +108,11 @@ class DmRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    // The same per-channel roster VoiceChannelRow polls; self is already dropped.
-    final inCall =
-        ref.watch(voiceRosterProvider(channel.id)).valueOrNull?.isNotEmpty ??
-        false;
+    // Queued, not fetched directly: the controller bounds how many rows become simultaneous requests.
+    ref.read(dmCallActivityProvider.notifier).ensureTracked(channel.id);
+    final inCall = ref.watch(
+      dmCallActivityProvider.select((m) => m[channel.id] ?? false),
+    );
     return ContextMenuRegion(
       itemsBuilder: (menuContext, close) => _menuItems(menuContext, ref, close),
       // AppListRow is already its own tab stop; see ContextMenuFocus.ownsFocusNode.

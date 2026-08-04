@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COALESCE(MAX(position), -1) + 1 AS \"next!: i64\" FROM channels\n               WHERE deleted_at IS NULL AND kind != 'dm'",
+  "query": "SELECT COALESCE(MAX(position), -1) + 1 AS \"next!: i64\" FROM channels\n               WHERE deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "4865cde5505647b6bb254a09e72c2686d24dab4b988faffda165d4b1708c6b30"
+  "hash": "e9982f525ef224ed2f452b7c23443f1c8b1b9e09caa056e0ce35e2df7392f2c5"
 }

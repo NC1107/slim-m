@@ -49,22 +49,44 @@ impl CallHeartbeats {
         Self::default()
     }
 
-    /// Records a heartbeat now, creating the entry on its first one.
-    pub fn record(&self, user_id: UserId, channel_id: ChannelId) {
-        self.record_at(user_id, channel_id, Instant::now());
-    }
-
-    /// [`Self::record`] with an explicit clock, so a test can drive staleness
-    /// deterministically instead of sleeping.
+    /// Records a heartbeat now, creating the entry on its first one. A test's
+    /// tool for putting an entry in place directly; a live caller wants
+    /// [`Self::record_reporting_new`] instead, which is this same write
+    /// plus the answer to whether it was the first one.
     pub fn record_at(&self, user_id: UserId, channel_id: ChannelId, now: Instant) {
         lock(&self.state).insert((user_id, channel_id), now);
     }
 
-    /// Whether an entry exists at all, regardless of freshness. Read before
-    /// [`Self::record`] or [`Self::forget`] to tell a real join or hangup
-    /// (the entry's presence actually changed) from a routine refresh, which
-    /// is what lets the caller publish a live signal only on the transition
-    /// rather than on every heartbeat tick.
+    /// [`Self::record_at`] with the real clock, reporting whether the entry
+    /// was newly created - a single lock-held check-and-insert, so two
+    /// concurrent first heartbeats for the same `(user, channel)` cannot
+    /// both observe "not present yet" and both report a join. Use this
+    /// rather than [`Self::contains`] followed by [`Self::record_at`],
+    /// which is exactly that race: the check and the write are two separate
+    /// lock acquisitions, so a second caller can slip in between them.
+    pub fn record_reporting_new(&self, user_id: UserId, channel_id: ChannelId) -> bool {
+        self.record_reporting_new_at(user_id, channel_id, Instant::now())
+    }
+
+    /// [`Self::record_reporting_new`] with an explicit clock, so a test can
+    /// drive it deterministically instead of sleeping.
+    pub fn record_reporting_new_at(
+        &self,
+        user_id: UserId,
+        channel_id: ChannelId,
+        now: Instant,
+    ) -> bool {
+        lock(&self.state)
+            .insert((user_id, channel_id), now)
+            .is_none()
+    }
+
+    /// Whether an entry exists at all, regardless of freshness. For a test
+    /// to confirm a handler actually reached [`Self::record_at`]; a live
+    /// caller deciding whether to publish a signal wants
+    /// [`Self::record_reporting_new`] or [`Self::forget_reporting_removed`]
+    /// instead, which answer the same question without the race a separate
+    /// read-then-write opens.
     pub fn contains(&self, user_id: UserId, channel_id: ChannelId) -> bool {
         lock(&self.state).contains_key(&(user_id, channel_id))
     }
@@ -74,6 +96,15 @@ impl CallHeartbeats {
     /// nothing stale left to rediscover and call the SFU about again.
     pub fn forget(&self, user_id: UserId, channel_id: ChannelId) {
         lock(&self.state).remove(&(user_id, channel_id));
+    }
+
+    /// [`Self::forget`], reporting whether there was an entry to drop - a
+    /// single lock-held check-and-remove, mirroring
+    /// [`Self::record_reporting_new`], so two concurrent real hangups for
+    /// the same `(user, channel)` cannot both observe "still present" and
+    /// both report a hangup.
+    pub fn forget_reporting_removed(&self, user_id: UserId, channel_id: ChannelId) -> bool {
+        lock(&self.state).remove(&(user_id, channel_id)).is_some()
     }
 
     /// Removes and returns every session whose last heartbeat is at least
@@ -191,5 +222,92 @@ mod tests {
 
         let past = start + STALE_AFTER + Duration::from_secs(1);
         assert!(heartbeats.sweep_stale_at(STALE_AFTER, past).is_empty());
+    }
+
+    #[test]
+    fn record_reporting_new_is_true_only_for_the_first_call() {
+        let heartbeats = CallHeartbeats::new();
+        let (user, channel) = (uid(), cid());
+
+        assert!(heartbeats.record_reporting_new(user, channel));
+        assert!(!heartbeats.record_reporting_new(user, channel));
+        assert!(!heartbeats.record_reporting_new(user, channel));
+    }
+
+    #[test]
+    fn forget_reporting_removed_is_true_only_when_something_was_there() {
+        let heartbeats = CallHeartbeats::new();
+        let (user, channel) = (uid(), cid());
+
+        assert!(!heartbeats.forget_reporting_removed(user, channel));
+
+        heartbeats.record_at(user, channel, Instant::now());
+        assert!(heartbeats.forget_reporting_removed(user, channel));
+        assert!(!heartbeats.forget_reporting_removed(user, channel));
+    }
+
+    /// The property `http::voice`'s handlers depend on: many callers racing
+    /// the same `(user, channel)` pair's first heartbeat must still see
+    /// exactly one of them report a real join. A separate check-then-write
+    /// (`contains` followed by `record_at`) cannot promise this - a second
+    /// caller can slip between the two lock acquisitions - which is exactly
+    /// the shape this single lock-held method exists to close. A
+    /// [`std::sync::Barrier`] lines every thread up at the same instant so
+    /// the race is real rather than merely possible.
+    #[test]
+    fn only_one_of_many_concurrent_first_heartbeats_reports_new() {
+        let heartbeats = CallHeartbeats::new();
+        let (user, channel) = (uid(), cid());
+        const THREADS: usize = 64;
+        let barrier = std::sync::Barrier::new(THREADS);
+
+        let new_count: usize = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..THREADS)
+                .map(|_| {
+                    scope.spawn(|| {
+                        barrier.wait();
+                        heartbeats.record_reporting_new(user, channel)
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().unwrap())
+                .filter(|&reported_change| reported_change)
+                .count()
+        });
+
+        assert_eq!(new_count, 1);
+    }
+
+    /// [`Self::forget_reporting_removed`]'s own version of the same race:
+    /// many callers reporting a real hangup for an entry that only ever
+    /// existed once must agree on exactly one of them being the one that
+    /// removed it.
+    #[test]
+    fn only_one_of_many_concurrent_hangups_reports_removed() {
+        let heartbeats = CallHeartbeats::new();
+        let (user, channel) = (uid(), cid());
+        heartbeats.record_at(user, channel, Instant::now());
+        const THREADS: usize = 64;
+        let barrier = std::sync::Barrier::new(THREADS);
+
+        let removed_count: usize = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..THREADS)
+                .map(|_| {
+                    scope.spawn(|| {
+                        barrier.wait();
+                        heartbeats.forget_reporting_removed(user, channel)
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().unwrap())
+                .filter(|&reported_change| reported_change)
+                .count()
+        });
+
+        assert_eq!(removed_count, 1);
     }
 }
