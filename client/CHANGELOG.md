@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.0](https://github.com/NC1107/slim-m/compare/client-v0.29.0...client-v0.30.0) (2026-08-04)
+
+
+### Miscellaneous Chores
+
+* **client:** Synchronize client versions
+
 ## [0.29.0](https://github.com/NC1107/slim-m/compare/client-v0.28.0...client-v0.29.0) (2026-08-04)
 
 

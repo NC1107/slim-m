@@ -3,7 +3,7 @@ name: slimm_app
 description: slim-m client application shell.
 publish_to: none
 # Feeds CFBundleShortVersionString/CFBundleVersion; release-please-tracked now (backlog item 56, see CLAUDE.md).
-version: 0.29.0+5
+version: 0.30.0+6
 resolution: workspace
 environment:
   sdk: ^3.10.0
