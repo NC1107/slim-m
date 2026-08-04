@@ -47,9 +47,6 @@ _SAFETY_NOTE = (
     "information; nothing abusive or explicit."
 )
 
-# Turns per requested conversation; seed_conversation.py owns topic/count rng.
-CONVERSATION_TURN_COUNT = 18
-
 _CONVERSATION_SCHEMA = {
     "type": "object",
     "properties": {"turns": {"type": "array", "items": {
@@ -170,12 +167,13 @@ def _save_json_cache(path, data):
 
 
 def load_or_generate_conversations(model, seed, requests, *,
-                                    turn_count=CONVERSATION_TURN_COUNT,
                                     base_url=DEFAULT_BASE_URL,
                                     cache_dir=CACHE_DIR,
                                     timeout=_REQUEST_TIMEOUT):
-    """One raw, not-yet-validated conversation per `(topic, participants)`
-    pair in `requests`.
+    """One raw, not-yet-validated conversation per `(topic, participants,
+    turn_count)` triple in `requests` - each request names its own turn
+    count, since `seed_conversation.py` varies conversation length to hit a
+    volume target rather than asking for a uniform size every time.
 
     Never raises: an unreachable server, a missing model, one bad
     conversation, or every single one failing all answer `[]` (logged to
@@ -194,7 +192,7 @@ def load_or_generate_conversations(model, seed, requests, *,
         return []
 
     raw_list = []
-    for topic, participants in requests:
+    for topic, participants, turn_count in requests:
         try:
             turns = _fetch_conversation(
                 base_url, model, participants, topic, turn_count, timeout)

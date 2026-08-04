@@ -49,10 +49,19 @@ def replay(conversation, accounts_by_display, main_channel_id, state, rng,
     shape `seed_accounts.register_accounts` returns).
 
     Returns `(stats, failures)`, the same shape every other seeding pass
-    reports in. A turn whose `reply_to`/`in_thread` reference turned out to
-    be wrong or unresolved falls back to the most recent applicable message
-    in the same channel scope, rather than losing the reply/thread
-    structure the model at least attempted - see the inline comments below.
+    reports in. A turn's `in_thread` only sends it into a thread when it
+    names one this replay actually opened; anything else - a stray index,
+    or a model that never opened the thread it kept referencing - is a
+    normal top-level message rather than being swept into an unrelated
+    thread. That is a deliberate choice, not a shortcut: an earlier version
+    fell back to "the most recently opened thread" for any unresolved
+    index, and against real model output that collapsed most of a
+    conversation's own back-and-forth into one thread the model never
+    meant to be that deep, starving the main channel of exactly the
+    content this replay exists to put there. `reply_to`'s own fallback (to
+    the most recent message in the same channel scope) is unaffected,
+    since it only changes which prior message a top-level reply points at,
+    never which channel the reply itself lands in.
     """
     stats = collections.Counter()
     failures = []
@@ -60,7 +69,6 @@ def replay(conversation, accounts_by_display, main_channel_id, state, rng,
     turn_channel_ids = {}
     turn_authors = {}
     thread_channel_for = {}
-    most_recent_thread_idx = None
     most_recent_in_channel = {}
 
     for idx, turn in enumerate(conversation.turns):
@@ -70,14 +78,9 @@ def replay(conversation, accounts_by_display, main_channel_id, state, rng,
         if ctx is None:
             continue
 
-        # Falls back to the most recent thread, then the main channel.
         target_channel = main_channel_id
         if turn.in_thread >= 0:
-            target_channel = thread_channel_for.get(turn.in_thread)
-            if target_channel is None and most_recent_thread_idx is not None:
-                target_channel = thread_channel_for.get(most_recent_thread_idx)
-            if target_channel is None:
-                target_channel = main_channel_id
+            target_channel = thread_channel_for.get(turn.in_thread, main_channel_id)
 
         reply_to_id = None
         reply_to_author = None
@@ -113,7 +116,6 @@ def replay(conversation, accounts_by_display, main_channel_id, state, rng,
                 if ok:
                     stats["conversation_open_thread"] += 1
                     thread_channel_for[idx] = thread["id"]
-                    most_recent_thread_idx = idx
                     state.add_thread(msg["id"], thread["id"])
 
         for emoji, reactor_names in turn.reactions:

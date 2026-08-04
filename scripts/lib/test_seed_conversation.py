@@ -187,30 +187,45 @@ class ParseConversationTest(unittest.TestCase):
 
 
 class PickRequestsTest(unittest.TestCase):
-    def test_returns_the_requested_count(self):
+    def test_turn_counts_sum_to_roughly_the_configured_multiple_of_draws(self):
         accounts = [{"display_name": n} for n in ("Alan", "Grace", "Linus", "Ada", "Ken")]
-        got = seed_conversation._pick_requests(random.Random(1), accounts, 3)
-        self.assertEqual(len(got), 3)
+        got = seed_conversation._pick_requests(random.Random(1), accounts, 100)
+        total_turns = sum(turn_count for _t, _p, turn_count in got)
+        target = 100 * seed_conversation.CONVERSATION_TURNS_PER_DRAW
+        self.assertGreaterEqual(total_turns, target)
+        self.assertLess(total_turns, target + max(seed_conversation._TURN_COUNT_RANGE))
+
+    def test_a_tiny_draw_budget_still_returns_the_minimum_count(self):
+        accounts = [{"display_name": n} for n in ("Alan", "Grace", "Linus", "Ada", "Ken")]
+        got = seed_conversation._pick_requests(random.Random(1), accounts, 1)
+        self.assertGreaterEqual(len(got), seed_conversation._MIN_CONVERSATION_COUNT)
 
     def test_every_participant_subset_is_drawn_from_the_real_accounts(self):
         names = ("Alan", "Grace", "Linus", "Ada", "Ken")
         accounts = [{"display_name": n} for n in names]
-        got = seed_conversation._pick_requests(random.Random(1), accounts, 4)
-        for _topic, subset in got:
+        got = seed_conversation._pick_requests(random.Random(1), accounts, 40)
+        for _topic, subset, turn_count in got:
             self.assertTrue(set(subset) <= set(names))
             self.assertGreaterEqual(len(subset), min(4, len(names)))
+            low, high = seed_conversation._TURN_COUNT_RANGE
+            self.assertTrue(low <= turn_count <= high)
 
     def test_a_small_account_count_still_works(self):
         accounts = [{"display_name": n} for n in ("Alan", "Grace")]
-        got = seed_conversation._pick_requests(random.Random(1), accounts, 2)
-        for _topic, subset in got:
+        got = seed_conversation._pick_requests(random.Random(1), accounts, 20)
+        for _topic, subset, _turn_count in got:
             self.assertEqual(set(subset), {"Alan", "Grace"})
+
+    def test_never_exceeds_the_hard_maximum_conversation_count(self):
+        accounts = [{"display_name": n} for n in ("Alan", "Grace", "Linus", "Ada")]
+        got = seed_conversation._pick_requests(random.Random(1), accounts, 100_000)
+        self.assertLessEqual(len(got), seed_conversation._MAX_CONVERSATION_COUNT)
 
 
 class BuildConversationsTest(unittest.TestCase):
     def test_no_accounts_means_no_conversations_and_no_network_call(self):
         with patch("seed_ollama.load_or_generate_conversations") as fake:
-            got = seed_conversation.build_conversations("m", [], 1)
+            got = seed_conversation.build_conversations("m", [], 1, total_draws=40)
         fake.assert_not_called()
         self.assertEqual(got, [])
 
@@ -218,7 +233,7 @@ class BuildConversationsTest(unittest.TestCase):
         accounts = [{"display_name": n} for n in ("Alan", "Grace", "Linus", "Ada")]
         with patch("seed_ollama.load_or_generate_conversations",
                     return_value=[{"topic": "x", "participants": [], "turns": []}]):
-            got = seed_conversation.build_conversations("m", accounts, 1)
+            got = seed_conversation.build_conversations("m", accounts, 1, total_draws=40)
         self.assertEqual(got, [])
 
     def test_a_usable_raw_conversation_is_parsed_through(self):
@@ -228,7 +243,7 @@ class BuildConversationsTest(unittest.TestCase):
             {"speaker": "Linus", "text": "c"}, {"speaker": "Ada", "text": "d"},
         ])
         with patch("seed_ollama.load_or_generate_conversations", return_value=[raw]):
-            got = seed_conversation.build_conversations("m", accounts, 1)
+            got = seed_conversation.build_conversations("m", accounts, 1, total_draws=40)
         self.assertEqual(len(got), 1)
         self.assertEqual(got[0].topic, "testing")
 
@@ -239,7 +254,7 @@ class BuildConversationsTest(unittest.TestCase):
         accounts = [{"display_name": n} for n in ("Alan", "Grace", "Linus", "Ada")]
         with patch("seed_ollama.load_or_generate_conversations",
                     return_value=[]) as fake:
-            seed_conversation.build_conversations("m", accounts, 1)
+            seed_conversation.build_conversations("m", accounts, 1, total_draws=40)
         called_kwargs = fake.call_args.kwargs
         self.assertNotIn("base_url", called_kwargs)
 

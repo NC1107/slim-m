@@ -7,6 +7,16 @@ each has spent its turn budget. Nothing here fabricates a timestamp: the
 server stamps every write with its own clock, so a run cannot backdate
 messages into earlier days to force a day-divider - see the module doc on
 `seed-data.py` for what that means for a single run's history.
+
+Any generated conversations split between two halves (`_split_conversation_
+tail`): most run concurrently with the per-account utility workers, sharing
+one pool so the two interleave in real time rather than reading as all
+business first and all conversation second; a reserved tail then replays
+strictly afterward, so the messages settle's own append lands after are
+guaranteed conversation rather than left to whichever concurrent task
+happened to still be posting when the interleaved phase ended - measured
+against a real run, that race left the true newest messages mostly filler
+regardless of how much conversation volume existed.
 """
 import concurrent.futures
 import datetime
@@ -20,8 +30,8 @@ import seed_accounts
 import seed_actions
 import seed_conversation
 import seed_credentials
+import seed_fixtures
 import seed_guard
-import seed_media
 import seed_ollama
 import seed_ollama_pools
 import seed_replay
@@ -31,96 +41,6 @@ import seed_worker
 
 _PACE_RANGE = (0.3, 1.5)
 
-# Wide, tall, small, a medium "screenshot", then one near the upload ceiling.
-_IMAGE_SPECS = (
-    ("seed-banner.png", lambda p, rng: seed_media.gradient_png(
-        p, 1600, 360, (27, 111, 145), (216, 88, 55), axis="x")),
-    ("seed-poster.png", lambda p, rng: seed_media.gradient_png(
-        p, 360, 1600, (88, 180, 216), (33, 33, 46), axis="y")),
-    ("seed-icon.png", lambda p, rng: seed_media.checkerboard_png(
-        p, 40, 40, (88, 216, 120), (20, 40, 30), cell=5)),
-    ("seed-screenshot.png", lambda p, rng: seed_media.rings_png(
-        p, 640, 360, (216, 88, 55), (245, 230, 200), ring_width=18)),
-    ("seed-large-photo.png", lambda p, rng: seed_media.noise_png(
-        p, 2000, 1400, rng)),
-)
-_PDF_TITLE = "Release notes - overnight sync"
-_PDF_LINES = (
-    "Fixed the reconnect loop dropping the last few messages.",
-    "Added retry with backoff on the push relay client.",
-    "Bumped the SQLite busy timeout to 5 seconds.",
-    "Known issue: screen share on Wayland still needs a manual source id.",
-    "Next up: paginate the report queue past 200 entries.",
-)
-_LOG_LINES = (
-    "2026-08-04T02:11:03Z INFO  slimm_server: listening on 0.0.0.0:8080",
-    "2026-08-04T02:11:04Z INFO  slimm_server::db: applied 24 migrations",
-    "2026-08-04T02:14:22Z WARN  slimm_server::push: relay unreachable, retrying in 5s",
-    "2026-08-04T02:14:27Z INFO  slimm_server::push: relay reachable again",
-    "2026-08-04T02:20:11Z INFO  slimm_server::voice: sweep removed 1 stale participant",
-)
-_ARCHIVE_ENTRIES = (
-    ("README.txt", b"Overnight sync notes.\nSee CHANGELOG for details.\n"),
-    ("config.json", b'{"retries": 3, "timeout_ms": 5000}\n'),
-)
-
-
-def _build_fixtures(scratch_dir, seed):
-    """Every attachment fixture the run may pick from `send_attachment`:
-    five PNGs (see `_IMAGE_SPECS`), one PDF, a text log, a zip archive, a
-    WAV tone, and - when ffmpeg is on `PATH` - a short real mp4 clip.
-
-    `seed-large-photo.png` targets roughly 8 MiB (80% of
-    `default_attachment_max_bytes` in `crates/slimm-server/src/config.rs`),
-    near a live deployment's per-upload ceiling without risking a 413 on one
-    that has not raised `SLIMM_ATTACHMENT_MAX_BYTES` past that default.
-    Nothing here is a file the server would refuse: see
-    `scripts/seed-data.py`'s module doc for the real allowed set, sniffed
-    from bytes rather than filename or declared type. Everything but the
-    mp4 is stdlib-only and so always present; the mp4 is skipped with a
-    printed reason, never a failure, when ffmpeg is not installed.
-
-    `seed` makes the noise image and the wav tone reproducible under
-    `--seed`, the same as every other generated fixture and message.
-    """
-    rng = random.Random(f"{seed}-fixtures")
-    fixtures = []
-    for filename, build in _IMAGE_SPECS:
-        path = os.path.join(scratch_dir, filename)
-        build(path, rng)
-        with open(path, "rb") as handle:
-            fixtures.append((handle.read(), "image/png", filename))
-
-    pdf_path = os.path.join(scratch_dir, "seed-notes.pdf")
-    seed_media.pdf(pdf_path, _PDF_TITLE, _PDF_LINES)
-    with open(pdf_path, "rb") as handle:
-        fixtures.append((handle.read(), "application/pdf", "seed-notes.pdf"))
-
-    log_path = os.path.join(scratch_dir, "server.log")
-    seed_media.plain_text(log_path, _LOG_LINES)
-    with open(log_path, "rb") as handle:
-        fixtures.append((handle.read(), "text/plain", "server.log"))
-
-    zip_path = os.path.join(scratch_dir, "sync-notes.zip")
-    seed_media.zip_archive(zip_path, _ARCHIVE_ENTRIES)
-    with open(zip_path, "rb") as handle:
-        fixtures.append((handle.read(), "application/zip", "sync-notes.zip"))
-
-    wav_path = os.path.join(scratch_dir, "seed-tone.wav")
-    seed_media.wav_tone(wav_path, rng)
-    with open(wav_path, "rb") as handle:
-        fixtures.append((handle.read(), "audio/wav", "seed-tone.wav"))
-
-    if seed_media.ffmpeg_available():
-        mp4_path = os.path.join(scratch_dir, "seed-clip.mp4")
-        seed_media.mp4_clip(mp4_path)
-        with open(mp4_path, "rb") as handle:
-            fixtures.append((handle.read(), "video/mp4", "seed-clip.mp4"))
-    else:
-        print("seed-data: ffmpeg not on PATH, skipping the video/mp4 fixture")
-
-    return fixtures
-
 
 def _worker_accounts(accounts, admin_api, admin_username):
     """Seed accounts plus the admin, if one logged in, as its own worker."""
@@ -128,6 +48,44 @@ def _worker_accounts(accounts, admin_api, admin_username):
     if admin_api is not None:
         workers.append({"username": admin_username, "api": admin_api})
     return workers
+
+
+def _conversation_pace_range(turn_count, actions_per_account):
+    """A per-conversation pace so this replay's own wall-clock duration
+    roughly matches one utility worker's, whatever `turn_count` turned out
+    to be and whatever `--actions-per-account` this run was given.
+
+    Without this a short conversation finishes long before the utility
+    loop does and goes quiet for the rest of the run, which is what let an
+    earlier version's interleaving fail in practice: submitting both kinds
+    of work to one pool only interleaves them while both are still
+    running, and a conversation with fewer turns than a worker has actions
+    reliably stops first.
+    """
+    target_seconds = actions_per_account * (sum(_PACE_RANGE) / 2)
+    per_turn = max(target_seconds / max(turn_count, 1), 0.05)
+    return (per_turn * 0.5, per_turn * 1.5)
+
+
+# Share of conversations held back for the guaranteed tail; see below.
+_TAIL_RESERVE_SHARE = 0.5
+
+
+def _split_conversation_tail(conversations):
+    """`(interleaved, tail)`: most conversations run concurrently with the
+    utility loop for a genuinely mixed transcript throughout, and a
+    reserved tail runs strictly afterward so the messages the settle pass's
+    own append lands after are guaranteed conversation - not dependent on
+    which concurrent task happened to still be posting last, which measured
+    against a real run left the true newest messages still mostly filler.
+    """
+    conversation_list = list(conversations or ())
+    if not conversation_list:
+        return [], []
+    reserve = min(len(conversation_list),
+                  max(1, round(len(conversation_list) * _TAIL_RESERVE_SHARE)))
+    split_at = len(conversation_list) - reserve
+    return conversation_list[:split_at], conversation_list[split_at:]
 
 
 def run(args):
@@ -172,13 +130,14 @@ def run(args):
         corpus = seed_ollama_pools.load_or_generate(model, base_seed)
         # build_conversations reaches ollama, never the deployment itself.
         conversations = seed_conversation.build_conversations(
-            model, accounts, base_seed)
+            model, accounts, base_seed,
+            total_draws=len(workers) * args.actions_per_account)
 
     # See seed_actions.CONVERSATION_COVERED for what UTILITY_ACTIONS trims.
     action_set = seed_actions.UTILITY_ACTIONS if conversations else seed_actions.ACTIONS
 
     with tempfile.TemporaryDirectory(prefix="slimm-seed-") as scratch:
-        fixtures = _build_fixtures(scratch, base_seed)
+        fixtures = seed_fixtures.build(scratch, base_seed)
         state = seed_state.SeedState()
         contexts = [
             seed_worker.WorkerContext(
@@ -191,23 +150,34 @@ def run(args):
             for index, worker in enumerate(workers)
         ]
 
+        # See _split_conversation_tail's doc comment for the interleave/tail split.
+        accounts_by_display = {a["display_name"]: a for a in accounts}
+        interleaved, tail_conversations = _split_conversation_tail(conversations)
+
         results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
+        pool_size = concurrency + len(interleaved)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=pool_size) as pool:
             futures = [
                 pool.submit(seed_worker.run_account, ctx,
                             args.actions_per_account, _PACE_RANGE, actions=action_set)
                 for ctx in contexts
             ]
+            futures += [
+                pool.submit(
+                    seed_replay.replay, conversation, accounts_by_display,
+                    channel["id"], state,
+                    random.Random(f"{base_seed}-conversation-replay-{index}"),
+                    pace_range=_conversation_pace_range(
+                        len(conversation.turns), args.actions_per_account))
+                for index, conversation in enumerate(interleaved)
+            ]
             for future in concurrent.futures.as_completed(futures):
                 results.append(future.result())
 
-        # Replayed last, so conversations end up as the newest, visible slice.
-        if conversations:
-            accounts_by_display = {a["display_name"]: a for a in accounts}
-            replay_rng = random.Random(f"{base_seed}-conversation-replay")
-            for conversation in conversations:
-                results.append(seed_replay.replay(
-                    conversation, accounts_by_display, channel["id"], state, replay_rng))
+        for index, conversation in enumerate(tail_conversations):
+            results.append(seed_replay.replay(
+                conversation, accounts_by_display, channel["id"], state,
+                random.Random(f"{base_seed}-conversation-tail-{index}")))
 
         results.append(seed_settle.run(contexts, state, random.Random(f"{base_seed}-settle")))
 

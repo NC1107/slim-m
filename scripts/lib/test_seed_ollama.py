@@ -75,7 +75,7 @@ class LoadOrGenerateConversationsTest(unittest.TestCase):
         with patch("seed_ollama._reachable", return_value=False), \
              patch("seed_ollama._fetch_conversation") as fake_fetch:
             got = seed_ollama.load_or_generate_conversations(
-                "m", "seed-1", [("topic", ["Alan"])], cache_dir=self.cache_dir)
+                "m", "seed-1", [("topic", ["Alan"], 4)], cache_dir=self.cache_dir)
         fake_fetch.assert_not_called()
         self.assertEqual(got, [])
 
@@ -89,7 +89,7 @@ class LoadOrGenerateConversationsTest(unittest.TestCase):
              patch("seed_ollama._fetch_conversation", side_effect=fake_fetch):
             got = seed_ollama.load_or_generate_conversations(
                 "m", "seed-1",
-                [("bad", ["Alan"]), ("good", ["Alan"])], cache_dir=self.cache_dir)
+                [("bad", ["Alan"], 4), ("good", ["Alan"], 4)], cache_dir=self.cache_dir)
         self.assertEqual([c["topic"] for c in got], ["good"])
 
     def test_a_successful_generation_is_cached_and_reused(self):
@@ -99,11 +99,11 @@ class LoadOrGenerateConversationsTest(unittest.TestCase):
         with patch("seed_ollama._reachable", return_value=True), \
              patch("seed_ollama._fetch_conversation", side_effect=fake_fetch):
             seed_ollama.load_or_generate_conversations(
-                "m", "seed-1", [("topic", ["Alan"])], cache_dir=self.cache_dir)
+                "m", "seed-1", [("topic", ["Alan"], 4)], cache_dir=self.cache_dir)
         with patch("seed_ollama._reachable") as fake_reachable, \
              patch("seed_ollama._fetch_conversation") as fake_fetch2:
             got = seed_ollama.load_or_generate_conversations(
-                "m", "seed-1", [("topic", ["Alan"])], cache_dir=self.cache_dir)
+                "m", "seed-1", [("topic", ["Alan"], 4)], cache_dir=self.cache_dir)
         fake_reachable.assert_not_called()
         fake_fetch2.assert_not_called()
         self.assertEqual(got[0]["topic"], "topic")
@@ -112,7 +112,7 @@ class LoadOrGenerateConversationsTest(unittest.TestCase):
         with patch("seed_ollama._reachable", return_value=True), \
              patch("seed_ollama._fetch_conversation", side_effect=ValueError("nope")):
             got = seed_ollama.load_or_generate_conversations(
-                "m", "seed-1", [("topic", ["Alan"])], cache_dir=self.cache_dir)
+                "m", "seed-1", [("topic", ["Alan"], 4)], cache_dir=self.cache_dir)
         self.assertEqual(got, [])
         path = seed_ollama._cache_path("m", "seed-1", self.cache_dir, kind="conversations")
         self.assertFalse(Path(path).exists())
