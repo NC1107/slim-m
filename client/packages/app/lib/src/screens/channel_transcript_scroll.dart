@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Where the transcript's scroll sits, and the two things that follow from
 /// it: the "jump to latest" affordance's visibility and when a viewed
-/// message is marked read.
+/// message is marked read. The affordance shows only once the reader has
+/// left the tail of the conversation and is heading back toward it, not
+/// merely for having left it.
 ///
 /// Split out of `channel_screen.dart`, which had no line budget left to grow
 /// into. It owns the [ScrollController] itself, not just state derived from
@@ -39,6 +41,11 @@ class TranscriptScrollTracker {
   int _latestSeq = 0;
   int _lastReadSeq = 0;
 
+  /// The offset last seen while genuinely away from the latest message; null
+  /// while at rest, so a fresh departure has no direction to compare against
+  /// yet. See [_onScrollChanged] for what this drives.
+  double? _lastAwayPixels;
+
   /// How close to [ScrollPosition.minScrollExtent] still counts as "at the
   /// latest message" for read-marking, covering overscroll bounce and float
   /// rounding from [scrollToLatest]'s own animation landing. Deliberately
@@ -48,17 +55,21 @@ class TranscriptScrollTracker {
   static const double _atLatestSlop = 4;
 
   /// How much of the viewport must be scrolled past the newest message
-  /// before the jump-to-latest control shows. Screen-relative rather than a
-  /// fixed pixel count, since the same absolute distance is a full screen on
-  /// a phone and a sliver of a wide desktop window: 30% of whatever is
-  /// currently visible is "no longer looking at the tail of the
-  /// conversation" on either.
+  /// before the jump-to-latest control is even a candidate to show. Screen-
+  /// relative rather than a fixed pixel count, since the same absolute
+  /// distance is a full screen on a phone and a sliver of a wide desktop
+  /// window: 30% of whatever is currently visible is "no longer looking at
+  /// the tail of the conversation" on either.
   static const double _scrolledAwayFraction = 0.3;
 
   /// Floor under [_scrolledAwayFraction], roughly two grouped message rows,
   /// so a short viewport (a compact split-pane column) still asks for a real
   /// scroll rather than a few dozen pixels of one.
   static const double _scrolledAwayFloor = 96;
+
+  /// How far a sample has to move before it counts as real motion rather
+  /// than scroll-delta noise, for the direction check in [_onScrollChanged].
+  static const double _directionSlop = 2;
 
   void dispose() {
     _disposed = true;
@@ -92,9 +103,27 @@ class TranscriptScrollTracker {
   /// Scrolling never rebuilds the transcript's `StreamBuilder`, so returning
   /// to the latest message needs its own trigger to re-mark read; this is
   /// it, on its own, independent of whether the arrow happens to repaint.
+  ///
+  /// The arrow itself asks for more than distance: leaving the tail is not a
+  /// reason to show a way back on its own, only heading toward the latest
+  /// message while still away from it is - so a fresh departure only arms a
+  /// baseline, and the arrow reveals itself on the first sample after that
+  /// moves back toward [ScrollPosition.minScrollExtent].
   void _onScrollChanged() {
     final wasAtLatest = atLatest;
-    scrolledAway.value = _scrolledAwayEnough;
+    if (!_scrolledAwayEnough) {
+      scrolledAway.value = false;
+      _lastAwayPixels = null;
+    } else {
+      final pixels = controller.position.pixels;
+      final last = _lastAwayPixels;
+      if (last != null && pixels < last - _directionSlop) {
+        scrolledAway.value = true;
+      } else if (last != null && pixels > last + _directionSlop) {
+        scrolledAway.value = false;
+      }
+      _lastAwayPixels = pixels;
+    }
     if (wasAtLatest) markRead(_latestSeq, _lastReadSeq);
   }
 
@@ -117,6 +146,7 @@ class TranscriptScrollTracker {
   /// noticed.
   void resetForChannelSwitch() {
     scrolledAway.value = false;
+    _lastAwayPixels = null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_disposed || !controller.hasClients) return;
       controller.jumpTo(controller.position.minScrollExtent);

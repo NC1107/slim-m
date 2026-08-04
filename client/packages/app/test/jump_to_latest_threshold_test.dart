@@ -5,6 +5,13 @@
 /// (`channel_transcript_scroll.dart`) now asks a second, coarser question for
 /// the arrow alone: has the reader left a meaningful fraction of the
 /// viewport, not merely the last few pixels of it.
+///
+/// Leaving that fraction is still not enough on its own: the owner reported
+/// the arrow showing while the newest messages were already on screen, which
+/// traced back to it appearing the instant a scroll crossed the threshold,
+/// including while still heading further into history. It now shows only
+/// once a sample past the threshold moves back toward the latest message,
+/// not merely for having crossed it.
 library;
 
 import 'dart:convert';
@@ -162,8 +169,8 @@ void main() {
   });
 
   testWidgets(
-    'scrolling past the viewport-relative threshold shows the arrow, and '
-    'returning below it hides the arrow again',
+    'crossing the viewport-relative threshold alone does not show the '
+    'arrow, only heading back toward the latest message while still past it',
     (tester) async {
       await _mount(tester);
       final scroll = _transcriptScroll(tester);
@@ -176,11 +183,44 @@ void main() {
             'or this test would not exercise it over the fixed floor',
       );
 
-      scroll.jumpTo(threshold + 50);
+      // Crossing the threshold on the way away must not reveal the arrow.
+      scroll.jumpTo(threshold + 200);
+      await _flush(tester);
+      expect(find.byKey(jumpButton), findsNothing);
+
+      // Moving further into history is still not "heading back".
+      scroll.jumpTo(threshold + 300);
+      await _flush(tester);
+      expect(find.byKey(jumpButton), findsNothing);
+
+      // Only once a sample moves back toward latest, still past the threshold, does the arrow appear.
+      scroll.jumpTo(threshold + 100);
       await _flush(tester);
       expect(find.byKey(jumpButton), findsOneWidget);
 
       scroll.jumpTo(20);
+      await _flush(tester);
+      expect(find.byKey(jumpButton), findsNothing);
+
+      await _unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'reversing back into history hides the arrow again, even mid-return',
+    (tester) async {
+      await _mount(tester);
+      final scroll = _transcriptScroll(tester);
+      final threshold = scroll.position.viewportDimension * 0.3;
+
+      scroll.jumpTo(threshold + 300);
+      await _flush(tester);
+      scroll.jumpTo(threshold + 100);
+      await _flush(tester);
+      expect(find.byKey(jumpButton), findsOneWidget);
+
+      // Heading away again, still well past the threshold: hidden.
+      scroll.jumpTo(threshold + 250);
       await _flush(tester);
       expect(find.byKey(jumpButton), findsNothing);
 

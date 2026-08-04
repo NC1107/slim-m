@@ -276,35 +276,37 @@ void main() {
     },
   );
 
-  testWidgets(
-    'the jump-to-latest affordance shows only once scrolled away, and '
-    'returns to the latest message when tapped',
-    (tester) async {
-      await _mount(tester);
+  testWidgets('the jump-to-latest affordance shows only once scrolled away and '
+      'heading back, and returns to the latest message when tapped', (
+    tester,
+  ) async {
+    await _mount(tester);
 
-      // Icon-only now (jump_to_latest_button.dart), so found by key not text.
-      const jumpButton = Key('jump-to-latest-tap-target');
-      expect(find.byKey(jumpButton), findsNothing);
+    // Icon-only now (jump_to_latest_button.dart), so found by key not text.
+    const jumpButton = Key('jump-to-latest-tap-target');
+    expect(find.byKey(jumpButton), findsNothing);
 
-      final scroll = _transcriptScroll(tester);
-      scroll.jumpTo(scroll.position.maxScrollExtent / 2);
-      await _flush(tester);
+    final scroll = _transcriptScroll(tester);
+    // Away, then a step back toward latest: the arrow only reveals itself on that second, "heading back" sample.
+    scroll.jumpTo(scroll.position.maxScrollExtent);
+    await _flush(tester);
+    scroll.jumpTo(scroll.position.maxScrollExtent / 2);
+    await _flush(tester);
 
-      expect(find.byKey(jumpButton), findsOneWidget);
+    expect(find.byKey(jumpButton), findsOneWidget);
 
-      await tester.tap(find.byKey(jumpButton));
-      await _flush(tester);
+    await tester.tap(find.byKey(jumpButton));
+    await _flush(tester);
 
-      expect(
-        scroll.position.pixels,
-        closeTo(scroll.position.minScrollExtent, 1),
-        reason:
-            'tapping it must be wired to the same scroll-to-latest '
-            'animation the composer already uses after a send',
-      );
-      expect(find.byKey(jumpButton), findsNothing);
+    expect(
+      scroll.position.pixels,
+      closeTo(scroll.position.minScrollExtent, 1),
+      reason:
+          'tapping it must be wired to the same scroll-to-latest '
+          'animation the composer already uses after a send',
+    );
+    expect(find.byKey(jumpButton), findsNothing);
 
-      await _unmount(tester);
-    },
-  );
+    await _unmount(tester);
+  });
 }

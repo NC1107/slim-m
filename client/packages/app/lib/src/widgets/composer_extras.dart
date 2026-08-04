@@ -398,34 +398,3 @@ Future<void> showComposerActionsSheet(
     ),
   );
 }
-
-/// The "shift + enter for newline" hint, shown only where a hardware Enter
-/// key exists.
-///
-/// Kept in the tree at full size while hidden so the composer does not jump,
-/// and `maintainSemantics` is left at its false default so a screen reader
-/// never announces a key the device has not got. The caller wraps this in a
-/// [Flexible] because the reserved space is a height, not a width: at full
-/// width the line overflows a 390pt phone by 9pt.
-class NewlineHint extends StatelessWidget {
-  const NewlineHint({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Visibility(
-      key: const Key('composer-newline-hint'),
-      // No maintainSize: it is the only thing on its row now that the typing
-      // indicator sits above the card, so reserving its height on a phone,
-      // where it is never shown, is pure wasted space.
-      visible: !usesSoftKeyboard(context),
-      child: Text(
-        'shift + enter for newline',
-        maxLines: 1,
-        softWrap: false,
-        overflow: TextOverflow.clip,
-        style: AppText.code.copyWith(color: tokens.textSecondary),
-      ),
-    );
-  }
-}

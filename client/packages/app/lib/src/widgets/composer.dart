@@ -466,16 +466,9 @@ class _ComposerState extends ConsumerState<Composer> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: MessageLengthCounter(length: _charCount),
-                    ),
-                  ),
-                  const NewlineHint(),
-                ],
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: MessageLengthCounter(length: _charCount),
               ),
             ),
           ],
