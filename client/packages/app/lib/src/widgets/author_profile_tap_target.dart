@@ -23,13 +23,16 @@ import 'member_profile.dart';
 /// anonymised author) or a profile that has not resolved yet skip the wrap
 /// outright rather than offering a tap that would fail once pressed.
 ///
-/// [child]'s own semantics are replaced by [semanticLabel], never merged
-/// with it: CLAUDE.md's "54, the resize bar" entry records a real bug where
-/// a `GestureDetector`'s own tap action bled a control's label onto an
-/// unrelated ancestor's, found only by dumping the real semantics tree, and
-/// this follows that fix's exact shape (`excludeFromSemantics` on the
-/// recognizer, the outer `Semantics` the sole source of truth) rather than
-/// assuming a merge is harmless.
+/// [child]'s own semantics are replaced by [semanticLabel], never merged with
+/// it - `excludeSemantics: true` on the outer [Semantics] is what does that,
+/// mutation-tested: without it a resolved avatar's label silently grew a
+/// second line merged in from `AppAvatar`'s own built-in name label, the same
+/// shape of bleed CLAUDE.md's "54, the resize bar" entry records, found only
+/// by dumping the real semantics tree, not by reading the widget.
+/// `excludeFromSemantics` on the [GestureDetector] is redundant given that
+/// (removing it alone changes nothing observable), kept anyway to match that
+/// same entry's established shape: the recognizer should not describe itself
+/// at all once an ancestor already owns the whole node.
 class AuthorProfileTapTarget extends ConsumerWidget {
   const AuthorProfileTapTarget({
     super.key,
