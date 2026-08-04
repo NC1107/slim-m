@@ -38,6 +38,12 @@
 ///   future overlay that reuses `ChannelHeader`'s controls needs to ask this
 ///   same question, since nothing about that provider shape stops it from
 ///   recurring.
+/// The bar carries the same bottom hairline `CompactChannelAppBar` does,
+/// and for the same reason: it shares `surfaceBase` with the transcript at
+/// zero elevation, so without a border there is no visible boundary between
+/// the bar and the messages under it. That was reported for the channel bar
+/// and fixed there first; this one had it too.
+///
 /// - Search is the one kept, and only because it does not have that
 ///   shape: `channelSearchProvider` (`channel_search_controller.dart`) is a
 ///   `family` keyed by channel id, so a thread's own copy of it can only
@@ -62,19 +68,23 @@ class ThreadScreen extends StatelessWidget {
   final String channelId;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      // The automatic back button is a Material glyph; BackToButton's is the Lucide one every other screen uses.
-      leading: const BackToButton(
-        tooltip: 'Back to the conversation',
-        fallback: Routes.channels,
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Scaffold(
+      appBar: AppBar(
+        // The automatic back button is a Material glyph; BackToButton's is the Lucide one every other screen uses.
+        leading: const BackToButton(
+          tooltip: 'Back to the conversation',
+          fallback: Routes.channels,
+        ),
+        title: const Text('Thread'),
+        shape: Border(bottom: BorderSide(color: tokens.borderSubtle)),
+        actions: [
+          ChannelSearchAction(channelId: channelId),
+          const SizedBox(width: AppSpacing.s8),
+        ],
       ),
-      title: const Text('Thread'),
-      actions: [
-        ChannelSearchAction(channelId: channelId),
-        const SizedBox(width: AppSpacing.s8),
-      ],
-    ),
-    body: ChannelScreen(channelId: channelId),
-  );
+      body: ChannelScreen(channelId: channelId),
+    );
+  }
 }

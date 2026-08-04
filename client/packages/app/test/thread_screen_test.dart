@@ -278,4 +278,22 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'the thread app bar carries a bottom border, as the phone one does',
+    (tester) async {
+      await _pumpThread(tester, const Size(900, 700));
+
+      final bar = tester.widget<AppBar>(find.byType(AppBar));
+      expect(
+        bar.shape,
+        isA<Border>(),
+        reason:
+            'this bar shares surfaceBase with the transcript at zero elevation, '
+            'so without a border there is no boundary between the two',
+      );
+
+      await _settle(tester);
+    },
+  );
 }
