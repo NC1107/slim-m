@@ -112,13 +112,19 @@ class ReplayTest(unittest.TestCase):
         self.assertNotEqual(thread_call.args[0], "main-channel")
         self.assertTrue(thread_call.args[0].startswith("thread-"))
 
-    def test_a_stray_in_thread_falls_back_to_the_most_recently_opened_thread(self):
+    def test_a_stray_in_thread_becomes_a_normal_top_level_message(self):
+        """A model output naming a thread that was never actually opened
+        (or never resolved) must not sweep unrelated content into whatever
+        thread happens to be open - it lands in the main channel instead,
+        which is the fix for real generated output that kept referencing
+        a thread_root it never set, collapsing most of a conversation's
+        own back-and-forth into one unrelated thread."""
         stats, _failures = self._replay([
             _turn("Alan", text="root", thread_root=True),
             _turn("Grace", text="reply", in_thread=999),
         ])
         thread_call = self.grace["api"].send_message.call_args
-        self.assertTrue(thread_call.args[0].startswith("thread-"))
+        self.assertEqual(thread_call.args[0], "main-channel")
 
     def test_a_thread_root_turn_that_actually_lives_in_a_thread_never_nests(self):
         """A turn resolved into a thread channel (by `in_thread`) never

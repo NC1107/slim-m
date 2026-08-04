@@ -51,5 +51,48 @@ class DescribeCorpusTest(unittest.TestCase):
         self.assertIn("0 poll", got)
 
 
+class ConversationPaceRangeTest(unittest.TestCase):
+    def test_a_shorter_conversation_gets_a_slower_per_turn_pace(self):
+        """Fewer turns spread over roughly the same target duration means
+        each turn has to wait longer, or the short conversation finishes
+        first and goes quiet for the rest of the run."""
+        short = seed_run._conversation_pace_range(10, 40)
+        long = seed_run._conversation_pace_range(40, 40)
+        self.assertGreater(sum(short) / 2, sum(long) / 2)
+
+    def test_never_returns_a_zero_or_negative_pace(self):
+        low, high = seed_run._conversation_pace_range(10_000, 1)
+        self.assertGreater(low, 0)
+        self.assertGreater(high, low)
+
+    def test_matching_actions_and_turns_yields_roughly_the_workers_own_pace(self):
+        low, high = seed_run._conversation_pace_range(40, 40)
+        worker_low, worker_high = seed_run._PACE_RANGE
+        worker_mid = (worker_low + worker_high) / 2
+        self.assertAlmostEqual((low + high) / 2, worker_mid, delta=0.05)
+
+
+class SplitConversationTailTest(unittest.TestCase):
+    def test_no_conversations_splits_into_two_empty_lists(self):
+        interleaved, tail = seed_run._split_conversation_tail([])
+        self.assertEqual(interleaved, [])
+        self.assertEqual(tail, [])
+
+    def test_every_conversation_lands_in_exactly_one_half(self):
+        conversations = list(range(10))
+        interleaved, tail = seed_run._split_conversation_tail(conversations)
+        self.assertEqual(sorted(interleaved + tail), conversations)
+
+    def test_the_tail_is_never_empty_when_conversations_exist(self):
+        for count in (1, 2, 3, 5, 10, 21):
+            _interleaved, tail = seed_run._split_conversation_tail(list(range(count)))
+            self.assertGreater(len(tail), 0, f"count={count}")
+
+    def test_the_tail_is_the_most_recently_generated_conversations(self):
+        conversations = ["a", "b", "c", "d"]
+        _interleaved, tail = seed_run._split_conversation_tail(conversations)
+        self.assertEqual(tail, conversations[-len(tail):])
+
+
 if __name__ == "__main__":
     unittest.main()

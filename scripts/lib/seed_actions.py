@@ -6,13 +6,26 @@ conversation - mostly short messages and reactions, occasionally a poll or
 an attachment - rather than a flat sample across every action kind. Every
 weight is a judgement call; there is nothing to derive them from.
 
-`CONVERSATION_COVERED` names the chat-shaped actions a generated
-conversation replay (`seed_conversation.py`/`seed_replay.py`) already
-covers end to end. `seed_run.py` draws from `UTILITY_ACTIONS` instead of
-`ACTIONS` only when a run actually has a conversation to replay, so a plain
-or failed `--ollama` run still draws the full, unmodified set exactly as
-before; `FALLBACK` and every handler stay reachable regardless, since a
-rare prerequisite fallback may still land on one of the covered names.
+`ACTIONS` is the whole set, used whenever there is no generated
+conversation to replay (no `--ollama`, or every conversation came back
+unusable) - a plain run behaves exactly as it always has. `UTILITY_ACTIONS`
+is the much smaller set `seed_run.py` draws from instead once a
+conversation *is* replaying: `CONVERSATION_COVERED` names every chat-shaped
+action (plain messages, replies, threads, reactions, mentions) that a
+replayed conversation already carries end to end and carries better - a
+mention inside real dialogue names who it is actually replying to, where
+the old canned `message_mention` bolted `@someone` onto an unrelated line.
+`UTILITY_ACTIONS` is its own tuple, not `ACTIONS` filtered down, on
+purpose: reusing the original weights over a much smaller remaining pool
+would silently multiply their relative share (a lesson learned the first
+time this shipped - `message_mention` alone reads as spam at three times
+its old relative weight, from removing everything else around it and not
+mention itself). What is left is deliberately "whatever genuinely benefits
+from being mechanical" - attachments, polls, code blocks, links, editing
+and deleting, plus enough `pin_message` to exercise it - each with a weight
+chosen for that reduced role, not inherited. `FALLBACK` and every handler
+stay reachable regardless, since a rare prerequisite fallback can still
+land on a covered name.
 """
 
 ACTIONS = (
@@ -39,15 +52,24 @@ ACTIONS = (
 # What an action falls back to when its prerequisite is not met yet.
 FALLBACK = "message_short"
 
-# See the module doc comment above for what this is and why.
+# What a replayed conversation already covers end to end; see the module doc.
 CONVERSATION_COVERED = frozenset({
     "message_short", "message_long", "message_emoji", "message_markdown",
     "burst", "reply", "open_thread", "reply_in_thread", "react",
+    "message_mention",
 })
 
-# `ACTIONS`, minus whatever a conversation replay already covers.
-UTILITY_ACTIONS = tuple(
-    (name, weight) for name, weight in ACTIONS if name not in CONVERSATION_COVERED)
+# The reduced pool once a conversation is actively replaying; see the module doc.
+UTILITY_ACTIONS = (
+    ("message_code_block", 5),
+    ("message_link", 6),
+    ("message_near_limit", 2),
+    ("edit_message", 4),
+    ("delete_message", 2),
+    ("pin_message", 2),
+    ("send_poll", 3),
+    ("send_attachment", 3),
+)
 
 _NEEDS_TOP_MESSAGE = frozenset({"reply", "react", "open_thread", "pin_message"})
 _OWN_MESSAGE_ACTIONS = frozenset({"edit_message", "delete_message"})

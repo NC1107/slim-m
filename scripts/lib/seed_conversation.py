@@ -15,6 +15,18 @@ A malformed or unusable conversation is dropped (`build_conversations`
 catches and logs it) rather than raised, the same never-crash contract
 `seed_ollama.py` already holds - a bad conversation just means fewer of
 them, never a failed run.
+
+`_pick_requests` sizes the whole batch to carry the run rather than
+garnish it: an earlier version asked for a fixed handful of conversations
+regardless of run size, which read as a rounding error against a large
+run's own static filler - the newest slice of the channel, the only part
+anyone actually reads, came out almost entirely one-liners. Turns are now
+generated at `CONVERSATION_TURNS_PER_DRAW` per draw the utility loop would
+otherwise spend, deliberately well past 1:1, so conversation dominates
+regardless of how big `--accounts`/`--actions-per-account` make the run.
+Cost is not the constraint: an 8B model call is cheap next to the run
+itself, and `seed_ollama.py`'s cache makes a repeat run under the same
+`--seed` free.
 """
 import dataclasses
 import random
@@ -23,8 +35,11 @@ import sys
 import seed_content
 import seed_ollama
 
-# Conversations per run, and the min/max accounts each draws speakers from.
-DEFAULT_CONVERSATION_COUNT = 6
+# Generated turns per utility-loop draw, well past 1:1 - see the module doc.
+CONVERSATION_TURNS_PER_DRAW = 1.5
+_MIN_CONVERSATION_COUNT = 6
+_MAX_CONVERSATION_COUNT = 200
+_TURN_COUNT_RANGE = (14, 32)
 _PARTICIPANT_MIN = 4
 
 # Below this many usable turns or resolved-speaker share, drop the conversation.
@@ -201,36 +216,53 @@ def parse_conversation(raw):
     return Conversation(topic=str(raw.get("topic") or ""), turns=turns)
 
 
-def _pick_requests(rng, accounts, count):
-    """`count` `(topic, participant_names)` pairs, each a random-sized
-    subset of `accounts` - see `DEFAULT_CONVERSATION_COUNT`'s own doc
-    comment for why not everyone is in every conversation."""
+def _pick_requests(rng, accounts, total_draws):
+    """`(topic, participant_names, turn_count)` triples whose turn counts
+    sum to roughly `total_draws * CONVERSATION_TURNS_PER_DRAW` - see the
+    constant's own doc comment for why that target rather than a fixed
+    conversation count. Each conversation draws a random-sized subset of
+    `accounts` as its speakers, since not everyone chimes in on every
+    topic in a real chat either, and a random 14-32 turn length so the
+    result is not a run of identically-sized conversations."""
     names = [a["display_name"] for a in accounts]
+    target_turns = max(1, round(total_draws * CONVERSATION_TURNS_PER_DRAW))
     topics = list(TOPICS)
-    chosen_topics = (rng.sample(topics, k=count) if len(topics) >= count
-                      else [rng.choice(topics) for _ in range(count)])
+    rng.shuffle(topics)
     requests = []
-    for topic in chosen_topics:
+    turns_so_far = 0
+    topic_index = 0
+    while ((turns_so_far < target_turns or len(requests) < _MIN_CONVERSATION_COUNT)
+           and len(requests) < _MAX_CONVERSATION_COUNT):
+        if topic_index >= len(topics):
+            rng.shuffle(topics)
+            topic_index = 0
+        topic = topics[topic_index]
+        topic_index += 1
+        turn_count = rng.randint(*_TURN_COUNT_RANGE)
         low = min(_PARTICIPANT_MIN, len(names))
         size = rng.randint(low, len(names)) if len(names) > low else len(names)
-        requests.append((topic, rng.sample(names, k=size)))
+        requests.append((topic, rng.sample(names, k=size), turn_count))
+        turns_so_far += turn_count
     return requests
 
 
 def build_conversations(model, accounts, base_seed, *,
-                         count=None, ollama_base_url=None, timeout=None):
+                         total_draws, ollama_base_url=None, timeout=None):
     """A list of validated `Conversation`s, or `[]` when generation is
     unavailable or produced nothing usable - never raises, the same
     contract `seed_ollama_pools.load_or_generate` holds for the corpus.
 
-    `ollama_base_url` is where Ollama itself listens (defaults to
-    `seed_ollama.DEFAULT_BASE_URL`) - never the deployment being seeded,
-    which this function never talks to at all.
+    `total_draws` is the utility loop's own draw budget (accounts times
+    actions per account, across every worker) - see `_pick_requests` for
+    how that turns into a conversation volume target. `ollama_base_url` is
+    where Ollama itself listens (defaults to `seed_ollama.DEFAULT_BASE_URL`)
+    - never the deployment being seeded, which this function never talks to
+    at all.
     """
     if not accounts:
         return []
     rng = random.Random(f"{base_seed}-conversation-topics")
-    requests = _pick_requests(rng, accounts, count or DEFAULT_CONVERSATION_COUNT)
+    requests = _pick_requests(rng, accounts, total_draws)
     kwargs = {}
     if ollama_base_url is not None:
         kwargs["base_url"] = ollama_base_url
