@@ -52,6 +52,34 @@
 ///   same provider is untouched). Kept scoped rather than dropped on the
 ///   same reasoning that would have dropped it: a control is fine here
 ///   exactly when it acts on the thread and nothing else.
+///
+/// `channel_screen.dart` decided "am I a thread" from the local store's
+/// `channel?.parentMessageId`, which is what every widget test here seeds
+/// directly and so never noticed that this screen reached by URL - a deep
+/// link, a reload while inside a thread, or `scripts/lib/e2e_threads.py`
+/// navigating straight to `#/thread/{id}` - has never fetched that row at
+/// all: a thread is excluded from `GET /channels` and `GET /dms` by design
+/// (docs/decisions/0005-threads.md), so the store answers null and every
+/// piece of chrome this doc comment just spent thirty lines explaining why
+/// to withhold came back anyway. `ChannelScreen` takes an `isThread` flag
+/// this screen sets unconditionally - it already knows what it opened, so
+/// there is no store round trip and nothing to race - and ORs it with the
+/// store's own answer rather than replacing it, so the ordinary
+/// `ConversationPane` route, which never sets the flag, keeps behaving
+/// exactly as it did.
+///
+/// The title carries an explicit `Semantics(container: true, header: true)`
+/// wrapper for a related reason: `AppBar(title: Text('Thread'))` alone
+/// produced no semantics node of its own for the word, merging it upward
+/// into the bar's own node instead, which leaves "Thread" reachable only as
+/// part of a blob shared with the back button's tooltip. That is worse for
+/// a screen reader, which can then only announce the whole blob rather than
+/// being asked what this bar is titled, and it is also what made
+/// `messaging: a thread stays off the ordinary channel list` time out: the
+/// e2e harness's node collector (`e2e_js.NODES`) keeps only semantics
+/// leaves, deliberately, since widening it to keep merged parents as well
+/// would let two nodes answer one `find()` across every other scenario.
+/// `container: true` is what forces the boundary that stops the merge.
 library;
 
 import 'package:flutter/material.dart';
@@ -77,14 +105,19 @@ class ThreadScreen extends StatelessWidget {
           tooltip: 'Back to the conversation',
           fallback: Routes.channels,
         ),
-        title: const Text('Thread'),
+        // container: true gives the title its own semantics node; see the doc comment above.
+        title: Semantics(
+          header: true,
+          container: true,
+          child: const Text('Thread'),
+        ),
         shape: Border(bottom: BorderSide(color: tokens.borderSubtle)),
         actions: [
           ChannelSearchAction(channelId: channelId),
           const SizedBox(width: AppSpacing.s8),
         ],
       ),
-      body: ChannelScreen(channelId: channelId),
+      body: ChannelScreen(channelId: channelId, isThread: true),
     );
   }
 }

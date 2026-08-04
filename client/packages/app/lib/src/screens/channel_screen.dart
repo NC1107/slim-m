@@ -50,9 +50,26 @@ export '../ids.dart' show newMessageId;
 
 /// One channel's messages.
 class ChannelScreen extends ConsumerStatefulWidget {
-  const ChannelScreen({required this.channelId, super.key});
+  const ChannelScreen({
+    required this.channelId,
+    this.isThread = false,
+    super.key,
+  });
 
   final String channelId;
+
+  /// True only from [ThreadScreen], which already knows what it is opening
+  /// and does not need to ask the local store. The store's own
+  /// `channel?.parentMessageId` is the fallback for the ordinary route
+  /// through `ConversationPane`, which never sets this and has always relied
+  /// on the row - but a thread reached by URL (a deep link, a reload while
+  /// inside one, or `scripts/lib/e2e_threads.py`) has never fetched that row:
+  /// a thread is excluded from `GET /channels` and `GET /dms` by design
+  /// (docs/decisions/0005-threads.md), so `watchChannelRow` answers null and
+  /// this screen built the full parent-channel header, `Pinned messages`,
+  /// `Open canvas` and `Toggle member list` included - exactly the chrome
+  /// `ThreadScreen`'s own doc comment says must never reach a thread.
+  final bool isThread;
 
   @override
   ConsumerState<ChannelScreen> createState() => _ChannelScreenState();
@@ -274,11 +291,13 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
           final dmPartnerId = channel?.dmParticipantId;
           final blockedDm =
               dmPartnerId != null && blocked.contains(dmPartnerId);
+          // Ored with the store's own answer; see isThread's doc comment.
+          final isThread = widget.isThread || channel?.parentMessageId != null;
 
           return Column(
             children: [
               // A thread supplies its own bar at every width; see thread_screen.dart.
-              if (layout.showsBothPanes && channel?.parentMessageId == null)
+              if (layout.showsBothPanes && !isThread)
                 ChannelHeader(
                   channelId: widget.channelId,
                   name: channelName,
@@ -360,8 +379,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   channelName: channel?.kind == 'text'
                                       ? channelName
                                       : null,
-                                  channelIsThread:
-                                      channel?.parentMessageId != null,
+                                  channelIsThread: isThread,
                                   channelTopic: channel?.topic,
                                   scrollController: _scrollTracker.controller,
                                   lastReadSeq: lastReadSeq,
@@ -383,8 +401,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                     myId: myId,
                                     myPermissions: myPermissions,
                                     pinnedIds: pinnedIds,
-                                    channelIsThread:
-                                        channel?.parentMessageId != null,
+                                    channelIsThread: isThread,
                                   ),
                                   onRetry: (m) =>
                                       unawaited(retryMessage(ref, m)),

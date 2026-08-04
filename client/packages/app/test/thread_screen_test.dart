@@ -60,7 +60,19 @@ http.Response _emptyJsonList() => http.Response(
 /// produces in the app. Returns the container so a test can read provider
 /// state the widget tree itself does not surface, e.g. that a control kept
 /// in the header acted on the thread's own channel id and nothing else.
-Future<ProviderContainer> _pumpThread(WidgetTester tester, Size size) async {
+/// [seedChannelRow] defaults to true, the shape every existing test in this
+/// file relies on. Pass false to reproduce a deep link, a reload while
+/// inside a thread, or `scripts/lib/e2e_threads.py` navigating straight to
+/// `#/thread/{id}` - none of which have ever fetched `GET /channels` or
+/// `GET /dms`, so the local store carries no row for the thread at all
+/// (docs/decisions/0005-threads.md, threads are excluded from both by
+/// design) and `channel?.parentMessageId` alone cannot tell `ChannelScreen`
+/// it is inside a thread.
+Future<ProviderContainer> _pumpThread(
+  WidgetTester tester,
+  Size size, {
+  bool seedChannelRow = true,
+}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -68,15 +80,17 @@ Future<ProviderContainer> _pumpThread(WidgetTester tester, Size size) async {
   final db = SlimmDatabase(NativeDatabase.memory());
   addTearDown(db.close);
   final store = MessageStore(db);
-  await store.upsertChannels([
-    const api.Channel(
-      id: 'c1',
-      name: '',
-      kind: 'text',
-      createdAt: 0,
-      parentMessageId: 'parent-1',
-    ),
-  ]);
+  if (seedChannelRow) {
+    await store.upsertChannels([
+      const api.Channel(
+        id: 'c1',
+        name: '',
+        kind: 'text',
+        createdAt: 0,
+        parentMessageId: 'parent-1',
+      ),
+    ]);
+  }
 
   final container = ProviderContainer(
     overrides: [
@@ -292,6 +306,62 @@ void main() {
             'this bar shares surfaceBase with the transcript at zero elevation, '
             'so without a border there is no boundary between the two',
       );
+
+      await _settle(tester);
+    },
+  );
+
+  /// Guards only the fix's own load-bearing line, not the browser bug it
+  /// fixes: flutter_test's own SemanticsNode tree already gave "Thread" a
+  /// distinct label with or without this wrapper (checked by hand, see
+  /// thread_screen.dart's own doc comment), so it cannot reproduce what only
+  /// the web engine's flt-semantics DOM projection did - collapse the title
+  /// into the AppBar's own unlabelled node. That is proven by a real
+  /// headless-browser run instead (`scripts/e2e.sh`, `messaging: a thread
+  /// stays off the ordinary channel list`), not by this test.
+  testWidgets(
+    'the thread title is wrapped in a semantics boundary of its own',
+    (tester) async {
+      await _pumpThread(tester, const Size(900, 700));
+
+      final appBar = tester.widget<AppBar>(find.byType(AppBar));
+      final title = appBar.title;
+      expect(title, isA<Semantics>());
+      expect(
+        (title! as Semantics).container,
+        isTrue,
+        reason:
+            'container: true is what forces a semantics boundary for the '
+            'title rather than letting it merge into an ancestor node',
+      );
+
+      await _settle(tester);
+    },
+  );
+
+  /// Compact width never builds ChannelHeader regardless of parentMessageId
+  /// (layout.showsBothPanes is false there), so only expanded width exercises
+  /// the bug this guards: ChannelScreen used to decide "am I a thread" from
+  /// the store row alone, which a deep link never seeds.
+  testWidgets(
+    'a thread reached with no local channel row still shows exactly one '
+    'header, never the parent channel chrome',
+    (tester) async {
+      await _pumpThread(tester, const Size(1400, 900), seedChannelRow: false);
+
+      expect(
+        find.byType(ChannelHeader),
+        findsNothing,
+        reason:
+            'with no store row, channel?.parentMessageId reads null; '
+            "ChannelScreen must still know it is a thread from "
+            "ThreadScreen's own isThread flag",
+      );
+      expect(find.text('Thread'), findsOneWidget);
+      expect(find.bySemanticsLabel('Pinned messages'), findsNothing);
+      expect(find.bySemanticsLabel('Open canvas'), findsNothing);
+      expect(find.bySemanticsLabel('Toggle member list'), findsNothing);
+      expect(find.bySemanticsLabel('Toggle channel list'), findsNothing);
 
       await _settle(tester);
     },
