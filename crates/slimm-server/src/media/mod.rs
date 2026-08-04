@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Filesystem-backed storage for attachment and avatar bytes, plus the
-//! content-type allowlist that decides what may be stored and served at all.
+//! Filesystem-backed storage for attachment and avatar bytes. The
+//! content-type allowlist that decides what may be stored and served at all
+//! lives in [`content_type`], split out to keep this file under the review
+//! budget once the allowlist grew past a handful of image types.
 //!
 //! Blobs live on disk beside the database rather than as SQLite rows:
 //! Litestream replicates only the database file, so multi-megabyte blobs in
@@ -26,76 +28,13 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
+mod content_type;
+pub use content_type::{is_inline, sniff_content_type};
+
 /// Largest attachment a single upload may store, for [`Media::for_tests`],
 /// which builds a handle without a `Config` to read the real default from.
 /// Matches `default_attachment_max_bytes` in `src/config.rs`.
 const DEFAULT_ATTACHMENT_MAX_BYTES: u64 = 10 * 1024 * 1024;
-
-// --- Content-type allowlist ---
-
-/// One entry in the upload allowlist: the content type stored bytes matching
-/// its magic number are served as, and whether that type is safe to render
-/// inline in a browser (an image) or must be forced to download.
-struct AllowedType {
-    content_type: &'static str,
-    inline: bool,
-    magic: fn(&[u8]) -> bool,
-}
-
-const ALLOWED_TYPES: &[AllowedType] = &[
-    AllowedType {
-        content_type: "image/png",
-        inline: true,
-        magic: |b| b.starts_with(b"\x89PNG\r\n\x1a\n"),
-    },
-    AllowedType {
-        content_type: "image/jpeg",
-        inline: true,
-        magic: |b| b.starts_with(b"\xff\xd8\xff"),
-    },
-    AllowedType {
-        content_type: "image/gif",
-        inline: true,
-        magic: |b| b.starts_with(b"GIF87a") || b.starts_with(b"GIF89a"),
-    },
-    AllowedType {
-        content_type: "image/webp",
-        inline: true,
-        magic: |b| b.len() >= 12 && &b[0..4] == b"RIFF" && &b[8..12] == b"WEBP",
-    },
-    AllowedType {
-        content_type: "application/pdf",
-        inline: false,
-        magic: |b| b.starts_with(b"%PDF-"),
-    },
-];
-
-/// Sniffs `bytes` against the allowlist, returning the content type to store
-/// and serve it as. `None` means refuse the upload outright.
-///
-/// Never derived from a filename extension or a client-declared Content-Type
-/// header: both are attacker-controlled input, and trusting either is what
-/// would turn this into a stored-XSS vector (a client claiming `image/png`
-/// or naming a file `photo.png` cannot talk its way into being served as
-/// `text/html` or `image/svg+xml` by any means, because neither is ever
-/// checked - only the bytes are, against a fixed allowlist that contains
-/// neither).
-pub fn sniff_content_type(bytes: &[u8]) -> Option<&'static str> {
-    ALLOWED_TYPES
-        .iter()
-        .find(|t| (t.magic)(bytes))
-        .map(|t| t.content_type)
-}
-
-/// Whether `content_type` (expected to be one [`sniff_content_type`]
-/// returned) is safe to render inline. Everything else is served as a forced
-/// download, so a browser is never asked to execute or render content this
-/// module cannot vouch for.
-pub fn is_inline(content_type: &str) -> bool {
-    ALLOWED_TYPES
-        .iter()
-        .any(|t| t.content_type == content_type && t.inline)
-}
 
 /// Longest a sanitized filename may be, in characters.
 const FILENAME_MAX_CHARS: usize = 200;
@@ -314,23 +253,6 @@ async fn remove(path: PathBuf) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn sniffs_by_bytes_not_by_claim() {
-        assert_eq!(
-            sniff_content_type(b"\x89PNG\r\n\x1a\nrest"),
-            Some("image/png")
-        );
-        assert_eq!(sniff_content_type(b"\xff\xd8\xffrest"), Some("image/jpeg"));
-        assert_eq!(sniff_content_type(b"GIF89arest"), Some("image/gif"));
-        assert_eq!(
-            sniff_content_type(b"RIFF\0\0\0\0WEBPrest"),
-            Some("image/webp")
-        );
-        assert_eq!(sniff_content_type(b"%PDF-1.7"), Some("application/pdf"));
-        assert_eq!(sniff_content_type(b"<html><script>"), None);
-        assert_eq!(sniff_content_type(b"<svg xmlns="), None);
-    }
 
     #[test]
     fn sanitize_strips_header_and_path_injection() {
