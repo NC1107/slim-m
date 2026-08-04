@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.29.0](https://github.com/NC1107/slim-m/compare/server-v0.28.0...server-v0.29.0) (2026-08-04)
+
+
+### Features
+
+* a live in-app signal when a DM call starts or ends ([#358](https://github.com/NC1107/slim-m/issues/358)) ([4f34b57](https://github.com/NC1107/slim-m/commit/4f34b577a86ef69a7238df3160314784723154f2))
+
+
+### Bug Fixes
+
+* a thread reply wakes the thread, not the whole parent channel ([#357](https://github.com/NC1107/slim-m/issues/357)) ([ebc3d47](https://github.com/NC1107/slim-m/commit/ebc3d47caf0d1dd0e8b1bcf482b259a58ae9d4ed))
+* eight findings from the 2026-08-04 multi-agent audit ([#362](https://github.com/NC1107/slim-m/issues/362)) ([2d954d3](https://github.com/NC1107/slim-m/commit/2d954d3453ec156382cdf33df4c822e2081cee71))
+
 ## [0.28.0](https://github.com/NC1107/slim-m/compare/server-v0.27.1...server-v0.28.0) (2026-08-04)
 
 
