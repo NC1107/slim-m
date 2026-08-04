@@ -5,6 +5,14 @@ Weighted rather than uniform, so a run reads like an uneven real
 conversation - mostly short messages and reactions, occasionally a poll or
 an attachment - rather than a flat sample across every action kind. Every
 weight is a judgement call; there is nothing to derive them from.
+
+`CONVERSATION_COVERED` names the chat-shaped actions a generated
+conversation replay (`seed_conversation.py`/`seed_replay.py`) already
+covers end to end. `seed_run.py` draws from `UTILITY_ACTIONS` instead of
+`ACTIONS` only when a run actually has a conversation to replay, so a plain
+or failed `--ollama` run still draws the full, unmodified set exactly as
+before; `FALLBACK` and every handler stay reachable regardless, since a
+rare prerequisite fallback may still land on one of the covered names.
 """
 
 ACTIONS = (
@@ -30,6 +38,16 @@ ACTIONS = (
 
 # What an action falls back to when its prerequisite is not met yet.
 FALLBACK = "message_short"
+
+# See the module doc comment above for what this is and why.
+CONVERSATION_COVERED = frozenset({
+    "message_short", "message_long", "message_emoji", "message_markdown",
+    "burst", "reply", "open_thread", "reply_in_thread", "react",
+})
+
+# `ACTIONS`, minus whatever a conversation replay already covers.
+UTILITY_ACTIONS = tuple(
+    (name, weight) for name, weight in ACTIONS if name not in CONVERSATION_COVERED)
 
 _NEEDS_TOP_MESSAGE = frozenset({"reply", "react", "open_thread", "pin_message"})
 _OWN_MESSAGE_ACTIONS = frozenset({"edit_message", "delete_message"})

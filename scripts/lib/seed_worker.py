@@ -224,16 +224,22 @@ HANDLERS = {
 }
 
 
-def run_account(ctx, actions_count, pace_range):
+def run_account(ctx, actions_count, pace_range, actions=None):
     """Performs `actions_count` actions for one account.
+
+    `actions` overrides the weighted pool `seed_actions.choose_action` draws
+    from - `seed_run.py` passes `seed_actions.UTILITY_ACTIONS` when a
+    generated conversation is already covering the chat-shaped ones, and
+    the full `seed_actions.ACTIONS` (the default) otherwise.
 
     Returns (stats, failures): a Counter of what actually ran, and a list of
     (username, action, reason) for whatever failed even after retrying.
     """
+    actions = actions if actions is not None else seed_actions.ACTIONS
     stats = collections.Counter()
     failures = []
     for _ in range(actions_count):
-        chosen = seed_actions.choose_action(ctx.rng)
+        chosen = seed_actions.choose_action(ctx.rng, actions=actions)
         resolved = seed_actions.resolve_action(
             chosen,
             has_top_message=ctx.state.has_top_message(),

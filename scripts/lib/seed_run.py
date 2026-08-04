@@ -17,9 +17,14 @@ import sys
 import tempfile
 
 import seed_accounts
+import seed_actions
+import seed_conversation
+import seed_credentials
 import seed_guard
 import seed_media
 import seed_ollama
+import seed_ollama_pools
+import seed_replay
 import seed_settle
 import seed_state
 import seed_worker
@@ -136,8 +141,9 @@ def run(args):
     if args.accounts < 1:
         sys.exit("refusing to run: --accounts must be at least 1")
 
-    password = args.password or secrets.token_urlsafe(16)
-    username_tag = args.username_tag or secrets.token_hex(3)
+    password = args.password or seed_credentials.load_or_create(base_url)
+    # Empty by default: a stable username per persona, so a rerun logs in.
+    username_tag = args.username_tag if args.username_tag is not None else ""
 
     try:
         invite_code, admin_api = seed_accounts.obtain_invite_code(
@@ -152,6 +158,7 @@ def run(args):
     except seed_accounts.AccountSetupError as exc:
         sys.exit(f"refusing to continue: {exc}")
 
+    reused_count = sum(1 for a in accounts if a.get("reused"))
     workers = _worker_accounts(accounts, admin_api, args.admin_username)
     privileged_username = workers[-1]["username"] if admin_api else workers[0]["username"]
     usernames = [w["username"] for w in workers]
@@ -159,9 +166,16 @@ def run(args):
     base_seed = args.seed if args.seed is not None else secrets.randbits(32)
 
     corpus = None
+    conversations = None
     if args.ollama:
-        corpus = seed_ollama.load_or_generate(
-            args.ollama_model or seed_ollama.DEFAULT_MODEL, base_seed)
+        model = args.ollama_model or seed_ollama.DEFAULT_MODEL
+        corpus = seed_ollama_pools.load_or_generate(model, base_seed)
+        # build_conversations reaches ollama, never the deployment itself.
+        conversations = seed_conversation.build_conversations(
+            model, accounts, base_seed)
+
+    # See seed_actions.CONVERSATION_COVERED for what UTILITY_ACTIONS trims.
+    action_set = seed_actions.UTILITY_ACTIONS if conversations else seed_actions.ACTIONS
 
     with tempfile.TemporaryDirectory(prefix="slimm-seed-") as scratch:
         fixtures = _build_fixtures(scratch, base_seed)
@@ -181,15 +195,25 @@ def run(args):
         with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
             futures = [
                 pool.submit(seed_worker.run_account, ctx,
-                            args.actions_per_account, _PACE_RANGE)
+                            args.actions_per_account, _PACE_RANGE, actions=action_set)
                 for ctx in contexts
             ]
             for future in concurrent.futures.as_completed(futures):
                 results.append(future.result())
 
+        # Replayed last, so conversations end up as the newest, visible slice.
+        if conversations:
+            accounts_by_display = {a["display_name"]: a for a in accounts}
+            replay_rng = random.Random(f"{base_seed}-conversation-replay")
+            for conversation in conversations:
+                results.append(seed_replay.replay(
+                    conversation, accounts_by_display, channel["id"], state, replay_rng))
+
         results.append(seed_settle.run(contexts, state, random.Random(f"{base_seed}-settle")))
 
-    _report(base_url, channel, channel_name, usernames, password, state, results, corpus)
+    _report(base_url, channel, channel_name, usernames, password, state, results,
+            corpus=corpus, conversations=conversations, reused_count=reused_count,
+            persona_count=len(accounts))
     return 0
 
 
@@ -205,8 +229,21 @@ def _describe_corpus(corpus):
             f"{len(corpus.code)} code, {len(corpus.polls)} poll pool entries")
 
 
+def _describe_conversations(conversations):
+    """One line on whether a generated conversation replay actually ran -
+    `None` when it never applied (no `--ollama`), distinct from `--ollama`
+    running but producing nothing usable, the same distinction
+    `_describe_corpus` already draws for the pooled corpus."""
+    if conversations is None:
+        return None
+    if not conversations:
+        return "generated conversations: none usable, ran the full action set instead"
+    turn_count = sum(len(c.turns) for c in conversations)
+    return f"generated conversations: {len(conversations)} ({turn_count} turns total)"
+
+
 def _report(base_url, channel, channel_name, usernames, password, state, results,
-            corpus=None):
+            corpus=None, conversations=None, reused_count=0, persona_count=0):
     totals = {}
     failures = []
     for stats, worker_failures in results:
@@ -220,8 +257,14 @@ def _report(base_url, channel, channel_name, usernames, password, state, results
     print(f"seeded {base_url}")
     print(f"channel: {channel_name!r} ({channel['id']})")
     print(f"accounts ({len(usernames)}): {', '.join(usernames)}")
+    if persona_count:
+        print(f"  {reused_count} reused from a previous run, "
+              f"{persona_count - reused_count} newly registered")
     print(f"shared password: {password}")
     print(_describe_corpus(corpus))
+    conversations_line = _describe_conversations(conversations)
+    if conversations_line:
+        print(conversations_line)
     print(f"created: {state.counts()}")
     recency = state.recency_stats()
     if recency["rate"] is not None:

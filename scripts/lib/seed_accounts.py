@@ -5,6 +5,12 @@ Reuses `e2e_api.Api` for every call rather than a second HTTP client, and
 follows `e2e_seed.py`'s own pattern of a first-account-claims-a-fresh-
 deployment flow - extended here to also work against an already-claimed one,
 via an admin login that mints an invite and creates the channel itself.
+
+Repeat runs reuse the same accounts by default rather than minting a fresh
+cohort: `seed-data.py` now defaults `--username-tag` to empty and the
+password to a value cached per deployment (`seed_credentials.py`), so a
+persona's username is stable across runs and `register_accounts` logs into
+it instead of re-registering the moment it already exists.
 """
 import urllib.error
 
@@ -65,16 +71,22 @@ def _mint_invite_if_possible(api, uses_needed):
 
 def register_accounts(base_url, count, password, invite_code, device_prefix,
                        username_tag=""):
-    """Registers `count` fresh accounts, retrying past the tight, IP-keyed
-    password bucket rather than firing every registration at once.
+    """Registers `count` accounts, reusing one already registered under a
+    persona's username rather than minting a new one every run.
 
-    With no code given up front, the first account registers with none at
-    all: on a still-unclaimed deployment that both succeeds and claims it,
-    at which point it mints a code of its own for the rest (see
-    `_mint_invite_if_possible`), the same shape `e2e_seed.py` already uses
-    for its two accounts, generalised to N. `username_tag` namespaces the
-    accounts so a second run against the same deployment does not collide
-    with the first's usernames.
+    Retries past the tight, IP-keyed password bucket rather than firing
+    every registration at once. With no code given up front, the first
+    account registers with none at all: on a still-unclaimed deployment
+    that both succeeds and claims it, at which point it mints a code of its
+    own for the rest (see `_mint_invite_if_possible`), the same shape
+    `e2e_seed.py` already uses for its two accounts, generalised to N.
+
+    A username already taken (409) is logged into instead of treated as a
+    failure, using the same `password` this call was given - which is why
+    the caller needs a *stable* default password (see `seed_credentials.py`)
+    for this to actually reuse anything across runs rather than just
+    failing every persona past the first one. Each returned account carries
+    `reused`, so a caller can report how much of the run was new.
     """
     accounts = []
     working_code = invite_code
@@ -85,22 +97,45 @@ def register_accounts(base_url, count, password, invite_code, device_prefix,
                  "password": password, "device_name": f"{device_prefix}-{index}"}
         if working_code:
             body["invite_code"] = working_code
+        reused = False
         try:
             got = seed_backoff.call_with_backoff(
                 lambda b=body: api.call("POST", "/auth/register", b))
         except urllib.error.HTTPError as exc:
-            hint = ("" if working_code else
-                    "; pass --invite-code, or --admin-username and "
-                    "--admin-password so this can mint one")
-            raise AccountSetupError(
-                f"could not register seed account {username!r}: "
-                f"{seed_backoff.describe_error(exc)}{hint}") from exc
+            if exc.code == 409:
+                got, reused = _login_existing(
+                    api, username, password, device_prefix, index)
+            else:
+                hint = ("" if working_code else
+                        "; pass --invite-code, or --admin-username and "
+                        "--admin-password so this can mint one")
+                raise AccountSetupError(
+                    f"could not register seed account {username!r}: "
+                    f"{seed_backoff.describe_error(exc)}{hint}") from exc
         api.token = got["access_token"]
         accounts.append({"username": username, "display_name": display,
-                          "api": api})
+                          "api": api, "reused": reused})
         if index == 0 and working_code is None and count > 1:
             working_code = _mint_invite_if_possible(api, count - 1)
     return accounts
+
+
+def _login_existing(api, username, password, device_prefix, index):
+    """The 409 branch of `register_accounts`: `username` already exists,
+    so this logs into it instead - returning `(tokens, True)` - or raises a
+    clear `AccountSetupError` naming the mismatch when even that fails,
+    most likely because the account was registered under a different
+    password than this run's."""
+    try:
+        got = seed_backoff.call_with_backoff(
+            lambda: api.login(username, password, device=f"{device_prefix}-{index}"))
+        return got, True
+    except urllib.error.HTTPError as exc:
+        raise AccountSetupError(
+            f"{username!r} already exists but could not log in with this "
+            f"run's password: {seed_backoff.describe_error(exc)}; pass "
+            "--password to match whatever it was registered with, or "
+            "--username-tag for a separate, fresh cohort instead") from exc
 
 
 def create_seed_channel(accounts, admin_api, channel_name):

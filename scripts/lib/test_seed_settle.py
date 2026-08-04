@@ -5,6 +5,7 @@ No network: every context's `api` is a `Mock`, so every assertion is on
 which targets and actors were chosen and how many calls landed, not on
 what a real server did with them.
 """
+import collections
 import random
 import sys
 import unittest
@@ -19,15 +20,20 @@ import seed_worker  # noqa: E402
 
 
 def _ctx(username):
-    """A fake `WorkerContext` whose `send_message` mints a unique reply id
-    per call (`reply-<username>-1`, `-2`, ...) rather than one constant
-    value, or two replies from the same account would collide on id and
-    undercount as one target in a caller's own bookkeeping."""
+    """A fake `WorkerContext` whose `send_message`/`open_thread` mint a
+    unique id per call (`reply-<username>-1`, `-2`, ... / `thread-...`)
+    rather than one constant value, or two replies or threads from the same
+    account would collide on id and undercount as one in a caller's own
+    bookkeeping."""
     fake_api = Mock()
     counter = iter(range(1, 10_000))
     fake_api.send_message.side_effect = (
         lambda *a, **k: {"id": f"reply-{username}-{next(counter)}"})
-    fake_api.call.return_value = {"id": "m1"}
+    call_counter = iter(range(1, 10_000))
+    fake_api.call.side_effect = (
+        lambda *a, **k: {"id": f"call-{username}-{next(call_counter)}"})
+    fake_api.open_thread.side_effect = (
+        lambda *a, **k: {"id": f"newthread-{username}-{next(call_counter)}"})
     return seed_worker.WorkerContext(
         api=fake_api, username=username, channel_id="c1",
         state=seed_state.SeedState(), rng=random.Random(username),
@@ -134,13 +140,56 @@ class RunTest(unittest.TestCase):
         failing = _ctx("alice")
         failing.api.call.side_effect = RuntimeError("boom")
         failing.api.send_message.side_effect = RuntimeError("boom")
+        failing.api.open_thread.side_effect = RuntimeError("boom")
         contexts = [failing, _ctx("bob")]
         stats, failures = seed_settle.run(contexts, state, random.Random(6))
         self.assertGreater(len(failures), 0)
         for username, action, reason in failures:
             self.assertIn(action, {
-                "settle_react", "settle_reply", "settle_reply_in_thread"})
+                "settle_react", "settle_reply", "settle_reply_in_thread",
+                "settle_open_thread"})
             self.assertIn("boom", reason)
+
+    def test_reactions_include_both_multi_emoji_and_multi_reactor_shapes(self):
+        state = _state_with_messages(seed_settle.SETTLE_TARGET_MESSAGES)
+        contexts = [_ctx(name) for name in ("alice", "bob", "carol", "dave", "erin")]
+        seed_settle.run(contexts, state, random.Random(8))
+        reactors_by_target_emoji = collections.defaultdict(set)
+        for ctx in contexts:
+            for call in ctx.api.call.call_args_list:
+                if call.args[0] != "PUT":
+                    continue
+                parts = call.args[1].split("/")
+                mid, emoji = parts[2], parts[4]
+                reactors_by_target_emoji[(mid, emoji)].add(ctx.username)
+        distinct_emoji_by_target = collections.defaultdict(set)
+        for mid, emoji in reactors_by_target_emoji:
+            distinct_emoji_by_target[mid].add(emoji)
+        self.assertTrue(any(len(v) > 1 for v in distinct_emoji_by_target.values()),
+                         "expected at least one target with 2+ distinct emoji")
+        self.assertTrue(any(len(v) > 1 for v in reactors_by_target_emoji.values()),
+                         "expected at least one (target, emoji) pair with 2+ reactors")
+
+    def test_opens_new_threads_near_the_tail_with_deep_replies(self):
+        state = _state_with_messages(seed_settle.SETTLE_TARGET_MESSAGES)
+        contexts = [_ctx(name) for name in ("alice", "bob", "carol", "dave")]
+        stats, _failures = seed_settle.run(contexts, state, random.Random(7))
+        self.assertGreater(stats["settle_open_thread"], 0)
+        channel_counts = collections.Counter()
+        for ctx in contexts:
+            for call in ctx.api.send_message.call_args_list:
+                channel_counts[call.args[0]] += 1
+        new_thread_channels = [c for c in channel_counts if c.startswith("newthread-")]
+        self.assertTrue(new_thread_channels)
+        low, high = seed_settle.SETTLE_NEW_THREAD_REPLIES
+        self.assertTrue(any(low <= channel_counts[c] <= high for c in new_thread_channels))
+
+    def test_new_threads_are_never_opened_on_a_larger_sample_than_available(self):
+        state = _state_with_messages(2)
+        contexts = [_ctx("alice"), _ctx("bob")]
+        stats, failures = seed_settle.run(contexts, state, random.Random(9))
+        self.assertEqual(failures, [])
+        self.assertLessEqual(stats["settle_open_thread"], 2)
 
 
 if __name__ == "__main__":
