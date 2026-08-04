@@ -42,13 +42,30 @@
 //! admit, and a UTF-16BE BOM (`\xFE\xFF`) is refused the same way because it
 //! is not valid UTF-8 at all. A UTF-16LE BOM (`\xFF\xFE`) is the one real
 //! collision, and it is not with this check: those same two bytes also
-//! satisfy the MP3 frame-sync heuristic below (11 set high bits), so a
-//! UTF-16LE file is stored as `audio/mpeg` rather than `text/plain` - a
-//! wrong label, not a hole, since `audio/mpeg` is exactly as inert a forced
-//! download as `text/plain` is. A binary format that never happens to emit a
-//! NUL or a control byte is the remaining real gap, and the failure mode is
-//! the same: a wrong label on a forced download, never rendering or
-//! execution, so it is accepted rather than chased.
+//! satisfy `is_mp3`'s frame-sync heuristic below, so a UTF-16LE file is
+//! stored as `audio/mpeg` rather than `text/plain` - a wrong label, not a
+//! hole, since `audio/mpeg` is exactly as inert a forced download as
+//! `text/plain` is.
+//!
+//! **This residual is real, not just theoretical, even after `is_mp3` was
+//! tightened to validate the frame header's reserved fields rather than
+//! trusting the sync bits alone (see `is_valid_mpeg_frame_header`).**
+//! Checked, not assumed: the BOM itself fixes the header's version and layer
+//! fields to non-reserved MPEG1/Layer-I values regardless of file content
+//! (`0xFE`'s own bits decode that way), so the tightened check's only
+//! remaining power over a UTF-16LE file rests entirely on the first content
+//! byte's bitrate and sampling-rate bits. Measured over all 256 byte values,
+//! 180 (about 70%) still pass; over printable ASCII specifically, 72 of 95
+//! still pass. So most real UTF-16LE text - `[0xFF, 0xFE, b'h', 0, b'i', 0]`
+//! among them - still sniffs as `audio/mpeg`, not `text/plain`, after this
+//! change. The tightening is a real improvement against arbitrary binary; it
+//! does not close this specific collision, and that is stated here rather
+//! than left to be rediscovered.
+//!
+//! A binary format that never happens to emit a NUL or a control byte is the
+//! remaining general gap, and the failure mode is the same as above: a wrong
+//! label on a forced download, never rendering or execution, so it is
+//! accepted rather than chased.
 //!
 //! Whether admitting this fallback turns the allowlist into "almost
 //! anything" in practice: yes, for the specific class of bytes that are
@@ -177,10 +194,29 @@ fn is_webm(bytes: &[u8]) -> bool {
 }
 
 /// An `ID3` tag covers most real-world MP3s (the id3 crate's own default),
-/// and a bare frame sync (11 set high bits: `0xFF` then `0xE0`-masked) covers
-/// the id3-less minority a raw encoder can still produce.
+/// and a validated bare frame sync covers the id3-less minority a raw
+/// encoder can still produce.
 fn is_mp3(bytes: &[u8]) -> bool {
-    bytes.starts_with(b"ID3") || (bytes.len() >= 2 && bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0)
+    bytes.starts_with(b"ID3") || is_valid_mpeg_frame_header(bytes)
+}
+
+/// The 11-bit frame sync alone (`0xFF` then `0xE0`-masked) is far too loose
+/// on its own: it is a coin flip on two bits of the second byte, so it
+/// false-positives on plenty of unrelated binary, including a UTF-16LE BOM
+/// (see this module's doc comment). This also requires the header's four
+/// reserved-value fields to be real MPEG values - version not `01`, layer
+/// not `00`, bitrate index not `1111`, sampling-rate index not `11` - the
+/// standard frame-header validity check, which a real encoder never emits
+/// and arbitrary bytes fail far more often than they pass.
+fn is_valid_mpeg_frame_header(bytes: &[u8]) -> bool {
+    if bytes.len() < 3 || bytes[0] != 0xFF || (bytes[1] & 0xE0) != 0xE0 {
+        return false;
+    }
+    let version = (bytes[1] >> 3) & 0x03;
+    let layer = (bytes[1] >> 1) & 0x03;
+    let bitrate_index = bytes[2] >> 4;
+    let sampling_rate_index = (bytes[2] >> 2) & 0x03;
+    version != 0b01 && layer != 0b00 && bitrate_index != 0b1111 && sampling_rate_index != 0b11
 }
 
 /// The last-resort fallback: see this module's doc comment for the full
@@ -283,6 +319,31 @@ mod tests {
         );
     }
 
+    /// The sync bits alone (`0xFF` then `0xE0`-masked) are not enough: each
+    /// case here sets them but trips exactly one of the four reserved-value
+    /// checks a real MPEG frame header must never have, so `is_mp3` has to
+    /// look past the sync bits to refuse it. `0xFF` is never valid UTF-8
+    /// either, so a refused frame sync does not fall through to `text/plain`.
+    #[test]
+    fn a_frame_sync_with_a_reserved_header_field_is_refused() {
+        let reserved_version = [0xFF, 0xEA, 0x60, 0x00];
+        let reserved_layer = [0xFF, 0xF8, 0x60, 0x00];
+        let reserved_bitrate_index = [0xFF, 0xFB, 0xF0, 0x00];
+        let reserved_sampling_rate_index = [0xFF, 0xFB, 0x6C, 0x00];
+        for bytes in [
+            reserved_version,
+            reserved_layer,
+            reserved_bitrate_index,
+            reserved_sampling_rate_index,
+        ] {
+            assert_eq!(
+                sniff_content_type(&bytes),
+                None,
+                "sync bits alone must not be enough: {bytes:?}"
+            );
+        }
+    }
+
     #[test]
     fn sniffs_ogg_and_wav() {
         assert_eq!(sniff_content_type(b"OggSrest"), Some("audio/ogg"));
@@ -337,12 +398,18 @@ mod tests {
         );
     }
 
+    /// The reserved-field tightening above does not close this: a UTF-16LE
+    /// BOM fixes the header's version and layer bits to valid MPEG1/Layer-I
+    /// values regardless of file content, so only the first content byte's
+    /// own bits can still fail the check, and most byte values do not (see
+    /// this module's doc comment for the measured rate). Documented and
+    /// harmless either way, since `audio/mpeg` is as inert a forced download
+    /// as `text/plain` would have been.
     #[test]
-    fn a_utf16le_bom_collides_with_the_mp3_frame_sync_heuristic() {
+    fn a_utf16le_bom_still_collides_with_mp3_after_the_tightening() {
         assert_eq!(
             sniff_content_type(&[0xFF, 0xFE, b'h', 0, b'i', 0]),
-            Some("audio/mpeg"),
-            "a known, documented, and harmless mislabel: still a forced download"
+            Some("audio/mpeg")
         );
     }
 
