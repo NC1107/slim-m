@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.28.1](https://github.com/NC1107/slim-m/compare/client-v0.28.0...client-v0.28.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **client:** align Space settings with personal settings' card treatment ([#366](https://github.com/NC1107/slim-m/issues/366)) ([8044b9e](https://github.com/NC1107/slim-m/commit/8044b9ebb5ca728370d58138325af3e203ab9523))
+* **client:** camera-refusal diagnostics, an instant call-leave, and one screen-share picker on Linux ([#369](https://github.com/NC1107/slim-m/issues/369)) ([a1f353c](https://github.com/NC1107/slim-m/commit/a1f353cc5fe3b803f74bb654eee1159f67cdca39))
+* stop the double context menu and clamp the reaction picker on screen ([#365](https://github.com/NC1107/slim-m/issues/365)) ([4982af4](https://github.com/NC1107/slim-m/commit/4982af4951968cc4fa0a48e76e84fcc32a29606b))
+
 ## [0.28.0](https://github.com/NC1107/slim-m/compare/client-v0.27.0...client-v0.28.0) (2026-08-04)
 
 
