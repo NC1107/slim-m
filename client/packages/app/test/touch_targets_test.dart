@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The rail's controls at both densities.
+/// The rail's per-row controls at both densities.
 ///
-/// The create-channel affordance is the one this exists for: it was rendered,
+/// Originally written for the create-channel affordance: it was rendered,
 /// permitted and functional at 30x30 on a phone, which is under the 44pt
-/// platform minimum, and the owner could not find it. The expanded-width half
-/// matters just as much: a pointer layout that grew to touch size would be a
-/// visible regression against the design, so both ends are asserted.
+/// platform minimum, and the owner could not find it. That affordance moved
+/// into `SpaceMenuButton`'s "Add channel"/"Add category" (backlog item 55),
+/// which are full-width `AppMenuItem` rows rather than a bare icon button, so
+/// their sizing is the design system's own `AppMenuItem` concern and is
+/// covered generically in `design_system/test/touch_targets_test.dart`
+/// instead of duplicated here. This file keeps the general property for
+/// whatever *is* still a bare icon here - today, the per-row manage kebab.
 library;
 
 import 'package:flutter/material.dart';
@@ -27,10 +31,6 @@ Channel _channel(String id, String name) => Channel(
   cursor: 0,
   lastReadSeq: 0,
   isPersonalSpace: false,
-);
-
-Finder _createButton() => find.byWidgetPredicate(
-  (w) => w is AppIconButton && w.semanticLabel == 'Create a channel',
 );
 
 Future<void> _pumpRail(WidgetTester tester, Size size) async {
@@ -60,27 +60,6 @@ Iterable<Size> _sizesOf(WidgetTester tester, Finder finder) =>
     finder.evaluate().map((e) => tester.getSize(find.byWidget(e.widget)));
 
 void main() {
-  testWidgets('the create-channel button meets 44pt at compact width', (
-    tester,
-  ) async {
-    await _pumpRail(tester, _phone);
-
-    expect(_createButton(), findsOneWidget);
-    expect(
-      tester.getSize(_createButton()).shortestSide,
-      greaterThanOrEqualTo(AppSizes.rowTouch),
-    );
-  });
-
-  testWidgets('the create-channel button stays pointer-sized when expanded', (
-    tester,
-  ) async {
-    await _pumpRail(tester, _desktop);
-
-    expect(_createButton(), findsOneWidget);
-    expect(tester.getSize(_createButton()).shortestSide, AppSizes.rowPointer);
-  });
-
   testWidgets('every rail control meets 44pt at compact width', (tester) async {
     await _pumpRail(tester, _phone);
 
@@ -90,9 +69,9 @@ void main() {
     for (final size in _sizesOf(tester, find.byType(AppListRow))) {
       expect(size.height, greaterThanOrEqualTo(AppSizes.rowTouch));
     }
-    // A manage button per channel plus the section's add button: proof the
-    // loop above had rows to walk rather than passing vacuously.
-    expect(find.byType(AppIconButton), findsNWidgets(3));
+    // A manage button per channel: proof the loop above had rows to walk
+    // rather than passing vacuously.
+    expect(find.byType(AppIconButton), findsNWidgets(2));
     expect(find.byType(AppListRow), findsNWidgets(2));
   });
 

@@ -58,9 +58,10 @@ void main() {
     await pump(tester, setup.container);
     await pressCtrlK(tester);
 
-    expect(find.text('CHANNELS'), findsOneWidget);
-    expect(find.text('MEMBERS'), findsOneWidget);
-    expect(find.text('ACTIONS'), findsOneWidget);
+    // Scoped: the rail behind it has its own "CHANNELS" header now (item 55).
+    expect(inPalette('CHANNELS'), findsOneWidget);
+    expect(inPalette('MEMBERS'), findsOneWidget);
+    expect(inPalette('ACTIONS'), findsOneWidget);
     expect(inPalette('general'), findsOneWidget);
     expect(inPalette('Ren'), findsOneWidget);
 

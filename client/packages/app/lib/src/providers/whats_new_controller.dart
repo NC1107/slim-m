@@ -34,6 +34,13 @@ import 'providers.dart';
 /// the device, not of who happens to be signed into it.
 const lastSeenWhatsNewVersionKey = 'slimm.whats_new.last_seen_version';
 
+/// Every real build before backlog item 56's release-please fix reported
+/// this exact, frozen [PackageInfo] version, so this is what every fresh
+/// install recorded here - never a genuine version its owner was ever
+/// actually on. Distinct from `null`, which already means "predates this
+/// feature entirely" and must keep showing the backlog; see [_check].
+const _neverTrackedVersion = '0.1.0';
+
 /// The entries, if any, still owed to whoever is using this install. Starts
 /// empty and either stays that way or is populated once the async check in
 /// the constructor resolves.
@@ -55,6 +62,11 @@ class WhatsNewController extends StateNotifier<List<WhatsNewEntry>> {
       }
 
       final lastSeen = prefs.getString(lastSeenWhatsNewVersionKey);
+      // Re-baseline silently, the same as a fresh install; see the constant's own doc.
+      if (lastSeen == _neverTrackedVersion) {
+        await prefs.setString(lastSeenWhatsNewVersionKey, version);
+        return;
+      }
       final pending = pendingWhatsNewEntries(
         lastSeen: lastSeen,
         currentVersion: version,
