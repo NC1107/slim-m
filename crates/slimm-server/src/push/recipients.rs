@@ -84,11 +84,18 @@ async fn narrow_for_thread(
         .collect())
 }
 
-/// The distinct `@name` runs in `content`, over the same `[A-Za-z0-9_]+`
-/// charset `message_inline.dart`'s `_mentionPattern` renders as a mention
-/// chip, so a push reaches exactly the mentions a reader would actually see
-/// highlighted. Hand-rolled rather than a `regex` dependency, the same call
-/// this codebase already made for its client-side markdown grammar.
+/// The distinct `@name` runs in `content`, over the same greedy charset
+/// `message_inline.dart`'s `_mentionPattern` renders as a mention chip -
+/// a word character to open, then any run of `[A-Za-z0-9_.-]` - so a push
+/// reaches exactly the mentions a reader would actually see highlighted.
+/// Trailing `.`/`-` are stripped from each run the same way the client's
+/// `_trimMentionEnd` does: `thanks @nick.` at the end of a sentence must
+/// resolve to `nick`, not `nick.`, or the mention silently fails to notify
+/// anyone. The cost, also paid client-side: a username genuinely ending in
+/// `.` or `-` (`validate_username` in `http/auth.rs` allows one) can never
+/// be mentioned, since its trailing character always reads as punctuation.
+/// Hand-rolled rather than a `regex` dependency, the same call this codebase
+/// already made for its client-side markdown grammar.
 fn mentioned_usernames(content: &str) -> HashSet<String> {
     let bytes = content.as_bytes();
     let mut names = HashSet::new();
@@ -99,20 +106,35 @@ fn mentioned_usernames(content: &str) -> HashSet<String> {
             continue;
         }
         let start = i + 1;
-        let mut end = start;
-        while end < bytes.len() && (bytes[end].is_ascii_alphanumeric() || bytes[end] == b'_') {
+        if start >= bytes.len() || !is_mention_start(bytes[start]) {
+            i += 1;
+            continue;
+        }
+        let mut end = start + 1;
+        while end < bytes.len() && is_mention_continuation(bytes[end]) {
             end += 1;
         }
-        if end > start {
-            names.insert(content[start..end].to_owned());
+        while end > start + 1 && matches!(bytes[end - 1], b'.' | b'-') {
+            end -= 1;
         }
-        i = end.max(start);
+        names.insert(content[start..end].to_owned());
+        i = end;
     }
     names
 }
 
+fn is_mention_start(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+fn is_mention_continuation(b: u8) -> bool {
+    is_mention_start(b) || matches!(b, b'.' | b'-')
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::mentioned_usernames;
 
     #[test]
@@ -127,5 +149,47 @@ mod tests {
     fn a_bare_at_with_nothing_after_it_is_not_a_mention() {
         assert!(mentioned_usernames("look @ this").is_empty());
         assert!(mentioned_usernames("trailing @").is_empty());
+    }
+
+    #[test]
+    fn a_trailing_full_stop_is_sentence_punctuation_not_part_of_the_name() {
+        assert_eq!(mentioned_usernames("thanks @nick."), one("nick"));
+    }
+
+    #[test]
+    fn a_hyphen_inside_a_name_is_kept_in_full() {
+        assert_eq!(mentioned_usernames("see @nick-c"), one("nick-c"));
+    }
+
+    fn one(name: &str) -> HashSet<String> {
+        HashSet::from([name.to_owned()])
+    }
+
+    /// Cross-checked against the exact same cases, on the exact same input
+    /// strings, in `client/packages/app/test/
+    /// message_inline_mention_charset_test.dart` - editing this function's
+    /// charset or trimming rule without a matching client edit fails one side
+    /// of that shared table, not both.
+    #[test]
+    fn the_shared_charset_fixture_agrees_with_message_inline_dart() {
+        for case in load_mention_cases() {
+            let actual = mentioned_usernames(&case.content);
+            let expected: HashSet<String> = case.mentions.into_iter().collect();
+            assert_eq!(actual, expected, "content: {:?}", case.content);
+        }
+    }
+
+    #[derive(serde::Deserialize)]
+    struct MentionCase {
+        content: String,
+        mentions: Vec<String>,
+    }
+
+    fn load_mention_cases() -> Vec<MentionCase> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/mention_charset_cases.json");
+        let raw = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
+        serde_json::from_str(&raw).expect("mention_charset_cases.json must be valid JSON")
     }
 }
