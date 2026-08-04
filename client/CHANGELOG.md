@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.29.1](https://github.com/NC1107/slim-m/compare/client-v0.29.0...client-v0.29.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **client:** a thread reached by URL showed the parent channel's chrome ([#376](https://github.com/NC1107/slim-m/issues/376)) ([1ced11f](https://github.com/NC1107/slim-m/commit/1ced11f209d66213dbc357964ec2b68449c08338))
+* **client:** raise the iOS deployment target to 15.0 ([#380](https://github.com/NC1107/slim-m/issues/380)) ([0c5915e](https://github.com/NC1107/slim-m/commit/0c5915eefa64c9ce7b8c7a04cf0f8d8c8fdaa978))
+* **release:** stop client-app from swallowing client's changelog ([#381](https://github.com/NC1107/slim-m/issues/381)) ([42bb983](https://github.com/NC1107/slim-m/commit/42bb98350d7e779f7148e687a7aae0b68fe0e2fc))
+* widen the mention charset to match what a username can be ([#374](https://github.com/NC1107/slim-m/issues/374)) ([901e712](https://github.com/NC1107/slim-m/commit/901e712e54788f75a3a066c08a2844c126bf6ad9))
+
 ## [0.29.0](https://github.com/NC1107/slim-m/compare/client-v0.28.0...client-v0.29.0) (2026-08-04)
 
 
