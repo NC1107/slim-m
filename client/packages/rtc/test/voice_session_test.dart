@@ -374,15 +374,30 @@ void main() {
     expect(session.screenShareNeedsSource, isTrue);
     expect((await session.screenShareSources()).single.id, '1');
   });
+
+  test(
+      'whether several sources are worth their own picker reaches the '
+      'session unchanged', () async {
+    final session = VoiceSession(
+      roomFactory: _EmptyRoom.new,
+      desktopSources: _FakeSources(const [], sourcePickerUseful: false),
+    );
+    addTearDown(session.dispose);
+
+    expect(session.screenShareSourcePickerUseful, isFalse);
+  });
 }
 
 class _FakeSources implements DesktopSources {
-  const _FakeSources(this._sources);
+  const _FakeSources(this._sources, {this.sourcePickerUseful = true});
 
   final List<ScreenShareSource> _sources;
 
   @override
   bool get required => true;
+
+  @override
+  final bool sourcePickerUseful;
 
   @override
   Future<List<ScreenShareSource>> list() async => _sources;

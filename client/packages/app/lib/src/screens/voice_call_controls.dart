@@ -159,7 +159,8 @@ class _CallControlsState extends ConsumerState<CallControls> {
         // Mandatory: capture cannot find a source nothing asked to list.
         final sources = await controller.screenShareSources();
         if (sources.isEmpty) return;
-        if (sources.length == 1) {
+        // On Linux the portal's own picker is the real choice; see DesktopSources.
+        if (sources.length == 1 || !controller.screenShareSourcePickerUseful) {
           sourceId = sources.first.id;
         } else {
           if (!context.mounted) return;

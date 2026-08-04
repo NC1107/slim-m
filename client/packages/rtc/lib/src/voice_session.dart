@@ -234,6 +234,10 @@ class VoiceSession {
   /// Whether starting a share here must name a source first.
   bool get screenShareNeedsSource => _desktopSources.required;
 
+  /// Whether more than one enumerated source is worth asking a person to
+  /// pick between; see [DesktopSources.sourcePickerUseful].
+  bool get screenShareSourcePickerUseful => _desktopSources.sourcePickerUseful;
+
   /// The screens this desktop will let the app capture.
   ///
   /// Calling this is what makes a later [setScreenShareEnabled] able to find
