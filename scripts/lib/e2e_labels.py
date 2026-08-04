@@ -38,10 +38,8 @@ ROLE_NAME = "Role name"
 CREATE_ROLE = "Create role"
 
 # Voice
-JOIN_CALL = "Join call"
 IN_CALL = "in call"
 SHARE_SCREEN = "Share a screen"
-SHARE_QUALITY = "Balanced"
 SHARING_NOTICE = "You are sharing your screen"
 STOP_SHARING = "Stop sharing"
 MUTE = "Mute"

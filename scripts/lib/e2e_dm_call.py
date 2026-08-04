@@ -33,6 +33,10 @@ whole ambiguity rather than trying to out-guess it with a choosier label.
 
 Run after the shared 'lounge' voice scenarios rather than beside them, so a
 call already open in one room can never collide with the other.
+
+L.DM_CALL joins directly now, the same as a voice channel row (PR #354
+removed the join lobby both used), so the click below is the join itself;
+see e2e_voice.join_call's own doc comment for the fuller reasoning.
 """
 import time
 
@@ -79,7 +83,6 @@ def start_dm_and_call(a, b, admin_api, member_api):
     room_id = f'channel-{channel_id}'
     for c in (a, b):
         c.click(L.DM_CALL, settle=2)
-        c.click(L.JOIN_CALL, settle=8)
         c.wait_for(L.IN_CALL)
     for c in (a, b):
         c.wait_for('2 in call')

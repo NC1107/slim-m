@@ -50,14 +50,18 @@ def tracks_of(participant, source):
 
 
 def join_call(a, b, room_id, channel=L.VOICE_CHANNEL):
-    """Both clients into the same room, each publishing and subscribed."""
+    """Both clients into the same room, each publishing and subscribed.
+
+    Clicking a voice channel joins it directly (PR #354 removed the join
+    lobby), so the click that used to open a preview is the join itself, and
+    the wait for L.IN_CALL is what proves the connect actually completed.
+    """
     # Reached through the rail rather than by URL, which is also the only
     # end-to-end check that the rail is reachable at all: it published no
     # accessibility nodes until the shell stopped letting a modal barrier
     # block them, and nothing but a real run would have noticed.
     for c in (a, b):
         c.click(channel)
-        c.click(L.JOIN_CALL, settle=8)
         c.wait_for(L.IN_CALL)
 
     for c in (a, b):
@@ -82,12 +86,12 @@ def share_screen(client, other, room_id):
 
     The browser is started with a capture source pre-selected, so the picker
     the operating system would raise never appears; everything after that is
-    the app's own path.
+    the app's own path. PR #348 removed the in-call quality dialog this used
+    to click through ("Balanced"): quality is read from saved Voice settings
+    now, so a click on Share a screen calls getDisplayMedia directly with no
+    further interaction, on web where `screenShareNeedsSource` is false.
     """
-    client.click(L.SHARE_SCREEN, settle=3)
-    # A quality is chosen before capture starts; picking one is what calls
-    # getDisplayMedia, and the browser answers it with a pre-selected source.
-    client.click(L.SHARE_QUALITY, settle=10)
+    client.click(L.SHARE_SCREEN, settle=10)
 
     deadline = time.time() + 45
     shared = None
@@ -132,7 +136,12 @@ def mute_propagates(a, b, room_id):
 
 
 def leave_call(a, b):
+    """Both sides leave: the drop to 1 proves the count, then a real empty room."""
     a.click(L.LEAVE_CALL, settle=8)
     b.wait_for("1 in call")
     b.shot("peer-left")
     print("  the remaining client dropped to 1 in call")
+    # A lingering call here reads as "in call" on b's own rail summary too,
+    # which would let the next scenario's own IN_CALL wait pass on nothing.
+    b.click(L.LEAVE_CALL, settle=4)
+    print("  and the remaining client leaves too, so no call is left open")
