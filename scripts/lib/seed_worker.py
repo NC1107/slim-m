@@ -28,6 +28,18 @@ class WorkerContext:
     other_usernames: list
     is_privileged: bool
     fixtures: list
+    corpus: object = None
+
+
+def _pool(ctx, attr):
+    """The named pool off `ctx.corpus`, or `None` for a plain canned run.
+
+    `ctx.corpus` may itself be a `Corpus` with some pools empty (a partial
+    generation failure), which an empty list already tells every
+    `seed_content` generator to fall back on, so no extra check is needed
+    here beyond "is there a corpus at all".
+    """
+    return getattr(ctx.corpus, attr) if ctx.corpus is not None else None
 
 
 def _do_message(ctx, content, reply_to_id=None):
@@ -38,46 +50,47 @@ def _do_message(ctx, content, reply_to_id=None):
 
 
 def handle_message_short(ctx):
-    _do_message(ctx, seed_content.short_message(ctx.rng))
+    _do_message(ctx, seed_content.short_message(ctx.rng, pool=_pool(ctx, "short")))
     return "sent a short message"
 
 
 def handle_message_long(ctx):
-    _do_message(ctx, seed_content.long_message(ctx.rng))
+    _do_message(ctx, seed_content.long_message(ctx.rng, pool=_pool(ctx, "long")))
     return "sent a long message"
 
 
 def handle_message_emoji(ctx):
-    _do_message(ctx, seed_content.emoji_message(ctx.rng))
+    _do_message(ctx, seed_content.emoji_message(ctx.rng, pool=_pool(ctx, "short")))
     return "sent a message with emoji"
 
 
 def handle_message_markdown(ctx):
-    _do_message(ctx, seed_content.markdown_message(ctx.rng))
+    _do_message(ctx, seed_content.markdown_message(ctx.rng, pool=_pool(ctx, "short")))
     return "sent a markdown message"
 
 
 def handle_message_code_block(ctx):
-    _do_message(ctx, seed_content.code_block_message(ctx.rng))
+    _do_message(ctx, seed_content.code_block_message(ctx.rng, pool=_pool(ctx, "code")))
     return "sent a code block"
 
 
 def handle_message_mention(ctx):
     if not ctx.other_usernames:
         return handle_message_short(ctx)
-    _do_message(ctx, seed_content.mention_message(ctx.rng, ctx.other_usernames))
+    _do_message(ctx, seed_content.mention_message(
+        ctx.rng, ctx.other_usernames, pool=_pool(ctx, "short")))
     return "sent a message mentioning someone"
 
 
 def handle_message_near_limit(ctx):
-    _do_message(ctx, seed_content.near_limit_message(ctx.rng))
+    _do_message(ctx, seed_content.near_limit_message(ctx.rng, pool=_pool(ctx, "short")))
     return "sent a message near the character limit"
 
 
 def handle_burst(ctx):
     """A short run of consecutive messages, so the transcript groups them."""
     for _ in range(ctx.rng.randint(2, 4)):
-        _do_message(ctx, seed_content.short_message(ctx.rng))
+        _do_message(ctx, seed_content.short_message(ctx.rng, pool=_pool(ctx, "short")))
         time.sleep(ctx.rng.uniform(0.2, 0.8))
     return "sent a consecutive burst"
 
@@ -86,7 +99,7 @@ def handle_reply(ctx):
     target = ctx.state.random_top_message(ctx.rng)
     if target is None:
         return handle_message_short(ctx)
-    content = seed_content.short_message(ctx.rng)
+    content = seed_content.short_message(ctx.rng, pool=_pool(ctx, "short"))
     if target["author"] != ctx.username:
         content = f"@{target['author']} {content}"
     _do_message(ctx, content, reply_to_id=target["id"])
@@ -100,8 +113,9 @@ def handle_open_thread(ctx):
     thread = seed_backoff.call_with_backoff(
         lambda: ctx.api.open_thread(ctx.channel_id, target["id"]))
     ctx.state.add_thread(target["id"], thread["id"])
+    opener = seed_content.short_message(ctx.rng, pool=_pool(ctx, "short"))
     seed_backoff.call_with_backoff(
-        lambda: ctx.api.send_message(thread["id"], seed_content.short_message(ctx.rng)))
+        lambda: ctx.api.send_message(thread["id"], opener))
     return "opened a thread"
 
 
@@ -110,9 +124,9 @@ def handle_reply_in_thread(ctx):
     if thread is None:
         return handle_open_thread(ctx)
     _, thread_channel_id = thread
+    reply = seed_content.short_message(ctx.rng, pool=_pool(ctx, "short"))
     seed_backoff.call_with_backoff(
-        lambda: ctx.api.send_message(
-            thread_channel_id, seed_content.short_message(ctx.rng)))
+        lambda: ctx.api.send_message(thread_channel_id, reply))
     return "replied inside a thread"
 
 
@@ -131,7 +145,7 @@ def handle_edit_message(ctx):
     own = ctx.state.random_own_message(ctx.rng, ctx.username)
     if own is None:
         return handle_message_short(ctx)
-    content = f"{seed_content.short_message(ctx.rng)} (edit)"
+    content = f"{seed_content.short_message(ctx.rng, pool=_pool(ctx, 'short'))} (edit)"
     seed_backoff.call_with_backoff(
         lambda: ctx.api.edit_message(own["channel_id"], own["id"], content))
     return "edited a message"
@@ -158,7 +172,7 @@ def handle_pin_message(ctx):
 
 
 def handle_send_poll(ctx):
-    question, options = seed_content.poll(ctx.rng)
+    question, options = seed_content.poll(ctx.rng, pool=_pool(ctx, "polls"))
     body = {"id": str(uuid.uuid4()), "question": question, "options": options}
     msg = seed_backoff.call_with_backoff(
         lambda: ctx.api.call(
@@ -173,7 +187,8 @@ def handle_send_attachment(ctx):
     uploaded = seed_backoff.call_with_backoff(
         lambda: ctx.api.call("POST", f"/attachments?filename={quoted}",
                               raw=data, content_type=content_type))
-    body = {"id": str(uuid.uuid4()), "content": seed_content.short_message(ctx.rng),
+    caption = seed_content.short_message(ctx.rng, pool=_pool(ctx, "short"))
+    body = {"id": str(uuid.uuid4()), "content": caption,
             "attachment_ids": [uploaded["id"]]}
     msg = seed_backoff.call_with_backoff(
         lambda: ctx.api.call("POST", f"/channels/{ctx.channel_id}/messages", body))
