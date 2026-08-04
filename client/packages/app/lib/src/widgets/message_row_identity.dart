@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/display_preferences.dart';
 import '../providers/user_profiles.dart';
 import 'author_label.dart';
+import 'author_profile_tap_target.dart';
 import 'user_avatar.dart';
 
 /// The avatar column's width, and therefore also the continuation gutter's:
@@ -165,9 +166,13 @@ class MessageRowLeading extends ConsumerWidget {
       );
     }
 
-    // Decorative here: the header beside it already names the author, and
-    // without this every message was announced "Ada Lovelace Ada Lovelace".
-    return ExcludeSemantics(
+    // Decorative once there is nothing to open (the header beside it already
+    // names the author, and without this every message was announced "Ada
+    // Lovelace Ada Lovelace"); a real profile promotes it to a tap target.
+    return AuthorProfileTapTarget(
+      authorId: message.authorId,
+      semanticLabel: 'View profile',
+      decorativeWhenUnresolved: true,
       child: AuthorAvatar(
         userId: message.authorId,
         name: _label(ref),
@@ -208,12 +213,16 @@ class MessageRowHeader extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Flexible(
-            child: Text(
-              name,
-              overflow: TextOverflow.ellipsis,
-              style: AppText.body.copyWith(
-                color: tokens.textPrimary,
-                fontWeight: AppWeights.semi,
+            child: AuthorProfileTapTarget(
+              authorId: message.authorId,
+              semanticLabel: '$name, view profile',
+              child: Text(
+                name,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.body.copyWith(
+                  color: tokens.textPrimary,
+                  fontWeight: AppWeights.semi,
+                ),
               ),
             ),
           ),

@@ -3,6 +3,17 @@
 /// and a tap to vote. Voting is refused server-side once the poll is
 /// closed regardless of what this renders, so [poll]'s own `closed` flag
 /// (never the client's clock) is what disables the tap here too.
+///
+/// Each option bar is a track (`borderSubtle`, always visible) with a
+/// proportional fill on top: `borderStrong` for an ordinary option, so the
+/// share reads by contrast alone rather than needing the percentage text to
+/// do all the work, and `accentSoft` for the one you voted for - one of the
+/// seven closed accent roles in `docs/decisions/0004-visual-identity-review.md`.
+/// The option's own border is always `borderSubtle`, never accent-coloured:
+/// `AppTokens.focusRing`'s own doc draws the house rule that selection is a
+/// fill plus a marker (the checkmark, already here) while an accent outline
+/// means keyboard focus, and an accent border marking selection here was
+/// exactly backwards against that.
 library;
 
 import 'package:flutter/material.dart';
@@ -62,7 +73,7 @@ class PollView extends StatelessWidget {
               selected: poll.votedOption == option.position,
               onTap: canVote ? () => onVote(option.position) : null,
             ),
-            const SizedBox(height: AppSpacing.s8),
+            const SizedBox(height: AppSpacing.s4),
           ],
           Text(
             '${poll.totalVotes} vote${poll.totalVotes == 1 ? '' : 's'}',
@@ -105,17 +116,18 @@ class _PollOptionRow extends StatelessWidget {
           height: 34,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? tokens.accentFill : tokens.borderSubtle,
-            ),
+            // Always the plain separator: an accent border means focus here, not selection.
+            border: Border.all(color: tokens.borderSubtle),
             borderRadius: BorderRadius.circular(AppRadii.control),
           ),
           child: Stack(
             children: [
+              // The track, always visible, so a zero-vote option still reads as a bar.
+              Positioned.fill(child: Container(color: tokens.borderSubtle)),
               FractionallySizedBox(
                 widthFactor: fraction.clamp(0, 1),
                 child: Container(
-                  color: selected ? tokens.accentSoft : tokens.surfaceSunken,
+                  color: selected ? tokens.accentSoft : tokens.borderStrong,
                 ),
               ),
               Padding(

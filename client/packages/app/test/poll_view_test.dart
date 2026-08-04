@@ -34,6 +34,31 @@ Widget _app(api.Poll poll) => MaterialApp(
   ),
 );
 
+/// The one [Container] per option row that carries its own border and
+/// clipping, found among the ancestors of its own label text; distinct from
+/// the poll card's outer container, which never clips.
+Finder _optionRow(String label) => find.ancestor(
+  of: find.text(label),
+  matching: find.byWidgetPredicate(
+    (w) => w is Container && w.clipBehavior == Clip.antiAlias,
+  ),
+);
+
+/// The track and fill layers inside one option's row: the two plain-coloured
+/// [Container]s the row's own bordered one is not (that one carries a
+/// [BoxDecoration] instead of a bare `color`).
+List<Container> _fillLayers(WidgetTester tester, String label) => tester
+    .widgetList<Container>(
+      find.descendant(of: _optionRow(label), matching: find.byType(Container)),
+    )
+    .where((c) => c.color != null)
+    .toList();
+
+/// Rec. 709 luma, the same conversion `presence_desaturation_test.dart` uses
+/// to check a cue survives greyscale, applied here to the poll's own track
+/// and fill tokens rather than to rendered pixels.
+double _luma(Color c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+
 void main() {
   testWidgets('the voted option carries a check, not colour alone', (
     tester,
@@ -87,4 +112,90 @@ void main() {
       );
     },
   );
+
+  group('selection is a fill, never the border', () {
+    testWidgets(
+      "an option's border is the plain separator whether or not it is the "
+      'one voted for - an accent border means keyboard focus elsewhere in '
+      'this system, and reused here it read backwards',
+      (tester) async {
+        await tester.pumpWidget(_app(_poll(votedOption: 1)));
+
+        for (final label in ['Option 0', 'Option 1']) {
+          final row = tester.widget<Container>(_optionRow(label));
+          final border = (row.decoration! as BoxDecoration).border! as Border;
+          expect(border.top.color, AppTokens.light.borderSubtle, reason: label);
+        }
+      },
+    );
+
+    testWidgets(
+      "an ordinary option's fill is a stronger neutral than its track, not "
+      'the near-invisible pair the percentage used to have to carry alone',
+      (tester) async {
+        await tester.pumpWidget(_app(_poll(votes: const [1, 3])));
+
+        final layers = _fillLayers(tester, 'Option 0');
+        expect(layers.length, 2);
+        expect(
+          layers.map((c) => c.color),
+          containsAll(<Color>[
+            AppTokens.light.borderSubtle,
+            AppTokens.light.borderStrong,
+          ]),
+        );
+      },
+    );
+
+    testWidgets(
+      "the voted option's fill is the soft accent tint, one of the seven "
+      'closed accent roles, not the plain neutral an ordinary option gets',
+      (tester) async {
+        await tester.pumpWidget(_app(_poll(votedOption: 1)));
+
+        final layers = _fillLayers(tester, 'Option 1');
+        expect(
+          layers.map((c) => c.color),
+          containsAll(<Color>[
+            AppTokens.light.borderSubtle,
+            AppTokens.light.accentSoft,
+          ]),
+        );
+      },
+    );
+
+    testWidgets(
+      'an option with no votes at all still shows a track, rather than '
+      'blending into the card the way a fully transparent fill used to',
+      (tester) async {
+        await tester.pumpWidget(_app(_poll(votes: const [0, 0])));
+
+        final layers = _fillLayers(tester, 'Option 0');
+        expect(
+          layers.map((c) => c.color),
+          contains(AppTokens.light.borderSubtle),
+        );
+      },
+    );
+
+    test('the track and an ordinary fill differ enough in greyscale luma to '
+        'read by contrast alone, in every theme', () {
+      for (final tokens in [
+        AppTokens.light,
+        AppTokens.dark,
+        AppTokens.trueBlack,
+      ]) {
+        final delta = (_luma(tokens.borderStrong) - _luma(tokens.borderSubtle))
+            .abs();
+        expect(
+          delta,
+          greaterThan(0.03),
+          reason:
+              'below this a fill reads the same as its track to anyone who '
+              'cannot use the hue difference, which is exactly the '
+              'complaint the percentage-only bars drew',
+        );
+      }
+    });
+  });
 }
