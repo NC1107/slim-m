@@ -272,3 +272,41 @@ pub(super) async fn room_for(state: &AppState, incoming: i64) -> Result<(), ApiE
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// HTML and SVG sniff to the `text/plain` fallback (see
+    /// `media::content_type`'s module doc), so this drives the real `serve`
+    /// handler with each and asserts the response a browser actually gets:
+    /// a forced download, never an inline render, with `nosniff` set too.
+    #[test]
+    fn html_and_svg_sniffed_as_text_are_served_as_a_forced_download() {
+        for bytes in [
+            b"<html><body><script>alert(1)</script></body></html>".to_vec(),
+            b"<svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert(1)\"></svg>".to_vec(),
+        ] {
+            let content_type = media::sniff_content_type(&bytes);
+            assert_eq!(content_type, Some("text/plain"));
+            let response = serve(bytes, content_type.unwrap(), "evil.html");
+
+            let disposition = response
+                .headers()
+                .get(header::CONTENT_DISPOSITION)
+                .unwrap()
+                .to_str()
+                .unwrap();
+            assert!(
+                disposition.starts_with("attachment"),
+                "must never be inline: {disposition}"
+            );
+
+            let nosniff = response
+                .headers()
+                .get(HeaderName::from_static("x-content-type-options"))
+                .unwrap();
+            assert_eq!(nosniff, "nosniff");
+        }
+    }
+}

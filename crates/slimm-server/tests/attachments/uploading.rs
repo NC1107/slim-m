@@ -42,11 +42,18 @@ async fn an_oversized_upload_is_refused() {
 }
 
 /// The filename and an explicit Content-Type header both claim an image, but
-/// the bytes are HTML. Neither signal is trusted - only the bytes are sniffed
-/// - so this must be refused exactly like an honestly labeled HTML upload
-/// would be.
+/// the bytes are HTML. Neither signal is trusted - only the bytes are
+/// sniffed - so the stored type is whatever the bytes actually are
+/// (`text/plain`, the last-resort fallback for plausibly readable text; see
+/// `media::content_type`'s module doc), never the lying `image/png` either
+/// signal claimed. This upload succeeds rather than being refused: HTML text
+/// is exactly the reference-material shape this allowlist was widened to
+/// admit, and it is inert once stored, since `text/plain` is never served
+/// inline (see `html_and_svg_sniffed_as_text_are_served_as_a_forced_download`
+/// in `http::attachments`, which drives the real serving handler on this
+/// same content and asserts the forced download).
 #[tokio::test]
-async fn a_disallowed_content_type_is_refused_even_when_the_filename_lies() {
+async fn the_sniffed_type_wins_over_a_lying_filename_and_content_type_header() {
     let (store, _guard) = new_store().await;
     store
         .create_role(
@@ -59,15 +66,51 @@ async fn a_disallowed_content_type_is_refused_even_when_the_filename_lies() {
     let app = app(store.clone());
     let (token, _id) = register(&store, "alice").await;
 
-    let evil = b"<html><body><script>alert(1)</script></body></html>".to_vec();
+    let html = b"<html><body><script>alert(1)</script></body></html>".to_vec();
     let request = Request::builder()
         .method("POST")
         .uri("/attachments?filename=totally-a-photo.png")
         .header("authorization", format!("Bearer {token}"))
         .header("content-type", "image/png")
-        .body(Body::from(evil))
+        .body(Body::from(html))
         .unwrap();
     let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let stored = json_body(response).await;
+    assert_eq!(
+        stored["content_type"], "text/plain",
+        "the bytes decide, not the filename or the claimed header"
+    );
+}
+
+/// Bytes matching no signature and failing the `text/plain` fallback too
+/// (a NUL byte, here) are still refused outright - the allowlist widened,
+/// it did not disappear.
+#[tokio::test]
+async fn bytes_matching_nothing_at_all_are_still_refused() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::ATTACH_FILES),
+            true,
+        )
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let (token, _id) = register(&store, "alice").await;
+
+    let garbage = vec![0x00, 0x01, 0x02, 0x03, 0xC3, 0x28];
+    let response = app
+        .clone()
+        .oneshot(request_bytes(
+            "POST",
+            "/attachments?filename=mystery.bin",
+            &token,
+            garbage,
+        ))
+        .await
+        .unwrap();
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 

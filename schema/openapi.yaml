@@ -1794,10 +1794,17 @@ paths:
         in `attachment_ids` on `sendMessage`. Content type is decided by
         sniffing the uploaded bytes against a fixed server-side allowlist,
         never from a client-declared Content-Type header or a filename
-        extension - an unrecognized type is refused outright. Idempotent by
-        content: uploading bytes that already exist returns the existing
-        id rather than storing a second copy. An id that is never referenced
-        by a message is reclaimed automatically after a day.
+        extension - an unrecognized type is refused outright. The allowlist
+        covers images, PDF, mp4 and webm video, mpeg/ogg/wav audio, zip and
+        gzip archives, and a last-resort `text/plain` match for bytes that
+        are plausibly readable text (valid UTF-8, no control characters
+        other than tab/newline/CR) - reference material such as source
+        files, logs, csv, json and yaml has no magic bytes of its own, so
+        this is the only way to admit it. Every type past the four inline
+        image types is always served as a forced download; see getAttachment.
+        Idempotent by content: uploading bytes that already exist returns the
+        existing id rather than storing a second copy. An id that is never
+        referenced by a message is reclaimed automatically after a day.
       parameters:
         - name: filename
           in: query
@@ -1876,6 +1883,38 @@ paths:
                 type: string
                 format: binary
             application/pdf:
+              schema:
+                type: string
+                format: binary
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+            video/webm:
+              schema:
+                type: string
+                format: binary
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/ogg:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+            application/zip:
+              schema:
+                type: string
+                format: binary
+            application/gzip:
+              schema:
+                type: string
+                format: binary
+            text/plain:
               schema:
                 type: string
                 format: binary
