@@ -38,10 +38,8 @@ ROLE_NAME = "Role name"
 CREATE_ROLE = "Create role"
 
 # Voice
-JOIN_CALL = "Join call"
 IN_CALL = "in call"
 SHARE_SCREEN = "Share a screen"
-SHARE_QUALITY = "Balanced"
 SHARING_NOTICE = "You are sharing your screen"
 STOP_SHARING = "Stop sharing"
 MUTE = "Mute"
@@ -57,8 +55,8 @@ REPLY_UNAVAILABLE = "Message unavailable"
 REPLY_UNAVAILABLE_QUOTE = "Reply to a message that is not available"
 JUMP_FAILED = "Could not find that message."
 
-# Threads: only the reply-count affordance is reachable, never "Reply in thread" itself (see e2e_threads.py).
-THREAD_HEADER = "Thread"
+# Threads: the reply-count affordance and the back tooltip, never the bar's own title (see e2e_threads.py).
+THREAD_HEADER = "Back to the conversation"
 
 # The fixture channels the seed creates
 TEXT_CHANNEL = "general"

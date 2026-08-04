@@ -15,6 +15,18 @@ A bystander only learns a thread's reply count on their next fetch of the
 parent channel, never live (CLAUDE.md's own note on the feature says so), so
 the reply-count check below forces a real reconnect rather than trusting an
 already-open tab to notice on its own.
+
+`L.THREAD_HEADER` is the back button's tooltip rather than the bar's own
+title, which is not an oversight. An `AppBar`'s title produces no semantics
+node of its own in Flutter web: it merges into the bar's node, which this
+harness's collector cannot see, since that collector keeps only leaves on
+purpose (widening it would let two nodes answer one `find()` across every
+other scenario). Wrapping the title in `Semantics(container: true)` was
+tried and does separate it in `flutter_test`'s framework-level tree, but
+does not change what the web engine projects into the DOM, which is the only
+thing a browser run can read. The tooltip is a real leaf, appears exactly
+once in the whole client, and only on this screen, so it proves the thread
+screen rendered just as well.
 """
 import time
 

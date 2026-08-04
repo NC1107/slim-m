@@ -49,15 +49,41 @@ def tracks_of(participant, source):
             if t.get("source") == source]
 
 
+def participants_with_mics(room_id, expected=2, timeout=25):
+    """The room's participants, once every one of them is publishing a mic.
+
+    "N in call" on screen means the client joined, which the SFU learns
+    before the microphone track is published, so reading the roster the
+    instant that label appears is a race the caller happens to win or lose.
+    The plain-voice path won it and the DM path did not, which read as a DM
+    bug rather than as the timing it was. Polling is what makes both honest;
+    the assertions the callers run afterwards are unchanged, so a genuinely
+    missing track still fails, just after a real wait rather than instantly.
+    """
+    deadline = time.time() + timeout
+    parts = []
+    while time.time() < deadline:
+        parts = sfu_participants(room_id)
+        if (len(parts) == expected
+                and all(tracks_of(p, "MICROPHONE") for p in parts)):
+            return parts
+        time.sleep(1)
+    return parts
+
+
 def join_call(a, b, room_id, channel=L.VOICE_CHANNEL):
-    """Both clients into the same room, each publishing and subscribed."""
+    """Both clients into the same room, each publishing and subscribed.
+
+    Clicking a voice channel joins it directly (PR #354 removed the join
+    lobby), so the click that used to open a preview is the join itself, and
+    the wait for L.IN_CALL is what proves the connect actually completed.
+    """
     # Reached through the rail rather than by URL, which is also the only
     # end-to-end check that the rail is reachable at all: it published no
     # accessibility nodes until the shell stopped letting a modal barrier
     # block them, and nothing but a real run would have noticed.
     for c in (a, b):
         c.click(channel)
-        c.click(L.JOIN_CALL, settle=8)
         c.wait_for(L.IN_CALL)
 
     for c in (a, b):
@@ -67,7 +93,7 @@ def join_call(a, b, room_id, channel=L.VOICE_CHANNEL):
     b.wait_for("Alice")
     print("  both clients report 2 in call and list each other")
 
-    parts = sfu_participants(room_id)
+    parts = participants_with_mics(room_id)
     assert len(parts) == 2, f"SFU has {len(parts)} participants, expected 2"
     for p in parts:
         mics = tracks_of(p, "MICROPHONE")
@@ -82,12 +108,12 @@ def share_screen(client, other, room_id):
 
     The browser is started with a capture source pre-selected, so the picker
     the operating system would raise never appears; everything after that is
-    the app's own path.
+    the app's own path. PR #348 removed the in-call quality dialog this used
+    to click through ("Balanced"): quality is read from saved Voice settings
+    now, so a click on Share a screen calls getDisplayMedia directly with no
+    further interaction, on web where `screenShareNeedsSource` is false.
     """
-    client.click(L.SHARE_SCREEN, settle=3)
-    # A quality is chosen before capture starts; picking one is what calls
-    # getDisplayMedia, and the browser answers it with a pre-selected source.
-    client.click(L.SHARE_QUALITY, settle=10)
+    client.click(L.SHARE_SCREEN, settle=10)
 
     deadline = time.time() + 45
     shared = None
@@ -132,7 +158,12 @@ def mute_propagates(a, b, room_id):
 
 
 def leave_call(a, b):
+    """Both sides leave: the drop to 1 proves the count, then a real empty room."""
     a.click(L.LEAVE_CALL, settle=8)
     b.wait_for("1 in call")
     b.shot("peer-left")
     print("  the remaining client dropped to 1 in call")
+    # A lingering call here reads as "in call" on b's own rail summary too,
+    # which would let the next scenario's own IN_CALL wait pass on nothing.
+    b.click(L.LEAVE_CALL, settle=4)
+    print("  and the remaining client leaves too, so no call is left open")
