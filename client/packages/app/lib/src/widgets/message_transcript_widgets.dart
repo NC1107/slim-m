@@ -22,11 +22,27 @@ import '../routing/breakpoints.dart';
 /// name, and its topic if it has one. It fills what would otherwise be a wide
 /// empty band above a short conversation (the list is bottom-anchored), and is
 /// the one place the channel topic is shown in the body.
+///
+/// A thread takes different copy entirely rather than the same sentence with
+/// a name substituted in. A thread channel is stored with an empty `name`
+/// (`Store::open_thread` inserts `''`, since a thread has no name of its
+/// own), so the channel wording rendered as a welcome to a channel called
+/// nothing, and read as one called "Thread". What a person opening an empty
+/// thread needs to know is that replies go here, which is what [isThread]
+/// says instead.
 class ChannelStartHeader extends StatelessWidget {
-  const ChannelStartHeader({super.key, required this.name, this.topic});
+  const ChannelStartHeader({
+    super.key,
+    required this.name,
+    this.topic,
+    this.isThread = false,
+  });
 
   final String name;
   final String? topic;
+
+  /// Whether this is a thread's own transcript rather than a channel's.
+  final bool isThread;
 
   @override
   Widget build(BuildContext context) {
@@ -53,16 +69,22 @@ class ChannelStartHeader extends StatelessWidget {
               color: tokens.surfaceRaised,
               shape: BoxShape.circle,
             ),
-            child: Icon(AppIcons.hash, size: 26, color: tokens.textSecondary),
+            child: Icon(
+              isThread ? AppIcons.thread : AppIcons.hash,
+              size: 26,
+              color: tokens.textSecondary,
+            ),
           ),
           const SizedBox(height: AppSpacing.s12),
           Text(
-            'Welcome to #$name',
+            isThread ? 'Thread' : 'Welcome to #$name',
             style: AppText.title.copyWith(color: tokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.s4),
           Text(
-            topic ?? 'This is the start of the #$name channel.',
+            isThread
+                ? 'Replies to the original message appear here.'
+                : topic ?? 'This is the start of the #$name channel.',
             style: AppText.body.copyWith(color: tokens.textSecondary),
           ),
         ],

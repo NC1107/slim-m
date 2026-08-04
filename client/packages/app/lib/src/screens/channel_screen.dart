@@ -360,6 +360,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   channelName: channel?.kind == 'text'
                                       ? channelName
                                       : null,
+                                  channelIsThread:
+                                      channel?.parentMessageId != null,
                                   channelTopic: channel?.topic,
                                   scrollController: _scrollTracker.controller,
                                   lastReadSeq: lastReadSeq,
