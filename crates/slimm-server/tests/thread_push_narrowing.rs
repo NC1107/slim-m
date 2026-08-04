@@ -10,6 +10,10 @@
 //! reach into a thread the same way they reach into any other channel -
 //! moved here from `threads.rs` since both are about push, not about a
 //! thread's own identity as a channel.
+//!
+//! `thread_push_mention_case.rs` is a sibling: it covers a username match's
+//! letter-case sensitivity specifically, split out once this file crossed
+//! the 500-line hard limit.
 
 use slimm_server::config::Config;
 use slimm_server::db;
