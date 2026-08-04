@@ -17,6 +17,7 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_roster.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/voice_screen.dart';
+import 'package:slimm_app/src/widgets/camera_self_preview.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -28,9 +29,16 @@ const _tokens = TokenPair(
   accessExpiresAt: 0,
 );
 
-/// A [VoiceSession] this file never actually drives into a call: every test
-/// here cares only about a failed `join`, before any session state matters.
+/// A [VoiceSession] most tests here never actually drive into a call, since
+/// they care only about a failed `join`, before any session state matters.
+/// [connectedParticipants], when given, is what the camera-preview tests use
+/// instead: `join` reports connected with exactly that roster, the same
+/// shape a real SFU handshake would report.
 class _NoopSession implements VoiceSession {
+  _NoopSession({this.connectedParticipants});
+
+  final List<VoiceParticipant>? connectedParticipants;
+
   @override
   bool get supportsParticipantVolume => true;
 
@@ -57,7 +65,7 @@ class _NoopSession implements VoiceSession {
   Stream<VoiceSessionState> get states => _states.stream;
 
   @override
-  List<VoiceParticipant> get participants => const [];
+  List<VoiceParticipant> get participants => connectedParticipants ?? const [];
 
   @override
   Stream<List<VoiceParticipant>> get participantChanges => _participants.stream;
@@ -113,7 +121,12 @@ class _NoopSession implements VoiceSession {
     required String token,
     bool microphoneEnabled = true,
     bool cameraEnabled = false,
-  }) async {}
+  }) async {
+    final roster = connectedParticipants;
+    if (roster == null) return;
+    _participants.add(roster);
+    _states.add(VoiceSessionState.connected);
+  }
 
   @override
   Future<void> leave() async {}
@@ -203,6 +216,48 @@ Widget _harness(Widget child, ProviderContainer container) =>
         theme: buildTheme(Brightness.light, AppTokens.light),
         home: Scaffold(body: child),
       ),
+    );
+
+/// A container already connected to `channel-1`, with a single local
+/// participant whose camera is [isCameraOn] - the shared setup for both
+/// camera-preview tests below.
+ProviderContainer _connectedContainer({required bool isCameraOn}) =>
+    ProviderContainer(
+      overrides: [
+        voiceRosterProvider.overrideWith(
+          (ref, channelId) =>
+              const Stream<List<VoiceRosterParticipant>>.empty(),
+        ),
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: _tokenApi(200),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+        voiceControllerProvider.overrideWith(
+          (ref) => VoiceController(
+            ref,
+            session: _NoopSession(
+              connectedParticipants: [
+                VoiceParticipant(
+                  identity: 'user-1',
+                  name: 'Me',
+                  isSpeaking: false,
+                  isMuted: false,
+                  isLocal: true,
+                  isScreenSharing: false,
+                  isCameraOn: isCameraOn,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
 
 void main() {
@@ -370,4 +425,45 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  testWidgets('a local camera track shows the self preview once in a call', (
+    tester,
+  ) async {
+    final container = _connectedContainer(isCameraOn: true);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      _harness(const VoiceScreen(channelId: 'channel-1'), container),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(CameraSelfPreview),
+      findsOneWidget,
+      reason:
+          "the local participant's camera is on, so the preview `me != "
+          'null && me.isCameraOn` guards must have rendered',
+    );
+    expect(find.byKey(const Key('fake-camera-view-user-1')), findsOneWidget);
+
+    // Stops the heartbeat timer `connected` started: the pending-timer
+    // check runs before `addTearDown`, so this has to happen in the body.
+    await container.read(voiceControllerProvider.notifier).leave();
+  });
+
+  testWidgets('no self preview shows once in a call with the camera off', (
+    tester,
+  ) async {
+    final container = _connectedContainer(isCameraOn: false);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      _harness(const VoiceScreen(channelId: 'channel-1'), container),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CameraSelfPreview), findsNothing);
+
+    await container.read(voiceControllerProvider.notifier).leave();
+  });
 }
