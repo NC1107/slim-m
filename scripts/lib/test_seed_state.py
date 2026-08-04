@@ -42,7 +42,7 @@ class SeedStateTest(unittest.TestCase):
         self.assertEqual(state.random_own_message(rng, "bob")["id"], "m2")
         self.assertIsNone(state.random_own_message(rng, "carol"))
 
-    def test_forgetting_a_message_removes_it_from_its_authors_pool_only(self):
+    def test_forgetting_a_message_removes_it_from_its_authors_pool(self):
         state = seed_state.SeedState()
         state.add_top_message("m1", "c1", "alice")
         state.add_top_message("m2", "c1", "alice")
@@ -50,6 +50,19 @@ class SeedStateTest(unittest.TestCase):
         rng = random.Random(0)
         remaining = [state.random_own_message(rng, "alice") for _ in range(5)]
         self.assertTrue(all(m["id"] == "m2" for m in remaining))
+
+    def test_forgetting_a_message_also_removes_it_from_the_top_level_pool(self):
+        """A deleted message must not still be a reachable react/reply/
+        settle-pass target, or those calls 404 against a message that is
+        no longer there."""
+        state = seed_state.SeedState()
+        state.add_top_message("m1", "c1", "alice")
+        state.add_top_message("m2", "c1", "bob")
+        state.forget_own_message("alice", "m1")
+        rng = random.Random(0)
+        remaining = [state.random_top_message(rng) for _ in range(5)]
+        self.assertTrue(all(m["id"] == "m2" for m in remaining))
+        self.assertNotIn("m1", {m["id"] for m in state.newest_top_messages(10)})
 
     def test_a_thread_is_recorded_as_a_parent_and_channel_pair(self):
         state = seed_state.SeedState()

@@ -90,12 +90,17 @@ class SeedState:
             return self._draw(rng, pool)
 
     def forget_own_message(self, author, message_id):
-        """Drops a deleted message so it is never targeted again."""
+        """Drops a deleted message so it is never targeted again - by a
+        later `random_own_message`/`random_top_message` draw, or by the
+        settle pass reading its own fixed `newest_top_messages` snapshot,
+        which would otherwise 404 reacting to or replying on it."""
         with self._lock:
             pool = self._own_messages.get(author)
             if pool:
                 self._own_messages[author] = [
                     m for m in pool if m["id"] != message_id]
+            self._top_messages = [
+                m for m in self._top_messages if m["id"] != message_id]
 
     def has_top_message(self):
         with self._lock:

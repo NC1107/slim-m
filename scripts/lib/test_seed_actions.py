@@ -77,5 +77,21 @@ class ResolveActionTest(unittest.TestCase):
                           "message_short")
 
 
+class UtilityActionsTest(unittest.TestCase):
+    def test_excludes_every_chat_shaped_action_conversation_replay_covers(self):
+        names = {name for name, _weight in seed_actions.UTILITY_ACTIONS}
+        self.assertFalse(names & seed_actions.CONVERSATION_COVERED)
+
+    def test_keeps_every_other_action_with_its_original_weight(self):
+        as_dict = dict(seed_actions.ACTIONS)
+        for name, weight in seed_actions.UTILITY_ACTIONS:
+            self.assertEqual(weight, as_dict[name])
+
+    def test_covers_every_named_action_between_the_two_pools(self):
+        covered_names = {name for name, _ in seed_actions.UTILITY_ACTIONS} | seed_actions.CONVERSATION_COVERED
+        all_names = {name for name, _ in seed_actions.ACTIONS}
+        self.assertEqual(covered_names, all_names)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,15 +1,30 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Optional Ollama-generated message content, for less templated seed data.
+"""Optional Ollama-generated content, for less templated seed data.
 
-Off unless `--ollama` is passed; see `seed-data.py`. A handful of batched
-calls build a pooled `Corpus` up front - never one call per message, since
-800 messages at one round trip each would dominate a run and hammer the
-model - and the corpus is cached to disk keyed by model and seed, so a
-repeat run with the same `--seed` is instant. Every failure this module can
-have (unreachable, missing model, a malformed response, a slow model past
-the timeout) is caught here and answered with an empty or partial `Corpus`;
-`seed_content.py`'s canned generators are always the fallback, per field, so
-a side feature going missing never breaks a seed run.
+Off unless `--ollama` is passed; see `seed-data.py`. Two shapes of call, both
+batched rather than one round trip per message:
+
+- `load_or_generate_conversations` (this file) asks for a handful of whole,
+  structured multi-speaker conversations, one call each, which
+  `seed_conversation.py` parses and `seed_replay.py` replays turn by turn.
+  This is the fix for a real defect: pooling disconnected one-line strings
+  and drawing them at random cannot produce a conversation, because nothing
+  any speaker says ever relates to what another speaker just said. A whole
+  conversation in one call, given the real participant names, can.
+- `load_or_generate` (`seed_ollama_pools.py`) builds a pooled `Corpus` of
+  disconnected strings instead, still used for the action kinds a
+  conversation replay does not cover (code blocks, polls).
+
+Both are cached to disk keyed by model and seed, so a repeat run with the
+same `--seed` is instant and reproducible, and both share the wire-level
+mechanics this file owns: `_request` (one `/api/generate` call, JSON-schema
+constrained), `_reachable` (a fast pre-flight so an outage fails in seconds
+rather than after several full-length timeouts), and the on-disk cache
+helpers. Every failure either shape can have (unreachable, missing model, a
+malformed response, a slow model past the timeout) is caught here and
+answered with an empty or partial result; the canned fallback in
+`seed_content.py`/`seed_conversation.py` is always there, per field or per
+conversation, so a side feature going missing never breaks a seed run.
 """
 import hashlib
 import json
@@ -24,91 +39,78 @@ CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "slim-m-seed")
 
 _PROBE_TIMEOUT = 5
 _REQUEST_TIMEOUT = 120
-_MAX_STRING = 2000
-_MAX_CODE = 800
 
-_SHORT_COUNT = 60
-_LONG_COUNT = 24
-_CODE_COUNT = 20
-_POLL_COUNT = 12
-
-# Applied to every prompt below: this lands in the owner's real deployment.
+# Applied to every prompt here and in seed_ollama_pools.py: this can land live.
 _SAFETY_NOTE = (
     " Keep it benign: no passwords, API keys, tokens, or anything that "
     "looks like a real credential; no real names, addresses or private "
     "information; nothing abusive or explicit."
 )
-_SHORT_PROMPT = (
-    f"Generate {_SHORT_COUNT} short casual chat messages (roughly 4 to 14 "
-    "words each) a small group of friends might send in a text channel: a "
-    "mix of questions, terse acknowledgements, replies-in-tone, and "
-    "enthusiastic reactions. No usernames or @ mentions." + _SAFETY_NOTE)
-_LONG_PROMPT = (
-    f"Generate {_LONG_COUNT} longer casual chat messages (roughly 4 to 8 "
-    "sentences each) catching up about work, a shared project, or weekend "
-    "plans, in a natural conversational tone. No usernames or @ mentions."
-    + _SAFETY_NOTE)
-_CODE_PROMPT = (
-    f"Generate {_CODE_COUNT} short benign code snippets (1 to 6 lines "
-    "each), spread across python, rust, bash and dart, the kind someone "
-    "would casually paste into a chat to show a teammate something."
-    + _SAFETY_NOTE)
-_POLL_PROMPT = (
-    f"Generate {_POLL_COUNT} short casual poll ideas a friend group chat "
-    "might post (like tabs vs spaces, or where to eat), each with 2 to 4 "
-    "short options." + _SAFETY_NOTE)
 
-_MESSAGES_SCHEMA = {
+# Turns per requested conversation; seed_conversation.py owns topic/count rng.
+CONVERSATION_TURN_COUNT = 18
+
+_CONVERSATION_SCHEMA = {
     "type": "object",
-    "properties": {"messages": {"type": "array", "items": {"type": "string"}}},
-    "required": ["messages"],
-}
-_CODE_SCHEMA = {
-    "type": "object",
-    "properties": {"items": {"type": "array", "items": {
+    "properties": {"turns": {"type": "array", "items": {
         "type": "object",
-        "properties": {"lang": {"type": "string"}, "code": {"type": "string"}},
-        "required": ["lang", "code"],
+        "properties": {
+            "speaker": {"type": "string"},
+            "text": {"type": "string"},
+            # -1 means "no target"; see seed_conversation.py's own parsing.
+            "reply_to": {"type": "integer"},
+            "thread_root": {"type": "boolean"},
+            "in_thread": {"type": "integer"},
+            "reactions": {"type": "array", "items": {
+                "type": "object",
+                "properties": {
+                    "emoji": {"type": "string"},
+                    "reactors": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["emoji", "reactors"],
+            }},
+        },
+        "required": ["speaker", "text"],
     }}},
-    "required": ["items"],
-}
-_POLL_SCHEMA = {
-    "type": "object",
-    "properties": {"polls": {"type": "array", "items": {
-        "type": "object",
-        "properties": {"question": {"type": "string"},
-                        "options": {"type": "array", "items": {"type": "string"}}},
-        "required": ["question", "options"],
-    }}},
-    "required": ["polls"],
+    "required": ["turns"],
 }
 
 
-class Corpus:
-    """A pooled batch of generated content, one list per action shape."""
-
-    def __init__(self, short=(), long=(), code=(), polls=()):
-        self.short = list(short)
-        self.long = list(long)
-        self.code = [tuple(item) for item in code]
-        self.polls = [tuple(item) for item in polls]
-
-    def is_empty(self):
-        return not (self.short or self.long or self.code or self.polls)
-
-    def as_dict(self):
-        return {"short": self.short, "long": self.long,
-                "code": self.code, "polls": self.polls}
+def _conversation_prompt(participants, topic, turn_count):
+    names = ", ".join(participants)
+    return (
+        "Write a realistic group chat transcript, as JSON, for a small "
+        f"friend group's private text channel. The participants, by name, "
+        f"are: {names}. Everyone already knows each other well. Write "
+        f"{turn_count} turns of natural back-and-forth about: {topic}. "
+        "Return an object with a 'turns' array. Each turn has: 'speaker' "
+        "(one of the names above, spelled exactly as given), 'text' (3 to "
+        "30 words, casual chat style, no markdown formatting, no @ "
+        "mentions), 'reply_to' (the 0-based index of an earlier turn this "
+        "one is a direct reply to, or -1 if it just continues the "
+        "conversation), 'thread_root' (true only on a turn that spins off "
+        "a short side conversation other turns later join), 'in_thread' "
+        "(the index of the turn with thread_root true that THIS turn "
+        "replies inside, or -1 if this turn is not part of a side "
+        "conversation), and 'reactions' (0 to 2 entries, each with an "
+        "'emoji' and a 'reactors' list of 1 to 3 OTHER participants' "
+        "names who reacted with it - never the speaker's own name). Vary "
+        "the length and tone of 'text' - some short one-word replies, "
+        "some longer ones, the way real friends actually type. Include at "
+        "least one turn with thread_root true and at least 3 later turns "
+        "whose in_thread points at it, so that side conversation has real "
+        "depth. Have people address each other by name sometimes, the way "
+        "friends do." + _SAFETY_NOTE)
 
 
 def _log(message):
     print(f"seed-ollama: {message}", file=sys.stderr)
 
 
-def _cache_path(model, seed, cache_dir):
+def _cache_path(model, seed, cache_dir, kind="corpus"):
     safe_model = "".join(c if c.isalnum() else "-" for c in model)
-    key = hashlib.sha256(f"{model}:{seed}".encode()).hexdigest()[:16]
-    return os.path.join(cache_dir, f"corpus-{safe_model}-{key}.json")
+    key = hashlib.sha256(f"{kind}:{model}:{seed}".encode()).hexdigest()[:16]
+    return os.path.join(cache_dir, f"{kind}-{safe_model}-{key}.json")
 
 
 def _request(base_url, model, prompt, schema, timeout):
@@ -122,47 +124,20 @@ def _request(base_url, model, prompt, schema, timeout):
     return json.loads(payload["response"])
 
 
-def _fetch_messages(base_url, model, prompt, timeout):
-    parsed = _request(base_url, model, prompt, _MESSAGES_SCHEMA, timeout)
-    return [m.strip()[:_MAX_STRING] for m in parsed["messages"]
-            if isinstance(m, str) and m.strip()]
-
-
-def _fetch_code(base_url, model, timeout):
-    parsed = _request(base_url, model, _CODE_PROMPT, _CODE_SCHEMA, timeout)
-    out = []
-    for item in parsed["items"]:
-        code = (item.get("code") or "").strip()
-        if not code:
-            continue
-        lang = (item.get("lang") or "").strip().lower() or None
-        out.append((lang, code[:_MAX_CODE]))
-    return out
-
-
-def _fetch_polls(base_url, model, timeout):
-    parsed = _request(base_url, model, _POLL_PROMPT, _POLL_SCHEMA, timeout)
-    out = []
-    for item in parsed["polls"]:
-        question = (item.get("question") or "").strip()
-        options = [o.strip() for o in (item.get("options") or []) if o.strip()][:4]
-        if question and len(options) >= 2:
-            out.append((question, options))
-    return out
-
-
-def _fetch_or_empty(label, fetch, *args):
-    """One pool's fetch, isolated: a bad response here must not sink the rest."""
-    try:
-        return fetch(*args)
-    except Exception as exc:  # noqa: BLE001 - one pool failing must not sink the corpus
-        _log(f"could not generate {label}, that pool will fall back: {exc}")
-        return []
+def _fetch_conversation(base_url, model, participants, topic, turn_count, timeout):
+    """The raw `turns` array for one conversation - not yet validated as
+    usable; see `seed_conversation.parse_conversation` for that."""
+    prompt = _conversation_prompt(participants, topic, turn_count)
+    parsed = _request(base_url, model, prompt, _CONVERSATION_SCHEMA, timeout)
+    turns = parsed.get("turns")
+    if not isinstance(turns, list):
+        raise ValueError("response had no usable 'turns' array")
+    return turns
 
 
 def _reachable(base_url, model):
     """A quick, short-timeout check, so an outage fails fast rather than
-    waiting out four full generation timeouts in a row."""
+    waiting out several full generation timeouts in a row."""
     try:
         req = urllib.request.Request(f"{base_url.rstrip('/')}/api/tags")
         with urllib.request.urlopen(req, timeout=_PROBE_TIMEOUT) as res:
@@ -177,58 +152,62 @@ def _reachable(base_url, model):
     return True
 
 
-def generate(base_url, model, timeout=_REQUEST_TIMEOUT):
-    """One `Corpus`. Each pool fails independently; this call itself never
-    raises."""
-    return Corpus(
-        short=_fetch_or_empty("short messages", _fetch_messages,
-                               base_url, model, _SHORT_PROMPT, timeout),
-        long=_fetch_or_empty("long messages", _fetch_messages,
-                              base_url, model, _LONG_PROMPT, timeout),
-        code=_fetch_or_empty("code snippets", _fetch_code,
-                              base_url, model, timeout),
-        polls=_fetch_or_empty("polls", _fetch_polls, base_url, model, timeout))
-
-
-def _load_cache(path):
+def _load_json_cache(path):
     try:
         with open(path, encoding="utf-8") as fh:
-            return Corpus(**json.load(fh))
-    except (OSError, ValueError, TypeError, KeyError):
+            return json.load(fh)
+    except (OSError, ValueError):
         return None
 
 
-def _save_cache(path, corpus):
+def _save_json_cache(path, data):
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as fh:
-            json.dump(corpus.as_dict(), fh)
+            json.dump(data, fh)
     except OSError as exc:
-        _log(f"could not write corpus cache: {exc}")
+        _log(f"could not write cache: {exc}")
 
 
-def load_or_generate(model, seed, *, base_url=DEFAULT_BASE_URL,
-                      cache_dir=CACHE_DIR, timeout=_REQUEST_TIMEOUT):
-    """A cache-first `Corpus`, or an empty one if generation is unavailable.
+def load_or_generate_conversations(model, seed, requests, *,
+                                    turn_count=CONVERSATION_TURN_COUNT,
+                                    base_url=DEFAULT_BASE_URL,
+                                    cache_dir=CACHE_DIR,
+                                    timeout=_REQUEST_TIMEOUT):
+    """One raw, not-yet-validated conversation per `(topic, participants)`
+    pair in `requests`.
 
-    Never raises: every failure is logged to stderr and answered with a
-    `Corpus` some or all of whose pools are empty, which is what tells
-    `seed_content.py`'s generators to fall back to their canned pools.
+    Never raises: an unreachable server, a missing model, one bad
+    conversation, or every single one failing all answer `[]` (logged to
+    stderr), which tells `seed_conversation.py` to fall back to the canned
+    corpus instead. A single bad topic does not sink the others - each is
+    its own `_request` call, isolated the same way the pooled corpus
+    isolates one pool's failure from the rest.
     """
-    path = _cache_path(model, seed, cache_dir)
-    cached = _load_cache(path)
-    if cached is not None and not cached.is_empty():
-        _log(f"using cached corpus at {path}")
+    path = _cache_path(model, seed, cache_dir, kind="conversations")
+    cached = _load_json_cache(path)
+    if cached:
+        _log(f"using cached conversations at {path}")
         return cached
 
     if not _reachable(base_url, model):
-        return Corpus()
+        return []
 
-    corpus = generate(base_url, model, timeout)
-    if corpus.is_empty():
-        _log("model returned nothing usable in any category; "
+    raw_list = []
+    for topic, participants in requests:
+        try:
+            turns = _fetch_conversation(
+                base_url, model, participants, topic, turn_count, timeout)
+        except Exception as exc:  # noqa: BLE001 - one bad topic must not sink the rest
+            _log(f"could not generate a conversation about {topic!r}: {exc}")
+            continue
+        raw_list.append({"topic": topic, "participants": list(participants),
+                          "turns": turns})
+
+    if not raw_list:
+        _log("no usable conversation came back from the model; "
              "falling back to canned content")
-        return corpus
+        return raw_list
 
-    _save_cache(path, corpus)
-    return corpus
+    _save_json_cache(path, raw_list)
+    return raw_list

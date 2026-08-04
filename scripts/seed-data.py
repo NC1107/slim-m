@@ -2,17 +2,38 @@
 # SPDX-License-Identifier: Apache-2.0
 """Fills a deployment with varied, realistic-looking chat activity.
 
-Creates a channel named for today's date, then N accounts (default 10)
-acting in parallel: short and long messages, emoji, markdown, real code
-functions across several languages, links (video, article, image, repo),
-mentions, polls, attachments, replies, threads, reactions, edits, deletes,
-and pins, picked at random from a weighted set so the result reads like an
-uneven real conversation rather than a uniform sample. Target selection for
-reactions and threads is recency-weighted (see scripts/lib/seed_state.py)
-and a settle pass at the end (scripts/lib/seed_settle.py) puts fresh
-activity on the newest slice specifically, so the screenful anyone actually
-opens a channel to look at is not the barest part of it. Drives plain REST,
-reusing scripts/lib/e2e_api.py rather than a second HTTP client.
+Creates a channel named for today's date, then N accounts (default 10) that
+by default are the *same* accounts a previous run against this deployment
+already created (see "Repeat runs" below), acting in parallel: short and
+long messages, emoji, markdown, real code functions across several
+languages, links (video, article, image, repo), mentions, polls,
+attachments, replies, threads, reactions, edits, deletes, and pins, picked
+at random from a weighted set so the result reads like an uneven real
+conversation rather than a uniform sample. Target selection for reactions
+and threads is recency-weighted (see scripts/lib/seed_state.py) and a
+settle pass at the end (scripts/lib/seed_settle.py) both guarantees a
+message can carry several different emoji or one emoji from several
+different reactors, and opens brand new, multi-reply threads on the newest
+messages specifically - so the screenful anyone actually opens a channel to
+look at is not the barest part of it. Drives plain REST, reusing
+scripts/lib/e2e_api.py rather than a second HTTP client.
+
+With --ollama, the chat itself is not drawn from pools of disconnected
+lines: scripts/lib/seed_conversation.py asks the model for a handful of
+whole, structured multi-speaker conversations - real participant names,
+who replies to whom, which turn opens a side thread, who reacts with what -
+in one call each, and scripts/lib/seed_replay.py sends the result turn by
+turn. A conversation the model garbles past usefulness is dropped rather
+than sent; --ollama absent, or every conversation unusable, falls all the
+way back to the pooled-and-templated behaviour this script always had.
+
+Repeat runs against the same deployment reuse the same accounts by default:
+--username-tag is empty unless given (so a persona's username is the same,
+e.g. seed-alan, every run) and the shared password is cached per deployment
+under ~/.cache/slim-m-seed/ unless --password overrides it, so
+register_accounts logs into an account that is already registered instead
+of minting a fresh one. Pass --username-tag to get a separate, fresh cohort
+alongside whatever already exists instead.
 
 The server's attachment upload sniffs content type from the bytes it is
 given, never from a filename or a declared Content-Type header (see
@@ -91,15 +112,20 @@ def _parse_args(argv):
     parser.add_argument("--admin-password", default=None)
     parser.add_argument("--password", default=None,
                          help="shared password for the seed accounts; "
-                              "random per run if omitted")
+                              "cached per deployment under "
+                              "~/.cache/slim-m-seed/ if omitted, so a "
+                              "repeat run can still log into the same "
+                              "accounts")
     parser.add_argument("--channel-name", default=None,
                          help="defaults to today's date")
     parser.add_argument("--seed", type=int, default=None,
                          help="random seed, for a reproducible run")
     parser.add_argument("--username-tag", default=None,
-                         help="namespaces seed account usernames; random per "
-                              "run if omitted, so re-seeding the same "
-                              "deployment never collides on username")
+                         help="namespaces seed account usernames; empty "
+                              "(stable across runs, so a repeat run logs "
+                              "into the same accounts) if omitted - pass a "
+                              "value for a separate, fresh cohort alongside "
+                              "whatever already exists")
     parser.add_argument("--ollama", action="store_true",
                          help="generate message content with a local Ollama "
                               "model instead of the canned templates; off "

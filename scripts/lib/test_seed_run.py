@@ -12,8 +12,24 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import seed_ollama  # noqa: E402
+import seed_conversation  # noqa: E402
+import seed_ollama_pools  # noqa: E402
 import seed_run  # noqa: E402
+
+
+class DescribeConversationsTest(unittest.TestCase):
+    def test_none_means_a_conversation_replay_never_applied(self):
+        self.assertIsNone(seed_run._describe_conversations(None))
+
+    def test_an_empty_list_reads_as_unusable_not_silent(self):
+        got = seed_run._describe_conversations([])
+        self.assertIn("none usable", got)
+
+    def test_a_populated_list_reports_the_count_and_turn_total(self):
+        conv = seed_conversation.Conversation(topic="t", turns=[object()] * 5)
+        got = seed_run._describe_conversations([conv, conv])
+        self.assertIn("2 (", got)
+        self.assertIn("10 turns", got)
 
 
 class DescribeCorpusTest(unittest.TestCase):
@@ -21,12 +37,12 @@ class DescribeCorpusTest(unittest.TestCase):
         self.assertIn("not requested", seed_run._describe_corpus(None))
 
     def test_an_empty_corpus_reads_as_unavailable_not_silent(self):
-        got = seed_run._describe_corpus(seed_ollama.Corpus())
+        got = seed_run._describe_corpus(seed_ollama_pools.Corpus())
         self.assertIn("unavailable", got)
         self.assertIn("canned", got)
 
     def test_a_populated_corpus_reports_each_pool_size(self):
-        corpus = seed_ollama.Corpus(
+        corpus = seed_ollama_pools.Corpus(
             short=["a", "b"], long=["c"], code=[("py", "x")], polls=[])
         got = seed_run._describe_corpus(corpus)
         self.assertIn("2 short", got)

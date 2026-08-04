@@ -8,6 +8,14 @@ anything could react to or reply on them. No weighting closes a shortage of
 remaining actions. This runs once, after every worker has finished, against
 a fixed snapshot of the newest messages and threads - never the whole
 channel, or it would just move the same problem rather than fix the tail.
+
+Two shapes this pass guarantees rather than leaves to chance, both real
+defects reported against an earlier version of this script: a message can
+carry several *different* emoji, and an emoji can be reacted to by several
+*different* people (a count above 1) - see `_reaction_plan`. And a thread
+can be freshly opened here, not just kept alive if one already exists near
+the tail - see `SETTLE_NEW_THREADS` - with enough replies (3 to 8) to read
+as an actual side conversation rather than a single, lonely reply.
 """
 import collections
 import urllib.parse
@@ -22,9 +30,16 @@ SETTLE_TARGET_MESSAGES = 100
 SETTLE_REACT_COVERAGE = 0.9
 # Share of targets that also get a top-level reply.
 SETTLE_REPLY_COVERAGE = 0.15
-# How many of the most recently opened threads get kept alive.
+# How many of the most recently opened threads get a light 1-3-reply top-up.
 SETTLE_THREAD_TARGETS = 10
 SETTLE_THREAD_REPLIES = (1, 3)
+# How many of the newest targets get a brand new, deeply-replied thread.
+SETTLE_NEW_THREADS = 6
+SETTLE_NEW_THREAD_REPLIES = (3, 8)
+
+# Weighted so one emoji/one reactor is still common, but not the only shape.
+_DISTINCT_EMOJI_WEIGHTS = ((1, 45), (2, 35), (3, 20))
+_REACTOR_COUNT_WEIGHTS = ((1, 40), (2, 35), (3, 15), (4, 10))
 
 
 def _actor(contexts, rng, exclude_username=None):
@@ -33,8 +48,20 @@ def _actor(contexts, rng, exclude_username=None):
     return rng.choice(pool)
 
 
-def _react(ctx, rng, target):
-    emoji = rng.choice(seed_content.EMOJI)
+def _weighted_choice(rng, weights):
+    return rng.choices([n for n, _w in weights], weights=[w for _n, w in weights])[0]
+
+
+def _reaction_plan(rng, actor_pool_size):
+    """A list of `(emoji, reactor_count)` pairs for one target - see the
+    module doc comment for why this is a plan rather than one draw."""
+    distinct = min(_weighted_choice(rng, _DISTINCT_EMOJI_WEIGHTS), len(seed_content.EMOJI))
+    emojis = rng.sample(seed_content.EMOJI, k=distinct)
+    return [(emoji, min(_weighted_choice(rng, _REACTOR_COUNT_WEIGHTS), actor_pool_size))
+            for emoji in emojis]
+
+
+def _react(ctx, target, emoji):
     encoded = urllib.parse.quote(emoji, safe="")
     return seed_backoff.call_with_backoff(
         lambda: ctx.api.call("PUT", f"/messages/{target['id']}/reactions/{encoded}"))
@@ -55,6 +82,11 @@ def _reply_in_thread(ctx, rng, thread_channel_id):
         lambda: ctx.api.send_message(thread_channel_id, content))
 
 
+def _open_thread(ctx, target):
+    return seed_backoff.call_with_backoff(
+        lambda: ctx.api.open_thread(target["channel_id"], target["id"]))
+
+
 def _try(failures, ctx, action_name, action):
     """Runs `action`, recording rather than raising on failure - the same
     best-effort contract `seed_worker.run_account` gives every other action.
@@ -71,8 +103,8 @@ def _try(failures, ctx, action_name, action):
 
 
 def _react_to(contexts, rng, stats, failures, reacted_ids, target):
-    """One reaction draw against `target`, folded into `stats`/`reacted_ids`
-    on success - the one piece of behaviour both loops below share.
+    """A whole reaction plan against `target` - several emoji, several
+    reactors each - folded into `stats`/`reacted_ids` on success.
 
     Called a second time for each reply the pass itself just created:
     that reply is now part of the newest slice too, starts exactly as bare
@@ -81,11 +113,37 @@ def _react_to(contexts, rng, stats, failures, reacted_ids, target):
     """
     if rng.random() >= SETTLE_REACT_COVERAGE:
         return
-    ctx = _actor(contexts, rng, target["author"])
-    ok, _result = _try(failures, ctx, "settle_react", lambda: _react(ctx, rng, target))
-    if ok:
-        stats["settle_react"] += 1
-        reacted_ids.add(target["id"])
+    pool = [c for c in contexts if c.username != target["author"]] or contexts
+    for emoji, reactor_count in _reaction_plan(rng, len(pool)):
+        for ctx in rng.sample(pool, k=reactor_count):
+            ok, _result = _try(failures, ctx, "settle_react",
+                                lambda ctx=ctx, emoji=emoji: _react(ctx, target, emoji))
+            if ok:
+                stats["settle_react"] += 1
+                reacted_ids.add(target["id"])
+
+
+def _open_new_threads(contexts, rng, stats, failures, state, targets):
+    """Opens a fresh thread on a random sample of `targets`, each with a
+    3-to-8-reply side conversation - the fix for threads that existed but
+    were never near enough the tail's own message ids to be visible there;
+    see the module doc comment."""
+    for target in rng.sample(targets, k=min(SETTLE_NEW_THREADS, len(targets))):
+        ctx = _actor(contexts, rng, target["author"])
+        ok, thread = _try(failures, ctx, "settle_open_thread",
+                           lambda ctx=ctx, target=target: _open_thread(ctx, target))
+        if not ok:
+            continue
+        stats["settle_open_thread"] += 1
+        state.add_thread(target["id"], thread["id"])
+        for _ in range(rng.randint(*SETTLE_NEW_THREAD_REPLIES)):
+            reply_ctx = _actor(contexts, rng)
+            ok, _result = _try(
+                failures, reply_ctx, "settle_reply_in_thread",
+                lambda reply_ctx=reply_ctx, thread=thread:
+                    _reply_in_thread(reply_ctx, rng, thread["id"]))
+            if ok:
+                stats["settle_reply_in_thread"] += 1
 
 
 def run(contexts, state, rng):
@@ -115,6 +173,8 @@ def run(contexts, state, rng):
     # See _react_to's own doc comment for why this second pass exists.
     for reply_target in created_replies:
         _react_to(contexts, rng, stats, failures, reacted_ids, reply_target)
+
+    _open_new_threads(contexts, rng, stats, failures, state, targets)
 
     for _parent_id, thread_channel_id in state.newest_threads(SETTLE_THREAD_TARGETS):
         for _ in range(rng.randint(*SETTLE_THREAD_REPLIES)):

@@ -9,10 +9,12 @@ this is testable with no network at all. Markdown syntax matches
 fenced code block.
 
 Every generator below also takes an optional `pool`: a shaped list from
-`seed_ollama.Corpus`, drawn from when non-empty, so a `--ollama` run reads
-less templated. `pool` is `None` (or empty) for a plain run, and every
-function falls back to its own canned content exactly as before - the two
-paths are the same functions, not a parallel implementation to drift from.
+`seed_ollama_pools.Corpus`, drawn from when non-empty, so a `--ollama` run's
+utility actions (the ones a generated conversation does not already cover;
+see `seed_conversation.py`) read less templated. `pool` is `None` (or
+empty) for a plain run, and every function falls back to its own canned
+content exactly as before - the two paths are the same functions, not a
+parallel implementation to drift from.
 """
 
 MAX_MESSAGE_CHARS = 4000
