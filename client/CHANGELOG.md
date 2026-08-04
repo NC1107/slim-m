@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.29.0](https://github.com/NC1107/slim-m/compare/client-v0.28.0...client-v0.29.0) (2026-08-04)
+
+
+### Bug Fixes
+
+* **client:** camera-refusal diagnostics, an instant call-leave, and one screen-share picker on Linux ([#369](https://github.com/NC1107/slim-m/issues/369)) ([a1f353c](https://github.com/NC1107/slim-m/commit/a1f353cc5fe3b803f74bb654eee1159f67cdca39))
+* three left-rail backlog items - toggle over drag, a CHANNELS header, and the app's real version ([#370](https://github.com/NC1107/slim-m/issues/370)) ([2d2044d](https://github.com/NC1107/slim-m/commit/2d2044d933605251f06b46c393f1cdcb737dfcd5))
+
 ## [0.28.0](https://github.com/NC1107/slim-m/compare/client-v0.27.0...client-v0.28.0) (2026-08-04)
 
 
