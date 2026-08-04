@@ -133,13 +133,11 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // ignore: deprecated_member_use
-        final dump = tester
+        final owner = tester
             .binding
-            .pipelineOwner
-            .semanticsOwner!
-            .rootSemanticsNode!
-            .toStringDeep();
+            // ignore: deprecated_member_use
+            .pipelineOwner;
+        final dump = owner.semanticsOwner!.rootSemanticsNode!.toStringDeep();
 
         final avatarNode = tester.getSemantics(
           find.byType(AuthorProfileTapTarget).at(0),
