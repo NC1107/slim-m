@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.27.0](https://github.com/NC1107/slim-m/compare/client-v0.26.0...client-v0.27.0) (2026-08-04)
+
+
+### Features
+
+* channel categories you can drag any channel into ([#355](https://github.com/NC1107/slim-m/issues/355)) ([b34cd78](https://github.com/NC1107/slim-m/commit/b34cd786656c10d9b6de150f947642cdb81ceb53))
+* **client:** 12/24h clock, reduce-motion override, high contrast, settings cards, header connection status ([#351](https://github.com/NC1107/slim-m/issues/351)) ([91ca790](https://github.com/NC1107/slim-m/commit/91ca7902b458e0663352e1aeb9b70a1679fe3e5e))
+* **client:** paste an image on the Linux desktop build, including Ctrl+V ([#353](https://github.com/NC1107/slim-m/issues/353)) ([a5630f4](https://github.com/NC1107/slim-m/commit/a5630f4e18169e724f6e416180b427164b32a4d0))
+
+
+### Bug Fixes
+
+* **client:** a thread's empty state and its missing header divider ([#356](https://github.com/NC1107/slim-m/issues/356)) ([6775b26](https://github.com/NC1107/slim-m/commit/6775b2663aeaa4cfe44e01bb8fa0c70acb16295d))
+* **client:** context menus on member, DM and channel rows, and menu position ([#349](https://github.com/NC1107/slim-m/issues/349)) ([4a87fe6](https://github.com/NC1107/slim-m/commit/4a87fe6fa0c11b1473134c1efcdd2ef6f405c8c8))
+* **client:** empty-thread anchoring, the phone header divider, poll layout, and update-note copy ([#346](https://github.com/NC1107/slim-m/issues/346)) ([fae96b4](https://github.com/NC1107/slim-m/commit/fae96b4c2d86797dd4c31d06918de3dd49df3a37))
+* **client:** four Linux voice/RTC bugs (device freeze, share dialogs, quality setting) ([#348](https://github.com/NC1107/slim-m/issues/348)) ([f9e6503](https://github.com/NC1107/slim-m/commit/f9e6503090076755046946b4b73eefe414f88d77))
+* **client:** name why a message failed to send, and refuse it before it does ([#345](https://github.com/NC1107/slim-m/issues/345)) ([e20e9ab](https://github.com/NC1107/slim-m/commit/e20e9ab922f8eb20889cb1aaff4ffb0fddcf13e8))
+* **client:** self camera/screen preview, live camera controls, and direct voice join ([#354](https://github.com/NC1107/slim-m/issues/354)) ([d190a71](https://github.com/NC1107/slim-m/commit/d190a711b67520efc63388f86f1e53a145ac65ca))
+
 ## [0.26.0](https://github.com/NC1107/slim-m/compare/client-v0.25.0...client-v0.26.0) (2026-08-03)
 
 
