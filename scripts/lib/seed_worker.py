@@ -11,12 +11,12 @@ import collections
 import dataclasses
 import time
 import urllib.parse
-import uuid
 
 import seed_actions
 import seed_backoff
 import seed_content
 import seed_links
+import uuid7
 
 
 @dataclasses.dataclass
@@ -179,7 +179,7 @@ def handle_pin_message(ctx):
 
 def handle_send_poll(ctx):
     question, options = seed_content.poll(ctx.rng, pool=_pool(ctx, "polls"))
-    body = {"id": str(uuid.uuid4()), "question": question, "options": options}
+    body = {"id": uuid7.uuid7(), "question": question, "options": options}
     msg = seed_backoff.call_with_backoff(
         lambda: ctx.api.call(
             "POST", f"/channels/{ctx.channel_id}/messages/polls", body))
@@ -194,7 +194,7 @@ def handle_send_attachment(ctx):
         lambda: ctx.api.call("POST", f"/attachments?filename={quoted}",
                               raw=data, content_type=content_type))
     caption = seed_content.short_message(ctx.rng, pool=_pool(ctx, "short"))
-    body = {"id": str(uuid.uuid4()), "content": caption,
+    body = {"id": uuid7.uuid7(), "content": caption,
             "attachment_ids": [uploaded["id"]]}
     msg = seed_backoff.call_with_backoff(
         lambda: ctx.api.call("POST", f"/channels/{ctx.channel_id}/messages", body))

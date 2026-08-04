@@ -179,6 +179,12 @@ def _report(base_url, channel, channel_name, usernames, password, state, results
     print(f"shared password: {password}")
     print(_describe_corpus(corpus))
     print(f"created: {state.counts()}")
+    recency = state.recency_stats()
+    if recency["rate"] is not None:
+        print(f"target selection favoured recent messages/threads "
+              f"{recency['rate']:.0%} of the time "
+              f"({recency['from_recent_window']}/{recency['draws']} draws), "
+              f"see seed_state.RECENCY_BIAS")
     print("actions performed:")
     for name in sorted(totals):
         print(f"  {name}: {totals[name]}")
