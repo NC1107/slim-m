@@ -1,0 +1,25 @@
+[
+  {
+    "content": "hey @alice and @bob, cc @alice again, not an email",
+    "mentions": ["alice", "bob"]
+  },
+  { "content": "look @ this", "mentions": [] },
+  { "content": "trailing @", "mentions": [] },
+  { "content": "no mentions here", "mentions": [] },
+  { "content": "thanks @nick.", "mentions": ["nick"] },
+  { "content": "see @nick-c", "mentions": ["nick-c"] },
+  { "content": "thanks @nick-c.", "mentions": ["nick-c"] },
+  { "content": "check out @a.b.c today", "mentions": ["a.b.c"] },
+  { "content": "ping @nick...", "mentions": ["nick"] },
+  { "content": "ping @nick-", "mentions": ["nick"] },
+  { "content": "hey @nick-.", "mentions": ["nick"] },
+  { "content": "@n.", "mentions": ["n"] },
+  { "content": "@a-", "mentions": ["a"] },
+  { "content": "@nick hello", "mentions": ["nick"] },
+  { "content": "cc @alice@bob", "mentions": ["alice", "bob"] },
+  { "content": "@_under_score-name.", "mentions": ["_under_score-name"] },
+  {
+    "content": "email-like a@b.com looks the same",
+    "mentions": ["b.com"]
+  }
+]

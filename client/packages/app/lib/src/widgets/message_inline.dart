@@ -66,7 +66,13 @@ class InlineSpoiler extends InlineNode {
   final List<InlineNode> children;
 }
 
-final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_]+');
+/// A mention's charset, greedy: the first character must be a word
+/// character, and `.`/`-` are accepted as interior separators alongside the
+/// rest, matching what `validate_username` (`crates/slimm-server/src/http/
+/// auth.rs`) allows a real account to be named. The greedy match is trimmed
+/// of trailing `.`/`-` by [_trimMentionEnd] below, since a username cannot
+/// be told apart from sentence punctuation by charset alone.
+final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_][A-Za-z0-9_.-]*');
 final RegExp _emojiPattern = RegExp(r':[A-Za-z0-9_]{1,32}:');
 final RegExp _digitsOnly = RegExp(r'^[0-9]+$');
 final RegExp _wordChar = RegExp(r'[A-Za-z0-9_]');
@@ -94,6 +100,22 @@ bool _readsAsDigitRun(String s, int start, int end) {
   final before = start - 1;
   return (before >= 0 && _isDigit(s, before)) ||
       (end < s.length && _isDigit(s, end));
+}
+
+/// Trims trailing `.`/`-` off a greedy `[start, end)` mention match, so
+/// `@nick.` at the end of a sentence keeps the full stop out of the name.
+/// `start` is the `@`, so `start + 2` is the first index that may never be
+/// stripped: the character right after `@` is always a word character by
+/// [_mentionPattern]'s own anchor, and this loop never removes it. The cost:
+/// a username genuinely ending in `.` or `-` can never be mentioned, since
+/// its trailing character reads as punctuation instead. Kept in sync with
+/// `mentioned_usernames` in `crates/slimm-server/src/push/recipients.rs`,
+/// which strips the same way over the same charset.
+int _trimMentionEnd(String s, int start, int end) {
+  while (end > start + 2 && (s[end - 1] == '.' || s[end - 1] == '-')) {
+    end--;
+  }
+  return end;
 }
 
 /// The index just past a backtick-delimited code span starting at [start]
@@ -243,9 +265,10 @@ List<InlineNode> parseInline(String content) {
     } else if (ch == '@') {
       final m = _mentionPattern.matchAsPrefix(content, i);
       if (m != null) {
+        final end = _trimMentionEnd(content, i, m.end);
         flush();
-        nodes.add(InlineMention(m.group(0)!));
-        i = m.end;
+        nodes.add(InlineMention(content.substring(i, end)));
+        i = end;
         continue;
       }
     } else if (ch == ':') {

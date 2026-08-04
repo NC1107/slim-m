@@ -138,6 +138,23 @@ void main() {
     expect((nodes[1] as InlineText).text, ' said hi');
   });
 
+  test('a mention keeps a hyphen or a dot as an interior separator', () {
+    final nodes = parseInline('see @nick-c and @a.b.c');
+    expect(nodes, hasLength(4));
+    expect((nodes[0] as InlineText).text, 'see ');
+    expect((nodes[1] as InlineMention).raw, '@nick-c');
+    expect((nodes[2] as InlineText).text, ' and ');
+    expect((nodes[3] as InlineMention).raw, '@a.b.c');
+  });
+
+  test('a sentence-final full stop is not part of the mentioned name', () {
+    final nodes = parseInline('thanks @nick.');
+    expect(nodes, hasLength(3));
+    expect((nodes[0] as InlineText).text, 'thanks ');
+    expect((nodes[1] as InlineMention).raw, '@nick');
+    expect((nodes[2] as InlineText).text, '.');
+  });
+
   test('a shortcode is a leaf the caller resolves', () {
     final nodes = parseInline('ship it :tada:');
     expect(nodes, hasLength(2));
