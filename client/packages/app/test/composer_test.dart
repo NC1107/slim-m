@@ -16,8 +16,6 @@ import 'package:slimm_design_system/design_system.dart';
 
 import 'composer_harness.dart';
 
-const _hintKey = Key('composer-newline-hint');
-
 void main() {
   late TextEditingController controller;
   late Sends sends;
@@ -184,7 +182,8 @@ void main() {
   );
 
   testWidgets(
-    'the shift + enter hint is hidden on touch and shown on desktop',
+    'the shift + enter hint is gone on both touch and desktop, and the '
+    'shortcut it used to describe still sends',
     (tester) async {
       await tester.pumpWidget(
         composerHarness(
@@ -193,9 +192,7 @@ void main() {
           platform: TargetPlatform.iOS,
         ),
       );
-      expect(find.byKey(_hintKey), findsOneWidget);
-      expect(tester.widget<Visibility>(find.byKey(_hintKey)).visible, isFalse);
-      final touchHeight = tester.getSize(find.byKey(_hintKey)).height;
+      expect(find.text('shift + enter for newline'), findsNothing);
 
       await tester.pumpWidget(
         composerHarness(
@@ -207,15 +204,27 @@ void main() {
       // MaterialApp lerps its theme, and ThemeData.lerp switches `platform` at
       // the halfway point, so the new value is not readable in the same frame.
       await tester.pump(kThemeAnimationDuration);
-      expect(tester.widget<Visibility>(find.byKey(_hintKey)).visible, isTrue);
-      expect(find.text('shift + enter for newline'), findsOneWidget);
-      // It collapses on touch rather than reserving its height: the hint can
-      // never show there, so a held-open row is wasted space on the tightest.
-      expect(touchHeight, 0.0);
+      expect(find.text('shift + enter for newline'), findsNothing);
+
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'hello there');
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump();
       expect(
-        tester.getSize(find.byKey(_hintKey)).height,
-        greaterThan(0.0),
-        reason: 'desktop still shows it, so it still occupies its row',
+        sends.count,
+        0,
+        reason: 'shift+enter must still insert a newline, not send',
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(
+        sends.count,
+        1,
+        reason: 'a bare enter must still send, hint or not',
       );
     },
   );

@@ -189,6 +189,9 @@ void main() {
 
     final scroll = _transcriptScroll(tester);
     expect(scroll.position.maxScrollExtent, greaterThan(0));
+    // Away, then a step back toward latest: the arrow only reveals itself on that second, "heading back" sample.
+    scroll.jumpTo(scroll.position.maxScrollExtent);
+    await _flush(tester);
     scroll.jumpTo(scroll.position.maxScrollExtent / 2);
     await _flush(tester);
     expect(find.byKey(jumpButton), findsOneWidget);
