@@ -27,10 +27,6 @@ import '../routing/breakpoints.dart';
 import 'context_menu_focus.dart';
 import 'message_context_menu_layout.dart';
 
-/// Kept off the viewport edges on top of whatever the safe area already
-/// reserves, so a clamped menu does not sit flush against the screen.
-const double _screenMargin = 8;
-
 /// Where the menu's top-left sits relative to the row's own top-left, used
 /// only when nothing opened the menu with a pointer position at all - the
 /// context-menu key, which carries no location to anchor to.
@@ -179,7 +175,7 @@ class _ContextMenuRegionState extends State<ContextMenuRegion> {
             anchor: _anchor,
             padding:
                 MediaQuery.paddingOf(context) +
-                const EdgeInsets.all(_screenMargin),
+                const EdgeInsets.all(menuScreenMargin),
           ),
           child: TapRegion(
             onTapOutside: (_) => _setOpen(false),

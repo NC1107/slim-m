@@ -443,4 +443,40 @@ void main() {
       reason: 'the grid pages internally rather than growing past the screen',
     );
   });
+
+  // Backlog item 62: an unclamped anchor ran the panel off the right edge.
+  testWidgets(
+    'opened near the right edge of the screen, the panel stays inside the '
+    'viewport',
+    (tester) async {
+      const screenWidth = 400.0;
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(screenWidth, 800);
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        _harness(
+          Align(
+            alignment: Alignment.topRight,
+            child: EmojiPickerButton(onSelect: (_) {}),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(EmojiPickerButton));
+      await tester.pumpAndSettle();
+
+      final panel = tester.getRect(find.byType(EmojiPickerPanel));
+      expect(
+        panel.right,
+        lessThanOrEqualTo(screenWidth),
+        reason: 'the panel must not run off the right edge of the screen',
+      );
+      expect(
+        panel.left,
+        greaterThanOrEqualTo(0),
+        reason: 'clamping right must not push the panel off the left edge',
+      );
+    },
+  );
 }
