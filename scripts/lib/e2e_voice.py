@@ -49,6 +49,28 @@ def tracks_of(participant, source):
             if t.get("source") == source]
 
 
+def participants_with_mics(room_id, expected=2, timeout=25):
+    """The room's participants, once every one of them is publishing a mic.
+
+    "N in call" on screen means the client joined, which the SFU learns
+    before the microphone track is published, so reading the roster the
+    instant that label appears is a race the caller happens to win or lose.
+    The plain-voice path won it and the DM path did not, which read as a DM
+    bug rather than as the timing it was. Polling is what makes both honest;
+    the assertions the callers run afterwards are unchanged, so a genuinely
+    missing track still fails, just after a real wait rather than instantly.
+    """
+    deadline = time.time() + timeout
+    parts = []
+    while time.time() < deadline:
+        parts = sfu_participants(room_id)
+        if (len(parts) == expected
+                and all(tracks_of(p, "MICROPHONE") for p in parts)):
+            return parts
+        time.sleep(1)
+    return parts
+
+
 def join_call(a, b, room_id, channel=L.VOICE_CHANNEL):
     """Both clients into the same room, each publishing and subscribed.
 
@@ -71,7 +93,7 @@ def join_call(a, b, room_id, channel=L.VOICE_CHANNEL):
     b.wait_for("Alice")
     print("  both clients report 2 in call and list each other")
 
-    parts = sfu_participants(room_id)
+    parts = participants_with_mics(room_id)
     assert len(parts) == 2, f"SFU has {len(parts)} participants, expected 2"
     for p in parts:
         mics = tracks_of(p, "MICROPHONE")

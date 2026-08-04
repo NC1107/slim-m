@@ -74,12 +74,17 @@
 /// into the bar's own node instead, which leaves "Thread" reachable only as
 /// part of a blob shared with the back button's tooltip. That is worse for
 /// a screen reader, which can then only announce the whole blob rather than
-/// being asked what this bar is titled, and it is also what made
-/// `messaging: a thread stays off the ordinary channel list` time out: the
-/// e2e harness's node collector (`e2e_js.NODES`) keeps only semantics
-/// leaves, deliberately, since widening it to keep merged parents as well
-/// would let two nodes answer one `find()` across every other scenario.
-/// `container: true` is what forces the boundary that stops the merge.
+/// being asked what this bar is titled.
+///
+/// It is kept for that reason alone, and an earlier version of this comment
+/// claimed more than it should have. `container: true` does separate the
+/// title in `flutter_test`'s framework-level semantics tree, which is what
+/// `thread_screen_test.dart` asserts, and it does NOT change what Flutter
+/// web projects into the DOM: a real browser run still shows the word merged
+/// into the bar's node. So this did not fix the e2e scenario that was timing
+/// out on it, and `scripts/lib/e2e_threads.py` waits on the back button's
+/// tooltip instead, for reasons its own module doc gives. Do not read this
+/// wrapper as making the title findable from a browser; it does not.
 library;
 
 import 'package:flutter/material.dart';
