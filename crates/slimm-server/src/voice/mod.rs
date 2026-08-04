@@ -262,9 +262,15 @@ impl VoiceService {
         self.heartbeats.forget(user_id, channel_id);
     }
 
-    /// Whether a heartbeat is on record for this `(user, channel)`, for a
-    /// test to confirm the HTTP handler actually reached [`Self::record_heartbeat`].
-    pub fn has_heartbeat_for_test(&self, user_id: UserId, channel_id: ChannelId) -> bool {
+    /// Whether a heartbeat is on record for this `(user, channel)`.
+    ///
+    /// Read by `http::voice`'s heartbeat and forget-heartbeat handlers before
+    /// they touch [`CallHeartbeats`], so a first join or a real hangup can be
+    /// told from a routine refresh and published as
+    /// [`crate::hub::Event::VoiceActivityChanged`] only on the transition; a
+    /// test also uses it to confirm a handler actually reached
+    /// [`Self::record_heartbeat`].
+    pub fn has_heartbeat(&self, user_id: UserId, channel_id: ChannelId) -> bool {
         self.heartbeats.contains(user_id, channel_id)
     }
 

@@ -4851,6 +4851,7 @@ components:
         - $ref: "#/components/schemas/ChannelDeleted"
         - $ref: "#/components/schemas/OverwriteChanged"
         - $ref: "#/components/schemas/CategoryChanged"
+        - $ref: "#/components/schemas/VoiceActivityChanged"
         - $ref: "#/components/schemas/CanvasObjectPlaced"
         - $ref: "#/components/schemas/CanvasObjectsRemoved"
         - $ref: "#/components/schemas/CanvasCleared"
@@ -5397,6 +5398,26 @@ components:
         type:
           type: string
           enum: [category.changed]
+
+    VoiceActivityChanged:
+      type: object
+      required: [type, channel_id]
+      description: >
+        Someone's presence on a channel's voice call changed: a join (the
+        first heartbeat for a user on that call), a clean hangup, or the
+        stale-heartbeat sweep evicting someone. Carries only the channel id,
+        never who: unlike ThreadUpdated's reply count, a voice roster is
+        per-viewer (GET .../voice/roster drops a hidden participant from
+        every viewer but themselves), so naming a participant here would be a
+        second, unfiltered way to learn who is on a call. A receiving client
+        re-fetches the roster, which already applies that filtering.
+      properties:
+        type:
+          type: string
+          enum: [voice.activity]
+        channel_id:
+          type: string
+          format: uuid
 
     ServerPong:
       type: object

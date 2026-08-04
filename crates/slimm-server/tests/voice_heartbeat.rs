@@ -98,7 +98,7 @@ async fn a_heartbeat_is_recorded_against_the_caller_and_channel() {
     let (user_id, token) = member(&store, "alice").await;
     let app = app(store.clone(), voice.clone());
 
-    assert!(!voice.has_heartbeat_for_test(user_id, channel.id));
+    assert!(!voice.has_heartbeat(user_id, channel.id));
 
     let response = app
         .oneshot(request(
@@ -109,7 +109,7 @@ async fn a_heartbeat_is_recorded_against_the_caller_and_channel() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
-    assert!(voice.has_heartbeat_for_test(user_id, channel.id));
+    assert!(voice.has_heartbeat(user_id, channel.id));
 }
 
 #[tokio::test]
@@ -134,7 +134,7 @@ async fn a_heartbeat_without_connect_is_refused() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    assert!(!voice.has_heartbeat_for_test(user_id, channel.id));
+    assert!(!voice.has_heartbeat(user_id, channel.id));
 }
 
 #[tokio::test]
@@ -218,7 +218,7 @@ async fn a_channel_denying_connect_beats_the_role_that_grants_it() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    assert!(!voice.has_heartbeat_for_test(user_id, channel.id));
+    assert!(!voice.has_heartbeat(user_id, channel.id));
 }
 
 /// A nonexistent channel must refuse identically to one the caller may not

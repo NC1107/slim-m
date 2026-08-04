@@ -47,7 +47,7 @@ pub async fn run() -> anyhow::Result<()> {
     let limiter = ratelimit::RateLimiter::with_trusted_hops(config.trust_proxy_hops);
     let push = push::PushSender::new(&config)?;
     let voice = voice::VoiceService::new(&config)?;
-    spawn_call_sweep(voice.clone());
+    spawn_call_sweep(voice.clone(), hub.clone());
     let app = cors.apply(http::router(http::AppState {
         store,
         auth,
@@ -147,21 +147,21 @@ const CALL_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(
 /// process, on the same detached, best-effort, wait-first model as
 /// [`spawn_token_sweep`]. A deployment with no SFU configured never has
 /// anything to sweep, so this is safe to spawn unconditionally.
-fn spawn_call_sweep(voice: voice::VoiceService) {
+fn spawn_call_sweep(voice: voice::VoiceService, hub: hub::Hub) {
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(CALL_SWEEP_INTERVAL);
         ticker.tick().await;
         loop {
             ticker.tick().await;
-            sweep_stale_voice_calls(&voice).await;
+            sweep_stale_voice_calls(&voice, &hub).await;
         }
     });
 }
 
 /// One pass of the stale-call sweep, evicting every call whose heartbeat has
 /// gone stale as of now.
-pub async fn sweep_stale_voice_calls(voice: &voice::VoiceService) {
-    sweep_stale_voice_calls_at(voice, std::time::Instant::now()).await;
+pub async fn sweep_stale_voice_calls(voice: &voice::VoiceService, hub: &hub::Hub) {
+    sweep_stale_voice_calls_at(voice, hub, std::time::Instant::now()).await;
 }
 
 /// [`sweep_stale_voice_calls`] with an explicit clock.
@@ -172,8 +172,19 @@ pub async fn sweep_stale_voice_calls(voice: &voice::VoiceService) {
 /// [`voice::VoiceService::remove_participant`] against a controlled clock,
 /// rather than re-implementing the loop and risking the copy drifting from
 /// what actually runs.
-pub async fn sweep_stale_voice_calls_at(voice: &voice::VoiceService, now: std::time::Instant) {
+///
+/// Publishes [`hub::Event::VoiceActivityChanged`] for every evicted
+/// `(user, channel)` pair regardless of whether the best-effort SFU removal
+/// below it succeeds: the heartbeat going stale is already the real
+/// transition, committed by [`voice::VoiceService::sweep_stale_calls_at`]
+/// before this loop ever runs.
+pub async fn sweep_stale_voice_calls_at(
+    voice: &voice::VoiceService,
+    hub: &hub::Hub,
+    now: std::time::Instant,
+) {
     for (user_id, channel_id) in voice.sweep_stale_calls_at(now) {
+        hub.publish(hub::Event::VoiceActivityChanged { channel_id });
         match voice.remove_participant(channel_id, user_id).await {
             Ok(()) => tracing::info!(
                 %user_id,

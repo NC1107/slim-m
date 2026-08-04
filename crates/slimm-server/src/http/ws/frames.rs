@@ -98,6 +98,8 @@ pub(super) enum ServerFrame {
     OverwriteChanged { channel_id: String },
     #[serde(rename = "category.changed")]
     CategoryChanged,
+    #[serde(rename = "voice.activity")]
+    VoiceActivityChanged { channel_id: String },
     #[serde(rename = "canvas.object.placed")]
     CanvasObjectPlaced {
         channel_id: String,

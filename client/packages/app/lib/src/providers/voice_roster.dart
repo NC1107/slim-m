@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Who is in a voice channel the caller has not joined, kept current by
-/// polling rather than any live event: the server has no push for this.
+/// polling, now nudged promptly by a live event rather than waiting out the
+/// interval.
 ///
 /// `autoDispose` and keyed per channel, so this only ever polls a channel a
 /// rail row is actually rendering right now; scrolling one away or switching
 /// servers cancels its timer with it. Ordinary rebuilds of that row do not
 /// restart the poll: Riverpod caches the stream by channel id, so only the
-/// interval below governs how often the network is actually touched.
+/// interval below governs the network's steady-state cost.
 library;
 
 import 'dart:async';
@@ -14,6 +15,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import 'live_events.dart';
 import 'providers.dart';
 
 /// How often an unjoined voice channel's roster is re-fetched. A real round
@@ -46,6 +48,12 @@ const voiceRosterPollInterval = Duration(seconds: 15);
 /// authentication - adds nothing this tick and simply waits for the next
 /// one, so the last roster this client actually saw stays on screen instead
 /// of being cleared to looking empty.
+///
+/// `voice.activity` (`api.VoiceActivityChanged`) refreshes this promptly
+/// rather than leaving a join or hangup to surface on the next poll tick, up
+/// to [voiceRosterPollInterval] later. It names no participant - see the
+/// event's own doc comment - so this is a nudge to re-ask, exactly what a
+/// stray or duplicate frame already costs nothing extra to trigger.
 final voiceRosterProvider = StreamProvider.autoDispose
     .family<List<api.VoiceRosterParticipant>, String>((ref, channelId) {
       final client = ref.watch(apiProvider);
@@ -71,8 +79,17 @@ final voiceRosterProvider = StreamProvider.autoDispose
       timer = Timer.periodic(voiceRosterPollInterval, (_) => tick(timer));
       unawaited(tick(timer));
 
+      final liveSub = ref.read(liveEventsProvider).listen((event) {
+        if (event case api.VoiceActivityChanged(
+          channelId: final eventChannelId,
+        ) when eventChannelId == channelId) {
+          unawaited(tick(timer));
+        }
+      });
+
       ref.onDispose(() {
         timer.cancel();
+        unawaited(liveSub.cancel());
         unawaited(controller.close());
       });
 

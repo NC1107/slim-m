@@ -152,6 +152,8 @@ sealed class ServerEvent {
       'overwrite.changed' when decoded['channel_id'] is String =>
         OverwriteChanged(channelId: decoded['channel_id'] as String),
       'category.changed' => const CategoryChanged(),
+      'voice.activity' when decoded['channel_id'] is String =>
+        VoiceActivityChanged(channelId: decoded['channel_id'] as String),
       'canvas.object.placed'
           when decoded['channel_id'] is String &&
               decoded['object'] is Map<String, dynamic> =>

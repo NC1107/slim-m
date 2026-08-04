@@ -22,6 +22,13 @@
 //! is gated the same way minting a token is, but `forget_heartbeat` is not
 //! gated at all beyond authentication, because forgetting a caller's own
 //! liveness marker exposes nothing about the channel it names.
+//!
+//! The heartbeat pair is also where [`Event::VoiceActivityChanged`] is
+//! published: on the first heartbeat for a `(user, channel)` pair (a join)
+//! and on a real forget (a clean hangup), each read-before-write against
+//! [`crate::voice::VoiceService::has_heartbeat`] so a routine refresh never
+//! republishes. The third publish site, the stale-heartbeat sweep, lives in
+//! `lib.rs` rather than here.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -35,6 +42,7 @@ use super::error::ApiError;
 use super::escalation::escalation_guard;
 use super::extract::{Authed, enforce};
 use super::messages::parse_uuid;
+use crate::hub::Event;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::presence::Visibility;
@@ -85,6 +93,12 @@ impl From<RoomToken> for TokenResponse {
 ///
 /// A nonexistent channel grants no permissions, so it refuses identically to a
 /// channel the caller may not join, revealing neither.
+///
+/// Deliberately does not publish [`Event::VoiceActivityChanged`]: minting a
+/// token is not joining, only being handed the credential to try. The first
+/// heartbeat, sent once the client has actually connected to the SFU, is the
+/// real signal; publishing here as well would notify for a token that is
+/// never redeemed.
 async fn token(
     Authed(ctx): Authed,
     parts: Parts,
@@ -130,6 +144,10 @@ async fn token(
 /// Best-effort by design on the client, and idempotent here - repeating it
 /// only pushes the deadline out further. See [`crate::voice::VoiceService`]
 /// for what a heartbeat that stops arriving eventually causes.
+///
+/// Publishes [`Event::VoiceActivityChanged`] only on a first heartbeat for
+/// this `(user, channel)` pair - a real join - never on the routine refreshes
+/// that follow it every few seconds for as long as the call lasts.
 async fn heartbeat(
     Authed(ctx): Authed,
     parts: Parts,
@@ -154,7 +172,13 @@ async fn heartbeat(
         return Err(ApiError::Forbidden);
     }
 
+    let already_on_the_call = state.voice.has_heartbeat(ctx.user_id, channel_id);
     state.voice.record_heartbeat(ctx.user_id, channel_id);
+    if !already_on_the_call {
+        state
+            .hub
+            .publish(Event::VoiceActivityChanged { channel_id });
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -170,6 +194,10 @@ async fn heartbeat(
 /// cleanup. Harmless, and answers the same way, on a deployment with no SFU
 /// configured or a channel that does not exist: there is never anything to
 /// forget either way.
+///
+/// Publishes [`Event::VoiceActivityChanged`] only when there really was
+/// something to forget, so a client that calls this having never joined (or
+/// calling it twice) does not fan out a signal for a call that never changed.
 async fn forget_heartbeat(
     Authed(ctx): Authed,
     parts: Parts,
@@ -178,7 +206,13 @@ async fn forget_heartbeat(
 ) -> Result<StatusCode, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    let was_on_the_call = state.voice.has_heartbeat(ctx.user_id, channel_id);
     state.voice.forget_heartbeat(ctx.user_id, channel_id);
+    if was_on_the_call {
+        state
+            .hub
+            .publish(Event::VoiceActivityChanged { channel_id });
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

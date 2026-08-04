@@ -14,6 +14,7 @@ use axum::extract::State;
 use axum::routing::post;
 use axum::{Json, http::StatusCode};
 use serde_json::{Value, json};
+use slimm_server::hub::{Event, Hub};
 use slimm_server::ids::{ChannelId, UserId};
 use slimm_server::voice::VoiceService;
 use tokio::net::TcpListener;
@@ -59,6 +60,7 @@ async fn a_stale_heartbeat_reaches_a_real_remove_participant_call() {
     let recorder = RecordingRoomService::default();
     let url = spawn(recorder.clone()).await;
     let voice = voice_at(&url);
+    let hub = Hub::new();
 
     let user = UserId::generate();
     let channel = ChannelId::generate();
@@ -66,13 +68,13 @@ async fn a_stale_heartbeat_reaches_a_real_remove_participant_call() {
     voice.record_heartbeat_at_for_test(user, channel, start);
 
     // Nothing stale yet: the sweep must find and remove nobody.
-    slimm_server::sweep_stale_voice_calls_at(&voice, start).await;
+    slimm_server::sweep_stale_voice_calls_at(&voice, &hub, start).await;
     assert!(recorder.removed.lock().unwrap().is_empty());
-    assert!(voice.has_heartbeat_for_test(user, channel));
+    assert!(voice.has_heartbeat(user, channel));
 
     // Past the staleness threshold now: the sweep must find and evict it.
     let past = start + Duration::from_secs(41);
-    slimm_server::sweep_stale_voice_calls_at(&voice, past).await;
+    slimm_server::sweep_stale_voice_calls_at(&voice, &hub, past).await;
 
     let removed = recorder.removed.lock().unwrap();
     assert_eq!(removed.len(), 1, "exactly one participant was evicted");
@@ -85,6 +87,7 @@ async fn a_swept_entry_is_forgotten_so_a_later_sweep_does_not_re_evict_it() {
     let recorder = RecordingRoomService::default();
     let url = spawn(recorder.clone()).await;
     let voice = voice_at(&url);
+    let hub = Hub::new();
 
     let user = UserId::generate();
     let channel = ChannelId::generate();
@@ -92,8 +95,8 @@ async fn a_swept_entry_is_forgotten_so_a_later_sweep_does_not_re_evict_it() {
     voice.record_heartbeat_at_for_test(user, channel, start);
 
     let past = start + Duration::from_secs(41);
-    slimm_server::sweep_stale_voice_calls_at(&voice, past).await;
-    slimm_server::sweep_stale_voice_calls_at(&voice, past + Duration::from_secs(1)).await;
+    slimm_server::sweep_stale_voice_calls_at(&voice, &hub, past).await;
+    slimm_server::sweep_stale_voice_calls_at(&voice, &hub, past + Duration::from_secs(1)).await;
 
     assert_eq!(
         recorder.removed.lock().unwrap().len(),
@@ -108,6 +111,7 @@ async fn a_refreshed_heartbeat_is_never_swept_or_evicted() {
     let recorder = RecordingRoomService::default();
     let url = spawn(recorder.clone()).await;
     let voice = voice_at(&url);
+    let hub = Hub::new();
 
     let user = UserId::generate();
     let channel = ChannelId::generate();
@@ -116,10 +120,10 @@ async fn a_refreshed_heartbeat_is_never_swept_or_evicted() {
     // A real client's next beat, landing before the old deadline.
     voice.record_heartbeat_at_for_test(user, channel, start + Duration::from_secs(20));
 
-    slimm_server::sweep_stale_voice_calls_at(&voice, start + Duration::from_secs(41)).await;
+    slimm_server::sweep_stale_voice_calls_at(&voice, &hub, start + Duration::from_secs(41)).await;
 
     assert!(recorder.removed.lock().unwrap().is_empty());
-    assert!(voice.has_heartbeat_for_test(user, channel));
+    assert!(voice.has_heartbeat(user, channel));
 }
 
 /// [`json`] is only used to shape the recorded body for the assertions
@@ -130,12 +134,13 @@ async fn the_recorded_call_carries_no_more_than_room_and_identity() {
     let recorder = RecordingRoomService::default();
     let url = spawn(recorder.clone()).await;
     let voice = voice_at(&url);
+    let hub = Hub::new();
 
     let user = UserId::generate();
     let channel = ChannelId::generate();
     let start = Instant::now();
     voice.record_heartbeat_at_for_test(user, channel, start);
-    slimm_server::sweep_stale_voice_calls_at(&voice, start + Duration::from_secs(60)).await;
+    slimm_server::sweep_stale_voice_calls_at(&voice, &hub, start + Duration::from_secs(60)).await;
 
     let removed = recorder.removed.lock().unwrap();
     let call = &removed[0];
@@ -143,4 +148,33 @@ async fn the_recorded_call_carries_no_more_than_room_and_identity() {
         call,
         &json!({ "room": format!("channel-{channel}"), "identity": user.to_string() })
     );
+}
+
+/// A bystander must learn a stale call ended, not only the SFU: the sweep
+/// is one of the three publish sites for `Event::VoiceActivityChanged`
+/// (`http/voice.rs`'s `heartbeat` and `forget_heartbeat` are the other two).
+#[tokio::test]
+async fn a_swept_stale_heartbeat_publishes_voice_activity_changed() {
+    let recorder = RecordingRoomService::default();
+    let url = spawn(recorder.clone()).await;
+    let voice = voice_at(&url);
+    let hub = Hub::new();
+    let mut rx = hub.subscribe();
+
+    let user = UserId::generate();
+    let channel = ChannelId::generate();
+    let start = Instant::now();
+    voice.record_heartbeat_at_for_test(user, channel, start);
+
+    // Nothing stale yet, so nothing to publish either.
+    slimm_server::sweep_stale_voice_calls_at(&voice, &hub, start).await;
+    assert!(rx.try_recv().is_err());
+
+    let past = start + Duration::from_secs(41);
+    slimm_server::sweep_stale_voice_calls_at(&voice, &hub, past).await;
+
+    match rx.try_recv().expect("the sweep must publish on eviction") {
+        Event::VoiceActivityChanged { channel_id } => assert_eq!(channel_id, channel),
+        other => panic!("expected VoiceActivityChanged, got {other:?}"),
+    }
 }

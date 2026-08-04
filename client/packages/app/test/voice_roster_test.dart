@@ -5,6 +5,7 @@
 /// however often something happens to watch it.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:fake_async/fake_async.dart';
@@ -13,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/providers/live_events.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_roster.dart';
 
@@ -23,7 +25,10 @@ const _tokens = api.TokenPair(
   accessExpiresAt: 4102444800000,
 );
 
-ProviderContainer _containerWith(http.Client httpClient) {
+ProviderContainer _containerWith(
+  http.Client httpClient, {
+  Stream<api.ServerEvent>? liveEvents,
+}) {
   final apiClient = api.SlimmApi(
     baseUrl: Uri.parse('http://localhost:8080'),
     session: api.SessionStore(tokens: _tokens),
@@ -31,7 +36,10 @@ ProviderContainer _containerWith(http.Client httpClient) {
   );
   addTearDown(apiClient.close);
   final container = ProviderContainer(
-    overrides: [apiProvider.overrideWithValue(apiClient)],
+    overrides: [
+      apiProvider.overrideWithValue(apiClient),
+      if (liveEvents != null) liveEventsProvider.overrideWithValue(liveEvents),
+    ],
   );
   addTearDown(container.dispose);
   return container;
@@ -190,4 +198,59 @@ void main() {
       });
     },
   );
+
+  test('a voice.activity event for this channel refetches immediately, '
+      'well before the poll interval would', () {
+    fakeAsync((async) {
+      var calls = 0;
+      final events = StreamController<api.ServerEvent>.broadcast();
+      addTearDown(events.close);
+      final container = _containerWith(
+        MockClient((_) async {
+          calls++;
+          return _roster(const []);
+        }),
+        liveEvents: events.stream,
+      );
+      final sub = container.listen(voiceRosterProvider('general'), (_, __) {});
+      async.flushMicrotasks();
+      expect(calls, 1);
+
+      events.add(const api.VoiceActivityChanged(channelId: 'general'));
+      async.flushMicrotasks();
+      expect(
+        calls,
+        2,
+        reason: 'a join or hangup must not wait out the poll interval',
+      );
+      sub.close();
+    });
+  });
+
+  test('a voice.activity event for a different channel is ignored', () {
+    fakeAsync((async) {
+      var calls = 0;
+      final events = StreamController<api.ServerEvent>.broadcast();
+      addTearDown(events.close);
+      final container = _containerWith(
+        MockClient((_) async {
+          calls++;
+          return _roster(const []);
+        }),
+        liveEvents: events.stream,
+      );
+      final sub = container.listen(voiceRosterProvider('general'), (_, __) {});
+      async.flushMicrotasks();
+      expect(calls, 1);
+
+      events.add(const api.VoiceActivityChanged(channelId: 'other'));
+      async.flushMicrotasks();
+      expect(
+        calls,
+        1,
+        reason: 'this provider only cares about its own channel id',
+      );
+      sub.close();
+    });
+  });
 }
