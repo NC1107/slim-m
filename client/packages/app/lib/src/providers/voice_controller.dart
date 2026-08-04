@@ -20,106 +20,9 @@ import 'providers.dart';
 import 'voice_call_heartbeat.dart';
 import 'voice_call_lifecycle_report.dart';
 import 'voice_sfu_security.dart';
+import 'voice_state.dart';
 
-/// Everything a voice surface needs to render, in one value.
-class VoiceState {
-  const VoiceState({
-    this.channelId,
-    this.state = VoiceSessionState.idle,
-    this.joining = false,
-    this.participants = const [],
-    this.microphoneEnabled = true,
-    this.cameraEnabled = false,
-    this.screenSharing = false,
-    this.awaitingBroadcast = false,
-    this.canPublish = true,
-    this.deafened = false,
-    this.error,
-    this.retryable = true,
-    this.connectedAt,
-  });
-
-  /// The channel this call belongs to, so a screen can tell "in a call here"
-  /// from "in a call somewhere else".
-  final String? channelId;
-  final VoiceSessionState state;
-  final List<VoiceParticipant> participants;
-
-  /// True for the whole span of a [VoiceController.join] call, set before
-  /// its first `await` and cleared in a `finally`. [state] does not reach
-  /// [VoiceSessionState.connecting] until the token round trip already
-  /// answered, so this is what tells a screen arriving elsewhere that a
-  /// join is under way during that gap; see `voice_screen.dart`'s `_busyElsewhere`.
-  final bool joining;
-
-  /// What the user has asked for, which is not always what they got: a token
-  /// without SPEAK cannot open a microphone however the toggle is set.
-  final bool microphoneEnabled;
-
-  /// What the user has asked for, the same double duty [microphoneEnabled]
-  /// carries: a pre-toggle before [VoiceController.join], and the live truth
-  /// once in a call, kept in step by [VoiceController]'s participant listener.
-  final bool cameraEnabled;
-  final bool screenSharing;
-
-  /// iOS only: sharing has been asked for and the system is waiting on the
-  /// user to start a broadcast. Nobody can see a screen yet, so this is
-  /// deliberately not [screenSharing]; showing it as sharing is the exact
-  /// lie this field exists to stop.
-  final bool awaitingBroadcast;
-
-  /// Whether the token allows publishing at all, mirroring the SPEAK grant.
-  final bool canPublish;
-
-  /// Whether every other participant's audio is locally silenced. Purely
-  /// local: it never touches this session's own microphone, so it carries
-  /// no [canPublish]-style server permission to check.
-  final bool deafened;
-
-  final String? error;
-
-  /// False for a failure this channel cannot retry its way out of: no voice
-  /// configured, or no permission. True (the default) is everything
-  /// transient, where trying again might really work.
-  final bool retryable;
-
-  /// When this call connected, for the in-call duration readout. Null
-  /// whenever not connected; survives reconnect-free state churn but resets
-  /// with the call.
-  final DateTime? connectedAt;
-
-  VoiceState copyWith({
-    String? channelId,
-    VoiceSessionState? state,
-    bool? joining,
-    List<VoiceParticipant>? participants,
-    bool? microphoneEnabled,
-    bool? cameraEnabled,
-    bool? screenSharing,
-    bool? awaitingBroadcast,
-    bool? canPublish,
-    bool? deafened,
-    String? error,
-    bool clearError = false,
-    bool? retryable,
-    DateTime? connectedAt,
-    bool clearConnectedAt = false,
-  }) => VoiceState(
-    channelId: channelId ?? this.channelId,
-    state: state ?? this.state,
-    joining: joining ?? this.joining,
-    participants: participants ?? this.participants,
-    microphoneEnabled: microphoneEnabled ?? this.microphoneEnabled,
-    cameraEnabled: cameraEnabled ?? this.cameraEnabled,
-    screenSharing: screenSharing ?? this.screenSharing,
-    awaitingBroadcast: awaitingBroadcast ?? this.awaitingBroadcast,
-    canPublish: canPublish ?? this.canPublish,
-    deafened: deafened ?? this.deafened,
-    error: clearError ? null : (error ?? this.error),
-    retryable: clearError ? true : (retryable ?? this.retryable),
-    connectedAt: clearConnectedAt ? null : (connectedAt ?? this.connectedAt),
-  );
-}
+export 'voice_state.dart' show VoiceState;
 
 class VoiceController extends StateNotifier<VoiceState> {
   VoiceController(
@@ -310,12 +213,24 @@ class VoiceController extends StateNotifier<VoiceState> {
   /// exact counterpart. The participant listener above corrects this from
   /// the session's own truth regardless, so a refusal here still repaints
   /// as off rather than lying that the toggle worked.
+  ///
+  /// The cause is included and logged rather than dropped, [setScreenShare]'s
+  /// own reasoning: a bare "could not turn the camera on" gives whoever hits
+  /// this nothing to act on, where the native platform's own refusal (no
+  /// device, permission denied, already in use) is exactly what is needed.
   Future<void> toggleCamera() async {
     final want = !state.cameraEnabled;
     final got = await _session.setCameraEnabled(want);
+    final cause = got ? null : _session.lastError;
+    if (cause != null) {
+      _log('Camera ${want ? 'on' : 'off'} failed', detail: cause);
+    }
     state = state.copyWith(
       cameraEnabled: got ? want : state.cameraEnabled,
-      error: got ? null : 'Could not turn the camera ${want ? 'on' : 'off'}.',
+      error: got
+          ? null
+          : 'Could not turn the camera ${want ? 'on' : 'off'}. ${cause ?? ''}'
+                .trim(),
       clearError: got,
     );
   }
@@ -364,6 +279,11 @@ class VoiceController extends StateNotifier<VoiceState> {
   /// screens to choose from. Enumerating is also what makes the capture that
   /// follows able to find anything, so it happens even for a single screen.
   bool get screenShareNeedsSource => _session.screenShareNeedsSource;
+
+  /// Whether more than one enumerated source is worth its own picker; see
+  /// [VoiceSession.screenShareSourcePickerUseful].
+  bool get screenShareSourcePickerUseful =>
+      _session.screenShareSourcePickerUseful;
 
   Future<List<ScreenShareSource>> screenShareSources() =>
       _session.screenShareSources();

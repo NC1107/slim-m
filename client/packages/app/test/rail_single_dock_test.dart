@@ -79,4 +79,48 @@ void main() {
       await teardownFixture(tester, fixture.container, fixture.db);
     },
   );
+
+  testWidgets(
+    'leaving a call from elsewhere is instant, with no confirmation dialog',
+    (tester) async {
+      final fixture = await fixtureContainer(
+        extraOverrides: [
+          voiceControllerProvider.overrideWith(
+            (ref) => _FixedVoiceController(ref, inMainCall),
+          ),
+        ],
+      );
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: fixture.container,
+          child: MaterialApp.router(
+            debugShowCheckedModeBanner: false,
+            theme: buildTheme(Brightness.dark, AppTokens.dark),
+            routerConfig: fixtureRouter('/channels'),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 350));
+
+      await tester.tap(find.bySemanticsLabel('Leave call'));
+      await tester.pump();
+
+      expect(
+        find.byType(AlertDialog),
+        findsNothing,
+        reason: 'the owner asked to leave instantly, not to be asked first',
+      );
+      expect(
+        fixture.container.read(voiceControllerProvider).state,
+        VoiceSessionState.idle,
+        reason: 'one tap must actually leave the call, not just dismiss it',
+      );
+
+      await teardownFixture(tester, fixture.container, fixture.db);
+    },
+  );
 }

@@ -80,6 +80,9 @@ class _NoopSession implements VoiceSession {
   bool get screenShareNeedsSource => false;
 
   @override
+  bool get screenShareSourcePickerUseful => true;
+
+  @override
   Future<List<ScreenShareSource>> screenShareSources() async => const [];
 
   final Set<String> _locallyMuted = {};

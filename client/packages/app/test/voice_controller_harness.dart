@@ -54,6 +54,7 @@ class FakeSession implements VoiceSession {
     this.deafenGranted = true,
     this.needsSource = false,
     this.sources = const [],
+    this.sourcePickerUseful = true,
     this.canFlipCamera = false,
     this.cameraNeedsSelection = false,
     this.cameraDeviceList = const [],
@@ -71,6 +72,10 @@ class FakeSession implements VoiceSession {
   /// Whether this platform makes a share name a screen first.
   final bool needsSource;
   final List<ScreenShareSource> sources;
+
+  /// Whether several enumerated sources are worth their own picker; see
+  /// [DesktopSources.sourcePickerUseful].
+  final bool sourcePickerUseful;
 
   @override
   final bool canFlipCamera;
@@ -127,6 +132,9 @@ class FakeSession implements VoiceSession {
 
   @override
   bool get screenShareNeedsSource => needsSource;
+
+  @override
+  bool get screenShareSourcePickerUseful => sourcePickerUseful;
 
   @override
   Future<List<ScreenShareSource>> screenShareSources() async {
@@ -207,9 +215,12 @@ class FakeSession implements VoiceSession {
   @override
   Future<bool> setMicrophoneEnabled(bool enabled) async => microphoneGranted;
 
+  /// Records a cause on refusal, `setScreenShareEnabled`'s own reasoning
+  /// below: a fake that drops it cannot catch a controller that does too.
   @override
   Future<bool> setCameraEnabled(bool enabled) async {
     askedForCameraOnToggle = enabled;
+    if (!cameraGranted) _lastError = 'no camera device found';
     return cameraGranted;
   }
 

@@ -17,7 +17,6 @@ import '../providers/providers.dart';
 import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart';
 import 'call_participant_tiles.dart';
-import 'confirm_dialog.dart';
 
 /// A second row under the footer's usual identity line, appearing only
 /// while [RailUserFooter] decides a call elsewhere is worth surfacing.
@@ -47,18 +46,6 @@ class RailCallSummary extends ConsumerStatefulWidget {
 
 class _RailCallSummaryState extends ConsumerState<RailCallSummary> {
   bool _pressed = false;
-
-  Future<void> _confirmLeave(BuildContext context, String name) async {
-    final confirmed = await confirmDangerousAction(
-      context,
-      title: 'Leave the call?',
-      message:
-          "You're not viewing the call in $name. Leaving disconnects your "
-          'microphone there.',
-      confirmLabel: 'Leave call',
-    );
-    if (confirmed) widget.onLeave();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,7 +128,8 @@ class _RailCallSummaryState extends ConsumerState<RailCallSummary> {
               semanticLabel: 'Leave call',
               tooltip: 'Leave call',
               variant: AppIconButtonVariant.danger,
-              onPressed: () => _confirmLeave(context, name),
+              // Instant: the in-call bar's own leave button asks nothing either.
+              onPressed: widget.onLeave,
             ),
           ],
         );

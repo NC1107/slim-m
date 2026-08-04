@@ -38,12 +38,17 @@ class _InertSession implements VoiceSession {
     bool needsSource = false,
     Future<List<ScreenShareSource>>? sources,
     ScreenShareOutcome outcome = ScreenShareOutcome.started,
+    bool sourcePickerUseful = true,
   }) : _needsSource = needsSource,
        _sources = sources ?? Future.value(const []),
-       _outcome = outcome;
+       _outcome = outcome,
+       screenShareSourcePickerUseful = sourcePickerUseful;
 
   final bool _needsSource;
   final Future<List<ScreenShareSource>> _sources;
+
+  @override
+  final bool screenShareSourcePickerUseful;
 
   /// Desktop starts sharing outright; `pendingBroadcast` is the iOS-only
   /// shape and is what would arm `VoiceController`'s 30-second broadcast
@@ -337,6 +342,38 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'on Linux the portal picks, so this app never opens a second picker',
+    (tester) async {
+      final session = _InertSession(
+        needsSource: true,
+        sources: Future.value(const [
+          ScreenShareSource(id: '1', name: 'Screen 1'),
+          ScreenShareSource(id: '2', name: 'Screen 2'),
+        ]),
+        sourcePickerUseful: false,
+      );
+      await pumpControls(
+        tester,
+        const VoiceState(state: VoiceSessionState.connected),
+        session: session,
+      );
+
+      await tester.tap(find.byTooltip('Share a screen'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Everyone in the call will see it until you stop sharing.'),
+        findsNothing,
+        reason:
+            'xdg-desktop-portal already asks; this sheet would be a second '
+            'dialog for the same choice',
+      );
+      expect(session.screenShareCalls, hasLength(1));
+      expect(session.screenShareCalls.single.sourceId, '1');
+    },
+  );
 
   testWidgets('the camera button is on the same row as hang up', (
     tester,
