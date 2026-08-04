@@ -26,10 +26,10 @@ import '../providers/providers.dart';
 import 'member_profile.dart';
 import 'user_avatar.dart';
 
-/// Whether the member pane is shown at expanded width. Defaults open; the
+/// Whether the member pane is shown, wherever it fits. Defaults open; the
 /// channel header's members toggle flips it. [HomeShell] also gates this on
-/// layout, since the toggle can only hide the pane, not summon room for it
-/// that is not there.
+/// `LayoutClass.fitsMemberPane`, since the toggle can only hide the pane, not
+/// summon room for it that is not there.
 final memberPaneVisibleProvider = StateProvider<bool>((ref) => true);
 
 /// 236px, `--surface-sunken`, a left hairline: the design's right member pane.

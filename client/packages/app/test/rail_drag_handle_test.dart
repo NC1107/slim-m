@@ -63,6 +63,38 @@ void main() {
   });
 
   testWidgets(
+    'the wide hit zone is coloured to match its neighbours, not left as a '
+    'gap between the rail and the transcript',
+    (tester) async {
+      final s = setup();
+      await pumpAtWidth(tester, s.container, 1400);
+
+      final colors = tester
+          .widgetList<Container>(
+            find.descendant(
+              of: find.byType(RailDragHandle),
+              matching: find.byType(Container),
+            ),
+          )
+          .map((c) => c.color)
+          .toList();
+
+      expect(
+        colors,
+        containsAll([
+          AppTokens.light.surfaceSunken,
+          AppTokens.light.surfaceBase,
+        ]),
+        reason:
+            'each side of the hairline should carry the surface it '
+            'actually borders, not a neutral strip belonging to neither',
+      );
+
+      await teardown(tester, s.container, s.db);
+    },
+  );
+
+  testWidgets(
     'collapsed, a real glyph stays on screen, and the semantic action a '
     'screen reader or the keyboard would use really restores the rail - '
     'the mutation that matters is deleting either half of this',

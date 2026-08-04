@@ -97,6 +97,17 @@ void main() {
   });
 
   testWidgets(
+    'the member pane also docks at a wide-enough medium width, not only '
+    'expanded - the owner\'s half-desktop-snap report at ~955px',
+    (tester) async {
+      final s = setup();
+      await pumpAtWidth(tester, s.container, 955);
+      expect(find.byType(AppMemberPane), findsOneWidget);
+      await teardown(tester, s.container, s.db);
+    },
+  );
+
+  testWidgets(
     'the member toggle shows only where the pane can, not at medium width',
     (tester) async {
       final s = setup(httpClient: quietClient(), signedIn: true);
@@ -117,6 +128,12 @@ void main() {
       await pumpAtWidth(tester, s.container, 700, location: '/channels/c1');
       expect(find.byType(AppMemberPane), findsNothing);
       expect(find.bySemanticsLabel('Toggle member list'), findsNothing);
+
+      // A wider medium window has the same room expanded always did, so the
+      // toggle and the pane agree there too.
+      await pumpAtWidth(tester, s.container, 955, location: '/channels/c1');
+      expect(find.byType(AppMemberPane), findsOneWidget);
+      expect(find.bySemanticsLabel('Toggle member list'), findsOneWidget);
 
       await teardown(tester, s.container, s.db);
     },

@@ -37,9 +37,11 @@ class ChannelHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final membersVisible = ref.watch(memberPaneVisibleProvider);
-    // The member pane only exists at expanded width, so the toggle only does
-    // there; at medium width it would sit lit over a pane that never appears.
-    final canToggleMembers = LayoutClass.of(context) == LayoutClass.expanded;
+    // The pane only docks where LayoutClass.fitsMemberPane says there is
+    // room; a toggle shown past that would sit lit over a pane that never appears.
+    final canToggleMembers = LayoutClass.of(
+      context,
+    ).fitsMemberPane(MediaQuery.sizeOf(context).width);
 
     return Container(
       height: 52,
