@@ -268,7 +268,14 @@ Read the channel before picking a task.
 
 - 👀 (`U+1F440`) when the item is picked up and being worked on
 - ✅ (`U+2705`) when it is **done and merged to main**, not merely when a PR is open
+- ❌ (`U+274C`) when it will not be done, with the reasoning said somewhere rather than left as a shrug
 - pins are reserved for items blocked on the owner, so the pins panel reads as "what Nick needs to answer"
+
+**Do not post standalone status messages into the channel.**
+Corrected by the owner 2026-08-04, in his words: "I dont need you to respond in the backlog channel, if you want to respond to a specific bug do it in a threaded reply btw".
+The reactions already carry status, so a running commentary of plan and progress posts is noise on top of a signal that is already there, and it pushes his own reports off the screen.
+When something genuinely needs saying about one item - a decline's reasoning, a question, a caveat the reaction cannot carry - open a **thread on that message** and say it there, where it stays attached to the thing it is about.
+The session that prompted this had posted six standalone messages in a day; the reactions alone would have said the same thing.
 
 Reactions rather than pin-and-unpin, decided 2026-08-01 after the owner proposed pinning every item and unpinning as they were done.
 Unpinning erases the record - a finished item becomes indistinguishable from one never touched - and pin/unpin carries one bit where the real states are picked-up, done, blocked and won't-do.
