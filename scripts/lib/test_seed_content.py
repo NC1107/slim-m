@@ -49,6 +49,14 @@ class MessageGeneratorsTest(unittest.TestCase):
         self.assertIn("```", got)
         self.assertEqual(got.count("```"), 2)
 
+    def test_the_code_corpus_reads_like_real_functions_not_hello_world(self):
+        for _lang, code in seed_content._CODE_SNIPPETS:
+            self.assertGreaterEqual(len(code.splitlines()), 5, code)
+
+    def test_the_code_corpus_spans_several_languages(self):
+        langs = {lang for lang, _code in seed_content._CODE_SNIPPETS if lang}
+        self.assertGreaterEqual(len(langs), 5, langs)
+
     def test_markdown_message_uses_a_recognised_marker(self):
         markers = ("**", "*", "> ", "||", "~~", "# ")
         rng = random.Random(3)

@@ -16,6 +16,7 @@ import uuid
 import seed_actions
 import seed_backoff
 import seed_content
+import seed_links
 
 
 @dataclasses.dataclass
@@ -85,6 +86,11 @@ def handle_message_mention(ctx):
 def handle_message_near_limit(ctx):
     _do_message(ctx, seed_content.near_limit_message(ctx.rng, pool=_pool(ctx, "short")))
     return "sent a message near the character limit"
+
+
+def handle_message_link(ctx):
+    _do_message(ctx, seed_links.link_message(ctx.rng))
+    return "sent a message with a link"
 
 
 def handle_burst(ctx):
@@ -204,6 +210,7 @@ HANDLERS = {
     "message_code_block": handle_message_code_block,
     "message_mention": handle_message_mention,
     "message_near_limit": handle_message_near_limit,
+    "message_link": handle_message_link,
     "burst": handle_burst,
     "reply": handle_reply,
     "open_thread": handle_open_thread,
