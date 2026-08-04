@@ -3,8 +3,13 @@
 /// queue, invites, roles, channel permission overwrites, who can join, and
 /// the Space's custom emoji.
 ///
-/// This is [SpaceSettingsScreen]'s whole body, not a section sharing a screen
-/// with personal settings, so it owns no group header or divider of its own.
+/// This is [SpaceSettingsScreen]'s whole body. Grouped into bordered
+/// [SettingsSectionCard]s the same way a personal settings pane is, rather
+/// than one bare column of rows under the app bar: every row here is a link
+/// to a screen of its own instead of inline content, which is why this
+/// screen is a single scroll rather than the nav-and-pane split personal
+/// settings uses, but that navigation difference is not licence for the two
+/// to read as different apps.
 library;
 
 import 'package:flutter/material.dart';
@@ -16,6 +21,7 @@ import '../permissions.dart';
 import '../providers/admin_providers.dart';
 import '../routing/routes.dart';
 import 'join_policy_row.dart';
+import 'settings_section_header.dart';
 
 /// Whether [permissions] carries any of the four bits that gate a row on
 /// [SpaceSettingsSection]. Shared with the rail's Space menu, which must hide
@@ -60,59 +66,81 @@ class SpaceSettingsSection extends ConsumerWidget {
       color: tokens.textSecondary,
     );
 
+    // A group renders only when at least one of its rows does.
+    final groups = <(String, List<Widget>)>[
+      (
+        'Moderation',
+        [
+          if (canModerate)
+            AppListRow(
+              label: 'Reports',
+              leading: const Icon(AppIcons.report),
+              trailing: chevron(),
+              onTap: () => context.push(Routes.adminReports),
+            ),
+          if (canBan)
+            AppListRow(
+              label: 'Removed members',
+              leading: const Icon(AppIcons.signOut),
+              trailing: chevron(),
+              onTap: () => context.push(Routes.adminRemovedMembers),
+            ),
+        ],
+      ),
+      (
+        'Access',
+        [
+          if (canInvite)
+            AppListRow(
+              label: 'Invites',
+              leading: const Icon(AppIcons.invite),
+              trailing: chevron(),
+              onTap: () => context.push(Routes.adminInvites),
+            ),
+          if (canManageServer) const JoinPolicyRow(),
+        ],
+      ),
+      (
+        'Configuration',
+        [
+          if (canManageRoles) ...[
+            AppListRow(
+              label: 'Roles',
+              leading: const Icon(AppIcons.shield),
+              trailing: chevron(),
+              onTap: () => context.push(Routes.adminRoles),
+            ),
+            AppListRow(
+              label: 'Channel permissions',
+              leading: const Icon(AppIcons.permissions),
+              trailing: chevron(),
+              onTap: () => context.push(Routes.adminOverwrites),
+            ),
+          ],
+          if (canManageChannels)
+            AppListRow(
+              label: 'Channel categories',
+              leading: const Icon(AppIcons.hash),
+              trailing: chevron(),
+              onTap: () => context.push(Routes.adminCategories),
+            ),
+          if (canManageServer)
+            AppListRow(
+              label: 'Emoji',
+              leading: const Icon(AppIcons.smile),
+              trailing: chevron(),
+              onTap: () => context.push(Routes.adminEmoji),
+            ),
+        ],
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (canModerate)
-          AppListRow(
-            label: 'Reports',
-            leading: const Icon(AppIcons.report),
-            trailing: chevron(),
-            onTap: () => context.push(Routes.adminReports),
-          ),
-        if (canInvite)
-          AppListRow(
-            label: 'Invites',
-            leading: const Icon(AppIcons.invite),
-            trailing: chevron(),
-            onTap: () => context.push(Routes.adminInvites),
-          ),
-        if (canManageRoles) ...[
-          AppListRow(
-            label: 'Roles',
-            leading: const Icon(AppIcons.shield),
-            trailing: chevron(),
-            onTap: () => context.push(Routes.adminRoles),
-          ),
-          AppListRow(
-            label: 'Channel permissions',
-            leading: const Icon(AppIcons.permissions),
-            trailing: chevron(),
-            onTap: () => context.push(Routes.adminOverwrites),
-          ),
-        ],
-        if (canManageChannels)
-          AppListRow(
-            label: 'Channel categories',
-            leading: const Icon(AppIcons.hash),
-            trailing: chevron(),
-            onTap: () => context.push(Routes.adminCategories),
-          ),
-        if (canBan)
-          AppListRow(
-            label: 'Removed members',
-            leading: const Icon(AppIcons.signOut),
-            trailing: chevron(),
-            onTap: () => context.push(Routes.adminRemovedMembers),
-          ),
-        if (canManageServer) const JoinPolicyRow(),
-        if (canManageServer)
-          AppListRow(
-            label: 'Emoji',
-            leading: const Icon(AppIcons.smile),
-            trailing: chevron(),
-            onTap: () => context.push(Routes.adminEmoji),
-          ),
+        for (final (title, rows) in groups)
+          if (rows.isNotEmpty)
+            SettingsSectionCard(title: title, children: rows),
       ],
     );
   }

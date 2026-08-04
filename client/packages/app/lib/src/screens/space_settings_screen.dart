@@ -21,7 +21,7 @@ class SpaceSettingsScreen extends StatelessWidget {
       // Reached with go(), which replaces, so there is no stack to pop.
       backTooltip: 'Back to channels',
       backFallback: Routes.channels,
-      padding: EdgeInsets.zero,
+      // Default padding, matching a personal settings pane's own ListView.
       child: SpaceSettingsSection(),
     );
   }
