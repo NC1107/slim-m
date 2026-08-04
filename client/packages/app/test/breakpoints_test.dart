@@ -18,10 +18,7 @@ void main() {
   });
 
   group('fitsMemberPane', () {
-    // fitsMemberPane's own doc comment gives this arithmetic: a medium rail,
-    // its handle, and the member pane, plus the minimum transcript width the
-    // compact/medium boundary already guarantees for a rail-and-transcript
-    // pair (that boundary minus the same rail and handle).
+    // The width fitsMemberPane's own doc comment derives it from.
     const minTranscript =
         kCompactWidth - ChannelRail.mediumWidth - AppSizes.rowPointer;
     const mediumThreshold =
