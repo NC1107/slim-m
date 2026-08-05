@@ -145,6 +145,33 @@ void main() {
       }
     });
 
+    test('a remove tombstones an id this client never placed at all - the '
+        'viewport-read-in-flight race the tombstone set exists for, where the '
+        'freed-slot check the other tests exercise cannot help because there '
+        'is no slot to free', () {
+      final document = CanvasDocument();
+      document.removeObject('never-placed');
+      final replay = document.applyPlaced(
+        const CanvasStrokeInput(
+          id: 'never-placed',
+          seq: 1,
+          zIndex: 1,
+          x: 0,
+          y: 0,
+          w: 1,
+          h: 1,
+          points: [0, 0, 1, 1],
+          width: 3,
+          colorKey: 'annotation',
+        ),
+      );
+      expect(
+        replay,
+        isNull,
+        reason: 'a late viewport response must not resurrect it',
+      );
+    });
+
     test('a clear does not resurrect an object whose place op is delivered '
         'after it, out of order', () async {
       final log = <CanonOp>[
