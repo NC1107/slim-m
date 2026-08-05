@@ -1,8 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Painting the one object [CanvasDocument.selectedObjectId] names: an
-/// outline in screen space, plus resize handles when it is an image - a
-/// stroke has no thinner shape inside its box for a corner drag to distort,
-/// so it is selectable (for reorder) but never grows handles.
+/// outline in screen space, plus resize handles when it is an image.
+///
+/// This painter would happily draw an outline-only selection for a stroke -
+/// a stroke has no thinner shape inside its box for a corner drag to
+/// distort, so it never grows handles - but nothing upstream ever selects
+/// one: `CanvasOpsController.beginSelect` only ever hit-tests an image, so
+/// `selectedObjectId` can never name a stroke today. A stroke is therefore
+/// neither movable nor reorderable through the Move tool, not merely
+/// handle-less; see `canvas_pane_ops_test.dart`'s "move is scoped to
+/// images" test.
 library;
 
 import 'package:flutter/foundation.dart';
