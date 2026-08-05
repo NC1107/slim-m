@@ -93,6 +93,27 @@ void main() {
       expect(resolved?.fontFamilyFallback, contains('Noto Color Emoji'));
     });
 
+    testWidgets(
+        'reaction chip padding and internal gap sit at the tightest '
+        'spacing token, s4 rather than s8', (tester) async {
+      await tester.pumpWidget(
+        _wrap(AppChip.reaction(
+            emoji: '\u{1F44D}', count: 1, active: false, onTap: () {})),
+      );
+
+      // The decorated chip is the only Container with a fill colour.
+      final visual = tester
+          .widgetList<Container>(find.byType(Container))
+          .firstWhere((c) =>
+              c.decoration is BoxDecoration &&
+              (c.decoration as BoxDecoration).color != null);
+      expect(visual.padding,
+          const EdgeInsets.symmetric(horizontal: AppSpacing.s4));
+
+      final gap = tester.widget<SizedBox>(find.byType(SizedBox));
+      expect(gap.width, AppSpacing.s4);
+    });
+
     testWidgets('operator variant renders as a non-interactive span',
         (tester) async {
       await tester

@@ -191,6 +191,70 @@ class RunTest(unittest.TestCase):
         self.assertEqual(failures, [])
         self.assertLessEqual(stats["settle_open_thread"], 2)
 
+    def test_polls_near_the_tail_get_a_guaranteed_round_of_votes(self):
+        state = seed_state.SeedState()
+        for i in range(seed_settle.SETTLE_POLL_TARGETS):
+            state.add_poll(f"p{i}", "c1", 3)
+        contexts = [_ctx(name) for name in ("alice", "bob", "carol", "dave", "erin")]
+        stats, failures = seed_settle.run(contexts, state, random.Random(10))
+        self.assertEqual(failures, [])
+        self.assertGreater(stats["settle_vote_poll"], 0)
+
+    def test_a_poll_can_get_votes_from_several_distinct_accounts(self):
+        state = seed_state.SeedState()
+        state.add_poll("p1", "c1", 3)
+        contexts = [_ctx(name) for name in ("alice", "bob", "carol", "dave", "erin")]
+        seed_settle.run(contexts, state, random.Random(11))
+        self.assertGreaterEqual(len(state.poll_voters("p1")), 2)
+
+    def test_the_settle_pass_never_votes_twice_for_one_account_on_one_poll(self):
+        state = seed_state.SeedState()
+        state.add_poll("p1", "c1", 4)
+        contexts = [_ctx(name) for name in ("alice", "bob", "carol")]
+        seed_settle.run(contexts, state, random.Random(13))
+        votes_by_account = collections.Counter()
+        for ctx in contexts:
+            for call in ctx.api.call.call_args_list:
+                if call.args[0] == "PUT" and call.args[1] == "/messages/p1/polls/vote":
+                    votes_by_account[ctx.username] += 1
+        self.assertTrue(all(count <= 1 for count in votes_by_account.values()))
+
+    def test_a_poll_the_coverage_roll_skips_gets_no_votes_at_all(self):
+        """Not every poll should get votes, or the tail would read as
+        uniformly finished rather than a run genuinely still in progress."""
+        class _AlwaysSkipsCoverage:
+            def random(self):
+                return 0.999
+
+        state = seed_state.SeedState()
+        state.add_poll("p1", "c1", 3)
+        contexts = [_ctx("alice"), _ctx("bob")]
+        stats, failures = collections.Counter(), []
+        seed_settle._vote_on_poll(
+            contexts, _AlwaysSkipsCoverage(), stats, failures, state,
+            state.newest_polls(1)[0])
+        self.assertEqual(stats["settle_vote_poll"], 0)
+        self.assertEqual(state.poll_voters("p1"), set())
+
+
+class PollVotePlanTest(unittest.TestCase):
+    def test_more_voters_than_options_forces_a_repeated_option(self):
+        """A pigeonhole guarantee, not a probabilistic one: 5 voters over 2
+        options must land at least one repeat, whatever the rng draws -
+        the shape a real poll needs so it does not read as one vote apiece."""
+        rng = random.Random(0)
+        plan = seed_settle._poll_vote_plan(rng, options_count=2, voter_count=5)
+        self.assertEqual(len(plan), 5)
+        self.assertTrue(all(0 <= option < 2 for option in plan))
+        self.assertGreater(len(plan), len(set(plan)))
+
+    def test_every_option_is_reachable_over_many_draws(self):
+        rng = random.Random(1)
+        seen = set()
+        for _ in range(50):
+            seen.update(seed_settle._poll_vote_plan(rng, options_count=4, voter_count=1))
+        self.assertEqual(seen, {0, 1, 2, 3})
+
 
 if __name__ == "__main__":
     unittest.main()

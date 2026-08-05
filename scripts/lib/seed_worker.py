@@ -184,7 +184,20 @@ def handle_send_poll(ctx):
         lambda: ctx.api.call(
             "POST", f"/channels/{ctx.channel_id}/messages/polls", body))
     ctx.state.add_top_message(msg["id"], ctx.channel_id, ctx.username)
+    ctx.state.add_poll(msg["id"], ctx.channel_id, len(options))
     return "sent a poll"
+
+
+def handle_vote_poll(ctx):
+    poll = ctx.state.random_unvoted_poll(ctx.rng, ctx.username)
+    if poll is None:
+        return handle_message_short(ctx)
+    option = ctx.rng.randrange(poll["options_count"])
+    seed_backoff.call_with_backoff(
+        lambda: ctx.api.call(
+            "PUT", f"/messages/{poll['id']}/polls/vote", {"option": option}))
+    ctx.state.record_poll_vote(poll["id"], ctx.username)
+    return f"voted on a poll (option {option})"
 
 
 def handle_send_attachment(ctx):
@@ -220,6 +233,7 @@ HANDLERS = {
     "delete_message": handle_delete_message,
     "pin_message": handle_pin_message,
     "send_poll": handle_send_poll,
+    "vote_poll": handle_vote_poll,
     "send_attachment": handle_send_attachment,
 }
 
@@ -246,7 +260,8 @@ def run_account(ctx, actions_count, pace_range, actions=None):
             has_own_message=ctx.state.random_own_message(ctx.rng, ctx.username) is not None,
             has_thread=ctx.state.has_thread(),
             has_other_account=bool(ctx.other_usernames),
-            is_privileged=ctx.is_privileged)
+            is_privileged=ctx.is_privileged,
+            has_poll=ctx.state.has_poll())
         try:
             HANDLERS[resolved](ctx)
             stats[resolved] += 1

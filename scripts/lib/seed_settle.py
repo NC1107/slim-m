@@ -16,6 +16,13 @@ carry several *different* emoji, and an emoji can be reacted to by several
 can be freshly opened here, not just kept alive if one already exists near
 the tail - see `SETTLE_NEW_THREADS` - with enough replies (3 to 8) to read
 as an actual side conversation rather than a single, lonely reply.
+
+A third shape: the newest polls also get a guaranteed round of votes, for
+the same reason as the two above - a poll sent near the tail has almost no
+run left in which `vote_poll`'s organic draws could reach it. See
+`_poll_vote_plan` for why the spread is a weighted draw rather than one
+vote per option: a poll where every option ties reads as generated, not as
+something people actually answered.
 """
 import collections
 import urllib.parse
@@ -36,10 +43,16 @@ SETTLE_THREAD_REPLIES = (1, 3)
 # How many of the newest targets get a brand new, deeply-replied thread.
 SETTLE_NEW_THREADS = 6
 SETTLE_NEW_THREAD_REPLIES = (3, 8)
+# How many of the newest polls get a guaranteed round of voting.
+SETTLE_POLL_TARGETS = 10
+# Share of those polls that get any votes at all; see the module doc.
+SETTLE_POLL_VOTE_COVERAGE = 0.85
 
 # Weighted so one emoji/one reactor is still common, but not the only shape.
 _DISTINCT_EMOJI_WEIGHTS = ((1, 45), (2, 35), (3, 20))
 _REACTOR_COUNT_WEIGHTS = ((1, 40), (2, 35), (3, 15), (4, 10))
+# A vote is a heavier commitment than a reaction, so this skews lower.
+_POLL_VOTER_COUNT_WEIGHTS = ((2, 25), (3, 30), (4, 25), (5, 15), (6, 5))
 
 
 def _actor(contexts, rng, exclude_username=None):
@@ -85,6 +98,48 @@ def _reply_in_thread(ctx, rng, thread_channel_id):
 def _open_thread(ctx, target):
     return seed_backoff.call_with_backoff(
         lambda: ctx.api.open_thread(target["channel_id"], target["id"]))
+
+
+def _poll_vote_plan(rng, options_count, voter_count):
+    """Which option each of `voter_count` voters picks.
+
+    Weights drawn from `rng.expovariate(1.0)` (Dirichlet(1,...,1) shares
+    once normalised, the maximally uninformative split over `options_count`
+    categories) rather than one vote per option: a Dirichlet(1) draw is
+    sometimes close to even and often has a clear leader, which is exactly
+    "an uneven spread, often a clear leader, sometimes a near-tie" without
+    hand-tuning a shape for it.
+    """
+    weights = [rng.expovariate(1.0) for _ in range(options_count)]
+    return rng.choices(range(options_count), weights=weights, k=voter_count)
+
+
+def _vote(ctx, poll, option):
+    return seed_backoff.call_with_backoff(
+        lambda: ctx.api.call(
+            "PUT", f"/messages/{poll['id']}/polls/vote", {"option": option}))
+
+
+def _vote_on_poll(contexts, rng, stats, failures, state, poll):
+    """A full vote round on one poll: not every poll gets one at all (see
+    SETTLE_POLL_VOTE_COVERAGE), and the poll's own author may be among the
+    voters - unlike reacting to one's own message, voting on one's own poll
+    is ordinary behaviour and is not excluded here."""
+    if rng.random() >= SETTLE_POLL_VOTE_COVERAGE:
+        return
+    already_voted = state.poll_voters(poll["id"])
+    pool = [c for c in contexts if c.username not in already_voted]
+    if not pool:
+        return
+    voter_count = min(_weighted_choice(rng, _POLL_VOTER_COUNT_WEIGHTS), len(pool))
+    voters = rng.sample(pool, k=voter_count)
+    plan = _poll_vote_plan(rng, poll["options_count"], voter_count)
+    for ctx, option in zip(voters, plan):
+        ok, _result = _try(failures, ctx, "settle_vote_poll",
+                            lambda ctx=ctx, option=option: _vote(ctx, poll, option))
+        if ok:
+            stats["settle_vote_poll"] += 1
+            state.record_poll_vote(poll["id"], ctx.username)
 
 
 def _try(failures, ctx, action_name, action):
@@ -184,6 +239,9 @@ def run(contexts, state, rng):
                 lambda: _reply_in_thread(ctx, rng, thread_channel_id))
             if ok:
                 stats["settle_reply_in_thread"] += 1
+
+    for poll in state.newest_polls(SETTLE_POLL_TARGETS):
+        _vote_on_poll(contexts, rng, stats, failures, state, poll)
 
     stats["settle_coverage_hits"] = len(reacted_ids)
     stats["settle_coverage_targets"] = len(targets) + len(created_replies)

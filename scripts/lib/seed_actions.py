@@ -46,6 +46,7 @@ ACTIONS = (
     ("delete_message", 2),
     ("pin_message", 2),
     ("send_poll", 3),
+    ("vote_poll", 6),
     ("send_attachment", 3),
 )
 
@@ -68,6 +69,7 @@ UTILITY_ACTIONS = (
     ("delete_message", 2),
     ("pin_message", 2),
     ("send_poll", 3),
+    ("vote_poll", 6),
     ("send_attachment", 3),
 )
 
@@ -83,7 +85,7 @@ def choose_action(rng, actions=ACTIONS):
 
 
 def resolve_action(action, *, has_top_message, has_own_message, has_thread,
-                    has_other_account, is_privileged):
+                    has_other_account, is_privileged, has_poll):
     """The action actually performed, honouring what state allows.
 
     A pure decision so the fallback chain is unit-testable with no server:
@@ -97,6 +99,8 @@ def resolve_action(action, *, has_top_message, has_own_message, has_thread,
     if action == "message_mention" and not has_other_account:
         return FALLBACK
     if action == "reply_in_thread" and not has_thread:
+        return FALLBACK
+    if action == "vote_poll" and not has_poll:
         return FALLBACK
     if action in _OWN_MESSAGE_ACTIONS and not has_own_message:
         return FALLBACK

@@ -110,4 +110,29 @@ void main() {
 
     expect(tester.getSize(find.byType(AppListRow)).height, 52);
   });
+
+  group('AppChip.reaction keeps its hit floor regardless of visual padding',
+      () {
+    // Tighter chip padding must not shrink the tappable margin around it.
+    Widget chip() => AppChip.reaction(
+        emoji: '\u{1F44D}', count: 3, active: false, onTap: () {});
+
+    testWidgets('a compact window puts the reaction chip at the touch floor',
+        (tester) async {
+      await _pump(tester, _phone, chip());
+
+      expect(tester.getSize(find.byType(GestureDetector).first).height,
+          AppSizes.rowTouch);
+    });
+
+    testWidgets(
+        'a desktop window never shrinks the reaction chip below pointer size',
+        (tester) async {
+      await _pump(tester, _desktop, chip());
+
+      // Never smaller than the floor, not an exact incidental measurement.
+      expect(tester.getSize(find.byType(GestureDetector).first).height,
+          greaterThanOrEqualTo(AppSizes.rowPointer));
+    });
+  });
 }

@@ -22,8 +22,10 @@ class SeedStateTest(unittest.TestCase):
         self.assertIsNone(state.random_top_message(rng))
         self.assertIsNone(state.random_thread(rng))
         self.assertIsNone(state.random_own_message(rng, "alice"))
+        self.assertIsNone(state.random_unvoted_poll(rng, "alice"))
         self.assertFalse(state.has_top_message())
         self.assertFalse(state.has_thread())
+        self.assertFalse(state.has_poll())
 
     def test_a_added_top_message_is_findable_by_anyone(self):
         state = seed_state.SeedState()
@@ -76,7 +78,9 @@ class SeedStateTest(unittest.TestCase):
         state.add_top_message("m1", "c1", "alice")
         state.add_top_message("m2", "c1", "bob")
         state.add_thread("m1", "thread-1")
-        self.assertEqual(state.counts(), {"top_messages": 2, "threads": 1})
+        state.add_poll("m3", "c1", 3)
+        self.assertEqual(
+            state.counts(), {"top_messages": 2, "threads": 1, "polls": 1})
 
     def test_newest_top_messages_is_a_fixed_tail_slice(self):
         state = seed_state.SeedState()
@@ -96,6 +100,30 @@ class SeedStateTest(unittest.TestCase):
             state.add_thread(f"parent-{i}", f"thread-{i}")
         newest = state.newest_threads(2)
         self.assertEqual(newest, [("parent-3", "thread-3"), ("parent-4", "thread-4")])
+
+    def test_a_fresh_poll_has_no_voters_and_is_findable_by_anyone(self):
+        state = seed_state.SeedState()
+        state.add_poll("p1", "c1", 3)
+        rng = random.Random(0)
+        self.assertTrue(state.has_poll())
+        self.assertEqual(state.poll_voters("p1"), set())
+        self.assertEqual(state.random_unvoted_poll(rng, "alice")["id"], "p1")
+
+    def test_a_recorded_vote_removes_that_voter_from_random_unvoted_poll(self):
+        state = seed_state.SeedState()
+        state.add_poll("p1", "c1", 2)
+        state.record_poll_vote("p1", "alice")
+        rng = random.Random(0)
+        self.assertEqual(state.poll_voters("p1"), {"alice"})
+        self.assertIsNone(state.random_unvoted_poll(rng, "alice"))
+        self.assertEqual(state.random_unvoted_poll(rng, "bob")["id"], "p1")
+
+    def test_newest_polls_is_a_fixed_tail_slice(self):
+        state = seed_state.SeedState()
+        for i in range(5):
+            state.add_poll(f"p{i}", "c1", 2)
+        newest = state.newest_polls(2)
+        self.assertEqual([p["id"] for p in newest], ["p3", "p4"])
 
 
 class RecencyChoiceTest(unittest.TestCase):
