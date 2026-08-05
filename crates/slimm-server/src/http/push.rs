@@ -1,24 +1,30 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Push registration routes: register or replace the caller's own device's
-//! push registration, drop it, and report the client's lifecycle state.
+//! push registration, drop it, report the client's lifecycle state, and read
+//! or set the caller's account-wide notification preference.
 //!
-//! Every handler here uses the device id from the authenticated session, never
-//! one taken from the request body, so a device can never write another
-//! device's registration; [`crate::store::Store::register_push`] and its
-//! siblings re-check `user_id` too, so this holds even if that ever changes.
+//! Every device-scoped handler here (all but the last two) uses the device id
+//! from the authenticated session, never one taken from the request body, so
+//! a device can never write another device's registration;
+//! [`crate::store::Store::register_push`] and its siblings re-check `user_id`
+//! too, so this holds even if that ever changes. The notification preference
+//! is deliberately not device-scoped: it decides whether *any* of the
+//! caller's devices should buzz for a message, so it lives on the account,
+//! not on the session's own device id.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
-use axum::routing::put;
+use axum::routing::{get, put};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, enforce};
+use super::extract::{Authed, AuthedLimited, Json, READ, enforce};
+use crate::notifications::NotificationPreference;
 use crate::ratelimit::Class;
 
 const BODY_LIMIT: usize = 4 * 1024;
@@ -33,6 +39,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/push", put(register).delete(deregister))
         .route("/push/lifecycle", put(report_lifecycle))
+        .route("/push/preference", get(get_preference).put(set_preference))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
@@ -54,6 +61,11 @@ struct LifecycleRequest {
     /// "background". Only "foreground" carries meaning to the server today;
     /// anything else is just not-foreground.
     state: String,
+}
+
+#[derive(Deserialize, Serialize)]
+struct NotificationPreferenceDto {
+    preference: String,
 }
 
 // --- Handlers ---
@@ -127,6 +139,51 @@ async fn report_lifecycle(
         .report_lifecycle(ctx.user_id, ctx.device_id, state_value)
         .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Reads the caller's own notification preference back, a genuine round trip
+/// rather than a local echo: unlike `PATCH /presence`, nothing here needs a
+/// batched, per-viewer-derived answer, so there is no reason this cannot
+/// simply answer with the stored value.
+async fn get_preference(
+    AuthedLimited(ctx): AuthedLimited<READ>,
+    State(state): State<AppState>,
+) -> Result<Json<NotificationPreferenceDto>, ApiError> {
+    let preference = state
+        .store
+        .notification_preference(ctx.user_id)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    Ok(Json(NotificationPreferenceDto {
+        preference: preference.as_str().to_owned(),
+    }))
+}
+
+/// Sets the caller's own notification preference. Enforced where push
+/// recipients are computed (`push::recipients::message_recipients`), before a
+/// device is ever woken - never a filter a client applies to a push that has
+/// already landed.
+async fn set_preference(
+    Authed(ctx): Authed,
+    parts: Parts,
+    State(state): State<AppState>,
+    Json(req): Json<NotificationPreferenceDto>,
+) -> Result<Json<NotificationPreferenceDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    let preference = NotificationPreference::parse(&req.preference).ok_or(ApiError::BadRequest(
+        "preference must be everything, mentions, or nothing",
+    ))?;
+
+    if !state
+        .store
+        .set_notification_preference(ctx.user_id, preference)
+        .await?
+    {
+        return Err(ApiError::Unauthorized);
+    }
+    Ok(Json(NotificationPreferenceDto {
+        preference: preference.as_str().to_owned(),
+    }))
 }
 
 // --- Validation ---

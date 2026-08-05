@@ -9,6 +9,7 @@
 use std::collections::HashSet;
 
 use crate::ids::{ChannelId, UserId};
+use crate::notifications::NotificationPreference;
 use crate::store::Store;
 
 /// Who should be woken for `content` in `channel_id`, written by `author_id`.
@@ -31,7 +32,12 @@ use crate::store::Store;
 ///
 /// When `channel_id` is a thread's own channel, [`narrow_for_thread`] further
 /// cuts this down to the thread's own audience; every other channel passes
-/// through unchanged.
+/// through unchanged. [`narrow_for_notification_preference`] runs last, over
+/// whatever survived both of the above: each recipient's own
+/// [`NotificationPreference`] is the final word on whether this particular
+/// message is worth waking them for, the same "read where the audience is
+/// computed" choke point blocking already uses above, not a filter a client
+/// applies after a device has already buzzed.
 pub async fn message_recipients(
     store: &Store,
     channel_id: ChannelId,
@@ -46,7 +52,25 @@ pub async fn message_recipients(
         .filter(|user_id| *user_id != author_id && !blockers.contains(user_id))
         .collect();
     let viewers = store.viewers_among(channel_id, &candidates).await?;
-    narrow_for_thread(store, channel_id, content, viewers).await
+    let mentioned = resolved_mentions(store, content).await?;
+    let viewers = narrow_for_thread(store, channel_id, &mentioned, viewers).await?;
+    narrow_for_notification_preference(store, channel_id, &mentioned, viewers).await
+}
+
+/// The distinct accounts [`mentioned_usernames`] resolves to, in one query -
+/// shared by [`narrow_for_thread`] and [`narrow_for_notification_preference`]
+/// so a message that is both a thread reply and has mentions only pays for
+/// the username-to-id resolution once.
+async fn resolved_mentions(store: &Store, content: &str) -> anyhow::Result<HashSet<UserId>> {
+    let names: Vec<String> = mentioned_usernames(content).into_iter().collect();
+    if names.is_empty() {
+        return Ok(HashSet::new());
+    }
+    Ok(store
+        .user_ids_for_usernames(&names)
+        .await?
+        .into_iter()
+        .collect())
 }
 
 /// Narrows `viewers` to a thread's own audience, for a reply into a thread's
@@ -58,14 +82,14 @@ pub async fn message_recipients(
 /// thread is treating that whole parent-channel audience as who should be
 /// *woken* by one reply in what may be a two-person side conversation. The
 /// audience is [`Store::thread_participants`] (the parent message's author
-/// plus everyone who has posted in the thread) unioned with anybody `content`
-/// `@`-mentions, each still intersected with `viewers` so this can only ever
-/// remove somebody from the set already permission-checked above, never add a
-/// view nobody granted.
+/// plus everyone who has posted in the thread) unioned with `mentioned`
+/// (already resolved by the caller), each still intersected with `viewers` so
+/// this can only ever remove somebody from the set already permission-checked
+/// above, never add a view nobody granted.
 async fn narrow_for_thread(
     store: &Store,
     channel_id: ChannelId,
-    content: &str,
+    mentioned: &HashSet<UserId>,
     viewers: Vec<UserId>,
 ) -> anyhow::Result<Vec<UserId>> {
     let Some(parent) = store.thread_parent(channel_id).await? else {
@@ -74,13 +98,42 @@ async fn narrow_for_thread(
     let mut audience = store
         .thread_participants(channel_id, parent.parent_message_id)
         .await?;
-    let mentioned: Vec<String> = mentioned_usernames(content).into_iter().collect();
-    if !mentioned.is_empty() {
-        audience.extend(store.user_ids_for_usernames(&mentioned).await?);
-    }
+    audience.extend(mentioned.iter().copied());
     Ok(viewers
         .into_iter()
         .filter(|user_id| audience.contains(user_id))
+        .collect())
+}
+
+/// Narrows `viewers` by each recipient's own [`NotificationPreference`]:
+/// [`NotificationPreference::Nothing`] drops them unconditionally, including
+/// from a DM; [`NotificationPreference::Mentions`] keeps them only if
+/// `mentioned` names them or `channel_id` resolves to a DM (see
+/// [`Store::channel_notifies_as_dm`] for why a DM counts - somebody messaging
+/// this account there is addressing them directly, the same as a mention);
+/// and [`NotificationPreference::Everything`], the default, passes everyone
+/// through unfiltered, which is what every account already got before this
+/// preference existed.
+async fn narrow_for_notification_preference(
+    store: &Store,
+    channel_id: ChannelId,
+    mentioned: &HashSet<UserId>,
+    viewers: Vec<UserId>,
+) -> anyhow::Result<Vec<UserId>> {
+    if viewers.is_empty() {
+        return Ok(viewers);
+    }
+    let preferences = store.notification_preferences(&viewers).await?;
+    let is_dm = store.channel_notifies_as_dm(channel_id).await?;
+    Ok(viewers
+        .into_iter()
+        .filter(
+            |user_id| match preferences.get(user_id).copied().unwrap_or_default() {
+                NotificationPreference::Everything => true,
+                NotificationPreference::Nothing => false,
+                NotificationPreference::Mentions => is_dm || mentioned.contains(user_id),
+            },
+        )
         .collect())
 }
 

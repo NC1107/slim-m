@@ -177,6 +177,16 @@ pub async fn run(c: &mut Contract) {
 }
 
 async fn push_calls(c: &mut Contract, root: &str) {
+    c.get("getNotificationPreference", "/push/preference", root)
+        .await;
+    c.json(
+        "setNotificationPreference",
+        "PUT",
+        "/push/preference",
+        root,
+        json!({ "preference": "mentions" }),
+    )
+    .await;
     c.json(
         "registerPush",
         "PUT",

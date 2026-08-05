@@ -2342,6 +2342,58 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /push/preference:
+    get:
+      operationId: getNotificationPreference
+      tags: [push]
+      summary: Read the caller's own notification preference.
+      description: >
+        Account-wide, unlike every other route under this tag: which messages
+        are worth waking any of the caller's devices for, not one device's own
+        registration. A genuine round trip rather than a local echo - unlike
+        `PATCH /presence`, nothing here needs a per-viewer-derived answer.
+        Absent on a server too old to have this route, which a caller must
+        read as the preference not being offered at all, never as `everything`.
+      responses:
+        "200":
+          description: The preference now in effect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPreference"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      operationId: setNotificationPreference
+      tags: [push]
+      summary: Set the caller's own notification preference.
+      description: >
+        Enforced where push recipients are computed
+        (`push::recipients::message_recipients`), before a device is ever
+        woken - never filtered client-side after a push has already landed.
+        `mentions` still wakes a device for a plain message in a DM, since
+        somebody messaging the caller there is addressing them directly, the
+        same as an `@`-mention; `nothing` is absolute and silences a DM too.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationPreference"
+      responses:
+        "200":
+          description: The preference now in effect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPreference"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /channels/{channelId}/read:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -4680,6 +4732,20 @@ components:
             A client lifecycle label, for example `foreground` or
             `background`. Only `foreground` carries meaning to the server
             today; anything else is treated as not foreground.
+
+    NotificationPreference:
+      type: object
+      required: [preference]
+      properties:
+        preference:
+          type: string
+          enum: [everything, mentions, nothing]
+          description: >
+            `everything` is every message in a channel the caller can see -
+            the default, and what every account already got before this
+            preference existed. `mentions` is a direct `@`-mention plus every
+            message in a DM. `nothing` is no push at all, ever, including a
+            DM.
 
     ReadState:
       type: object

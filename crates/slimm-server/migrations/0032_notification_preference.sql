@@ -1,0 +1,18 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+-- Notification preference: a durable per-account choice for which messages
+-- are worth waking a device for. The backlog channel's own trigger was the
+-- seed script - a 500-message channel buzzes a phone for every one of them -
+-- but the preference is ordinary and wanted regardless of the seed script.
+--
+-- 'everything' | 'mentions' | 'nothing', validated in the application layer
+-- (see src/notifications.rs::NotificationPreference), the same convention
+-- presence_visibility (migration 0008) already uses for an unvalidated TEXT
+-- column rather than a CHECK constraint. Enforced exactly once, in
+-- push::recipients::message_recipients, the audience computation CLAUDE.md
+-- already calls out as the whole security decision on the push path - never
+-- filtered client-side after a device has already buzzed.
+--
+-- Defaults to 'everything' so every existing account keeps its current
+-- behaviour unchanged until it opts into something narrower: this column
+-- did not exist before today, so nothing was ever the account's own choice.
+ALTER TABLE users ADD COLUMN notification_preference TEXT NOT NULL DEFAULT 'everything';

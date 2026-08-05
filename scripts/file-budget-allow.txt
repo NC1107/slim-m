@@ -6,7 +6,7 @@
 # file's own ceiling, so this is a debt register rather than an exemption.
 # Nothing here is a decision that the file is fine; see docs/ci.md.
 
-schema/openapi.yaml 5480 # one OpenAPI document is one document; splitting it across $ref files would give the router-vs-schema gate two sources to reconcile. This number rises when the API does; raising it is the deliberate act, and the diff is where that shows. Raised again for the widened attachment content-type allowlist (video, audio, zip, gzip, text/plain)
+schema/openapi.yaml 5546 # one OpenAPI document is one document; splitting it across $ref files would give the router-vs-schema gate two sources to reconcile. This number rises when the API does; raising it is the deliberate act, and the diff is where that shows. Raised again for GET/PUT /push/preference, the account-wide notification preference
 .github/workflows/release.yml 809 # ten publish jobs sharing release-please outputs, plus two thin verify jobs wiring every publish path to a required commit-status gate; each publish job's own condition collapsed into that gate's result, so the release condition lives in one place per component rather than eight. Raised for the second release-please-action step: one manifest file per package instead of one shared between both, so a release commit for either package can no longer conflict the other's standing PR
 crates/slimm-server/src/store/sessions.rs 815 # tokens, refresh rotation, ws tickets and account deletion in one file; account deletion is the obvious first split
 crates/slimm-server/src/push.rs 600 # envelope sealing, relay client and fan-out triggering; the sealed-box half has no dependency on the other two

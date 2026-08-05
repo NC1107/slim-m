@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE users SET notification_preference = ? WHERE id = ? AND deleted_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "29ff876e5e9ecb97a21031d02867d8ebb2c59ae87de3cf446e77dd6300f78cb2"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT notification_preference AS \"notification_preference!\" FROM users\n               WHERE id = ? AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "notification_preference!",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "29c9616fb1abaf078965fce967e030bf9494bb1e1cf224d22f14cc233be1734b"
+}

@@ -28,6 +28,7 @@ export 'src/client.dart'
         SlimmApiMessages,
         SlimmApiModeration,
         SlimmApiPresence,
+        SlimmApiPush,
         SlimmApiRoles,
         SlimmApiSpace,
         SlimmApiThreads,
