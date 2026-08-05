@@ -29,6 +29,7 @@ mod invites;
 mod message_ops;
 mod message_search;
 mod messages;
+mod notifications;
 mod permissions;
 mod permissions_batch;
 mod pins;

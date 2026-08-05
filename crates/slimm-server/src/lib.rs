@@ -14,6 +14,7 @@ pub mod hub;
 pub mod identity;
 pub mod ids;
 pub mod media;
+pub mod notifications;
 pub mod permissions;
 pub mod presence;
 pub mod push;
