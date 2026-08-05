@@ -188,10 +188,11 @@ class ParseConversationTest(unittest.TestCase):
 
 class PickRequestsTest(unittest.TestCase):
     def test_turn_counts_sum_to_roughly_the_configured_multiple_of_draws(self):
+        # 200 keeps this well above _MIN_CONVERSATION_COUNT's own floor.
         accounts = [{"display_name": n} for n in ("Alan", "Grace", "Linus", "Ada", "Ken")]
-        got = seed_conversation._pick_requests(random.Random(1), accounts, 100)
+        got = seed_conversation._pick_requests(random.Random(1), accounts, 200)
         total_turns = sum(turn_count for _t, _p, turn_count in got)
-        target = 100 * seed_conversation.CONVERSATION_TURNS_PER_DRAW
+        target = 200 * seed_conversation.CONVERSATION_TURNS_PER_DRAW
         self.assertGreaterEqual(total_turns, target)
         self.assertLess(total_turns, target + max(seed_conversation._TURN_COUNT_RANGE))
 

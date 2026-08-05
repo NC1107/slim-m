@@ -22,11 +22,21 @@ regardless of run size, which read as a rounding error against a large
 run's own static filler - the newest slice of the channel, the only part
 anyone actually reads, came out almost entirely one-liners. Turns are now
 generated at `CONVERSATION_TURNS_PER_DRAW` per draw the utility loop would
-otherwise spend, deliberately well past 1:1, so conversation dominates
-regardless of how big `--accounts`/`--actions-per-account` make the run.
-Cost is not the constraint: an 8B model call is cheap next to the run
-itself, and `seed_ollama.py`'s cache makes a repeat run under the same
-`--seed` free.
+otherwise spend, past 1:1 so conversation still dominates regardless of how
+big `--accounts`/`--actions-per-account` make the run.
+
+That ratio was 1.5 and is 1.0 now, deliberately trimmed: `seed_actions.
+ACTIONS`'s own weights put about 77% of an ordinary draw on something
+`CONVERSATION_COVERED` already lists as chat-shaped, so a 1:1 ratio still
+generates noticeably more turns than that 77% share would have produced as
+plain messages, without also generating half again as many on top of it.
+Cost is not free the way the module doc used to claim: `seed_ollama.py`'s
+cache makes a *repeat* run under the same `--seed` free, but the first,
+uncached run of a few dozen conversations is real wall-clock time (measured
+at roughly 0.7-1s per turn on this project's own dev GPU), all of it spent
+before `seed_run.py`'s worker pool even starts. Trimming the ratio to 1.0
+cuts that wait by a third against the old 1.5 for the same run size,
+without giving up the "conversation dominates" property this exists for.
 """
 import dataclasses
 import random
@@ -35,8 +45,8 @@ import sys
 import seed_content
 import seed_ollama
 
-# Generated turns per utility-loop draw, well past 1:1 - see the module doc.
-CONVERSATION_TURNS_PER_DRAW = 1.5
+# Generated turns per utility-loop draw, past 1:1 - see the module doc.
+CONVERSATION_TURNS_PER_DRAW = 1.0
 _MIN_CONVERSATION_COUNT = 6
 _MAX_CONVERSATION_COUNT = 200
 _TURN_COUNT_RANGE = (14, 32)

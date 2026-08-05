@@ -243,9 +243,24 @@ def emoji_message(rng, pool=None):
     return f"{text} {picked}"
 
 
+# A real paste is often bare, and an intro is not always the same phrase.
+_CODE_INTROS = (
+    "here's what I mean:",
+    "quick snippet:",
+    "something like this:",
+    "found this earlier, might help:",
+    "for reference:",
+    "this is roughly what I had:",
+)
+_NO_INTRO_CHANCE = 0.3
+
+
 def code_block_message(rng, pool=None):
     lang, code = rng.choice(pool) if pool else rng.choice(_CODE_SNIPPETS)
-    return f"here's what I mean:\n```{lang or ''}\n{code}\n```"
+    fence = f"```{lang or ''}\n{code}\n```"
+    if rng.random() < _NO_INTRO_CHANCE:
+        return fence
+    return f"{rng.choice(_CODE_INTROS)}\n{fence}"
 
 
 def markdown_message(rng, pool=None):

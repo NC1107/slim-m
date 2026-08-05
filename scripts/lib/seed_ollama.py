@@ -25,11 +25,30 @@ malformed response, a slow model past the timeout) is caught here and
 answered with an empty or partial result; the canned fallback in
 `seed_content.py`/`seed_conversation.py` is always there, per field or per
 conversation, so a side feature going missing never breaks a seed run.
+
+`load_or_generate_conversations` logs one line before and one after every
+conversation it asks for, each carrying its index and the total count, so a
+run sitting quietly for two minutes on conversation 12/45 reads as normal
+and one sitting quietly for twenty reads as stuck - the actual gap this
+closes: an uncached run of a few dozen conversations printed nothing at all
+between its start and its finish, which cost one real run being killed on
+the (wrong) belief that it had wedged. Generation is deliberately still
+sequential, not fanned out over a thread pool the way the seed workers are:
+measured on this project's own dev box (a single local GPU, `ollama ps`
+showing exactly one loaded model instance), four conversations run
+concurrently took the same wall-clock time as the same four run one after
+another, because Ollama serialises generation on one model instance
+regardless of how many HTTP requests arrive at once - concurrency here
+would only load that one instance harder for no throughput gained, and
+would also make the per-request timing this progress log reports on
+meaningless (a slow request either genuinely slow or just waiting behind
+its neighbours look identical).
 """
 import hashlib
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -191,14 +210,24 @@ def load_or_generate_conversations(model, seed, requests, *,
     if not _reachable(base_url, model):
         return []
 
+    total = len(requests)
+    run_start = time.monotonic()
     raw_list = []
-    for topic, participants, turn_count in requests:
+    for index, (topic, participants, turn_count) in enumerate(requests, start=1):
+        _log(f"generating conversation {index}/{total} "
+             f"({turn_count} turns, {len(participants)} speakers)...")
+        call_start = time.monotonic()
         try:
             turns = _fetch_conversation(
                 base_url, model, participants, topic, turn_count, timeout)
         except Exception as exc:  # noqa: BLE001 - one bad topic must not sink the rest
-            _log(f"could not generate a conversation about {topic!r}: {exc}")
+            elapsed = time.monotonic() - call_start
+            _log(f"conversation {index}/{total} about {topic!r} failed "
+                 f"after {elapsed:.0f}s: {exc}")
             continue
+        elapsed = time.monotonic() - call_start
+        _log(f"conversation {index}/{total} done in {elapsed:.0f}s "
+             f"({len(turns)} turns)")
         raw_list.append({"topic": topic, "participants": list(participants),
                           "turns": turns})
 
@@ -207,5 +236,7 @@ def load_or_generate_conversations(model, seed, requests, *,
              "falling back to canned content")
         return raw_list
 
+    _log(f"generated {len(raw_list)}/{total} conversations in "
+         f"{time.monotonic() - run_start:.0f}s total")
     _save_json_cache(path, raw_list)
     return raw_list

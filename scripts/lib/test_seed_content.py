@@ -57,6 +57,20 @@ class MessageGeneratorsTest(unittest.TestCase):
         langs = {lang for lang, _code in seed_content._CODE_SNIPPETS if lang}
         self.assertGreaterEqual(len(langs), 5, langs)
 
+    def test_code_block_message_intro_varies_across_draws(self):
+        rng = random.Random(6)
+        intros = set()
+        for _ in range(60):
+            got = seed_content.code_block_message(rng)
+            intros.add(got.split("\n```", 1)[0])
+        self.assertGreater(len(intros), 2, intros)
+
+    def test_code_block_message_sometimes_skips_the_intro(self):
+        rng = random.Random(6)
+        results = [seed_content.code_block_message(rng) for _ in range(60)]
+        self.assertTrue(any(got.startswith("```") for got in results))
+        self.assertTrue(any(not got.startswith("```") for got in results))
+
     def test_markdown_message_uses_a_recognised_marker(self):
         markers = ("**", "*", "> ", "||", "~~", "# ")
         rng = random.Random(3)
