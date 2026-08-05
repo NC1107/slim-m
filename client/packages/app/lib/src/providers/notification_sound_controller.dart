@@ -118,7 +118,7 @@ class NotificationSoundController {
 
   void _onVoiceStateChanged(VoiceState? previous, VoiceState next) {
     _handleVoiceError(previous, next);
-    _handleRosterChange(next);
+    _handleRosterChange(previous, next);
   }
 
   void _handleVoiceError(VoiceState? previous, VoiceState next) {
@@ -127,11 +127,21 @@ class NotificationSoundController {
     unawaited(_player.play(NotificationSound.error));
   }
 
-  void _handleRosterChange(VoiceState next) {
+  /// [VoiceController] fans `states` and `participantChanges` in from two
+  /// independent streams, so the event that flips [VoiceState.state] to
+  /// [VoiceSessionState.connected] carries whatever stale `participants`
+  /// list preceded it - the real roster arrives moments later on the other
+  /// stream. Treating that first, empty-or-stale reading as the baseline
+  /// would let the real roster, arriving right after it, read as a burst of
+  /// live joins for everyone already in the room. [identical] below is what
+  /// tells the two apart: the stale reading carries the exact same list
+  /// instance, since nothing copied a new one into it.
+  void _handleRosterChange(VoiceState? previous, VoiceState next) {
     if (next.state != VoiceSessionState.connected) {
       _rosterBaseline = null;
       return;
     }
+    if (identical(next.participants, previous?.participants)) return;
     final selfId = _ref.read(apiProvider).session.tokens?.userId;
     final current = {
       for (final p in next.participants)

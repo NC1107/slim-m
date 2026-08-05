@@ -289,6 +289,9 @@ Dependencies: Phase 0, Phase 2 (client shell), Phase 3 (NSE), Phase 4 (CallKit a
 Exit criteria: seven distinguishable, consistently normalized sounds play correctly on Fedora, iOS, and Android; in-app chimes never glitch a live call; reduce-motion collapses non-essential motion; the polish pass has no known visible defects in the primary flows; and a golden proves every presence state stays distinguishable desaturated, since the shape-first cue only matters if it survives the greyscale screenshot a bug report arrives as.
 
 Status (2026-07-28): the two exit criteria that need no audio are met; the audio half is not started.
+Update (2026-08-04): the foreground in-app slice of "seven distinguishable, consistently normalized sounds play correctly" is done, Fedora, iOS and Android all reached by the same bundled asset and the same `audioplayers` seam.
+That is unverified on a real iOS or Android device, the same as everything else client-side in this environment.
+NSE and Android Notification Channel playback (the parts of the second deliverable that reach a backgrounded app) and the CallKit ringtone are still open; see CLAUDE.md.
 
 ~~Nothing in the client handles reduced motion; a repo-wide search for it turns up nothing.~~
 Closed 2026-07-28.
@@ -312,7 +315,11 @@ The synthesis pipeline exists (`assets/audio/`): one shared `synth.py`, seven so
 It does not normalise the way this roadmap and STRATEGY.md describe, and the reason is written into `synth.py`: built as specified, pyloudnorm with a whole-clip fallback under 400ms, the family spanned 3.4 dB measured on any one consistent scale. Level is set by the loudest short-term K-weighted window instead, which is defined identically at every length.
 Reduce motion and the desaturated presence proof are both done; see CLAUDE.md.
 ~~Still open here: per-platform playback (nothing plays these sounds yet, and no client bundles them), the CallKit ringtone, the CI bundle-check, and the motion, haptic and hover polish pass.~~
-The motion, haptic and hover polish pass closed 2026-07-29 (PR #121, `app_haptics.dart`, `app_fade_in.dart`, the `fast`/`base`/`slow` motion tokens; see "Motion, haptics, and the device-testing polish pass" in CLAUDE.md). Still open: per-platform playback (nothing plays these sounds yet, and no client bundles them), the CallKit ringtone, and the CI bundle-check.
+The motion, haptic and hover polish pass closed 2026-07-29 (PR #121, `app_haptics.dart`, `app_fade_in.dart`, the `fast`/`base`/`slow` motion tokens; see "Motion, haptics, and the device-testing polish pass" in CLAUDE.md).
+~~Still open: per-platform playback (nothing plays these sounds yet, and no client bundles them), the CallKit ringtone, and the CI bundle-check.~~
+The foreground in-app slice closed 2026-08-04: the client bundles and plays all seven sounds via `audioplayers`, and `notification_sound_bundle_test.dart` is the CI bundle-check, gated through `client-ci`'s ordinary `flutter test` rather than a new workflow.
+See "The seven sounds finally play: the in-app slice" in CLAUDE.md for what plays where, the >8-participant cutoff, and the call-audio-safety reasoning.
+Still open, and each needs a real device or a Mac this environment does not have: the iOS Notification Service Extension's on-device sound selection, Android versioned Notification Channels, and the CallKit ringtone.
 
 ## Phase 9 - Release Readiness and Store Submission
 

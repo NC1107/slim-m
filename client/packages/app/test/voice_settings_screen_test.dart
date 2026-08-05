@@ -322,6 +322,32 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getBool('slimm.voice.join_leave_sounds_enabled'), isFalse);
   });
+
+  testWidgets('turning off the incoming-call sound persists it', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap(const VoiceSettingsBody()));
+    await tester.pumpAndSettle();
+
+    final ringToggle = find.byWidgetPredicate(
+      (w) =>
+          w is AppToggle &&
+          w.semanticLabel == 'Play a sound for an incoming call',
+    );
+    // The capability check section pushes this below the initial viewport.
+    await tester.scrollUntilVisible(
+      ringToggle,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(ringToggle);
+    await tester.pumpAndSettle();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('slimm.voice.call_ring_sound_enabled'), isFalse);
+  });
+
   testWidgets('the Calls pane holds voice settings, with no second route', (
     tester,
   ) async {
