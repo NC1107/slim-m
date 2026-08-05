@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_bar.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -358,5 +359,23 @@ void main() {
     await tester.pumpWidget(_wrap(_bar(canUndo: true)));
     expect(find.byTooltip('Undo'), findsOneWidget);
     expect(find.byTooltip('Nothing to undo yet'), findsNothing);
+  });
+
+  /// The trigger button is already an ordinary tab stop reachable by Tab and
+  /// Enter/Space, the same as any other `AppIconButton`; what the message
+  /// context menu needed and this lacked is what happens once it is open.
+  testWidgets('Escape closes the overflow menu once it is open', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap(_bar()));
+
+    await tester.tap(find.bySemanticsLabel('More canvas actions'));
+    await tester.pumpAndSettle();
+    expect(find.text('Paste image'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+
+    expect(find.text('Paste image'), findsNothing);
   });
 }
