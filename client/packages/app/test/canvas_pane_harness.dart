@@ -84,8 +84,9 @@ Map<String, dynamic> canvasImageJson(
 };
 
 /// A 1x1 transparent PNG: real bytes, so a hydration fetch decodes rather
-/// than throwing.
-final _png = Uint8List.fromList(
+/// than throwing. Public so other suites pumping a real canvas (rather than
+/// this file's own fixture) can serve the identical bytes.
+final canvasPngFixture = Uint8List.fromList(
   base64Decode(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8'
     'z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -220,7 +221,7 @@ class CanvasPaneFixture {
                 );
               }
               return http.Response.bytes(
-                _png,
+                canvasPngFixture,
                 200,
                 headers: {'content-type': 'image/png'},
               );
