@@ -64,27 +64,26 @@ void main() {
     expect(find.byType(CanvasPresenceBubble), findsNothing);
   });
 
-  testWidgets(
-    'a participant inside the viewport renders exactly one bubble',
-    (tester) async {
-      final document = CanvasDocument();
-      addTearDown(document.dispose);
-      document.setViewport(const Size(1000, 800));
+  testWidgets('a participant inside the viewport renders exactly one bubble', (
+    tester,
+  ) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    document.setViewport(const Size(1000, 800));
 
-      await tester.pumpWidget(
-        _wrap(
-          CanvasPresenceLayer(
-            document: document,
-            participants: const [_cameraOff],
-            cameraViewFor: (_) => const SizedBox(),
-          ),
+    await tester.pumpWidget(
+      _wrap(
+        CanvasPresenceLayer(
+          document: document,
+          participants: const [_cameraOff],
+          cameraViewFor: (_) => const SizedBox(),
         ),
-      );
-      await tester.pump();
+      ),
+    );
+    await tester.pump();
 
-      expect(find.byType(CanvasPresenceBubble), findsOneWidget);
-    },
-  );
+    expect(find.byType(CanvasPresenceBubble), findsOneWidget);
+  });
 
   testWidgets('a camera-on participant renders the built camera view', (
     tester,
