@@ -31,6 +31,8 @@ CanvasBar _bar({
   ValueListenable<String?>? selection,
   ValueChanged<String>? onBringToFront,
   ValueChanged<String>? onSendToBack,
+  bool activityLogOpen = false,
+  VoidCallback? onToggleActivityLog,
 }) => CanvasBar(
   channelId: 'c1',
   onClose: () {},
@@ -45,6 +47,8 @@ CanvasBar _bar({
   selection: selection ?? ValueNotifier<String?>(null),
   onBringToFront: onBringToFront ?? (_) {},
   onSendToBack: onSendToBack ?? (_) {},
+  activityLogOpen: activityLogOpen,
+  onToggleActivityLog: onToggleActivityLog ?? () {},
 );
 
 void main() {
@@ -236,6 +240,38 @@ void main() {
       expect(cleared, 1);
     },
   );
+
+  testWidgets(
+    'the overflow offers to show or hide the activity log, and its label '
+    'says which',
+    (tester) async {
+      var toggled = 0;
+      await tester.pumpWidget(
+        _wrap(_bar(onToggleActivityLog: () => toggled++)),
+      );
+
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Show activity log'), findsOneWidget);
+      expect(find.text('Hide activity log'), findsNothing);
+
+      await tester.tap(find.text('Show activity log'));
+      await tester.pump();
+      expect(toggled, 1);
+    },
+  );
+
+  testWidgets('the overflow label flips once the log is open', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap(_bar(activityLogOpen: true)));
+
+    await tester.tap(find.bySemanticsLabel('More canvas actions'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hide activity log'), findsOneWidget);
+    expect(find.text('Show activity log'), findsNothing);
+  });
 
   testWidgets('cancelling the confirm never calls onClear', (tester) async {
     var cleared = 0;

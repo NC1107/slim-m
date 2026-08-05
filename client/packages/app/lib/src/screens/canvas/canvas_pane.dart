@@ -35,6 +35,7 @@ import '../../providers/live_events.dart';
 import '../../providers/sync_controller.dart';
 import '../../providers/user_profiles.dart';
 import '../../providers/voice_controller.dart';
+import 'canvas_activity_log.dart';
 import 'canvas_commit_queue.dart';
 import 'canvas_cursor_relay.dart';
 import 'canvas_image_hydrator.dart';
@@ -64,6 +65,9 @@ class CanvasPane extends ConsumerStatefulWidget {
 class _CanvasPaneState extends ConsumerState<CanvasPane> {
   final CanvasDocument _document = CanvasDocument();
   final CanvasCursors _cursors = CanvasCursors();
+  late final CanvasActivityLog _activityLog = CanvasActivityLog(
+    isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
+  );
   StreamSubscription<api.ServerEvent>? _live;
   CanvasCommitQueue? _queue;
   CanvasOpsController? _opsController;
@@ -99,6 +103,8 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       coldFetch: _fetch,
       forgetFetchedRegion: () => _fetched = null,
       onObjectPlaced: _hydrator.hydrate,
+      onOpApplied: _activityLog.recordOp,
+      onHardReset: _activityLog.recordResync,
     );
     // Registered once here, not in build: a listener re-attached per rebuild would fire a catch-up per rebuild, not per transition into live.
     _syncStatusSubscription = ref.listenManual<SyncStatus>(
@@ -126,6 +132,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _document.dispose();
     _cursorRelay?.dispose();
     _cursors.dispose();
+    _activityLog.dispose();
     super.dispose();
   }
 
@@ -207,6 +214,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     relay: () => _relay,
     applyPlacedObject: _apply,
     forgetFetchedRegion: () => _fetched = null,
+    activityLog: _activityLog,
   );
 
   void _apply(api.CanvasObject object) {
@@ -482,6 +490,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           cameraViewFor: ref
               .read(voiceControllerProvider.notifier)
               .cameraViewFor,
+          activityLog: _activityLog,
         ),
       ),
     );

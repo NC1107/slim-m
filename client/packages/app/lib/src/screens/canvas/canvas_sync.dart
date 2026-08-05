@@ -100,6 +100,8 @@ class CanvasSync {
     required this.coldFetch,
     required this.forgetFetchedRegion,
     this.onObjectPlaced,
+    this.onOpApplied,
+    this.onHardReset,
   });
 
   final String channelId;
@@ -112,6 +114,16 @@ class CanvasSync {
   /// rather than required, since most of this class's own tests have no
   /// opinion about hydration at all.
   final void Function(api.CanvasObject object)? onObjectPlaced;
+
+  /// Fires for every op the catch-up feed actually applies - place, remove,
+  /// clear, restore or move - so the accessibility activity log sees the
+  /// same history a reconnect or a gap replays, not only what arrives live.
+  final void Function(api.CanvasOp op)? onOpApplied;
+
+  /// Fires when a hard reset discards local state for a fresh snapshot, so
+  /// the activity log can say a gap exists rather than showing nothing and
+  /// implying nothing happened.
+  final VoidCallback? onHardReset;
 
   /// The pane's own cold viewport fetch, reused rather than duplicated here:
   /// it alone knows the padded region and owns the pane's fetched-region
@@ -282,6 +294,7 @@ class CanvasSync {
       case api.CanvasUnknownOp():
         return false;
     }
+    onOpApplied?.call(op);
     return true;
   }
 
@@ -296,6 +309,7 @@ class CanvasSync {
     document.reset();
     forgetFetchedRegion();
     _asOfSeq = null;
+    onHardReset?.call();
     if (_disposed) return;
     await coldFetch();
   }

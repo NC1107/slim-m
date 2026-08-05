@@ -117,6 +117,10 @@ abstract final class AppIcons {
   static const IconData bringToFront = LucideIcons.bringToFront300;
   static const IconData sendToBack = LucideIcons.sendToBack300;
 
+  /// The canvas's text activity log: the accessibility fallback for a
+  /// surface a screen reader otherwise cannot read at all.
+  static const IconData activityLog = LucideIcons.history300;
+
   // Account.
   static const IconData signOut = LucideIcons.logOut300;
   static const IconData account = LucideIcons.circleUser300;

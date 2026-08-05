@@ -191,4 +191,35 @@ void main() {
       expect(segment.w, lessThanOrEqualTo(maxObjectExtent));
     }
   });
+
+  group('liveCountsByKind', () {
+    test('an empty document reports zero of both', () {
+      final document = CanvasDocument();
+      expect(document.liveCountsByKind, (strokes: 0, images: 0));
+    });
+
+    test('counts strokes and images separately, ignoring dead slots', () {
+      final document = CanvasDocument()
+        ..applyPlaced(stroke('a'))
+        ..applyPlaced(stroke('b'))
+        ..applyPlaced(
+          CanvasStrokeInput(
+            id: 'c',
+            seq: 1,
+            zIndex: 1,
+            x: 0,
+            y: 0,
+            w: 10,
+            h: 10,
+            points: const [],
+            width: 0,
+            colorKey: '',
+            kind: CanvasObjectKind.image,
+          ),
+        );
+      document.kill('b');
+
+      expect(document.liveCountsByKind, (strokes: 1, images: 1));
+    });
+  });
 }

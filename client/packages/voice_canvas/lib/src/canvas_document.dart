@@ -85,6 +85,27 @@ class CanvasDocument extends ChangeNotifier {
     return slot != null && (_strokes[slot]?.alive ?? false);
   }
 
+  /// Live object counts by kind, across the whole document rather than only
+  /// what the last cull kept - the one query the accessibility summary
+  /// needs and nothing else here does, so it is a scan rather than a
+  /// maintained counter. Cheap even at the channel's own object ceiling (the
+  /// server itself measured a plain scan at 20,000 rows as 1.56ms), and it
+  /// is only ever asked for when a screen-reader user opens the activity
+  /// panel, never once per frame the way [objectCount] is.
+  ({int strokes, int images}) get liveCountsByKind {
+    var strokes = 0;
+    var images = 0;
+    for (final stroke in _strokes) {
+      if (stroke == null || !stroke.alive) continue;
+      if (stroke.kind == CanvasObjectKind.image) {
+        images++;
+      } else {
+        strokes++;
+      }
+    }
+    return (strokes: strokes, images: images);
+  }
+
   /// Slots the last cull kept, in paint order.
   ///
   /// Sorted here rather than taken as the cull emits them: [UniformGrid]

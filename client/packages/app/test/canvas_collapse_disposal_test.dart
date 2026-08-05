@@ -94,7 +94,7 @@ void main() {
       // observes it, the same trap canvas_pane_test.dart already documents.
       await tester.runAsync(() async {
         await pumpAtWidth(tester, s.container, 1400, location: '/channels/c1');
-        await Future<void>.delayed(const Duration(milliseconds: 20));
+        await Future<void>.delayed(const Duration(milliseconds: 200));
       });
       await tester.pumpAndSettle();
 

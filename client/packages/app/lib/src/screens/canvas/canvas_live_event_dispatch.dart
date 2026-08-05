@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
+import 'canvas_activity_log.dart';
 import 'canvas_cursor_relay.dart';
 import 'canvas_sync.dart';
 
@@ -20,6 +21,11 @@ import 'canvas_sync.dart';
 /// stays lazy: a remote cursor object is only ever constructed the first
 /// time an actual [api.CanvasCursorMoved] for this channel arrives, never on
 /// an unrelated placement or removal.
+///
+/// [activityLog] is recorded inline, per case, rather than through a second
+/// switch elsewhere: every other kind's live frame structurally carries no
+/// actor at all (see `Event::CanvasObjectsRemoved`'s own doc), which is why
+/// only the `CanvasObjectPlaced` case ever passes one through.
 void dispatchCanvasLiveEvent(
   api.ServerEvent event, {
   required String paneChannelId,
@@ -28,14 +34,19 @@ void dispatchCanvasLiveEvent(
   required CanvasCursorRelay Function() relay,
   required void Function(api.CanvasObject object) applyPlacedObject,
   required VoidCallback forgetFetchedRegion,
+  CanvasActivityLog? activityLog,
 }) {
   switch (event) {
     case api.CanvasObjectPlaced(:final channelId, :final object)
         when channelId == paneChannelId:
-      sync.applyLive(event.seq, () => applyPlacedObject(object));
+      sync.applyLive(event.seq, () {
+        applyPlacedObject(object);
+        activityLog?.recordPlacedLive(object);
+      });
     case api.CanvasObjectsRemoved(
           :final channelId,
           :final seq,
+          :final opId,
           :final objectIds,
         )
         when channelId == paneChannelId:
@@ -44,16 +55,24 @@ void dispatchCanvasLiveEvent(
           document.removeObject(id);
         }
         document.refresh();
+        activityLog?.recordRemovedLive(opId, objectIds);
       });
-    case api.CanvasCleared(:final channelId, :final seq, :final beforeSeq)
+    case api.CanvasCleared(
+          :final channelId,
+          :final seq,
+          :final opId,
+          :final beforeSeq,
+        )
         when channelId == paneChannelId:
       sync.applyLive(seq, () {
         document.clearBelow(beforeSeq);
         document.refresh();
+        activityLog?.recordClearedLive(opId);
       });
     case api.CanvasObjectsRestored(
           :final channelId,
           :final seq,
+          :final opId,
           :final objectIds,
         )
         when channelId == paneChannelId:
@@ -72,6 +91,7 @@ void dispatchCanvasLiveEvent(
       sync.applyLive(seq, () {
         document.forgetRemoved(objectIds);
         forgetFetchedRegion();
+        activityLog?.recordRestoredLive(opId, objectIds.length);
       });
     case api.CanvasCursorMoved(
           :final channelId,
@@ -85,6 +105,7 @@ void dispatchCanvasLiveEvent(
     case api.CanvasObjectMoved(
           :final channelId,
           :final seq,
+          :final opId,
           :final objectId,
           :final x,
           :final y,
@@ -95,6 +116,7 @@ void dispatchCanvasLiveEvent(
       sync.applyLive(seq, () {
         document.moveObject(objectId, x, y, w, h);
         document.refresh();
+        activityLog?.recordMovedLive(opId);
       });
     case api.CanvasObjectReordered(
           :final channelId,
