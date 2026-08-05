@@ -10,9 +10,11 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_bar.dart';
+import 'canvas_presence_layer.dart';
 
 class CanvasPaneBody extends StatelessWidget {
   const CanvasPaneBody({
@@ -40,6 +42,8 @@ class CanvasPaneBody extends StatelessWidget {
     this.cursors,
     this.cursorColors = const [],
     this.onPointerMoved,
+    this.callParticipants = const [],
+    required this.cameraViewFor,
   });
 
   final String channelId;
@@ -73,6 +77,12 @@ class CanvasPaneBody extends StatelessWidget {
   final CanvasCursors? cursors;
   final List<Color> cursorColors;
   final PointerMoved? onPointerMoved;
+
+  /// Who is on this channel's call right now, already filtered for
+  /// blocking - empty whenever there is no call here, or this viewer has not
+  /// joined it, in which case [CanvasPresenceLayer] renders nothing.
+  final List<VoiceParticipant> callParticipants;
+  final CameraViewBuilder cameraViewFor;
 
   @override
   Widget build(BuildContext context) {
@@ -128,22 +138,31 @@ class CanvasPaneBody extends StatelessWidget {
                       : 'Canvas, $count objects drawn',
                   child: child,
                 ),
-                child: CanvasSurface(
-                  document: document,
-                  ink: AppCanvasColors.annotation,
-                  gridLine: tokens.borderSubtle,
-                  placeholderFill: tokens.surfaceRaised,
-                  placeholderIcon: tokens.textDisabled,
-                  onStroke: onStroke,
-                  tool: tool,
-                  onErase: onErase,
-                  onEraseEnd: onEraseEnd,
-                  onSelectStart: onSelectStart,
-                  onSelectDrag: onSelectDrag,
-                  onSelectEnd: onSelectEnd,
-                  cursors: cursors,
-                  cursorColors: cursorColors,
-                  onPointerMoved: onPointerMoved,
+                child: Stack(
+                  children: [
+                    CanvasSurface(
+                      document: document,
+                      ink: AppCanvasColors.annotation,
+                      gridLine: tokens.borderSubtle,
+                      placeholderFill: tokens.surfaceRaised,
+                      placeholderIcon: tokens.textDisabled,
+                      onStroke: onStroke,
+                      tool: tool,
+                      onErase: onErase,
+                      onEraseEnd: onEraseEnd,
+                      onSelectStart: onSelectStart,
+                      onSelectDrag: onSelectDrag,
+                      onSelectEnd: onSelectEnd,
+                      cursors: cursors,
+                      cursorColors: cursorColors,
+                      onPointerMoved: onPointerMoved,
+                    ),
+                    CanvasPresenceLayer(
+                      document: document,
+                      participants: callParticipants,
+                      cameraViewFor: cameraViewFor,
+                    ),
+                  ],
                 ),
               ),
             ),
