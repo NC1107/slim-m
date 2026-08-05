@@ -17,6 +17,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/blocks_controller.dart';
 import '../providers/composer_focus.dart';
+import '../providers/notification_sound_controller.dart';
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/breakpoints.dart';
@@ -53,6 +54,8 @@ class HomeShell extends ConsumerWidget {
     final selected = selectedChannelId(context);
     // With the shell, or the first surface to consult it filters against none.
     ref.watch(blocksProvider);
+    // Forces creation for the session; nothing here reads its own state.
+    ref.watch(notificationSoundControllerProvider);
     // CanvasBar is the only header while open (ConversationPane's doc); the compact app bar below would otherwise stack a second one above it.
     final canvasOpen =
         selected != null && ref.watch(canvasOpenProvider) == selected;
