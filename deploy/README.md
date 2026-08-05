@@ -43,7 +43,47 @@ To turn it on: fill in the `LITESTREAM_*` values in `.env`, uncomment `COMPOSE_P
 **Litestream replicates only the SQLite database file. Attachment and avatar bytes are not covered.**
 They live on disk beside the database, at `SLIMM_ATTACHMENTS_DIR` (default `/data/media` inside the container, so the same `slimm_data` volume as the database), specifically because multi-megabyte blobs in the SQLite file would bloat what Litestream streams for no benefit.
 That means restoring from a Litestream replica brings back every message and its attachment references, but not the attachment files themselves; a client would render broken images and failed downloads for anything uploaded since the last time `/data/media` was backed up some other way.
-If attachments matter to your deployment, back up the whole `slimm_data` volume yourself (a periodic `docker run --rm -v slimm_data:/data -v $(pwd):/backup alpine tar czf /backup/slimm-data-$(date +%F).tgz -C / data`, restic, or your platform's volume-snapshot feature), not just the database.
+
+### `scripts/backup.py` and `scripts/restore-drill.py`
+
+These two scripts are the "some other way", and they complement Litestream rather than duplicate it: Litestream is continuous, off-host replication of the database file alone, while these are a periodic snapshot of the database *and* the attachment/avatar bytes together, plus a drill that actually restores and checks one.
+Run both if you can; either alone leaves a gap the other closes.
+
+Both are plain-stdlib Python (no pip install), so run them from a throwaway container against the running server's volume - the server image itself is distroless and has no shell or interpreter to exec into:
+
+```bash
+docker run --rm \
+  -v slimm_data:/data:ro \
+  -v "$(pwd)/scripts":/scripts:ro \
+  -v /path/on/host/slim-m-backups:/backup \
+  python:3-slim \
+  python3 /scripts/backup.py --backup-root /backup \
+    --database-path /data/slimm.db --media-dir /data/media
+```
+
+It takes a `VACUUM INTO` snapshot of the database (a consistent point-in-time copy SQLite produces from inside its own read transaction, safe to take while the server keeps writing through WAL - it does not need the server stopped, and the source volume above is mounted read-only on purpose) and mirrors every attachment and avatar file referenced by that snapshot into `/backup`.
+Attachments are content-addressed by their own sha256, so a byte-identical file already mirrored from a previous run is never re-copied; avatars are small, mutable, and few, so they are simply re-copied every run.
+Nothing is ever deleted from the mirror by this script, and every copy is an independent one (never a hardlink to the live file) - a backup that could still be corrupted by whatever corrupts the original is not a backup.
+Pass `--keep N` to prune older database snapshots (the media mirror itself is never pruned).
+Run it on a schedule (cron, systemd timer) the same way you would Litestream.
+
+Then actually restore what you just backed up and check it, rather than trusting that a backup that has never been restored is one:
+
+```bash
+docker run --rm \
+  -v /path/on/host/slim-m-backups:/backup \
+  python:3-slim \
+  python3 /scripts/restore-drill.py --backup-root /backup
+```
+
+It copies the newest snapshot to a fresh scratch path, runs `PRAGMA integrity_check` on that standalone copy, then checks that every attachment the database references exists in the mirror *and* that the file's real, recomputed sha256 actually matches its name (not merely that a same-named file exists), and the same existence check for every user's avatar.
+It prints exactly what is missing or corrupt and exits non-zero if anything is, which is the property a restore drill exists for.
+Run it after every backup, or at least on a schedule of its own - a backup nobody has restored is a guess.
+
+**The database snapshot is exactly as sensitive as the live database, not merely business data.**
+The server's own Ed25519 identity secret (the key a client's trust-on-first-use fingerprint is derived from) lives in that same database as an ordinary row - there is no separate identity file these scripts have to think about excluding, because there is no separate identity file at all.
+Treat every snapshot `backup.py` writes with the same care as the running deployment: not a public bucket with no access control, not attached to a bug report.
+Neither script touches `deploy/.env` (LiveKit keys, Litestream credentials, ACME email) - those are operator secrets that never reach the database or the media volume, and are yours to back up by whatever means you already use for secrets.
 
 ## Browser clients (`SLIMM_CORS_ALLOWED_ORIGINS`)
 

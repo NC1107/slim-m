@@ -335,7 +335,10 @@ Exit criteria: the store-readiness checklist passes; a one-command self-host wor
 
 Status (2026-07-28): not met, as expected this early, but worth recording precisely rather than leaving unstated.
 Current versions are nowhere near 1.0: server 0.18.5, client 0.13.3 (`.release-please-manifest.json`).
-`deploy/` has a working `docker-compose.yml` (at the repo root, documented at `deploy/README.md`), a `Caddyfile`, and `.env.example`, but the backup story this phase asks for (a `VACUUM INTO` hot copy, restore-and-checksum drills) is not built; only Litestream exists, which replicates the SQLite file only and explicitly does not cover attachments.
+`deploy/` has a working `docker-compose.yml` (at the repo root, documented at `deploy/README.md`), a `Caddyfile`, and `.env.example`.
+The backup story this phase asks for is built as of 2026-08-04: `scripts/backup.py` takes a `VACUUM INTO` hot copy of the database (safe against a live WAL writer, confirmed by taking one every two seconds against a concurrently-writing server) plus a content-addressed, never-pruned mirror of every attachment and avatar the snapshot references, and `scripts/restore-drill.py` is the restore-and-checksum drill: it restores the newest snapshot to a scratch path, runs `PRAGMA integrity_check`, and recomputes every attachment's sha256 against its own filename rather than trusting that a same-named file is the right one.
+This complements rather than replaces Litestream, which still only replicates the SQLite file continuously and still does not cover attachments; see `deploy/README.md`'s "Backups" section for what each half covers.
+The one thing the deliverable's own phrasing assumed and reality did not have: there is no separate "server encryption key" file to back up apart from the database, because the server's Ed25519 identity secret already lives inside it as an ordinary row - the database snapshot itself is the sensitive artifact, and `deploy/README.md` says so rather than implying a second file exists to protect.
 The product still carries its placeholder name; both `decisions/0001-owner-decisions.md` and `STRATEGY.md` still defer the rename to this phase's closeout, as planned.
 The Flatpak remains absent (see the Phase 0 status above), which alone blocks "produces all platform artifacts automatically."
 
