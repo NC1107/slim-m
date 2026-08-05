@@ -261,6 +261,7 @@ class CursorPainter extends CustomPainter {
     required this.cursors,
     required this.document,
     required this.colors,
+    this.labelFontFamily,
   }) : super(repaint: Listenable.merge([cursors, document]));
 
   final CanvasCursors cursors;
@@ -270,6 +271,12 @@ class CursorPainter extends CustomPainter {
   /// [CanvasCursor.colorIndex]. This package carries no palette of its own,
   /// the same convention every other painter here follows.
   final List<Color> colors;
+
+  /// The app's own type family for the name chip, the same plain-value
+  /// convention [colors] already follows: this package has no font of its
+  /// own to fall back on, and leaving this null draws Flutter's platform
+  /// default rather than the product's own IBM Plex Sans.
+  final String? labelFontFamily;
 
   /// Pixels of screen-space margin past which a cursor is not worth drawing
   /// at all, since its glyph and label would be fully off-canvas anyway.
@@ -296,6 +303,11 @@ class CursorPainter extends CustomPainter {
     }
   }
 
+  /// A white rim behind the fill, not a second identical fill: the same path
+  /// drawn twice with no stroke and no inset (the shape this replaces) paints
+  /// the second pass directly over the first, so the white never actually
+  /// shows - a cursor in a hue close to whatever sits behind it (another
+  /// participant's ink, a similarly-toned object) had no contrast edge at all.
   void _paintGlyph(Canvas canvas, Offset at, Color color) {
     final path = Path()
       ..moveTo(at.dx, at.dy)
@@ -310,7 +322,8 @@ class CursorPainter extends CustomPainter {
       path,
       Paint()
         ..color = const Color(0xFFFFFFFF)
-        ..style = PaintingStyle.fill,
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
     );
     canvas.drawPath(path, Paint()..color = color);
   }
@@ -320,9 +333,10 @@ class CursorPainter extends CustomPainter {
     final painter = TextPainter(
       text: TextSpan(
         text: label,
-        style: const TextStyle(
+        style: TextStyle(
+          fontFamily: labelFontFamily,
           fontSize: 11,
-          color: Color(0xFFFFFFFF),
+          color: const Color(0xFFFFFFFF),
           height: 1,
         ),
       ),

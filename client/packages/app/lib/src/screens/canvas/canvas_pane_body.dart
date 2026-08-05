@@ -199,7 +199,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           document: widget.document,
           ink: AppCanvasColors.annotation,
           gridLine: tokens.borderSubtle,
-          placeholderFill: tokens.surfaceRaised,
+          // AppTokens.stripe: its own doc reserves it for exactly this state.
+          placeholderFill: tokens.stripe,
           placeholderIcon: tokens.textDisabled,
           selectionOutline: tokens.accentFill,
           selectionHandleFill: tokens.surfaceRaised,
@@ -213,6 +214,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           onSelectEnd: widget.onSelectEnd,
           cursors: widget.cursors,
           cursorColors: widget.cursorColors,
+          cursorLabelFontFamily: AppFonts.sans,
           onPointerMoved: widget.onPointerMoved,
         ),
         CanvasPresenceLayer(
