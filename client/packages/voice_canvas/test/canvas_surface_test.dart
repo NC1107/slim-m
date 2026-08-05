@@ -7,6 +7,7 @@
 /// the painters must be the same objects frame after frame.
 library;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
@@ -197,5 +198,119 @@ void main() {
     await tester.pump();
 
     expect(erased, 0);
+  });
+
+  testWidgets(
+      'onPointerMoved reports world points during a hover, no button down', (
+    tester,
+  ) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    final moved = <Offset>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          onStroke: (_) {},
+          onPointerMoved: moved.add,
+        ),
+      ),
+    );
+    await tester.pump();
+    document.setCamera(const Camera(x: 100, y: 50, zoom: 1));
+    await tester.pump();
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(gesture.removePointer);
+    await gesture.addPointer(location: const Offset(20, 20));
+    await tester.pump();
+    await gesture.moveTo(const Offset(60, 40));
+    await tester.pump();
+
+    expect(moved, contains(const Offset(160, 90)));
+  });
+
+  testWidgets('onPointerMoved also reports positions while drawing', (
+    tester,
+  ) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    final moved = <Offset>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          onStroke: (_) {},
+          onPointerMoved: moved.add,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final gesture = await tester.startGesture(const Offset(20, 20));
+    await gesture.moveTo(const Offset(60, 40));
+    await gesture.up();
+    await tester.pump();
+
+    expect(moved, [const Offset(20, 20), const Offset(60, 40)]);
+  });
+
+  testWidgets('a cursor layer paints only when cursors is supplied', (
+    tester,
+  ) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    final cursors = CanvasCursors();
+    addTearDown(cursors.dispose);
+    cursors.upsert(id: 'alice', x: 0, y: 0, label: 'Alice', colorIndex: 0);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          onStroke: (_) {},
+          cursors: cursors,
+          cursorColors: const [Color(0xFFE0699A)],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.widgetList<CustomPaint>(find.byType(CustomPaint)).any(
+            (paint) => paint.painter is CursorPainter,
+          ),
+      isTrue,
+    );
+  });
+
+  testWidgets('no cursor layer exists when cursors is null', (tester) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          onStroke: (_) {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.widgetList<CustomPaint>(find.byType(CustomPaint)).any(
+            (paint) => paint.painter is CursorPainter,
+          ),
+      isFalse,
+    );
   });
 }

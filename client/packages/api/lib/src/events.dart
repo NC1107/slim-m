@@ -196,6 +196,17 @@ sealed class ServerEvent {
           opId: decoded['op_id'] as String,
           objectIds: (decoded['object_ids'] as List<dynamic>).cast<String>(),
         ),
+      'canvas.cursor.moved'
+          when decoded['channel_id'] is String &&
+              decoded['user_id'] is String &&
+              decoded['x'] is num &&
+              decoded['y'] is num =>
+        CanvasCursorMoved(
+          channelId: decoded['channel_id'] as String,
+          userId: decoded['user_id'] as String,
+          x: (decoded['x'] as num).toDouble(),
+          y: (decoded['y'] as num).toDouble(),
+        ),
       'pong' => const PongEvent(),
       'error' => ErrorEvent(decoded['message'] as String? ?? 'unknown'),
       _ => null,
@@ -342,6 +353,21 @@ class EventConnection {
   /// silently rather than erroring or closing the socket.
   void typing(String channelId) => _channel.sink
       .add(jsonEncode({'type': 'typing', 'channel_id': channelId}));
+
+  /// Reports this user's pointer position on a channel's canvas.
+  ///
+  /// Ephemeral like [typing]: no acknowledgement, no retry, and safe to call
+  /// as often as the caller likes - the server rate-limits and drops the
+  /// excess silently. The caller is expected to throttle on its own so a
+  /// well-behaved client rarely hits that limit in the first place.
+  void canvasCursor(String channelId, double x, double y) => _channel.sink.add(
+        jsonEncode({
+          'type': 'canvas.cursor',
+          'channel_id': channelId,
+          'x': x,
+          'y': y,
+        }),
+      );
 
   Future<void> close() => _channel.sink.close();
 }

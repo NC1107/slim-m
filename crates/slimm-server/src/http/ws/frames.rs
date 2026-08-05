@@ -127,6 +127,13 @@ pub(super) enum ServerFrame {
         op_id: String,
         object_ids: Vec<String>,
     },
+    #[serde(rename = "canvas.cursor.moved")]
+    CanvasCursorMoved {
+        channel_id: String,
+        user_id: String,
+        x: f64,
+        y: f64,
+    },
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]
@@ -161,4 +168,10 @@ pub(super) enum ClientFrame {
     /// no explicit "stop" frame: the state lapses on its own without a refresh.
     #[serde(rename = "typing")]
     Typing { channel_id: String },
+    /// A pointer position on a channel's canvas. Rate-limited and authorized
+    /// the same bar the canvas HTTP routes use (view plus `USE_CANVAS`); see
+    /// [`super::signals::handle_canvas_cursor`]. No "stop" frame either, for
+    /// the reason [`crate::hub::Event::CanvasCursorMoved`] gives.
+    #[serde(rename = "canvas.cursor")]
+    CanvasCursor { channel_id: String, x: f64, y: f64 },
 }

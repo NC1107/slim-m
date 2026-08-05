@@ -33,6 +33,9 @@ class CanvasPaneBody extends StatelessWidget {
     required this.onStroke,
     required this.onErase,
     required this.onEraseEnd,
+    this.cursors,
+    this.cursorColors = const [],
+    this.onPointerMoved,
   });
 
   final String channelId;
@@ -51,6 +54,13 @@ class CanvasPaneBody extends StatelessWidget {
   final StrokeCommitted onStroke;
   final ValueChanged<Offset> onErase;
   final VoidCallback onEraseEnd;
+
+  /// Other participants' live pointers, and the palette their colours are
+  /// drawn from. Null renders no cursor layer, the same "cheap to omit"
+  /// shape [CanvasSurface] itself already offers.
+  final CanvasCursors? cursors;
+  final List<Color> cursorColors;
+  final PointerMoved? onPointerMoved;
 
   @override
   Widget build(BuildContext context) {
@@ -113,6 +123,9 @@ class CanvasPaneBody extends StatelessWidget {
                   tool: tool,
                   onErase: onErase,
                   onEraseEnd: onEraseEnd,
+                  cursors: cursors,
+                  cursorColors: cursorColors,
+                  onPointerMoved: onPointerMoved,
                 ),
               ),
             ),

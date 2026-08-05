@@ -109,6 +109,14 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// error to the person typing.
   void notifyTyping(String channelId) => _connection?.typing(channelId);
 
+  /// Tells the server this user's pointer moved on a channel's canvas.
+  ///
+  /// The same no-op-while-down shape as [notifyTyping]: a cursor position
+  /// missed during a reconnect is worth nothing and must never surface as an
+  /// error to whoever is drawing.
+  void notifyCanvasCursor(String channelId, double x, double y) =>
+      _connection?.canvasCursor(channelId, x, y);
+
   /// Starts, or restarts, synchronisation. Safe to call repeatedly: a call
   /// superseded by a later [start] or a [stop] before it reaches a given
   /// checkpoint abandons itself there rather than finishing against a

@@ -23,14 +23,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../../ids.dart';
 import '../../permissions.dart';
+import '../../providers/blocks_controller.dart';
 import '../../providers/providers.dart';
 import '../../providers/live_events.dart';
 import '../../providers/sync_controller.dart';
+import '../../providers/user_profiles.dart';
 import 'canvas_commit_queue.dart';
+import 'canvas_cursor_relay.dart';
 import 'canvas_ops_controller.dart';
 import 'canvas_pane_body.dart';
 import 'canvas_sync.dart';
@@ -54,9 +58,11 @@ class CanvasPane extends ConsumerStatefulWidget {
 
 class _CanvasPaneState extends ConsumerState<CanvasPane> {
   final CanvasDocument _document = CanvasDocument();
+  final CanvasCursors _cursors = CanvasCursors();
   StreamSubscription<api.ServerEvent>? _live;
   CanvasCommitQueue? _queue;
   CanvasOpsController? _opsController;
+  CanvasCursorRelay? _cursorRelay;
   Timer? _panDebounce;
   late final CanvasSync _sync;
   ProviderSubscription<SyncStatus>? _syncStatusSubscription;
@@ -103,6 +109,8 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _sync.dispose();
     _document.removeListener(_onCameraMoved);
     _document.dispose();
+    _cursorRelay?.dispose();
+    _cursors.dispose();
     super.dispose();
   }
 
@@ -138,6 +146,30 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       if (mounted) setState(() => _error = message);
     },
   );
+
+  CanvasCursorRelay get _relay => _cursorRelay ??= CanvasCursorRelay(
+    cursors: _cursors,
+    paletteSize: AppCanvasColors.cursors.length,
+    send: (x, y) => ref
+        .read(syncControllerProvider.notifier)
+        .notifyCanvasCursor(widget.channelId, x, y),
+    resolveLabel: _cursorLabel,
+    isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
+    selfId: () => ref.read(meProvider).valueOrNull?.id,
+  );
+
+  /// A remote cursor's label as of the last resolved answer, kicking off a
+  /// fetch for an id this session has not asked about yet - the same
+  /// resolve-then-fall-back order `authorLabel` uses for a message author,
+  /// minus the local `authorDisplayName` cache a cursor has no row to carry.
+  String _cursorLabel(String userId) {
+    final profiles = ref.read(batchProfilesControllerProvider);
+    resolveAuthorProfiles(ref, [userId]);
+    if (profiles.containsKey(userId)) {
+      return profiles[userId]?.displayName ?? 'Deleted user';
+    }
+    return 'Someone';
+  }
 
   void _onEvent(api.ServerEvent event) {
     switch (event) {
@@ -184,6 +216,15 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           _document.forgetRemoved(objectIds);
           _fetched = null;
         });
+      case api.CanvasCursorMoved(
+            :final channelId,
+            :final userId,
+            :final x,
+            :final y,
+          )
+          when channelId == widget.channelId:
+        // Never through _sync.applyLive: a cursor carries no seq to catch up on.
+        _relay.applyRemote(userId, x, y);
       default:
         break;
     }
@@ -353,6 +394,8 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
 
   Future<void> _onClear() => _ops.clear(_sync.asOfSeq ?? 0);
 
+  void _onPointerMoved(Offset world) => _relay.reportLocalPointer(world);
+
   @override
   Widget build(BuildContext context) {
     final me = ref.watch(meProvider).valueOrNull;
@@ -384,6 +427,9 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           onStroke: _onStroke,
           onErase: _onErase,
           onEraseEnd: () => unawaited(_onEraseEnd()),
+          cursors: _cursors,
+          cursorColors: AppCanvasColors.cursors,
+          onPointerMoved: _onPointerMoved,
         ),
       ),
     );

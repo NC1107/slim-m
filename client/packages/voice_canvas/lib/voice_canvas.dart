@@ -8,9 +8,10 @@
 /// enforces that, which is what keeps the render loop honest.
 library;
 
+export 'src/canvas_cursors.dart';
 export 'src/canvas_document.dart';
 export 'src/canvas_hit_test.dart';
-export 'src/canvas_painters.dart' show DraftStroke;
+export 'src/canvas_painters.dart' show CursorPainter, DraftStroke;
 export 'src/canvas_scene.dart';
 export 'src/canvas_surface.dart';
 export 'src/spatial_grid.dart';
