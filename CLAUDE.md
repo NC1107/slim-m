@@ -474,7 +474,17 @@ The owner agreed ("you were right we can just reactions for progress of the bugs
 ### Reaching the deployment as an agent
 
 There is a `claude` account on the live instance (user id `019fbd20-3d53-7482-9855-77551a00d47c`, display name **Claude**), registered 2026-08-01 with an invite the owner supplied.
-Credentials are **not** in the repo: the password is in the session scratchpad, and a fresh session that cannot find it should ask the owner for a new invite code and register again rather than hunting for it.
+Credentials are **not** in the repo: the password is at `~/.secrets/slim-m/claude-account-password.txt`, mode 600, beside every other credential for this project.
+
+~~the password is in the session scratchpad~~ - it was, until 2026-08-05, and that was the wrong place.
+A session scratchpad is per-session and gets cleared, so the credential vanished mid-session and locked the agent out of the deployment entirely: no backlog channel, no reactions, no seeding.
+Recovering it needed the owner's permission to write to the live database, because resetting a password requires an administrator and `claude` **is** the administrator, which makes the ordinary reset path circular.
+
+**The recovery, written down because the circularity will recur if the file is ever lost again.**
+Do not hand-craft an Argon2id hash into `users`: `POST /auth/reset` already does the hashing, so the only thing needed is a row it will accept.
+`password_reset_codes.code_hash` stores `auth::hash_secret(code)`, which is plain lowercase-hex SHA-256 of the code (`auth.rs`), so a code can be minted outside the server: insert `(code_hash, user_id, NULL, now_ms, now_ms + a short window)` and redeem the plaintext through the public route.
+The container is distroless and has no shell, so the write goes through a throwaway container mounted on the same volume (`docker run --rm -v slim-m_slimm_data:/data python:3-alpine`), not `docker exec`.
+`sqlite3.connect` with a `busy_timeout` is enough alongside the running server; this is an ordinary concurrent WAL write, not a stop-the-world operation.
 
 Everything is plain REST against `https://slim.npc-server.top`, no client build needed:
 
