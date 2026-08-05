@@ -40,8 +40,7 @@ on:
       # Its own file, so a change to how these builds work is validated and
       # deployed by them rather than waiting on unrelated work to trigger it.
       - ".github/workflows/main-builds.yml"
-      # A packaging change is precisely a change that needs repackaging; without
-      # this, a spec fix cannot trigger the job that builds the rpm it fixes.
+      # A spec fix must be able to trigger the job that builds the rpm it fixes.
       - "packaging/**"
       - "!client/CHANGELOG.md"
       - "!client/pubspec.yaml"
