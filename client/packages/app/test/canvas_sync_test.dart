@@ -348,6 +348,61 @@ void main() {
     });
   });
 
+  test('a restore read off the catch-up feed cold-fetches, not only forgets '
+      'the tombstone', () {
+    fakeAsync((async) {
+      final document = CanvasDocument();
+      var coldFetches = 0;
+      var forgets = 0;
+      final ops = [
+        _rawOp(
+          1,
+          'restore',
+          extra: {
+            'target_op': 'op-0',
+            'object_ids': ['a'],
+          },
+        ),
+      ];
+      final sync = CanvasSync(
+        channelId: 'c1',
+        client: fakeCanvasOpsApi(
+          (afterSeq) => _json({
+            'ops': ops.where((o) => o['seq'] as int > afterSeq).toList(),
+            'latest_seq': 1,
+            'has_more': false,
+            'reset': false,
+          }),
+        ),
+        document: document,
+        coldFetch: () async {
+          coldFetches++;
+        },
+        forgetFetchedRegion: () {
+          forgets++;
+        },
+      );
+
+      sync.seedFromViewport(0);
+      sync.catchUp();
+      async.flushMicrotasks();
+
+      expect(
+        forgets,
+        1,
+        reason: 'the tombstone still has to go, same as before this fix',
+      );
+      expect(
+        coldFetches,
+        1,
+        reason:
+            'a restored object\'s payload was freed on removal, so nothing '
+            'repaints it without an actual fetch - forgetting the tombstone '
+            'alone only helps the *next* camera move, which may never come',
+      );
+    });
+  });
+
   test('onObjectPlaced fires for a place op read off the catch-up feed, and '
       'only for that kind', () {
     fakeAsync((async) {

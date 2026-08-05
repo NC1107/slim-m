@@ -127,13 +127,27 @@ class CanvasSync {
 
   /// The pane's own cold viewport fetch, reused rather than duplicated here:
   /// it alone knows the padded region and owns the pane's fetched-region
-  /// cache. Called by a hard reset, and by nothing else.
+  /// cache. Called by a hard reset and by a restore.
+  ///
+  /// The restore call is not optional the way it first looked: a restored
+  /// object's payload was freed on removal, so forgetting the tombstone
+  /// alone leaves nothing to paint until *something* re-reads it, and the
+  /// pane's own camera-move guard only checks the fetched-region cache when
+  /// the view itself changes - never on its own. Without this, undoing an
+  /// erase or a clear did nothing visible on the very client that clicked
+  /// Undo unless they happened to pan afterward; a full reload "fixed" it
+  /// only because a fresh pane's first camera-moved call always cold-fetches
+  /// regardless. Found by an end-to-end scenario checking the actor's own
+  /// screen after undo, not by a widget test - none of them drove a real
+  /// restore through this path without also panning or reloading.
   final Future<void> Function() coldFetch;
 
   /// Drops the pane's fetched-region cache, so the next camera move
   /// refetches rather than trusting a region that no longer means what it
   /// did. Called by a restore (a local resurrect is not attempted; only a
-  /// fetch can bring the object's payload back) and by a hard reset.
+  /// fetch can bring the object's payload back) and by a hard reset -
+  /// always alongside [coldFetch] now, never alone, for the reason that
+  /// field's own doc gives.
   final VoidCallback forgetFetchedRegion;
 
   int? _asOfSeq;
@@ -281,6 +295,8 @@ class CanvasSync {
       case api.CanvasRestoreOp(:final objectIds):
         document.forgetRemoved(objectIds);
         forgetFetchedRegion();
+        // A restored object's payload was freed on removal, so nothing shows it again without this: see coldFetch's own doc.
+        unawaited(coldFetch());
       case api.CanvasMoveOp(
         :final objectId,
         :final x,

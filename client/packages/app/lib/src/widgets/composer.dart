@@ -58,9 +58,13 @@ class Composer extends ConsumerStatefulWidget {
   /// no-op everywhere else. Parameters rather than a direct call so a test
   /// can hand over a fake that fires synchronously, since nothing about a
   /// real browser paste event can be produced from a widget test.
-  final void Function(void Function(Uint8List bytes, String filename) onImage)
-  clipboardPasteStart;
-  final void Function() clipboardPasteStop;
+  final void Function(PastedImageHandler onImage) clipboardPasteStart;
+
+  /// Takes the same callback [clipboardPasteStart] was given, which is also
+  /// the ownership token that stops this from tearing down a *different*
+  /// caller's still-active registration - see the web implementation's own
+  /// doc for the race this closes.
+  final void Function(PastedImageHandler onImage) clipboardPasteStop;
 
   @override
   ConsumerState<Composer> createState() => _ComposerState();
@@ -157,7 +161,7 @@ class _ComposerState extends ConsumerState<Composer> {
     });
     widget.controller.removeListener(_handleChange);
     _focus.removeListener(_handleFocusChange);
-    widget.clipboardPasteStop();
+    widget.clipboardPasteStop(_handlePastedImage);
     _focus.dispose();
     _attachments.removeListener(_handleAttachmentsChange);
     _attachments.dispose();
@@ -181,7 +185,7 @@ class _ComposerState extends ConsumerState<Composer> {
     if (_focus.hasFocus) {
       widget.clipboardPasteStart(_handlePastedImage);
     } else {
-      widget.clipboardPasteStop();
+      widget.clipboardPasteStop(_handlePastedImage);
     }
   }
 

@@ -75,21 +75,28 @@ const MethodChannel _clipboardImageChannel = MethodChannel(
   'top.npcserver.slimm/clipboard_image',
 );
 
-void Function(Uint8List bytes, String filename)? _onPastedImage;
+/// A pasted image's bytes and a filename, also the ownership token
+/// [stopClipboardImagePaste] checks; see the web sibling's own copy of this
+/// typedef for why a real race made that check necessary.
+typedef PastedImageHandler = void Function(Uint8List bytes, String filename);
+
+PastedImageHandler? _onPastedImage;
 
 /// Starts listening for an image the iOS edit menu's Paste item hands over;
 /// call once per focus gained, paired with [stopClipboardImagePaste] on
 /// focus lost - see this file's doc comment for why a native menu tap is
 /// treated as the same seam as the web listener it mirrors.
-void startClipboardImagePaste(
-  void Function(Uint8List bytes, String filename) onImage,
-) {
+void startClipboardImagePaste(PastedImageHandler onImage) {
   _onPastedImage = onImage;
   _clipboardImageChannel.setMethodCallHandler(_handlePastedImageCall);
 }
 
-/// Stops listening; safe to call even if nothing was ever started.
-void stopClipboardImagePaste() {
+/// Stops listening, but only while [onImage] is still the registered
+/// callback - matching the web implementation's own fix for the race where
+/// an unmounting caller's stop can otherwise outrun a newer caller's start.
+void stopClipboardImagePaste(PastedImageHandler onImage) {
+  // == rather than identical(): two tear-offs of one instance method are == but never identical.
+  if (_onPastedImage != onImage) return;
   _onPastedImage = null;
   _clipboardImageChannel.setMethodCallHandler(null);
 }

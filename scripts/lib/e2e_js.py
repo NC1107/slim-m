@@ -157,3 +157,55 @@ def set_gestures(value_json):
     """Let real pointer events through to the canvas, or take them back."""
     return ("(function(){var h=document.querySelector('flt-semantics-host');"
             "if(h) h.style.pointerEvents=%s;})()" % value_json)
+
+
+def canvas_rect():
+    """The Voice Canvas surface's own bounding rect.
+
+    Its one container Semantics node carries a label starting "Canvas,"
+    (object counts, or "loading"); that same rect is the coordinate frame
+    drawing and dragging happen in - see e2e_canvas.py's own doc for why
+    the rect's top-left is all the geometry this harness ever needs. The
+    label lands as inline text rather than an `aria-label` attribute, the
+    same shape NODES already works around for a reply's quote button, so a
+    node is only a candidate if it carries no nested flt-semantics of its
+    own - or its *own* text, not an ancestor's, would answer first.
+    """
+    return """
+    (function(){
+      var els=document.querySelectorAll('flt-semantics');
+      for (var i=0;i<els.length;i++){
+        var e=els[i];
+        var named=e.getAttribute('aria-label');
+        if (!named && e.querySelector('flt-semantics')) continue;
+        var t=(named||e.textContent||'').trim();
+        if (t.indexOf('Canvas,')===0){
+          var r=e.getBoundingClientRect();
+          return JSON.stringify({x:r.x,y:r.y,width:r.width,height:r.height});
+        }
+      }
+      return null;
+    })()"""
+
+
+def paste_image(payload_json, name_json, mime_json):
+    """Dispatch a real browser `paste` event carrying an image file.
+
+    The web build reads a pasted image off this DOM event directly, never
+    the async clipboard-read API (see composer_clipboard_image_web.dart's
+    own doc for why), so this is the same event a person's Ctrl+V produces -
+    not a shortcut around it.
+    """
+    return """
+    (function(){
+      var raw = atob(%s);
+      var bytes = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      var file = new File([bytes], %s, {type: %s});
+      var dt = new DataTransfer();
+      dt.items.add(file);
+      var ev = new ClipboardEvent('paste', {
+        clipboardData: dt, bubbles: true, cancelable: true});
+      document.dispatchEvent(ev);
+      return 'ok';
+    })()""" % (payload_json, name_json, mime_json)

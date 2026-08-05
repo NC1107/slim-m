@@ -276,17 +276,20 @@ Widget composerHarness({
 
 /// Stands in for the real browser `paste` listener a widget test cannot
 /// produce: [start] just remembers the callback so a test can invoke it
-/// directly, as though an image had really been pasted.
+/// directly, as though an image had really been pasted. [stop] mirrors the
+/// real implementations' own ownership check - only the caller that is
+/// still the registered one can disarm it - so a test built on this fake
+/// gets the same protection the real race fix added.
 class FakeClipboardPaste {
-  void Function(Uint8List bytes, String filename)? _onImage;
+  PastedImageHandler? _onImage;
   int stopCalls = 0;
 
-  void start(void Function(Uint8List bytes, String filename) onImage) =>
-      _onImage = onImage;
+  void start(PastedImageHandler onImage) => _onImage = onImage;
 
-  void stop() {
+  void stop(PastedImageHandler onImage) {
     stopCalls += 1;
-    _onImage = null;
+    // == rather than identical(): two tear-offs of one instance method are == but never identical.
+    if (_onImage == onImage) _onImage = null;
   }
 
   /// True only while the composer is actually listening, i.e. its field has

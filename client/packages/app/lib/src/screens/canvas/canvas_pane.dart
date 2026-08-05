@@ -45,6 +45,8 @@ import 'canvas_ops_controller.dart';
 import 'canvas_pane_body.dart';
 import 'canvas_sync.dart';
 
+part 'canvas_pane_gestures.dart';
+
 /// The channel whose canvas is open, or null.
 ///
 /// A provider rather than a route: joining a call opens voice and the canvas
@@ -378,68 +380,12 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     if (mounted) setState(() {});
   }
 
-  /// Leaving the select tool deselects, so the outline and its resize
-  /// handles do not linger over a selection nothing can act on any more
-  /// while the pen or eraser is active.
-  void _onToolChanged(CanvasTool tool) {
-    if (tool != CanvasTool.select) _document.selectedObjectId.value = null;
-    setState(() => _tool = tool);
-  }
-
-  void _onSelectStart(Offset world) {
-    final me = ref.read(meProvider).valueOrNull;
-    _ops.beginSelect(
-      world,
-      manageCanvas: me?.permissions.hasPermission(Perm.manageCanvas) ?? false,
-      selfId: me?.id,
-    );
-  }
-
-  /// Aspect locks by default; holding Shift frees it. Read fresh on every
-  /// drag point rather than once at [_onSelectStart], so releasing the key
-  /// mid-drag takes effect immediately rather than on the next gesture.
-  void _onSelectDrag(Offset world) => _ops.dragSelect(
-    world,
-    lockAspect: !HardwareKeyboard.instance.isShiftPressed,
-  );
-
-  Future<void> _onSelectEnd() async {
-    await _ops.endSelect();
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _onBringToFront(String objectId) async {
-    await _ops.bringToFront(objectId);
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _onSendToBack(String objectId) async {
-    await _ops.sendToBack(objectId);
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _onUndo() async {
-    await _ops.undo();
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _onClear() => _ops.clear(_sync.asOfSeq ?? 0);
-
-  void _onPointerMoved(Offset world) => _relay.reportLocalPointer(world);
-
-  /// Who to show on the canvas as a camera bubble: nobody, unless this
-  /// device itself has joined a call in this exact channel - a canvas
-  /// viewer who has not joined the call has no LiveKit room to render a
-  /// live texture from at all (`VoiceSession.cameraViewFor` answers nothing
-  /// without one), so there is no video to lay out for anybody in that
-  /// case, not even for participants known some other way.
-  List<VoiceParticipant> _callParticipants() {
-    final voice = ref.watch(voiceControllerProvider);
-    if (voice.channelId != widget.channelId) return const [];
-    final blocks = ref.watch(blocksProvider);
-    return voice.participants
-        .where((p) => !blocks.contains(p.identity))
-        .toList(growable: false);
+  /// `setState` and `mounted` are `@protected` on `State`, so an extension
+  /// method - `_CanvasPaneGestures`'s own, in a different file even though
+  /// the same library - cannot call either directly; this bridges that gap
+  /// from a plain method the analyzer sees as a real member of this class.
+  void _refresh([VoidCallback? mutate]) {
+    if (mounted) setState(mutate ?? () {});
   }
 
   @override

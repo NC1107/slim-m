@@ -258,6 +258,44 @@ class Client:
         self.click(open_label, settle=2)
         self.give_file(path, mime)
 
+    def drag(self, points, hold=0.05):
+        """A raw press, move through every point, release gesture.
+
+        For the canvas surface only: a `CustomPainter` has no accessible
+        element to click through, so [gestures] must be on first and this is
+        the only way to draw, select, or drag a resize handle on it.
+        """
+        x0, y0 = points[0]
+        self.send(_MOUSE, {"type": "mousePressed", "x": x0, "y": y0,
+                           "button": "left", "clickCount": 1})
+        time.sleep(hold)
+        for x, y in points[1:]:
+            self.send(_MOUSE, {"type": "mouseMoved", "x": x, "y": y,
+                               "button": "left", "buttons": 1})
+            time.sleep(hold)
+        lx, ly = points[-1]
+        self.send(_MOUSE, {"type": "mouseReleased", "x": lx, "y": ly,
+                           "button": "left", "clickCount": 1})
+        time.sleep(hold)
+
+    def canvas_rect(self):
+        """The drawing surface's own bounding box; see e2e_js.canvas_rect."""
+        raw = self.ev(e2e_js.canvas_rect())
+        if not raw:
+            raise AssertionError(f"{self.name}: canvas surface not found")
+        return json.loads(raw)
+
+    def paste_clipboard_image(self, path, mime="image/png"):
+        """Dispatches a real `paste` DOM event carrying [path]'s bytes."""
+        with open(path, "rb") as fh:
+            payload = base64.b64encode(fh.read()).decode()
+        name = os.path.basename(path)
+        ok = self.ev(e2e_js.paste_image(
+            json.dumps(payload), json.dumps(name), json.dumps(mime)))
+        if ok != "ok":
+            raise AssertionError(f"{self.name}: {ok}")
+        time.sleep(2)
+
     def wait_url(self, fragment, timeout=TIMEOUT):
         deadline = time.time() + timeout
         while time.time() < deadline:

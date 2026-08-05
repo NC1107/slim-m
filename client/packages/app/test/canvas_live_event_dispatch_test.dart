@@ -131,6 +131,44 @@ void main() {
     expect(log.entries.single.actorId, isNull);
   });
 
+  test('a live restore cold-fetches, not only forgets the tombstone', () {
+    var coldFetches = 0;
+    final countingSync = CanvasSync(
+      channelId: 'c1',
+      client: _inertApi(),
+      document: document,
+      coldFetch: () async {
+        coldFetches++;
+      },
+      forgetFetchedRegion: () {},
+    );
+
+    dispatchCanvasLiveEvent(
+      api.CanvasObjectsRestored(
+        channelId: 'c1',
+        seq: 1,
+        opId: 'op-1',
+        objectIds: const ['a'],
+      ),
+      paneChannelId: 'c1',
+      sync: countingSync,
+      document: document,
+      relay: () => throw StateError('no cursor event exercised here'),
+      applyPlacedObject: (_) {},
+      forgetFetchedRegion: () {},
+      activityLog: log,
+    );
+
+    expect(
+      coldFetches,
+      1,
+      reason:
+          'a restored object\'s payload was freed on removal and the '
+          'camera-move guard only checks on an actual pan, so nothing '
+          'repaints it on the actor\'s own screen without this',
+    );
+  });
+
   test('an empty-id restore defers to the feed and records nothing here - '
       'the feed will record it once it actually applies', () {
     dispatch(
