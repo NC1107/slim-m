@@ -1,0 +1,104 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/flatpak/flatpak-builder/main/data/flatpak-manifest.schema.json
+# SPDX-License-Identifier: Apache-2.0
+#
+# Flatpak manifest for the slim-m desktop client. This repackages the same
+# Flutter Linux bundle the rpm (packaging/rpm/slim-m-client.spec) repackages,
+# rather than running `flutter build linux` inside the sandbox: the build
+# sandbox has no network by default, and `dart pub get` needs one. `release.yml`
+# builds the bundle first and this manifest's `dir` source points straight at
+# its output, so nothing here duplicates that build.
+#
+# The app id, desktop file and icons are the same ones the rpm installs
+# (top.npcserver.slimm everywhere), on purpose: two different ids for one app
+# would split its icon cache entry, its notification grouping and its
+# eventual Secret Service keyring namespace for no reason.
+#
+# Verification status (packaging/flatpak/README.md has the full account):
+# built successfully with `org.flatpak.Builder` against a real
+# `flutter build linux --release` output on 2026-08-05, producing an
+# installable bundle. The app has not been launched from that bundle, so the
+# runtime permissions below are reasoned from source and from a working
+# Element (Electron+WebRTC) manifest, not confirmed on a running instance.
+
+app-id: top.npcserver.slimm
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: slim-m
+separate-locales: false
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  # Voice and screen-share audio; GStreamer's pulsesink/pulsesrc reach it too.
+  - --socket=pulseaudio
+  - --device=dri
+  # Raw /dev/video* for the webcam: flutter_webrtc's V4L2 capturer, not a portal (same as Element's manifest).
+  - --device=all
+  - --share=network
+  # flutter_secure_storage's Linux plugin is libsecret, talking to the Secret Service D-Bus name directly.
+  - --talk-name=org.freedesktop.secrets
+  # Belt-and-suspenders PipeWire socket access alongside the ScreenCast portal (again matches Element).
+  - --filesystem=xdg-run/pipewire-0
+
+modules:
+  - name: slim-m-client
+    buildsystem: simple
+    only-arches:
+      - x86_64
+    build-commands:
+      - install -d /app/slim-m/lib /app/slim-m/data /app/bin
+      - install -m0755 bundle/slimm_app /app/slim-m/slimm_app
+      - cp -a bundle/lib/. /app/slim-m/lib/
+      - cp -a bundle/data/. /app/slim-m/data/
+      - for so in /app/slim-m/lib/*.so; do patchelf-bin/bin/patchelf --set-rpath '$ORIGIN' "$so"; done
+      - chmod 0755 /app/slim-m/lib/*.so
+      - ln -s ../slim-m/slimm_app /app/bin/slim-m
+      - install -Dm644 top.npcserver.slimm.desktop /app/share/applications/top.npcserver.slimm.desktop
+      - install -Dm644 top.npcserver.slimm-16.png /app/share/icons/hicolor/16x16/apps/top.npcserver.slimm.png
+      - install -Dm644 top.npcserver.slimm-22.png /app/share/icons/hicolor/22x22/apps/top.npcserver.slimm.png
+      - install -Dm644 top.npcserver.slimm-24.png /app/share/icons/hicolor/24x24/apps/top.npcserver.slimm.png
+      - install -Dm644 top.npcserver.slimm-32.png /app/share/icons/hicolor/32x32/apps/top.npcserver.slimm.png
+      - install -Dm644 top.npcserver.slimm-48.png /app/share/icons/hicolor/48x48/apps/top.npcserver.slimm.png
+      - install -Dm644 top.npcserver.slimm-64.png /app/share/icons/hicolor/64x64/apps/top.npcserver.slimm.png
+      - install -Dm644 top.npcserver.slimm-128.png /app/share/icons/hicolor/128x128/apps/top.npcserver.slimm.png
+      - install -Dm644 top.npcserver.slimm-256.png /app/share/icons/hicolor/256x256/apps/top.npcserver.slimm.png
+      - install -Dm644 top.npcserver.slimm-512.png /app/share/icons/hicolor/512x512/apps/top.npcserver.slimm.png
+      # gdk-pixbuf sniffs an SVG by its first bytes; this drops the source's leading comment, which defeats that.
+      - sed -n '/<svg/,$p' top.npcserver.slimm.svg > icon.svg
+      - install -Dm644 icon.svg /app/share/icons/hicolor/scalable/apps/top.npcserver.slimm.svg
+    sources:
+      # The already-built Flutter bundle; see release.yml's linux-client job.
+      - type: dir
+        path: ../../client/packages/app/build/linux/x64/release/bundle
+        dest: bundle
+      # A prebuilt static patchelf, used only at build time: the SDK carries none (checked, not assumed).
+      - type: archive
+        url: https://github.com/NixOS/patchelf/releases/download/0.19.1/patchelf-0.19.1-x86_64.tar.gz
+        sha256: a6818fef80128fb354423234ecacdcca3e993913d774e5d8346bc63f70fed4cf
+        dest: patchelf-bin
+        only-arches:
+          - x86_64
+      - type: file
+        path: ../rpm/top.npcserver.slimm.desktop
+      - type: file
+        path: ../linux/icons/top.npcserver.slimm-16.png
+      - type: file
+        path: ../linux/icons/top.npcserver.slimm-22.png
+      - type: file
+        path: ../linux/icons/top.npcserver.slimm-24.png
+      - type: file
+        path: ../linux/icons/top.npcserver.slimm-32.png
+      - type: file
+        path: ../linux/icons/top.npcserver.slimm-48.png
+      - type: file
+        path: ../linux/icons/top.npcserver.slimm-64.png
+      - type: file
+        path: ../linux/icons/top.npcserver.slimm-128.png
+      - type: file
+        path: ../linux/icons/top.npcserver.slimm-256.png
+      - type: file
+        path: ../linux/icons/top.npcserver.slimm-512.png
+      - type: file
+        path: ../linux/icons/top.npcserver.slimm.svg

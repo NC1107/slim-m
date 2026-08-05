@@ -66,9 +66,9 @@ This means a PR that breaks the Linux desktop compile is not caught before merge
 
 ## Suspected
 
-**GPU-accelerated hardware video decode inside a future Flatpak sandbox has never been validated, because there is no Flatpak build yet.**
+**GPU-accelerated hardware video decode inside the Flatpak sandbox has never been validated, because the app has never been launched from a Flatpak build.**
 `docs/ROADMAP.md`'s Phase 4 deliverable names "also validating GPU hardware video decode inside the Flatpak sandbox" as part of the Linux RTC spike, and the spike's own status entry (Phase 4, 2026-07-28) does not report this sub-clause as separately confirmed, only that the general Linux `flutter_webrtc`/`livekit_client` build and link succeeded on Fedora KDE Wayland.
-Since the Flatpak manifest itself does not exist yet (`packaging/flatpak/*.yaml` is absent; see `docs/ROADMAP.md` Phase 0 and Phase 9 status, and `docs/OPEN-QUESTIONS.md` section 6), sandboxed GPU decode specifically cannot have been tested and is recorded as suspected-untested rather than assumed working. The rpm and portable-tarball builds this project does ship run outside any sandbox, so they do not exercise this path at all.
+`packaging/flatpak/top.npcserver.slimm.yaml` exists now (2026-08-05) and has been built and installed for real, but only as far as `readelf`/`ldd` on the installed files; the app itself has never been launched from that bundle, on any display, so GPU-accelerated video decode specifically remains exactly as untested as before, only for a narrower reason now - see `packaging/flatpak/README.md` for precisely what was and was not checked.
 
 **Behaviour on non-KDE, non-Wayland Linux desktops (GNOME, X11, other window managers) is unverified.**
 Every confirmed Linux finding in this project - the screen-share segfault, the emoji font, the keyring dependency, the rpm build itself - was found and fixed on the owner's specific Fedora 44 KDE Plasma Wayland machine, the project's stated single Linux development and test target (`CLAUDE.md`, "Local development").
