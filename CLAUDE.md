@@ -1658,6 +1658,7 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
   Read it before assuming an untested iOS or Android path works; several entries exist precisely because a fix was recorded as done and a real device later disproved it.
 
 - [docs/BACKLOG.md](docs/BACKLOG.md): accepted extra features, architectural hooks to preserve, and deliberate declines from the segment gap analysis.
+- [docs/os_backlog/](docs/os_backlog/README.md): one file per supported OS (Windows, macOS, Linux, iOS, Android, web) naming the platform-specific issues this project already knows about or reasonably expects, each cited and split into confirmed versus suspected. Added 2026-08-04. Read before claiming a feature works on a platform nobody here has hardware for, or before scaffolding the still-missing Windows and macOS desktop targets.
 - [docs/design/design-language.md](docs/design/design-language.md): the visual identity spec (colour, type, spacing, iconography, motion). It moved out of `docs/research/` on 2026-07-26, which is where it was hiding.
 - [docs/decisions/0004-visual-identity-review.md](docs/decisions/0004-visual-identity-review.md): the designer review that gated token lock. Read this before changing a token; it also closes the seven accent roles and settles the canvas `window` contradiction.
 - [docs/design/layout-explorations.md](docs/design/layout-explorations.md): the parked Spaces/Focus/Deck layout concepts (the sidebar layout was kept for v1, and the review confirms nothing needs reopening).
