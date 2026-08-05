@@ -102,8 +102,7 @@ class _FullscreenVideoViewState extends ConsumerState<FullscreenVideoView> {
     final voice = ref.watch(voiceControllerProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
     final live = _stillLive(voice);
-    // Scheduled rather than called inline: a provider must not be told to
-    // change (here, the navigator's own stack) from inside a build method.
+    // Scheduled: a build method must not itself change the navigator stack.
     if (!live && !_exiting) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _exit());
     }

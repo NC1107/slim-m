@@ -126,8 +126,7 @@ void main() {
         find.text('This is the start of your conversation.'),
         findsOneWidget,
       );
-      // The DM decision this must not reopen: no "Welcome to #" over a name
-      // that is a person, not a channel.
+      // The DM decision this must not reopen: no "Welcome to #" over a person's name.
       expect(find.textContaining('Welcome to #'), findsNothing);
     },
   );
