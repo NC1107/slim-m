@@ -55,8 +55,7 @@ class VacuumIntoTest(BackupTestCase):
         self.assertFalse(Path(str(dest) + "-shm").exists())
 
     def test_a_database_path_holding_a_uri_special_character_still_works(self):
-        # A bare "?" would otherwise start a URI query string mid-path,
-        # silently opening a different, empty database instead of this one.
+        # An unescaped "?" would start a URI query string mid-path instead.
         odd_db = self.root / "weird?name#dir" / "slimm.db"
         data = b"snapshot taken from an oddly named path"
         sha = fixtures.sha256_of(data)
