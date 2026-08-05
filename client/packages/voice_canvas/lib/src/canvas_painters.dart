@@ -17,6 +17,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 
+import 'canvas_cursors.dart';
 import 'canvas_document.dart';
 
 /// The background lattice, at a spacing quantised to the zoom so the mesh
@@ -180,4 +181,99 @@ class DraftPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(DraftPainter oldDelegate) => false;
+}
+
+/// Other participants' live pointers.
+///
+/// Its own layer, listening to both [cursors] and [document]: a cursor move
+/// repaints with no camera change, and a pan repaints every shown cursor at
+/// its new screen position with no cursor having moved in world space.
+class CursorPainter extends CustomPainter {
+  CursorPainter({
+    required this.cursors,
+    required this.document,
+    required this.colors,
+  }) : super(repaint: Listenable.merge([cursors, document]));
+
+  final CanvasCursors cursors;
+  final CanvasDocument document;
+
+  /// The caller's closed cursor-colour set, indexed by
+  /// [CanvasCursor.colorIndex]. This package carries no palette of its own,
+  /// the same convention every other painter here follows.
+  final List<Color> colors;
+
+  /// Pixels of screen-space margin past which a cursor is not worth drawing
+  /// at all, since its glyph and label would be fully off-canvas anyway.
+  static const double _cullMargin = 48;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (colors.isEmpty) return;
+    final camera = document.camera;
+    for (final cursor in cursors.all) {
+      final at = Offset(
+        (cursor.x - camera.x) * camera.zoom,
+        (cursor.y - camera.y) * camera.zoom,
+      );
+      if (at.dx < -_cullMargin ||
+          at.dy < -_cullMargin ||
+          at.dx > size.width + _cullMargin ||
+          at.dy > size.height + _cullMargin) {
+        continue;
+      }
+      final color = colors[cursor.colorIndex % colors.length];
+      _paintGlyph(canvas, at, color);
+      _paintLabel(canvas, at, cursor.label, color);
+    }
+  }
+
+  void _paintGlyph(Canvas canvas, Offset at, Color color) {
+    final path = Path()
+      ..moveTo(at.dx, at.dy)
+      ..lineTo(at.dx, at.dy + 15)
+      ..lineTo(at.dx + 4.5, at.dy + 11.5)
+      ..lineTo(at.dx + 7, at.dy + 17)
+      ..lineTo(at.dx + 9.5, at.dy + 16)
+      ..lineTo(at.dx + 7, at.dy + 10.5)
+      ..lineTo(at.dx + 11.5, at.dy + 10.5)
+      ..close();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xFFFFFFFF)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  void _paintLabel(Canvas canvas, Offset at, String label, Color color) {
+    if (label.isEmpty) return;
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: const TextStyle(
+          fontSize: 11,
+          color: Color(0xFFFFFFFF),
+          height: 1,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: 160);
+    final origin = Offset(at.dx + 14, at.dy + 12);
+    final chip = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        origin.dx - 4,
+        origin.dy - 2,
+        painter.width + 8,
+        painter.height + 4,
+      ),
+      const Radius.circular(4),
+    );
+    canvas.drawRRect(chip, Paint()..color = color);
+    painter.paint(canvas, origin);
+  }
+
+  @override
+  bool shouldRepaint(CursorPainter oldDelegate) => false;
 }

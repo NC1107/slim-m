@@ -9,7 +9,7 @@ use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::presence::{self, Status, Visibility};
 use crate::ratelimit::{Class, RateLimiter};
-use crate::store::{SessionContext, Store};
+use crate::store::{SessionContext, Store, WORLD_LIMIT};
 
 /// Ensures a disconnect is always recorded and published, no matter which
 /// branch of the read loop in `super::serve` causes it to return: a `Drop`
@@ -176,5 +176,53 @@ pub(super) async fn handle_typing(
                 user_id,
             });
         }
+    });
+}
+
+/// Relays a pointer position on a channel's canvas, if the rate limiter,
+/// bounds check and channel permissions all allow it. Silent on every
+/// rejection, the same treatment [`handle_typing`] gives a refused refresh:
+/// a dropped cursor frame is worth nothing, never an error frame or a closed
+/// socket.
+///
+/// The permission bar matches the canvas HTTP routes exactly (view plus
+/// `USE_CANVAS`), and there is deliberately no timeout check: a timeout
+/// freezes the pen, not the mouse, the same reasoning `submit_op` already
+/// gives for letting a timed-out member erase their own ink.
+pub(super) async fn handle_canvas_cursor(
+    store: &Store,
+    hub: &Hub,
+    limiter: &RateLimiter,
+    ctx: &SessionContext,
+    channel_id: &str,
+    x: f64,
+    y: f64,
+) {
+    let Ok(channel_id) = uuid::Uuid::parse_str(channel_id) else {
+        return;
+    };
+    let channel_id = ChannelId(channel_id);
+
+    if !x.is_finite() || !y.is_finite() || x.abs() > WORLD_LIMIT || y.abs() > WORLD_LIMIT {
+        return;
+    }
+
+    if !limiter.check(Class::CanvasCursor, &format!("u:{}", ctx.user_id)) {
+        return;
+    }
+
+    hub.presence().touch(ctx.user_id);
+
+    let needed = Permissions::VIEW_CHANNEL.union(Permissions::USE_CANVAS);
+    match store.has_permission(ctx.user_id, channel_id, needed).await {
+        Ok(true) => {}
+        _ => return,
+    }
+
+    hub.publish(Event::CanvasCursorMoved {
+        channel_id,
+        user_id: ctx.user_id,
+        x,
+        y,
     });
 }

@@ -131,6 +131,18 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                                 )
                                 .await;
                             }
+                            Ok(ClientFrame::CanvasCursor { channel_id, x, y }) => {
+                                signals::handle_canvas_cursor(
+                                    &state.store,
+                                    &state.hub,
+                                    &state.limiter,
+                                    &ctx,
+                                    &channel_id,
+                                    x,
+                                    y,
+                                )
+                                .await;
+                            }
                             // A second hello or anything unparseable is not
                             // worth tearing the connection down over.
                             Ok(ClientFrame::Hello { .. }) | Err(_) => {}

@@ -38,6 +38,7 @@ export 'src/client.dart'
 export 'src/events.dart'
     show
         CanvasCleared,
+        CanvasCursorMoved,
         CanvasObjectPlaced,
         CanvasObjectsRemoved,
         CanvasObjectsRestored,

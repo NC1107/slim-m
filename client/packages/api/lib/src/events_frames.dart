@@ -358,3 +358,25 @@ class CanvasObjectsRestored extends ServerEvent {
   final String opId;
   final List<String> objectIds;
 }
+
+/// A live pointer position on a channel's canvas.
+///
+/// Never a fact about `canvas_objects` or `canvas_ops` and carries no `seq`:
+/// it is a this-instant hint, not a change to reconcile, so a client that
+/// missed one is not stale and needs no catch-up path for it. There is no
+/// matching "stopped" event; a receiver ages a cursor out on its own after a
+/// short silence, the deliberate difference from [TypingStarted]/
+/// [TypingStopped].
+class CanvasCursorMoved extends ServerEvent {
+  const CanvasCursorMoved({
+    required this.channelId,
+    required this.userId,
+    required this.x,
+    required this.y,
+  });
+
+  final String channelId;
+  final String userId;
+  final double x;
+  final double y;
+}

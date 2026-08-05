@@ -284,4 +284,22 @@ pub enum Event {
         op_id: CanvasOpId,
         object_ids: Vec<CanvasObjectId>,
     },
+    /// A live pointer position on a channel's canvas, relayed as-is.
+    ///
+    /// Never persisted and carries no `seq`: unlike every other canvas event
+    /// this is not a fact about `canvas_objects` or `canvas_ops`, only a
+    /// this-instant hint, so there is nothing for a reconnecting or
+    /// newly-arriving client to catch up on and no op-stream slot is spent on
+    /// it. A receiver that misses one is not stale, it just has not been told
+    /// yet; the sender's next move corrects it. There is no matching "stopped"
+    /// event, the deliberate difference from [`Event::TypingStarted`]/
+    /// [`Event::TypingStopped`]: a receiver ages a cursor out on its own after
+    /// a short silence rather than trusting a stop frame the sender might
+    /// never get to send (a closed tab sends nothing further either way).
+    CanvasCursorMoved {
+        channel_id: ChannelId,
+        user_id: UserId,
+        x: f64,
+        y: f64,
+    },
 }

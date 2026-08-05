@@ -71,6 +71,12 @@ pub enum Class {
     /// the rate is elsewhere: the per-object props ceiling, the per-channel
     /// object ceiling, and the viewport limit.
     Canvas,
+    /// Canvas pointer-position frames over the WebSocket. Sent far more often
+    /// than a typing refresh (a client throttles to roughly 12/second while
+    /// the pointer is moving over the canvas), so the budget is sized around
+    /// that sustained rate with headroom for a burst, rather than reused from
+    /// [`Class::Typing`]'s much sparser one.
+    CanvasCursor,
 }
 
 impl Class {
@@ -86,6 +92,7 @@ impl Class {
             Class::InviteCheck => (10.0, 1.0 / 10.0),
             Class::Upload => (10.0, 1.0 / 20.0),
             Class::Canvas => (60.0, 10.0),
+            Class::CanvasCursor => (30.0, 15.0),
         }
     }
 }

@@ -58,7 +58,8 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         Event::CanvasObjectPlaced { .. }
         | Event::CanvasObjectsRemoved { .. }
         | Event::CanvasCleared { .. }
-        | Event::CanvasObjectsRestored { .. } => Some(Permissions::USE_CANVAS),
+        | Event::CanvasObjectsRestored { .. }
+        | Event::CanvasCursorMoved { .. } => Some(Permissions::USE_CANVAS),
         Event::MessageCreated { .. }
         | Event::MessageEdited { .. }
         | Event::MessageDeleted { .. }
@@ -184,6 +185,7 @@ pub(super) async fn authorize(
         Event::CanvasObjectsRemoved { channel_id, .. } => *channel_id,
         Event::CanvasCleared { channel_id, .. } => *channel_id,
         Event::CanvasObjectsRestored { channel_id, .. } => *channel_id,
+        Event::CanvasCursorMoved { channel_id, .. } => *channel_id,
         Event::VoiceActivityChanged { channel_id } => *channel_id,
         // Control events are handled in the loop; the rest already returned above.
         Event::SessionRevoked(_)
@@ -236,8 +238,11 @@ pub(super) async fn authorize(
         return Authorization::Withhold;
     }
 
-    // Typing leaks presence too, so it must fail closed on a blip, unlike `PresenceChanged`.
-    if let Event::TypingStarted { user_id, .. } | Event::TypingStopped { user_id, .. } = event {
+    // Typing and a cursor both leak presence, so both must fail closed on a blip.
+    if let Event::TypingStarted { user_id, .. }
+    | Event::TypingStopped { user_id, .. }
+    | Event::CanvasCursorMoved { user_id, .. } = event
+    {
         let confirmed_visible = matches!(
             signals::presence_status(store, hub, ctx.user_id, user_id).await,
             Ok(Some(status)) if status != crate::presence::Status::Offline
@@ -404,6 +409,17 @@ pub(super) async fn authorize(
         },
         Event::VoiceActivityChanged { channel_id } => ServerFrame::VoiceActivityChanged {
             channel_id: channel_id.to_string(),
+        },
+        Event::CanvasCursorMoved {
+            channel_id,
+            user_id,
+            x,
+            y,
+        } => ServerFrame::CanvasCursorMoved {
+            channel_id: channel_id.to_string(),
+            user_id: user_id.to_string(),
+            x,
+            y,
         },
         // The deployment-wide and channel-deletion cases already returned above.
         Event::SessionRevoked(_)

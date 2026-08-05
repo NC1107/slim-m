@@ -97,6 +97,7 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::CanvasObjectsRemoved { .. }
         | Event::CanvasCleared { .. }
         | Event::CanvasObjectsRestored { .. }
+        | Event::CanvasCursorMoved { .. }
         | Event::SessionRevoked(_)
         // Who is on a call changes no permission's answer.
         | Event::VoiceActivityChanged { .. }
@@ -265,6 +266,12 @@ mod epoch_tests {
         });
         hub.publish(Event::VoiceActivityChanged {
             channel_id: ChannelId::generate(),
+        });
+        hub.publish(Event::CanvasCursorMoved {
+            channel_id: ChannelId::generate(),
+            user_id: UserId::generate(),
+            x: 0.0,
+            y: 0.0,
         });
         assert_eq!(hub.permissions_epoch(), before);
     }

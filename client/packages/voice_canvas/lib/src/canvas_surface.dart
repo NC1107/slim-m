@@ -7,11 +7,16 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'canvas_cursors.dart';
 import 'canvas_document.dart';
 import 'canvas_painters.dart';
 
 /// A pen stroke the surface has finished and wants committed.
 typedef StrokeCommitted = void Function(List<Offset> worldPoints);
+
+/// This pointer moved to a world position, on every hover and drag alike.
+/// The caller decides whether and how often to relay it.
+typedef PointerMoved = void Function(Offset worldPoint);
 
 /// Which gesture a single pointer draws.
 ///
@@ -39,6 +44,9 @@ class CanvasSurface extends StatefulWidget {
     this.tool = CanvasTool.pen,
     this.strokeWidth = 3,
     this.enabled = true,
+    this.cursors,
+    this.cursorColors = const [],
+    this.onPointerMoved,
   });
 
   final CanvasDocument document;
@@ -46,6 +54,21 @@ class CanvasSurface extends StatefulWidget {
   final Color gridLine;
   final StrokeCommitted onStroke;
   final double strokeWidth;
+
+  /// Other participants' live pointers, painted over the ink. Null renders
+  /// no cursor layer at all, so a caller that has not wired remote cursors up
+  /// yet (or a test that has no opinion about them) pays nothing for it.
+  final CanvasCursors? cursors;
+
+  /// The closed colour set [cursors] indexes into. Meaningless without
+  /// [cursors], and ignored when it is null.
+  final List<Color> cursorColors;
+
+  /// Fires on every hover or drag move, drawing or not, in world
+  /// coordinates. The caller decides whether, and how often, to relay this
+  /// onward - this widget applies no throttle of its own so a test can
+  /// assert on every call without needing a fake clock.
+  final PointerMoved? onPointerMoved;
 
   /// Which gesture a pointer draws. Resolving a world point to an object is
   /// the caller's job, over [onErase], so this widget stays free of any
@@ -87,6 +110,13 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
     ink: widget.ink,
     width: widget.strokeWidth,
   );
+  late final CursorPainter? _cursorPainter = widget.cursors == null
+      ? null
+      : CursorPainter(
+          cursors: widget.cursors!,
+          document: widget.document,
+          colors: widget.cursorColors,
+        );
 
   int _pointers = 0;
 
@@ -105,6 +135,7 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
   }
 
   void _down(PointerDownEvent event) {
+    widget.onPointerMoved?.call(_toWorld(event.localPosition));
     _pointers++;
     if (_pointers > 1) {
       _draft.cancel();
@@ -119,12 +150,20 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
   }
 
   void _move(PointerMoveEvent event) {
+    widget.onPointerMoved?.call(_toWorld(event.localPosition));
     if (_pointers != 1 || !widget.enabled) return;
     if (widget.tool == CanvasTool.eraser) {
       widget.onErase?.call(_toWorld(event.localPosition));
       return;
     }
     _draft.extend(event.localPosition);
+  }
+
+  /// A pointer moving with nothing pressed - drawing or erasing never
+  /// happens here, only the position report a mouse (not a touch, which
+  /// never hovers) gets for free.
+  void _hover(PointerHoverEvent event) {
+    widget.onPointerMoved?.call(_toWorld(event.localPosition));
   }
 
   void _up(PointerEvent event) {
@@ -210,6 +249,7 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
         return Listener(
           onPointerDown: _down,
           onPointerMove: _move,
+          onPointerHover: _hover,
           onPointerUp: _up,
           onPointerCancel: _up,
           onPointerSignal: _signal,
@@ -222,6 +262,8 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
                 RepaintBoundary(child: CustomPaint(painter: _grid)),
                 RepaintBoundary(child: CustomPaint(painter: _strokes)),
                 RepaintBoundary(child: CustomPaint(painter: _draftPainter)),
+                if (_cursorPainter case final cursorPainter?)
+                  RepaintBoundary(child: CustomPaint(painter: cursorPainter)),
               ],
             ),
           ),
