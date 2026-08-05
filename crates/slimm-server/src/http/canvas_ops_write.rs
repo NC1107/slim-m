@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Submitting a canvas mutation: `remove`, `clear`, `restore`, and `move`,
-//! the kinds this slice writes to the op stream `super::canvas_ops` only
-//! reads.
+//! Submitting a canvas mutation: `remove`, `clear`, `restore`, `move` and
+//! `reorder`, the kinds this slice writes to the op stream
+//! `super::canvas_ops` only reads.
 //!
 //! A sibling of [`super::canvas_ops`] rather than part of it, the same split
 //! `super::canvas`/`super::canvas_write` already make: the read and write
 //! halves of one surface stay under the review budget separately.
 //!
-//! Three of the four kinds ask no timeout question at all: a timeout freezes
+//! Three of the five kinds ask no timeout question at all: a timeout freezes
 //! the pen, never the eraser, so a timed-out member may still remove or undo
 //! their own ink. Refusing that would make a timeout's practical effect "lock
-//! the defacement in place", which is backwards. `move` is the exception,
-//! checked the same way `canvas_write::place` already does - it repositions
-//! ink rather than removing it, so it is the pen's freeze that applies, not
-//! the eraser's exemption.
+//! the defacement in place", which is backwards. `move` and `reorder` are the
+//! exception, checked the same way `canvas_write::place` already does - both
+//! change how ink presents rather than removing it, so it is the pen's freeze
+//! that applies, not the eraser's exemption.
 //!
 //! `MANAGE_CANVAS` gets its only meaning here: removing another member's
-//! object, clearing, restoring an op you did not author, or moving another
-//! member's object, needs it. Everyone else may only erase, undo, or
-//! reposition their own ink.
+//! object, clearing, restoring an op you did not author, or moving or
+//! restacking another member's object, needs it. Everyone else may only
+//! erase, undo, or reposition or restack their own ink.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -41,12 +41,14 @@ pub(super) struct SubmitOpParams {
     object_ids: Option<Vec<String>>,
     before_seq: Option<i64>,
     target_op: Option<String>,
-    /// The object a `move` repositions.
+    /// The object a `move` repositions or a `reorder` restacks.
     object_id: Option<String>,
     x: Option<f64>,
     y: Option<f64>,
     w: Option<f64>,
     h: Option<f64>,
+    /// The paint order a `reorder` sets.
+    z_index: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -88,9 +90,11 @@ pub(super) async fn submit_op(
     let may_moderate = permissions.contains(Permissions::MANAGE_CANVAS);
 
     let request = parse_request(params)?;
-    // See the module doc: only `move` freezes under a timeout.
-    if matches!(request, CanvasOpRequest::Move { .. })
-        && state.store.timed_out_until(ctx.user_id).await?.is_some()
+    // See the module doc: only `move` and `reorder` freeze under a timeout.
+    if matches!(
+        request,
+        CanvasOpRequest::Move { .. } | CanvasOpRequest::Reorder { .. }
+    ) && state.store.timed_out_until(ctx.user_id).await?.is_some()
     {
         return Err(ApiError::Forbidden);
     }
@@ -143,9 +147,9 @@ impl From<SubmittedOp> for CanvasOpResultDto {
 
 /// Validates the discriminated body by hand rather than through a tagged
 /// serde enum, the way `super::canvas_write::PlaceParams` validates `kind`
-/// before touching its other fields: `object_ids`, `before_seq`, `target_op`
-/// and the move-specific fields are each legal on only one of the four kinds
-/// this slice accepts.
+/// before touching its other fields: `object_ids`, `before_seq`, `target_op`,
+/// the move-specific fields, and `z_index` are each legal on only one of the
+/// five kinds this slice accepts.
 fn parse_request(params: SubmitOpParams) -> Result<CanvasOpRequest, ApiError> {
     match params.kind.as_str() {
         "remove" => {
@@ -201,6 +205,9 @@ fn parse_request(params: SubmitOpParams) -> Result<CanvasOpRequest, ApiError> {
             if params.target_op.is_some() {
                 return Err(ApiError::BadRequest("target_op is not valid for move"));
             }
+            if params.z_index.is_some() {
+                return Err(ApiError::BadRequest("z_index is not valid for move"));
+            }
             let object_id = params
                 .object_id
                 .ok_or(ApiError::BadRequest("move needs object_id"))?;
@@ -216,6 +223,31 @@ fn parse_request(params: SubmitOpParams) -> Result<CanvasOpRequest, ApiError> {
                 w,
                 h,
             })
+        }
+        "reorder" => {
+            if params.object_ids.is_some() {
+                return Err(ApiError::BadRequest("object_ids is not valid for reorder"));
+            }
+            if params.before_seq.is_some() {
+                return Err(ApiError::BadRequest("before_seq is not valid for reorder"));
+            }
+            if params.target_op.is_some() {
+                return Err(ApiError::BadRequest("target_op is not valid for reorder"));
+            }
+            if params.x.is_some() || params.y.is_some() || params.w.is_some() || params.h.is_some()
+            {
+                return Err(ApiError::BadRequest(
+                    "x, y, w and h are not valid for reorder",
+                ));
+            }
+            let object_id = params
+                .object_id
+                .ok_or(ApiError::BadRequest("reorder needs object_id"))?;
+            let object_id = CanvasObjectId(parse_uuid(&object_id)?);
+            let z_index = params
+                .z_index
+                .ok_or(ApiError::BadRequest("reorder needs z_index"))?;
+            Ok(CanvasOpRequest::Reorder { object_id, z_index })
         }
         _ => Err(ApiError::BadRequest("unknown canvas op kind")),
     }
@@ -255,6 +287,20 @@ fn publish(state: &AppState, channel_id: ChannelId, op_id: CanvasOpId, outcome: 
                     y,
                     w,
                     h,
+                });
+            }
+        }
+        "reorder" => {
+            // Both are set together on the fresh, effective path only; see `SubmittedOp::reordered_to`.
+            if let (Some(z_index), Some(&object_id)) =
+                (outcome.reordered_to, outcome.touched_ids.first())
+            {
+                state.hub.publish(Event::CanvasObjectReordered {
+                    channel_id,
+                    seq: Seq(outcome.seq),
+                    op_id,
+                    object_id,
+                    z_index,
                 });
             }
         }

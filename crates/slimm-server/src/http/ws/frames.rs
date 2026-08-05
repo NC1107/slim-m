@@ -145,6 +145,14 @@ pub(super) enum ServerFrame {
         w: f64,
         h: f64,
     },
+    #[serde(rename = "canvas.object.reordered")]
+    CanvasObjectReordered {
+        channel_id: String,
+        seq: i64,
+        op_id: String,
+        object_id: String,
+        z_index: i64,
+    },
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]

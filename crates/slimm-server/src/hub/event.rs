@@ -323,4 +323,22 @@ pub enum Event {
         w: f64,
         h: f64,
     },
+    /// A placed object's paint order changed.
+    ///
+    /// Carries the new `z_index` outright, the same reason
+    /// [`Event::CanvasObjectMoved`] carries the whole new box: a receiver
+    /// needs no refetch to repaint it in its new stacking position. The
+    /// actor is deliberately absent, the same shape [`Event::CanvasObjectMoved`]
+    /// already uses, since restacking another member's object needs
+    /// `MANAGE_CANVAS` and so can be a moderation act the same way a move is.
+    ///
+    /// Published only for a fresh, effective reorder. An idempotent replay,
+    /// or a reorder naming an already-removed object, publishes nothing.
+    CanvasObjectReordered {
+        channel_id: ChannelId,
+        seq: Seq,
+        op_id: CanvasOpId,
+        object_id: CanvasObjectId,
+        z_index: i64,
+    },
 }

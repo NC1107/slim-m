@@ -166,6 +166,10 @@ pub(crate) fn move_op(id: &str, object_id: &str, bounds: (f64, f64, f64, f64)) -
     json!({ "id": id, "kind": "move", "object_id": object_id, "x": x, "y": y, "w": w, "h": h })
 }
 
+pub(crate) fn reorder_op(id: &str, object_id: &str, z_index: i64) -> Value {
+    json!({ "id": id, "kind": "reorder", "object_id": object_id, "z_index": z_index })
+}
+
 pub(crate) async fn get_ops(
     app: &Router,
     channel: ChannelId,

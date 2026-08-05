@@ -111,6 +111,48 @@ pub(super) async fn apply_move(
     Ok(("move", 1, vec![object_id], None))
 }
 
+/// Restacks one live object to an explicit `z_index`, authorized identically
+/// to [`apply_move`]: the caller's own object needs nothing further, anyone
+/// else's needs `MANAGE_CANVAS`.
+///
+/// Unlike a move, no bounds check applies - any `i64` is a legal paint order -
+/// so there is no [`SubmitOpError::OutOfBounds`] path here at all. The
+/// `UPDATE` names only `z_index`, which the R-Tree trigger does not watch (see
+/// migration 0015's `UPDATE OF` clause), so a reorder never touches the
+/// spatial index.
+pub(super) async fn apply_reorder(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    channel_id: ChannelId,
+    actor_id: UserId,
+    may_moderate: bool,
+    object_id: CanvasObjectId,
+    z_index: i64,
+) -> Result<(&'static str, i64, Vec<CanvasObjectId>, Option<i64>), SubmitOpError> {
+    let Some(found) = fetch_object_for_op(tx, channel_id, object_id).await? else {
+        return Err(SubmitOpError::NotFound);
+    };
+    if found.is_dead {
+        return Ok(("reorder", 0, Vec::new(), None));
+    }
+    if !may_moderate && found.author_id != Some(actor_id) {
+        return Err(SubmitOpError::NotAuthorized);
+    }
+    let affected = sqlx::query!(
+        "UPDATE canvas_objects SET z_index = ?
+         WHERE id = ? AND channel_id = ? AND deleted_at IS NULL",
+        z_index,
+        object_id,
+        channel_id
+    )
+    .execute(&mut **tx)
+    .await?
+    .rows_affected();
+    if affected == 0 {
+        return Ok(("reorder", 0, Vec::new(), None));
+    }
+    Ok(("reorder", 1, vec![object_id], None))
+}
+
 /// Un-deletes what `target_op` (a `remove` or `clear`) touched, refused past
 /// the channel's live ceiling in the same transaction that counts it - the
 /// `place_canvas_object` shape, extended to a batch.
@@ -260,17 +302,17 @@ pub(super) async fn current_canvas_seq(
 }
 
 /// Recomputes `affected` for a replayed op, since the count itself is not a
-/// stored column. A `remove`'s, `restore`'s or `move`'s own target row
-/// already names exactly what it touched, all keyed by the op's own seq; a
-/// `clear` shares one `now` between `deleted_at` and its own `created_at`,
-/// and the single writer this database has means no other write can share
-/// that millisecond, so matching on it is exact.
+/// stored column. A `remove`'s, `restore`'s, `move`'s or `reorder`'s own
+/// target row already names exactly what it touched, all keyed by the op's
+/// own seq; a `clear` shares one `now` between `deleted_at` and its own
+/// `created_at`, and the single writer this database has means no other
+/// write can share that millisecond, so matching on it is exact.
 pub(super) async fn affected_count_for(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     channel_id: ChannelId,
     op: &ExistingOp,
 ) -> Result<i64, sqlx::Error> {
-    if op.kind == "remove" || op.kind == "restore" || op.kind == "move" {
+    if op.kind == "remove" || op.kind == "restore" || op.kind == "move" || op.kind == "reorder" {
         sqlx::query_scalar!(
             r#"SELECT COUNT(*) AS "count!: i64" FROM canvas_op_targets
                WHERE channel_id = ? AND seq = ?"#,

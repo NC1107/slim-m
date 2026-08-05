@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Submitting a mutation to the canvas op stream: `remove`, `clear`,
-//! `restore`, and `move`.
+//! `restore`, `move`, and `reorder`.
 //!
 //! A sibling of [`super::canvas_ops`] rather than part of it, the same split
 //! `http::canvas` and `http::canvas_write` already make: the read and write
@@ -14,12 +14,22 @@
 //! targets, only a fence) it is every object whose `deleted_at` matches that
 //! exact op's timestamp, the same single-writer reasoning
 //! `canvas_ops_apply::affected_count_for` already rests a clear replay's
-//! count on. `move` reuses `canvas_op_targets` too, one row naming the object
-//! it repositioned, so a reconnecting client's catch-up feed learns of a move
-//! the same way it already learns of a remove - without it a move made while
-//! a viewer's pane was closed would never reach them, since a coordinate
-//! update alone does not advance the object's own `seq` the way
-//! `canvas_objects.seq` is fixed at placement.
+//! count on. `move` and `reorder` both reuse `canvas_op_targets` too, one row
+//! naming the object each repositioned or restacked, so a reconnecting
+//! client's catch-up feed learns of either the same way it already learns of
+//! a remove - without it, a change made while a viewer's pane was closed
+//! would never reach them, since neither a coordinate nor a `z_index` update
+//! advances the object's own `seq` the way `canvas_objects.seq` is fixed at
+//! placement.
+//!
+//! `reorder` carries an explicit target `z_index` rather than a relative
+//! "bring to front"/"send to back" flag, the same choice `move` already makes
+//! for bounds over a delta: the caller (client-side) computes the value
+//! against whatever it currently knows, and last-write-wins on the stored
+//! column is what makes two concurrent reorders resolve unambiguously,
+//! whichever commits second landing strictly on top of - or below - the
+//! other. It is also what makes undo exact: reversing a reorder is resubmitting
+//! the object's own prior `z_index`, not a guess at some inverse action.
 //!
 //! This file is the orchestrator and the public request/result types only;
 //! what each kind actually authorizes and touches is
@@ -29,7 +39,8 @@
 use anyhow::Context;
 
 use super::canvas_ops_apply::{
-    affected_count_for, apply_move, apply_remove, apply_restore, current_canvas_seq, fetch_op,
+    affected_count_for, apply_move, apply_remove, apply_reorder, apply_restore, current_canvas_seq,
+    fetch_op,
 };
 use super::{PlaceError, Store, now_ms};
 use crate::ids::{CanvasObjectId, CanvasOpId, ChannelId, UserId};
@@ -52,14 +63,26 @@ pub enum CanvasOpRequest {
     Restore {
         target_op: CanvasOpId,
     },
-    /// Repositions one live object to a new bounding box, never resizing more
-    /// than moving a placed image needs and never touching its `z_index`.
+    /// Repositions one live object to a new bounding box, never touching its
+    /// `z_index`. A resize is the same request with `w`/`h` changed: the
+    /// server has no separate notion of "moved" versus "resized", since both
+    /// are just a new box.
     Move {
         object_id: CanvasObjectId,
         x: f64,
         y: f64,
         w: f64,
         h: f64,
+    },
+    /// Sets one live object's paint order to an explicit `z_index`, never
+    /// touching its bounds. The caller computes the target value (typically
+    /// one above or below every `z_index` it currently knows about, for
+    /// "bring to front"/"send to back"); the server only applies and
+    /// broadcasts it, the same explicit-value shape `Move` already uses for
+    /// bounds rather than a server-computed delta.
+    Reorder {
+        object_id: CanvasObjectId,
+        z_index: i64,
     },
 }
 
@@ -85,6 +108,9 @@ pub struct SubmittedOp {
     /// receiver need not refetch. `None` for every other kind and for a
     /// replay, for the same reason `touched_ids` is empty there.
     pub moved_to: Option<(f64, f64, f64, f64)>,
+    /// The `z_index` a fresh `reorder` applied, for the same reason
+    /// `moved_to` exists. `None` for every other kind and for a replay.
+    pub reordered_to: Option<i64>,
 }
 
 /// Why submitting an op failed.
@@ -132,9 +158,9 @@ impl From<anyhow::Error> for SubmitOpError {
 }
 
 impl Store {
-    /// Submits a `remove`, `clear`, `restore` or `move`, idempotent by
-    /// `op_id` the way placing an object is idempotent by the object's own
-    /// id.
+    /// Submits a `remove`, `clear`, `restore`, `move` or `reorder`,
+    /// idempotent by `op_id` the way placing an object is idempotent by the
+    /// object's own id.
     ///
     /// `may_moderate` is the caller's already-evaluated `MANAGE_CANVAS`,
     /// resolved once by the caller alongside `VIEW_CHANNEL`/`USE_CANVAS`
@@ -166,6 +192,7 @@ impl Store {
                 touched_ids: Vec::new(),
                 cleared_before_seq: None,
                 moved_to: None,
+                reordered_to: None,
             });
         }
 
@@ -174,6 +201,8 @@ impl Store {
         let mut target_op_for_row: Option<CanvasOpId> = None;
         // Only a fresh, effective `move` sets this.
         let mut move_bounds: Option<(f64, f64, f64, f64)> = None;
+        // Only a fresh, effective `reorder` sets this.
+        let mut reorder_z: Option<i64> = None;
         let (kind, affected, touched_ids, bound_seq) = match request {
             CanvasOpRequest::Remove(object_ids) => {
                 apply_remove(
@@ -228,6 +257,21 @@ impl Store {
                 }
                 outcome
             }
+            CanvasOpRequest::Reorder { object_id, z_index } => {
+                let outcome = apply_reorder(
+                    &mut tx,
+                    channel_id,
+                    actor_id,
+                    may_moderate,
+                    object_id,
+                    z_index,
+                )
+                .await?;
+                if outcome.1 > 0 {
+                    reorder_z = Some(z_index);
+                }
+                outcome
+            }
         };
 
         // An op row exists only for a real state transition; see the module doc.
@@ -244,6 +288,7 @@ impl Store {
                 touched_ids: Vec::new(),
                 cleared_before_seq: None,
                 moved_to: None,
+                reordered_to: None,
             });
         }
 
@@ -264,8 +309,8 @@ impl Store {
         sqlx::query!(
             r#"INSERT INTO canvas_ops
                    (channel_id, seq, id, kind, actor_id, bound_seq, target_op,
-                    move_x, move_y, move_w, move_h, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+                    move_x, move_y, move_w, move_h, reorder_z, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
             channel_id,
             seq,
             op_id,
@@ -277,6 +322,7 @@ impl Store {
             move_y,
             move_w,
             move_h,
+            reorder_z,
             now
         )
         .execute(&mut *tx)
@@ -305,6 +351,7 @@ impl Store {
             touched_ids,
             cleared_before_seq: bound_seq,
             moved_to: move_bounds,
+            reordered_to: reorder_z,
         })
     }
 }

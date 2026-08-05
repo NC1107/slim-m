@@ -242,6 +242,20 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         }),
     )
     .await;
+    // Exercises `reorder` on `CanvasOpRequest`, `CanvasOpResult` and the ops feed below.
+    c.json(
+        "submitCanvasOp",
+        "POST",
+        &format!("/channels/{channel}/canvas/ops"),
+        root,
+        json!({
+            "id": Uuid::now_v7().to_string(),
+            "kind": "reorder",
+            "object_id": first_object_id,
+            "z_index": 500,
+        }),
+    )
+    .await;
     // Both objects live again, so this page still carries what it had before.
     c.get(
         "listCanvasViewport",
@@ -249,7 +263,7 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         root,
     )
     .await;
-    // Covers place, remove, restore, a second place (the image), and move.
+    // Covers place, remove, restore, a second place (the image), move, and reorder.
     c.get(
         "listCanvasOps",
         &format!("/channels/{channel}/canvas/ops?after_seq=0"),
