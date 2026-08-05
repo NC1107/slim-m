@@ -11,7 +11,31 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:livekit_client/livekit_client.dart' as lk;
 
 import 'camera_devices.dart';
+import 'camera_failure.dart';
 import 'voice_models.dart';
+
+/// What came of a camera enable/disable attempt. [reason] is only ever set
+/// alongside a failed *enable* (see [CameraSwitching.setEnabled]), since
+/// "no camera detected" has no sensible reading for a camera that was
+/// already on and failed to turn off.
+class CameraToggleResult {
+  const CameraToggleResult.ok()
+      : cause = null,
+        reason = null;
+
+  const CameraToggleResult.failed(this.cause, this.reason);
+
+  bool get ok => cause == null;
+
+  final Object? cause;
+  final CameraFailureReason? reason;
+
+  /// What [VoiceSession] should store as `lastError`: [cause] wrapped in a
+  /// [CameraFailure] when [reason] is known, so that one getter keeps
+  /// answering every failure while still letting a caller ask this apart.
+  Object? get error =>
+      reason == null || cause == null ? cause : CameraFailure(cause!, reason!);
+}
 
 class CameraSwitching {
   const CameraSwitching(this._devices);
@@ -29,6 +53,37 @@ class CameraSwitching {
   bool get needsSelection => !lk.lkPlatformIsMobile();
 
   Future<List<CameraDevice>> devices() => _devices.list();
+
+  /// Enables or disables [local]'s camera, classifying the failure when
+  /// enabling does not work.
+  ///
+  /// A disable failure is reported with no [CameraFailureReason.noCameraDetected]
+  /// framing: the camera was already on, so a device plainly exists, and the
+  /// caller (`VoiceSession._trySetCamera`) does not ask for one in that case.
+  /// [_devices] is only consulted here, on failure, rather than on every
+  /// attempt: it is an extra round trip that only the error message needs.
+  Future<CameraToggleResult> setEnabled(
+    lk.LocalParticipant? local,
+    bool enabled,
+  ) async {
+    if (local == null) return const CameraToggleResult.ok();
+    try {
+      await local.setCameraEnabled(enabled);
+      return const CameraToggleResult.ok();
+    } catch (e) {
+      if (!enabled) return CameraToggleResult.failed(e, null);
+      bool? hasDevice;
+      try {
+        hasDevice = (await _devices.list()).isNotEmpty;
+      } catch (_) {
+        hasDevice = null;
+      }
+      return CameraToggleResult.failed(
+        e,
+        classifyCameraFailure(e, hasDevice: hasDevice),
+      );
+    }
+  }
 
   /// Flips [local]'s published camera between front and back. Native
   /// `Helper.switchCamera` with no device id is the platform's own flip: it

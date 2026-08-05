@@ -90,6 +90,81 @@ void main() {
   );
 
   test(
+    'no camera detected reads as absence, not as a generic refusal',
+    () async {
+      final session = FakeSession(
+        cameraGranted: false,
+        cameraFailureReason: CameraFailureReason.noCameraDetected,
+      );
+      final controller = harness.controllerWith(session, voiceApi());
+
+      await controller.join('channel-1');
+      await controller.toggleCamera();
+
+      expect(
+        controller.state.error,
+        'No camera detected. Check that one is connected.',
+      );
+    },
+  );
+
+  test(
+    'a denied camera permission names the permission, not the device',
+    () async {
+      final session = FakeSession(
+        cameraGranted: false,
+        cameraFailureReason: CameraFailureReason.permissionDenied,
+      );
+      final controller = harness.controllerWith(session, voiceApi());
+
+      await controller.join('channel-1');
+      await controller.toggleCamera();
+
+      expect(
+        controller.state.error,
+        'Camera access was denied. Check your camera permission for this app.',
+      );
+    },
+  );
+
+  test(
+    'a camera busy elsewhere is reported as unavailable, not absent',
+    () async {
+      final session = FakeSession(
+        cameraGranted: false,
+        cameraFailureReason: CameraFailureReason.cameraUnavailable,
+      );
+      final controller = harness.controllerWith(session, voiceApi());
+
+      await controller.join('channel-1');
+      await controller.toggleCamera();
+
+      expect(
+        controller.state.error,
+        'The camera could not be opened. It may be in use by another app.',
+      );
+    },
+  );
+
+  test(
+    'a camera failing to turn off never claims no camera was detected',
+    () async {
+      // The camera was already on, so "no camera" cannot apply here.
+      final session = FakeSession(
+        cameraGranted: false,
+        cameraFailureReason: CameraFailureReason.noCameraDetected,
+      );
+      final controller = harness.controllerWith(session, voiceApi());
+      controller.setCameraPreference(true);
+
+      await controller.join('channel-1');
+      await controller.toggleCamera();
+
+      expect(controller.state.error, contains('Could not turn the camera off'));
+    },
+  );
+
+  test(
     'a desktop that refuses the capture is reported, not shown as sharing',
     () async {
       final session = FakeSession(

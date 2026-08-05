@@ -10,6 +10,8 @@ library;
 export 'src/audio_gain.dart';
 export 'src/broadcast_bridge.dart';
 export 'src/camera_devices.dart';
+export 'src/camera_failure.dart';
+export 'src/camera_switching.dart';
 export 'src/desktop_sources.dart';
 export 'src/media_capabilities.dart';
 export 'src/screen_share.dart';

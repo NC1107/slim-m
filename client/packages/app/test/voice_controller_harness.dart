@@ -50,6 +50,7 @@ class FakeSession implements VoiceSession {
     this.joinOutcome = VoiceSessionState.connected,
     this.microphoneGranted = true,
     this.cameraGranted = true,
+    this.cameraFailureReason,
     this.screenShareOutcome = ScreenShareOutcome.started,
     this.deafenGranted = true,
     this.needsSource = false,
@@ -63,6 +64,12 @@ class FakeSession implements VoiceSession {
   final VoiceSessionState joinOutcome;
   final bool microphoneGranted;
   final bool cameraGranted;
+
+  /// What a refused [setCameraEnabled] classifies as, the way
+  /// `CameraSwitching.setEnabled` would; `null` drives the plain, unclassified
+  /// path a real refusal `classifyCameraFailure` could not read anything out
+  /// of also takes.
+  final CameraFailureReason? cameraFailureReason;
 
   /// What a request to start sharing reports back. Every branch the
   /// controller has to tell apart is one of these.
@@ -220,7 +227,12 @@ class FakeSession implements VoiceSession {
   @override
   Future<bool> setCameraEnabled(bool enabled) async {
     askedForCameraOnToggle = enabled;
-    if (!cameraGranted) _lastError = 'no camera device found';
+    if (!cameraGranted) {
+      final reason = cameraFailureReason;
+      _lastError = reason == null
+          ? 'no camera device found'
+          : CameraFailure('no camera device found', reason);
+    }
     return cameraGranted;
   }
 
