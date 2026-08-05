@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.31.1](https://github.com/NC1107/slim-m/compare/client-v0.31.0...client-v0.31.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* **canvas:** a visible cursor rim, the product's own font, and the stripe placeholder ([#427](https://github.com/NC1107/slim-m/issues/427)) ([05f24b1](https://github.com/NC1107/slim-m/commit/05f24b16516a1e4ed590c521478e108990656749))
+* **canvas:** make the canvas say what it can do ([#422](https://github.com/NC1107/slim-m/issues/422)) ([5095b54](https://github.com/NC1107/slim-m/commit/5095b547f0a535a3978b8e060814967bb5fcd73b))
+* **test:** drop two imports the rebase left unused ([#428](https://github.com/NC1107/slim-m/issues/428)) ([98d6c1a](https://github.com/NC1107/slim-m/commit/98d6c1af72e8c2b9d6e56b81e3c8cd5d3d6fe9e7))
+
 ## [0.31.0](https://github.com/NC1107/slim-m/compare/client-v0.30.0...client-v0.31.0) (2026-08-05)
 
 
