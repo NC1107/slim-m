@@ -12,8 +12,14 @@
 
 # The Flutter engine and its plugin .so files are private to this app, not distro
 # libraries: rpm must neither advertise them nor try to resolve them elsewhere.
+# Matched by shape rather than by name: every Flutter plugin builds to
+# `lib<name>_plugin.so`, so a newly added plugin needs no edit here. The
+# hand-kept list this replaces went stale the moment audioplayers landed and
+# shipped a 0.31.0 rpm that required a library it contained but never advertised.
+# System libraries the bundle genuinely needs (gstreamer, gtk, libsecret) are
+# deliberately still resolved, so this must not become a by-path exclusion.
 %global __provides_exclude_from ^%{bundledir}/.*\\.so$
-%global __requires_exclude ^lib(flutter_linux_gtk|webrtc|flutter_webrtc_plugin|flutter_secure_storage_linux_plugin|livekit_client_plugin|sqlite3_flutter_libs_plugin)\\.so
+%global __requires_exclude ^lib(flutter_linux_gtk|webrtc)\\.so|^lib.*_plugin\\.so
 
 Name:           slim-m-client
 # Bumped by hand for a COPR rebuild; the release workflow stamps the tag's
