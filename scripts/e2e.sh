@@ -145,6 +145,7 @@ for pair in "9801:alice" "9802:bob"; do
     --window-size=1280,900 --no-first-run --no-default-browser-check \
     --use-fake-device-for-media-stream --use-fake-ui-for-media-stream \
     --autoplay-policy=no-user-gesture-required --enable-unsafe-swiftshader \
+    --mute-audio \
     --auto-select-desktop-capture-source='Entire screen' \
     'http://localhost:$WEB_PORT'" > "$WORK/chrome-$who.log" 2>&1 < /dev/null &
 done
