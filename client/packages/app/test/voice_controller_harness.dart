@@ -341,12 +341,20 @@ class VoiceHarness {
 
   /// The controller as the app builds it, with only the network and the SFU
   /// swapped: a real session, a real [SlimmApi], and the same provider wiring.
+  ///
+  /// [now], when given, stands in for `DateTime.now()` everywhere the
+  /// controller reads the clock - the call recap's duration math, so a test
+  /// can advance it by hand rather than racing real wall time.
+  /// [extraOverrides] append onto the fixed list above, for a caller (a
+  /// widget test) that also needs to stub something like `voiceRosterProvider`.
   VoiceController controllerWith(
     FakeSession session,
     http.Client client, {
     Duration broadcastStartTimeout = const Duration(seconds: 30),
     Duration voiceHeartbeatInterval = const Duration(seconds: 15),
     CallLifecycleChannel? callLifecycle,
+    DateTime Function()? now,
+    List<Override> extraOverrides = const [],
   }) {
     final container = ProviderContainer(
       overrides: [
@@ -368,8 +376,10 @@ class VoiceHarness {
             broadcastStartTimeout: broadcastStartTimeout,
             voiceHeartbeatInterval: voiceHeartbeatInterval,
             callLifecycle: callLifecycle,
+            now: now,
           ),
         ),
+        ...extraOverrides,
       ],
     );
     _container = container;

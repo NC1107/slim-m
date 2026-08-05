@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../providers/call_recap.dart';
 import '../providers/member_presence.dart' show membersProvider, presenceOf;
 import '../providers/presence_controller.dart';
 import '../providers/voice_controller.dart';
@@ -47,6 +48,13 @@ bool _busyElsewhere(VoiceState voice, String channelId) =>
     (voice.state == VoiceSessionState.connected ||
         voice.state == VoiceSessionState.connecting ||
         voice.joining);
+
+/// [voice]'s recap, but only when it belongs to [channelId]: `VoiceController`
+/// is one instance for every channel, and CLAUDE.md already recorded this
+/// exact leak shape once for an in-call error message shown in the wrong
+/// channel's preview.
+CallRecap? recapForChannel(VoiceState voice, String channelId) =>
+    voice.recap?.channelId == channelId ? voice.recap : null;
 
 class VoiceScreen extends ConsumerStatefulWidget {
   const VoiceScreen({required this.channelId, this.isDm = false, super.key});
@@ -140,6 +148,7 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
             errorMessage: errorMessage,
             canRetry: canRetry,
             onRetry: () => controller.join(channelId),
+            recap: recapForChannel(voice, channelId),
           ),
         },
       ),

@@ -13,6 +13,24 @@ import 'package:slimm_rtc/rtc.dart';
 
 import 'voice_controller_harness.dart';
 
+const _me = VoiceParticipant(
+  identity: 'user-1',
+  name: 'Me',
+  isLocal: true,
+  isSpeaking: false,
+  isMuted: false,
+  isScreenSharing: false,
+);
+
+const _alice = VoiceParticipant(
+  identity: 'user-2',
+  name: 'Alice',
+  isLocal: false,
+  isSpeaking: false,
+  isMuted: false,
+  isScreenSharing: false,
+);
+
 void main() {
   final harness = VoiceHarness();
 
@@ -309,5 +327,121 @@ void main() {
     await controller.setScreenShare(true, sourceId: sources.first.id);
 
     expect(session.lastSourceId, 'screen-2');
+  });
+
+  group('the call recap leave() leaves behind', () {
+    test('a real call with someone else in it produces a recap', () async {
+      var now = DateTime(2026, 1, 1, 12);
+      final session = FakeSession();
+      final controller = harness.controllerWith(
+        session,
+        voiceApi(),
+        now: () => now,
+      );
+
+      await controller.join('channel-1');
+      session.emitState(VoiceSessionState.connected);
+      await Future<void>.delayed(Duration.zero);
+      session.emitParticipants(const [_me, _alice]);
+      await Future<void>.delayed(Duration.zero);
+
+      now = now.add(const Duration(minutes: 3));
+      await controller.leave();
+
+      final recap = controller.state.recap;
+      expect(recap, isNotNull);
+      expect(recap!.channelId, 'channel-1');
+      expect(recap.duration, const Duration(minutes: 3));
+      expect(recap.others.single.name, 'Alice');
+      expect(recap.isWorthShowing, isTrue);
+    });
+
+    test(
+      'someone who left before you hang up is recorded, not dropped',
+      () async {
+        var now = DateTime(2026, 1, 1, 12);
+        final session = FakeSession();
+        final controller = harness.controllerWith(
+          session,
+          voiceApi(),
+          now: () => now,
+        );
+
+        await controller.join('channel-1');
+        session.emitState(VoiceSessionState.connected);
+        await Future<void>.delayed(Duration.zero);
+        session.emitParticipants(const [_me, _alice]);
+        await Future<void>.delayed(Duration.zero);
+        now = now.add(const Duration(minutes: 1));
+        session.emitParticipants(const [_me]);
+        await Future<void>.delayed(Duration.zero);
+
+        now = now.add(const Duration(minutes: 1));
+        await controller.leave();
+
+        final person = controller.state.recap!.others.single;
+        expect(person.name, 'Alice');
+        expect(
+          person.leftAt,
+          isNotNull,
+          reason: 'Alice hung up a minute before this device did',
+        );
+      },
+    );
+
+    test('a call spent entirely alone is not worth showing', () async {
+      var now = DateTime(2026, 1, 1, 12);
+      final session = FakeSession();
+      final controller = harness.controllerWith(
+        session,
+        voiceApi(),
+        now: () => now,
+      );
+
+      await controller.join('channel-1');
+      session.emitState(VoiceSessionState.connected);
+      await Future<void>.delayed(Duration.zero);
+      session.emitParticipants(const [_me]);
+      await Future<void>.delayed(Duration.zero);
+
+      now = now.add(const Duration(minutes: 5));
+      await controller.leave();
+
+      final recap = controller.state.recap;
+      expect(recap, isNotNull);
+      expect(recap!.wasAlone, isTrue);
+      expect(
+        recap.isWorthShowing,
+        isFalse,
+        reason: 'nobody joining an empty channel is not worth a summary',
+      );
+    });
+
+    test("joining again clears the previous call's recap", () async {
+      var now = DateTime(2026, 1, 1, 12);
+      final session = FakeSession();
+      final controller = harness.controllerWith(
+        session,
+        voiceApi(),
+        now: () => now,
+      );
+
+      await controller.join('channel-1');
+      session.emitState(VoiceSessionState.connected);
+      await Future<void>.delayed(Duration.zero);
+      session.emitParticipants(const [_me, _alice]);
+      await Future<void>.delayed(Duration.zero);
+      now = now.add(const Duration(minutes: 2));
+      await controller.leave();
+      expect(controller.state.recap, isNotNull);
+
+      await controller.join('channel-2');
+
+      expect(
+        controller.state.recap,
+        isNull,
+        reason: "a fresh join must not carry the previous call's recap forward",
+      );
+    });
   });
 }
