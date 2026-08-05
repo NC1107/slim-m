@@ -125,18 +125,22 @@ void main() {
 
   /// The clear control is gated on MANAGE_CANVAS and hidden entirely below
   /// it, matching every other moderation control in this client.
-  testWidgets('the clear control is absent without MANAGE_CANVAS', (
-    tester,
-  ) async {
-    final fixture = CanvasPaneFixture()..objects = [canvasObjectJson('a')];
-    final container = fixture.container();
-    addTearDown(container.dispose);
-    addTearDown(fixture.events.close);
-    await pumpCanvasPane(tester, container);
-    await tester.pumpAndSettle();
+  testWidgets(
+    'the overflow offers no Clear canvas item without MANAGE_CANVAS',
+    (tester) async {
+      final fixture = CanvasPaneFixture()..objects = [canvasObjectJson('a')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
 
-    expect(find.bySemanticsLabel('More canvas actions'), findsNothing);
-  });
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Clear canvas'), findsNothing);
+    },
+  );
 
   testWidgets(
     'the clear control reaches the canvas: confirm, then one clear op',

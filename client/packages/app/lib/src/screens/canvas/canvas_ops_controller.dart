@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Mints canvas mutation ops - remove, clear, restore - and the undo ledger
-/// that reverses them.
+/// Mints canvas mutation ops - remove, clear, restore, move - and the undo
+/// ledger that reverses them.
 ///
 /// Plain Dart, like `CanvasSync`: nothing here is observed inside a frame,
 /// so it stays off Riverpod, and it never reaches back into the widget tree
@@ -43,6 +43,44 @@ class _EraseEntry extends _UndoEntry {
   final String opId;
 }
 
+class _MoveEntry extends _UndoEntry {
+  _MoveEntry(this.objectId, this.fromX, this.fromY, this.fromW, this.fromH);
+
+  final String objectId;
+  final double fromX;
+  final double fromY;
+  final double fromW;
+  final double fromH;
+}
+
+/// One select-drag in progress: the object picked up, its bounds when the
+/// drag began (for [CanvasOpsController.undo] to restore), and the bounds it
+/// currently occupies (updated on every [CanvasOpsController.dragMove]).
+class _DragState {
+  _DragState(
+    this.objectId,
+    this.fromX,
+    this.fromY,
+    this.fromW,
+    this.fromH,
+    this.anchor,
+  ) : x = fromX,
+      y = fromY;
+
+  final String objectId;
+  final double fromX;
+  final double fromY;
+  final double fromW;
+  final double fromH;
+
+  /// The world point the drag started at, so every later point becomes a
+  /// delta from the object's own original position rather than its own.
+  final Offset anchor;
+
+  double x;
+  double y;
+}
+
 /// Reconciles the undo stack, the erase tool, and the clear control against
 /// [document] and the server's op stream.
 class CanvasOpsController {
@@ -64,6 +102,7 @@ class CanvasOpsController {
 
   final Queue<_UndoEntry> _undoStack = Queue<_UndoEntry>();
   final Set<String> _dragBatch = <String>{};
+  _DragState? _drag;
 
   bool get canUndo => _undoStack.isNotEmpty;
 
@@ -88,6 +127,14 @@ class CanvasOpsController {
         await _undoDraw(objectIds);
       case _EraseEntry(:final opId):
         await _restore(opId);
+      case _MoveEntry(
+        :final objectId,
+        :final fromX,
+        :final fromY,
+        :final fromW,
+        :final fromH,
+      ):
+        await _undoMove(objectId, fromX, fromY, fromW, fromH);
     }
   }
 
@@ -153,6 +200,121 @@ class CanvasOpsController {
     if (immediate.isEmpty) return;
     final opId = await _submitRemove(immediate);
     if (opId != null) _pushUndo(_EraseEntry(opId));
+  }
+
+  /// Picks up the topmost live image under [world] the caller may move -
+  /// their own, or anybody's with [manageCanvas] - and remembers its
+  /// original bounds so [dragMove] can preview the move locally and
+  /// [undo] can reverse it. A no-op, silently, if nothing movable is there:
+  /// the same "scope at hit-test time" choice [onErasePoint] already makes.
+  void beginMove(
+    Offset world, {
+    required bool manageCanvas,
+    required String? selfId,
+  }) {
+    final id = hitTestImageAt(
+      document,
+      world,
+      allowed: (stroke) =>
+          manageCanvas ||
+          (stroke.authorId != null && stroke.authorId == selfId),
+    );
+    if (id == null) return;
+    final bounds = document.objectBounds(id);
+    if (bounds == null) return;
+    _drag = _DragState(id, bounds.x, bounds.y, bounds.w, bounds.h, world);
+  }
+
+  /// Moves whatever [beginMove] picked up so its drag delta from [world]
+  /// matches the object's own displacement, and previews the new position
+  /// locally. Does nothing if nothing is being dragged.
+  void dragMove(Offset world) {
+    final drag = _drag;
+    if (drag == null) return;
+    drag.x = drag.fromX + (world.dx - drag.anchor.dx);
+    drag.y = drag.fromY + (world.dy - drag.anchor.dy);
+    document.moveObject(drag.objectId, drag.x, drag.y, drag.fromW, drag.fromH);
+    document.refresh();
+  }
+
+  /// Commits the drag's final position as one `move` op, or does nothing if
+  /// nothing was being dragged or the object never actually moved - picking
+  /// an object up and putting it back down costs no request and pushes no
+  /// undo entry. The position is already showing locally, from [dragMove]'s
+  /// own optimistic updates during the drag; a failure here is what puts it
+  /// back, the same "revert what was already shown" shape a failed placement
+  /// or restore already uses elsewhere in this file.
+  Future<void> endMove() async {
+    final drag = _drag;
+    _drag = null;
+    if (drag == null) return;
+    if (drag.x == drag.fromX && drag.y == drag.fromY) return;
+    try {
+      await client.submitCanvasOp(
+        channelId,
+        id: newCanvasOpId(),
+        kind: 'move',
+        objectId: drag.objectId,
+        x: drag.x,
+        y: drag.y,
+        w: drag.fromW,
+        h: drag.fromH,
+      );
+      _pushUndo(
+        _MoveEntry(
+          drag.objectId,
+          drag.fromX,
+          drag.fromY,
+          drag.fromW,
+          drag.fromH,
+        ),
+      );
+    } on api.ApiException {
+      document.moveObject(
+        drag.objectId,
+        drag.fromX,
+        drag.fromY,
+        drag.fromW,
+        drag.fromH,
+      );
+      document.refresh();
+      onError('That could not be moved.');
+    }
+  }
+
+  /// Reverses a move by submitting the inverse one - there is no dedicated
+  /// undo-a-move op, since a move already carries its own destination and
+  /// undoing it is just another move, back. Applied locally first, the same
+  /// immediate feedback [undo] already gives a reversed draw or erase, with
+  /// the object's pre-undo bounds kept so a failure can put it back.
+  Future<void> _undoMove(
+    String objectId,
+    double x,
+    double y,
+    double w,
+    double h,
+  ) async {
+    final before = document.objectBounds(objectId);
+    document.moveObject(objectId, x, y, w, h);
+    document.refresh();
+    try {
+      await client.submitCanvasOp(
+        channelId,
+        id: newCanvasOpId(),
+        kind: 'move',
+        objectId: objectId,
+        x: x,
+        y: y,
+        w: w,
+        h: h,
+      );
+    } on api.ApiException {
+      if (before != null) {
+        document.moveObject(objectId, before.x, before.y, before.w, before.h);
+        document.refresh();
+      }
+      onError('That could not be undone.');
+    }
   }
 
   /// Clears every object placed at or before [beforeSeq] - see

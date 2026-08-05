@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
-import 'canvas_clear_menu.dart';
+import 'canvas_overflow_menu.dart';
 
 /// The canvas's own bar. It carries the close affordance because the pane
 /// replaces the conversation, header and all, at every width.
@@ -23,14 +23,16 @@ class CanvasBar extends StatelessWidget {
     required this.canManage,
     required this.objectCount,
     required this.onClear,
+    required this.onPasteImage,
   });
 
   final String channelId;
   final VoidCallback onClose;
 
-  /// Which tool a tap or drag on the surface draws with. Two tools is a
-  /// toggle, not a dock: a picker over one item is a control that cannot
-  /// change anything.
+  /// Which tool a tap or drag on the surface draws with. Three tools is
+  /// still a toggle row, not a dock: nothing here needs a picker, and a
+  /// floating panel would only add a container around the same three
+  /// buttons this bar already has room for.
   final CanvasTool tool;
   final ValueChanged<CanvasTool> onToolChanged;
 
@@ -42,14 +44,19 @@ class CanvasBar extends StatelessWidget {
   /// the same compromise `manage_channel_sheet.dart` already makes.
   final bool canManage;
 
-  /// The live count [CanvasClearMenu]'s confirm names, so it never quotes a
-  /// number from before the pane's own first fetch.
+  /// The live count [CanvasOverflowMenu]'s confirm names, so it never quotes
+  /// a number from before the pane's own first fetch.
   final ValueListenable<int> objectCount;
 
   /// Clears the canvas as of whatever the pane's own cursor is when this
   /// fires, not a value captured at build time. A failure is reported the
   /// same way any other op failure is, through the pane's own error state.
   final Future<void> Function() onClear;
+
+  /// Reads the clipboard and, if it holds an image, places it. Lives in the
+  /// overflow menu, reachable regardless of MANAGE_CANVAS, since placing an
+  /// image needs only the same USE_CANVAS bit drawing already does.
+  final VoidCallback onPasteImage;
 
   @override
   Widget build(BuildContext context) {
@@ -92,16 +99,26 @@ class CanvasBar extends StatelessWidget {
             active: tool == CanvasTool.eraser,
             onPressed: () => onToolChanged(CanvasTool.eraser),
           ),
+          const SizedBox(width: AppSpacing.s4),
+          AppIconButton(
+            icon: AppIcons.select,
+            semanticLabel: 'Move',
+            active: tool == CanvasTool.select,
+            onPressed: () => onToolChanged(CanvasTool.select),
+          ),
           const SizedBox(width: AppSpacing.s8),
           AppIconButton(
             icon: AppIcons.undo,
             semanticLabel: 'Undo',
             onPressed: canUndo ? onUndo : null,
           ),
-          if (canManage) ...[
-            const SizedBox(width: AppSpacing.s4),
-            CanvasClearMenu(objectCount: objectCount, onClear: onClear),
-          ],
+          const SizedBox(width: AppSpacing.s4),
+          CanvasOverflowMenu(
+            onPasteImage: onPasteImage,
+            canManage: canManage,
+            objectCount: objectCount,
+            onClear: onClear,
+          ),
           const SizedBox(width: AppSpacing.s4),
           AppIconButton(
             icon: AppIcons.dismiss,

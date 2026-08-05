@@ -36,12 +36,20 @@ const int maxCatchUpPages = 25;
 @visibleForTesting
 const Duration hardResetFloor = Duration(seconds: 5);
 
-/// Converts a wire object into what the document needs to paint a stroke, or
-/// null for a kind this client does not draw. Shared between a viewport page,
-/// a live placement, and a `place` op read off the catch-up feed, so the
-/// three paths cannot silently disagree on what counts as paintable.
+/// Converts a wire object into what the document needs to paint a stroke or
+/// an image, or null for a kind this client does not draw. Shared between a
+/// viewport page, a live placement, and a `place` op read off the catch-up
+/// feed, so the three paths cannot silently disagree on what counts as
+/// paintable.
 CanvasStrokeInput? canvasStrokeInputFrom(api.CanvasObject object) {
-  if (object.kind != 'stroke') return null;
+  return switch (object.kind) {
+    'stroke' => _strokeInputFrom(object),
+    'image' => _imageInputFrom(object),
+    _ => null,
+  };
+}
+
+CanvasStrokeInput? _strokeInputFrom(api.CanvasObject object) {
   final raw = object.props['points'];
   if (raw is! List) return null;
   return CanvasStrokeInput(
@@ -56,6 +64,30 @@ CanvasStrokeInput? canvasStrokeInputFrom(api.CanvasObject object) {
     width: (object.props['width'] as num?)?.toDouble() ?? 3,
     colorKey: object.props['color'] as String? ?? 'annotation',
     authorId: object.authorId,
+  );
+}
+
+/// `props.attachment` is the one field this client actually reads; the rest
+/// of an image's props (`content_type`, the natural pixel size) are only
+/// ever written, not read back, since the box on the wire already says how
+/// large to paint it.
+CanvasStrokeInput? _imageInputFrom(api.CanvasObject object) {
+  final attachment = object.props['attachment'];
+  if (attachment is! String) return null;
+  return CanvasStrokeInput(
+    id: object.id,
+    seq: object.seq,
+    zIndex: object.zIndex,
+    x: object.x,
+    y: object.y,
+    w: object.w,
+    h: object.h,
+    points: const [],
+    width: 0,
+    colorKey: '',
+    authorId: object.authorId,
+    kind: CanvasObjectKind.image,
+    attachmentId: attachment,
   );
 }
 
@@ -226,6 +258,14 @@ class CanvasSync {
       case api.CanvasRestoreOp(:final objectIds):
         document.forgetRemoved(objectIds);
         forgetFetchedRegion();
+      case api.CanvasMoveOp(
+        :final objectId,
+        :final x,
+        :final y,
+        :final w,
+        :final h,
+      ):
+        document.moveObject(objectId, x, y, w, h);
       case api.CanvasUnknownOp():
         return false;
     }

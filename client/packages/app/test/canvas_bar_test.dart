@@ -27,6 +27,7 @@ CanvasBar _bar({
   bool canManage = false,
   ValueListenable<int>? objectCount,
   Future<void> Function()? onClear,
+  VoidCallback? onPasteImage,
 }) => CanvasBar(
   channelId: 'c1',
   onClose: () {},
@@ -37,6 +38,7 @@ CanvasBar _bar({
   canManage: canManage,
   objectCount: objectCount ?? ValueNotifier<int>(3),
   onClear: onClear ?? () async {},
+  onPasteImage: onPasteImage ?? () {},
 );
 
 void main() {
@@ -68,6 +70,32 @@ void main() {
     expect(chosen, CanvasTool.pen);
   });
 
+  testWidgets('tapping select calls onToolChanged with select', (tester) async {
+    CanvasTool? chosen;
+    await tester.pumpWidget(
+      _wrap(_bar(onToolChanged: (tool) => chosen = tool)),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Move'));
+    await tester.pump();
+
+    expect(chosen, CanvasTool.select);
+  });
+
+  testWidgets('tapping paste image in the overflow calls onPasteImage', (
+    tester,
+  ) async {
+    var pasted = 0;
+    await tester.pumpWidget(_wrap(_bar(onPasteImage: () => pasted++)));
+
+    await tester.tap(find.bySemanticsLabel('More canvas actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Paste image'));
+    await tester.pump();
+
+    expect(pasted, 1);
+  });
+
   testWidgets('undo is disabled when canUndo is false', (tester) async {
     var undone = 0;
     await tester.pumpWidget(
@@ -94,18 +122,28 @@ void main() {
     expect(undone, 1);
   });
 
-  testWidgets('the overflow clear control is absent without MANAGE_CANVAS', (
-    tester,
-  ) async {
+  testWidgets('the overflow is always present, but offers no Clear canvas item '
+      'without MANAGE_CANVAS', (tester) async {
     await tester.pumpWidget(_wrap(_bar(canManage: false)));
-    expect(find.bySemanticsLabel('More canvas actions'), findsNothing);
+    expect(find.bySemanticsLabel('More canvas actions'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('More canvas actions'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paste image'), findsOneWidget);
+    expect(find.text('Clear canvas'), findsNothing);
   });
 
-  testWidgets('the overflow clear control appears with MANAGE_CANVAS', (
+  testWidgets('the overflow offers Clear canvas with MANAGE_CANVAS', (
     tester,
   ) async {
     await tester.pumpWidget(_wrap(_bar(canManage: true)));
-    expect(find.bySemanticsLabel('More canvas actions'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('More canvas actions'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paste image'), findsOneWidget);
+    expect(find.text('Clear canvas'), findsOneWidget);
   });
 
   testWidgets(
@@ -177,6 +215,7 @@ void main() {
     for (final label in [
       'Pen',
       'Eraser',
+      'Move',
       'Undo',
       'More canvas actions',
       'Close canvas',

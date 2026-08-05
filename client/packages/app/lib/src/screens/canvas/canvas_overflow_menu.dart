@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The overflow behind "Clear canvas": one menu item, gated on MANAGE_CANVAS
-/// by the caller, so a control the operator never granted never renders.
+/// The canvas bar's overflow: always present for "Paste image", since
+/// placing an image needs only the USE_CANVAS bit drawing already does, with
+/// "Clear canvas" appearing inside it only for MANAGE_CANVAS.
 library;
 
 import 'dart:async';
@@ -11,28 +12,38 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../../widgets/confirm_dialog.dart';
 
-/// The bar's own overflow trigger and the confirm dialog behind it.
+/// The bar's own overflow trigger and the confirm dialog behind Clear.
 ///
-/// A single item still goes behind a menu rather than a bare button: the
-/// extra tap is deliberate friction on the one destructive control here,
-/// matching `manage_channel_sheet.dart`'s own danger-zone separation.
-class CanvasClearMenu extends StatefulWidget {
-  const CanvasClearMenu({
+/// Clear stays behind a menu item rather than a bare button even when it is
+/// the only reason a manager opens this: the extra tap is deliberate
+/// friction on the one destructive control here, matching
+/// `manage_channel_sheet.dart`'s own danger-zone separation.
+class CanvasOverflowMenu extends StatefulWidget {
+  const CanvasOverflowMenu({
     super.key,
+    required this.onPasteImage,
+    required this.canManage,
     required this.objectCount,
     required this.onClear,
   });
 
+  final VoidCallback onPasteImage;
+  final bool canManage;
   final ValueListenable<int> objectCount;
   final Future<void> Function() onClear;
 
   @override
-  State<CanvasClearMenu> createState() => _CanvasClearMenuState();
+  State<CanvasOverflowMenu> createState() => _CanvasOverflowMenuState();
 }
 
-class _CanvasClearMenuState extends State<CanvasClearMenu> {
+class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
   final _controller = OverlayPortalController();
   final _link = LayerLink();
+
+  void _paste() {
+    _controller.hide();
+    widget.onPasteImage();
+  }
 
   Future<void> _requestClear() async {
     _controller.hide();
@@ -83,11 +94,19 @@ class _CanvasClearMenuState extends State<CanvasClearMenu> {
             width: 200,
             children: [
               AppMenuItem(
-                label: 'Clear canvas',
-                leading: AppIcons.delete,
-                tone: AppMenuItemTone.danger,
-                onTap: () => unawaited(_requestClear()),
+                label: 'Paste image',
+                leading: AppIcons.clipboardPaste,
+                onTap: _paste,
               ),
+              if (widget.canManage) ...[
+                const AppMenuDivider(),
+                AppMenuItem(
+                  label: 'Clear canvas',
+                  leading: AppIcons.delete,
+                  tone: AppMenuItemTone.danger,
+                  onTap: () => unawaited(_requestClear()),
+                ),
+              ],
             ],
           ),
         ),

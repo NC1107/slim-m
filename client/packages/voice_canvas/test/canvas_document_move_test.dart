@@ -48,8 +48,7 @@ void main() {
       ..moveObject('a', 100, 100, 10, 5)
       ..refresh();
 
-    // The stroke's drawn line, not merely its bounding box, must have moved -
-    // a point at the old end of the line must no longer hit-test.
+    // The drawn line, not merely its box, must have moved: the old end misses.
     expect(hitTestStroke(document, const Offset(10, 5)), isNull);
     expect(hitTestStroke(document, const Offset(110, 105)), 'a');
   });
