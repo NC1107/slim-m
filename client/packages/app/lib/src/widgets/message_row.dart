@@ -6,6 +6,13 @@
 /// hover-reveal mechanism (shared with the emoji picker and the context
 /// menu) lives in `hover_reveal.dart`; both were split out to keep this file
 /// to the row's own composition.
+///
+/// The background fill answers `hovered || menuOpen` rather than `hovered`
+/// alone: `menuOpen` is `HoverReveal`'s own signal that this row's context
+/// menu is showing by any gesture, long press included, which `hovered`
+/// cannot answer since a long press deliberately never pins it (see
+/// `HoverReveal`'s own doc for why). AppListRow's own hover token is reused
+/// rather than a second hover convention.
 library;
 
 import 'package:flutter/material.dart';
@@ -162,11 +169,16 @@ class MessageRow extends StatelessWidget {
 
   bool get _unsent => message.pending || message.failed;
 
+  /// Exposed so a test can find the hover/menu-open background fill without
+  /// depending on widget tree shape.
+  static const Key hoverFillKey = Key('message_row_hover_fill');
+
   @override
   Widget build(BuildContext context) {
     final compact = LayoutClass.of(context) == LayoutClass.compact;
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     return HoverReveal(
-      builder: (context, hovered) => Column(
+      builder: (context, hovered, menuOpen) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (dayLabel != null) DayDivider(label: dayLabel!),
@@ -181,14 +193,23 @@ class MessageRow extends StatelessWidget {
             // because its content is still the author's to act on.
             child: Stack(
               children: [
+                // Full-bleed, edge to edge; see this file's own doc comment.
+                Positioned.fill(
+                  child: AnimatedContainer(
+                    key: MessageRow.hoverFillKey,
+                    duration: AppMotion.reduced(context, AppMotion.fast),
+                    curve: AppMotion.entrance,
+                    color: hovered || menuOpen
+                        ? tokens.surfaceRaised
+                        : Colors.transparent,
+                  ),
+                ),
                 DecoratedBox(
                   decoration: BoxDecoration(
                     border: message.failed
                         ? Border(
                             left: BorderSide(
-                              color: Theme.of(
-                                context,
-                              ).extension<AppTokens>()!.dangerBorder,
+                              color: tokens.dangerBorder,
                               width: 2,
                             ),
                           )

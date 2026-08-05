@@ -45,6 +45,7 @@ class ContextMenuRegion extends StatefulWidget {
     required this.itemsBuilder,
     required this.child,
     this.onOpenChanged,
+    this.onVisibilityChanged,
     this.onHoldChanged,
     this.ownsFocusNode = true,
   });
@@ -63,6 +64,15 @@ class ContextMenuRegion extends StatefulWidget {
   /// `MessageContextMenuRegion` uses this to keep a row's hover-revealed
   /// controls mounted rather than reflowing under the open menu.
   final ValueChanged<bool>? onOpenChanged;
+
+  /// [onOpenChanged]'s unconditional counterpart: told `true`/`false` on
+  /// every real open or close, long press included, for a caller that wants
+  /// to know the menu's own visibility rather than whether to keep a
+  /// hover-revealed control mounted. A background highlight is exactly that
+  /// caller - it has nothing to do with the picker button [onOpenChanged]
+  /// exists for, and a long press deserves the same highlight a right-click
+  /// gets even though it has no hover state to pin.
+  final ValueChanged<bool>? onVisibilityChanged;
 
   /// Told `true` on press-down and `false` once the press is cancelled or
   /// commits, for a caller that shows hold progress across the long-press
@@ -105,6 +115,7 @@ class _ContextMenuRegionState extends State<ContextMenuRegion> {
   /// so the anchor is only taken on the first of the two: recomputing it on
   /// the second call, which carries no position, would throw the real one away.
   void _setOpen(bool open, {bool pinRow = true, Offset? pointerGlobal}) {
+    widget.onVisibilityChanged?.call(open);
     if (pinRow || !open) widget.onOpenChanged?.call(open);
     if (LayoutClass.of(context) == LayoutClass.compact) {
       _setSheetOpen(open);

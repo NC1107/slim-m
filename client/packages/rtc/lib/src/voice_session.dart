@@ -286,15 +286,13 @@ class VoiceSession {
   Future<bool> _trySetCamera(bool enabled) async {
     final room = _room;
     if (room == null) return false;
-    try {
-      await room.localParticipant?.setCameraEnabled(enabled);
-      _refreshParticipants();
-      return true;
-    } catch (e) {
-      _lastError = e;
-      _refreshParticipants();
-      return false;
-    }
+    final result = await _cameraSwitching.setEnabled(
+      room.localParticipant,
+      enabled,
+    );
+    if (result.error != null) _lastError = result.error;
+    _refreshParticipants();
+    return result.ok;
   }
 
   /// Starts or stops sharing a screen, bounded by [quality].

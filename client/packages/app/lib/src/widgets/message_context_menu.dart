@@ -195,6 +195,8 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
     return ContextMenuRegion(
       itemsBuilder: _items,
       onOpenChanged: (open) => HoverRevealScope.maybeOf(context)?.pin(open),
+      onVisibilityChanged: (open) =>
+          HoverRevealScope.maybeOf(context)?.reportMenuOpen(open),
       onHoldChanged: (holding) => setState(() => _holding = holding),
       child: AnimatedContainer(
         duration: _holding

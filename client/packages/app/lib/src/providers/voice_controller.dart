@@ -216,8 +216,9 @@ class VoiceController extends StateNotifier<VoiceState> {
   ///
   /// The cause is included and logged rather than dropped, [setScreenShare]'s
   /// own reasoning: a bare "could not turn the camera on" gives whoever hits
-  /// this nothing to act on, where the native platform's own refusal (no
-  /// device, permission denied, already in use) is exactly what is needed.
+  /// this nothing to act on. [_cameraFailureMessage] says the specific thing
+  /// where the platform actually distinguished it, and the raw cause
+  /// otherwise, rather than inventing a distinction it did not give us.
   Future<void> toggleCamera() async {
     final want = !state.cameraEnabled;
     final got = await _session.setCameraEnabled(want);
@@ -227,12 +228,27 @@ class VoiceController extends StateNotifier<VoiceState> {
     }
     state = state.copyWith(
       cameraEnabled: got ? want : state.cameraEnabled,
-      error: got
-          ? null
-          : 'Could not turn the camera ${want ? 'on' : 'off'}. ${cause ?? ''}'
-                .trim(),
+      error: got ? null : _cameraFailureMessage(want, cause),
       clearError: got,
     );
+  }
+
+  /// [wantOn] is only ever asking "tried to turn on": a camera failing to
+  /// turn *off* was plainly already open, so [CameraFailureReason] has
+  /// nothing useful to say there and the raw cause is kept as before.
+  String _cameraFailureMessage(bool wantOn, Object? cause) {
+    final reason = wantOn && cause is CameraFailure ? cause.reason : null;
+    return switch (reason) {
+      CameraFailureReason.noCameraDetected =>
+        'No camera detected. Check that one is connected.',
+      CameraFailureReason.permissionDenied =>
+        'Camera access was denied. Check your camera permission for this app.',
+      CameraFailureReason.cameraUnavailable =>
+        'The camera could not be opened. It may be in use by another app.',
+      CameraFailureReason.unknown || null =>
+        'Could not turn the camera ${wantOn ? 'on' : 'off'}. ${cause ?? ''}'
+            .trim(),
+    };
   }
 
   /// Whether [identity] is silenced for this listener alone; see
