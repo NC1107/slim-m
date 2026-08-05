@@ -16,6 +16,7 @@ import 'package:slimm_rtc/rtc.dart';
 
 import '../api_failure.dart';
 import '../diagnostics/debug_log.dart';
+import 'call_recap.dart';
 import 'providers.dart';
 import 'voice_call_heartbeat.dart';
 import 'voice_call_lifecycle_report.dart';
@@ -31,9 +32,12 @@ class VoiceController extends StateNotifier<VoiceState> {
     CallLifecycleChannel? callLifecycle,
     this.broadcastStartTimeout = const Duration(seconds: 30),
     Duration voiceHeartbeatInterval = const Duration(seconds: 15),
+    DateTime Function()? now,
   }) : _session = session ?? VoiceSession(),
        _callLifecycle = callLifecycle ?? CallLifecycleChannel(),
        _heartbeat = VoiceCallHeartbeat(_ref, interval: voiceHeartbeatInterval),
+       _now = now ?? DateTime.now,
+       _activity = CallActivityTracker(now: now ?? DateTime.now),
        super(const VoiceState()) {
     _endCallRequests = _callLifecycle.endCallRequests.listen((_) {
       unawaited(leave());
@@ -67,7 +71,7 @@ class VoiceController extends StateNotifier<VoiceState> {
       // so participant churn does not restart it.
       state = switch (s) {
         VoiceSessionState.connected when state.connectedAt == null =>
-          state.copyWith(state: s, connectedAt: DateTime.now()),
+          state.copyWith(state: s, connectedAt: _now()),
         VoiceSessionState.idle || VoiceSessionState.failed => state.copyWith(
           state: s,
           clearConnectedAt: true,
@@ -76,6 +80,7 @@ class VoiceController extends StateNotifier<VoiceState> {
       };
     });
     _participants = _session.participantChanges.listen((p) {
+      _activity.observe(p);
       // Trust the session's view of the local participant over the local
       // toggle: the SFU is what actually decides whether a track is live.
       final sharing = p.any((x) => x.isLocal && x.isScreenSharing);
@@ -99,6 +104,8 @@ class VoiceController extends StateNotifier<VoiceState> {
   final VoiceSession _session;
   final CallLifecycleChannel _callLifecycle;
   final VoiceCallHeartbeat _heartbeat;
+  final DateTime Function() _now;
+  final CallActivityTracker _activity;
   late final StreamSubscription<VoiceSessionState> _states;
   late final StreamSubscription<List<VoiceParticipant>> _participants;
   late final StreamSubscription<void> _endCallRequests;
@@ -118,10 +125,13 @@ class VoiceController extends StateNotifier<VoiceState> {
   }
 
   Future<void> join(String channelId) async {
+    // A recap belongs to the call that just ended, never to this new one.
+    _activity.reset();
     // Set before the first await, so an arrival elsewhere reads this as busy; see VoiceState.joining.
     state = state.copyWith(
       channelId: channelId,
       clearError: true,
+      clearRecap: true,
       joining: true,
     );
     try {
@@ -184,6 +194,15 @@ class VoiceController extends StateNotifier<VoiceState> {
   Future<void> leave() async {
     _cancelBroadcastDeadline();
     final channelId = state.channelId;
+    final startedAt = state.connectedAt;
+    // Read before `_session.leave()`, so nobody still here misreads as having left when we did.
+    final recap = channelId != null && startedAt != null
+        ? _activity.summary(
+            channelId: channelId,
+            startedAt: startedAt,
+            endedAt: _now(),
+          )
+        : null;
     _heartbeat.stop();
     await _session.leave();
     // Best-effort and fire-and-forget: this client already disconnected.
@@ -192,6 +211,7 @@ class VoiceController extends StateNotifier<VoiceState> {
     state = VoiceState(
       microphoneEnabled: state.microphoneEnabled,
       cameraEnabled: state.cameraEnabled,
+      recap: recap,
     );
   }
 

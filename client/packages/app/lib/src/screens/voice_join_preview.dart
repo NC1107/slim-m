@@ -14,7 +14,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/call_recap.dart';
 import '../providers/voice_roster.dart';
+import '../widgets/call_recap_card.dart';
 import '../widgets/user_avatar.dart';
 
 class VoiceConnecting extends StatelessWidget {
@@ -108,6 +110,7 @@ class VoiceRejoinScreen extends StatelessWidget {
     required this.canRetry,
     required this.onRetry,
     this.errorMessage,
+    this.recap,
   });
 
   final String channelId;
@@ -115,6 +118,13 @@ class VoiceRejoinScreen extends StatelessWidget {
   final bool canRetry;
   final VoidCallback onRetry;
   final String? errorMessage;
+
+  /// The call that just ended here, already checked against this channel by
+  /// the caller. Rendered only when [errorMessage] is null and
+  /// [CallRecap.isWorthShowing] - a failed rejoin attempt keeps the error
+  /// as the one thing on screen, and a mis-click or a call spent alone gets
+  /// nothing, not a summary of noise.
+  final CallRecap? recap;
 
   @override
   Widget build(BuildContext context) {
@@ -154,6 +164,11 @@ class VoiceRejoinScreen extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.s12),
                         child: AppErrorState(message: errorMessage!),
+                      )
+                    else if (recap case final recap? when recap.isWorthShowing)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+                        child: CallRecapCard(recap: recap),
                       )
                     else
                       Padding(

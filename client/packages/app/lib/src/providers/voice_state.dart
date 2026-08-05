@@ -7,6 +7,8 @@ library;
 
 import 'package:slimm_rtc/rtc.dart';
 
+import 'call_recap.dart';
+
 class VoiceState {
   const VoiceState({
     this.channelId,
@@ -22,6 +24,7 @@ class VoiceState {
     this.error,
     this.retryable = true,
     this.connectedAt,
+    this.recap,
   });
 
   /// The channel this call belongs to, so a screen can tell "in a call here"
@@ -73,6 +76,12 @@ class VoiceState {
   /// with the call.
   final DateTime? connectedAt;
 
+  /// The most recently finished call in this channel, shown once on the
+  /// screen a hang-up leaves you on; see `CallRecap`'s own doc comment.
+  /// Cleared by the next `VoiceController.join`, whichever channel it
+  /// targets, so it never survives to be shown for the wrong call.
+  final CallRecap? recap;
+
   VoiceState copyWith({
     String? channelId,
     VoiceSessionState? state,
@@ -89,6 +98,8 @@ class VoiceState {
     bool? retryable,
     DateTime? connectedAt,
     bool clearConnectedAt = false,
+    CallRecap? recap,
+    bool clearRecap = false,
   }) => VoiceState(
     channelId: channelId ?? this.channelId,
     state: state ?? this.state,
@@ -103,5 +114,6 @@ class VoiceState {
     error: clearError ? null : (error ?? this.error),
     retryable: clearError ? true : (retryable ?? this.retryable),
     connectedAt: clearConnectedAt ? null : (connectedAt ?? this.connectedAt),
+    recap: clearRecap ? null : (recap ?? this.recap),
   );
 }
