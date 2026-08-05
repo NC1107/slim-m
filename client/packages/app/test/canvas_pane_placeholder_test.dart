@@ -10,8 +10,6 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slimm_app/src/screens/canvas/canvas_bar.dart';
-import 'package:slimm_app/src/screens/canvas/canvas_pane.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
