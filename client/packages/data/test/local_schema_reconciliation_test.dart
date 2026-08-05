@@ -20,6 +20,11 @@
 /// so whoever adds one is pointed at the debt note before shipping a cache
 /// nothing keeps in sync.
 ///
+/// `docs/decisions/0009-reactions-pins-polls-reconciliation.md` is the
+/// designed answer for that day: none of the three needs `message_ops`'
+/// shape, and each has a cheaper reconciliation already precedented
+/// elsewhere in this client. Read it before building one from scratch.
+///
 /// `channel_categories` (docs/decisions/0006-channel-categories.md) is
 /// listed here deliberately rather than reopening that debt: it is replaced
 /// wholesale on every channel refresh
