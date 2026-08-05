@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
+import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/categories_screen.dart';
 import '../screens/admin/channel_overwrites_screen.dart';
 import '../screens/admin/emoji_screen.dart';
@@ -126,6 +127,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.adminEmoji,
         pageBuilder: (context, state) =>
             modalPage(context, const EmojiScreen()),
+      ),
+      GoRoute(
+        path: Routes.adminAnalytics,
+        pageBuilder: (context, state) =>
+            modalPage(context, const AnalyticsScreen()),
       ),
       GoRoute(
         path: Routes.debugLog,

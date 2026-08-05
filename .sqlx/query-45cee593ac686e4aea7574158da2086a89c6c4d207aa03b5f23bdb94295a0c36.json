@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO space_metrics_samples (sampled_at, rss_bytes) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "45cee593ac686e4aea7574158da2086a89c6c4d207aa03b5f23bdb94295a0c36"
+}

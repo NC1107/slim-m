@@ -131,6 +131,13 @@ class SpaceSettingsSection extends ConsumerWidget {
               trailing: chevron(),
               onTap: () => context.push(Routes.adminEmoji),
             ),
+          if (canManageServer)
+            AppListRow(
+              label: 'Analytics',
+              leading: const Icon(AppIcons.analytics),
+              trailing: chevron(),
+              onTap: () => context.push(Routes.adminAnalytics),
+            ),
         ],
       ),
     ];

@@ -133,6 +133,10 @@ pub async fn run(c: &mut Contract) {
     )
     .await;
 
+    // Off by default, exercising the `stats: null` branch before it is on.
+    c.bare("getSpaceAnalytics", "GET", "/space/analytics", root)
+        .await;
+
     profile_calls(c, root, &admin_id, &bob_id).await;
     safety_calls(c, root, bob_token, &bob_id).await;
 
@@ -140,6 +144,16 @@ pub async fn run(c: &mut Contract) {
     let message = message_calls(c, root, &channel).await;
     emoji_calls(c, root).await;
     moderation_calls(c, root, bob_token, &message).await;
+
+    // Turned on after real history exists, so `stats` is populated, not zeros.
+    c.json(
+        "updateSpaceAnalytics",
+        "PATCH",
+        "/space/analytics",
+        root,
+        json!({"enabled": true}),
+    )
+    .await;
 
     c.json(
         "sync",
