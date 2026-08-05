@@ -174,9 +174,10 @@ class _ActivityRow extends ConsumerWidget {
   }
 }
 
-/// A short, relative timestamp ("just now", "5m ago") - the row's own
-/// sentence already carries the fact, this is only a visible refinement, so
-/// it is excluded from the row's `Semantics` label rather than doubling it.
+/// A short, relative timestamp ("just now", "5m ago"). `AppListRow` merges
+/// its own `meta` text into the row's single `Semantics` label alongside
+/// the sentence - confirmed against the real dumped tree, not assumed - so
+/// a screen reader hears both rather than only the visible one.
 String _relativeTime(DateTime at) {
   final elapsed = DateTime.now().difference(at);
   if (elapsed.inSeconds < 30) return 'just now';

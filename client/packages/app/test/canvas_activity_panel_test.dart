@@ -75,68 +75,61 @@ Future<void> _pump(
 }
 
 void main() {
-  testWidgets(
-    'each entry renders as its own real sentence, both as visible text and '
-    'as a Semantics label a screen reader reads',
-    (tester) async {
-      final container = _container();
-      addTearDown(container.dispose);
-      // Not addTearDown: tearDown runs after the binding's pending-timer check, so the announce Timer must be cancelled in the test body itself.
-      final log = CanvasActivityLog(isBlocked: (_) => false);
-      log
-        ..recordPlacedLive(
-          api.CanvasObject(
-            id: 'a',
-            kind: 'stroke',
-            zIndex: 1,
-            x: 0,
-            y: 0,
-            w: 1,
-            h: 1,
-            props: const {},
-            authorId: 'alice',
-            seq: 1,
-            createdAt: 0,
-          ),
-        )
-        ..recordClearedLive('op-2');
+  testWidgets('each entry renders as its own real sentence, both as visible text and '
+      'as a Semantics label a screen reader reads', (tester) async {
+    final container = _container();
+    addTearDown(container.dispose);
+    // Not addTearDown: tearDown runs after the binding's pending-timer check, so the announce Timer must be cancelled in the test body itself.
+    final log = CanvasActivityLog(isBlocked: (_) => false);
+    log
+      ..recordPlacedLive(
+        api.CanvasObject(
+          id: 'a',
+          kind: 'stroke',
+          zIndex: 1,
+          x: 0,
+          y: 0,
+          w: 1,
+          h: 1,
+          props: const {},
+          authorId: 'alice',
+          seq: 1,
+          createdAt: 0,
+        ),
+      )
+      ..recordClearedLive('op-2');
 
-      await _pump(
-        tester,
-        container,
-        CanvasActivityPanel(activityLog: log, summary: '2 objects: 2 strokes'),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+    await _pump(
+      tester,
+      container,
+      CanvasActivityPanel(activityLog: log, summary: '2 objects: 2 strokes'),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('2 objects: 2 strokes'), findsOneWidget);
-      expect(find.text('The canvas was cleared.'), findsOneWidget);
-      // AppListRow merges its `meta` timestamp into the same label, hence substring rather than equality.
-      expect(
-        find.bySemanticsLabel(RegExp(RegExp.escape('The canvas was cleared.'))),
-        findsOneWidget,
-      );
-      // Resolved through the real profile fetch, not left at a raw id.
-      expect(find.text('Alice placed a stroke.'), findsOneWidget);
+    expect(find.text('2 objects: 2 strokes'), findsOneWidget);
+    expect(find.text('The canvas was cleared.'), findsOneWidget);
+    // AppListRow merges its `meta` timestamp into the same label, hence substring rather than equality.
+    expect(
+      find.bySemanticsLabel(RegExp(RegExp.escape('The canvas was cleared.'))),
+      findsOneWidget,
+    );
+    // Resolved through the real profile fetch, not left at a raw id.
+    expect(find.text('Alice placed a stroke.'), findsOneWidget);
 
-      // The real tree, not a widget read on paper: two rows plus the header.
-      final tree = tester
-          .binding
-          .pipelineOwner
-          .semanticsOwner!
-          .rootSemanticsNode!
-          .toStringDeep();
-      expect(tree, contains('The canvas was cleared.'));
-      expect(tree, contains('2 objects: 2 strokes'));
-      expect(
-        'isFocusable'.allMatches(tree).length,
-        2,
-        reason: 'both rows must be real Tab stops, not swipe-only',
-      );
-      // Dumped once by hand: each row carries `actions: focus, flags: isFocusable`, so Tab reaches it, not only a screen reader's own swipe.
-      log.dispose();
-    },
-  );
+    // The real tree, not a widget read on paper: two rows plus the header.
+    final tree = tester.binding.pipelineOwner.semanticsOwner!.rootSemanticsNode!
+        .toStringDeep();
+    expect(tree, contains('The canvas was cleared.'));
+    expect(tree, contains('2 objects: 2 strokes'));
+    expect(
+      'isFocusable'.allMatches(tree).length,
+      2,
+      reason: 'both rows must be real Tab stops, not swipe-only',
+    );
+    // Dumped once by hand: each row carries `actions: focus, flags: isFocusable`, so Tab reaches it, not only a screen reader's own swipe.
+    log.dispose();
+  });
 
   testWidgets('an empty log says so rather than rendering a blank list', (
     tester,
