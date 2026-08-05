@@ -348,45 +348,42 @@ void main() {
     });
   });
 
-  test(
-    'onObjectPlaced fires for a place op read off the catch-up feed, and '
-    'only for that kind',
-    () {
-      fakeAsync((async) {
-        final document = CanvasDocument();
-        final placed = <String>[];
-        final ops = [
-          _rawOp(1, 'place', extra: {'object': _object('a', seq: 1)}),
-          _rawOp(
-            2,
-            'remove',
-            extra: {
-              'object_ids': ['a'],
-            },
-          ),
-        ];
-        final sync = CanvasSync(
-          channelId: 'c1',
-          client: fakeCanvasOpsApi(
-            (afterSeq) => _json({
-              'ops': ops.where((o) => o['seq'] as int > afterSeq).toList(),
-              'latest_seq': 2,
-              'has_more': false,
-              'reset': false,
-            }),
-          ),
-          document: document,
-          coldFetch: () async {},
-          forgetFetchedRegion: () {},
-          onObjectPlaced: (object) => placed.add(object.id),
-        );
+  test('onObjectPlaced fires for a place op read off the catch-up feed, and '
+      'only for that kind', () {
+    fakeAsync((async) {
+      final document = CanvasDocument();
+      final placed = <String>[];
+      final ops = [
+        _rawOp(1, 'place', extra: {'object': _object('a', seq: 1)}),
+        _rawOp(
+          2,
+          'remove',
+          extra: {
+            'object_ids': ['a'],
+          },
+        ),
+      ];
+      final sync = CanvasSync(
+        channelId: 'c1',
+        client: fakeCanvasOpsApi(
+          (afterSeq) => _json({
+            'ops': ops.where((o) => o['seq'] as int > afterSeq).toList(),
+            'latest_seq': 2,
+            'has_more': false,
+            'reset': false,
+          }),
+        ),
+        document: document,
+        coldFetch: () async {},
+        forgetFetchedRegion: () {},
+        onObjectPlaced: (object) => placed.add(object.id),
+      );
 
-        sync.seedFromViewport(0);
-        sync.catchUp();
-        async.flushMicrotasks();
+      sync.seedFromViewport(0);
+      sync.catchUp();
+      async.flushMicrotasks();
 
-        expect(placed, ['a']);
-      });
-    },
-  );
+      expect(placed, ['a']);
+    });
+  });
 }

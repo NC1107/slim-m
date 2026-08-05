@@ -33,6 +33,80 @@ void main() {
     expect(surfaceDocument(tester).objectCount.value, 2);
   });
 
+  /// The gap the owner reported: an image placed by anyone but this exact
+  /// session used to apply to the document (hit-testable, movable) and
+  /// never paint, since only the paste path ever fetched its bytes back.
+  testWidgets(
+    'an image fetched from the viewport, not pasted by this client, ends '
+    'up with a decoded bitmap',
+    (tester) async {
+      final fixture = CanvasPaneFixture()
+        ..objects = [canvasImageJson('pic', authorId: 'someone-else')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      // A real codec decode needs real asynchrony; pumpAndSettle alone never observes it, the same trap fullscreen_image_viewer_test.dart already documents.
+      await tester.runAsync(() async {
+        await pumpCanvasPane(tester, container);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      });
+      await tester.pumpAndSettle();
+
+      expect(fixture.attachmentFetches, 1);
+      final document = surfaceDocument(tester);
+      final slot = document.strokeIfAlive(document.paintOrder.single)!;
+      expect(slot.image, isNotNull);
+      expect(slot.imageLoadFailed, isFalse);
+    },
+  );
+
+  testWidgets(
+    'an image whose bytes cannot be fetched shows a load-failed placeholder',
+    (tester) async {
+      final fixture = CanvasPaneFixture(attachmentFetchStatus: 403)
+        ..objects = [canvasImageJson('pic', authorId: 'someone-else')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      final document = surfaceDocument(tester);
+      final slot = document.strokeIfAlive(document.paintOrder.single)!;
+      expect(slot.image, isNull);
+      expect(slot.imageLoadFailed, isTrue);
+    },
+  );
+
+  testWidgets(
+    'a live-event image placement is hydrated the same as a fetched one',
+    (tester) async {
+      final fixture = CanvasPaneFixture();
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+
+      fixture.events.add(
+        api.CanvasObjectPlaced(
+          channelId: 'c1',
+          object: api.CanvasObject.fromJson(
+            canvasImageJson('pic', authorId: 'someone-else'),
+          ),
+        ),
+      );
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      });
+      await tester.pumpAndSettle();
+
+      expect(fixture.attachmentFetches, 1);
+      final document = surfaceDocument(tester);
+      final slot = document.strokeIfAlive(document.paintOrder.single)!;
+      expect(slot.image, isNotNull);
+    },
+  );
+
   testWidgets('a live frame for this channel lands, one for another does not', (
     tester,
   ) async {

@@ -11,6 +11,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,6 +83,15 @@ Map<String, dynamic> canvasImageJson(
   'created_at': 0,
 };
 
+/// A 1x1 transparent PNG: real bytes, so a hydration fetch decodes rather
+/// than throwing.
+final _png = Uint8List.fromList(
+  base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8'
+    'z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  ),
+);
+
 http.Response jsonResponse(Object body) => http.Response(
   jsonEncode(body),
   200,
@@ -94,6 +104,7 @@ class CanvasPaneFixture {
     this.hasMore = false,
     this.mePermissions = 0,
     this.opsPostStatus = 201,
+    this.attachmentFetchStatus = 200,
   });
 
   final StreamController<api.ServerEvent> events =
@@ -105,6 +116,15 @@ class CanvasPaneFixture {
   /// The status `POST .../canvas/ops` answers with, so a test can drive the
   /// controller's failure path (a revert) without a real server refusal.
   final int opsPostStatus;
+
+  /// The status `GET .../attachments/{id}` answers with. 200 serves a real
+  /// decodable PNG, so a test can prove an image object placed by anyone
+  /// other than this client ends up hydrated; any other value drives the
+  /// hydrator's own failure-placeholder path.
+  final int attachmentFetchStatus;
+
+  /// Every `GET .../attachments/{id}` the pane's image hydrator sent.
+  int attachmentFetches = 0;
 
   /// The signed-in member's own permission bitmask, as `GET /me` answers it.
   final int mePermissions;
@@ -184,6 +204,21 @@ class CanvasPaneFixture {
                 'has_more': false,
                 'reset': false,
               });
+            }
+            if (request.url.path.startsWith('/attachments/')) {
+              attachmentFetches++;
+              if (attachmentFetchStatus != 200) {
+                return http.Response(
+                  jsonEncode({'error': 'no'}),
+                  attachmentFetchStatus,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
+              return http.Response.bytes(
+                _png,
+                200,
+                headers: {'content-type': 'image/png'},
+              );
             }
             if (!request.url.path.endsWith('/canvas/objects')) {
               return jsonResponse(<Object>[]);

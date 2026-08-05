@@ -102,9 +102,7 @@ class CanvasImageHydrator {
       document.setImageBitmap(id, frame.image);
     } catch (_) {
       _pending.remove(id);
-      // A 403 (access changed underneath this fetch) and a 404 (the
-      // attachment was swept) are both real answers, not a bug in this
-      // hydrator, which is why nothing here schedules a retry.
+      // A 403 or a 404 is a real answer, not a bug, so nothing retries it.
       if (!_disposed) {
         _failed.add(id);
         document.markImageLoadFailed(id);
