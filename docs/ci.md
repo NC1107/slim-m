@@ -396,9 +396,10 @@ It resolves with `dart pub get --enforce-lockfile`, the same as the Android and 
 That one artifact serves both readers: it is the download for a user whose distribution has no package, and it is the `Source0` the rpm spec fetches from the release.
 Naming follows the server binaries in this same workflow (`slimm-server-<version>-linux-<arch>`), so one release page does not call the same machine `amd64` in one asset and `x86_64` in another.
 
-Packaging then gates per format, not on both at once: `packaging/flatpak/org.slimm.Client.yaml` enables the Flatpak step and `packaging/rpm/slim-m-client.spec` enables the rpm step, independently.
+Packaging then gates per format, not on both at once: `packaging/flatpak/top.npcserver.slimm.yaml` enables the Flatpak step and `packaging/rpm/slim-m-client.spec` enables the rpm step, independently.
 An earlier version required both, which would have held a working rpm behind a flatpak manifest nobody had written.
 Each missing input still warns by name, and the tarball ships either way.
+The flatpak step also carries `continue-on-error: true`, unlike the rpm step: it has one real build behind it rather than the rpm's dozens of releases, so a bad first run must not be able to take the tarball or rpm down with it; see `packaging/flatpak/README.md`.
 
 The rpm is built inside a `fedora:latest` container rather than on the runner, because the spec is written against Fedora's macros and dependency generators and Ubuntu's `rpm` has neither.
 It builds from the tarball staged moments earlier in the same job, not from the URL in `Source0`, since that release asset does not exist yet at that point in the run.

@@ -377,11 +377,11 @@ jobs:
       - name: check packaging inputs
         id: pkg
         run: |
-          if [ -f packaging/flatpak/org.slimm.Client.yaml ]; then
+          if [ -f packaging/flatpak/top.npcserver.slimm.yaml ]; then
             echo "flatpak=true" >> "$GITHUB_OUTPUT"
           else
             echo "flatpak=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::No packaging/flatpak/org.slimm.Client.yaml, so no Flatpak bundle is built. The portable tarball is published regardless."
+            echo "::warning::No packaging/flatpak/top.npcserver.slimm.yaml, so no Flatpak bundle is built. The portable tarball is published regardless."
           fi
           if [ -f packaging/rpm/slim-m-client.spec ]; then
             echo "rpm=true" >> "$GITHUB_OUTPUT"
@@ -390,20 +390,20 @@ jobs:
             echo "::warning::No packaging/rpm/slim-m-client.spec, so no rpm is built. The portable tarball is published regardless."
           fi
 
+      # continue-on-error: this format has one real CI run behind it versus the rpm's dozens; see packaging/flatpak/README.md.
       - name: build flatpak
         if: steps.pkg.outputs.flatpak == 'true'
+        continue-on-error: true
         run: |
           sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
           flatpak remote-add --user --if-not-exists flathub \
             https://flathub.org/repo/flathub.flatpakrepo
-          # TODO: the manifest must reference the flutter build output in
-          # client/packages/app/build/linux/*/release/bundle as the app source.
           flatpak-builder --user --install-deps-from=flathub --force-clean \
             --repo=dist/flatpak-repo build-dir \
-            packaging/flatpak/org.slimm.Client.yaml
+            packaging/flatpak/top.npcserver.slimm.yaml
           flatpak build-bundle dist/flatpak-repo \
             "dist/slim-m-client-${{ steps.ver.outputs.version }}.flatpak" \
-            org.slimm.Client
+            top.npcserver.slimm
 
       # In a Fedora container, not on the runner: the spec is written against
       # Fedora's macros and dependency generators, and Ubuntu's rpm has neither.
