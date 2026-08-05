@@ -41,6 +41,8 @@ class SeedState:
         self._top_messages = []
         self._threads = []
         self._own_messages = {}
+        self._polls = []
+        self._poll_voters = {}
         self._recency_draws = 0
         self._recency_hits = 0
 
@@ -54,6 +56,17 @@ class SeedState:
     def add_thread(self, parent_message_id, thread_channel_id):
         with self._lock:
             self._threads.append((parent_message_id, thread_channel_id))
+
+    def add_poll(self, message_id, channel_id, options_count):
+        """Records a just-sent poll message so a later turn (or the settle
+        pass) can find and vote on it."""
+        entry = {
+            "id": message_id, "channel_id": channel_id,
+            "options_count": options_count,
+        }
+        with self._lock:
+            self._polls.append(entry)
+            self._poll_voters[message_id] = set()
 
     def _draw(self, rng, pool):
         """Runs `_recency_choice` and folds its outcome into `recency_stats()`.
@@ -102,6 +115,30 @@ class SeedState:
             self._top_messages = [
                 m for m in self._top_messages if m["id"] != message_id]
 
+    def random_unvoted_poll(self, rng, username):
+        """A poll `username` has not yet voted on, or `None`.
+
+        Filtered rather than a plain `random_poll`, or the main loop would
+        happily have one account replace its own vote turn after turn -
+        harmless to the server (a second vote just replaces the first) but
+        wasted budget and not how a real poll gets voted on.
+        """
+        with self._lock:
+            pool = [p for p in self._polls
+                    if username not in self._poll_voters.get(p["id"], ())]
+            return self._draw(rng, pool)
+
+    def poll_voters(self, poll_id):
+        """The usernames who have already voted on this poll, so a caller
+        (the settle pass) can pick fresh voters without re-querying per
+        candidate."""
+        with self._lock:
+            return set(self._poll_voters.get(poll_id, ()))
+
+    def record_poll_vote(self, poll_id, username):
+        with self._lock:
+            self._poll_voters.setdefault(poll_id, set()).add(username)
+
     def has_top_message(self):
         with self._lock:
             return bool(self._top_messages)
@@ -109,6 +146,10 @@ class SeedState:
     def has_thread(self):
         with self._lock:
             return bool(self._threads)
+
+    def has_poll(self):
+        with self._lock:
+            return bool(self._polls)
 
     def newest_top_messages(self, count):
         """A fixed snapshot of the newest `count` top-level messages.
@@ -125,11 +166,17 @@ class SeedState:
         with self._lock:
             return list(self._threads[-count:])
 
+    def newest_polls(self, count):
+        """A fixed snapshot of the newest `count` polls."""
+        with self._lock:
+            return list(self._polls[-count:])
+
     def counts(self):
         with self._lock:
             return {
                 "top_messages": len(self._top_messages),
                 "threads": len(self._threads),
+                "polls": len(self._polls),
             }
 
     def recency_stats(self):

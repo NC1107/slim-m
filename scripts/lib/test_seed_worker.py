@@ -90,6 +90,28 @@ class HandlerDrawsFromCorpusTest(unittest.TestCase):
         self.assertEqual(body["question"], "pooled question?")
         self.assertEqual(body["options"], ["X", "Y"])
 
+    def test_send_poll_records_the_poll_so_it_can_later_be_voted_on(self):
+        ctx = _ctx(corpus=seed_ollama_pools.Corpus(
+            polls=[("pooled question?", ["X", "Y", "Z"])]))
+        seed_worker.handle_send_poll(ctx)
+        self.assertTrue(ctx.state.has_poll())
+        poll = ctx.state.random_unvoted_poll(random.Random(0), "bob")
+        self.assertEqual(poll["options_count"], 3)
+
+    def test_vote_poll_casts_a_vote_and_records_the_voter(self):
+        ctx = _ctx()
+        ctx.state.add_poll("p1", "c1", 3)
+        seed_worker.handle_vote_poll(ctx)
+        method, path, body = ctx.api.call.call_args[0]
+        self.assertEqual((method, path), ("PUT", "/messages/p1/polls/vote"))
+        self.assertIn(body["option"], (0, 1, 2))
+        self.assertEqual(ctx.state.poll_voters("p1"), {"alice"})
+
+    def test_vote_poll_falls_back_to_a_short_message_with_no_poll(self):
+        ctx = _ctx()
+        seed_worker.handle_vote_poll(ctx)
+        ctx.api.send_message.assert_called_once()
+
     def test_code_block_message_uses_the_pooled_snippet(self):
         ctx = _ctx(corpus=seed_ollama_pools.Corpus(code=[("dart", "1+1;")]))
         seed_worker.handle_message_code_block(ctx)

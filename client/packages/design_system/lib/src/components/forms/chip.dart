@@ -66,12 +66,10 @@ class AppChip extends StatelessWidget {
 
   final VoidCallback? onTap;
 
-  /// Neither the operator's 7px horizontal padding nor the reaction's 6px
-  /// emoji-to-count gap match a step in AppSpacing (nearest are s8 and s4/s8
-  /// respectively). The design gives exact pixel values for both, used as
-  /// literals here and reported as a token gap.
+  /// The operator's 7px horizontal padding does not match a step in
+  /// AppSpacing (nearest is s8). The design gives an exact pixel value,
+  /// used as a literal here and reported as a token gap.
   static const double _operatorPaddingH = 7;
-  static const double _reactionGap = 6;
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +116,7 @@ class AppChip extends StatelessWidget {
       builder: (context, focused, hovered) {
         return Container(
           height: 24,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
           decoration: BoxDecoration(
             color: active ? tokens.accentSoft : tokens.surfaceRaised,
             border: Border.all(
@@ -134,7 +132,7 @@ class AppChip extends StatelessWidget {
               glyph ??
                   Text(emoji ?? '',
                       style: const TextStyle(fontSize: 13, height: 1)),
-              const SizedBox(width: _reactionGap),
+              const SizedBox(width: AppSpacing.s4),
               Text(
                 '$count',
                 style: AppText.caption.copyWith(

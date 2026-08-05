@@ -40,6 +40,7 @@ def _resolve(action, **overrides):
     state = {
         "has_top_message": True, "has_own_message": True,
         "has_thread": True, "has_other_account": True, "is_privileged": True,
+        "has_poll": True,
     }
     state.update(overrides)
     return seed_actions.resolve_action(action, **state)
@@ -65,6 +66,10 @@ class ResolveActionTest(unittest.TestCase):
 
     def test_reply_in_thread_needs_an_existing_thread(self):
         self.assertEqual(_resolve("reply_in_thread", has_thread=False),
+                          seed_actions.FALLBACK)
+
+    def test_vote_poll_needs_an_existing_poll(self):
+        self.assertEqual(_resolve("vote_poll", has_poll=False),
                           seed_actions.FALLBACK)
 
     def test_edit_and_delete_need_a_message_of_ones_own(self):
