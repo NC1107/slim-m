@@ -408,3 +408,26 @@ class CanvasObjectMoved extends ServerEvent {
   final double w;
   final double h;
 }
+
+/// A placed object's paint order changed.
+///
+/// Carries the new [zIndex] outright, so a receiver needs no refetch to
+/// repaint it in its new stacking position. The actor is deliberately
+/// absent, matching [CanvasObjectMoved]: restacking another member's object
+/// needs `MANAGE_CANVAS` and so can be a moderation act the same way a move
+/// is.
+class CanvasObjectReordered extends ServerEvent {
+  const CanvasObjectReordered({
+    required this.channelId,
+    required this.seq,
+    required this.opId,
+    required this.objectId,
+    required this.zIndex,
+  });
+
+  final String channelId;
+  final int seq;
+  final String opId;
+  final String objectId;
+  final int zIndex;
+}
