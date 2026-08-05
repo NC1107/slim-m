@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: Apache-2.0
+/// The live-event dispatch switch `CanvasPane` reads off the socket, split
+/// out of `canvas_pane.dart` because it sat at the file budget's hard
+/// ceiling. A pure function over explicit callbacks rather than a class:
+/// nothing here holds state between calls, everything it touches belongs to
+/// whoever calls it.
+library;
+
+import 'package:flutter/foundation.dart';
+import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_voice_canvas/voice_canvas.dart';
+
+import 'canvas_cursor_relay.dart';
+import 'canvas_sync.dart';
+
+/// Applies one server event to [document] if it names [paneChannelId], the
+/// exact switch `CanvasPane._onEvent` used to carry directly.
+///
+/// [relay] is a closure rather than a value so the caller's own lazy getter
+/// stays lazy: a remote cursor object is only ever constructed the first
+/// time an actual [api.CanvasCursorMoved] for this channel arrives, never on
+/// an unrelated placement or removal.
+void dispatchCanvasLiveEvent(
+  api.ServerEvent event, {
+  required String paneChannelId,
+  required CanvasSync sync,
+  required CanvasDocument document,
+  required CanvasCursorRelay Function() relay,
+  required void Function(api.CanvasObject object) applyPlacedObject,
+  required VoidCallback forgetFetchedRegion,
+}) {
+  switch (event) {
+    case api.CanvasObjectPlaced(:final channelId, :final object)
+        when channelId == paneChannelId:
+      sync.applyLive(event.seq, () => applyPlacedObject(object));
+    case api.CanvasObjectsRemoved(
+          :final channelId,
+          :final seq,
+          :final objectIds,
+        )
+        when channelId == paneChannelId:
+      sync.applyLive(seq, () {
+        for (final id in objectIds) {
+          document.removeObject(id);
+        }
+        document.refresh();
+      });
+    case api.CanvasCleared(:final channelId, :final seq, :final beforeSeq)
+        when channelId == paneChannelId:
+      sync.applyLive(seq, () {
+        document.clearBelow(beforeSeq);
+        document.refresh();
+      });
+    case api.CanvasObjectsRestored(
+          :final channelId,
+          :final seq,
+          :final objectIds,
+        )
+        when channelId == paneChannelId:
+
+      /// An empty list never means "nothing was restored": the server only
+      /// publishes this frame when it restored at least one object, and
+      /// empties the list rather than exceed the frame bound a `remove`
+      /// already sets. Applying it would clear no tombstone while advancing
+      /// the cursor past the one op that could, so the objects stay
+      /// invisible on this client for good. The feed carries the full list,
+      /// so this defers to it instead.
+      if (objectIds.isEmpty) {
+        sync.deferToFeed();
+        return;
+      }
+      sync.applyLive(seq, () {
+        document.forgetRemoved(objectIds);
+        forgetFetchedRegion();
+      });
+    case api.CanvasCursorMoved(
+          :final channelId,
+          :final userId,
+          :final x,
+          :final y,
+        )
+        when channelId == paneChannelId:
+      // Never through sync.applyLive: a cursor carries no seq to catch up on.
+      relay().applyRemote(userId, x, y);
+    case api.CanvasObjectMoved(
+          :final channelId,
+          :final seq,
+          :final objectId,
+          :final x,
+          :final y,
+          :final w,
+          :final h,
+        )
+        when channelId == paneChannelId:
+      sync.applyLive(seq, () {
+        document.moveObject(objectId, x, y, w, h);
+        document.refresh();
+      });
+    default:
+      break;
+  }
+}

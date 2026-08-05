@@ -51,11 +51,19 @@ class CanvasSurface extends StatefulWidget {
     this.cursors,
     this.cursorColors = const [],
     this.onPointerMoved,
+    this.placeholderFill = const Color(0xFFB9C0C8),
+    this.placeholderIcon = const Color(0xFF6C757E),
   });
 
   final CanvasDocument document;
   final Color ink;
   final Color gridLine;
+
+  /// The muted fill and glyph colour for an image whose bytes could not be
+  /// fetched or decoded. See [StrokePainter]'s own doc for why this draws
+  /// something rather than nothing.
+  final Color placeholderFill;
+  final Color placeholderIcon;
   final StrokeCommitted onStroke;
   final double strokeWidth;
 
@@ -122,6 +130,8 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
   late final StrokePainter _strokes = StrokePainter(
     document: widget.document,
     ink: widget.ink,
+    placeholderFill: widget.placeholderFill,
+    placeholderIcon: widget.placeholderIcon,
   );
   late final DraftPainter _draftPainter = DraftPainter(
     draft: _draft,

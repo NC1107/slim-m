@@ -146,6 +146,7 @@ class CanvasStroke {
     this.h = 0,
     this.attachmentId,
     this.image,
+    this.imageLoadFailed = false,
   });
 
   final String id;
@@ -176,6 +177,16 @@ class CanvasStroke {
   /// two placements of the same attachment (see the package's own doc on
   /// what that costs).
   ui.Image? image;
+
+  /// True once the app layer has given up fetching or decoding
+  /// [attachmentId]'s bytes for good - a 403, a 404, or bytes that will not
+  /// decode. Distinct from [image] being merely null (still in flight, or
+  /// evicted from a bounded cache to be re-fetched later): the painter draws
+  /// a visible placeholder for this case rather than silence, so a missing
+  /// image reads as a stated fact rather than a blank the eye has to guess
+  /// at. Reset to false by [CanvasDocument.setImageBitmap], defensively, in
+  /// case a future retry path ever sets a real bitmap after a failure.
+  bool imageLoadFailed;
 
   /// Every point in absolute world coordinates, for hit testing against a
   /// world-space pointer with no per-call offset arithmetic.

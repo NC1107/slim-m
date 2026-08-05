@@ -4,9 +4,28 @@
 /// attaching a decoded bitmap to one.
 library;
 
+import 'dart:async';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
+
+/// A minimal real [ui.Image], built from raw pixels rather than a PNG/JPEG
+/// codec: what these tests need is a disposable bitmap the document can
+/// hold, never anything about its content.
+Future<ui.Image> _fakeImage() {
+  final completer = Completer<ui.Image>();
+  ui.decodeImageFromPixels(
+    Uint8List(2 * 2 * 4),
+    2,
+    2,
+    ui.PixelFormat.rgba8888,
+    completer.complete,
+  );
+  return completer.future;
+}
 
 CanvasStrokeInput strokeAt(String id, {double x = 0, double y = 0}) =>
     CanvasStrokeInput(
@@ -106,5 +125,146 @@ void main() {
   test('objectBounds is null for an id never placed', () {
     final document = CanvasDocument()..setViewport(const Size(800, 600));
     expect(document.objectBounds('never'), isNull);
+  });
+
+  test(
+    'markImageLoadFailed sets the flag, and setImageBitmap clears it again',
+    () async {
+      final document = CanvasDocument()..setViewport(const Size(800, 600));
+      document
+        ..applyPlaced(
+          const CanvasStrokeInput(
+            id: 'pic',
+            seq: 1,
+            zIndex: 1,
+            x: 0,
+            y: 0,
+            w: 20,
+            h: 20,
+            points: [],
+            width: 0,
+            colorKey: '',
+            kind: CanvasObjectKind.image,
+            attachmentId: 'sha-pic',
+          ),
+        )
+        ..refresh();
+
+      document.markImageLoadFailed('pic');
+      var slot = document.strokeIfAlive(document.paintOrder.single)!;
+      expect(slot.imageLoadFailed, isTrue);
+
+      document.setImageBitmap('pic', await _fakeImage());
+      slot = document.strokeIfAlive(document.paintOrder.single)!;
+      expect(slot.imageLoadFailed, isFalse);
+      expect(slot.image, isNotNull);
+    },
+  );
+
+  test(
+    'markImageLoadFailed never blanks an image that already landed',
+    () async {
+      final document = CanvasDocument()..setViewport(const Size(800, 600));
+      document
+        ..applyPlaced(
+          const CanvasStrokeInput(
+            id: 'pic',
+            seq: 1,
+            zIndex: 1,
+            x: 0,
+            y: 0,
+            w: 20,
+            h: 20,
+            points: [],
+            width: 0,
+            colorKey: '',
+            kind: CanvasObjectKind.image,
+            attachmentId: 'sha-pic',
+          ),
+        )
+        ..refresh();
+      document.setImageBitmap('pic', await _fakeImage());
+
+      document.markImageLoadFailed('pic');
+
+      final slot = document.strokeIfAlive(document.paintOrder.single)!;
+      expect(
+        slot.imageLoadFailed,
+        isFalse,
+        reason: 'a late failure racing behind a fetch that already landed '
+            'must not blank a real image',
+      );
+    },
+  );
+
+  test('moveObject carries imageLoadFailed forward', () {
+    final document = CanvasDocument()..setViewport(const Size(800, 600));
+    document
+      ..applyPlaced(
+        const CanvasStrokeInput(
+          id: 'pic',
+          seq: 1,
+          zIndex: 1,
+          x: 0,
+          y: 0,
+          w: 20,
+          h: 20,
+          points: [],
+          width: 0,
+          colorKey: '',
+          kind: CanvasObjectKind.image,
+          attachmentId: 'sha-pic',
+        ),
+      )
+      ..refresh();
+    document.markImageLoadFailed('pic');
+
+    document.moveObject('pic', 50, 50, 20, 20);
+    document.refresh();
+
+    final slot = document.strokeIfAlive(document.paintOrder.single)!;
+    expect(slot.imageLoadFailed, isTrue);
+  });
+
+  test(
+    'evictImageBitmap disposes the bitmap without removing the object',
+    () async {
+      final document = CanvasDocument()..setViewport(const Size(800, 600));
+      document
+        ..applyPlaced(
+          const CanvasStrokeInput(
+            id: 'pic',
+            seq: 1,
+            zIndex: 1,
+            x: 0,
+            y: 0,
+            w: 20,
+            h: 20,
+            points: [],
+            width: 0,
+            colorKey: '',
+            kind: CanvasObjectKind.image,
+            attachmentId: 'sha-pic',
+          ),
+        )
+        ..refresh();
+      document.setImageBitmap('pic', await _fakeImage());
+
+      document.evictImageBitmap('pic');
+
+      expect(document.objectBounds('pic'), isNotNull);
+      final slot = document.strokeIfAlive(document.paintOrder.single)!;
+      expect(slot.image, isNull);
+    },
+  );
+
+  test('evictImageBitmap on an id with no bitmap is a harmless no-op', () {
+    final document = CanvasDocument()..setViewport(const Size(800, 600));
+    document.applyPlaced(strokeAt('a'));
+
+    document.evictImageBitmap('a');
+    document.evictImageBitmap('never-placed');
+
+    expect(document.objectBounds('a'), isNotNull);
   });
 }

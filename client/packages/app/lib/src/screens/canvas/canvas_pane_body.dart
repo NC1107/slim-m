@@ -132,6 +132,8 @@ class CanvasPaneBody extends StatelessWidget {
                   document: document,
                   ink: AppCanvasColors.annotation,
                   gridLine: tokens.borderSubtle,
+                  placeholderFill: tokens.surfaceRaised,
+                  placeholderIcon: tokens.textDisabled,
                   onStroke: onStroke,
                   tool: tool,
                   onErase: onErase,

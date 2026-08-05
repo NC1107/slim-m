@@ -35,7 +35,9 @@ import '../../providers/sync_controller.dart';
 import '../../providers/user_profiles.dart';
 import 'canvas_commit_queue.dart';
 import 'canvas_cursor_relay.dart';
+import 'canvas_image_hydrator.dart';
 import 'canvas_image_paste.dart';
+import 'canvas_live_event_dispatch.dart';
 import 'canvas_ops_controller.dart';
 import 'canvas_pane_body.dart';
 import 'canvas_sync.dart';
@@ -79,6 +81,10 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   int _localZ = provisionalLocalZIndex;
   CanvasTool _tool = CanvasTool.pen;
   CanvasImagePaste? _imagePasteHelper;
+  late final CanvasImageHydrator _hydrator = CanvasImageHydrator(
+    client: ref.read(apiProvider),
+    document: _document,
+  );
 
   @override
   void initState() {
@@ -90,6 +96,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       document: _document,
       coldFetch: _fetch,
       forgetFetchedRegion: () => _fetched = null,
+      onObjectPlaced: _hydrator.hydrate,
     );
     // Registered once here, not in build: a listener re-attached per rebuild would fire a catch-up per rebuild, not per transition into live.
     _syncStatusSubscription = ref.listenManual<SyncStatus>(
@@ -106,6 +113,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
 
   @override
   void dispose() {
+    _hydrator.dispose();
     _imagePasteHelper?.stop();
     _panDebounce?.cancel();
     _queue?.close();
@@ -189,78 +197,15 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     return 'Someone';
   }
 
-  void _onEvent(api.ServerEvent event) {
-    switch (event) {
-      case api.CanvasObjectPlaced(:final channelId, :final object)
-          when channelId == widget.channelId:
-        _sync.applyLive(event.seq, () => _apply(object));
-      case api.CanvasObjectsRemoved(
-            :final channelId,
-            :final seq,
-            :final objectIds,
-          )
-          when channelId == widget.channelId:
-        _sync.applyLive(seq, () {
-          for (final id in objectIds) {
-            _document.removeObject(id);
-          }
-          _document.refresh();
-        });
-      case api.CanvasCleared(:final channelId, :final seq, :final beforeSeq)
-          when channelId == widget.channelId:
-        _sync.applyLive(seq, () {
-          _document.clearBelow(beforeSeq);
-          _document.refresh();
-        });
-      case api.CanvasObjectsRestored(
-            :final channelId,
-            :final seq,
-            :final objectIds,
-          )
-          when channelId == widget.channelId:
-
-        /// An empty list never means "nothing was restored": the server only
-        /// publishes this frame when it restored at least one object, and
-        /// empties the list rather than exceed the frame bound a `remove`
-        /// already sets. Applying it would clear no tombstone while advancing
-        /// the cursor past the one op that could, so the objects stay
-        /// invisible on this client for good. The feed carries the full list,
-        /// so this defers to it instead.
-        if (objectIds.isEmpty) {
-          _sync.deferToFeed();
-          return;
-        }
-        _sync.applyLive(seq, () {
-          _document.forgetRemoved(objectIds);
-          _fetched = null;
-        });
-      case api.CanvasCursorMoved(
-            :final channelId,
-            :final userId,
-            :final x,
-            :final y,
-          )
-          when channelId == widget.channelId:
-        // Never through _sync.applyLive: a cursor carries no seq to catch up on.
-        _relay.applyRemote(userId, x, y);
-      case api.CanvasObjectMoved(
-            :final channelId,
-            :final seq,
-            :final objectId,
-            :final x,
-            :final y,
-            :final w,
-            :final h,
-          )
-          when channelId == widget.channelId:
-        _sync.applyLive(seq, () {
-          _document.moveObject(objectId, x, y, w, h);
-          _document.refresh();
-        });
-      default:
-        break;
-    }
-  }
+  void _onEvent(api.ServerEvent event) => dispatchCanvasLiveEvent(
+    event,
+    paneChannelId: widget.channelId,
+    sync: _sync,
+    document: _document,
+    relay: () => _relay,
+    applyPlacedObject: _apply,
+    forgetFetchedRegion: () => _fetched = null,
+  );
 
   void _apply(api.CanvasObject object) {
     final input = canvasStrokeInputFrom(object);
@@ -268,6 +213,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _document
       ..applyPlaced(input)
       ..refresh();
+    _hydrator.hydrate(object);
   }
 
   /// A pan re-reads once the camera has settled, never per frame.
@@ -333,7 +279,10 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       if (!mounted) return;
       for (final object in page.objects) {
         final input = canvasStrokeInputFrom(object);
-        if (input != null) _document.applyPlaced(input);
+        if (input != null) {
+          _document.applyPlaced(input);
+          _hydrator.hydrate(object);
+        }
       }
       // Set before refresh(), not after: refresh() reaches _onCameraMoved synchronously and must see this fetch's own answer, not the value from before it ran.
       setState(() {

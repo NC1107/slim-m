@@ -209,6 +209,7 @@ class CanvasDocument extends ChangeNotifier {
         h: h,
         attachmentId: stroke.attachmentId,
         image: stroke.image,
+        imageLoadFailed: stroke.imageLoadFailed,
       ),
     );
     assert(newSlot == _strokes.length - 1, 'scene.add must stay dense');
@@ -231,6 +232,38 @@ class CanvasDocument extends ChangeNotifier {
       return;
     }
     stroke.image = image;
+    stroke.imageLoadFailed = false;
+    notifyListeners();
+  }
+
+  /// Marks a live [CanvasObjectKind.image] object as one whose bytes could
+  /// not be fetched or decoded, so the painter draws a placeholder instead
+  /// of leaving it blank. A no-op if [id] is unknown, dead, or already
+  /// carries a bitmap - a hydration failure racing behind a fetch that
+  /// already landed must not blank out a real image.
+  void markImageLoadFailed(String id) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    if (stroke == null || !stroke.alive || stroke.image != null) return;
+    stroke.imageLoadFailed = true;
+    notifyListeners();
+  }
+
+  /// Detaches and disposes a live object's decoded bitmap, if it holds one,
+  /// without removing the object itself.
+  ///
+  /// The one caller is the app layer's bounded decode cache: evicting an
+  /// off-budget bitmap has to free the memory without forgetting the
+  /// object, which would need a real removal op nobody sent. The object
+  /// simply stops painting until it is fetched and hydrated again, the same
+  /// as one still waiting on its first decode.
+  void evictImageBitmap(String id) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    final image = stroke?.image;
+    if (image == null) return;
+    stroke!.image = null;
+    image.dispose();
     notifyListeners();
   }
 

@@ -99,11 +99,19 @@ class CanvasSync {
     required this.document,
     required this.coldFetch,
     required this.forgetFetchedRegion,
+    this.onObjectPlaced,
   });
 
   final String channelId;
   final api.SlimmApi client;
   final CanvasDocument document;
+
+  /// Fires for every object a catch-up `place` op actually applies, so the
+  /// pane's image hydrator sees an arrival off this path exactly as it does
+  /// a viewport page or a live frame. Optional and defaulted to nothing
+  /// rather than required, since most of this class's own tests have no
+  /// opinion about hydration at all.
+  final void Function(api.CanvasObject object)? onObjectPlaced;
 
   /// The pane's own cold viewport fetch, reused rather than duplicated here:
   /// it alone knows the padded region and owns the pane's fetched-region
@@ -247,7 +255,10 @@ class CanvasSync {
       case api.CanvasPlaceOp(:final object):
         if (object != null) {
           final input = canvasStrokeInputFrom(object);
-          if (input != null) document.applyPlaced(input);
+          if (input != null) {
+            document.applyPlaced(input);
+            onObjectPlaced?.call(object);
+          }
         }
       case api.CanvasRemoveOp(:final objectIds):
         for (final id in objectIds) {
