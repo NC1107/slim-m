@@ -223,8 +223,8 @@ Deliverables:
 - Render layers with narrow RepaintBoundary triggers (background grid, committed strokes, in-flight stroke, images and windows, presence video textures); the presence video layer wired to LiveKit via a track-reference field; the bounded world (roughly plus or minus 5,000,000 logical px) with recentering.
 - Freeform drawing, pasted images and GIFs, movable and resizable windows; a bounded LRU decoded-bitmap cache (96MB iOS, 256MB Linux) with mip-tier swap and an 8-GIF animation cap.
 - Undo as an inverse op with its own sequence, restricted to the object's author or a moderate-permission member; a surfaced soft object cap plus a high hard ceiling with a clear error, never a silent drop.
-- Split canvas rate limits (a strict persisted-op cap and a separate byte-rate cap for ephemeral relay-only preview frames); collapse-to-strip that actually unmounts and suspends the spatial index and paint layers for voice-only participants.
-- A text-based canvas activity-log accessibility fallback.
+- Split canvas rate limits (a strict persisted-op cap and a separate byte-rate cap for ephemeral relay-only preview frames); ~~collapse-to-strip that actually unmounts and suspends the spatial index and paint layers for voice-only participants~~ (closed 2026-08-05: the existing close-canvas path already did this, see CLAUDE.md).
+- ~~A text-based canvas activity-log accessibility fallback.~~ Built 2026-08-05; see CLAUDE.md.
 
 Risks: op-log growth and cache eviction pop-in are managed by compaction and mip-tiers; the day-one object-count and cache tuning is validated against telemetry and adjusted rather than assumed.
 
@@ -239,8 +239,9 @@ See "The canvas, first visible slice: one shared pen (2026-07-30)" in CLAUDE.md 
 `move_canvas_object` and `remove_canvas_object` are still called only by tests (`tests/canvas_write.rs`, `tests/canvas_index.rs`), so the object cursor still has no way to observe a move or a removal, exactly as this phase's design anticipates.
 `canvas_ops` and `canvas_audit_log` still do not exist: this slice's write path has no removal at all, so nothing yet needs an op log or moderation-evidence retention.
 `client/packages/voice_canvas` is a real dependency of `packages/app` now (`canvas_pane.dart` imports it) and its doc comment no longer says spike-only; it describes "a document, three paint layers, and pointer handling," with persistence and the wire protocol in the app layer.
-Exit criteria are still not met: there is no convergence property test, no move, resize or z-order, no images or windows, no undo, no compaction, no LRU bitmap cache, no split rate limits, and no collapse-to-strip or accessibility fallback.
+Exit criteria are still not met: there is no convergence property test, no resize, z-order or windows, no compaction, no LRU bitmap cache, and no split rate limits.
 "Not started" was the wrong headline the moment the write route shipped; "a first slice, not the full build" is the accurate one.
+Move exists now (`CanvasOpsController.beginMove`/`dragMove`/`endMove`, images only), pasted images and undo exist too, and both collapse-to-strip and the accessibility fallback closed 2026-08-05 (see CLAUDE.md).
 
 ## Phase 7 - Administration, Moderation, and Metrics
 

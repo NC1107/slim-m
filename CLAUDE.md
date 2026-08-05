@@ -12,6 +12,46 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## Two Phase 6 canvas deliverables the roadmap had marked open: collapse-to-strip and the text activity log (2026-08-05)
+
+`docs/ROADMAP.md`'s Phase 6 section named two things as still missing: "collapse-to-strip that actually unmounts and suspends the spatial index and paint layers for voice-only participants," and "a text-based canvas activity-log accessibility fallback."
+Read this before touching `canvas_pane.dart`, `canvas_pane_body.dart`, `canvas_activity_log.dart`, or `canvas_sync.dart`'s two new callbacks.
+
+**Collapse-to-strip turned out to already be built, and closing canvas already unmounted it - nothing here needed changing except proving it.**
+`ConversationPane`'s stage ternary (`home_shell.dart`) swaps `CanvasPane` out for a different widget the instant `canvasOpenProvider` clears, and `AppFadeIn`'s key changes with the stage, so the old subtree (and `_CanvasPaneState.dispose()`) is torn down synchronously in the same frame the close button is tapped - no `Offstage`, no `Visibility`, nothing to almost-fix.
+What had never been checked is whether disposal actually freed the expensive thing: a decoded image bitmap.
+`canvas_collapse_disposal_test.dart` hydrates a real image, captures the `ui.Image`, closes the canvas, and asserts `image.debugDisposed` flips true - proof the whole chain (`_CanvasPaneState.dispose()` to `CanvasDocument.dispose()` to `stroke.image?.dispose()`) actually runs, not just that the widget vanished.
+Mutation-tested: dropping `_document.dispose()` fails exactly this test.
+
+**The activity log is fed from two places, and the split matters: catch-up ops carry a disclosed actor, live frames structurally never do.**
+`CanvasActivityLog` (`client/packages/app/lib/src/screens/canvas/canvas_activity_log.dart`) records a `CanvasActivityEntry` (kind, actor, object kind, count, timestamp) for every place/move/remove/clear/restore.
+`GET /canvas/ops` already nulls `actor_id` for a moderation act unless the caller holds `MANAGE_CANVAS` (see the message_ops section above on the canvas's own withheld-actor precedent), so `CanvasSync`'s new `onOpApplied` callback (fired once per catch-up-applied op) hands the log whatever the wire already decided to disclose.
+The live socket frames for those same kinds (`CanvasObjectsRemoved`, `CanvasCleared`, `CanvasObjectsRestored`, `CanvasObjectMoved`) carry no actor field at all, ever, regardless of the receiver's own permissions - `dispatchCanvasLiveEvent` records those with `actorId: null` unconditionally.
+Only `CanvasObjectPlaced` (live or fed) ever carries a real actor, since placing is not a moderation act.
+The log never guesses a name for a null actor and never treats "no actor on the wire" as "ask again": both read as nothing to attribute, and the sentence builder (`describeCanvasActivityEntry`) renders those passively ("An object was removed.") rather than inventing "Someone" for a withheld moderator - a `nameFor` closure only ever resolves a *non-null* id.
+One asymmetry recorded rather than fixed: a manager watching live sees no actor on a live-delivered removal, the identical event a catch-up replay would have shown them the actor for, since the live frame's own wire shape has no field to disclose regardless of permission. That is a pre-existing gap in the live-vs-feed fidelity, not something this work introduced or closed.
+
+**Blocking matches the cursor precedent exactly, by reusing its own shape rather than inventing a second rule.**
+`CanvasActivityLog` takes the identical `bool Function(String userId) isBlocked` signature `CanvasCursorRelay.applyRemote` already filters a remote pointer with, and drops an entry whose actor is blocked before it ever reaches the list. An entry with no actor is never filtered - there is nothing to match a blocked id against.
+
+**A throttled live announcement, not one "someone drew a stroke" per pointer-up.**
+`CanvasActivityLog.announceDelay` (2s default) batches every entry recorded within the quiet window into one summary, flushed via `announcementTick` (a plain int a widget watches for *changing*, not for a specific value - a `ValueNotifier<String>`'s `==`-gated notification would silently swallow two batches that happen to summarize identically).
+`CanvasActivityAnnouncer` is mounted unconditionally by `CanvasPaneBody`, always, regardless of whether the panel itself is open, so a screen-reader user hears about activity without having opened anything.
+A repeated identical announcement text is a known platform limitation (some screen readers dedupe identical consecutive live-region text) left unworked-around, since the only fix - an invisible varying suffix - would corrupt what is literally read aloud.
+
+**The panel is a real navigable list, built from `AppListRow`, not a hand-rolled row.**
+`CanvasActivityPanel` replaces the canvas surface entirely while open (toggled from the overflow menu's "Show/Hide activity log," not a dedicated bar icon, to avoid crowding the bar at phone width) - a summary line ("N objects: X strokes, Y images," from the new `CanvasDocument.liveCountsByKind`) plus a `ListView` of entries, newest first.
+Dumping the real semantics tree (`tester.binding.pipelineOwner.semanticsOwner!.rootSemanticsNode!.toStringDeep()`, not reasoned about on paper) confirmed each row carries `actions: focus, flags: isFocusable` from `AppListRow`'s own `FocusableActionDetector` - a keyboard Tab reaches every entry, not only a screen reader's own swipe navigation - and caught a stale doc comment claiming the row's relative timestamp was excluded from its Semantics label, when the dump showed `AppListRow` merges it into the same label instead.
+The dump is also what the drawing surface and the log-reading panel cannot both be on screen at once explains: opening the panel unmounts `CanvasSurface`, so a person cannot draw while reading the log, or vice versa - a real trade-off from screen real estate at phone width, not something worked around.
+
+**A real bug the panel's own summary line had, caught only because the fix for it was tested against the live-event path rather than a toggle.**
+`CanvasPaneBody` never rebuilds on its own when the document changes - by design, to keep Riverpod and widget rebuilds out of the canvas's render loop (`canvas_pane.dart`'s own module doc explains why).
+The panel branch's first draft called `_summary()` directly with no listener, so it would have frozen at whatever it read when the panel was last toggled open.
+A test that draws locally or toggles the panel closed-then-open cannot catch this, because both already force a fresh rebuild for unrelated reasons; only a live frame arriving from another participant *while the panel stays open* exposes it.
+`_panel()` now wraps in the identical `document.objectCount` `ValueListenableBuilder` the surface branch already uses.
+
+**Three touched files are now further over the 300-line soft budget than before, worth a look before adding more to any of them:** `canvas_pane.dart` (451, was 442), `canvas_sync.dart` (314, was 300), and `canvas_document.dart` in `voice_canvas` (444, was 423). None crossed the 500 hard ceiling and none were split further here, since each addition was small and proportionate to what was already there; the next contributor adding to any of them should budget for a split rather than a fourth small addition.
+
 ## Space usage analytics: the metrics half of Phase 7, finally, and not the way the roadmap specified (2026-08-05)
 
 The owner asked for this by name in the backlog channel: total messages, active hours, "these are server side analytics kind of things so where we have the space settings button we also have a toggle for recording analytics."
