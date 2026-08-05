@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.30.0](https://github.com/NC1107/slim-m/compare/client-v0.29.1...client-v0.30.0) (2026-08-05)
+
+
+### Features
+
+* a per-account notification preference, including mentions only ([#397](https://github.com/NC1107/slim-m/issues/397)) ([9c756f8](https://github.com/NC1107/slim-m/commit/9c756f8fb5c003af1792fe8706cbf52e8635f2a5))
+* **client:** open a profile from a message author, and fix the poll's selection cue ([#390](https://github.com/NC1107/slim-m/issues/390)) ([0890e00](https://github.com/NC1107/slim-m/commit/0890e00f8e77dd8d2c03dd2897edbbf4ef783c5a))
+* **client:** play the notification sounds that have been sitting unused since july ([#394](https://github.com/NC1107/slim-m/issues/394)) ([9d2ebba](https://github.com/NC1107/slim-m/commit/9d2ebba39098648af23b11e6072c26245ed10c1f))
+* multi-user canvas cursors, live and ephemeral ([#400](https://github.com/NC1107/slim-m/issues/400)) ([b4f6b8c](https://github.com/NC1107/slim-m/commit/b4f6b8cc75601cc0c88224c01a50e78a6370dcfb))
+* Space usage analytics, off by default ([#401](https://github.com/NC1107/slim-m/issues/401)) ([f140ca8](https://github.com/NC1107/slim-m/commit/f140ca8154607fe27c68e4e22d7828d3123660a0))
+
+
+### Bug Fixes
+
+* **client:** dock the member pane at half-desktop width, and close the rail handle's gap ([#387](https://github.com/NC1107/slim-m/issues/387)) ([b3661d7](https://github.com/NC1107/slim-m/commit/b3661d75f8cf6922f9e69babbcaaa2ec69f11478))
+* **client:** drop the newline hint and gate the jump arrow on direction ([#388](https://github.com/NC1107/slim-m/issues/388)) ([fe3759a](https://github.com/NC1107/slim-m/commit/fe3759a3b0ddb129bb6a885329cc0728558ff9e1))
+* **client:** tell a missing camera apart from a refused one, and highlight the message under the cursor ([#396](https://github.com/NC1107/slim-m/issues/396)) ([3f762b6](https://github.com/NC1107/slim-m/commit/3f762b6cb82b7d834234f3a4e23ad9a1c18f23e9))
+* **scripts:** drive the e2e voice scenarios through direct join, not the removed lobby ([#383](https://github.com/NC1107/slim-m/issues/383)) ([7f8c377](https://github.com/NC1107/slim-m/commit/7f8c3773e8b3b5b8914caf66e89882496211291e))
+
 ## [0.29.1](https://github.com/NC1107/slim-m/compare/client-v0.29.0...client-v0.29.1) (2026-08-04)
 
 
