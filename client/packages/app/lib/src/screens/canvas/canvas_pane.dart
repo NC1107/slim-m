@@ -24,6 +24,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../../ids.dart';
@@ -33,6 +34,7 @@ import '../../providers/providers.dart';
 import '../../providers/live_events.dart';
 import '../../providers/sync_controller.dart';
 import '../../providers/user_profiles.dart';
+import '../../providers/voice_controller.dart';
 import 'canvas_commit_queue.dart';
 import 'canvas_cursor_relay.dart';
 import 'canvas_image_hydrator.dart';
@@ -393,6 +395,21 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
 
   void _onPointerMoved(Offset world) => _relay.reportLocalPointer(world);
 
+  /// Who to show on the canvas as a camera bubble: nobody, unless this
+  /// device itself has joined a call in this exact channel - a canvas
+  /// viewer who has not joined the call has no LiveKit room to render a
+  /// live texture from at all (`VoiceSession.cameraViewFor` answers nothing
+  /// without one), so there is no video to lay out for anybody in that
+  /// case, not even for participants known some other way.
+  List<VoiceParticipant> _callParticipants() {
+    final voice = ref.watch(voiceControllerProvider);
+    if (voice.channelId != widget.channelId) return const [];
+    final blocks = ref.watch(blocksProvider);
+    return voice.participants
+        .where((p) => !blocks.contains(p.identity))
+        .toList(growable: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final me = ref.watch(meProvider).valueOrNull;
@@ -435,6 +452,10 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           cursors: _cursors,
           cursorColors: AppCanvasColors.cursors,
           onPointerMoved: _onPointerMoved,
+          callParticipants: _callParticipants(),
+          cameraViewFor: ref
+              .read(voiceControllerProvider.notifier)
+              .cameraViewFor,
         ),
       ),
     );

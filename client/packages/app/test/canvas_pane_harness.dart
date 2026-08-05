@@ -145,7 +145,12 @@ class CanvasPaneFixture {
   final List<Map<String, dynamic>> postedOps = [];
   var _opSeq = 0;
 
-  ProviderContainer container() => ProviderContainer(
+  /// A caller that also needs `voiceControllerProvider` or `blocksProvider`
+  /// stubbed (the presence-layer suite) appends onto this rather than this
+  /// fixture growing a case for every consumer's own needs.
+  ProviderContainer container({
+    List<Override> extraOverrides = const [],
+  }) => ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       sessionProvider.overrideWithValue(api.SessionStore(tokens: testTokens)),
@@ -257,6 +262,7 @@ class CanvasPaneFixture {
         ref.onDispose(client.close);
         return client;
       }),
+      ...extraOverrides,
     ],
   );
 }
