@@ -82,6 +82,10 @@ class StrokePainter extends CustomPainter {
 
     for (final slot in document.paintOrder) {
       final stroke = document.strokeAt(slot);
+      if (stroke.kind == CanvasObjectKind.image) {
+        _paintImage(canvas, stroke, camera);
+        continue;
+      }
       canvas.save();
       // Recentering, exactly: a screen-sized translate in Dart doubles keeps Skia's float32 rasteriser away from world coordinates.
       canvas.translate(
@@ -93,6 +97,28 @@ class StrokePainter extends CustomPainter {
       canvas.drawPath(stroke.path, paint);
       canvas.restore();
     }
+  }
+
+  /// Skipped entirely while the app layer's decode is still in flight -
+  /// there is nothing to draw yet, and the object reappears the moment
+  /// [CanvasDocument.setImageBitmap] lands and repaints.
+  void _paintImage(Canvas canvas, CanvasStroke stroke, Camera camera) {
+    final bitmap = stroke.image;
+    if (bitmap == null) return;
+    final dst = Rect.fromLTWH(
+      (stroke.x - camera.x) * camera.zoom,
+      (stroke.y - camera.y) * camera.zoom,
+      stroke.w * camera.zoom,
+      stroke.h * camera.zoom,
+    );
+    final src = Rect.fromLTWH(
+      0,
+      0,
+      bitmap.width.toDouble(),
+      bitmap.height.toDouble(),
+    );
+    canvas.drawImageRect(
+        bitmap, src, dst, Paint()..filterQuality = FilterQuality.medium);
   }
 
   @override

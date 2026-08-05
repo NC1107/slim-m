@@ -16,8 +16,8 @@ String newMessageId() => _uuidV7();
 /// belongs to.
 String newCanvasObjectId() => _uuidV7();
 
-/// The same generator for a canvas op (`remove`, `clear`, `restore`), which is
-/// idempotent by id the same way a placement is.
+/// The same generator for a canvas op (`remove`, `clear`, `restore`, `move`),
+/// which is idempotent by id the same way a placement is.
 String newCanvasOpId() => _uuidV7();
 
 String _uuidV7() {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The canvas op stream: the single ordering authority every mutation -
-/// place, remove, clear, restore - writes into, and the paged catch-up feed
-/// a client reconciling after a drop reads it back through. A sibling of
+/// place, remove, clear, restore, move - writes into, and the paged catch-up
+/// feed a client reconciling after a drop reads it back through. A sibling of
 /// `models_canvas.dart`, which holds the object and viewport-read shapes.
 library;
 
@@ -61,6 +61,17 @@ sealed class CanvasOp {
           createdAt: createdAt,
           targetOp: json['target_op'] as String,
           objectIds: _stringList(json['object_ids']),
+        ),
+      'move' => CanvasMoveOp(
+          seq: seq,
+          id: id,
+          actorId: actorId,
+          createdAt: createdAt,
+          objectId: json['object_id'] as String,
+          x: (json['x'] as num).toDouble(),
+          y: (json['y'] as num).toDouble(),
+          w: (json['w'] as num).toDouble(),
+          h: (json['h'] as num).toDouble(),
         ),
       _ => CanvasUnknownOp(
           seq: seq,
@@ -130,6 +141,28 @@ class CanvasRestoreOp extends CanvasOp {
   final List<String> objectIds;
 }
 
+/// An object was repositioned to `(x, y, w, h)`, without touching its
+/// z-index.
+class CanvasMoveOp extends CanvasOp {
+  const CanvasMoveOp({
+    required super.seq,
+    required super.id,
+    required super.actorId,
+    required super.createdAt,
+    required this.objectId,
+    required this.x,
+    required this.y,
+    required this.w,
+    required this.h,
+  });
+
+  final String objectId;
+  final double x;
+  final double y;
+  final double w;
+  final double h;
+}
+
 /// A kind this client does not recognise. Never skipped by a catch-up:
 /// silently ignoring an unknown kind could mean leaving ink on screen the
 /// server has since removed, so a caller resets rather than skips it.
@@ -175,7 +208,8 @@ class CanvasOpsPage {
       );
 }
 
-/// The answer to submitting one canvas op (`remove`, `clear`, or `restore`).
+/// The answer to submitting one canvas op (`remove`, `clear`, `restore`, or
+/// `move`).
 class CanvasOpResult {
   const CanvasOpResult({required this.op, required this.fresh});
 

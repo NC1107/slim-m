@@ -207,6 +207,25 @@ sealed class ServerEvent {
           x: (decoded['x'] as num).toDouble(),
           y: (decoded['y'] as num).toDouble(),
         ),
+      'canvas.object.moved'
+          when decoded['channel_id'] is String &&
+              decoded['seq'] is int &&
+              decoded['op_id'] is String &&
+              decoded['object_id'] is String &&
+              decoded['x'] is num &&
+              decoded['y'] is num &&
+              decoded['w'] is num &&
+              decoded['h'] is num =>
+        CanvasObjectMoved(
+          channelId: decoded['channel_id'] as String,
+          seq: decoded['seq'] as int,
+          opId: decoded['op_id'] as String,
+          objectId: decoded['object_id'] as String,
+          x: (decoded['x'] as num).toDouble(),
+          y: (decoded['y'] as num).toDouble(),
+          w: (decoded['w'] as num).toDouble(),
+          h: (decoded['h'] as num).toDouble(),
+        ),
       'pong' => const PongEvent(),
       'error' => ErrorEvent(decoded['message'] as String? ?? 'unknown'),
       _ => null,

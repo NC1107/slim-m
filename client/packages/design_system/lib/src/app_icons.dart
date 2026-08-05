@@ -110,6 +110,9 @@ abstract final class AppIcons {
   static const IconData eraser = LucideIcons.eraser300;
   static const IconData undo = LucideIcons.undo2300;
 
+  /// The canvas's select-and-drag tool, for repositioning a placed object.
+  static const IconData select = LucideIcons.move300;
+
   // Account.
   static const IconData signOut = LucideIcons.logOut300;
   static const IconData account = LucideIcons.circleUser300;

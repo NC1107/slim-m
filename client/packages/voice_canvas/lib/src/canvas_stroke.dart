@@ -7,8 +7,15 @@
 /// imported it for these types has to change.
 library;
 
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
+
+/// What a placed object is. `stroke` is pen ink; `image` is a pasted picture,
+/// decoded and painted by the app layer, which is the one place this package
+/// steps outside pure geometry.
+enum CanvasObjectKind { stroke, image }
 
 /// How many erased ids [CanvasDocument] remembers so an in-flight fetch
 /// cannot resurrect one, matching the server's own `MAX_OBJECTS_PER_CHANNEL`:
@@ -85,6 +92,8 @@ class CanvasStrokeInput {
     required this.width,
     required this.colorKey,
     this.authorId,
+    this.kind = CanvasObjectKind.stroke,
+    this.attachmentId,
   });
 
   final String id;
@@ -95,19 +104,27 @@ class CanvasStrokeInput {
   final double w;
   final double h;
 
-  /// Flat `[x0,y0,x1,y1,...]`, relative to [x] and [y], in world units.
+  /// Flat `[x0,y0,x1,y1,...]`, relative to [x] and [y], in world units. Empty
+  /// for an [CanvasObjectKind.image]: a picture has no path, only its box.
   final List<double> points;
   final double width;
 
   /// A design-token role name. An unrecognised one renders as the default ink
   /// rather than being dropped, because the set is closed and a row is
   /// durable: a client too old to know a colour must still draw the mark.
+  /// Meaningless for an image.
   final String colorKey;
 
   /// Null for a locally drawn stroke still awaiting its first server answer,
   /// or once the author's account has been anonymized. The eraser scopes a
   /// hit test on this, so an anonymized object is nobody's own ink.
   final String? authorId;
+
+  final CanvasObjectKind kind;
+
+  /// The attachment an [CanvasObjectKind.image] names, so the app layer knows
+  /// which bytes to fetch and decode. Null for a stroke.
+  final String? attachmentId;
 }
 
 /// A stroke ready to paint: its [Path] is built once, at insert, in
@@ -124,6 +141,11 @@ class CanvasStroke {
     required this.zIndex,
     required this.seq,
     this.authorId,
+    this.kind = CanvasObjectKind.stroke,
+    this.w = 0,
+    this.h = 0,
+    this.attachmentId,
+    this.image,
   });
 
   final String id;
@@ -135,6 +157,25 @@ class CanvasStroke {
 
   /// See [CanvasStrokeInput.authorId].
   final String? authorId;
+
+  final CanvasObjectKind kind;
+
+  /// The object's own extent, needed to paint an [CanvasObjectKind.image]
+  /// (which has no [path] to bound it) and to reposition either kind on a
+  /// move.
+  final double w;
+  final double h;
+
+  /// See [CanvasStrokeInput.attachmentId].
+  final String? attachmentId;
+
+  /// The decoded bitmap for an [CanvasObjectKind.image], set once the app
+  /// layer has fetched and decoded [attachmentId]'s bytes. Null until then,
+  /// and always null for a stroke. Owned by this object: disposed when the
+  /// slot holding it is freed or the document is reset, never shared across
+  /// two placements of the same attachment (see the package's own doc on
+  /// what that costs).
+  ui.Image? image;
 
   /// Every point in absolute world coordinates, for hit testing against a
   /// world-space pointer with no per-call offset arithmetic.

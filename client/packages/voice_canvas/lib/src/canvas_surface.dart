@@ -20,9 +20,10 @@ typedef PointerMoved = void Function(Offset worldPoint);
 
 /// Which gesture a single pointer draws.
 ///
-/// Two tools is a toggle, not a dock: a picker over one item is a control
-/// that cannot change anything.
-enum CanvasTool { pen, eraser }
+/// Three tools is still a toggle row, not a dock: nothing here needs a
+/// picker with more options than fit on one line, and a floating panel would
+/// only add a container around the same three buttons.
+enum CanvasTool { pen, eraser, select }
 
 /// The canvas itself.
 ///
@@ -41,6 +42,9 @@ class CanvasSurface extends StatefulWidget {
     required this.onStroke,
     this.onErase,
     this.onEraseEnd,
+    this.onSelectStart,
+    this.onSelectDrag,
+    this.onSelectEnd,
     this.tool = CanvasTool.pen,
     this.strokeWidth = 3,
     this.enabled = true,
@@ -85,6 +89,21 @@ class CanvasSurface extends StatefulWidget {
   /// submit whatever [onErase] collected as one removal rather than one per
   /// point, which is what makes undoing an erase drag a single op.
   final VoidCallback? onEraseEnd;
+
+  /// Fires on pointer-down while [tool] is [CanvasTool.select], in world
+  /// coordinates. Resolving whether an object was actually picked up (and
+  /// which one) is the caller's job, the same division [onErase] already
+  /// draws, so this widget carries no notion of hit testing either.
+  final ValueChanged<Offset>? onSelectStart;
+
+  /// Fires on every pointer move while [tool] is [CanvasTool.select] and a
+  /// drag is under way, in world coordinates.
+  final ValueChanged<Offset>? onSelectDrag;
+
+  /// Fires once a select-drag ends - the last pointer lifting - so the
+  /// caller can commit the final position as one op rather than one per
+  /// move, the same shape [onEraseEnd] already uses.
+  final VoidCallback? onSelectEnd;
 
   /// False freezes the pen and leaves pan and zoom alone, which is what a
   /// timed-out member gets: they keep seeing the canvas and cannot add to it.
@@ -142,21 +161,27 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
       return;
     }
     if (!widget.enabled) return;
-    if (widget.tool == CanvasTool.eraser) {
-      widget.onErase?.call(_toWorld(event.localPosition));
-      return;
+    switch (widget.tool) {
+      case CanvasTool.eraser:
+        widget.onErase?.call(_toWorld(event.localPosition));
+      case CanvasTool.select:
+        widget.onSelectStart?.call(_toWorld(event.localPosition));
+      case CanvasTool.pen:
+        _draft.begin(event.localPosition);
     }
-    _draft.begin(event.localPosition);
   }
 
   void _move(PointerMoveEvent event) {
     widget.onPointerMoved?.call(_toWorld(event.localPosition));
     if (_pointers != 1 || !widget.enabled) return;
-    if (widget.tool == CanvasTool.eraser) {
-      widget.onErase?.call(_toWorld(event.localPosition));
-      return;
+    switch (widget.tool) {
+      case CanvasTool.eraser:
+        widget.onErase?.call(_toWorld(event.localPosition));
+      case CanvasTool.select:
+        widget.onSelectDrag?.call(_toWorld(event.localPosition));
+      case CanvasTool.pen:
+        _draft.extend(event.localPosition);
     }
-    _draft.extend(event.localPosition);
   }
 
   /// A pointer moving with nothing pressed - drawing or erasing never
@@ -168,14 +193,17 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
 
   void _up(PointerEvent event) {
     _pointers = (_pointers - 1).clamp(0, 10);
-    if (widget.tool == CanvasTool.eraser) {
-      if (_pointers == 0) widget.onEraseEnd?.call();
-      return;
+    switch (widget.tool) {
+      case CanvasTool.eraser:
+        if (_pointers == 0) widget.onEraseEnd?.call();
+      case CanvasTool.select:
+        if (_pointers == 0) widget.onSelectEnd?.call();
+      case CanvasTool.pen:
+        if (_draft.isEmpty) return;
+        final screen = _draft.take();
+        if (screen.length < 2) return;
+        widget.onStroke(screen.map(_toWorld).toList(growable: false));
     }
-    if (_draft.isEmpty) return;
-    final screen = _draft.take();
-    if (screen.length < 2) return;
-    widget.onStroke(screen.map(_toWorld).toList(growable: false));
   }
 
   void _signal(PointerSignalEvent event) {
