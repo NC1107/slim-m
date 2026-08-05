@@ -177,6 +177,19 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
     super.dispose();
   }
 
+  /// The one cursor a tool switch justifies changing, never a per-hover one:
+  /// this widget deliberately never rebuilds for anything the pointer does
+  /// (see the library doc), and a cursor keyed to hover position would need
+  /// exactly that. A disabled surface (a timed-out member) shows the plain
+  /// arrow regardless of tool, since nothing here would answer a click.
+  MouseCursor _cursorFor(CanvasTool tool, bool enabled) {
+    if (!enabled) return SystemMouseCursors.basic;
+    return switch (tool) {
+      CanvasTool.pen || CanvasTool.eraser => SystemMouseCursors.precise,
+      CanvasTool.select => SystemMouseCursors.grab,
+    };
+  }
+
   Offset _toWorld(Offset screen) {
     final camera = widget.document.camera;
     return Offset(
@@ -306,28 +319,31 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
         WidgetsBinding.instance.addPostFrameCallback(
           (_) => widget.document.setViewport(size),
         );
-        return Listener(
-          onPointerDown: _down,
-          onPointerMove: _move,
-          onPointerHover: _hover,
-          onPointerUp: _up,
-          onPointerCancel: _up,
-          onPointerSignal: _signal,
-          child: GestureDetector(
-            onScaleStart: _scaleBegin,
-            onScaleUpdate: _scaleUpdate,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                RepaintBoundary(child: CustomPaint(painter: _grid)),
-                RepaintBoundary(child: CustomPaint(painter: _strokes)),
-                RepaintBoundary(child: CustomPaint(painter: _draftPainter)),
-                if (_selectionPainter case final selectionPainter?)
-                  RepaintBoundary(
-                      child: CustomPaint(painter: selectionPainter)),
-                if (_cursorPainter case final cursorPainter?)
-                  RepaintBoundary(child: CustomPaint(painter: cursorPainter)),
-              ],
+        return MouseRegion(
+          cursor: _cursorFor(widget.tool, widget.enabled),
+          child: Listener(
+            onPointerDown: _down,
+            onPointerMove: _move,
+            onPointerHover: _hover,
+            onPointerUp: _up,
+            onPointerCancel: _up,
+            onPointerSignal: _signal,
+            child: GestureDetector(
+              onScaleStart: _scaleBegin,
+              onScaleUpdate: _scaleUpdate,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  RepaintBoundary(child: CustomPaint(painter: _grid)),
+                  RepaintBoundary(child: CustomPaint(painter: _strokes)),
+                  RepaintBoundary(child: CustomPaint(painter: _draftPainter)),
+                  if (_selectionPainter case final selectionPainter?)
+                    RepaintBoundary(
+                        child: CustomPaint(painter: selectionPainter)),
+                  if (_cursorPainter case final cursorPainter?)
+                    RepaintBoundary(child: CustomPaint(painter: cursorPainter)),
+                ],
+              ),
             ),
           ),
         );

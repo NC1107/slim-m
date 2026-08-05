@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/context_menu_focus.dart';
 
 /// The bar's own overflow trigger and the confirm dialog behind Clear.
 ///
@@ -99,6 +100,7 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
         child: AppIconButton(
           icon: AppIcons.moreVertical,
           semanticLabel: 'More canvas actions',
+          tooltip: 'More canvas actions',
           onPressed: _controller.toggle,
         ),
       ),
@@ -115,6 +117,24 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
     widget.onSendToBack(objectId);
   }
 
+  Widget _shortcutHint(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const AppKbd('Ctrl'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Text(
+            '+',
+            style: AppText.micro.copyWith(color: tokens.textDisabled),
+          ),
+        ),
+        const AppKbd('V'),
+      ],
+    );
+  }
+
   Widget _buildMenu() {
     return Positioned(
       left: 0,
@@ -127,47 +147,55 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
         offset: const Offset(0, 4),
         child: TapRegion(
           onTapOutside: (_) => _controller.hide(),
-          child: ValueListenableBuilder<String?>(
-            valueListenable: widget.selection,
-            builder: (context, selected, _) => AppMenu(
-              width: 200,
-              children: [
-                AppMenuItem(
-                  label: 'Paste image',
-                  leading: AppIcons.clipboardPaste,
-                  onTap: _paste,
-                ),
-                const AppMenuDivider(),
-                AppMenuItem(
-                  label: widget.activityLogOpen
-                      ? 'Hide activity log'
-                      : 'Show activity log',
-                  leading: AppIcons.activityLog,
-                  onTap: _toggleActivityLog,
-                ),
-                if (selected != null) ...[
+          // The same keyboard route the message context menu already earned: Tab reaches every item once open, and Escape closes it.
+          child: ContextMenuKeyboardScope(
+            onDismiss: _controller.hide,
+            child: ValueListenableBuilder<String?>(
+              valueListenable: widget.selection,
+              builder: (context, selected, _) => AppMenu(
+                width: 200,
+                children: [
+                  AppMenuItem(
+                    label: 'Paste image',
+                    leading: AppIcons.clipboardPaste,
+                    // Ctrl+V already works from anywhere in the pane (see canvas_pane.dart's CallbackShortcuts); nothing said so until this hint, and a touch layout drops it, the same "no finger can press it" rule the channel search field's own Ctrl+K hint already follows.
+                    trailing: AppTouchTargets.of(context)
+                        ? null
+                        : _shortcutHint(context),
+                    onTap: _paste,
+                  ),
                   const AppMenuDivider(),
                   AppMenuItem(
-                    label: 'Bring to front',
-                    leading: AppIcons.bringToFront,
-                    onTap: () => _bringToFront(selected),
+                    label: widget.activityLogOpen
+                        ? 'Hide activity log'
+                        : 'Show activity log',
+                    leading: AppIcons.activityLog,
+                    onTap: _toggleActivityLog,
                   ),
-                  AppMenuItem(
-                    label: 'Send to back',
-                    leading: AppIcons.sendToBack,
-                    onTap: () => _sendToBack(selected),
-                  ),
+                  if (selected != null) ...[
+                    const AppMenuDivider(),
+                    AppMenuItem(
+                      label: 'Bring to front',
+                      leading: AppIcons.bringToFront,
+                      onTap: () => _bringToFront(selected),
+                    ),
+                    AppMenuItem(
+                      label: 'Send to back',
+                      leading: AppIcons.sendToBack,
+                      onTap: () => _sendToBack(selected),
+                    ),
+                  ],
+                  if (widget.canManage) ...[
+                    const AppMenuDivider(),
+                    AppMenuItem(
+                      label: 'Clear canvas',
+                      leading: AppIcons.delete,
+                      tone: AppMenuItemTone.danger,
+                      onTap: () => unawaited(_requestClear()),
+                    ),
+                  ],
                 ],
-                if (widget.canManage) ...[
-                  const AppMenuDivider(),
-                  AppMenuItem(
-                    label: 'Clear canvas',
-                    leading: AppIcons.delete,
-                    tone: AppMenuItemTone.danger,
-                    onTap: () => unawaited(_requestClear()),
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         ),

@@ -94,12 +94,17 @@ class CanvasBar extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.s8),
           Expanded(
-            child: Text(
-              'Canvas',
-              overflow: TextOverflow.ellipsis,
-              style: AppText.body.copyWith(
-                color: tokens.textPrimary,
-                fontWeight: AppWeights.medium,
+            // A bare Text here merges upward into the pane's outer Focus scope rather than staying its own node - the same AppBar-title trap CLAUDE.md already names, found here only by dumping the real semantics tree.
+            child: Semantics(
+              container: true,
+              header: true,
+              child: Text(
+                'Canvas',
+                overflow: TextOverflow.ellipsis,
+                style: AppText.body.copyWith(
+                  color: tokens.textPrimary,
+                  fontWeight: AppWeights.medium,
+                ),
               ),
             ),
           ),
@@ -107,6 +112,7 @@ class CanvasBar extends StatelessWidget {
           AppIconButton(
             icon: AppIcons.pen,
             semanticLabel: 'Pen',
+            tooltip: 'Pen',
             active: tool == CanvasTool.pen,
             onPressed: () => onToolChanged(CanvasTool.pen),
           ),
@@ -114,6 +120,7 @@ class CanvasBar extends StatelessWidget {
           AppIconButton(
             icon: AppIcons.eraser,
             semanticLabel: 'Eraser',
+            tooltip: 'Eraser',
             active: tool == CanvasTool.eraser,
             onPressed: () => onToolChanged(CanvasTool.eraser),
           ),
@@ -121,6 +128,10 @@ class CanvasBar extends StatelessWidget {
           AppIconButton(
             icon: AppIcons.select,
             semanticLabel: 'Move',
+            // Answers two things nothing else on screen says: this tool only picks up a placed image, and Shift is what frees the aspect ratio while resizing.
+            tooltip:
+                'Move an image · hold Shift while resizing to free the '
+                'aspect ratio',
             active: tool == CanvasTool.select,
             onPressed: () => onToolChanged(CanvasTool.select),
           ),
@@ -128,6 +139,8 @@ class CanvasBar extends StatelessWidget {
           AppIconButton(
             icon: AppIcons.undo,
             semanticLabel: 'Undo',
+            // Disabled must say why, not only look greyed out - the same "state why unavailable" rule the design language sets for every other disabled control here.
+            tooltip: canUndo ? 'Undo' : 'Nothing to undo yet',
             onPressed: canUndo ? onUndo : null,
           ),
           const SizedBox(width: AppSpacing.s4),
@@ -146,6 +159,7 @@ class CanvasBar extends StatelessWidget {
           AppIconButton(
             icon: AppIcons.dismiss,
             semanticLabel: 'Close canvas',
+            tooltip: 'Close canvas',
             onPressed: onClose,
           ),
         ],

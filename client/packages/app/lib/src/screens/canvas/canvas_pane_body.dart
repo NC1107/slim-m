@@ -185,7 +185,13 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     builder: (context, count, child) => Semantics(
       container: true,
       label: widget.loading ? 'Canvas, loading' : 'Canvas, ${_summary()}',
-      child: child,
+      child: Stack(
+        children: [
+          child!,
+          // A blank canvas otherwise looks identical to a broken one; the screen-reader label above already says so, so this is ignored by pointers and excluded from semantics rather than doubling that node.
+          if (count == 0 && !widget.loading) _emptyHint(tokens),
+        ],
+      ),
     ),
     child: Stack(
       children: [
@@ -215,6 +221,41 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           cameraViewFor: widget.cameraViewFor,
         ),
       ],
+    ),
+  );
+
+  Widget _emptyHint(AppTokens tokens) => Positioned.fill(
+    child: IgnorePointer(
+      child: ExcludeSemantics(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  AppIcons.pen,
+                  size: AppSizes.icon24,
+                  color: tokens.textDisabled,
+                ),
+                const SizedBox(height: AppSpacing.s8),
+                Text(
+                  'Nothing on this canvas yet',
+                  style: AppText.body.copyWith(color: tokens.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.s4),
+                Text(
+                  'Draw with the pen, or paste an image from '
+                  '"More canvas actions"',
+                  style: AppText.caption.copyWith(color: tokens.textDisabled),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     ),
   );
 
