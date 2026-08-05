@@ -75,6 +75,12 @@ pub enum CanvasOpBody {
         w: f64,
         h: f64,
     },
+    /// An object's paint order was set to `z_index`, without touching its
+    /// bounds.
+    Reorder {
+        object_id: CanvasObjectId,
+        z_index: i64,
+    },
 }
 
 /// Writes the op row a placement produces, under the `seq` the object itself
@@ -164,6 +170,7 @@ impl Store {
                       o.target_op AS "target_op: CanvasOpId", o.created_at AS "created_at!: i64",
                       o.move_x AS "move_x: f64", o.move_y AS "move_y: f64",
                       o.move_w AS "move_w: f64", o.move_h AS "move_h: f64",
+                      o.reorder_z AS "reorder_z: i64",
                       obj.id AS "obj_id?: CanvasObjectId", obj.kind AS "obj_kind?: String",
                       obj.z_index AS "obj_z_index?: i64", obj.x AS "obj_x?: f64",
                       obj.y AS "obj_y?: f64", obj.w AS "obj_w?: f64", obj.h AS "obj_h?: f64",
@@ -278,7 +285,20 @@ impl Store {
                                 .context("canvas_op_move_bounds guarantees this")?,
                         }
                     }
-                    other => anyhow::bail!("canvas_op_kind admits only 5 kinds, got {other}"),
+                    "reorder" => {
+                        let object_id = targets_by_seq
+                            .get(&row.seq)
+                            .and_then(|ids| ids.first())
+                            .copied()
+                            .context("a reorder op always writes its own target row")?;
+                        CanvasOpBody::Reorder {
+                            object_id,
+                            z_index: row
+                                .reorder_z
+                                .context("canvas_op_reorder_z guarantees this")?,
+                        }
+                    }
+                    other => anyhow::bail!("canvas_op_kind admits only 6 kinds, got {other}"),
                 };
                 Ok(CanvasOpEntry {
                     seq: row.seq,

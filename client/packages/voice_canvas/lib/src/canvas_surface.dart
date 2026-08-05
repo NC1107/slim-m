@@ -10,6 +10,7 @@ import 'package:flutter/widgets.dart';
 import 'canvas_cursors.dart';
 import 'canvas_document.dart';
 import 'canvas_painters.dart';
+import 'selection_painter.dart';
 
 /// A pen stroke the surface has finished and wants committed.
 typedef StrokeCommitted = void Function(List<Offset> worldPoints);
@@ -53,11 +54,22 @@ class CanvasSurface extends StatefulWidget {
     this.onPointerMoved,
     this.placeholderFill = const Color(0xFFB9C0C8),
     this.placeholderIcon = const Color(0xFF6C757E),
+    this.selectionOutline,
+    this.selectionHandleFill,
+    this.selectionHandleBorder,
   });
 
   final CanvasDocument document;
   final Color ink;
   final Color gridLine;
+
+  /// The selection outline and resize-handle colours. Null renders no
+  /// selection layer at all, the same "pay nothing for it unwired" choice
+  /// [cursors] already makes - a caller with no notion of selection (a test,
+  /// a read-only viewer) does not pay for the extra paint pass.
+  final Color? selectionOutline;
+  final Color? selectionHandleFill;
+  final Color? selectionHandleBorder;
 
   /// The muted fill and glyph colour for an image whose bytes could not be
   /// fetched or decoded. See [StrokePainter]'s own doc for why this draws
@@ -145,6 +157,16 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
           cursors: widget.cursors!,
           document: widget.document,
           colors: widget.cursorColors,
+        );
+  late final SelectionPainter? _selectionPainter = widget.selectionOutline ==
+          null
+      ? null
+      : SelectionPainter(
+          document: widget.document,
+          outline: widget.selectionOutline!,
+          handleFill: widget.selectionHandleFill ?? widget.selectionOutline!,
+          handleBorder:
+              widget.selectionHandleBorder ?? widget.selectionOutline!,
         );
 
   int _pointers = 0;
@@ -300,6 +322,9 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
                 RepaintBoundary(child: CustomPaint(painter: _grid)),
                 RepaintBoundary(child: CustomPaint(painter: _strokes)),
                 RepaintBoundary(child: CustomPaint(painter: _draftPainter)),
+                if (_selectionPainter case final selectionPainter?)
+                  RepaintBoundary(
+                      child: CustomPaint(painter: selectionPainter)),
                 if (_cursorPainter case final cursorPainter?)
                   RepaintBoundary(child: CustomPaint(painter: cursorPainter)),
               ],

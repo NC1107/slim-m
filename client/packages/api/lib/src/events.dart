@@ -226,6 +226,19 @@ sealed class ServerEvent {
           w: (decoded['w'] as num).toDouble(),
           h: (decoded['h'] as num).toDouble(),
         ),
+      'canvas.object.reordered'
+          when decoded['channel_id'] is String &&
+              decoded['seq'] is int &&
+              decoded['op_id'] is String &&
+              decoded['object_id'] is String &&
+              decoded['z_index'] is int =>
+        CanvasObjectReordered(
+          channelId: decoded['channel_id'] as String,
+          seq: decoded['seq'] as int,
+          opId: decoded['op_id'] as String,
+          objectId: decoded['object_id'] as String,
+          zIndex: decoded['z_index'] as int,
+        ),
       'pong' => const PongEvent(),
       'error' => ErrorEvent(decoded['message'] as String? ?? 'unknown'),
       _ => null,

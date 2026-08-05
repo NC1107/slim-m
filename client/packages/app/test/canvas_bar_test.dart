@@ -28,6 +28,9 @@ CanvasBar _bar({
   ValueListenable<int>? objectCount,
   Future<void> Function()? onClear,
   VoidCallback? onPasteImage,
+  ValueListenable<String?>? selection,
+  ValueChanged<String>? onBringToFront,
+  ValueChanged<String>? onSendToBack,
 }) => CanvasBar(
   channelId: 'c1',
   onClose: () {},
@@ -39,6 +42,9 @@ CanvasBar _bar({
   objectCount: objectCount ?? ValueNotifier<int>(3),
   onClear: onClear ?? () async {},
   onPasteImage: onPasteImage ?? () {},
+  selection: selection ?? ValueNotifier<String?>(null),
+  onBringToFront: onBringToFront ?? (_) {},
+  onSendToBack: onSendToBack ?? (_) {},
 );
 
 void main() {
@@ -145,6 +151,53 @@ void main() {
     expect(find.text('Paste image'), findsOneWidget);
     expect(find.text('Clear canvas'), findsOneWidget);
   });
+
+  testWidgets(
+    'Bring to front and Send to back are absent with nothing selected',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(_bar(selection: ValueNotifier<String?>(null))),
+      );
+
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bring to front'), findsNothing);
+      expect(find.text('Send to back'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Bring to front and Send to back appear and fire with an object selected',
+    (tester) async {
+      String? front;
+      String? back;
+      await tester.pumpWidget(
+        _wrap(
+          _bar(
+            selection: ValueNotifier<String?>('obj-1'),
+            onBringToFront: (id) => front = id,
+            onSendToBack: (id) => back = id,
+          ),
+        ),
+      );
+
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Bring to front'), findsOneWidget);
+      expect(find.text('Send to back'), findsOneWidget);
+
+      await tester.tap(find.text('Bring to front'));
+      await tester.pump();
+      expect(front, 'obj-1');
+
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Send to back'));
+      await tester.pump();
+      expect(back, 'obj-1');
+    },
+  );
 
   testWidgets(
     'clearing goes through a menu, then a confirm naming the count, and '

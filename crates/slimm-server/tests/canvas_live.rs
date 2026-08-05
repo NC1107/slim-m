@@ -190,6 +190,24 @@ fn move_request(channel: ChannelId, token: &str, object_id: &str) -> Request<Bod
         .unwrap()
 }
 
+fn reorder_request(channel: ChannelId, token: &str, object_id: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(format!("/channels/{channel}/canvas/ops"))
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "id": Uuid::now_v7().to_string(),
+                "kind": "reorder",
+                "object_id": object_id,
+                "z_index": 500,
+            })
+            .to_string(),
+        ))
+        .unwrap()
+}
+
 fn restore_request(channel: ChannelId, token: &str, target_op: &str) -> Request<Body> {
     Request::builder()
         .method("POST")
@@ -328,15 +346,16 @@ async fn a_canvas_burst_does_not_disconnect_a_text_only_connection() {
     assert_eq!(seen, 60);
 }
 
-/// The same load-bearing property as the placement test above, for the four
+/// The same load-bearing property as the placement test above, for the five
 /// other frames: a member an overwrite denies `USE_CANVAS` must receive
-/// neither a removal, a clear, a restore, nor a move, exactly as she receives
-/// no placement. Extends the reachability guard `extra_bit` exists for:
+/// neither a removal, a clear, a restore, a move, nor a reorder, exactly as
+/// she receives no placement. Extends the reachability guard `extra_bit`
+/// exists for:
 /// reverting it to a `matches!` naming only `CanvasObjectPlaced` fails this
-/// the moment any one of the four fires.
+/// the moment any one of the five fires.
 #[tokio::test]
-async fn a_removal_a_clear_a_restore_and_a_move_need_both_bits_and_a_denied_member_never_sees_any()
-{
+async fn a_removal_a_clear_a_restore_a_move_and_a_reorder_need_both_bits_and_a_denied_member_never_sees_any()
+ {
     let (store, _guard) = new_store().await;
     let state = state_for(&store);
     let (alice_access, alice_ticket, alice) = user_ticket(&store, "alice").await;
@@ -430,11 +449,22 @@ async fn a_removal_a_clear_a_restore_and_a_move_need_both_bits_and_a_denied_memb
     assert_eq!(frame["object_id"], object_id);
     assert_eq!(frame["x"], 9.0);
 
+    let reordered = http::router(state.clone())
+        .oneshot(reorder_request(channel, &alice_access, &object_id))
+        .await
+        .unwrap();
+    assert_eq!(reordered.status(), StatusCode::CREATED);
+    let frame = read_frame(&mut alice_ws).await;
+    assert_eq!(frame["type"], "canvas.object.reordered");
+    assert_eq!(frame["channel_id"], channel.to_string());
+    assert_eq!(frame["object_id"], object_id);
+    assert_eq!(frame["z_index"], 500);
+
     let carol_next =
         tokio::time::timeout(Duration::from_millis(300), read_frame(&mut carol_ws)).await;
     assert!(
         carol_next.is_err(),
-        "carol is denied USE_CANVAS and must receive none of a removal, a clear, a restore, or a move",
+        "carol is denied USE_CANVAS and must receive none of a removal, a clear, a restore, a move, or a reorder",
     );
 }
 

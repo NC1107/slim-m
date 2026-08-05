@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The canvas bar's overflow: always present for "Paste image", since
-/// placing an image needs only the USE_CANVAS bit drawing already does, with
-/// "Clear canvas" appearing inside it only for MANAGE_CANVAS.
+/// placing an image needs only the USE_CANVAS bit drawing already does,
+/// with "Bring to front"/"Send to back" appearing only while something is
+/// selected and "Clear canvas" appearing only for MANAGE_CANVAS.
 library;
 
 import 'dart:async';
@@ -25,12 +26,23 @@ class CanvasOverflowMenu extends StatefulWidget {
     required this.canManage,
     required this.objectCount,
     required this.onClear,
+    required this.selection,
+    required this.onBringToFront,
+    required this.onSendToBack,
   });
 
   final VoidCallback onPasteImage;
   final bool canManage;
   final ValueListenable<int> objectCount;
   final Future<void> Function() onClear;
+
+  /// The one object currently selected for a resize or reorder, or null.
+  /// "Bring to front"/"Send to back" appear only while this holds an id,
+  /// the same "no button that would just do nothing" choice
+  /// `AppSegmentedOption.disabled` already makes elsewhere on this canvas.
+  final ValueListenable<String?> selection;
+  final ValueChanged<String> onBringToFront;
+  final ValueChanged<String> onSendToBack;
 
   @override
   State<CanvasOverflowMenu> createState() => _CanvasOverflowMenuState();
@@ -78,6 +90,16 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
     );
   }
 
+  void _bringToFront(String objectId) {
+    _controller.hide();
+    widget.onBringToFront(objectId);
+  }
+
+  void _sendToBack(String objectId) {
+    _controller.hide();
+    widget.onSendToBack(objectId);
+  }
+
   Widget _buildMenu() {
     return Positioned(
       left: 0,
@@ -90,24 +112,40 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
         offset: const Offset(0, 4),
         child: TapRegion(
           onTapOutside: (_) => _controller.hide(),
-          child: AppMenu(
-            width: 200,
-            children: [
-              AppMenuItem(
-                label: 'Paste image',
-                leading: AppIcons.clipboardPaste,
-                onTap: _paste,
-              ),
-              if (widget.canManage) ...[
-                const AppMenuDivider(),
+          child: ValueListenableBuilder<String?>(
+            valueListenable: widget.selection,
+            builder: (context, selected, _) => AppMenu(
+              width: 200,
+              children: [
                 AppMenuItem(
-                  label: 'Clear canvas',
-                  leading: AppIcons.delete,
-                  tone: AppMenuItemTone.danger,
-                  onTap: () => unawaited(_requestClear()),
+                  label: 'Paste image',
+                  leading: AppIcons.clipboardPaste,
+                  onTap: _paste,
                 ),
+                if (selected != null) ...[
+                  const AppMenuDivider(),
+                  AppMenuItem(
+                    label: 'Bring to front',
+                    leading: AppIcons.bringToFront,
+                    onTap: () => _bringToFront(selected),
+                  ),
+                  AppMenuItem(
+                    label: 'Send to back',
+                    leading: AppIcons.sendToBack,
+                    onTap: () => _sendToBack(selected),
+                  ),
+                ],
+                if (widget.canManage) ...[
+                  const AppMenuDivider(),
+                  AppMenuItem(
+                    label: 'Clear canvas',
+                    leading: AppIcons.delete,
+                    tone: AppMenuItemTone.danger,
+                    onTap: () => unawaited(_requestClear()),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

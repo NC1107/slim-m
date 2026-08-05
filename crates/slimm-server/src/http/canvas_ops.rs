@@ -85,6 +85,10 @@ enum CanvasOpBodyDto {
         w: f64,
         h: f64,
     },
+    Reorder {
+        object_id: String,
+        z_index: i64,
+    },
 }
 
 impl CanvasOpDto {
@@ -140,6 +144,10 @@ impl CanvasOpDto {
                 y,
                 w,
                 h,
+            },
+            CanvasOpBody::Reorder { object_id, z_index } => CanvasOpBodyDto::Reorder {
+                object_id: object_id.to_string(),
+                z_index,
             },
         };
         Self {

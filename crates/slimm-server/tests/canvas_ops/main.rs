@@ -11,6 +11,7 @@ mod feed;
 mod fixtures;
 mod http_gate;
 mod r#move;
+mod reorder;
 mod restore;
 #[path = "../support/mod.rs"]
 mod support;

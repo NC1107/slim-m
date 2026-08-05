@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The canvas op stream: the single ordering authority every mutation -
-/// place, remove, clear, restore, move - writes into, and the paged catch-up
-/// feed a client reconciling after a drop reads it back through. A sibling of
-/// `models_canvas.dart`, which holds the object and viewport-read shapes.
+/// place, remove, clear, restore, move, reorder - writes into, and the paged
+/// catch-up feed a client reconciling after a drop reads it back through. A
+/// sibling of `models_canvas.dart`, which holds the object and
+/// viewport-read shapes.
 library;
 
 import 'models_canvas.dart';
@@ -72,6 +73,14 @@ sealed class CanvasOp {
           y: (json['y'] as num).toDouble(),
           w: (json['w'] as num).toDouble(),
           h: (json['h'] as num).toDouble(),
+        ),
+      'reorder' => CanvasReorderOp(
+          seq: seq,
+          id: id,
+          actorId: actorId,
+          createdAt: createdAt,
+          objectId: json['object_id'] as String,
+          zIndex: json['z_index'] as int,
         ),
       _ => CanvasUnknownOp(
           seq: seq,
@@ -163,6 +172,21 @@ class CanvasMoveOp extends CanvasOp {
   final double h;
 }
 
+/// An object's paint order was set to [zIndex], without touching its bounds.
+class CanvasReorderOp extends CanvasOp {
+  const CanvasReorderOp({
+    required super.seq,
+    required super.id,
+    required super.actorId,
+    required super.createdAt,
+    required this.objectId,
+    required this.zIndex,
+  });
+
+  final String objectId;
+  final int zIndex;
+}
+
 /// A kind this client does not recognise. Never skipped by a catch-up:
 /// silently ignoring an unknown kind could mean leaving ink on screen the
 /// server has since removed, so a caller resets rather than skips it.
@@ -208,8 +232,8 @@ class CanvasOpsPage {
       );
 }
 
-/// The answer to submitting one canvas op (`remove`, `clear`, `restore`, or
-/// `move`).
+/// The answer to submitting one canvas op (`remove`, `clear`, `restore`,
+/// `move`, or `reorder`).
 class CanvasOpResult {
   const CanvasOpResult({required this.op, required this.fresh});
 

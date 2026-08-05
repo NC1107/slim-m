@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: Apache-2.0
+/// Painting the one object [CanvasDocument.selectedObjectId] names: an
+/// outline in screen space, plus resize handles when it is an image - a
+/// stroke has no thinner shape inside its box for a corner drag to distort,
+/// so it is selectable (for reorder) but never grows handles.
+library;
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
+
+import 'canvas_document.dart';
+import 'canvas_resize.dart';
+
+/// Draws the current selection over the committed ink, one layer above
+/// `StrokePainter` in `CanvasSurface`'s stack.
+///
+/// Handle size and hit radius are both fixed screen quantities (see
+/// `canvas_resize.dart`), painted here with no `canvas.scale(zoom)` at all -
+/// unlike `StrokePainter`, which paints ink in world scale. That is what
+/// keeps a handle the same visual size at any zoom: usable up close without
+/// ballooning, and still grabbable zoomed out rather than shrinking to a
+/// point.
+class SelectionPainter extends CustomPainter {
+  SelectionPainter({
+    required this.document,
+    required this.outline,
+    required this.handleFill,
+    required this.handleBorder,
+  }) : super(repaint: Listenable.merge([document, document.selectedObjectId]));
+
+  final CanvasDocument document;
+  final Color outline;
+  final Color handleFill;
+  final Color handleBorder;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final id = document.selectedObjectId.value;
+    if (id == null) return;
+    final bounds = document.objectBounds(id);
+    if (bounds == null) return;
+    final camera = document.camera;
+
+    final screen = Rect.fromLTWH(
+      (bounds.x - camera.x) * camera.zoom,
+      (bounds.y - camera.y) * camera.zoom,
+      bounds.w * camera.zoom,
+      bounds.h * camera.zoom,
+    );
+    final line = Paint()
+      ..color = outline
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawRect(screen, line);
+
+    if (document.kindOf(id) != CanvasObjectKind.image) return;
+    final fill = Paint()..color = handleFill;
+    final border = Paint()
+      ..color = handleBorder
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (final corner in resizeHandleCorners(bounds).values) {
+      final at = Offset(
+        (corner.dx - camera.x) * camera.zoom,
+        (corner.dy - camera.y) * camera.zoom,
+      );
+      final handle = Rect.fromCenter(
+        center: at,
+        width: resizeHandleVisualSize,
+        height: resizeHandleVisualSize,
+      );
+      canvas.drawRect(handle, fill);
+      canvas.drawRect(handle, border);
+    }
+  }
+
+  @override
+  bool shouldRepaint(SelectionPainter oldDelegate) => false;
+}

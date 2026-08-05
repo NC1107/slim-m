@@ -370,19 +370,43 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     if (mounted) setState(() {});
   }
 
+  /// Leaving the select tool deselects, so the outline and its resize
+  /// handles do not linger over a selection nothing can act on any more
+  /// while the pen or eraser is active.
+  void _onToolChanged(CanvasTool tool) {
+    if (tool != CanvasTool.select) _document.selectedObjectId.value = null;
+    setState(() => _tool = tool);
+  }
+
   void _onSelectStart(Offset world) {
     final me = ref.read(meProvider).valueOrNull;
-    _ops.beginMove(
+    _ops.beginSelect(
       world,
       manageCanvas: me?.permissions.hasPermission(Perm.manageCanvas) ?? false,
       selfId: me?.id,
     );
   }
 
-  void _onSelectDrag(Offset world) => _ops.dragMove(world);
+  /// Aspect locks by default; holding Shift frees it. Read fresh on every
+  /// drag point rather than once at [_onSelectStart], so releasing the key
+  /// mid-drag takes effect immediately rather than on the next gesture.
+  void _onSelectDrag(Offset world) => _ops.dragSelect(
+    world,
+    lockAspect: !HardwareKeyboard.instance.isShiftPressed,
+  );
 
   Future<void> _onSelectEnd() async {
-    await _ops.endMove();
+    await _ops.endSelect();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _onBringToFront(String objectId) async {
+    await _ops.bringToFront(objectId);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _onSendToBack(String objectId) async {
+    await _ops.sendToBack(objectId);
     if (mounted) setState(() {});
   }
 
@@ -432,7 +456,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           channelId: widget.channelId,
           onClose: () => ref.read(canvasOpenProvider.notifier).state = null,
           tool: _tool,
-          onToolChanged: (tool) => setState(() => _tool = tool),
+          onToolChanged: _onToolChanged,
           canUndo: _ops.canUndo,
           onUndo: () => unawaited(_onUndo()),
           canManage: manageCanvas,
@@ -449,6 +473,8 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           onSelectStart: _onSelectStart,
           onSelectDrag: _onSelectDrag,
           onSelectEnd: () => unawaited(_onSelectEnd()),
+          onBringToFront: (id) => unawaited(_onBringToFront(id)),
+          onSendToBack: (id) => unawaited(_onSendToBack(id)),
           cursors: _cursors,
           cursorColors: AppCanvasColors.cursors,
           onPointerMoved: _onPointerMoved,

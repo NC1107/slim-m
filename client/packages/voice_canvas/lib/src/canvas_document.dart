@@ -50,6 +50,13 @@ class CanvasDocument extends ChangeNotifier {
   /// so an announcement can be rebuilt on content without firing at pan rate.
   final ValueNotifier<int> objectCount = ValueNotifier<int>(0);
 
+  /// The one object currently selected for a resize or reorder, or null.
+  /// A document-level notifier rather than caller-held state, the same
+  /// reason [objectCount] is: the selection painter needs to repaint on a
+  /// change here with no widget rebuild in between, the render-loop rule
+  /// this whole package exists to keep.
+  final ValueNotifier<String?> selectedObjectId = ValueNotifier<String?>(null);
+
   Camera get camera => _camera;
   Size get viewport => _viewport;
 
@@ -218,6 +225,66 @@ class CanvasDocument extends ChangeNotifier {
     return true;
   }
 
+  /// The kind a live object was placed as, or null if [id] is unknown or has
+  /// been removed. What a resize gesture needs to refuse a stroke: only an
+  /// image has a box with nothing thinner inside it to distort.
+  CanvasObjectKind? kindOf(String id) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    return (stroke != null && stroke.alive) ? stroke.kind : null;
+  }
+
+  /// A live object's author, or null if [id] is unknown, removed, or was
+  /// authored by a since-deleted account. What a resize or reorder gesture
+  /// on the *current selection* needs to decide authorship without a fresh
+  /// hit test - unlike a move or an erase, the pointer is over a handle or a
+  /// toolbar button, not the object itself.
+  String? authorIdOf(String id) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    return (stroke != null && stroke.alive) ? stroke.authorId : null;
+  }
+
+  /// A live object's current `zIndex`, or null if [id] is unknown or has
+  /// been removed.
+  int? zIndexOf(String id) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    return (stroke != null && stroke.alive) ? stroke.zIndex : null;
+  }
+
+  /// Sets a live object's `zIndex` directly, with no reindexing: unlike
+  /// [moveObject], paint order is not part of the spatial grid's own key,
+  /// so there is no slot to free and re-add. Returns false if [id] is
+  /// unknown or has been removed.
+  bool setZIndex(String id, int zIndex) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    if (stroke == null || !stroke.alive) return false;
+    stroke.zIndex = zIndex;
+    return true;
+  }
+
+  /// The lowest and highest `zIndex` this document currently holds live, or
+  /// null if it holds nothing.
+  ///
+  /// Scans every loaded object, not only what [paintOrder]'s cull currently
+  /// keeps: "bring to front" means in front of everything this client
+  /// knows about, not only what fits on screen right now. Correctness for
+  /// a concurrent reorder rests on the server's last-write-wins column, not
+  /// on this being the true deployment-wide extreme - see
+  /// `CanvasOpsController.bringToFront`'s own doc for why that is enough.
+  (int min, int max)? get zIndexRange {
+    int? lo;
+    int? hi;
+    for (final stroke in _strokes) {
+      if (stroke == null || !stroke.alive) continue;
+      lo = lo == null ? stroke.zIndex : math.min(lo, stroke.zIndex);
+      hi = hi == null ? stroke.zIndex : math.max(hi, stroke.zIndex);
+    }
+    return lo == null ? null : (lo, hi!);
+  }
+
   /// Attaches a decoded bitmap to a live [CanvasObjectKind.image] object.
   ///
   /// [image] is disposed immediately, rather than attached, if [id] is no
@@ -353,6 +420,8 @@ class CanvasDocument extends ChangeNotifier {
   void _freeSlot(int slot) {
     final stroke = _strokes[slot];
     if (stroke == null) return;
+    // A dying selection must not stay offered a resize or reorder action.
+    if (selectedObjectId.value == stroke.id) selectedObjectId.value = null;
     scene.remove(slot);
     stroke.image?.dispose();
     _strokes[slot] = null;
@@ -417,6 +486,7 @@ class CanvasDocument extends ChangeNotifier {
   void dispose() {
     _disposeImages();
     objectCount.dispose();
+    selectedObjectId.dispose();
     scene.dispose();
     super.dispose();
   }

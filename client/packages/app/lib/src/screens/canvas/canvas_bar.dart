@@ -24,6 +24,9 @@ class CanvasBar extends StatelessWidget {
     required this.objectCount,
     required this.onClear,
     required this.onPasteImage,
+    required this.selection,
+    required this.onBringToFront,
+    required this.onSendToBack,
   });
 
   final String channelId;
@@ -57,6 +60,13 @@ class CanvasBar extends StatelessWidget {
   /// overflow menu, reachable regardless of MANAGE_CANVAS, since placing an
   /// image needs only the same USE_CANVAS bit drawing already does.
   final VoidCallback onPasteImage;
+
+  /// The one object currently selected for a resize or reorder, or null -
+  /// forwarded to [CanvasOverflowMenu] so its own doc on why "Bring to
+  /// front"/"Send to back" only appear then applies here too.
+  final ValueListenable<String?> selection;
+  final ValueChanged<String> onBringToFront;
+  final ValueChanged<String> onSendToBack;
 
   @override
   Widget build(BuildContext context) {
@@ -118,6 +128,9 @@ class CanvasBar extends StatelessWidget {
             canManage: canManage,
             objectCount: objectCount,
             onClear: onClear,
+            selection: selection,
+            onBringToFront: onBringToFront,
+            onSendToBack: onSendToBack,
           ),
           const SizedBox(width: AppSpacing.s4),
           AppIconButton(

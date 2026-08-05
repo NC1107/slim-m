@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Mints canvas mutation ops - remove, clear, restore, move - and the undo
-/// ledger that reverses them.
+/// Mints canvas mutation ops - remove, clear, restore, move, reorder - and
+/// the undo ledger that reverses them.
 ///
 /// Plain Dart, like `CanvasSync`: nothing here is observed inside a frame,
 /// so it stays off Riverpod, and it never reaches back into the widget tree
@@ -17,6 +17,13 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../../ids.dart';
 import 'canvas_commit_queue.dart';
+
+/// Bring-to-front/send-to-back: split out once resize joined this file and
+/// pushed it over the 500-line hard limit. A part, not a sibling library,
+/// for the same reason `client_canvas.dart` is one of `client.dart`'s: it
+/// reaches this file's private undo stack and document, and Dart privacy is
+/// library-scoped, not file-scoped.
+part 'canvas_ops_controller_reorder.dart';
 
 /// How many gestures [CanvasOpsController] can reverse. About the product,
 /// not the memory: a deeper stack that dies on pane close is a promise the
@@ -55,7 +62,7 @@ class _MoveEntry extends _UndoEntry {
 
 /// One select-drag in progress: the object picked up, its bounds when the
 /// drag began (for [CanvasOpsController.undo] to restore), and the bounds it
-/// currently occupies (updated on every [CanvasOpsController.dragMove]).
+/// currently occupies (updated on every [CanvasOpsController.dragSelect]).
 class _DragState {
   _DragState(
     this.objectId,
@@ -81,6 +88,20 @@ class _DragState {
   double y;
 }
 
+/// One resize-handle drag in progress: which object and corner, its bounds
+/// when the drag began (for [CanvasOpsController.undo] to restore, and as
+/// the anchor [resizeBounds] measures every later point against), and the
+/// bounds it currently previews.
+class _ResizeState {
+  _ResizeState(this.objectId, this.corner, this.fromBounds)
+    : current = fromBounds;
+
+  final String objectId;
+  final ResizeCorner corner;
+  final ({double x, double y, double w, double h}) fromBounds;
+  ({double x, double y, double w, double h}) current;
+}
+
 /// Reconciles the undo stack, the erase tool, and the clear control against
 /// [document] and the server's op stream.
 class CanvasOpsController {
@@ -103,6 +124,7 @@ class CanvasOpsController {
   final Queue<_UndoEntry> _undoStack = Queue<_UndoEntry>();
   final Set<String> _dragBatch = <String>{};
   _DragState? _drag;
+  _ResizeState? _resize;
 
   bool get canUndo => _undoStack.isNotEmpty;
 
@@ -135,6 +157,8 @@ class CanvasOpsController {
         :final fromH,
       ):
         await _undoMove(objectId, fromX, fromY, fromW, fromH);
+      case _ReorderEntry(:final objectId, :final fromZIndex):
+        await _undoReorder(objectId, fromZIndex);
     }
   }
 
@@ -202,16 +226,35 @@ class CanvasOpsController {
     if (opId != null) _pushUndo(_EraseEntry(opId));
   }
 
-  /// Picks up the topmost live image under [world] the caller may move -
-  /// their own, or anybody's with [manageCanvas] - and remembers its
-  /// original bounds so [dragMove] can preview the move locally and
-  /// [undo] can reverse it. A no-op, silently, if nothing movable is there:
-  /// the same "scope at hit-test time" choice [onErasePoint] already makes.
-  void beginMove(
+  /// Grabs a resize handle on the current selection if [world] lands on
+  /// one, or otherwise picks up the topmost live image under [world] the
+  /// caller may move - their own, or anybody's with [manageCanvas] -
+  /// selecting it and remembering its original bounds so [dragSelect] can
+  /// preview locally and [undo] can reverse whichever this turns out to be.
+  /// Deselects, silently, if nothing is there: the same "scope at hit-test
+  /// time" choice [onErasePoint] already makes.
+  ///
+  /// A handle only exists on an image (see `SelectionPainter`'s own doc for
+  /// why a stroke never grows one), so the resize branch is skipped for any
+  /// other kind without needing its own check here.
+  void beginSelect(
     Offset world, {
     required bool manageCanvas,
     required String? selfId,
   }) {
+    final selected = document.selectedObjectId.value;
+    if (selected != null &&
+        document.kindOf(selected) == CanvasObjectKind.image) {
+      final owns = manageCanvas || document.authorIdOf(selected) == selfId;
+      final bounds = document.objectBounds(selected);
+      if (owns && bounds != null) {
+        final corner = hitTestResizeHandle(bounds, world, document.camera.zoom);
+        if (corner != null) {
+          _resize = _ResizeState(selected, corner, bounds);
+          return;
+        }
+      }
+    }
     final id = hitTestImageAt(
       document,
       world,
@@ -219,16 +262,36 @@ class CanvasOpsController {
           manageCanvas ||
           (stroke.authorId != null && stroke.authorId == selfId),
     );
+    document.selectedObjectId.value = id;
     if (id == null) return;
     final bounds = document.objectBounds(id);
     if (bounds == null) return;
     _drag = _DragState(id, bounds.x, bounds.y, bounds.w, bounds.h, world);
   }
 
-  /// Moves whatever [beginMove] picked up so its drag delta from [world]
-  /// matches the object's own displacement, and previews the new position
-  /// locally. Does nothing if nothing is being dragged.
-  void dragMove(Offset world) {
+  /// Continues whichever gesture [beginSelect] started: reshapes the
+  /// selection's box toward [world] if a handle was grabbed ([lockAspect]
+  /// true unless a modifier is held), or moves it by the same drag delta
+  /// otherwise. Does nothing if neither is under way.
+  void dragSelect(Offset world, {required bool lockAspect}) {
+    final resize = _resize;
+    if (resize != null) {
+      resize.current = resizeBounds(
+        corner: resize.corner,
+        original: resize.fromBounds,
+        pointerWorld: world,
+        lockAspect: lockAspect,
+      );
+      document.moveObject(
+        resize.objectId,
+        resize.current.x,
+        resize.current.y,
+        resize.current.w,
+        resize.current.h,
+      );
+      document.refresh();
+      return;
+    }
     final drag = _drag;
     if (drag == null) return;
     drag.x = drag.fromX + (world.dx - drag.anchor.dx);
@@ -237,48 +300,64 @@ class CanvasOpsController {
     document.refresh();
   }
 
-  /// Commits the drag's final position as one `move` op, or does nothing if
-  /// nothing was being dragged or the object never actually moved - picking
-  /// an object up and putting it back down costs no request and pushes no
-  /// undo entry. The position is already showing locally, from [dragMove]'s
-  /// own optimistic updates during the drag; a failure here is what puts it
-  /// back, the same "revert what was already shown" shape a failed placement
-  /// or restore already uses elsewhere in this file.
-  Future<void> endMove() async {
+  /// Commits whichever gesture [beginSelect] started as one `move` op, or
+  /// does nothing if nothing was under way or the box never actually
+  /// changed - picking an object up and putting it back down costs no
+  /// request and pushes no undo entry. The result is already showing
+  /// locally from [dragSelect]'s own optimistic updates; a failure here is
+  /// what puts it back, the same "revert what was already shown" shape a
+  /// failed placement or restore already uses elsewhere in this file.
+  ///
+  /// A resize is a `move` request with a different box, never a distinct
+  /// wire kind - see `canvas_ops_write.rs`'s own doc for why the server has
+  /// no separate notion of the two.
+  Future<void> endSelect() async {
+    final resize = _resize;
+    _resize = null;
+    if (resize != null) {
+      await _commitBounds(
+        resize.objectId,
+        resize.fromBounds,
+        resize.current,
+        'That could not be resized.',
+      );
+      return;
+    }
     final drag = _drag;
     _drag = null;
     if (drag == null) return;
     if (drag.x == drag.fromX && drag.y == drag.fromY) return;
+    await _commitBounds(
+      drag.objectId,
+      (x: drag.fromX, y: drag.fromY, w: drag.fromW, h: drag.fromH),
+      (x: drag.x, y: drag.y, w: drag.fromW, h: drag.fromH),
+      'That could not be moved.',
+    );
+  }
+
+  Future<void> _commitBounds(
+    String objectId,
+    ({double x, double y, double w, double h}) from,
+    ({double x, double y, double w, double h}) to,
+    String errorMessage,
+  ) async {
+    if (to == from) return;
     try {
       await client.submitCanvasOp(
         channelId,
         id: newCanvasOpId(),
         kind: 'move',
-        objectId: drag.objectId,
-        x: drag.x,
-        y: drag.y,
-        w: drag.fromW,
-        h: drag.fromH,
+        objectId: objectId,
+        x: to.x,
+        y: to.y,
+        w: to.w,
+        h: to.h,
       );
-      _pushUndo(
-        _MoveEntry(
-          drag.objectId,
-          drag.fromX,
-          drag.fromY,
-          drag.fromW,
-          drag.fromH,
-        ),
-      );
+      _pushUndo(_MoveEntry(objectId, from.x, from.y, from.w, from.h));
     } on api.ApiException {
-      document.moveObject(
-        drag.objectId,
-        drag.fromX,
-        drag.fromY,
-        drag.fromW,
-        drag.fromH,
-      );
+      document.moveObject(objectId, from.x, from.y, from.w, from.h);
       document.refresh();
-      onError('That could not be moved.');
+      onError(errorMessage);
     }
   }
 

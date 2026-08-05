@@ -113,6 +113,10 @@ abstract final class AppIcons {
   /// The canvas's select-and-drag tool, for repositioning a placed object.
   static const IconData select = LucideIcons.move300;
 
+  /// The canvas's z-order actions, for a selected image overlapping another.
+  static const IconData bringToFront = LucideIcons.bringToFront300;
+  static const IconData sendToBack = LucideIcons.sendToBack300;
+
   // Account.
   static const IconData signOut = LucideIcons.logOut300;
   static const IconData account = LucideIcons.circleUser300;
