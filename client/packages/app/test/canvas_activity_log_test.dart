@@ -243,34 +243,32 @@ void main() {
     expect(log.entries.map((e) => e.id), ['obj-2', 'obj-3', 'obj-4']);
   });
 
-  test(
-    'a burst of changes inside the throttle window announces once, not once '
-    'per change',
-    () {
-      fakeAsync((async) {
-        final log = CanvasActivityLog(
-          isBlocked: (_) => false,
-          announceDelay: const Duration(seconds: 2),
-        );
-        addTearDown(log.dispose);
+  test('a burst of changes inside the throttle window announces once, not once '
+      'per change', () {
+    fakeAsync((async) {
+      final log = CanvasActivityLog(
+        isBlocked: (_) => false,
+        announceDelay: const Duration(seconds: 2),
+      );
+      addTearDown(log.dispose);
 
-        log.recordPlacedLive(_object(id: 'a'));
-        async.elapse(const Duration(seconds: 1));
-        log.recordPlacedLive(_object(id: 'b'));
-        expect(
-          log.announcementTick,
-          0,
-          reason: 'the second change must restart the quiet window, not '
-              'flush early',
-        );
+      log.recordPlacedLive(_object(id: 'a'));
+      async.elapse(const Duration(seconds: 1));
+      log.recordPlacedLive(_object(id: 'b'));
+      expect(
+        log.announcementTick,
+        0,
+        reason:
+            'the second change must restart the quiet window, not '
+            'flush early',
+      );
 
-        async.elapse(const Duration(seconds: 2, milliseconds: 1));
-        expect(log.announcementTick, 1);
+      async.elapse(const Duration(seconds: 2, milliseconds: 1));
+      expect(log.announcementTick, 1);
 
-        final batch = log.takeAnnouncementBatch();
-        expect(batch, hasLength(2));
-        expect(log.takeAnnouncementBatch(), isEmpty);
-      });
-    },
-  );
+      final batch = log.takeAnnouncementBatch();
+      expect(batch, hasLength(2));
+      expect(log.takeAnnouncementBatch(), isEmpty);
+    });
+  });
 }

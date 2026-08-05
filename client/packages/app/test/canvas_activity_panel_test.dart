@@ -81,10 +81,7 @@ void main() {
     (tester) async {
       final container = _container();
       addTearDown(container.dispose);
-      // Not addTearDown: a tearDown callback runs after
-      // TestWidgetsFlutterBinding's own pending-timer check, so the
-      // announce-delay Timer this log starts on its first entry has to be
-      // cancelled inside the test body itself.
+      // Not addTearDown: tearDown runs after the binding's pending-timer check, so the announce Timer must be cancelled in the test body itself.
       final log = CanvasActivityLog(isBlocked: (_) => false);
       log
         ..recordPlacedLive(
@@ -114,8 +111,7 @@ void main() {
 
       expect(find.text('2 objects: 2 strokes'), findsOneWidget);
       expect(find.text('The canvas was cleared.'), findsOneWidget);
-      // AppListRow's own semantics node merges its `meta` timestamp into the
-      // same label, so this matches by substring rather than equality.
+      // AppListRow merges its `meta` timestamp into the same label, hence substring rather than equality.
       expect(
         find.bySemanticsLabel(RegExp(RegExp.escape('The canvas was cleared.'))),
         findsOneWidget,
@@ -123,9 +119,11 @@ void main() {
       // Resolved through the real profile fetch, not left at a raw id.
       expect(find.text('Alice placed a stroke.'), findsOneWidget);
 
-      // The real tree, not a widget read on paper: two rows plus the header,
-      // and nothing merged the way an AppBar title once was.
-      final tree = tester.binding.pipelineOwner.semanticsOwner!
+      // The real tree, not a widget read on paper: two rows plus the header.
+      final tree = tester
+          .binding
+          .pipelineOwner
+          .semanticsOwner!
           .rootSemanticsNode!
           .toStringDeep();
       expect(tree, contains('The canvas was cleared.'));
@@ -135,11 +133,7 @@ void main() {
         2,
         reason: 'both rows must be real Tab stops, not swipe-only',
       );
-      // Dumped once by hand to confirm the real shape (see this file's
-      // header comment): each row carries `actions: focus,
-      // flags: isFocusable`, from `AppListRow`'s own `FocusableActionDetector`
-      // - a keyboard Tab reaches every entry, not only a screen reader's own
-      // swipe navigation - and the summary carries `flags: isHeader`.
+      // Dumped once by hand: each row carries `actions: focus, flags: isFocusable`, so Tab reaches it, not only a screen reader's own swipe.
       log.dispose();
     },
   );
@@ -167,18 +161,13 @@ void main() {
     (tester) async {
       final container = _container();
       addTearDown(container.dispose);
-      // Not addTearDown: see the earlier test's own note on why the
-      // announce Timer has to be cancelled inside the test body.
+      // Not addTearDown: see the earlier test's own note on the announce Timer.
       final log = CanvasActivityLog(
         isBlocked: (_) => false,
         announceDelay: const Duration(milliseconds: 1),
       );
 
-      await _pump(
-        tester,
-        container,
-        CanvasActivityAnnouncer(activityLog: log),
-      );
+      await _pump(tester, container, CanvasActivityAnnouncer(activityLog: log));
       await tester.pump();
 
       final region = find.byKey(CanvasActivityAnnouncer.liveRegionKey);

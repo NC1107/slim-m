@@ -166,10 +166,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
                     )
                   : _surface(tokens),
             ),
-            // Mounted regardless of the panel's own open state, so a
-            // screen-reader user is told about activity even without
-            // having opened it - the panel is for browsing history, not
-            // the only way to hear about it changing.
+            // Mounted regardless of the panel's own open state: browsing history is optional, hearing about it is not.
             CanvasActivityAnnouncer(activityLog: widget.activityLog),
           ],
         ),

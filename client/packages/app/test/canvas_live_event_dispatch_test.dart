@@ -87,9 +87,7 @@ void main() {
   );
 
   test('a live placement records with its own actor', () {
-    dispatch(
-      api.CanvasObjectPlaced(channelId: 'c1', object: _object('a')),
-    );
+    dispatch(api.CanvasObjectPlaced(channelId: 'c1', object: _object('a')));
 
     expect(log.entries.single.kind, CanvasActivityKind.placed);
     expect(log.entries.single.actorId, 'alice');
@@ -166,9 +164,7 @@ void main() {
   });
 
   test('an event for a different channel records nothing', () {
-    dispatch(
-      api.CanvasObjectPlaced(channelId: 'other', object: _object('a')),
-    );
+    dispatch(api.CanvasObjectPlaced(channelId: 'other', object: _object('a')));
 
     expect(log.entries, isEmpty);
   });

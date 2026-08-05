@@ -261,9 +261,7 @@ void main() {
     },
   );
 
-  testWidgets('the overflow label flips once the log is open', (
-    tester,
-  ) async {
+  testWidgets('the overflow label flips once the log is open', (tester) async {
     await tester.pumpWidget(_wrap(_bar(activityLogOpen: true)));
 
     await tester.tap(find.bySemanticsLabel('More canvas actions'));

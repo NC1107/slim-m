@@ -49,24 +49,23 @@ http.Response _json(Object body, [int status = 200]) => http.Response(
   headers: {'content-type': 'application/json'},
 );
 
-api.SlimmApi _fakeApi(
-  http.Response Function(int afterSeq) onOpsRequest,
-) => api.SlimmApi(
-  baseUrl: Uri.parse('http://localhost:8080'),
-  session: api.SessionStore(
-    tokens: const api.TokenPair(
-      userId: 'me',
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      accessExpiresAt: 0,
-    ),
-  ),
-  httpClient: MockClient((request) async {
-    if (!request.url.path.endsWith('/canvas/ops')) return _json(<Object>[]);
-    final afterSeq = int.parse(request.url.queryParameters['after_seq']!);
-    return onOpsRequest(afterSeq);
-  }),
-);
+api.SlimmApi _fakeApi(http.Response Function(int afterSeq) onOpsRequest) =>
+    api.SlimmApi(
+      baseUrl: Uri.parse('http://localhost:8080'),
+      session: api.SessionStore(
+        tokens: const api.TokenPair(
+          userId: 'me',
+          accessToken: 'access',
+          refreshToken: 'refresh',
+          accessExpiresAt: 0,
+        ),
+      ),
+      httpClient: MockClient((request) async {
+        if (!request.url.path.endsWith('/canvas/ops')) return _json(<Object>[]);
+        final afterSeq = int.parse(request.url.queryParameters['after_seq']!);
+        return onOpsRequest(afterSeq);
+      }),
+    );
 
 void main() {
   test('onOpApplied fires once per applied op, in order, and never for a '
@@ -135,28 +134,31 @@ void main() {
     expect(resets, 1);
   });
 
-  test('onHardReset fires when the server reports the cursor unreachable', () async {
-    var resets = 0;
-    final document = CanvasDocument();
-    final sync = CanvasSync(
-      channelId: 'c1',
-      client: _fakeApi(
-        (afterSeq) => _json({
-          'ops': <Object>[],
-          'latest_seq': 0,
-          'has_more': false,
-          'reset': true,
-        }),
-      ),
-      document: document,
-      coldFetch: () async {},
-      forgetFetchedRegion: () {},
-      onHardReset: () => resets++,
-    );
+  test(
+    'onHardReset fires when the server reports the cursor unreachable',
+    () async {
+      var resets = 0;
+      final document = CanvasDocument();
+      final sync = CanvasSync(
+        channelId: 'c1',
+        client: _fakeApi(
+          (afterSeq) => _json({
+            'ops': <Object>[],
+            'latest_seq': 0,
+            'has_more': false,
+            'reset': true,
+          }),
+        ),
+        document: document,
+        coldFetch: () async {},
+        forgetFetchedRegion: () {},
+        onHardReset: () => resets++,
+      );
 
-    sync.seedFromViewport(5);
-    await sync.catchUp();
+      sync.seedFromViewport(5);
+      await sync.catchUp();
 
-    expect(resets, 1);
-  });
+      expect(resets, 1);
+    },
+  );
 }

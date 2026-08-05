@@ -54,9 +54,7 @@ MockClient _imageCanvasClient() => MockClient((request) async {
     });
   }
   if (path.endsWith('/canvas/ops')) {
-    final afterSeq = int.parse(
-      request.url.queryParameters['after_seq'] ?? '0',
-    );
+    final afterSeq = int.parse(request.url.queryParameters['after_seq'] ?? '0');
     return _jsonResponse({
       'ops': <Object>[],
       'latest_seq': afterSeq,
@@ -90,8 +88,7 @@ void main() {
       ]);
       s.container.read(canvasOpenProvider.notifier).state = 'c1';
 
-      // A real codec decode needs real asynchrony; pumpAndSettle alone never
-      // observes it, the same trap canvas_pane_test.dart already documents.
+      // A real codec decode needs real asynchrony (canvas_pane_test.dart's own note); pumpAndSettle alone never observes it.
       await tester.runAsync(() async {
         await pumpAtWidth(tester, s.container, 1400, location: '/channels/c1');
         await Future<void>.delayed(const Duration(milliseconds: 200));
@@ -102,7 +99,8 @@ void main() {
       expect(
         document.paintOrder,
         hasLength(1),
-        reason: 'the fixture placed exactly one image; if hydration never '
+        reason:
+            'the fixture placed exactly one image; if hydration never '
             'ran this assertion catches that rather than a null crash below',
       );
       final image = document.strokeIfAlive(document.paintOrder.single)!.image!;
@@ -119,7 +117,8 @@ void main() {
       expect(
         image.debugDisposed,
         isTrue,
-        reason: 'the canvas pane disposes its document on unmount, which '
+        reason:
+            'the canvas pane disposes its document on unmount, which '
             'frees every decoded bitmap it held - a collapse that left this '
             'resident would spend the 64MB decode budget on a pane nobody '
             'can see',

@@ -169,10 +169,7 @@ class _ActivityRow extends ConsumerWidget {
       );
     }
     final text = describeCanvasActivityEntry(entry, nameFor: (_) => name);
-    // AppListRow, not a hand-rolled row: the same widget the channel rail
-    // and the member list already build every single-line row from, so this
-    // one gets the same keyboard focus ring and touch target for free
-    // rather than a fourth copy of that logic.
+    // AppListRow: the same focusable row the channel rail already uses.
     return AppListRow(label: text, meta: _relativeTime(entry.at));
   }
 }

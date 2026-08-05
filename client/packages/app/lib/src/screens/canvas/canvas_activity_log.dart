@@ -113,7 +113,9 @@ class CanvasActivityLog extends ChangeNotifier {
       case api.CanvasPlaceOp(:final object):
         if (object != null) _recordPlace(op.id, object);
       case api.CanvasRemoveOp(:final actorId, :final objectIds):
-        _add(_entry(op.id, CanvasActivityKind.removed, actorId, objectIds.length));
+        _add(
+          _entry(op.id, CanvasActivityKind.removed, actorId, objectIds.length),
+        );
       case api.CanvasClearOp(:final actorId):
         _add(_entry(op.id, CanvasActivityKind.cleared, actorId, 1));
       case api.CanvasRestoreOp(:final actorId, :final objectIds):
