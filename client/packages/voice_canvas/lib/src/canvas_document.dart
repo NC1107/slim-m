@@ -234,6 +234,17 @@ class CanvasDocument extends ChangeNotifier {
     return (stroke != null && stroke.alive) ? stroke.kind : null;
   }
 
+  /// A live object's author, or null if [id] is unknown, removed, or was
+  /// authored by a since-deleted account. What a resize or reorder gesture
+  /// on the *current selection* needs to decide authorship without a fresh
+  /// hit test - unlike a move or an erase, the pointer is over a handle or a
+  /// toolbar button, not the object itself.
+  String? authorIdOf(String id) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    return (stroke != null && stroke.alive) ? stroke.authorId : null;
+  }
+
   /// A live object's current `zIndex`, or null if [id] is unknown or has
   /// been removed.
   int? zIndexOf(String id) {
@@ -409,6 +420,8 @@ class CanvasDocument extends ChangeNotifier {
   void _freeSlot(int slot) {
     final stroke = _strokes[slot];
     if (stroke == null) return;
+    // A dying selection must not stay offered a resize or reorder action.
+    if (selectedObjectId.value == stroke.id) selectedObjectId.value = null;
     scene.remove(slot);
     stroke.image?.dispose();
     _strokes[slot] = null;

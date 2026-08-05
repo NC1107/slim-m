@@ -96,6 +96,17 @@ void dispatchCanvasLiveEvent(
         document.moveObject(objectId, x, y, w, h);
         document.refresh();
       });
+    case api.CanvasObjectReordered(
+          :final channelId,
+          :final seq,
+          :final objectId,
+          :final zIndex,
+        )
+        when channelId == paneChannelId:
+      sync.applyLive(seq, () {
+        document.setZIndex(objectId, zIndex);
+        document.refresh();
+      });
     default:
       break;
   }

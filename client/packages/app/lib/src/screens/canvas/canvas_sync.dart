@@ -277,6 +277,8 @@ class CanvasSync {
         :final h,
       ):
         document.moveObject(objectId, x, y, w, h);
+      case api.CanvasReorderOp(:final objectId, :final zIndex):
+        document.setZIndex(objectId, zIndex);
       case api.CanvasUnknownOp():
         return false;
     }

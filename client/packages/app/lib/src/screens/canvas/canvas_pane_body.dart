@@ -39,6 +39,8 @@ class CanvasPaneBody extends StatelessWidget {
     required this.onSelectStart,
     required this.onSelectDrag,
     required this.onSelectEnd,
+    required this.onBringToFront,
+    required this.onSendToBack,
     this.cursors,
     this.cursorColors = const [],
     this.onPointerMoved,
@@ -70,6 +72,8 @@ class CanvasPaneBody extends StatelessWidget {
   final ValueChanged<Offset> onSelectStart;
   final ValueChanged<Offset> onSelectDrag;
   final VoidCallback onSelectEnd;
+  final ValueChanged<String> onBringToFront;
+  final ValueChanged<String> onSendToBack;
 
   /// Other participants' live pointers, and the palette their colours are
   /// drawn from. Null renders no cursor layer, the same "cheap to omit"
@@ -105,6 +109,9 @@ class CanvasPaneBody extends StatelessWidget {
               objectCount: document.objectCount,
               onClear: onClear,
               onPasteImage: onPasteImage,
+              selection: document.selectedObjectId,
+              onBringToFront: onBringToFront,
+              onSendToBack: onSendToBack,
             ),
             if (error != null)
               Padding(
@@ -146,6 +153,9 @@ class CanvasPaneBody extends StatelessWidget {
                       gridLine: tokens.borderSubtle,
                       placeholderFill: tokens.surfaceRaised,
                       placeholderIcon: tokens.textDisabled,
+                      selectionOutline: tokens.accentFill,
+                      selectionHandleFill: tokens.surfaceRaised,
+                      selectionHandleBorder: tokens.accentFill,
                       onStroke: onStroke,
                       tool: tool,
                       onErase: onErase,
