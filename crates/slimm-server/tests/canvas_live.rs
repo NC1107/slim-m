@@ -172,6 +172,24 @@ fn clear_request(channel: ChannelId, token: &str, before_seq: i64) -> Request<Bo
         .unwrap()
 }
 
+fn move_request(channel: ChannelId, token: &str, object_id: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(format!("/channels/{channel}/canvas/ops"))
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({
+                "id": Uuid::now_v7().to_string(),
+                "kind": "move",
+                "object_id": object_id,
+                "x": 9.0, "y": 9.0, "w": 9.0, "h": 9.0,
+            })
+            .to_string(),
+        ))
+        .unwrap()
+}
+
 fn restore_request(channel: ChannelId, token: &str, target_op: &str) -> Request<Body> {
     Request::builder()
         .method("POST")
@@ -310,14 +328,15 @@ async fn a_canvas_burst_does_not_disconnect_a_text_only_connection() {
     assert_eq!(seen, 60);
 }
 
-/// The same load-bearing property as the placement test above, for the three
-/// new frames: a member an overwrite denies `USE_CANVAS` must receive
-/// neither a removal, a clear, nor a restore, exactly as she receives no
-/// placement. Extends the reachability guard `extra_bit` exists for: reverting
-/// it to a `matches!` naming only `CanvasObjectPlaced` fails this the moment
-/// any one of the three fires.
+/// The same load-bearing property as the placement test above, for the four
+/// other frames: a member an overwrite denies `USE_CANVAS` must receive
+/// neither a removal, a clear, a restore, nor a move, exactly as she receives
+/// no placement. Extends the reachability guard `extra_bit` exists for:
+/// reverting it to a `matches!` naming only `CanvasObjectPlaced` fails this
+/// the moment any one of the four fires.
 #[tokio::test]
-async fn a_removal_a_clear_and_a_restore_need_both_bits_and_a_denied_member_never_sees_any() {
+async fn a_removal_a_clear_a_restore_and_a_move_need_both_bits_and_a_denied_member_never_sees_any()
+{
     let (store, _guard) = new_store().await;
     let state = state_for(&store);
     let (alice_access, alice_ticket, alice) = user_ticket(&store, "alice").await;
@@ -399,11 +418,23 @@ async fn a_removal_a_clear_and_a_restore_need_both_bits_and_a_denied_member_neve
     assert_eq!(frame["channel_id"], channel.to_string());
     assert_eq!(frame["object_ids"], json!([object_id]));
 
+    // Restored above, so it is live again and movable.
+    let moved = http::router(state.clone())
+        .oneshot(move_request(channel, &alice_access, &object_id))
+        .await
+        .unwrap();
+    assert_eq!(moved.status(), StatusCode::CREATED);
+    let frame = read_frame(&mut alice_ws).await;
+    assert_eq!(frame["type"], "canvas.object.moved");
+    assert_eq!(frame["channel_id"], channel.to_string());
+    assert_eq!(frame["object_id"], object_id);
+    assert_eq!(frame["x"], 9.0);
+
     let carol_next =
         tokio::time::timeout(Duration::from_millis(300), read_frame(&mut carol_ws)).await;
     assert!(
         carol_next.is_err(),
-        "carol is denied USE_CANVAS and must receive neither a removal, a clear, nor a restore",
+        "carol is denied USE_CANVAS and must receive none of a removal, a clear, a restore, or a move",
     );
 }
 

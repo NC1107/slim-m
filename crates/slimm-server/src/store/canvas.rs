@@ -115,6 +115,11 @@ pub enum PlaceError {
     OutOfBounds,
     /// This channel's canvas already holds [`MAX_OBJECTS_PER_CHANNEL`].
     ChannelFull,
+    /// An `image` object named an attachment that was never uploaded, was
+    /// already swept as an orphan, or that this caller may not reference -
+    /// one answer for all three, the same collapse `SendError::AttachmentNotFound`
+    /// already makes for a message attachment.
+    AttachmentNotFound,
     Internal(anyhow::Error),
 }
 
@@ -130,6 +135,15 @@ impl From<anyhow::Error> for PlaceError {
     }
 }
 
+impl From<super::attachments::LinkError> for PlaceError {
+    fn from(err: super::attachments::LinkError) -> Self {
+        match err {
+            super::attachments::LinkError::NotFound => PlaceError::AttachmentNotFound,
+            super::attachments::LinkError::Internal(e) => PlaceError::Internal(e),
+        }
+    }
+}
+
 /// A 24-bit discriminant of a channel id, stored on every object and used as
 /// the R-Tree's third dimension. Drawn from the UUIDv7's random tail, not its
 /// timestamp prefix, which channels created in the same millisecond share.
@@ -138,7 +152,11 @@ pub(crate) fn channel_key(channel_id: ChannelId) -> i64 {
     i64::from(bytes[13]) << 16 | i64::from(bytes[14]) << 8 | i64::from(bytes[15])
 }
 
-fn valid_bounds(x: f64, y: f64, w: f64, h: f64) -> bool {
+/// Whether a bounding box is finite, non-negative, within
+/// [`MAX_OBJECT_EXTENT`] and inside the bounded world. Shared with
+/// `canvas_ops_write`'s `move`, which is the same shape check a placement
+/// already makes.
+pub(crate) fn valid_bounds(x: f64, y: f64, w: f64, h: f64) -> bool {
     [x, y, w, h].iter().all(|v| v.is_finite())
         && w >= 0.0
         && h >= 0.0
@@ -150,22 +168,48 @@ fn valid_bounds(x: f64, y: f64, w: f64, h: f64) -> bool {
         && y + h <= WORLD_LIMIT
 }
 
+/// What [`Store::place_canvas_object`] needs beyond the caller and the
+/// object's identity, grouped so the function stays under the 7-parameter
+/// ceiling rather than growing a longer flat signature.
+pub struct PlaceRequest<'a> {
+    pub kind: &'a str,
+    pub bounds: (f64, f64, f64, f64),
+    pub props: &'a str,
+    /// The sha256 an `image` object's `props.attachment` names, resolved by
+    /// the caller before this runs. `None` for every other kind.
+    pub attachment: Option<&'a [u8]>,
+}
+
 impl Store {
     /// Places an object on a channel's canvas, idempotent by `id` and taking
     /// the next value from that channel's `canvas` sequence stream, which is
     /// independent of its message stream.
+    ///
+    /// `request.attachment`, when present, is checked with the same
+    /// `may_link` this caller's own uploads or already-visible bytes already
+    /// pass for a message, before the write lock is taken, for the reason
+    /// `Store::send_message`'s own note on `may_link` gives.
     pub async fn place_canvas_object(
         &self,
         channel_id: ChannelId,
         author_id: UserId,
         id: CanvasObjectId,
-        kind: &str,
-        bounds: (f64, f64, f64, f64),
-        props: &str,
+        request: PlaceRequest<'_>,
     ) -> Result<Placement, PlaceError> {
+        let PlaceRequest {
+            kind,
+            bounds,
+            props,
+            attachment,
+        } = request;
         let (x, y, w, h) = bounds;
         if !valid_bounds(x, y, w, h) {
             return Err(PlaceError::OutOfBounds);
+        }
+        if let Some(sha256) = attachment
+            && !super::attachments::may_link(self, author_id, sha256).await?
+        {
+            return Err(PlaceError::AttachmentNotFound);
         }
 
         // Reads the id before deciding to write, so the write lock is taken up
@@ -231,6 +275,15 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        if let Some(sha256) = attachment {
+            sqlx::query!(
+                "INSERT INTO canvas_object_attachments (object_id, sha256) VALUES (?, ?)",
+                id,
+                sha256
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
         // Same transaction, same seq, or the op stream stops being dense.
         insert_place_op(&mut tx, channel_id, seq, author_id, id, now).await?;
         tx.commit().await?;
@@ -251,32 +304,6 @@ impl Store {
             },
             fresh: true,
         })
-    }
-
-    /// Moves or resizes an object. Named `UPDATE OF` columns are what fire the
-    /// R-Tree trigger, so this is the only write that has to touch all four.
-    pub async fn move_canvas_object(
-        &self,
-        id: CanvasObjectId,
-        bounds: (f64, f64, f64, f64),
-    ) -> Result<bool, PlaceError> {
-        let (x, y, w, h) = bounds;
-        if !valid_bounds(x, y, w, h) {
-            return Err(PlaceError::OutOfBounds);
-        }
-        let affected = sqlx::query!(
-            "UPDATE canvas_objects SET x = ?, y = ?, w = ?, h = ?
-             WHERE id = ? AND deleted_at IS NULL",
-            x,
-            y,
-            w,
-            h,
-            id
-        )
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
-        Ok(affected > 0)
     }
 
     /// Soft-deletes an object, which the trigger takes out of the R-Tree.

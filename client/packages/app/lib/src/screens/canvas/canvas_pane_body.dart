@@ -26,6 +26,7 @@ class CanvasPaneBody extends StatelessWidget {
     required this.canManage,
     required this.document,
     required this.onClear,
+    required this.onPasteImage,
     required this.error,
     required this.onDismissError,
     required this.truncated,
@@ -33,6 +34,9 @@ class CanvasPaneBody extends StatelessWidget {
     required this.onStroke,
     required this.onErase,
     required this.onEraseEnd,
+    required this.onSelectStart,
+    required this.onSelectDrag,
+    required this.onSelectEnd,
     this.cursors,
     this.cursorColors = const [],
     this.onPointerMoved,
@@ -47,6 +51,11 @@ class CanvasPaneBody extends StatelessWidget {
   final bool canManage;
   final CanvasDocument document;
   final Future<void> Function() onClear;
+
+  /// The toolbar's "Paste image" action, always available - the manual
+  /// fallback that works on every platform, the same shape the composer's
+  /// own "+" sheet row already is.
+  final VoidCallback onPasteImage;
   final String? error;
   final VoidCallback onDismissError;
   final bool truncated;
@@ -54,6 +63,9 @@ class CanvasPaneBody extends StatelessWidget {
   final StrokeCommitted onStroke;
   final ValueChanged<Offset> onErase;
   final VoidCallback onEraseEnd;
+  final ValueChanged<Offset> onSelectStart;
+  final ValueChanged<Offset> onSelectDrag;
+  final VoidCallback onSelectEnd;
 
   /// Other participants' live pointers, and the palette their colours are
   /// drawn from. Null renders no cursor layer, the same "cheap to omit"
@@ -82,6 +94,7 @@ class CanvasPaneBody extends StatelessWidget {
               canManage: canManage,
               objectCount: document.objectCount,
               onClear: onClear,
+              onPasteImage: onPasteImage,
             ),
             if (error != null)
               Padding(
@@ -119,10 +132,15 @@ class CanvasPaneBody extends StatelessWidget {
                   document: document,
                   ink: AppCanvasColors.annotation,
                   gridLine: tokens.borderSubtle,
+                  placeholderFill: tokens.surfaceRaised,
+                  placeholderIcon: tokens.textDisabled,
                   onStroke: onStroke,
                   tool: tool,
                   onErase: onErase,
                   onEraseEnd: onEraseEnd,
+                  onSelectStart: onSelectStart,
+                  onSelectDrag: onSelectDrag,
+                  onSelectEnd: onSelectEnd,
                   cursors: cursors,
                   cursorColors: cursorColors,
                   onPointerMoved: onPointerMoved,

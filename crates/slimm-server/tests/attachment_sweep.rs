@@ -11,8 +11,8 @@
 
 use slimm_server::config::Config;
 use slimm_server::db;
-use slimm_server::ids::EmojiId;
-use slimm_server::store::Store;
+use slimm_server::ids::{CanvasObjectId, EmojiId};
+use slimm_server::store::{PlaceRequest, Store};
 use sqlx::SqlitePool;
 
 mod support;
@@ -155,6 +155,70 @@ async fn removing_the_emoji_releases_its_bytes_to_the_next_sweep() {
     let freed = store.sweep_orphaned_attachments().await.unwrap();
     assert_eq!(freed, vec![hex(&emoji_bytes)]);
     assert_eq!(attachment_count(&pool).await, 0);
+}
+
+/// A pasted canvas image is never attached to a message at all - the same
+/// blind spot an emoji's own bytes are, and the same fix: excluding
+/// `canvas_object_attachments` in the sweep's own `NOT EXISTS` clauses, not
+/// relying on a `RESTRICT` this table deliberately does not carry (a canvas
+/// object is only ever soft-deleted, so its attachment link must survive a
+/// restore, which `ON DELETE RESTRICT` cannot express).
+#[tokio::test]
+async fn a_canvas_placement_does_not_stop_the_sweep_and_its_bytes_survive() {
+    let (pool, _guard) = pool().await;
+    let store = Store::new(pool.clone());
+
+    let pasted = [0x44u8; 32];
+    let orphan = [0x55u8; 32];
+    let author = store
+        .create_account("ann", "Ann", "hash")
+        .await
+        .expect("an author")
+        .id;
+    let channel = store.create_channel("canvas", "voice").await.unwrap().id;
+    store
+        .store_attachment(&pasted, 8, "image/png", "pasted.png", Some(author))
+        .await
+        .unwrap();
+    store
+        .store_attachment(&orphan, 8, "image/png", "orphan.png", None)
+        .await
+        .unwrap();
+    store
+        .place_canvas_object(
+            channel,
+            author,
+            CanvasObjectId::generate(),
+            PlaceRequest {
+                kind: "image",
+                bounds: (0.0, 0.0, 10.0, 10.0),
+                props: r#"{"attachment":"aaaa"}"#,
+                attachment: Some(&pasted),
+            },
+        )
+        .await
+        .expect("the placement is authorized: the caller uploaded these bytes");
+    age_attachments(&pool).await;
+
+    let freed = store
+        .sweep_orphaned_attachments()
+        .await
+        .expect("a canvas placement must not fail the sweep");
+    assert_eq!(
+        freed,
+        vec![hex(&orphan)],
+        "the genuine orphan is reclaimed and the pasted image's bytes are not"
+    );
+
+    let kept: Option<Vec<u8>> = sqlx::query_scalar("SELECT sha256 FROM attachments")
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        kept.as_deref(),
+        Some(pasted.as_slice()),
+        "the canvas image's row is the only attachment left"
+    );
 }
 
 /// Deleting a message whose image is ALSO a custom emoji must not fail.

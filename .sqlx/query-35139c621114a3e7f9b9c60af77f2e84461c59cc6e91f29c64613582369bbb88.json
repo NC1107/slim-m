@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO canvas_object_attachments (object_id, sha256) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "35139c621114a3e7f9b9c60af77f2e84461c59cc6e91f29c64613582369bbb88"
+}

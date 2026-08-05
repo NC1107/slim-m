@@ -154,11 +154,16 @@ impl Store {
         }))
     }
 
-    /// Every channel with a live message referencing this attachment. Used
-    /// only to decide the fetch permission: a caller may read the bytes if
-    /// they hold VIEW_CHANNEL in *any* channel that has attached them, since
-    /// content already visible to them in one channel does not become more
-    /// sensitive for also being attached somewhere else.
+    /// Every channel with a live message, or a canvas object, referencing
+    /// this attachment. Used only to decide the fetch permission: a caller
+    /// may read the bytes if they hold VIEW_CHANNEL in *any* channel that has
+    /// attached them, since content already visible to them in one channel
+    /// does not become more sensitive for also being attached somewhere else.
+    ///
+    /// A canvas placement is not filtered on `deleted_at IS NULL` the way a
+    /// message is: an erased canvas object can be un-erased by a `restore`
+    /// op, so a channel's own VIEW_CHANNEL is still the right question to ask
+    /// while it is soft-deleted, not a reason to withdraw fetch access.
     pub async fn channels_referencing_attachment(
         &self,
         sha256: &[u8],
@@ -167,7 +172,13 @@ impl Store {
             r#"SELECT DISTINCT m.channel_id AS "channel_id!: ChannelId"
                FROM message_attachments ma
                JOIN messages m ON m.id = ma.message_id
-               WHERE ma.sha256 = ? AND m.deleted_at IS NULL"#,
+               WHERE ma.sha256 = ? AND m.deleted_at IS NULL
+               UNION
+               SELECT DISTINCT co.channel_id AS "channel_id!: ChannelId"
+               FROM canvas_object_attachments coa
+               JOIN canvas_objects co ON co.id = coa.object_id
+               WHERE coa.sha256 = ?"#,
+            sha256,
             sha256
         )
         .fetch_all(&self.pool)
@@ -235,11 +246,17 @@ impl Store {
     ///
     /// A message is not the only thing that can point at an attachment: a
     /// custom emoji's image is an `attachments` row nothing ever attached to
-    /// a message, which is the exact shape this hunts.
+    /// a message, which is the exact shape this hunts, and a canvas placement
+    /// is the same shape again - a pasted image is never attached to a
+    /// message at all.
     /// `0016_custom_emoji.sql` guards those bytes with `ON DELETE RESTRICT`,
     /// and RESTRICT does not filter, it aborts the whole statement. Excluding
     /// them here is what keeps one emoji from stopping the sweep for the
     /// entire deployment; the RESTRICT stays as the backstop it always was.
+    /// `canvas_object_attachments` carries no such RESTRICT (see its own
+    /// migration), so excluding it here is not a backstop, it is the only
+    /// thing standing between a pasted image and the sweep reclaiming it out
+    /// from under a still-live canvas object.
     pub async fn sweep_orphaned_attachments(&self) -> anyhow::Result<Vec<String>> {
         let cutoff = now_ms() - ORPHAN_GRACE_MS;
         let rows = sqlx::query!(
@@ -249,6 +266,9 @@ impl Store {
                    WHERE a.created_at < ?
                      AND NOT EXISTS (SELECT 1 FROM message_attachments ma WHERE ma.sha256 = a.sha256)
                      AND NOT EXISTS (SELECT 1 FROM custom_emoji e WHERE e.sha256 = a.sha256)
+                     AND NOT EXISTS (
+                         SELECT 1 FROM canvas_object_attachments coa WHERE coa.sha256 = a.sha256
+                     )
                    LIMIT ?
                )
                RETURNING sha256 AS "sha256!: Vec<u8>""#,

@@ -19,7 +19,9 @@ mod analytics;
 mod attachments;
 mod bootstrap;
 mod canvas;
+mod canvas_move;
 mod canvas_ops;
+mod canvas_ops_apply;
 mod canvas_ops_write;
 mod categories;
 mod channel_order;
@@ -55,8 +57,8 @@ pub use analytics::{ANALYTICS_WINDOW_DAYS, AnalyticsStats, DayCount, MetricSampl
 pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
 pub use bootstrap::Bootstrap;
 pub use canvas::{
-    CanvasObject, MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL, PlaceError, Placement, Rect,
-    ViewportQuery, WORLD_LIMIT,
+    CanvasObject, MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL, PlaceError, PlaceRequest, Placement,
+    Rect, ViewportQuery, WORLD_LIMIT,
 };
 pub use canvas_ops::{
     CANVAS_OP_GAP, CANVAS_OP_PAGE_BYTES, CanvasOpBody, CanvasOpEntry, CanvasOpsPage,

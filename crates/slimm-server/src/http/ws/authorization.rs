@@ -59,7 +59,8 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::CanvasObjectsRemoved { .. }
         | Event::CanvasCleared { .. }
         | Event::CanvasObjectsRestored { .. }
-        | Event::CanvasCursorMoved { .. } => Some(Permissions::USE_CANVAS),
+        | Event::CanvasCursorMoved { .. }
+        | Event::CanvasObjectMoved { .. } => Some(Permissions::USE_CANVAS),
         Event::MessageCreated { .. }
         | Event::MessageEdited { .. }
         | Event::MessageDeleted { .. }
@@ -186,6 +187,7 @@ pub(super) async fn authorize(
         Event::CanvasCleared { channel_id, .. } => *channel_id,
         Event::CanvasObjectsRestored { channel_id, .. } => *channel_id,
         Event::CanvasCursorMoved { channel_id, .. } => *channel_id,
+        Event::CanvasObjectMoved { channel_id, .. } => *channel_id,
         Event::VoiceActivityChanged { channel_id } => *channel_id,
         // Control events are handled in the loop; the rest already returned above.
         Event::SessionRevoked(_)
@@ -420,6 +422,25 @@ pub(super) async fn authorize(
             user_id: user_id.to_string(),
             x,
             y,
+        },
+        Event::CanvasObjectMoved {
+            channel_id,
+            seq,
+            op_id,
+            object_id,
+            x,
+            y,
+            w,
+            h,
+        } => ServerFrame::CanvasObjectMoved {
+            channel_id: channel_id.to_string(),
+            seq: seq.0,
+            op_id: op_id.to_string(),
+            object_id: object_id.to_string(),
+            x,
+            y,
+            w,
+            h,
         },
         // The deployment-wide and channel-deletion cases already returned above.
         Event::SessionRevoked(_)

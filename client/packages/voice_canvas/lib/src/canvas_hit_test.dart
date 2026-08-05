@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Which stroke, if any, a pointer landed on.
+/// Which stroke, or which image, a pointer landed on.
 ///
-/// Nearest-segment-within-tolerance against a stroke's own points, never its
-/// bounding box: a long diagonal stroke's box covers area its ink never
-/// touches, so testing the box would let an eraser take out a neighbour the
-/// drawn line never crossed.
+/// A stroke is nearest-segment-within-tolerance against its own points,
+/// never its bounding box: a long diagonal stroke's box covers area its ink
+/// never touches, so testing the box would let an eraser take out a
+/// neighbour the drawn line never crossed. An image has no thinner shape
+/// inside its box to miss, so [hitTestImageAt] tests the box directly.
 library;
 
 import 'dart:typed_data';
@@ -60,6 +61,46 @@ String? hitTestStroke(
     if (allowed != null && !allowed(stroke)) continue;
     final tolerance = stroke.width / 2 + slop;
     if (_withinTolerance(stroke.points, world.dx, world.dy, tolerance)) {
+      return stroke.id;
+    }
+  }
+  return null;
+}
+
+/// Finds the topmost live image object whose box contains [world] and that
+/// [allowed] accepts, or null.
+///
+/// Unlike [hitTestStroke], the box itself is the hit target: an image is a
+/// filled rectangle with no thinner shape inside it to miss, so there is no
+/// tolerance to add and no reason to cull wider than the point itself.
+String? hitTestImageAt(
+  CanvasDocument document,
+  Offset world, {
+  CullResult? scratch,
+  bool Function(CanvasStroke stroke)? allowed,
+}) {
+  final out = scratch ?? CullResult();
+  document.scene.queryRect(world.dx, world.dy, world.dx, world.dy, out);
+
+  final candidates = <int>[];
+  for (final slot in out.slots) {
+    final stroke = document.strokeIfAlive(slot);
+    if (stroke != null && stroke.kind == CanvasObjectKind.image) {
+      candidates.add(slot);
+    }
+  }
+  candidates.sort(
+    (a, b) =>
+        document.strokeAt(b).zIndex.compareTo(document.strokeAt(a).zIndex),
+  );
+
+  for (final slot in candidates) {
+    final stroke = document.strokeAt(slot);
+    if (allowed != null && !allowed(stroke)) continue;
+    if (world.dx >= stroke.x &&
+        world.dx <= stroke.x + stroke.w &&
+        world.dy >= stroke.y &&
+        world.dy <= stroke.y + stroke.h) {
       return stroke.id;
     }
   }

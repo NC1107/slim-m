@@ -38,6 +38,11 @@ class _RecordingCanvas implements Canvas {
   final List<Rect> deviceBounds = <Rect>[];
   final List<_Transform> _stack = <_Transform>[const _Transform(0, 0, 1)];
 
+  /// Every rounded-rect draw: the image placeholder's fill and its border,
+  /// two calls per placeholder and none for anything else this painter
+  /// draws.
+  int roundedRectCalls = 0;
+
   _Transform get _current => _stack.last;
 
   @override
@@ -68,7 +73,36 @@ class _RecordingCanvas implements Canvas {
   }
 
   @override
+  void drawRRect(RRect rrect, Paint paint) => roundedRectCalls++;
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+/// A document holding one live image object with no bitmap yet, either
+/// still waiting on a decode or one that failed for good.
+CanvasDocument _documentWithImage({required bool loadFailed}) {
+  final document = CanvasDocument();
+  document.setViewport(const Size(400, 400));
+  document.applyPlaced(
+    const CanvasStrokeInput(
+      id: 'pic',
+      seq: 1,
+      zIndex: 1,
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 100,
+      points: [],
+      width: 0,
+      colorKey: '',
+      kind: CanvasObjectKind.image,
+      attachmentId: 'sha-pic',
+    ),
+  );
+  if (loadFailed) document.markImageLoadFailed('pic');
+  document.refresh();
+  return document;
 }
 
 /// A document holding one committed horizontal stroke, camera set last so the
@@ -142,5 +176,40 @@ void main() {
         .paint(draftCanvas, const Size(400, 400));
 
     expect(draftCanvas.deviceBounds, committedCanvas.deviceBounds);
+  });
+
+  test('a load that failed for good draws the placeholder, not silence', () {
+    final document = _documentWithImage(loadFailed: true);
+    addTearDown(document.dispose);
+
+    final canvas = _RecordingCanvas();
+    StrokePainter(document: document, ink: _ink).paint(
+      canvas,
+      const Size(400, 400),
+    );
+
+    expect(
+      canvas.roundedRectCalls,
+      greaterThan(0),
+      reason: 'a missing image must draw something, never nothing at all',
+    );
+  });
+
+  test('a decode still in flight draws nothing yet, not the placeholder', () {
+    final document = _documentWithImage(loadFailed: false);
+    addTearDown(document.dispose);
+
+    final canvas = _RecordingCanvas();
+    StrokePainter(document: document, ink: _ink).paint(
+      canvas,
+      const Size(400, 400),
+    );
+
+    expect(
+      canvas.roundedRectCalls,
+      0,
+      reason: 'the object reappears the moment its own decode lands; '
+          'painting a placeholder meanwhile would flash it needlessly',
+    );
   });
 }

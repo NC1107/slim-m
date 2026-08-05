@@ -11,6 +11,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,6 +64,34 @@ Map<String, dynamic> canvasObjectJson(
   'created_at': 0,
 };
 
+Map<String, dynamic> canvasImageJson(
+  String id, {
+  double x = 10,
+  int seq = 1,
+  String authorId = 'me',
+}) => {
+  'id': id,
+  'kind': 'image',
+  'z_index': seq,
+  'x': x,
+  'y': 10.0,
+  'w': 20.0,
+  'h': 20.0,
+  'props': {'attachment': 'sha-$id', 'content_type': 'image/png'},
+  'author_id': authorId,
+  'seq': seq,
+  'created_at': 0,
+};
+
+/// A 1x1 transparent PNG: real bytes, so a hydration fetch decodes rather
+/// than throwing.
+final _png = Uint8List.fromList(
+  base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8'
+    'z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  ),
+);
+
 http.Response jsonResponse(Object body) => http.Response(
   jsonEncode(body),
   200,
@@ -74,6 +103,8 @@ class CanvasPaneFixture {
     this.viewportStatus = 200,
     this.hasMore = false,
     this.mePermissions = 0,
+    this.opsPostStatus = 201,
+    this.attachmentFetchStatus = 200,
   });
 
   final StreamController<api.ServerEvent> events =
@@ -81,6 +112,19 @@ class CanvasPaneFixture {
 
   final int viewportStatus;
   final bool hasMore;
+
+  /// The status `POST .../canvas/ops` answers with, so a test can drive the
+  /// controller's failure path (a revert) without a real server refusal.
+  final int opsPostStatus;
+
+  /// The status `GET .../attachments/{id}` answers with. 200 serves a real
+  /// decodable PNG, so a test can prove an image object placed by anyone
+  /// other than this client ends up hydrated; any other value drives the
+  /// hydrator's own failure-placeholder path.
+  final int attachmentFetchStatus;
+
+  /// Every `GET .../attachments/{id}` the pane's image hydrator sent.
+  int attachmentFetches = 0;
 
   /// The signed-in member's own permission bitmask, as `GET /me` answers it.
   final int mePermissions;
@@ -124,6 +168,13 @@ class CanvasPaneFixture {
             if (request.url.path.endsWith('/canvas/ops') &&
                 request.method == 'POST') {
               final body = jsonDecode(request.body) as Map<String, dynamic>;
+              if (opsPostStatus != 201) {
+                return http.Response(
+                  jsonEncode({'error': 'no'}),
+                  opsPostStatus,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
               postedOps.add(body);
               _opSeq++;
               return http.Response(
@@ -153,6 +204,21 @@ class CanvasPaneFixture {
                 'has_more': false,
                 'reset': false,
               });
+            }
+            if (request.url.path.startsWith('/attachments/')) {
+              attachmentFetches++;
+              if (attachmentFetchStatus != 200) {
+                return http.Response(
+                  jsonEncode({'error': 'no'}),
+                  attachmentFetchStatus,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
+              return http.Response.bytes(
+                _png,
+                200,
+                headers: {'content-type': 'image/png'},
+              );
             }
             if (!request.url.path.endsWith('/canvas/objects')) {
               return jsonResponse(<Object>[]);

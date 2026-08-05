@@ -66,6 +66,15 @@ pub enum CanvasOpBody {
         target_op: CanvasOpId,
         object_ids: Vec<CanvasObjectId>,
     },
+    /// An object was repositioned to `(x, y, w, h)`, without touching its
+    /// `z_index`.
+    Move {
+        object_id: CanvasObjectId,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+    },
 }
 
 /// Writes the op row a placement produces, under the `seq` the object itself
@@ -153,6 +162,8 @@ impl Store {
             r#"SELECT o.seq AS "seq!: i64", o.id AS "id!: CanvasOpId", o.kind AS "kind!",
                       o.actor_id AS "actor_id: UserId", o.bound_seq AS "bound_seq: i64",
                       o.target_op AS "target_op: CanvasOpId", o.created_at AS "created_at!: i64",
+                      o.move_x AS "move_x: f64", o.move_y AS "move_y: f64",
+                      o.move_w AS "move_w: f64", o.move_h AS "move_h: f64",
                       obj.id AS "obj_id?: CanvasObjectId", obj.kind AS "obj_kind?: String",
                       obj.z_index AS "obj_z_index?: i64", obj.x AS "obj_x?: f64",
                       obj.y AS "obj_y?: f64", obj.w AS "obj_w?: f64", obj.h AS "obj_h?: f64",
@@ -245,7 +256,29 @@ impl Store {
                         target_op: row.target_op.context("canvas_op_target guarantees this")?,
                         object_ids: targets_by_seq.get(&row.seq).cloned().unwrap_or_default(),
                     },
-                    other => anyhow::bail!("canvas_op_kind admits only 4 kinds, got {other}"),
+                    "move" => {
+                        let object_id = targets_by_seq
+                            .get(&row.seq)
+                            .and_then(|ids| ids.first())
+                            .copied()
+                            .context("a move op always writes its own target row")?;
+                        CanvasOpBody::Move {
+                            object_id,
+                            x: row
+                                .move_x
+                                .context("canvas_op_move_bounds guarantees this")?,
+                            y: row
+                                .move_y
+                                .context("canvas_op_move_bounds guarantees this")?,
+                            w: row
+                                .move_w
+                                .context("canvas_op_move_bounds guarantees this")?,
+                            h: row
+                                .move_h
+                                .context("canvas_op_move_bounds guarantees this")?,
+                        }
+                    }
+                    other => anyhow::bail!("canvas_op_kind admits only 5 kinds, got {other}"),
                 };
                 Ok(CanvasOpEntry {
                     seq: row.seq,

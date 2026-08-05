@@ -2547,18 +2547,26 @@ paths:
         every cell of a client's spatial grid.
 
 
-        `kind` is `stroke`. It is an allowlist rather than free text, because
-        the kind decides how every client renders a row and an unknown one is a
-        row nobody can draw and nobody can remove. There is no `window` kind: a
-        window is a behaviour of an object rather than an object (decision
-        0004).
+        `kind` is `stroke` or `image`. It is an allowlist rather than free
+        text, because the kind decides how every client renders a row and an
+        unknown one is a row nobody can draw and nobody can remove. There is
+        no `window` kind: a window is a behaviour of an object rather than an
+        object (decision 0004).
 
 
         `props` is kind-specific and opaque to the server, capped at 4 KiB
-        serialized. For a `stroke` it carries `points` (a flat
-        `[x0,y0,x1,y1,...]` array *relative to* `x` and `y`, in world units),
-        `width`, and `color`. A client splits a long stroke into several
-        objects on this byte budget rather than on a point count.
+        serialized, with one exception: an `image` object's `props.attachment`
+        is read, since it is what this route authorizes against. For a
+        `stroke` it carries `points` (a flat `[x0,y0,x1,y1,...]` array
+        *relative to* `x` and `y`, in world units), `width`, and `color`. A
+        client splits a long stroke into several objects on this byte budget
+        rather than on a point count. For an `image`, `props.attachment` is
+        the hex id of an already-uploaded attachment (`POST /attachments`),
+        checked the same way attaching one to a message is: the caller must
+        have uploaded it themselves, or already hold `VIEW_CHANNEL` somewhere
+        it is already visible. An attachment never uploaded, already swept as
+        an orphan, or not visible to this caller is a 400, the same collapse
+        a message's own attachment check already makes.
 
 
         A 409 also means the channel's canvas is full: a canvas holds at most
@@ -2658,7 +2666,7 @@ paths:
     post:
       operationId: submitCanvasOp
       tags: [canvas]
-      summary: Remove objects from a channel's canvas, clear it, or restore a removal.
+      summary: Remove objects from a channel's canvas, clear it, restore a removal, or move an object.
       description: >
         Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel.
         An unrecognised `kind` is a 400, the same as an unrecognised
@@ -2694,11 +2702,24 @@ paths:
         its ceiling is a 409, refused inside the same transaction that counts.
 
 
-        Refused for none of the three kinds is a timeout: a timeout freezes
-        the pen, not the eraser, so a timed-out member may still remove or
-        restore their own ink. `affected` may be 0 - every named object
-        already gone, nothing at or below `before_seq`, or a restore naming
-        nothing still dead - in which case no seq is allocated, no op is
+        `move` repositions a single live object to `x`, `y`, `w`, `h`,
+        touching nothing else about it - not its `z_index`, not its `props`.
+        Moving your own object needs nothing further; moving anyone else's
+        needs `MANAGE_CANVAS`. An id absent from this channel, or belonging to
+        another one, is the same 404 `remove` gives; bounds outside the world
+        or past the object-extent ceiling are the same 400 a placement gives.
+        An id naming an already-removed object is not an error: `affected` is
+        0, the same as the other kinds' own not-quite-there answers below.
+
+
+        Refused for `remove`, `clear` and `restore` is a timeout: a timeout
+        freezes the pen, not the eraser, so a timed-out member may still
+        remove or restore their own ink. `move` is the exception, refused
+        under a timeout the same way `placeCanvasObject` is, since it
+        repositions ink rather than removing it. `affected` may be 0 for any
+        kind - every named object already gone, nothing at or below
+        `before_seq`, a restore naming nothing still dead, or a move naming an
+        already-removed object - in which case no seq is allocated, no op is
         written, and nothing is published; an op row exists only for a real
         state transition.
       requestBody:
@@ -4246,7 +4267,7 @@ components:
           description: Client-generated UUIDv7; also the idempotency key.
         kind:
           type: string
-          description: What the object is. Only `stroke` exists so far.
+          description: What the object is. `stroke` or `image` so far.
         z_index:
           type: integer
           format: int64
@@ -4294,7 +4315,7 @@ components:
           description: Client-generated UUIDv7; also the idempotency key.
         kind:
           type: string
-          enum: [stroke]
+          enum: [stroke, image]
         x:
           type: number
           format: double
@@ -4344,10 +4365,11 @@ components:
       required: [seq, id, kind, actor_id, created_at]
       description: >-
         One entry in a channel's canvas op stream. Which of `object`,
-        `object_ids`, `before_seq` and `target_op` are present depends on
-        `kind`: a `place` carries `object` (absent once the object has since
-        been removed); a `remove` or `restore` carries `object_ids`; a `clear`
-        carries `before_seq`; a `restore` also carries `target_op`.
+        `object_ids`, `before_seq`, `target_op`, and the move fields are
+        present depends on `kind`: a `place` carries `object` (absent once the
+        object has since been removed); a `remove` or `restore` carries
+        `object_ids`; a `clear` carries `before_seq`; a `restore` also carries
+        `target_op`; a `move` carries `object_id`, `x`, `y`, `w` and `h`.
       properties:
         seq:
           type: integer
@@ -4360,16 +4382,17 @@ components:
             idempotency key); client-minted for every other kind.
         kind:
           type: string
-          enum: [place, remove, clear, restore]
+          enum: [place, remove, clear, restore, move]
         actor_id:
           type: [string, "null"]
           format: uuid
           description: >-
             Null once the actor's account has been anonymized, and on a
-            `remove`, `clear` or `restore` read without `MANAGE_CANVAS`: a
-            moderation act does not name its moderator to the whole channel,
-            which is what the live removal event withholds too. A `place`
-            always names its actor - `CanvasObject.author_id` is the same id.
+            `remove`, `clear`, `restore` or `move` read without
+            `MANAGE_CANVAS`: a moderation act does not name its moderator to
+            the whole channel, which is what the live removal event withholds
+            too. A `place` always names its actor - `CanvasObject.author_id`
+            is the same id.
         created_at:
           type: integer
           format: int64
@@ -4387,6 +4410,25 @@ components:
           type: string
           format: uuid
           description: The `remove` or `clear` op a `restore` undoes.
+        object_id:
+          type: string
+          format: uuid
+          description: The object a `move` repositioned.
+        x:
+          type: number
+          format: double
+          description: A `move`'s new top-left corner.
+        y:
+          type: number
+          format: double
+        w:
+          type: number
+          format: double
+          description: A `move`'s new width.
+        h:
+          type: number
+          format: double
+          description: A `move`'s new height.
 
     CanvasOpPage:
       type: object
@@ -4417,10 +4459,12 @@ components:
       required: [id, kind]
       description: >-
         One mutation submitted to `submitCanvasOp`. Which of `object_ids`,
-        `before_seq` and `target_op` may be present depends on `kind`: a
-        `remove` takes `object_ids` and neither other field; a `clear` takes
-        `before_seq` and neither other field; a `restore` takes `target_op`
-        and neither other field.
+        `before_seq`, `target_op`, and the move fields may be present depends
+        on `kind`: a `remove` takes `object_ids` and none of the others; a
+        `clear` takes `before_seq` and none of the others; a `restore` takes
+        `target_op` and none of the others; a `move` takes `object_id`, `x`,
+        `y`, `w` and `h`, and none of `object_ids`, `before_seq` or
+        `target_op`.
       properties:
         id:
           type: string
@@ -4428,7 +4472,7 @@ components:
           description: Client-minted UUIDv7; also the idempotency key.
         kind:
           type: string
-          enum: [remove, clear, restore]
+          enum: [remove, clear, restore, move]
         object_ids:
           type: array
           minItems: 1
@@ -4449,6 +4493,28 @@ components:
             Required for `restore`. The `remove` or `clear` op to undo, which
             must belong to this channel and which the caller must have
             authored unless they hold `MANAGE_CANVAS`.
+        object_id:
+          type: string
+          format: uuid
+          description: >-
+            Required for `move`. The object to reposition, which the caller
+            must have authored unless they hold `MANAGE_CANVAS`.
+        x:
+          type: number
+          format: double
+          description: Required for `move`. The object's new top-left corner.
+        y:
+          type: number
+          format: double
+          description: Required for `move`.
+        w:
+          type: number
+          format: double
+          description: Required for `move`. At most 8192, as a placement's own `w` is.
+        h:
+          type: number
+          format: double
+          description: Required for `move`. At most 8192, as a placement's own `h` is.
 
     CanvasOpResult:
       type: object
@@ -4466,14 +4532,15 @@ components:
               format: int64
             kind:
               type: string
-              enum: [remove, clear, restore]
+              enum: [remove, clear, restore, move]
             affected:
               type: integer
               format: int64
               description: >-
                 How many objects this op actually changed. May be 0: every
                 named object was already gone, nothing matched `before_seq`,
-                or a restore named nothing still dead.
+                a restore named nothing still dead, or a move named an
+                already-removed object.
             created_at:
               type: integer
               format: int64
@@ -5102,6 +5169,7 @@ components:
         - $ref: "#/components/schemas/CanvasCleared"
         - $ref: "#/components/schemas/CanvasObjectsRestored"
         - $ref: "#/components/schemas/CanvasCursorMoved"
+        - $ref: "#/components/schemas/CanvasObjectMoved"
         - $ref: "#/components/schemas/ServerPong"
         - $ref: "#/components/schemas/ServerError"
 
@@ -5225,6 +5293,47 @@ components:
           type: number
           format: double
         y:
+          type: number
+          format: double
+
+    CanvasObjectMoved:
+      type: object
+      required: [type, channel_id, seq, op_id, object_id, x, y, w, h]
+      description: >-
+        A placed object was repositioned, gated the same way
+        `canvas.object.placed` is. Carries the whole new box, so a receiver
+        needs no refetch to draw it in its new place. The actor is
+        deliberately absent, matching `canvas.objects.removed`: moving
+        another member's object needs `MANAGE_CANVAS` and so can be a
+        moderation act the same way a removal is. Delivered only for a fresh,
+        effective move - an idempotent replay, or a move naming an
+        already-removed object, publishes nothing.
+      properties:
+        type:
+          type: string
+          enum: [canvas.object.moved]
+        channel_id:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          format: int64
+        op_id:
+          type: string
+          format: uuid
+        object_id:
+          type: string
+          format: uuid
+        x:
+          type: number
+          format: double
+        y:
+          type: number
+          format: double
+        w:
+          type: number
+          format: double
+        h:
           type: number
           format: double
 

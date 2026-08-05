@@ -11,6 +11,7 @@ library;
 
 import 'dart:collection';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
@@ -149,11 +150,121 @@ class CanvasDocument extends ChangeNotifier {
         zIndex: input.zIndex,
         seq: input.seq,
         authorId: input.authorId,
+        kind: input.kind,
+        w: input.w,
+        h: input.h,
+        attachmentId: input.attachmentId,
       ),
     );
     _slotById[input.id] = slot;
     objectCount.value = objectCount.value + 1;
     return slot;
+  }
+
+  /// The bounds a live object currently occupies, or null if [id] is unknown
+  /// or has been removed. What [moveObject]'s caller needs to compute a drag
+  /// delta, and what an undo needs to restore a move's own original box.
+  ({double x, double y, double w, double h})? objectBounds(String id) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    if (stroke == null || !stroke.alive) return null;
+    return (x: stroke.x, y: stroke.y, w: stroke.w, h: stroke.h);
+  }
+
+  /// Repositions a live object to a new box, reindexing the spatial grid
+  /// slot it occupies - a stroke's own points move with it, so a moved
+  /// stroke still hit-tests against its drawn shape rather than its old one.
+  /// Returns false if [id] is unknown or has been removed.
+  ///
+  /// The grid never updates a slot in place ([UniformGrid] has no such
+  /// operation), so this frees the old slot and inserts a fresh one, the same
+  /// remove-then-add [_freeSlot] and [applyPlaced] already do separately.
+  bool moveObject(String id, double x, double y, double w, double h) {
+    final slot = _slotById[id];
+    if (slot == null) return false;
+    final stroke = _strokes[slot];
+    if (stroke == null || !stroke.alive) return false;
+    final dx = x - stroke.x;
+    final dy = y - stroke.y;
+    final points = Float32List(stroke.points.length);
+    for (var i = 0; i < stroke.points.length; i++) {
+      points[i] = stroke.points[i] + (i.isEven ? dx : dy);
+    }
+    scene.remove(slot);
+    final newSlot = scene.add(x, y, x + w, y + h);
+    _strokes.add(
+      CanvasStroke(
+        id: stroke.id,
+        x: x,
+        y: y,
+        path: stroke.path.shift(Offset(dx, dy)),
+        points: points,
+        width: stroke.width,
+        colorKey: stroke.colorKey,
+        zIndex: stroke.zIndex,
+        seq: stroke.seq,
+        authorId: stroke.authorId,
+        kind: stroke.kind,
+        w: w,
+        h: h,
+        attachmentId: stroke.attachmentId,
+        image: stroke.image,
+        imageLoadFailed: stroke.imageLoadFailed,
+      ),
+    );
+    assert(newSlot == _strokes.length - 1, 'scene.add must stay dense');
+    _strokes[slot] = null;
+    _slotById[id] = newSlot;
+    return true;
+  }
+
+  /// Attaches a decoded bitmap to a live [CanvasObjectKind.image] object.
+  ///
+  /// [image] is disposed immediately, rather than attached, if [id] is no
+  /// longer alive by the time its decode finishes - the race between a fetch
+  /// in flight and a removal landing first - since nothing else would ever
+  /// free bytes nobody can reach again.
+  void setImageBitmap(String id, ui.Image image) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    if (stroke == null || !stroke.alive) {
+      image.dispose();
+      return;
+    }
+    stroke.image = image;
+    stroke.imageLoadFailed = false;
+    notifyListeners();
+  }
+
+  /// Marks a live [CanvasObjectKind.image] object as one whose bytes could
+  /// not be fetched or decoded, so the painter draws a placeholder instead
+  /// of leaving it blank. A no-op if [id] is unknown, dead, or already
+  /// carries a bitmap - a hydration failure racing behind a fetch that
+  /// already landed must not blank out a real image.
+  void markImageLoadFailed(String id) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    if (stroke == null || !stroke.alive || stroke.image != null) return;
+    stroke.imageLoadFailed = true;
+    notifyListeners();
+  }
+
+  /// Detaches and disposes a live object's decoded bitmap, if it holds one,
+  /// without removing the object itself.
+  ///
+  /// The one caller is the app layer's bounded decode cache: evicting an
+  /// off-budget bitmap has to free the memory without forgetting the
+  /// object, which would need a real removal op nobody sent. The object
+  /// simply stops painting until it is fetched and hydrated again, the same
+  /// as one still waiting on its first decode.
+  void evictImageBitmap(String id) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    final image = stroke?.image;
+    if (image == null) return;
+    stroke!.image = null;
+    image.dispose();
+    notifyListeners();
   }
 
   /// Marks a stroke as never having landed.
@@ -221,6 +332,7 @@ class CanvasDocument extends ChangeNotifier {
   /// is deliberately untouched, so a reset does not also throw the person's
   /// pan and zoom away.
   void reset() {
+    _disposeImages();
     _strokes.clear();
     _slotById.clear();
     _order.clear();
@@ -242,8 +354,15 @@ class CanvasDocument extends ChangeNotifier {
     final stroke = _strokes[slot];
     if (stroke == null) return;
     scene.remove(slot);
+    stroke.image?.dispose();
     _strokes[slot] = null;
     objectCount.value = objectCount.value - 1;
+  }
+
+  void _disposeImages() {
+    for (final stroke in _strokes) {
+      stroke?.image?.dispose();
+    }
   }
 
   /// Re-culls against the current camera and repaints.
@@ -296,6 +415,7 @@ class CanvasDocument extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposeImages();
     objectCount.dispose();
     scene.dispose();
     super.dispose();

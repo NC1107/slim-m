@@ -64,11 +64,22 @@ class GridPainter extends CustomPainter {
 
 /// The committed ink.
 class StrokePainter extends CustomPainter {
-  StrokePainter({required this.document, required this.ink})
-      : super(repaint: document);
+  StrokePainter({
+    required this.document,
+    required this.ink,
+    this.placeholderFill = const Color(0xFFB9C0C8),
+    this.placeholderIcon = const Color(0xFF6C757E),
+  }) : super(repaint: document);
 
   final CanvasDocument document;
   final Color ink;
+
+  /// The muted fill and glyph stroke for an image whose bytes could not be
+  /// fetched or decoded. Default to plain neutral greys so a caller with no
+  /// opinion (a test, a benchmark) still gets a visible placeholder; the
+  /// app layer overrides both with its own design tokens.
+  final Color placeholderFill;
+  final Color placeholderIcon;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -82,6 +93,10 @@ class StrokePainter extends CustomPainter {
 
     for (final slot in document.paintOrder) {
       final stroke = document.strokeAt(slot);
+      if (stroke.kind == CanvasObjectKind.image) {
+        _paintImage(canvas, stroke, camera);
+        continue;
+      }
       canvas.save();
       // Recentering, exactly: a screen-sized translate in Dart doubles keeps Skia's float32 rasteriser away from world coordinates.
       canvas.translate(
@@ -93,6 +108,59 @@ class StrokePainter extends CustomPainter {
       canvas.drawPath(stroke.path, paint);
       canvas.restore();
     }
+  }
+
+  /// A live bitmap paints normally; a load that failed for good draws the
+  /// placeholder, never silence, so a missing image reads as a stated fact
+  /// rather than a blank the eye has to guess at. Anything still in flight
+  /// (the ordinary case just after a fetch or catch-up) draws nothing yet,
+  /// and the object reappears the moment [CanvasDocument.setImageBitmap]
+  /// lands and repaints.
+  void _paintImage(Canvas canvas, CanvasStroke stroke, Camera camera) {
+    final dst = Rect.fromLTWH(
+      (stroke.x - camera.x) * camera.zoom,
+      (stroke.y - camera.y) * camera.zoom,
+      stroke.w * camera.zoom,
+      stroke.h * camera.zoom,
+    );
+    final bitmap = stroke.image;
+    if (bitmap == null) {
+      if (stroke.imageLoadFailed) _paintImagePlaceholder(canvas, dst);
+      return;
+    }
+    final src = Rect.fromLTWH(
+      0,
+      0,
+      bitmap.width.toDouble(),
+      bitmap.height.toDouble(),
+    );
+    canvas.drawImageRect(
+        bitmap, src, dst, Paint()..filterQuality = FilterQuality.medium);
+  }
+
+  /// A muted box plus a broken-picture glyph (a small square with a
+  /// diagonal tear), never colour alone: the same "never one channel alone"
+  /// rule this project's own presence indicators already follow, here shape
+  /// against a muted fill rather than colour against a status dot.
+  void _paintImagePlaceholder(Canvas canvas, Rect box) {
+    final fill = Paint()..color = placeholderFill;
+    final line = Paint()
+      ..color = placeholderIcon
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final rounded = RRect.fromRectAndRadius(box, const Radius.circular(4));
+    canvas.drawRRect(rounded, fill);
+    canvas.drawRRect(rounded.deflate(0.75), line);
+
+    final glyphSize = math.min(box.width, box.height) * 0.32;
+    if (glyphSize < 6) return;
+    final glyph = Rect.fromCenter(
+      center: box.center,
+      width: glyphSize,
+      height: glyphSize,
+    );
+    canvas.drawRect(glyph, line);
+    canvas.drawLine(glyph.topLeft, glyph.bottomRight, line);
   }
 
   @override

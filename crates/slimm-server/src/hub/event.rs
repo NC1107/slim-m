@@ -302,4 +302,25 @@ pub enum Event {
         x: f64,
         y: f64,
     },
+    /// A placed object was repositioned.
+    ///
+    /// Carries the whole new box, the same reason [`Event::CanvasObjectPlaced`]
+    /// carries the whole row: a receiver needs no refetch to draw it in its
+    /// new place. The actor is deliberately absent, the shape
+    /// [`Event::CanvasObjectsRemoved`] already uses, since moving another
+    /// member's object needs `MANAGE_CANVAS` and so can be a moderation act
+    /// the same way a removal is.
+    ///
+    /// Published only for a fresh, effective move. An idempotent replay, or a
+    /// move naming an already-removed object, publishes nothing.
+    CanvasObjectMoved {
+        channel_id: ChannelId,
+        seq: Seq,
+        op_id: CanvasOpId,
+        object_id: CanvasObjectId,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+    },
 }

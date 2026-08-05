@@ -380,3 +380,31 @@ class CanvasCursorMoved extends ServerEvent {
   final double x;
   final double y;
 }
+
+/// A placed object was repositioned.
+///
+/// Carries the whole new box, so a receiver needs no refetch to draw it in
+/// its new place. The actor is deliberately absent, the same shape
+/// [CanvasObjectsRemoved] uses: moving another member's object needs
+/// `MANAGE_CANVAS` and so can be a moderation act the same way a removal is.
+class CanvasObjectMoved extends ServerEvent {
+  const CanvasObjectMoved({
+    required this.channelId,
+    required this.seq,
+    required this.opId,
+    required this.objectId,
+    required this.x,
+    required this.y,
+    required this.w,
+    required this.h,
+  });
+
+  final String channelId;
+  final int seq;
+  final String opId;
+  final String objectId;
+  final double x;
+  final double y;
+  final double w;
+  final double h;
+}

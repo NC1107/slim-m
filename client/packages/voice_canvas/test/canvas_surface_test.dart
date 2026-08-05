@@ -200,6 +200,44 @@ void main() {
     expect(erased, 0);
   });
 
+  testWidgets('the select tool reports world points and commits no ink', (
+    tester,
+  ) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    var strokes = 0;
+    final starts = <Offset>[];
+    final drags = <Offset>[];
+    var ends = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          tool: CanvasTool.select,
+          onStroke: (_) => strokes++,
+          onSelectStart: starts.add,
+          onSelectDrag: drags.add,
+          onSelectEnd: () => ends++,
+        ),
+      ),
+    );
+    await tester.pump();
+    document.setCamera(const Camera(x: 100, y: 50, zoom: 1));
+    await tester.pump();
+
+    final gesture = await tester.startGesture(const Offset(20, 20));
+    await gesture.moveTo(const Offset(60, 40));
+    await gesture.up();
+    await tester.pump();
+
+    expect(strokes, 0, reason: 'select must never commit a pen stroke');
+    expect(starts, [const Offset(120, 70)]);
+    expect(drags, [const Offset(160, 90)]);
+    expect(ends, 1);
+  });
+
   testWidgets(
       'onPointerMoved reports world points during a hover, no button down', (
     tester,

@@ -17,7 +17,7 @@ use slimm_server::media::Media;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{PlaceRequest, Store};
 use slimm_server::voice::VoiceService;
 use tower::ServiceExt;
 
@@ -94,9 +94,12 @@ async fn place(store: &Store, channel: ChannelId, author: UserId, x: f64) {
             channel,
             author,
             CanvasObjectId::generate(),
-            "stroke",
-            (x, 0.0, 10.0, 10.0),
-            "{}",
+            PlaceRequest {
+                kind: "stroke",
+                bounds: (x, 0.0, 10.0, 10.0),
+                props: "{}",
+                attachment: None,
+            },
         )
         .await
         .expect("placed");

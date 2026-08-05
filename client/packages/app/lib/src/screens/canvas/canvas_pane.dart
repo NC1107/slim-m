@@ -35,6 +35,9 @@ import '../../providers/sync_controller.dart';
 import '../../providers/user_profiles.dart';
 import 'canvas_commit_queue.dart';
 import 'canvas_cursor_relay.dart';
+import 'canvas_image_hydrator.dart';
+import 'canvas_image_paste.dart';
+import 'canvas_live_event_dispatch.dart';
 import 'canvas_ops_controller.dart';
 import 'canvas_pane_body.dart';
 import 'canvas_sync.dart';
@@ -77,6 +80,11 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   bool _truncated = false;
   int _localZ = provisionalLocalZIndex;
   CanvasTool _tool = CanvasTool.pen;
+  CanvasImagePaste? _imagePasteHelper;
+  late final CanvasImageHydrator _hydrator = CanvasImageHydrator(
+    client: ref.read(apiProvider),
+    document: _document,
+  );
 
   @override
   void initState() {
@@ -88,6 +96,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       document: _document,
       coldFetch: _fetch,
       forgetFetchedRegion: () => _fetched = null,
+      onObjectPlaced: _hydrator.hydrate,
     );
     // Registered once here, not in build: a listener re-attached per rebuild would fire a catch-up per rebuild, not per transition into live.
     _syncStatusSubscription = ref.listenManual<SyncStatus>(
@@ -98,10 +107,14 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     );
     // No fetch here: CanvasSurface's first setViewport call reaches _onCameraMoved below and fetches the real region, not a wasted one against a zero viewport.
     _document.addListener(_onCameraMoved);
+    // This pane is the only content mounted while it exists, so one listener for the whole mount is safe: nothing else here could hold it at the same time.
+    _imagePaste.start();
   }
 
   @override
   void dispose() {
+    _hydrator.dispose();
+    _imagePasteHelper?.stop();
     _panDebounce?.cancel();
     _queue?.close();
     unawaited(_live?.cancel());
@@ -113,6 +126,19 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _cursors.dispose();
     super.dispose();
   }
+
+  CanvasImagePaste get _imagePaste => _imagePasteHelper ??= CanvasImagePaste(
+    client: ref.read(apiProvider),
+    channelId: widget.channelId,
+    document: _document,
+    onPlaced: () {
+      // A just-pasted image is the one thing worth repositioning immediately.
+      if (mounted) setState(() => _tool = CanvasTool.select);
+    },
+    onError: (message) {
+      if (mounted) setState(() => _error = message);
+    },
+  );
 
   CanvasCommitQueue get _commits => _queue ??= CanvasCommitQueue(
     client: ref.read(apiProvider),
@@ -171,64 +197,15 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     return 'Someone';
   }
 
-  void _onEvent(api.ServerEvent event) {
-    switch (event) {
-      case api.CanvasObjectPlaced(:final channelId, :final object)
-          when channelId == widget.channelId:
-        _sync.applyLive(event.seq, () => _apply(object));
-      case api.CanvasObjectsRemoved(
-            :final channelId,
-            :final seq,
-            :final objectIds,
-          )
-          when channelId == widget.channelId:
-        _sync.applyLive(seq, () {
-          for (final id in objectIds) {
-            _document.removeObject(id);
-          }
-          _document.refresh();
-        });
-      case api.CanvasCleared(:final channelId, :final seq, :final beforeSeq)
-          when channelId == widget.channelId:
-        _sync.applyLive(seq, () {
-          _document.clearBelow(beforeSeq);
-          _document.refresh();
-        });
-      case api.CanvasObjectsRestored(
-            :final channelId,
-            :final seq,
-            :final objectIds,
-          )
-          when channelId == widget.channelId:
-
-        /// An empty list never means "nothing was restored": the server only
-        /// publishes this frame when it restored at least one object, and
-        /// empties the list rather than exceed the frame bound a `remove`
-        /// already sets. Applying it would clear no tombstone while advancing
-        /// the cursor past the one op that could, so the objects stay
-        /// invisible on this client for good. The feed carries the full list,
-        /// so this defers to it instead.
-        if (objectIds.isEmpty) {
-          _sync.deferToFeed();
-          return;
-        }
-        _sync.applyLive(seq, () {
-          _document.forgetRemoved(objectIds);
-          _fetched = null;
-        });
-      case api.CanvasCursorMoved(
-            :final channelId,
-            :final userId,
-            :final x,
-            :final y,
-          )
-          when channelId == widget.channelId:
-        // Never through _sync.applyLive: a cursor carries no seq to catch up on.
-        _relay.applyRemote(userId, x, y);
-      default:
-        break;
-    }
-  }
+  void _onEvent(api.ServerEvent event) => dispatchCanvasLiveEvent(
+    event,
+    paneChannelId: widget.channelId,
+    sync: _sync,
+    document: _document,
+    relay: () => _relay,
+    applyPlacedObject: _apply,
+    forgetFetchedRegion: () => _fetched = null,
+  );
 
   void _apply(api.CanvasObject object) {
     final input = canvasStrokeInputFrom(object);
@@ -236,6 +213,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _document
       ..applyPlaced(input)
       ..refresh();
+    _hydrator.hydrate(object);
   }
 
   /// A pan re-reads once the camera has settled, never per frame.
@@ -301,7 +279,10 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       if (!mounted) return;
       for (final object in page.objects) {
         final input = canvasStrokeInputFrom(object);
-        if (input != null) _document.applyPlaced(input);
+        if (input != null) {
+          _document.applyPlaced(input);
+          _hydrator.hydrate(object);
+        }
       }
       // Set before refresh(), not after: refresh() reaches _onCameraMoved synchronously and must see this fetch's own answer, not the value from before it ran.
       setState(() {
@@ -387,6 +368,22 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     if (mounted) setState(() {});
   }
 
+  void _onSelectStart(Offset world) {
+    final me = ref.read(meProvider).valueOrNull;
+    _ops.beginMove(
+      world,
+      manageCanvas: me?.permissions.hasPermission(Perm.manageCanvas) ?? false,
+      selfId: me?.id,
+    );
+  }
+
+  void _onSelectDrag(Offset world) => _ops.dragMove(world);
+
+  Future<void> _onSelectEnd() async {
+    await _ops.endMove();
+    if (mounted) setState(() {});
+  }
+
   Future<void> _onUndo() async {
     await _ops.undo();
     if (mounted) setState(() {});
@@ -407,6 +404,10 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
             unawaited(_onUndo()),
         const SingleActivator(LogicalKeyboardKey.keyZ, meta: true): () =>
             unawaited(_onUndo()),
+        const SingleActivator(LogicalKeyboardKey.keyV, control: true): () =>
+            unawaited(_imagePaste.pasteFromKeystroke()),
+        const SingleActivator(LogicalKeyboardKey.keyV, meta: true): () =>
+            unawaited(_imagePaste.pasteFromKeystroke()),
       },
       child: Focus(
         autofocus: true,
@@ -420,6 +421,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           canManage: manageCanvas,
           document: _document,
           onClear: _onClear,
+          onPasteImage: () => unawaited(_imagePaste.pasteFromButton()),
           error: _error,
           onDismissError: () => setState(() => _error = null),
           truncated: _truncated,
@@ -427,6 +429,9 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           onStroke: _onStroke,
           onErase: _onErase,
           onEraseEnd: () => unawaited(_onEraseEnd()),
+          onSelectStart: _onSelectStart,
+          onSelectDrag: _onSelectDrag,
+          onSelectEnd: () => unawaited(_onSelectEnd()),
           cursors: _cursors,
           cursorColors: AppCanvasColors.cursors,
           onPointerMoved: _onPointerMoved,

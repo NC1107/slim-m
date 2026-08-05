@@ -13,7 +13,7 @@ use std::path::Path;
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{CanvasObjectId, CanvasOpId, ChannelId, UserId};
-use slimm_server::store::{CanvasOpRequest, Rect, Store, ViewportQuery};
+use slimm_server::store::{CanvasOpRequest, PlaceRequest, Rect, Store, ViewportQuery};
 use sqlx::{Row, SqlitePool};
 
 mod support;
@@ -68,7 +68,17 @@ async fn place(
 ) -> CanvasObjectId {
     let id = CanvasObjectId::generate();
     store
-        .place_canvas_object(channel, author, id, "stroke", bounds, "{}")
+        .place_canvas_object(
+            channel,
+            author,
+            id,
+            PlaceRequest {
+                kind: "stroke",
+                bounds,
+                props: "{}",
+                attachment: None,
+            },
+        )
         .await
         .expect("placed");
     id
