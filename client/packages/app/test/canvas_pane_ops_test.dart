@@ -205,64 +205,62 @@ void main() {
 
   /// Move is scoped to images: `beginMove` hit-tests only the image kind, so
   /// a drag starting over a stroke picks nothing up and submits nothing.
-  testWidgets(
-    'move is scoped to images: dragging over a stroke does nothing',
-    (tester) async {
-      final fixture = CanvasPaneFixture()..objects = [canvasObjectJson('a')];
-      final container = fixture.container();
-      addTearDown(container.dispose);
-      addTearDown(fixture.events.close);
-      await pumpCanvasPane(tester, container);
-      await tester.pumpAndSettle();
+  testWidgets('move is scoped to images: dragging over a stroke does nothing', (
+    tester,
+  ) async {
+    final fixture = CanvasPaneFixture()..objects = [canvasObjectJson('a')];
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+    await pumpCanvasPane(tester, container);
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Move'));
-      await tester.pump();
+    await tester.tap(find.bySemanticsLabel('Move'));
+    await tester.pump();
 
-      final start = screenFor(tester, const Offset(15, 15));
-      final gesture = await tester.startGesture(start);
-      await gesture.moveTo(screenFor(tester, const Offset(45, 35)));
-      await gesture.up();
-      await tester.pumpAndSettle();
+    final start = screenFor(tester, const Offset(15, 15));
+    final gesture = await tester.startGesture(start);
+    await gesture.moveTo(screenFor(tester, const Offset(45, 35)));
+    await gesture.up();
+    await tester.pumpAndSettle();
 
-      expect(fixture.postedOps, isEmpty);
-      final bounds = surfaceDocument(tester).objectBounds('a')!;
-      expect(bounds.x, 10);
-      expect(bounds.y, 10);
-    },
-  );
+    expect(fixture.postedOps, isEmpty);
+    final bounds = surfaceDocument(tester).objectBounds('a')!;
+    expect(bounds.x, 10);
+    expect(bounds.y, 10);
+  });
 
   /// A move already shows its new position optimistically (the property the
   /// first test above checks); a failed submit has to put that back, the
   /// same "revert what was already shown" shape a failed erase never needs
   /// because erasing shows nothing until the drag ends.
-  testWidgets(
-    'a failed move reverts the object locally and shows an error',
-    (tester) async {
-      final fixture = CanvasPaneFixture(opsPostStatus: 403)
-        ..objects = [canvasImageJson('img')];
-      final container = fixture.container();
-      addTearDown(container.dispose);
-      addTearDown(fixture.events.close);
-      await pumpCanvasPane(tester, container);
-      await tester.pumpAndSettle();
+  testWidgets('a failed move reverts the object locally and shows an error', (
+    tester,
+  ) async {
+    final fixture = CanvasPaneFixture(opsPostStatus: 403)
+      ..objects = [canvasImageJson('img')];
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+    await pumpCanvasPane(tester, container);
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Move'));
-      await tester.pump();
+    await tester.tap(find.bySemanticsLabel('Move'));
+    await tester.pump();
 
-      final start = screenFor(tester, const Offset(15, 15));
-      final gesture = await tester.startGesture(start);
-      await gesture.moveTo(screenFor(tester, const Offset(45, 35)));
-      await gesture.up();
-      await tester.pumpAndSettle();
+    final start = screenFor(tester, const Offset(15, 15));
+    final gesture = await tester.startGesture(start);
+    await gesture.moveTo(screenFor(tester, const Offset(45, 35)));
+    await gesture.up();
+    await tester.pumpAndSettle();
 
-      expect(fixture.postedOps, isEmpty);
-      expect(find.text('That could not be moved.'), findsOneWidget);
+    expect(fixture.postedOps, isEmpty);
+    expect(find.text('That could not be moved.'), findsOneWidget);
 
-      final bounds = surfaceDocument(tester).objectBounds('img')!;
-      expect(bounds.x, 10, reason: 'a failed move must put the image back');
-      expect(bounds.y, 10);
-    },
-  );
+    final bounds = surfaceDocument(tester).objectBounds('img')!;
+    expect(bounds.x, 10, reason: 'a failed move must put the image back');
+    expect(bounds.y, 10);
+  });
 
   /// The server empties a restore frame's id list rather than exceed the
   /// bound a `remove` sets, so an empty list means "more than I can name",
