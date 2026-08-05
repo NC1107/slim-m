@@ -55,13 +55,22 @@ class VacuumIntoTest(BackupTestCase):
         self.assertFalse(Path(str(dest) + "-shm").exists())
 
     def test_a_database_path_holding_a_uri_special_character_still_works(self):
+        # A bare "?" would otherwise start a URI query string mid-path,
+        # silently opening a different, empty database instead of this one.
         odd_db = self.root / "weird?name#dir" / "slimm.db"
-        fixtures.build_database(odd_db)
+        data = b"snapshot taken from an oddly named path"
+        sha = fixtures.sha256_of(data)
+        fixtures.build_database(odd_db, attachments=[(sha, len(data), "text/plain")])
         dest = self.root / "snap.db"
 
         backup_lib.vacuum_into(odd_db, dest)
 
-        self.assertTrue(dest.is_file())
+        conn = sqlite3.connect(str(dest))
+        try:
+            rows = conn.execute("SELECT sha256, size FROM attachments").fetchall()
+        finally:
+            conn.close()
+        self.assertEqual(rows, [(sha, len(data))])
 
     def test_snapshot_rows_match_the_live_source(self):
         data = b"hello"
