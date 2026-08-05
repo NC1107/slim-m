@@ -37,6 +37,9 @@ on:
     paths:
       - "client/**"
       - "crates/**"
+      # Its own file, so a change to how these builds work is validated and
+      # deployed by them rather than waiting on unrelated work to trigger it.
+      - ".github/workflows/main-builds.yml"
       - "!client/CHANGELOG.md"
       - "!client/pubspec.yaml"
 
