@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) AS \"c!: i64\" FROM messages WHERE deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "c!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b60ae9112f994ae202318627ca099b87d384bf86127fa409c2b92ad438376734"
+}

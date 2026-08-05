@@ -2995,6 +2995,65 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /space/analytics:
+    get:
+      operationId: getSpaceAnalytics
+      tags: [space]
+      summary: Read this Space's usage stats, if analytics recording is on.
+      description: >
+        Gated on MANAGE_SERVER, the same bit as `/space/settings`. Answers 200
+        either way: `stats` is present only when `enabled` is true, so a
+        disabled deployment reads as an off feature rather than an error a
+        client has to special-case apart from a real permission failure.
+        `stats.messages_by_day` and `active_hours` cover a trailing 30-day
+        window; `active_hours` is a 24-bucket histogram summed across every
+        author, never broken out per member.
+      responses:
+        "200":
+          description: The current toggle state, and stats if it is on.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpaceAnalytics"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    patch:
+      operationId: updateSpaceAnalytics
+      tags: [space]
+      summary: Turn Space analytics recording on or off.
+      description: >
+        Off by default on every deployment. Turning it on does not start a
+        background job: the one recorded series (this process's own memory)
+        is sampled lazily on a later read of this same route, at most once
+        every five minutes, so a deployment that enables it and never opens
+        the analytics screen adds nothing to what runs. Turning it off stops
+        this route answering with stats; already-recorded samples are kept
+        rather than deleted, and reappear if it is turned back on.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSpaceAnalytics"
+      responses:
+        "200":
+          description: The toggle state after the change, and stats if now on.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpaceAnalytics"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /sync:
     post:
       operationId: sync
@@ -3630,6 +3689,87 @@ components:
             default every deployment keeps on upgrade. `open` means anyone
             who can reach the server may register; a code is still accepted,
             so an invite granting a role keeps working.
+    UpdateSpaceAnalytics:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+    SpaceAnalyticsStats:
+      type: object
+      required:
+        [
+          total_messages,
+          member_count,
+          channel_count,
+          attachment_bytes,
+          messages_by_day,
+          active_hours,
+          memory_samples,
+        ]
+      properties:
+        total_messages:
+          type: integer
+          description: All-time count of live (non-deleted) messages, Space-wide.
+        member_count:
+          type: integer
+        channel_count:
+          type: integer
+          description: Live, non-DM, non-thread channels.
+        attachment_bytes:
+          type: integer
+          description: Current total bytes stored across every attachment.
+        messages_by_day:
+          type: array
+          description: One entry per day in the trailing 30-day window, zero-filled.
+          items:
+            $ref: "#/components/schemas/SpaceAnalyticsDayCount"
+        active_hours:
+          type: array
+          description: >
+            24 entries, index 0-23 as UTC hour-of-day, each the count of
+            messages sent starting in that hour across the same 30-day
+            window, summed over every author.
+          items:
+            type: integer
+          minItems: 24
+          maxItems: 24
+        memory_samples:
+          type: array
+          description: >
+            This process's resident memory, oldest first, sampled lazily on a
+            read of this route rather than on a timer.
+          items:
+            $ref: "#/components/schemas/SpaceAnalyticsMemorySample"
+    SpaceAnalyticsDayCount:
+      type: object
+      required: [date, count]
+      properties:
+        date:
+          type: string
+          description: "`YYYY-MM-DD`, UTC."
+        count:
+          type: integer
+    SpaceAnalyticsMemorySample:
+      type: object
+      required: [sampled_at, rss_bytes]
+      properties:
+        sampled_at:
+          type: integer
+          description: Unix milliseconds.
+        rss_bytes:
+          type: integer
+    SpaceAnalytics:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+        stats:
+          description: Present only when `enabled` is true.
+          anyOf:
+            - $ref: "#/components/schemas/SpaceAnalyticsStats"
+            - type: "null"
     PresenceStatus:
       type: object
       required: [user_id, status]

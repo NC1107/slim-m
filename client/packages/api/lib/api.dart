@@ -17,6 +17,10 @@ export 'src/client.dart'
     show
         SlimmApi,
         SessionStore,
+        AnalyticsDayCount,
+        AnalyticsMemorySample,
+        AnalyticsStats,
+        SpaceAnalytics,
         SlimmApiAdmin,
         SlimmApiAttachments,
         SlimmApiAuth,

@@ -15,6 +15,7 @@ use sqlx::SqlitePool;
 use crate::ids::{ChannelCategoryId, ChannelId, MessageId, Seq, UserId};
 
 mod account_deletion;
+mod analytics;
 mod attachments;
 mod bootstrap;
 mod canvas;
@@ -50,6 +51,7 @@ mod timeouts;
 mod users;
 
 pub use account_deletion::DeleteAccountError;
+pub use analytics::{ANALYTICS_WINDOW_DAYS, AnalyticsStats, DayCount, MetricSample};
 pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
 pub use bootstrap::Bootstrap;
 pub use canvas::{

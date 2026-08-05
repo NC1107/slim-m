@@ -17,6 +17,7 @@ pub mod media;
 pub mod notifications;
 pub mod permissions;
 pub mod presence;
+mod process_metrics;
 pub mod push;
 pub mod ratelimit;
 pub mod store;

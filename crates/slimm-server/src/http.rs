@@ -23,6 +23,7 @@ use crate::voice::VoiceService;
 use error::ApiError;
 use extract::{Json, READ, RateLimited};
 
+mod analytics;
 mod attachments;
 mod auth;
 mod canvas;
@@ -111,6 +112,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
         .route("/version", get(version))
+        .merge(analytics::routes())
         .merge(auth::routes())
         .merge(canvas::routes())
         .merge(categories::routes())

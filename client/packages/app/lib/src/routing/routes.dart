@@ -18,6 +18,7 @@ abstract final class Routes {
   static const adminOverwrites = '/settings/permissions';
   static const adminCategories = '/settings/categories';
   static const adminEmoji = '/settings/emoji';
+  static const adminAnalytics = '/settings/analytics';
   static const debugLog = '/settings/debug-log';
 
   /// The messages of one channel.

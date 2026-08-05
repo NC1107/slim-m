@@ -70,3 +70,10 @@ final roleChangeWatcherProvider = Provider.autoDispose<void>((ref) {
 final customEmojiProvider = FutureProvider.autoDispose<List<api.CustomEmoji>>(
   (ref) => ref.watch(apiProvider).listCustomEmoji(),
 );
+
+/// The Space usage analytics toggle and, while it is on, its stats. Off by
+/// default; see `docs/decisions/0008-space-analytics.md` and
+/// `screens/admin/analytics_screen.dart`.
+final spaceAnalyticsProvider = FutureProvider.autoDispose<api.SpaceAnalytics>(
+  (ref) => ref.watch(apiProvider).spaceAnalytics(),
+);

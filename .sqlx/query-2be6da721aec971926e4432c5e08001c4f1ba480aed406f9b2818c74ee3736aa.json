@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sampled_at AS \"t!: i64\" FROM space_metrics_samples\n               ORDER BY sampled_at DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "t!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2be6da721aec971926e4432c5e08001c4f1ba480aed406f9b2818c74ee3736aa"
+}

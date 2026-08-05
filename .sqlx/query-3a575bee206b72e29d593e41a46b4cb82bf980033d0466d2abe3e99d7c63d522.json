@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sampled_at AS \"t!: i64\", rss_bytes AS \"r!: i64\" FROM space_metrics_samples\n               WHERE sampled_at >= ? ORDER BY sampled_at ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "t!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "r!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "3a575bee206b72e29d593e41a46b4cb82bf980033d0466d2abe3e99d7c63d522"
+}

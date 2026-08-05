@@ -153,6 +153,10 @@ abstract final class AppIcons {
   static const IconData assignRole = LucideIcons.userCog300;
   static const IconData permissions = LucideIcons.lock300;
 
+  /// Space usage analytics. A different weight-300 bar-chart glyph from
+  /// [poll]'s, so the two rows never share a silhouette in the settings list.
+  static const IconData analytics = LucideIcons.barChart3300;
+
   /// Removing a row from a personal list view rather than deleting anything:
   /// distinct from [delete], which destroys the thing itself.
   static const IconData removeFromList = LucideIcons.listX300;

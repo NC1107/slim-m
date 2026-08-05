@@ -93,3 +93,10 @@ On Android it is configured to request no audio focus at all (`AndroidAudioFocus
 
 A single `AudioPlayer` instance handles every chime (`AudioPlayersSoundPlayer`), stopped and restarted on each `play()` call rather than pooled, since overlap is rare and briefly cutting one chime short for the next is not a defect worth the complexity of a pool.
 Playback goes through a `SoundPlayer` seam so a test never touches a real audio device; see `notification_sound_message_test.dart`, `notification_sound_roster_test.dart` and `notification_sound_call_ring_test.dart` for the fakes.
+
+### No charting package, for the Space analytics screen
+
+The Space usage analytics screen (`docs/decisions/0008-space-analytics.md`) needed three small bar charts: messages by day, active hours, and a memory series.
+`fl_chart` and `syncfusion_flutter_charts` were the two real candidates, and both were rejected on the same grounds this project already used for the Voice Canvas and the speaking ring: a small, bespoke drawing is a `CustomPainter`, not a dependency, and this is three bar charts, not a dashboard toolkit.
+`fl_chart` alone would have pulled in real weight (its own gesture, tooltip, and legend machinery) for a screen with no gestures, no legend, and one visible series each.
+`AnalyticsBarChart` (`client/packages/app/lib/src/widgets/analytics_bar_chart.dart`) is under 100 lines and is reused for all three series rather than growing a chart type per series.

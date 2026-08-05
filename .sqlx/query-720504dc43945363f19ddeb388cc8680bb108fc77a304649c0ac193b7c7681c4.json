@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM space_metrics_samples WHERE sampled_at < ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "720504dc43945363f19ddeb388cc8680bb108fc77a304649c0ac193b7c7681c4"
+}
