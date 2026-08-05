@@ -21,6 +21,7 @@ export 'models_canvas.dart';
 export 'models_canvas_ops.dart';
 export 'models_channel.dart';
 export 'models_message_ops.dart';
+export 'models_notification_preference.dart';
 export 'models_pins.dart';
 export 'models_polls.dart';
 export 'models_presence.dart';
