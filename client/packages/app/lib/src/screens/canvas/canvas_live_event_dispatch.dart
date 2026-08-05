@@ -6,6 +6,8 @@
 /// whoever calls it.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_voice_canvas/voice_canvas.dart';
@@ -93,6 +95,8 @@ void dispatchCanvasLiveEvent(
         forgetFetchedRegion();
         activityLog?.recordRestoredLive(opId, objectIds.length);
       });
+      // A restored object's payload was freed on removal and the camera-move guard only checks on an actual pan, so nothing repaints it without this - see CanvasSync.coldFetch's own doc.
+      unawaited(sync.coldFetch());
     case api.CanvasCursorMoved(
           :final channelId,
           :final userId,

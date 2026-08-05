@@ -63,21 +63,22 @@ tile is not a published track.
 | sharing a screen | the UI | a `SCREEN_SHARE` track on the SFU |
 | calling in a DM | the UI | the SFU's participant and track list, keyed by the DM's own channel id |
 | edit, delete, search, pins, polls, invites, DMs, channel admin, devices, read state, sync | the API | the effect of each, not its status code |
+| the Voice Canvas: draw, paste an image, move, resize, erase, clear, undo, reload | the UI (`e2e_canvas.py`; see below) | `GET /channels/{id}/canvas/objects`, and the second client's own `performance` resource log for the pasted image's bytes |
 
 The run ends by reporting how many documented API paths it actually touched,
 counted from what the harness and both browsers requested rather than from a
 list kept by hand, since a hand-kept list overstates coverage the moment a
-scenario changes. A full run currently reaches **38 of 66** documented paths
+scenario changes. A full run currently reaches **42 of 70** documented paths
 (confirmed against a live run rather than assumed; the schema has grown
 since this number was first written, the harness's own reach has grown with it).
 
-What it does not reach divides into three: routes that need a second
+What it does not reach divides into two: routes that need a second
 deployment or real hardware (push, the relay lifecycle, account recovery),
-routes for a feature the harness does not yet drive (the Voice Canvas, whose
-read and write routes both exist now but have no scenario here), and routes
-that are simply not covered yet (per-channel overwrites, assigning a role to
-a member, kicking someone from a call, revoking one device, custom emoji,
-redeeming a second invite). The last group is the honest backlog; the run
+and routes that are simply not covered yet (per-channel overwrites, assigning
+a role to a member, kicking someone from a call, revoking one device, custom
+emoji, redeeming a second invite, space analytics). The Voice Canvas closed
+the third category this file used to name here; see "Driving a canvas app"
+below for what that took. The remaining group is the honest backlog; the run
 prints it every time so it cannot quietly grow.
 
 ## Layout
@@ -90,7 +91,7 @@ prints it every time so it cannot quietly grow.
 | `lib/e2e_js.py` | the browser-side half: reading and driving the semantics tree |
 | `lib/e2e_labels.py` | every accessible name the app is driven by, in one place |
 | `lib/e2e_api.py` | the server's own answer, for checking against |
-| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py`, `e2e_markdown.py`, `e2e_reconcile.py`, `e2e_replies.py`, `e2e_threads.py`, `e2e_dm_call.py` | the scenarios |
+| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py`, `e2e_markdown.py`, `e2e_reconcile.py`, `e2e_replies.py`, `e2e_threads.py`, `e2e_dm_call.py`, `e2e_canvas.py` | the scenarios |
 | `lib/e2e_sweep.py` | the API-level routes the scenarios do not reach |
 | `lib/e2e_seed.py`, `e2e_fixtures.py` | the accounts and the two PNGs a run uploads |
 
@@ -129,6 +130,32 @@ Four things cost real time to learn, and each fails silently rather than loudly:
   semantics elements sit over it. `gestures(True)` lifts them for the one
   affordance that has no label - the react button, which only exists while the
   pointer is over a message.
+
+### Driving the Voice Canvas specifically
+
+The signature feature is a `CustomPainter`, so it publishes almost nothing
+else to the tree beyond what the general rules above already cover. Two more
+things `e2e_canvas.py` leans on, documented at length in its own module doc:
+
+- **The one container `Semantics` node whose label starts "Canvas,"** states
+  the live object count ("Canvas, 2 objects: 1 stroke, 1 image") and updates
+  on every local and live change, so it is the main proof both clients agree
+  without ever opening anything else. Its own bounding rect is also the
+  coordinate frame every drawing and dragging gesture is placed in, since the
+  camera starts at world `(0, 0)` with `zoom: 1` and this scenario never pans
+  or zooms - a page coordinate and a world coordinate differ by exactly one
+  constant offset for the whole scenario.
+- **`CanvasActivityPanel`, the text activity log**, is reached for exactly
+  one thing the object count cannot show: that a move or a resize actually
+  arrived on the client that did not make it, not only that the server's own
+  row changed. It replaces the drawing surface while open, so it is toggled
+  on, read, and toggled back off rather than left open.
+
+Drawing, moving and resizing all still need `gestures(True)` and raw pointer
+events, the same as the react button; the pasted image goes through the same
+`paste` DOM event a real Ctrl+V produces (`e2e_js.paste_image`), not the API,
+because the bug this scenario exists to catch was a client-side hydration
+gap that calling the API directly would never have exercised.
 
 ## What it drives at the API, on purpose
 
@@ -209,9 +236,37 @@ three sizes.
 The context menu is unreachable without a pointer, described above. Recorded,
 not fixed.
 
+Driving the Voice Canvas for the first time found two more, neither of which
+any widget test had caught, because neither needed a widget test to be wrong -
+they needed two clients, or a client that never moved its camera.
+
+Pasting an image onto the canvas did nothing, silently, whenever the composer
+had ever held focus in the same session (which is every real session, since
+signing in lands on a channel with a composer already there). Both the
+composer and the canvas share one module-level "who is listening for a
+paste" variable with no notion of ownership, and the composer's own
+`dispose()` calls `stopClipboardImagePaste()` unconditionally; if that call
+lands *after* the canvas's own `start()` already took over - which a fade
+transition makes likely, not just possible - it tore down the canvas's
+listener instead of its own. `stopClipboardImagePaste` now takes the same
+callback `start` was given and only tears down while it is still the
+registered one.
+
+Undoing an erase or a clear did nothing visible on the client that clicked
+Undo, unless that client happened to pan the camera afterward. The object
+comes back server-side immediately - confirmed by reading `GET
+.../canvas/ops` directly - but the client deliberately never re-materializes
+a restored object's payload locally (it was freed on removal), and the
+camera-move guard that would otherwise re-fetch it only runs when the view
+actually changes. A full reload "fixed" it in testing only because a fresh
+pane's very first camera-moved call always cold-fetches regardless of that
+guard, which is what made this easy to not notice. Both `CanvasSync`'s
+catch-up path and the live dispatch's `CanvasObjectsRestored` case now
+force an explicit re-fetch alongside forgetting the tombstone.
+
 ## What it does not cover
 
-The mobile clients, push notifications, the canvas, search, polls, pinning,
+The mobile clients, push notifications, search, polls, pinning,
 invites beyond the one the seed spends, and message edit and delete.
 Those are honest gaps rather than assumed-working: the run reports only what it
 checked.

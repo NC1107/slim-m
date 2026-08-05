@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/permissions.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 import 'canvas_pane_harness.dart';
 
@@ -166,6 +167,51 @@ void main() {
       expect(fixture.postedOps, hasLength(1));
       expect(fixture.postedOps.single['kind'], 'clear');
       expect(surfaceDocument(tester).objectCount.value, 0);
+    },
+  );
+
+  /// `_onClear` was the one action of five (draw, move, erase, undo, clear)
+  /// that never called `setState` after completing, so `CanvasBar`'s own
+  /// `canUndo` prop kept whatever value it held at the pane's last build -
+  /// stale for as long as nothing unrelated happened to rebuild it. Reachable
+  /// only when a clear is the pane's *first* undoable action, since a prior
+  /// draw, move or erase already leaves `canUndo` true and so already shows
+  /// correctly by coincidence - the same shape as the thread bug where every
+  /// existing test seeded a row a URL-opened thread never had.
+  testWidgets(
+    'the undo button reflects a clear that is the first undoable action',
+    (tester) async {
+      final fixture = CanvasPaneFixture(mePermissions: Perm.manageCanvas)
+        ..objects = [canvasObjectJson('a')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      AppIconButton undoButton() => tester.widget<AppIconButton>(
+        find.byWidgetPredicate(
+          (w) => w is AppIconButton && w.semanticLabel == 'Undo',
+        ),
+      );
+      expect(undoButton().onPressed, isNull);
+
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Clear canvas'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Clear canvas').last);
+      await tester.pumpAndSettle();
+
+      expect(fixture.postedOps, hasLength(1));
+      expect(
+        undoButton().onPressed,
+        isNotNull,
+        reason:
+            'a clear pushes an undo entry just like a draw or an erase '
+            'does, and the button must reflect that without needing an '
+            'unrelated rebuild to happen along first',
+      );
     },
   );
 

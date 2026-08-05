@@ -56,10 +56,12 @@ class CanvasImagePaste {
   /// Registers the event-driven route: call once when this pane mounts.
   void start() => startClipboardImagePaste(_handleNativePaste);
 
-  /// Unregisters it: call once when this pane unmounts, or the next screen
-  /// to register its own handler would silently replace this one anyway,
-  /// but a mounted pane must not go on holding a stale listener regardless.
-  void stop() => stopClipboardImagePaste();
+  /// Unregisters it: call once when this pane unmounts. Passing
+  /// [_handleNativePaste] back is what lets `stopClipboardImagePaste` tell
+  /// this call apart from a *different* caller's still-active registration
+  /// - see that function's own doc for the race a bare, argument-less stop
+  /// used to lose.
+  void stop() => stopClipboardImagePaste(_handleNativePaste);
 
   /// The toolbar's "Paste image" action: the manual poll-and-tap route that
   /// works unconditionally on every platform, the same fallback the

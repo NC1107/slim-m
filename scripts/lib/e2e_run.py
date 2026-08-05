@@ -15,6 +15,7 @@ import time
 import traceback
 
 import e2e_admin
+import e2e_canvas
 import e2e_labels as L
 import e2e_messaging
 import e2e_markdown
@@ -54,7 +55,7 @@ def go_home(client):
         time.sleep(2)
 
 
-def scenarios(a, b, admin, member, room_id):
+def scenarios(a, b, admin, member, room_id, server):
     """Every scenario, as (name, callable). Named so a failure says which."""
     picture = os.path.join(FIXTURES, "avatar.png")
     upload = os.path.join(FIXTURES, "attachment.png")
@@ -111,6 +112,23 @@ def scenarios(a, b, admin, member, room_id):
         ("reconcile: an edit and a delete while a client is away",
          lambda: e2e_reconcile.survives_an_absence(
              b, a, L.TEXT_CHANNEL, admin)),
+        ("canvas: opening it from the channel header",
+         lambda: e2e_canvas.open_on_both(a, b, L.TEXT_CHANNEL)),
+        ("canvas: a stroke arrives on the other client live",
+         lambda: e2e_canvas.draw_stroke_and_see_it_live(a, b)),
+        ("canvas: a pasted image renders, not just a box",
+         lambda: e2e_canvas.paste_image_and_hydrate(
+             a, b, server, admin, admin.channel_named(L.TEXT_CHANNEL)["id"],
+             upload)),
+        ("canvas: moving and resizing it converges on both sides",
+         lambda: e2e_canvas.move_and_resize_converges(
+             a, b, admin, admin.channel_named(L.TEXT_CHANNEL)["id"])),
+        ("canvas: erase, undo, clear, and undo again",
+         lambda: e2e_canvas.erase_undo_clear_and_restore(
+             a, b, admin, admin.channel_named(L.TEXT_CHANNEL)["id"])),
+        ("canvas: a reload proves it actually persisted",
+         lambda: e2e_canvas.reload_persists(b, L.TEXT_CHANNEL)),
+        ("canvas: closing it", lambda: e2e_canvas.close_on_both(a, b)),
         ("voice: two clients in one call", lambda: e2e_voice.join_call(
             a, b, room_id)),
         ("voice: sharing a screen", lambda: e2e_voice.share_screen(
@@ -139,7 +157,7 @@ def main():
     sign_in(b, server, "bob", secret)
 
     failures = []
-    for name, run in scenarios(a, b, admin, member, room_id):
+    for name, run in scenarios(a, b, admin, member, room_id, server):
         if only and only not in name:
             continue
         print(f"\n== {name} ==")

@@ -140,5 +140,18 @@ class Api:
     def space_settings(self):
         return self.call("GET", "/space/settings")
 
+    def canvas_objects(self, channel_id, half_width=1_000_000.0):
+        """Every live canvas object, well past anything this harness places."""
+        q = (f"min_x=-{half_width}&min_y=-{half_width}"
+             f"&max_x={half_width}&max_y={half_width}")
+        got = self.call("GET", f"/channels/{channel_id}/canvas/objects?{q}")
+        return got["objects"] if isinstance(got, dict) else got
+
+    def canvas_object(self, channel_id, object_id):
+        for obj in self.canvas_objects(channel_id):
+            if obj["id"] == object_id:
+                return obj
+        raise AssertionError(f"no live canvas object {object_id!r}")
+
     def version(self):
         return Api(self.base).call("GET", "/version")

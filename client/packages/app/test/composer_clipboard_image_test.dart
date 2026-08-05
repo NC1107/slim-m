@@ -124,15 +124,18 @@ void main() {
   );
 
   group('startClipboardImagePaste/stopClipboardImagePaste', () {
-    tearDown(stopClipboardImagePaste);
+    // stop() now only tears down its own still-registered callback, so tearDown needs each test's own reference.
+    late PastedImageHandler current;
+    tearDown(() => stopClipboardImagePaste(current));
 
     test('a native pastedImage call reaches the registered callback', () async {
       Uint8List? bytes;
       String? filename;
-      startClipboardImagePaste((b, f) {
+      current = (b, f) {
         bytes = b;
         filename = f;
-      });
+      };
+      startClipboardImagePaste(current);
 
       await _deliverNativeCall(
         MethodCall('pastedImage', Uint8List.fromList([9, 9, 2])),
@@ -144,7 +147,8 @@ void main() {
 
     test('an unrelated method name is ignored, even carrying bytes', () async {
       var called = false;
-      startClipboardImagePaste((_, _) => called = true);
+      current = (_, _) => called = true;
+      startClipboardImagePaste(current);
 
       await _deliverNativeCall(
         MethodCall('somethingElse', Uint8List.fromList([9, 9, 2])),
@@ -155,7 +159,8 @@ void main() {
 
     test('a pastedImage call carrying no bytes is ignored', () async {
       var called = false;
-      startClipboardImagePaste((_, _) => called = true);
+      current = (_, _) => called = true;
+      startClipboardImagePaste(current);
 
       await _deliverNativeCall(const MethodCall('pastedImage'));
 
@@ -164,8 +169,9 @@ void main() {
 
     test('stopClipboardImagePaste clears the handler', () async {
       var called = false;
-      startClipboardImagePaste((_, _) => called = true);
-      stopClipboardImagePaste();
+      current = (_, _) => called = true;
+      startClipboardImagePaste(current);
+      stopClipboardImagePaste(current);
 
       await _deliverNativeCall(
         MethodCall('pastedImage', Uint8List.fromList([1])),
@@ -173,5 +179,28 @@ void main() {
 
       expect(called, isFalse);
     });
+
+    test(
+      "stopping with a different callback leaves the active one running",
+      () async {
+        var called = false;
+        current = (_, _) => called = true;
+        startClipboardImagePaste(current);
+
+        stopClipboardImagePaste((_, _) {});
+
+        await _deliverNativeCall(
+          MethodCall('pastedImage', Uint8List.fromList([1])),
+        );
+
+        expect(
+          called,
+          isTrue,
+          reason:
+              'a stale caller stopping with its own, no-longer-active '
+              'callback must not tear down a different one that took over',
+        );
+      },
+    );
   });
 }

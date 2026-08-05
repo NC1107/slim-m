@@ -59,6 +59,18 @@ JUMP_FAILED = "Could not find that message."
 # Threads: the reply-count affordance and the back tooltip, never the bar's own title (see e2e_threads.py).
 THREAD_HEADER = "Back to the conversation"
 
+# Canvas
+OPEN_CANVAS = "Open canvas"
+CLOSE_CANVAS = "Close canvas"
+PEN_TOOL = "Pen"
+ERASER_TOOL = "Eraser"
+SELECT_TOOL = "Move"
+UNDO = "Undo"
+MORE_CANVAS_ACTIONS = "More canvas actions"
+SHOW_ACTIVITY_LOG = "Show activity log"
+HIDE_ACTIVITY_LOG = "Hide activity log"
+CLEAR_CANVAS = "Clear canvas"
+
 # The fixture channels the seed creates
 TEXT_CHANNEL = "general"
 VOICE_CHANNEL = "lounge"
