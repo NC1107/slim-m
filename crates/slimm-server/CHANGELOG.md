@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.31.0](https://github.com/NC1107/slim-m/compare/server-v0.30.0...server-v0.31.0) (2026-08-05)
+
+
+### Features
+
+* a per-account notification preference, including mentions only ([#397](https://github.com/NC1107/slim-m/issues/397)) ([9c756f8](https://github.com/NC1107/slim-m/commit/9c756f8fb5c003af1792fe8706cbf52e8635f2a5))
+* multi-user canvas cursors, live and ephemeral ([#400](https://github.com/NC1107/slim-m/issues/400)) ([b4f6b8c](https://github.com/NC1107/slim-m/commit/b4f6b8cc75601cc0c88224c01a50e78a6370dcfb))
+* Space usage analytics, off by default ([#401](https://github.com/NC1107/slim-m/issues/401)) ([f140ca8](https://github.com/NC1107/slim-m/commit/f140ca8154607fe27c68e4e22d7828d3123660a0))
+
 ## [0.30.0](https://github.com/NC1107/slim-m/compare/server-v0.29.0...server-v0.30.0) (2026-08-04)
 
 
