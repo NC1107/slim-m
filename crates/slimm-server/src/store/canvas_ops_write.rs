@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Submitting a mutation to the canvas op stream: `remove`, `clear`, and
-//! `restore`.
+//! Submitting a mutation to the canvas op stream: `remove`, `clear`,
+//! `restore`, and `move`.
 //!
 //! A sibling of [`super::canvas_ops`] rather than part of it, the same split
 //! `http::canvas` and `http::canvas_write` already make: the read and write
@@ -13,12 +13,25 @@
 //! own `canvas_op_targets` rows, and for a `clear` (which stores no per-object
 //! targets, only a fence) it is every object whose `deleted_at` matches that
 //! exact op's timestamp, the same single-writer reasoning
-//! [`affected_count_for`] already rests a clear replay's count on.
+//! `canvas_ops_apply::affected_count_for` already rests a clear replay's
+//! count on. `move` reuses `canvas_op_targets` too, one row naming the object
+//! it repositioned, so a reconnecting client's catch-up feed learns of a move
+//! the same way it already learns of a remove - without it a move made while
+//! a viewer's pane was closed would never reach them, since a coordinate
+//! update alone does not advance the object's own `seq` the way
+//! `canvas_objects.seq` is fixed at placement.
+//!
+//! This file is the orchestrator and the public request/result types only;
+//! what each kind actually authorizes and touches is
+//! `super::canvas_ops_apply`, split out once `move` joining `remove`, `clear`
+//! and `restore` crossed the 500-line hard limit.
 
 use anyhow::Context;
 
-use super::canvas::MAX_OBJECTS_PER_CHANNEL;
-use super::{Store, now_ms};
+use super::canvas_ops_apply::{
+    affected_count_for, apply_move, apply_remove, apply_restore, current_canvas_seq, fetch_op,
+};
+use super::{PlaceError, Store, now_ms};
 use crate::ids::{CanvasObjectId, CanvasOpId, ChannelId, UserId};
 
 /// Most object ids one `remove` may name in a single op.
@@ -38,6 +51,15 @@ pub enum CanvasOpRequest {
     /// Un-deletes what a named `remove` or `clear` op touched.
     Restore {
         target_op: CanvasOpId,
+    },
+    /// Repositions one live object to a new bounding box, never resizing more
+    /// than moving a placed image needs and never touching its `z_index`.
+    Move {
+        object_id: CanvasObjectId,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
     },
 }
 
@@ -59,6 +81,10 @@ pub struct SubmittedOp {
     /// The fence a fresh `clear` applied. `None` for `remove`, `restore`, and
     /// a replay, for the same reason `touched_ids` is empty there.
     pub cleared_before_seq: Option<i64>,
+    /// The bounds a fresh `move` applied, for the live event to carry so a
+    /// receiver need not refetch. `None` for every other kind and for a
+    /// replay, for the same reason `touched_ids` is empty there.
+    pub moved_to: Option<(f64, f64, f64, f64)>,
 }
 
 /// Why submitting an op failed.
@@ -76,7 +102,21 @@ pub enum SubmitOpError {
     /// A restore would push this channel's live object count past
     /// [`MAX_OBJECTS_PER_CHANNEL`].
     ChannelFull,
+    /// A `move`'s target bounds are not finite, have negative extent, exceed
+    /// `MAX_OBJECT_EXTENT`, or fall outside the bounded world - the same
+    /// check a placement itself makes.
+    OutOfBounds,
     Internal(anyhow::Error),
+}
+
+impl From<PlaceError> for SubmitOpError {
+    fn from(err: PlaceError) -> Self {
+        match err {
+            PlaceError::OutOfBounds => SubmitOpError::OutOfBounds,
+            // `move_canvas_object_query` only ever returns these two variants.
+            other => SubmitOpError::Internal(anyhow::anyhow!("unexpected move error: {other:?}")),
+        }
+    }
 }
 
 impl From<sqlx::Error> for SubmitOpError {
@@ -91,23 +131,10 @@ impl From<anyhow::Error> for SubmitOpError {
     }
 }
 
-struct ExistingOp {
-    channel_id: ChannelId,
-    seq: i64,
-    kind: String,
-    actor_id: Option<UserId>,
-    bound_seq: Option<i64>,
-    created_at: i64,
-}
-
-struct ObjectAuth {
-    author_id: Option<UserId>,
-    is_dead: bool,
-}
-
 impl Store {
-    /// Submits a `remove`, `clear` or `restore`, idempotent by `op_id` the way
-    /// placing an object is idempotent by the object's own id.
+    /// Submits a `remove`, `clear`, `restore` or `move`, idempotent by
+    /// `op_id` the way placing an object is idempotent by the object's own
+    /// id.
     ///
     /// `may_moderate` is the caller's already-evaluated `MANAGE_CANVAS`,
     /// resolved once by the caller alongside `VIEW_CHANNEL`/`USE_CANVAS`
@@ -138,12 +165,15 @@ impl Store {
                 fresh: false,
                 touched_ids: Vec::new(),
                 cleared_before_seq: None,
+                moved_to: None,
             });
         }
 
         let now = now_ms();
         // Only a `restore` sets this; `canvas_op_target` requires exactly that.
         let mut target_op_for_row: Option<CanvasOpId> = None;
+        // Only a fresh, effective `move` sets this.
+        let mut move_bounds: Option<(f64, f64, f64, f64)> = None;
         let (kind, affected, touched_ids, bound_seq) = match request {
             CanvasOpRequest::Remove(object_ids) => {
                 apply_remove(
@@ -177,6 +207,27 @@ impl Store {
                 target_op_for_row = Some(target_op);
                 apply_restore(&mut tx, channel_id, actor_id, may_moderate, target_op).await?
             }
+            CanvasOpRequest::Move {
+                object_id,
+                x,
+                y,
+                w,
+                h,
+            } => {
+                let outcome = apply_move(
+                    &mut tx,
+                    channel_id,
+                    actor_id,
+                    may_moderate,
+                    object_id,
+                    (x, y, w, h),
+                )
+                .await?;
+                if outcome.1 > 0 {
+                    move_bounds = Some((x, y, w, h));
+                }
+                outcome
+            }
         };
 
         // An op row exists only for a real state transition; see the module doc.
@@ -192,6 +243,7 @@ impl Store {
                 fresh: true,
                 touched_ids: Vec::new(),
                 cleared_before_seq: None,
+                moved_to: None,
             });
         }
 
@@ -205,9 +257,15 @@ impl Store {
         .await?
         .context("channel has no canvas sequence counter")?;
 
+        let (move_x, move_y, move_w, move_h) = match move_bounds {
+            Some((x, y, w, h)) => (Some(x), Some(y), Some(w), Some(h)),
+            None => (None, None, None, None),
+        };
         sqlx::query!(
-            r#"INSERT INTO canvas_ops (channel_id, seq, id, kind, actor_id, bound_seq, target_op, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
+            r#"INSERT INTO canvas_ops
+                   (channel_id, seq, id, kind, actor_id, bound_seq, target_op,
+                    move_x, move_y, move_w, move_h, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
             channel_id,
             seq,
             op_id,
@@ -215,6 +273,10 @@ impl Store {
             actor_id,
             bound_seq,
             target_op_for_row,
+            move_x,
+            move_y,
+            move_w,
+            move_h,
             now
         )
         .execute(&mut *tx)
@@ -242,234 +304,7 @@ impl Store {
             fresh: true,
             touched_ids,
             cleared_before_seq: bound_seq,
+            moved_to: move_bounds,
         })
-    }
-}
-
-/// Validates every id first, in request order, before touching any row: an id
-/// this caller may not remove must not leave an earlier id in the same batch
-/// removed while the request as a whole fails.
-async fn apply_remove(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-    channel_id: ChannelId,
-    actor_id: UserId,
-    may_moderate: bool,
-    object_ids: &[CanvasObjectId],
-    now: i64,
-) -> Result<(&'static str, i64, Vec<CanvasObjectId>, Option<i64>), SubmitOpError> {
-    let mut already_dead = Vec::with_capacity(object_ids.len());
-    for object_id in object_ids {
-        let Some(found) = fetch_object_for_op(tx, channel_id, *object_id).await? else {
-            return Err(SubmitOpError::NotFound);
-        };
-        if !may_moderate && found.author_id != Some(actor_id) {
-            return Err(SubmitOpError::NotAuthorized);
-        }
-        already_dead.push(found.is_dead);
-    }
-
-    let mut touched = Vec::new();
-    for (object_id, was_dead) in object_ids.iter().zip(already_dead) {
-        if was_dead {
-            continue;
-        }
-        let rows = sqlx::query!(
-            "UPDATE canvas_objects SET deleted_at = ?
-             WHERE id = ? AND channel_id = ? AND deleted_at IS NULL",
-            now,
-            object_id,
-            channel_id
-        )
-        .execute(&mut **tx)
-        .await?
-        .rows_affected();
-        if rows > 0 {
-            touched.push(*object_id);
-        }
-    }
-
-    let affected = touched.len() as i64;
-    Ok(("remove", affected, touched, None))
-}
-
-/// Un-deletes what `target_op` (a `remove` or `clear`) touched, refused past
-/// the channel's live ceiling in the same transaction that counts it - the
-/// `place_canvas_object` shape, extended to a batch.
-///
-/// A target that is absent, foreign, or not a `remove`/`clear` gets one 404:
-/// this route is not a way to learn which of the three a bad id happens to
-/// be. The authorship check reads the *op*'s actor, not the touched objects',
-/// which is what stops the person being moderated from undoing the moderation.
-async fn apply_restore(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-    channel_id: ChannelId,
-    actor_id: UserId,
-    may_moderate: bool,
-    target_op: CanvasOpId,
-) -> Result<(&'static str, i64, Vec<CanvasObjectId>, Option<i64>), SubmitOpError> {
-    let Some(target) = fetch_op(tx, target_op).await? else {
-        return Err(SubmitOpError::NotFound);
-    };
-    if target.channel_id != channel_id || !matches!(target.kind.as_str(), "remove" | "clear") {
-        return Err(SubmitOpError::NotFound);
-    }
-    if !may_moderate && target.actor_id != Some(actor_id) {
-        return Err(SubmitOpError::NotAuthorized);
-    }
-
-    let candidates = restore_candidates(tx, channel_id, &target).await?;
-    let mut dead = Vec::with_capacity(candidates.len());
-    for object_id in &candidates {
-        if let Some(found) = fetch_object_for_op(tx, channel_id, *object_id).await?
-            && found.is_dead
-        {
-            dead.push(*object_id);
-        }
-    }
-
-    let live = sqlx::query_scalar!(
-        r#"SELECT COUNT(*) AS "count!: i64" FROM canvas_objects
-           WHERE channel_id = ? AND deleted_at IS NULL"#,
-        channel_id
-    )
-    .fetch_one(&mut **tx)
-    .await?;
-    if live + dead.len() as i64 > MAX_OBJECTS_PER_CHANNEL {
-        return Err(SubmitOpError::ChannelFull);
-    }
-
-    let mut touched = Vec::with_capacity(dead.len());
-    for object_id in &dead {
-        let rows = sqlx::query!(
-            "UPDATE canvas_objects SET deleted_at = NULL
-             WHERE id = ? AND channel_id = ? AND deleted_at IS NOT NULL",
-            object_id,
-            channel_id
-        )
-        .execute(&mut **tx)
-        .await?
-        .rows_affected();
-        if rows > 0 {
-            touched.push(*object_id);
-        }
-    }
-
-    let affected = touched.len() as i64;
-    Ok(("restore", affected, touched, None))
-}
-
-/// The objects `target` named: a `remove`'s own `canvas_op_targets` rows, or -
-/// since a `clear` stores no per-object targets, only a fence - every object
-/// whose `deleted_at` matches the exact moment that clear ran.
-async fn restore_candidates(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-    channel_id: ChannelId,
-    target: &ExistingOp,
-) -> Result<Vec<CanvasObjectId>, sqlx::Error> {
-    if target.kind == "remove" {
-        sqlx::query_scalar!(
-            r#"SELECT object_id AS "object_id!: CanvasObjectId" FROM canvas_op_targets
-               WHERE channel_id = ? AND seq = ?"#,
-            channel_id,
-            target.seq
-        )
-        .fetch_all(&mut **tx)
-        .await
-    } else {
-        let bound = target.bound_seq.unwrap_or(0);
-        sqlx::query_scalar!(
-            r#"SELECT id AS "id!: CanvasObjectId" FROM canvas_objects
-               WHERE channel_id = ? AND seq <= ? AND deleted_at = ?"#,
-            channel_id,
-            bound,
-            target.created_at
-        )
-        .fetch_all(&mut **tx)
-        .await
-    }
-}
-
-async fn fetch_op(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-    id: CanvasOpId,
-) -> Result<Option<ExistingOp>, sqlx::Error> {
-    sqlx::query_as!(
-        ExistingOp,
-        r#"SELECT channel_id AS "channel_id!: ChannelId", seq AS "seq!: i64",
-                  kind AS "kind!", actor_id AS "actor_id: UserId",
-                  bound_seq AS "bound_seq: i64", created_at AS "created_at!: i64"
-           FROM canvas_ops WHERE id = ?"#,
-        id
-    )
-    .fetch_optional(&mut **tx)
-    .await
-}
-
-async fn fetch_object_for_op(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-    channel_id: ChannelId,
-    id: CanvasObjectId,
-) -> Result<Option<ObjectAuth>, sqlx::Error> {
-    let row = sqlx::query!(
-        r#"SELECT author_id AS "author_id: UserId", deleted_at AS "deleted_at: i64"
-           FROM canvas_objects WHERE id = ? AND channel_id = ?"#,
-        id,
-        channel_id
-    )
-    .fetch_optional(&mut **tx)
-    .await?;
-    Ok(row.map(|r| ObjectAuth {
-        author_id: r.author_id,
-        is_dead: r.deleted_at.is_some(),
-    }))
-}
-
-/// The channel's current canvas head, for the response an `affected == 0`
-/// call gets when no seq was allocated: "the stream stands here, unmoved".
-async fn current_canvas_seq(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-    channel_id: ChannelId,
-) -> Result<i64, sqlx::Error> {
-    let seq = sqlx::query_scalar!(
-        r#"SELECT next_seq - 1 AS "seq!: i64" FROM channel_seq_counters
-           WHERE channel_id = ? AND stream = 'canvas'"#,
-        channel_id
-    )
-    .fetch_optional(&mut **tx)
-    .await?;
-    Ok(seq.unwrap_or(0))
-}
-
-/// Recomputes `affected` for a replayed op, since the count itself is not a
-/// stored column. A `remove`'s or a `restore`'s own target rows already name
-/// exactly what it touched, both keyed by the op's own seq; a `clear` shares
-/// one `now` between `deleted_at` and its own `created_at`, and the single
-/// writer this database has means no other write can share that millisecond,
-/// so matching on it is exact.
-async fn affected_count_for(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-    channel_id: ChannelId,
-    op: &ExistingOp,
-) -> Result<i64, sqlx::Error> {
-    if op.kind == "remove" || op.kind == "restore" {
-        sqlx::query_scalar!(
-            r#"SELECT COUNT(*) AS "count!: i64" FROM canvas_op_targets
-               WHERE channel_id = ? AND seq = ?"#,
-            channel_id,
-            op.seq
-        )
-        .fetch_one(&mut **tx)
-        .await
-    } else {
-        let bound = op.bound_seq.unwrap_or(0);
-        sqlx::query_scalar!(
-            r#"SELECT COUNT(*) AS "count!: i64" FROM canvas_objects
-               WHERE channel_id = ? AND seq <= ? AND deleted_at = ?"#,
-            channel_id,
-            bound,
-            op.created_at
-        )
-        .fetch_one(&mut **tx)
-        .await
     }
 }

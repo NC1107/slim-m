@@ -134,6 +134,17 @@ pub(super) enum ServerFrame {
         x: f64,
         y: f64,
     },
+    #[serde(rename = "canvas.object.moved")]
+    CanvasObjectMoved {
+        channel_id: String,
+        seq: i64,
+        op_id: String,
+        object_id: String,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+    },
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]

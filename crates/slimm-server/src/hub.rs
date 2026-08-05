@@ -98,6 +98,7 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::CanvasCleared { .. }
         | Event::CanvasObjectsRestored { .. }
         | Event::CanvasCursorMoved { .. }
+        | Event::CanvasObjectMoved { .. }
         | Event::SessionRevoked(_)
         // Who is on a call changes no permission's answer.
         | Event::VoiceActivityChanged { .. }

@@ -203,6 +203,45 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         }),
     )
     .await;
+    // A canvas image needs an already-uploaded attachment to name.
+    let canvas_attachment = c
+        .call(
+            "uploadAttachment",
+            "POST",
+            "/attachments?filename=pasted.png",
+            Some(root),
+            Payload::Bytes(PNG.to_vec()),
+        )
+        .await;
+    let canvas_attachment = text(&canvas_attachment, "id");
+    // Exercises the `image` kind on both `CanvasObjectPlacement` and `CanvasObject`.
+    c.json(
+        "placeCanvasObject",
+        "POST",
+        &format!("/channels/{channel}/canvas/objects"),
+        root,
+        json!({
+            "id": Uuid::now_v7().to_string(),
+            "kind": "image",
+            "x": 300.0, "y": 300.0, "w": 64.0, "h": 64.0,
+            "props": { "attachment": canvas_attachment, "content_type": "image/png" },
+        }),
+    )
+    .await;
+    // Exercises `move` on `CanvasOpRequest`, `CanvasOpResult` and the ops feed below.
+    c.json(
+        "submitCanvasOp",
+        "POST",
+        &format!("/channels/{channel}/canvas/ops"),
+        root,
+        json!({
+            "id": Uuid::now_v7().to_string(),
+            "kind": "move",
+            "object_id": first_object_id,
+            "x": 250.0, "y": 250.0, "w": 40.0, "h": 20.0,
+        }),
+    )
+    .await;
     // Both objects live again, so this page still carries what it had before.
     c.get(
         "listCanvasViewport",
@@ -210,7 +249,8 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         root,
     )
     .await;
-    // Covers a `place`, the `remove` op, and the `restore` op that undid it.
+    // Covers a `place`, the `remove` op, the `restore` op that undid it, a
+    // second `place` (the image), and the `move` that repositioned the first.
     c.get(
         "listCanvasOps",
         &format!("/channels/{channel}/canvas/ops?after_seq=0"),

@@ -78,6 +78,13 @@ enum CanvasOpBodyDto {
         target_op: String,
         object_ids: Vec<String>,
     },
+    Move {
+        object_id: String,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+    },
 }
 
 impl CanvasOpDto {
@@ -120,6 +127,19 @@ impl CanvasOpDto {
             } => CanvasOpBodyDto::Restore {
                 target_op: target_op.to_string(),
                 object_ids: ids(object_ids),
+            },
+            CanvasOpBody::Move {
+                object_id,
+                x,
+                y,
+                w,
+                h,
+            } => CanvasOpBodyDto::Move {
+                object_id: object_id.to_string(),
+                x,
+                y,
+                w,
+                h,
             },
         };
         Self {

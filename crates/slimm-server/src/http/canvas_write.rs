@@ -21,12 +21,18 @@
 //! is now a distinct 409 from `IdConflict`, since an honest retry racing an
 //! erase deserves a truthful answer, not "id taken".
 //!
-//! What the server does not validate is the inside of `props`. It stays
-//! opaque, the way the read's degrade-to-`{}` already assumes; a schema per
-//! kind would make the "kind-specific, opaque" column a lie. The residual is
-//! that an object whose points run past its declared box paints outside it and
-//! vanishes when the box leaves the viewport - a rendering artifact produced by
-//! somebody already authorized to draw, not a privilege escape.
+//! What the server does not validate is the inside of `props`, with one
+//! exception: an `image` object's `props.attachment` is read, because it is
+//! the one field this route needs to authorize - the same `may_link` check a
+//! message's attachment already passes through, so pasting bytes onto a
+//! canvas can grant no wider a reach than sending them ever could. Every
+//! other field, and every field of every other kind, stays opaque the way the
+//! read's degrade-to-`{}` already assumes; a schema per kind would make the
+//! "kind-specific, opaque" column a lie. The residual is that an object whose
+//! points (or, for an image, declared box) run past what it claims paints
+//! outside it and vanishes when the box leaves the viewport - a rendering
+//! artifact produced by somebody already authorized to draw, not a privilege
+//! escape.
 //!
 //! One thing to know before slice three: a timed-out member cannot mint a
 //! LiveKit token at all (`TIMEOUT_DENY` removes `CONNECT`), which is the only
@@ -45,6 +51,7 @@ use super::extract::{AuthedLimited, CANVAS, Json};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{CanvasObjectId, ChannelId};
+use crate::media;
 use crate::permissions::Permissions;
 use crate::store::PlaceError;
 
@@ -60,14 +67,31 @@ pub(super) const MAX_PROPS_BYTES: usize = 4 * 1024;
 /// The whole request body, which is `props` plus a small fixed envelope.
 pub(super) const MAX_BODY_BYTES: usize = 8 * 1024;
 
-/// Object kinds this server accepts. One, for now.
+/// Object kinds this server accepts.
 ///
 /// An allowlist rather than the free text the store takes: `kind` decides how
 /// every client renders a row, and an unknown one is a row nobody can draw and
-/// nobody can remove. Adding `image` here is a one-line edit when it has a
-/// renderer. Per decision 0004 there is no `window` kind: a window is a
-/// behaviour of an object, not an object.
-const KINDS: [&str; 1] = ["stroke"];
+/// nobody can remove. Per decision 0004 there is no `window` kind: a window is
+/// a behaviour of an object, not an object.
+const KINDS: [&str; 2] = ["stroke", "image"];
+
+/// The only kind-specific field this server reads out of an otherwise opaque
+/// `props`: which attachment an `image` object names. A raw sha256, not a hex
+/// string parsed lazily inside the store, so a malformed reference is a 400
+/// naming the field rather than an internal error surfacing from a query.
+fn image_attachment(props: &Value) -> Result<Vec<u8>, ApiError> {
+    let raw = props
+        .get("attachment")
+        .and_then(Value::as_str)
+        .ok_or(ApiError::BadRequest(
+            "an image object needs props.attachment",
+        ))?;
+    media::from_hex(raw)
+        .filter(|bytes| bytes.len() == 32)
+        .ok_or(ApiError::BadRequest(
+            "props.attachment is not a valid attachment id",
+        ))
+}
 
 #[derive(Deserialize)]
 pub(super) struct PlaceParams {
@@ -118,6 +142,11 @@ pub(super) async fn place(
     if props.len() > MAX_PROPS_BYTES {
         return Err(ApiError::BadRequest("canvas props are too large"));
     }
+    let attachment = if params.kind == "image" {
+        Some(image_attachment(&params.props)?)
+    } else {
+        None
+    };
 
     let placement = state
         .store
@@ -125,9 +154,12 @@ pub(super) async fn place(
             channel_id,
             ctx.user_id,
             id,
-            &params.kind,
-            (params.x, params.y, params.w, params.h),
-            &props,
+            crate::store::PlaceRequest {
+                kind: &params.kind,
+                bounds: (params.x, params.y, params.w, params.h),
+                props: &props,
+                attachment: attachment.as_deref(),
+            },
         )
         .await;
     let placement = match placement {
@@ -143,6 +175,11 @@ pub(super) async fn place(
         }
         Err(PlaceError::Removed) => {
             return Err(ApiError::Conflict("that object was removed"));
+        }
+        Err(PlaceError::AttachmentNotFound) => {
+            return Err(ApiError::BadRequest(
+                "attachment not found; upload it first",
+            ));
         }
         Err(PlaceError::Internal(err)) => return Err(err.into()),
     };

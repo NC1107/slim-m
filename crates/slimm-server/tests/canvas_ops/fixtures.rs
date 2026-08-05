@@ -19,7 +19,7 @@ use slimm_server::ids::{CanvasObjectId, ChannelId, UserId};
 use slimm_server::media::Media;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{PlaceRequest, Store};
 use slimm_server::voice::VoiceService;
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -161,6 +161,11 @@ pub(crate) fn restore(id: &str, target_op: &str) -> Value {
     json!({ "id": id, "kind": "restore", "target_op": target_op })
 }
 
+pub(crate) fn move_op(id: &str, object_id: &str, bounds: (f64, f64, f64, f64)) -> Value {
+    let (x, y, w, h) = bounds;
+    json!({ "id": id, "kind": "move", "object_id": object_id, "x": x, "y": y, "w": w, "h": h })
+}
+
 pub(crate) async fn get_ops(
     app: &Router,
     channel: ChannelId,
@@ -203,7 +208,17 @@ pub(crate) async fn place(
         serde_json::to_string(&json!({ "filler": "x".repeat(props_bytes) })).unwrap()
     };
     store
-        .place_canvas_object(channel, author, id, "stroke", (0.0, 0.0, 1.0, 1.0), &props)
+        .place_canvas_object(
+            channel,
+            author,
+            id,
+            PlaceRequest {
+                kind: "stroke",
+                bounds: (0.0, 0.0, 1.0, 1.0),
+                props: &props,
+                attachment: None,
+            },
+        )
         .await
         .expect("placed");
     id
