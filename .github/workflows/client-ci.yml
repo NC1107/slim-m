@@ -76,6 +76,41 @@ jobs:
         working-directory: client/packages/app
         run: flutter build web --release
 
+  # A native desktop plugin's own CMake is invisible to analyze, test and the
+  # web build alike: adding audioplayers put a gstreamer-1.0 pkg-config
+  # requirement into the Linux build that nothing on a pull request compiled,
+  # so main went red on merge and stayed red for five merges before a release
+  # missed its Linux artifacts entirely. Its own job rather than a step above,
+  # so it runs in parallel and its apt cost is not paid by every other check.
+  linux-compiles:
+    name: linux desktop compiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Must stay in step with the same list in main-builds.yml and release.yml;
+      # a plugin added here is a plugin those two need before the next release.
+      - name: linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
+
+      - name: linux compiles
+        working-directory: client/packages/app
+        run: flutter build linux --release
+
   # The iOS half lives in client-ios-ci.yml. It costs 14 minutes on a macOS
   # runner against 5 for everything here, so it is gated on the paths that can
   # actually change its answer rather than on any client change at all.
