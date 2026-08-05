@@ -14,6 +14,7 @@ export 'src/canvas_hit_test.dart';
 export 'src/canvas_painters.dart' show CursorPainter, DraftStroke;
 export 'src/canvas_presence_layout.dart';
 export 'src/canvas_presence_visibility.dart';
+export 'src/canvas_resize.dart';
 export 'src/canvas_scene.dart';
 export 'src/canvas_surface.dart';
 export 'src/spatial_grid.dart';
