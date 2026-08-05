@@ -27,9 +27,10 @@ import hashlib
 import shutil
 import sqlite3
 import sys
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+
+import path_guard
 
 
 def parse_args(argv):
@@ -79,10 +80,14 @@ def check_attachments(restored_db, mirror_dir):
         conn.close()
 
     attachments_dir = Path(mirror_dir, "attachments")
-    missing, mismatched, verified = [], [], 0
+    missing, mismatched, malformed, verified = [], [], [], 0
     for blob, size in rows:
-        expected = blob.hex()
-        path = attachments_dir / expected
+        try:
+            expected = path_guard.sha256_hex(blob)
+            path = path_guard.contained_path(attachments_dir, expected)
+        except path_guard.PathValidationError as error:
+            malformed.append(str(error))
+            continue
         if not path.is_file():
             missing.append(expected)
             continue
@@ -97,6 +102,7 @@ def check_attachments(restored_db, mirror_dir):
         "verified": verified,
         "missing": missing,
         "mismatched": mismatched,
+        "malformed": malformed,
     }
 
 
@@ -110,15 +116,24 @@ def check_avatars(restored_db, mirror_dir):
         conn.close()
 
     avatars_dir = Path(mirror_dir, "avatars")
-    missing, verified = [], 0
+    missing, malformed, verified = [], [], 0
     for blob, username in rows:
-        name = str(uuid.UUID(bytes=blob))
-        path = avatars_dir / name
+        try:
+            name = path_guard.avatar_uuid(blob)
+            path = path_guard.contained_path(avatars_dir, name)
+        except path_guard.PathValidationError as error:
+            malformed.append(str(error))
+            continue
         if not path.is_file() or path.stat().st_size == 0:
             missing.append((name, username))
             continue
         verified += 1
-    return {"total": len(rows), "verified": verified, "missing": missing}
+    return {
+        "total": len(rows),
+        "verified": verified,
+        "missing": missing,
+        "malformed": malformed,
+    }
 
 
 def run(args):
@@ -156,14 +171,23 @@ def run(args):
             f"({actual_size} bytes, expected {expected_size})",
             file=sys.stderr,
         )
-    ok = ok and not attachments["missing"] and not attachments["mismatched"]
+    for reason in attachments["malformed"]:
+        print(f"  MALFORMED  attachments: {reason}", file=sys.stderr)
+    ok = (
+        ok
+        and not attachments["missing"]
+        and not attachments["mismatched"]
+        and not attachments["malformed"]
+    )
 
     avatars = check_avatars(restored_db, backup_root)
     print(f"avatars: {avatars['verified']}/{avatars['total']} verified, "
           f"{len(avatars['missing'])} missing")
     for name, username in avatars["missing"]:
         print(f"  MISSING    avatars/{name} (user {username})", file=sys.stderr)
-    ok = ok and not avatars["missing"]
+    for reason in avatars["malformed"]:
+        print(f"  MALFORMED  avatars: {reason}", file=sys.stderr)
+    ok = ok and not avatars["missing"] and not avatars["malformed"]
 
     print("PASS" if ok else "FAIL")
     return 0 if ok else 1

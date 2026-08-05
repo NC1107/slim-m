@@ -42,9 +42,11 @@ import shutil
 import sqlite3
 import sys
 import time
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
+
+import path_guard
 
 
 def _default(env_name, fallback):
@@ -78,7 +80,9 @@ def parse_args(argv):
 
 
 def vacuum_into(source_db, dest_db):
-    conn = sqlite3.connect(f"file:{source_db}?mode=ro", uri=True)
+    resolved_source = Path(source_db).resolve()
+    uri = f"file:{quote(str(resolved_source), safe='/')}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
     try:
         conn.execute("VACUUM INTO ?", (str(dest_db),))
     finally:
@@ -94,16 +98,20 @@ def sync_attachments(snapshot_db, source_media_dir, mirror_dir):
     rows = conn.execute("SELECT sha256, size FROM attachments").fetchall()
     conn.close()
 
-    copied, already_present, missing_source, repaired = 0, 0, [], 0
+    copied, already_present, missing_source, repaired, malformed = 0, 0, [], 0, []
     for blob, size in rows:
-        digest = blob.hex()
-        dest = dest_dir / digest
+        try:
+            digest = path_guard.sha256_hex(blob)
+            dest = path_guard.contained_path(dest_dir, digest)
+            src = path_guard.contained_path(source_dir, digest)
+        except path_guard.PathValidationError as error:
+            malformed.append(str(error))
+            continue
         # A cheap size check, not a full hash: catches a truncated mirror file.
         if dest.is_file() and dest.stat().st_size == size:
             already_present += 1
             continue
         was_present = dest.is_file()
-        src = source_dir / digest
         if not src.is_file():
             missing_source.append(digest)
             continue
@@ -117,6 +125,7 @@ def sync_attachments(snapshot_db, source_media_dir, mirror_dir):
         "repaired": repaired,
         "already_present": already_present,
         "missing_source": missing_source,
+        "malformed": malformed,
     }
 
 
@@ -131,16 +140,26 @@ def sync_avatars(snapshot_db, source_media_dir, mirror_dir):
     ).fetchall()
     conn.close()
 
-    copied, missing_source = 0, []
+    copied, missing_source, malformed = 0, [], []
     for (blob,) in rows:
-        name = str(uuid.UUID(bytes=blob))
-        src = source_dir / name
+        try:
+            name = path_guard.avatar_uuid(blob)
+            src = path_guard.contained_path(source_dir, name)
+            dest = path_guard.contained_path(dest_dir, name)
+        except path_guard.PathValidationError as error:
+            malformed.append(str(error))
+            continue
         if not src.is_file():
             missing_source.append(name)
             continue
-        _independent_copy(src, dest_dir / name)
+        _independent_copy(src, dest)
         copied += 1
-    return {"total": len(rows), "copied": copied, "missing_source": missing_source}
+    return {
+        "total": len(rows),
+        "copied": copied,
+        "missing_source": missing_source,
+        "malformed": malformed,
+    }
 
 
 def _independent_copy(src, dest):
@@ -206,12 +225,16 @@ def run(args):
     )
     for digest in attachments["missing_source"]:
         print(f"  MISSING SOURCE FILE  attachments/{digest}", file=sys.stderr)
+    for reason in attachments["malformed"]:
+        print(f"  MALFORMED ID  attachments: {reason}", file=sys.stderr)
     print(
         f"avatars: {avatars['copied']} copied, "
         f"{len(avatars['missing_source'])} missing on disk"
     )
     for name in avatars["missing_source"]:
         print(f"  MISSING SOURCE FILE  avatars/{name}", file=sys.stderr)
+    for reason in avatars["malformed"]:
+        print(f"  MALFORMED ID  avatars: {reason}", file=sys.stderr)
     if removed:
         print(f"pruned {len(removed)} older snapshot(s): {', '.join(removed)}")
 
@@ -220,6 +243,13 @@ def run(args):
             "backup completed, but the LIVE deployment already has orphaned "
             "database rows with no file behind them; the restore drill will "
             "report the same gap",
+            file=sys.stderr,
+        )
+        return 1
+    if attachments["malformed"] or avatars["malformed"]:
+        print(
+            "backup completed, but the database holds a row whose id is not "
+            "a well-formed reference; it was skipped rather than mirrored",
             file=sys.stderr,
         )
         return 1

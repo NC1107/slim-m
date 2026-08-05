@@ -92,6 +92,16 @@ class CheckAttachmentsTest(RestoreDrillTestCase):
         self.assertEqual(expected, sha.hex())
         self.assertNotEqual(actual, expected)
 
+    def test_a_malformed_sha256_is_reported_as_malformed_not_missing(self):
+        snapshot = self._write_snapshot(attachments=[(b"not-a-real-digest", 17, "text/plain")])
+
+        result = restore_drill_lib.check_attachments(snapshot, self.backup_root)
+
+        self.assertEqual(len(result["malformed"]), 1)
+        self.assertEqual(result["missing"], [])
+        self.assertEqual(result["mismatched"], [])
+        self.assertEqual(result["verified"], 0)
+
 
 class CheckAvatarsTest(RestoreDrillTestCase):
     def test_verifies_a_present_avatar(self):
@@ -111,6 +121,15 @@ class CheckAvatarsTest(RestoreDrillTestCase):
         result = restore_drill_lib.check_avatars(snapshot, self.backup_root)
 
         self.assertEqual(result["missing"], [(str(uuid.UUID(bytes=user_id)), "bob")])
+
+    def test_a_malformed_user_id_is_reported_as_malformed_not_missing(self):
+        snapshot = self._write_snapshot(avatar_users=[(b"too-short", "eve")])
+
+        result = restore_drill_lib.check_avatars(snapshot, self.backup_root)
+
+        self.assertEqual(len(result["malformed"]), 1)
+        self.assertEqual(result["missing"], [])
+        self.assertEqual(result["verified"], 0)
 
 
 class LatestSnapshotTest(RestoreDrillTestCase):
@@ -159,6 +178,13 @@ class RunTest(RestoreDrillTestCase):
         self.assertEqual(code, 1)
 
     def test_no_snapshot_found_exits_non_zero(self):
+        code = restore_drill_lib.run(self._args())
+
+        self.assertEqual(code, 1)
+
+    def test_a_malformed_attachment_id_exits_non_zero(self):
+        self._write_snapshot(attachments=[(b"not-a-real-digest", 17, "text/plain")])
+
         code = restore_drill_lib.run(self._args())
 
         self.assertEqual(code, 1)
