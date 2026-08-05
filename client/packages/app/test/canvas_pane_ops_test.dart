@@ -169,6 +169,101 @@ void main() {
     },
   );
 
+  /// The reviewable criterion for move: dragging an image with the select
+  /// tool previews the new position at once and commits it as one op on
+  /// release, the same "one gesture, one op" shape undo already relies on.
+  testWidgets(
+    'dragging with the select tool moves an image and posts one move op',
+    (tester) async {
+      final fixture = CanvasPaneFixture()..objects = [canvasImageJson('img')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.pump();
+
+      final start = screenFor(tester, const Offset(15, 15));
+      final gesture = await tester.startGesture(start);
+      await gesture.moveTo(screenFor(tester, const Offset(45, 35)));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(fixture.postedOps, hasLength(1));
+      expect(fixture.postedOps.single['kind'], 'move');
+      expect(fixture.postedOps.single['object_id'], 'img');
+      expect(fixture.postedOps.single['x'], 40);
+      expect(fixture.postedOps.single['y'], 30);
+
+      final bounds = surfaceDocument(tester).objectBounds('img')!;
+      expect(bounds.x, 40);
+      expect(bounds.y, 30);
+    },
+  );
+
+  /// Move is scoped to images: `beginMove` hit-tests only the image kind, so
+  /// a drag starting over a stroke picks nothing up and submits nothing.
+  testWidgets(
+    'move is scoped to images: dragging over a stroke does nothing',
+    (tester) async {
+      final fixture = CanvasPaneFixture()..objects = [canvasObjectJson('a')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.pump();
+
+      final start = screenFor(tester, const Offset(15, 15));
+      final gesture = await tester.startGesture(start);
+      await gesture.moveTo(screenFor(tester, const Offset(45, 35)));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(fixture.postedOps, isEmpty);
+      final bounds = surfaceDocument(tester).objectBounds('a')!;
+      expect(bounds.x, 10);
+      expect(bounds.y, 10);
+    },
+  );
+
+  /// A move already shows its new position optimistically (the property the
+  /// first test above checks); a failed submit has to put that back, the
+  /// same "revert what was already shown" shape a failed erase never needs
+  /// because erasing shows nothing until the drag ends.
+  testWidgets(
+    'a failed move reverts the object locally and shows an error',
+    (tester) async {
+      final fixture = CanvasPaneFixture(opsPostStatus: 403)
+        ..objects = [canvasImageJson('img')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.pump();
+
+      final start = screenFor(tester, const Offset(15, 15));
+      final gesture = await tester.startGesture(start);
+      await gesture.moveTo(screenFor(tester, const Offset(45, 35)));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(fixture.postedOps, isEmpty);
+      expect(find.text('That could not be moved.'), findsOneWidget);
+
+      final bounds = surfaceDocument(tester).objectBounds('img')!;
+      expect(bounds.x, 10, reason: 'a failed move must put the image back');
+      expect(bounds.y, 10);
+    },
+  );
+
   /// The server empties a restore frame's id list rather than exceed the
   /// bound a `remove` sets, so an empty list means "more than I can name",
   /// never "nothing". Applying it would clear no tombstone while advancing

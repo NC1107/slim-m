@@ -63,6 +63,25 @@ Map<String, dynamic> canvasObjectJson(
   'created_at': 0,
 };
 
+Map<String, dynamic> canvasImageJson(
+  String id, {
+  double x = 10,
+  int seq = 1,
+  String authorId = 'me',
+}) => {
+  'id': id,
+  'kind': 'image',
+  'z_index': seq,
+  'x': x,
+  'y': 10.0,
+  'w': 20.0,
+  'h': 20.0,
+  'props': {'attachment': 'sha-$id', 'content_type': 'image/png'},
+  'author_id': authorId,
+  'seq': seq,
+  'created_at': 0,
+};
+
 http.Response jsonResponse(Object body) => http.Response(
   jsonEncode(body),
   200,
@@ -74,6 +93,7 @@ class CanvasPaneFixture {
     this.viewportStatus = 200,
     this.hasMore = false,
     this.mePermissions = 0,
+    this.opsPostStatus = 201,
   });
 
   final StreamController<api.ServerEvent> events =
@@ -81,6 +101,10 @@ class CanvasPaneFixture {
 
   final int viewportStatus;
   final bool hasMore;
+
+  /// The status `POST .../canvas/ops` answers with, so a test can drive the
+  /// controller's failure path (a revert) without a real server refusal.
+  final int opsPostStatus;
 
   /// The signed-in member's own permission bitmask, as `GET /me` answers it.
   final int mePermissions;
@@ -124,6 +148,13 @@ class CanvasPaneFixture {
             if (request.url.path.endsWith('/canvas/ops') &&
                 request.method == 'POST') {
               final body = jsonDecode(request.body) as Map<String, dynamic>;
+              if (opsPostStatus != 201) {
+                return http.Response(
+                  jsonEncode({'error': 'no'}),
+                  opsPostStatus,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
               postedOps.add(body);
               _opSeq++;
               return http.Response(
