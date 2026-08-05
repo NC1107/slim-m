@@ -30,6 +30,13 @@ import '../routing/breakpoints.dart';
 /// nothing, and read as one called "Thread". What a person opening an empty
 /// thread needs to know is that replies go here, which is what [isThread]
 /// says instead.
+///
+/// [name] is null for a DM: its "name" is a person, so this deliberately
+/// never says "Welcome to #" over somebody's own name. It renders generic
+/// copy instead of nothing, which `message_transcript.dart`'s own doc
+/// comment on `_topSlot` explains: a DM reaching its true start used to
+/// vanish outright rather than swap, the one case that broke the invariant
+/// [HistoryTopAffordance] documents below.
 class ChannelStartHeader extends StatelessWidget {
   const ChannelStartHeader({
     super.key,
@@ -38,7 +45,7 @@ class ChannelStartHeader extends StatelessWidget {
     this.isThread = false,
   });
 
-  final String name;
+  final String? name;
   final String? topic;
 
   /// Whether this is a thread's own transcript rather than a channel's.
@@ -51,6 +58,7 @@ class ChannelStartHeader extends StatelessWidget {
     final gutter = LayoutClass.of(context) == LayoutClass.compact
         ? AppSizes.paneGutterCompact
         : AppSizes.paneGutter;
+    final name = this.name;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         gutter,
@@ -70,23 +78,32 @@ class ChannelStartHeader extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isThread ? AppIcons.thread : AppIcons.hash,
+              isThread
+                  ? AppIcons.thread
+                  : name != null
+                  ? AppIcons.hash
+                  : AppIcons.members,
               size: 26,
               color: tokens.textSecondary,
             ),
           ),
           const SizedBox(height: AppSpacing.s12),
           Text(
-            isThread ? 'Thread' : 'Welcome to #$name',
+            isThread
+                ? 'Thread'
+                : name != null
+                ? 'Welcome to #$name'
+                : 'This is the start of your conversation.',
             style: AppText.title.copyWith(color: tokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.s4),
-          Text(
-            isThread
-                ? 'Replies to the original message appear here.'
-                : topic ?? 'This is the start of the #$name channel.',
-            style: AppText.body.copyWith(color: tokens.textSecondary),
-          ),
+          Text(switch ((isThread, name)) {
+            (true, _) => 'Replies to the original message appear here.',
+            (false, final String n) =>
+              topic ?? 'This is the start of the #$n channel.',
+            (false, null) =>
+              'Messages sent here are just between the two of you.',
+          }, style: AppText.body.copyWith(color: tokens.textSecondary)),
         ],
       ),
     );

@@ -262,9 +262,18 @@ class _MessageTranscriptState extends State<MessageTranscript> {
     });
   }
 
-  /// The start header only when the oldest loaded row is known to be the
-  /// channel's first, and only where such a header belongs at all.
-  Widget? _topSlot() {
+  /// The slot at the very top of the loaded window: always present, never
+  /// absent, so the list's own item count never shifts by one right where the
+  /// reader is scrolled when a page lands - only what fills it changes.
+  ///
+  /// Returning null here for a DM once history reached its true start used to
+  /// be exactly that shift: paging only ever triggers near the far end of the
+  /// loaded list, so the one item that could vanish always vanished right
+  /// under the reader's own scroll offset. [ChannelStartHeader] renders
+  /// generic copy for a DM now instead of nothing, closing the gap without
+  /// reopening the "Welcome to # a person's name" wording it was never meant
+  /// to say.
+  Widget _topSlot() {
     if (!widget.history.atStart) {
       return HistoryTopAffordance(
         failed: widget.history.failed,
@@ -272,9 +281,8 @@ class _MessageTranscriptState extends State<MessageTranscript> {
         onRetry: widget.onRetryOlder,
       );
     }
-    if (widget.channelName == null) return null;
     return ChannelStartHeader(
-      name: widget.channelName!,
+      name: widget.channelName,
       topic: widget.channelTopic,
       isThread: widget.channelIsThread,
     );
@@ -287,7 +295,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
 
     if (messages.isEmpty) {
       // Reverse-anchored like the populated list below, so the welcome sits above the composer, not at the top of an empty pane.
-      if (start != null && widget.syncStatus == SyncStatus.live) {
+      if (widget.syncStatus == SyncStatus.live) {
         return ListView(
           controller: widget.scrollController,
           reverse: true,
@@ -315,9 +323,9 @@ class _MessageTranscriptState extends State<MessageTranscript> {
         controller: widget.scrollController,
         reverse: true,
         padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-        itemCount: messages.length + (start != null ? 1 : 0),
+        itemCount: messages.length + 1,
         itemBuilder: (context, i) {
-          if (start != null && i == messages.length) return start;
+          if (i == messages.length) return start;
           // Index 0 is the newest; `previous` stays the row visually above,
           // so grouping still reads right.
           final index = messages.length - 1 - i;
