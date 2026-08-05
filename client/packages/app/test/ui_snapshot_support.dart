@@ -18,6 +18,8 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/message_extras.dart';
+import 'package:slimm_app/src/audio/notification_sound.dart';
+import 'package:slimm_app/src/providers/notification_sound_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/routing/modal_page.dart';
@@ -162,6 +164,13 @@ Future<({ProviderContainer container, SlimmDatabase db})> fixtureContainer({
         return client;
       }),
       databaseProvider.overrideWith((ref) => db),
+      // HomeShell watches this, so the real AudioPlayers player is built for
+      // every surface. Ordinary widget tests never notice, because nothing
+      // drives the platform channel; the SLIMM_UI_SNAPSHOTS render path does,
+      // through tester.runAsync, and the channel has no host in a test.
+      notificationSoundControllerProvider.overrideWith(
+        (ref) => NotificationSoundController(ref, player: _SilentPlayer()),
+      ),
       ...extraOverrides,
     ],
   );
@@ -303,4 +312,14 @@ Future<void> teardownFixture(
   await tester.pumpWidget(const SizedBox());
   await tester.pump(const Duration(seconds: 1));
   await db.close();
+}
+
+/// Plays nothing: a snapshot render is about pixels, and the real player
+/// reaches a platform channel with no host under `tester.runAsync`.
+class _SilentPlayer implements SoundPlayer {
+  @override
+  Future<void> play(NotificationSound sound) async {}
+
+  @override
+  Future<void> dispose() async {}
 }
