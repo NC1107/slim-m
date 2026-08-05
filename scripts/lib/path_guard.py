@@ -19,12 +19,8 @@ reach anywhere on it. The trust boundary this module defends is between
 the database's own content and the filesystem, not between the operator
 and the filesystem.
 """
-import re
 import uuid
 from pathlib import Path
-
-_SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
-_UUID_TEXT = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
 class PathValidationError(ValueError):
@@ -32,21 +28,19 @@ class PathValidationError(ValueError):
 
 
 def sha256_hex(raw):
+    """A bytes object of exactly 32 bytes always hex-encodes to 64 lowercase
+    hex characters, so checking the source length is checking the result."""
     if not isinstance(raw, (bytes, bytearray)) or len(raw) != 32:
         raise PathValidationError(f"attachments.sha256 is not a 32-byte digest: {raw!r}")
-    digest = bytes(raw).hex()
-    if not _SHA256_HEX.fullmatch(digest):
-        raise PathValidationError(f"attachments.sha256 did not hex-encode cleanly: {raw!r}")
-    return digest
+    return bytes(raw).hex()
 
 
 def avatar_uuid(raw):
+    """A bytes object of exactly 16 bytes always formats as a canonical
+    lowercase uuid, so checking the source length is checking the result."""
     if not isinstance(raw, (bytes, bytearray)) or len(raw) != 16:
         raise PathValidationError(f"users.id is not a 16-byte uuid: {raw!r}")
-    text = str(uuid.UUID(bytes=bytes(raw)))
-    if not _UUID_TEXT.fullmatch(text):
-        raise PathValidationError(f"users.id did not format as a uuid: {raw!r}")
-    return text
+    return str(uuid.UUID(bytes=bytes(raw)))
 
 
 def contained_path(root, name):
