@@ -158,14 +158,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
                   ),
                 ),
               ),
-            Expanded(
-              child: _activityLogOpen
-                  ? CanvasActivityPanel(
-                      activityLog: widget.activityLog,
-                      summary: _summary(),
-                    )
-                  : _surface(tokens),
-            ),
+            Expanded(child: _activityLogOpen ? _panel() : _surface(tokens)),
             // Mounted regardless of the panel's own open state: browsing history is optional, hearing about it is not.
             CanvasActivityAnnouncer(activityLog: widget.activityLog),
           ],
@@ -173,6 +166,24 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
       ),
     );
   }
+
+  /// `document.objectCount` is the same trigger `_surface` already listens
+  /// to, since a placed or removed object is exactly what changes
+  /// `liveCountsByKind` too - without this, the summary would freeze at
+  /// whatever it read when the panel was last opened, since nothing else
+  /// rebuilds this widget on a live document change by design.
+  /// `document.objectCount` is the same trigger `_surface` already listens
+  /// to, since a placed or removed object is exactly what changes
+  /// `liveCountsByKind` too - without this, the summary would freeze at
+  /// whatever it read when the panel was last opened, since nothing else
+  /// rebuilds this widget on a live document change by design.
+  Widget _panel() => ValueListenableBuilder<int>(
+    valueListenable: widget.document.objectCount,
+    builder: (context, count, child) => CanvasActivityPanel(
+      activityLog: widget.activityLog,
+      summary: _summary(),
+    ),
+  );
 
   Widget _surface(AppTokens tokens) => ValueListenableBuilder<int>(
     valueListenable: widget.document.objectCount,
@@ -219,7 +230,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     final counts = widget.document.liveCountsByKind;
     final total = counts.strokes + counts.images;
     if (total == 0) return 'no objects';
-    return '$total objects: '
+    return '$total ${total == 1 ? 'object' : 'objects'}: '
         '${counts.strokes} ${counts.strokes == 1 ? 'stroke' : 'strokes'}, '
         '${counts.images} ${counts.images == 1 ? 'image' : 'images'}';
   }
