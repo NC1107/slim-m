@@ -249,8 +249,7 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         root,
     )
     .await;
-    // Covers a `place`, the `remove` op, the `restore` op that undid it, a
-    // second `place` (the image), and the `move` that repositioned the first.
+    // Covers place, remove, restore, a second place (the image), and move.
     c.get(
         "listCanvasOps",
         &format!("/channels/{channel}/canvas/ops?after_seq=0"),

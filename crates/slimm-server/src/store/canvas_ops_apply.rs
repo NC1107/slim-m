@@ -80,6 +80,13 @@ pub(super) async fn apply_remove(
 /// same "an honest retry deserves a truthful answer" reasoning `PlaceError::Removed`
 /// documents, extended here since a move naming a since-erased id is exactly
 /// that kind of race, not a caller mistake.
+///
+/// Bounds are validated inside [`move_canvas_object_query`] itself, the same
+/// check a placement makes, so this never duplicates it. And since this runs
+/// inside the caller's own write transaction, nothing can remove `object_id`
+/// between the dead-check above and the update below - single-writer is what
+/// makes a `false` result here mean the row vanished by some path this module
+/// does not know about, not a race this function lost.
 pub(super) async fn apply_move(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     channel_id: ChannelId,
@@ -97,11 +104,6 @@ pub(super) async fn apply_move(
     if !may_moderate && found.author_id != Some(actor_id) {
         return Err(SubmitOpError::NotAuthorized);
     }
-    // Bounds are validated inside `move_canvas_object_query` itself, the same
-    // check `place_canvas_object` makes, so this never duplicates it.
-    // Single-writer, inside this transaction: nothing can remove `object_id`
-    // between the check above and this update, so a false `moved` here would
-    // mean the row vanished by some path this module does not know about.
     let moved = move_canvas_object_query(&mut **tx, object_id, bounds).await?;
     if !moved {
         return Ok(("move", 0, Vec::new(), None));
