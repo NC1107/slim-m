@@ -14,6 +14,18 @@
 /// the server running out of older messages - never inferred from a row's
 /// `seq`, which soft deletes make gappy, and never from the window being
 /// unfilled, which says nothing about what was never asked for.
+///
+/// [window] is also the whole reason the scrollbar the transcript's
+/// `ListView` draws never represents the channel's full history: its extent
+/// is the loaded window's, which grows in pages rather than being known up
+/// front. Faking a total by estimating unfetched history would answer with a
+/// number that changes on every page and cannot be trusted; loading
+/// everything up front to make the number real is exactly what paging exists
+/// to avoid. The honest reading is a position-within-what-is-loaded
+/// indicator, the same trade-off other paginated chat clients make, not a
+/// proportion-of-everything gauge - see `message_transcript.dart`'s own note
+/// on `_topSlot` for the one place that answer used to lie by omission
+/// instead, which is now fixed.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';

@@ -10,11 +10,17 @@ library;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'fullscreen_video_overlay.dart';
+
 class CameraSelfPreview extends StatelessWidget {
-  const CameraSelfPreview({super.key, required this.child});
+  const CameraSelfPreview({super.key, required this.child, this.onExpand});
 
   /// The live view, from `VoiceController.cameraViewFor`.
   final Widget child;
+
+  /// Opens this preview full screen. Null only in the tests that build this
+  /// widget in isolation with nothing behind it to expand into.
+  final VoidCallback? onExpand;
 
   @override
   Widget build(BuildContext context) {
@@ -24,16 +30,32 @@ class CameraSelfPreview extends StatelessWidget {
       child: SizedBox(
         width: 220,
         height: 165,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: const Color(0xFF000000),
-              border: Border.all(color: tokens.borderSubtle),
-              borderRadius: BorderRadius.circular(AppRadii.card),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadii.card),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF000000),
+                    border: Border.all(color: tokens.borderSubtle),
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                  ),
+                  child: child,
+                ),
+              ),
             ),
-            child: child,
-          ),
+            if (onExpand != null)
+              Positioned(
+                left: 4,
+                top: 4,
+                child: ExpandVideoButton(
+                  label: 'View your camera full screen',
+                  onTap: onExpand!,
+                ),
+              ),
+          ],
         ),
       ),
     );

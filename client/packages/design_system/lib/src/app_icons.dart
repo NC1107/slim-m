@@ -94,6 +94,9 @@ abstract final class AppIcons {
   static const IconData screenShare = LucideIcons.monitorUp300;
   static const IconData leaveCall = LucideIcons.phoneOff300;
 
+  /// Expanding a call tile's video to fill the screen.
+  static const IconData expand = LucideIcons.maximize2300;
+
   /// Starting or joining a DM call, distinct from [voice] (a voice channel's
   /// own icon) since a DM has no channel kind of its own to draw.
   static const IconData startCall = LucideIcons.phone300;

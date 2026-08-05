@@ -26,6 +26,7 @@ import '../providers/presence_controller.dart';
 import '../providers/voice_controller.dart';
 import '../widgets/call_participant_tiles.dart';
 import '../widgets/camera_self_preview.dart';
+import '../widgets/fullscreen_video_overlay.dart';
 import '../widgets/member_profile.dart';
 import '../widgets/local_screen_share_banner.dart';
 import '../widgets/screen_share_stage.dart';
@@ -197,6 +198,14 @@ class _InCall extends ConsumerWidget {
               child: ScreenShareStage(
                 sharerName: sharer.name,
                 isLocal: sharer.isLocal,
+                onExpand: () => showFullscreenVideo(
+                  context,
+                  identity: sharer.identity,
+                  label: sharer.isLocal
+                      ? 'Your screen'
+                      : "${sharer.name}'s screen",
+                  kind: FullscreenVideoKind.screenShare,
+                ),
                 child: controller.screenShareViewFor(sharer.identity),
               ),
             ),
@@ -227,6 +236,12 @@ class _InCall extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.s16),
                   child: CameraSelfPreview(
+                    onExpand: () => showFullscreenVideo(
+                      context,
+                      identity: me.identity,
+                      label: 'Your camera',
+                      kind: FullscreenVideoKind.camera,
+                    ),
                     child: controller.cameraViewFor(me.identity),
                   ),
                 ),
@@ -245,6 +260,20 @@ class _InCall extends ConsumerWidget {
                         CallParticipantTile(
                           participant: p,
                           onTap: () => _openProfile(context, ref, p),
+                          // The local participant's camera already has its
+                          // own enlarged preview above; only a remote one
+                          // needs a view rendered onto its tile here.
+                          cameraView: (!p.isLocal && p.isCameraOn)
+                              ? controller.cameraViewFor(p.identity)
+                              : null,
+                          onExpand: (!p.isLocal && p.isCameraOn)
+                              ? () => showFullscreenVideo(
+                                  context,
+                                  identity: p.identity,
+                                  label: p.name,
+                                  kind: FullscreenVideoKind.camera,
+                                )
+                              : null,
                         ),
                     ],
                   ),
