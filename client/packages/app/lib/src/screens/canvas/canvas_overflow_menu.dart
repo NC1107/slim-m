@@ -99,6 +99,7 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
         child: AppIconButton(
           icon: AppIcons.moreVertical,
           semanticLabel: 'More canvas actions',
+          tooltip: 'More canvas actions',
           onPressed: _controller.toggle,
         ),
       ),

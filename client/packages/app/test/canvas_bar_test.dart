@@ -314,4 +314,49 @@ void main() {
       );
     }
   });
+
+  /// A mouse hover is the only route a sighted desktop user has to learn a
+  /// button's name without already knowing the icon, so every button here
+  /// needs one - not just a screen-reader-only semantic label.
+  testWidgets('every toolbar and overflow button carries a hover tooltip', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap(_bar(canManage: true, canUndo: true)));
+
+    for (final tooltip in [
+      'Pen',
+      'Eraser',
+      'Undo',
+      'More canvas actions',
+      'Close canvas',
+    ]) {
+      expect(
+        find.byTooltip(tooltip),
+        findsOneWidget,
+        reason:
+            '$tooltip must be reachable on hover, not only by screen reader',
+      );
+    }
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Tooltip &&
+            (widget.message?.startsWith('Move an image') ?? false),
+      ),
+      findsOneWidget,
+      reason: 'Move\'s tooltip is the only place Shift-frees-aspect is said',
+    );
+  });
+
+  /// A disabled control must say why, per the design language: greyed out
+  /// with no explanation reads as broken rather than as "nothing to do yet".
+  testWidgets('the undo tooltip explains why it is disabled', (tester) async {
+    await tester.pumpWidget(_wrap(_bar(canUndo: false)));
+    expect(find.byTooltip('Nothing to undo yet'), findsOneWidget);
+    expect(find.byTooltip('Undo'), findsNothing);
+
+    await tester.pumpWidget(_wrap(_bar(canUndo: true)));
+    expect(find.byTooltip('Undo'), findsOneWidget);
+    expect(find.byTooltip('Nothing to undo yet'), findsNothing);
+  });
 }
