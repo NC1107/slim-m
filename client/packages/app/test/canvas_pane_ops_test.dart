@@ -203,8 +203,8 @@ void main() {
     },
   );
 
-  /// Move is scoped to images: `beginMove` hit-tests only the image kind, so
-  /// a drag starting over a stroke picks nothing up and submits nothing.
+  /// Move is scoped to images: `beginSelect` hit-tests only the image kind,
+  /// so a drag starting over a stroke picks nothing up and submits nothing.
   testWidgets('move is scoped to images: dragging over a stroke does nothing', (
     tester,
   ) async {
