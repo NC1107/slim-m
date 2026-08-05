@@ -299,6 +299,14 @@ async fn a_stale_sample_is_pruned_on_the_next_write() {
         .unwrap();
 
     s.maybe_record_metrics_sample(2_000).await.unwrap();
+
+    // Off the table directly: `analytics_stats`'s own windowed read would pass this even unpruned.
+    let row_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM space_metrics_samples")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(row_count, 1);
+
     let stats = s.analytics_stats().await.unwrap();
     assert_eq!(stats.memory_samples.len(), 1);
     assert_eq!(stats.memory_samples[0].rss_bytes, 2_000);
