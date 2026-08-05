@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.31.0](https://github.com/NC1107/slim-m/compare/client-v0.30.0...client-v0.31.0) (2026-08-05)
+
+
+### Features
+
+* **canvas:** a text activity log, and proof the canvas really lets go on close ([#417](https://github.com/NC1107/slim-m/issues/417)) ([a4c7034](https://github.com/NC1107/slim-m/commit/a4c7034739a81899dc09e54a8d103a2d0a7d1d5b))
+* **canvas:** camera bubbles for a channel's call, positioned in world space ([#413](https://github.com/NC1107/slim-m/issues/413)) ([21ff1f4](https://github.com/NC1107/slim-m/commit/21ff1f42d8bf0efa495c701d4cfb2c156478d8d9))
+* **canvas:** resize a placed image, and control what sits on top ([#416](https://github.com/NC1107/slim-m/issues/416)) ([8d388f8](https://github.com/NC1107/slim-m/commit/8d388f88eaff6b1d646e90297f7ded5d885347de))
+* **client:** show a call recap on hang-up instead of a bare screen ([#404](https://github.com/NC1107/slim-m/issues/404)) ([1def50d](https://github.com/NC1107/slim-m/commit/1def50deb2d74fc6ea20e4e101c24bc0081e91b1))
+* paste an image onto the canvas and drag it around ([#410](https://github.com/NC1107/slim-m/issues/410)) ([b07e263](https://github.com/NC1107/slim-m/commit/b07e2637e7259091ba1b8e65ce01dabe616217a4))
+
+
+### Bug Fixes
+
+* **client:** stabilise the transcript's paging anchor, and make call video fullscreenable ([#408](https://github.com/NC1107/slim-m/issues/408)) ([4a20df5](https://github.com/NC1107/slim-m/commit/4a20df5a78789b30bbc8858ce48168f516fafcd1))
+* **client:** tighten reaction chip spacing to existing tokens ([#414](https://github.com/NC1107/slim-m/issues/414)) ([1fdb007](https://github.com/NC1107/slim-m/commit/1fdb0079dff773942ea72ec0ea379a0228e52418))
+* **scripts:** have the seeder vote on the polls it sends ([1fdb007](https://github.com/NC1107/slim-m/commit/1fdb0079dff773942ea72ec0ea379a0228e52418))
+* **test:** give the snapshot harness a silent sound player ([#409](https://github.com/NC1107/slim-m/issues/409)) ([7cf12b0](https://github.com/NC1107/slim-m/commit/7cf12b01bfc7c9a83f8b80629ee27d422bb54344))
+
 ## [0.30.0](https://github.com/NC1107/slim-m/compare/client-v0.29.1...client-v0.30.0) (2026-08-05)
 
 
