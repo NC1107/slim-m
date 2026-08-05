@@ -54,6 +54,15 @@ class VacuumIntoTest(BackupTestCase):
         self.assertFalse(Path(str(dest) + "-wal").exists())
         self.assertFalse(Path(str(dest) + "-shm").exists())
 
+    def test_a_database_path_holding_a_uri_special_character_still_works(self):
+        odd_db = self.root / "weird?name#dir" / "slimm.db"
+        fixtures.build_database(odd_db)
+        dest = self.root / "snap.db"
+
+        backup_lib.vacuum_into(odd_db, dest)
+
+        self.assertTrue(dest.is_file())
+
     def test_snapshot_rows_match_the_live_source(self):
         data = b"hello"
         sha, size = fixtures.sha256_of(data), len(data)
@@ -127,6 +136,19 @@ class SyncAttachmentsTest(BackupTestCase):
         self.assertEqual(result["copied"], 1)
         self.assertEqual((mirror_dir / sha.hex()).read_bytes(), data)
 
+    def test_a_malformed_sha256_is_reported_and_never_mirrored(self):
+        fixtures.build_database(
+            self.source_db, attachments=[(b"not-a-real-digest", 17, "text/plain")]
+        )
+
+        result = backup_lib.sync_attachments(self.source_db, self.media_dir, self.backup_root)
+
+        self.assertEqual(len(result["malformed"]), 1)
+        self.assertEqual(result["copied"], 0)
+        self.assertEqual(result["missing_source"], [])
+        mirror_dir = self.backup_root / "attachments"
+        self.assertEqual(list(mirror_dir.iterdir()) if mirror_dir.is_dir() else [], [])
+
 
 class SyncAvatarsTest(BackupTestCase):
     def test_mirrors_every_user_with_an_avatar(self):
@@ -150,6 +172,17 @@ class SyncAvatarsTest(BackupTestCase):
 
         self.assertEqual(result["copied"], 0)
         self.assertEqual(result["missing_source"], [str(uuid.UUID(bytes=user_id))])
+
+    def test_a_malformed_user_id_is_reported_and_never_mirrored(self):
+        fixtures.build_database(self.source_db, avatar_users=[(b"too-short", "eve")])
+
+        result = backup_lib.sync_avatars(self.source_db, self.media_dir, self.backup_root)
+
+        self.assertEqual(len(result["malformed"]), 1)
+        self.assertEqual(result["copied"], 0)
+        self.assertEqual(result["missing_source"], [])
+        mirror_dir = self.backup_root / "avatars"
+        self.assertEqual(list(mirror_dir.iterdir()) if mirror_dir.is_dir() else [], [])
 
 
 class MirrorIndependenceTest(BackupTestCase):
@@ -240,6 +273,15 @@ class RunTest(BackupTestCase):
         self.assertEqual(code, 1)
 
     def test_no_source_database_exits_non_zero(self):
+        code = backup_lib.run(self._args())
+
+        self.assertEqual(code, 1)
+
+    def test_a_malformed_attachment_id_exits_non_zero(self):
+        fixtures.build_database(
+            self.source_db, attachments=[(b"not-a-real-digest", 17, "text/plain")]
+        )
+
         code = backup_lib.run(self._args())
 
         self.assertEqual(code, 1)
