@@ -9,6 +9,10 @@ environment:
   sdk: ^3.10.0
   flutter: ">=3.38.1"
 dependencies:
+  # Cross-platform including Linux (its own GStreamer plugin, not a bundled
+  # native compile) and lets a caller set iOS's .ambient session category -
+  # see notification_sound.dart and docs/dependencies.md.
+  audioplayers: ^6.8.1
   # Ambient, so a hard-reset floor measures against a test's fake clock rather than real wall time.
   clock: ^1.1.0
   emojis: ^3.2.0
@@ -45,3 +49,14 @@ dev_dependencies:
   http: ^1.2.0
 flutter:
   uses-material-design: true
+  # A symlink to the repo-root `assets/audio/notifications/` (see its own
+  # generate.py): Flutter drops an asset path outside the package silently,
+  # confirmed by a build that produced no error and no bundled file.
+  assets:
+    - assets/audio/notifications/call_ring.wav
+    - assets/audio/notifications/direct_message.wav
+    - assets/audio/notifications/error.wav
+    - assets/audio/notifications/group_message.wav
+    - assets/audio/notifications/member_join.wav
+    - assets/audio/notifications/member_leave.wav
+    - assets/audio/notifications/mention.wav

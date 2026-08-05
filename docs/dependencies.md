@@ -77,3 +77,19 @@ That is also why `device_info_plus` now carries a `dependency_overrides` entry: 
 That override was checked rather than assumed - see the pull request that introduced it - but it is the thing to look at first if voice starts misbehaving on a client build.
 
 If a future conflict looks like this again, the wrong move is still to bump the other `win32` packages: they follow `livekit_client`, not preference.
+
+### `audioplayers`, for the notification chimes
+
+The client had no audio-playback dependency at all before the notification-sound slice (Phase 8): `assets/audio/` held seven synthesised WAVs and nothing played them.
+
+Three real candidates, checked rather than assumed.
+`just_audio` has no native Linux desktop support at all (would need the separately-maintained `just_audio_mpv`), which fails this project's own bar: Fedora KDE Plasma Wayland is where the client is validated day to day, not a release-only target.
+`soundpool` has no Linux plugin either (android, ios, web, macos only, per its own pubspec), same failure for the same reason.
+`flutter_soloud` covers Linux, but through a bundled native C++ library compiled via FFI - exactly the shape (a bundled native capturer, not a system library) that this project's own screen-share segfault-on-Wayland trap came from, and a newer, smaller-audience package than the alternative.
+
+`audioplayers` (github.com/bluefireteam, published under `blue-fire.xyz`, a verified pub.dev publisher) is cross-platform including Linux desktop through `audioplayers_linux`, which wraps GStreamer - a system library already present rather than something newly compiled into the app, the same shape flutter_webrtc's own Linux plugin already uses safely in this codebase.
+It is also the one of the three that exposes the iOS audio session category directly (`AudioContextIOS`), which is what lets a chime ask for `.ambient` rather than interrupting or ducking whatever else is playing - see `client/packages/app/lib/src/audio/notification_sound.dart`'s own doc comment for why `.ambient` specifically, and why `mixWithOthers` must *not* be set alongside it (`AudioContextIOS`'s own asserts refuse that combination; the category already implies it).
+On Android it is configured to request no audio focus at all (`AndroidAudioFocus.none`), so a chime can never be the reason a call's audio pauses or ducks.
+
+A single `AudioPlayer` instance handles every chime (`AudioPlayersSoundPlayer`), stopped and restarted on each `play()` call rather than pooled, since overlap is rare and briefly cutting one chime short for the next is not a defect worth the complexity of a pool.
+Playback goes through a `SoundPlayer` seam so a test never touches a real audio device; see `notification_sound_message_test.dart`, `notification_sound_roster_test.dart` and `notification_sound_call_ring_test.dart` for the fakes.

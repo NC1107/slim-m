@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/notification_sound_settings.dart';
 import '../providers/presence_controller.dart';
 import '../providers/push_controller.dart';
 import 'presence_menu.dart' show applyPresenceVisibility, presenceOptions;
@@ -77,6 +78,7 @@ class NotificationsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(pushControllerProvider);
+    final soundsEnabled = ref.watch(messageSoundSettingsProvider);
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final registered = status == PushStatus.registered;
     final blocked = status == PushStatus.registeredNotificationsBlocked;
@@ -94,6 +96,29 @@ class NotificationsSection extends ConsumerWidget {
                 : tokens.textSecondary,
           ),
           title: Text(status.label),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s16,
+            vertical: AppSpacing.s8,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Play a sound for messages, mentions and errors',
+                  style: TextStyle(color: tokens.textPrimary),
+                ),
+              ),
+              AppToggle(
+                value: soundsEnabled,
+                onChanged: (value) => ref
+                    .read(messageSoundSettingsProvider.notifier)
+                    .setEnabled(value),
+                semanticLabel: 'Play a sound for messages, mentions and errors',
+              ),
+            ],
+          ),
         ),
       ],
     );

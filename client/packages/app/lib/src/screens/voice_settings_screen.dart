@@ -22,27 +22,37 @@ import '../providers/voice_controller.dart';
 import '../widgets/media_capability_section.dart';
 
 const _soundsKey = 'slimm.voice.join_leave_sounds_enabled';
+const _callRingSoundKey = 'slimm.voice.call_ring_sound_enabled';
 const _qualityKey = 'slimm.voice.screen_share_quality';
 
-/// What this screen shows and edits. Both fields are pure local device
+/// What this screen shows and edits. All three fields are pure local device
 /// preferences with no server truth, unlike [presenceVisibilityDisplayProvider]'s
 /// session-only echo, so they are persisted in [preferencesProvider] and
 /// read back on the next launch.
 class VoiceSettingsState {
   const VoiceSettingsState({
     this.joinLeaveSoundsEnabled = true,
+    this.callRingSoundEnabled = true,
     this.screenShareQuality = ScreenShareQuality.balanced,
   });
 
   final bool joinLeaveSoundsEnabled;
+
+  /// Whether a DM call becoming active while this device is not already on
+  /// it plays `call_ring` - a separate question from [joinLeaveSoundsEnabled],
+  /// since someone may want to hear an incoming call and not care about
+  /// roster chatter inside one already joined, or the other way round.
+  final bool callRingSoundEnabled;
   final ScreenShareQuality screenShareQuality;
 
   VoiceSettingsState copyWith({
     bool? joinLeaveSoundsEnabled,
+    bool? callRingSoundEnabled,
     ScreenShareQuality? screenShareQuality,
   }) => VoiceSettingsState(
     joinLeaveSoundsEnabled:
         joinLeaveSoundsEnabled ?? this.joinLeaveSoundsEnabled,
+    callRingSoundEnabled: callRingSoundEnabled ?? this.callRingSoundEnabled,
     screenShareQuality: screenShareQuality ?? this.screenShareQuality,
   );
 }
@@ -59,6 +69,7 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
     final storedQuality = prefs.getString(_qualityKey);
     state = state.copyWith(
       joinLeaveSoundsEnabled: prefs.getBool(_soundsKey) ?? true,
+      callRingSoundEnabled: prefs.getBool(_callRingSoundKey) ?? true,
       screenShareQuality: ScreenShareQuality.values
           .where((q) => q.name == storedQuality)
           .firstOrDefault(ScreenShareQuality.balanced),
@@ -69,6 +80,12 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
     state = state.copyWith(joinLeaveSoundsEnabled: enabled);
     final prefs = await _ref.read(preferencesProvider.future);
     await prefs.setBool(_soundsKey, enabled);
+  }
+
+  Future<void> setCallRingSoundEnabled(bool enabled) async {
+    state = state.copyWith(callRingSoundEnabled: enabled);
+    final prefs = await _ref.read(preferencesProvider.future);
+    await prefs.setBool(_callRingSoundKey, enabled);
   }
 
   Future<void> setScreenShareQuality(ScreenShareQuality quality) async {
@@ -344,6 +361,30 @@ class _SoundsSection extends ConsumerWidget {
               'These turn off on their own in a call above about 8 people, '
               'so a busy channel does not turn into a wall of chimes.',
             ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s16),
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s16,
+            vertical: AppSpacing.s8,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Play a sound for an incoming call',
+                  style: TextStyle(color: tokens.textPrimary),
+                ),
+              ),
+              AppToggle(
+                value: settings.callRingSoundEnabled,
+                onChanged: (value) => ref
+                    .read(voiceSettingsControllerProvider.notifier)
+                    .setCallRingSoundEnabled(value),
+                semanticLabel: 'Play a sound for an incoming call',
+              ),
+            ],
           ),
         ),
         const SizedBox(height: AppSpacing.s16),
