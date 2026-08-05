@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /// `dispatchCanvasLiveEvent`'s own activity-log recording: every live kind
-/// this client currently handles - place, remove, clear, restore, move -
-/// must reach [CanvasActivityLog] the moment it lands, not only through
-/// `CanvasSync`'s own catch-up path.
+/// this client currently handles - place, remove, clear, restore, move,
+/// reorder - must reach [CanvasActivityLog] the moment it lands, not only
+/// through `CanvasSync`'s own catch-up path.
 library;
 
 import 'package:flutter/painting.dart';
@@ -160,6 +160,36 @@ void main() {
     );
 
     expect(log.entries.single.kind, CanvasActivityKind.moved);
+    expect(log.entries.single.actorId, isNull);
+  });
+
+  test('a live reorder records with no actor', () {
+    document.applyPlaced(
+      CanvasStrokeInput(
+        id: 'a',
+        seq: 1,
+        zIndex: 1,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        points: const [],
+        width: 0,
+        colorKey: '',
+        kind: CanvasObjectKind.image,
+      ),
+    );
+    dispatch(
+      api.CanvasObjectReordered(
+        channelId: 'c1',
+        seq: 1,
+        opId: 'op-1',
+        objectId: 'a',
+        zIndex: 5,
+      ),
+    );
+
+    expect(log.entries.single.kind, CanvasActivityKind.reordered);
     expect(log.entries.single.actorId, isNull);
   });
 

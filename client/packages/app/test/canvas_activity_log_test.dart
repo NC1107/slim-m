@@ -134,6 +134,25 @@ void main() {
       expect(log.entries.single.count, 2);
     });
 
+    test('a reorder op with a disclosed actor (MANAGE_CANVAS) keeps it', () {
+      final log = CanvasActivityLog(isBlocked: (_) => false);
+      addTearDown(log.dispose);
+
+      log.recordOp(
+        api.CanvasReorderOp(
+          seq: 7,
+          id: 'op-7',
+          actorId: 'mod',
+          createdAt: 0,
+          objectId: 'x',
+          zIndex: 42,
+        ),
+      );
+
+      expect(log.entries.single.kind, CanvasActivityKind.reordered);
+      expect(log.entries.single.actorId, 'mod');
+    });
+
     test('an unknown op kind is not recorded at all', () {
       final log = CanvasActivityLog(isBlocked: (_) => false);
       addTearDown(log.dispose);
@@ -157,8 +176,8 @@ void main() {
       expect(log.entries.single.actorId, 'alice');
     });
 
-    test('a live removal, clear, restore or move never carries an actor - '
-        'the live frame structurally has none', () {
+    test('a live removal, clear, restore, move or reorder never carries an '
+        'actor - the live frame structurally has none', () {
       final log = CanvasActivityLog(isBlocked: (_) => false);
       addTearDown(log.dispose);
 
@@ -166,7 +185,8 @@ void main() {
         ..recordRemovedLive('op-1', ['a', 'b'])
         ..recordClearedLive('op-2')
         ..recordRestoredLive('op-3', 2)
-        ..recordMovedLive('op-4');
+        ..recordMovedLive('op-4')
+        ..recordReorderedLive('op-5');
 
       expect(log.entries.map((e) => e.actorId), everyElement(isNull));
       expect(log.entries.map((e) => e.kind), [
@@ -174,6 +194,7 @@ void main() {
         CanvasActivityKind.cleared,
         CanvasActivityKind.restored,
         CanvasActivityKind.moved,
+        CanvasActivityKind.reordered,
       ]);
     });
   });

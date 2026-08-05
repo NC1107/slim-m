@@ -172,11 +172,6 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
   /// `liveCountsByKind` too - without this, the summary would freeze at
   /// whatever it read when the panel was last opened, since nothing else
   /// rebuilds this widget on a live document change by design.
-  /// `document.objectCount` is the same trigger `_surface` already listens
-  /// to, since a placed or removed object is exactly what changes
-  /// `liveCountsByKind` too - without this, the summary would freeze at
-  /// whatever it read when the panel was last opened, since nothing else
-  /// rebuilds this widget on a live document change by design.
   Widget _panel() => ValueListenableBuilder<int>(
     valueListenable: widget.document.objectCount,
     builder: (context, count, child) => CanvasActivityPanel(

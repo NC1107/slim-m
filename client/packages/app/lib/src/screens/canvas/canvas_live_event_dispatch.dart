@@ -121,6 +121,7 @@ void dispatchCanvasLiveEvent(
     case api.CanvasObjectReordered(
           :final channelId,
           :final seq,
+          :final opId,
           :final objectId,
           :final zIndex,
         )
@@ -128,6 +129,7 @@ void dispatchCanvasLiveEvent(
       sync.applyLive(seq, () {
         document.setZIndex(objectId, zIndex);
         document.refresh();
+        activityLog?.recordReorderedLive(opId);
       });
     default:
       break;

@@ -79,6 +79,12 @@ void main() {
       );
       expect(
         describeCanvasActivityEntry(
+          _entry(kind: CanvasActivityKind.reordered, actorId: null),
+        ),
+        "An object's stacking order changed.",
+      );
+      expect(
+        describeCanvasActivityEntry(
           _entry(kind: CanvasActivityKind.restored, actorId: null, count: 2),
         ),
         '2 objects were restored.',
@@ -92,6 +98,13 @@ void main() {
           nameFor: (_) => 'Mod',
         ),
         'Mod removed 3 objects.',
+      );
+      expect(
+        describeCanvasActivityEntry(
+          _entry(kind: CanvasActivityKind.reordered, actorId: 'mod'),
+          nameFor: (_) => 'Mod',
+        ),
+        "Mod changed an object's stacking order.",
       );
     });
 

@@ -35,7 +35,15 @@ import 'package:slimm_api/api.dart' as api;
 /// whatever happened between the old cursor and the fresh snapshot's head,
 /// and saying nothing would read as nothing having happened rather than as
 /// a known hole.
-enum CanvasActivityKind { placed, moved, removed, cleared, restored, resynced }
+enum CanvasActivityKind {
+  placed,
+  moved,
+  reordered,
+  removed,
+  cleared,
+  restored,
+  resynced,
+}
 
 /// One line of canvas history, already filtered for blocking and already
 /// carrying whatever attribution the wire disclosed - a widget only ever
@@ -124,6 +132,8 @@ class CanvasActivityLog extends ChangeNotifier {
         );
       case api.CanvasMoveOp(:final actorId):
         _add(_entry(op.id, CanvasActivityKind.moved, actorId, 1));
+      case api.CanvasReorderOp(:final actorId):
+        _add(_entry(op.id, CanvasActivityKind.reordered, actorId, 1));
       case api.CanvasUnknownOp():
         break;
     }
@@ -148,6 +158,13 @@ class CanvasActivityLog extends ChangeNotifier {
 
   void recordMovedLive(String opId) =>
       _add(_entry(opId, CanvasActivityKind.moved, null, 1));
+
+  /// A live `CanvasObjectReordered` frame: restacking another member's
+  /// object needs `MANAGE_CANVAS`, the same moderation-capable shape a move
+  /// carries, so this live frame has no actor field either - see
+  /// `CanvasObjectReordered`'s own wire doc.
+  void recordReorderedLive(String opId) =>
+      _add(_entry(opId, CanvasActivityKind.reordered, null, 1));
 
   /// A hard reset happened: whatever changed between the old cursor and the
   /// fresh snapshot's head is unrecoverable, and this is the one line that
@@ -258,6 +275,10 @@ String describeCanvasActivityEntry(
       return who == null ? 'Someone placed $what.' : '$who placed $what.';
     case CanvasActivityKind.moved:
       return who == null ? 'An object was moved.' : '$who moved an object.';
+    case CanvasActivityKind.reordered:
+      return who == null
+          ? "An object's stacking order changed."
+          : "$who changed an object's stacking order.";
     case CanvasActivityKind.removed:
       final what = entry.count == 1 ? 'An object' : '${entry.count} objects';
       final verb = entry.count == 1 ? 'was' : 'were';
@@ -282,6 +303,7 @@ String describeCanvasActivityEntry(
 String _kindLabel(CanvasActivityKind kind) => switch (kind) {
   CanvasActivityKind.placed => 'placed',
   CanvasActivityKind.moved => 'moved',
+  CanvasActivityKind.reordered => 'reordered',
   CanvasActivityKind.removed => 'removed',
   CanvasActivityKind.cleared => 'cleared',
   CanvasActivityKind.restored => 'restored',
