@@ -27,6 +27,8 @@ class CanvasBar extends StatelessWidget {
     required this.selection,
     required this.onBringToFront,
     required this.onSendToBack,
+    required this.activityLogOpen,
+    required this.onToggleActivityLog,
   });
 
   final String channelId;
@@ -67,6 +69,12 @@ class CanvasBar extends StatelessWidget {
   final ValueListenable<String?> selection;
   final ValueChanged<String> onBringToFront;
   final ValueChanged<String> onSendToBack;
+
+  /// The accessibility fallback's own open state and toggle, threaded
+  /// straight through to the overflow menu - see that file for why it lives
+  /// there rather than as a dedicated bar icon.
+  final bool activityLogOpen;
+  final VoidCallback onToggleActivityLog;
 
   @override
   Widget build(BuildContext context) {
@@ -131,6 +139,8 @@ class CanvasBar extends StatelessWidget {
             selection: selection,
             onBringToFront: onBringToFront,
             onSendToBack: onSendToBack,
+            activityLogOpen: activityLogOpen,
+            onToggleActivityLog: onToggleActivityLog,
           ),
           const SizedBox(width: AppSpacing.s4),
           AppIconButton(

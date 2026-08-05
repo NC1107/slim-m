@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The canvas pane's widget tree: the bar, the error and truncation
-/// banners, and the drawing surface.
+/// banners, the drawing surface, and the text activity log a screen reader
+/// can browse in place of it.
 ///
 /// Split out of `canvas_pane.dart`, which was already past the review
 /// budget before this slice added the eraser, undo and clear controls to
-/// it. `_CanvasPaneState` owns every callback and every piece of state
-/// this only renders; nothing here reaches Riverpod.
+/// it. `_CanvasPaneState` owns every callback and every piece of state that
+/// has to survive the pane's own lifetime; whether the activity panel is
+/// open right now is pure presentation, so it is this widget's own local
+/// state instead of one more field threaded through an already-large parent.
 library;
 
 import 'package:flutter/material.dart';
@@ -13,10 +16,12 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
+import 'canvas_activity_log.dart';
+import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
 import 'canvas_presence_layer.dart';
 
-class CanvasPaneBody extends StatelessWidget {
+class CanvasPaneBody extends StatefulWidget {
   const CanvasPaneBody({
     super.key,
     required this.channelId,
@@ -41,6 +46,7 @@ class CanvasPaneBody extends StatelessWidget {
     required this.onSelectEnd,
     required this.onBringToFront,
     required this.onSendToBack,
+    required this.activityLog,
     this.cursors,
     this.cursorColors = const [],
     this.onPointerMoved,
@@ -75,6 +81,13 @@ class CanvasPaneBody extends StatelessWidget {
   final ValueChanged<String> onBringToFront;
   final ValueChanged<String> onSendToBack;
 
+  /// The accessibility fallback: who placed, moved, removed, cleared or
+  /// restored what, filtered for blocking exactly as a remote cursor
+  /// already is. Owned by `_CanvasPaneState` and outlives a panel toggle,
+  /// so the history survives closing and reopening the panel within one
+  /// session.
+  final CanvasActivityLog activityLog;
+
   /// Other participants' live pointers, and the palette their colours are
   /// drawn from. Null renders no cursor layer, the same "cheap to omit"
   /// shape [CanvasSurface] itself already offers.
@@ -89,6 +102,13 @@ class CanvasPaneBody extends StatelessWidget {
   final CameraViewBuilder cameraViewFor;
 
   @override
+  State<CanvasPaneBody> createState() => _CanvasPaneBodyState();
+}
+
+class _CanvasPaneBodyState extends State<CanvasPaneBody> {
+  bool _activityLogOpen = false;
+
+  @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     // No AppBar sits above CanvasBar, so this pane insets itself for top/bottom; left stays unconsumed because a rail, not this pane, ever occupies the true left edge.
@@ -99,29 +119,32 @@ class CanvasPaneBody extends StatelessWidget {
         child: Column(
           children: [
             CanvasBar(
-              channelId: channelId,
-              onClose: onClose,
-              tool: tool,
-              onToolChanged: onToolChanged,
-              canUndo: canUndo,
-              onUndo: onUndo,
-              canManage: canManage,
-              objectCount: document.objectCount,
-              onClear: onClear,
-              onPasteImage: onPasteImage,
-              selection: document.selectedObjectId,
-              onBringToFront: onBringToFront,
-              onSendToBack: onSendToBack,
+              channelId: widget.channelId,
+              onClose: widget.onClose,
+              tool: widget.tool,
+              onToolChanged: widget.onToolChanged,
+              canUndo: widget.canUndo,
+              onUndo: widget.onUndo,
+              canManage: widget.canManage,
+              objectCount: widget.document.objectCount,
+              onClear: widget.onClear,
+              onPasteImage: widget.onPasteImage,
+              selection: widget.document.selectedObjectId,
+              onBringToFront: widget.onBringToFront,
+              onSendToBack: widget.onSendToBack,
+              activityLogOpen: _activityLogOpen,
+              onToggleActivityLog: () =>
+                  setState(() => _activityLogOpen = !_activityLogOpen),
             ),
-            if (error != null)
+            if (widget.error != null)
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.s12),
                 child: AppErrorState(
-                  message: error!,
-                  onDismiss: onDismissError,
+                  message: widget.error!,
+                  onDismiss: widget.onDismissError,
                 ),
               ),
-            if (truncated)
+            if (widget.truncated)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.s12,
@@ -135,50 +158,75 @@ class CanvasPaneBody extends StatelessWidget {
                   ),
                 ),
               ),
-            Expanded(
-              child: ValueListenableBuilder<int>(
-                valueListenable: document.objectCount,
-                builder: (context, count, child) => Semantics(
-                  container: true,
-                  label: loading
-                      ? 'Canvas, loading'
-                      : 'Canvas, $count objects drawn',
-                  child: child,
-                ),
-                child: Stack(
-                  children: [
-                    CanvasSurface(
-                      document: document,
-                      ink: AppCanvasColors.annotation,
-                      gridLine: tokens.borderSubtle,
-                      placeholderFill: tokens.surfaceRaised,
-                      placeholderIcon: tokens.textDisabled,
-                      selectionOutline: tokens.accentFill,
-                      selectionHandleFill: tokens.surfaceRaised,
-                      selectionHandleBorder: tokens.accentFill,
-                      onStroke: onStroke,
-                      tool: tool,
-                      onErase: onErase,
-                      onEraseEnd: onEraseEnd,
-                      onSelectStart: onSelectStart,
-                      onSelectDrag: onSelectDrag,
-                      onSelectEnd: onSelectEnd,
-                      cursors: cursors,
-                      cursorColors: cursorColors,
-                      onPointerMoved: onPointerMoved,
-                    ),
-                    CanvasPresenceLayer(
-                      document: document,
-                      participants: callParticipants,
-                      cameraViewFor: cameraViewFor,
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            Expanded(child: _activityLogOpen ? _panel() : _surface(tokens)),
+            // Mounted regardless of the panel's own open state: browsing history is optional, hearing about it is not.
+            CanvasActivityAnnouncer(activityLog: widget.activityLog),
           ],
         ),
       ),
     );
+  }
+
+  /// `document.objectCount` is the same trigger `_surface` already listens
+  /// to, since a placed or removed object is exactly what changes
+  /// `liveCountsByKind` too - without this, the summary would freeze at
+  /// whatever it read when the panel was last opened, since nothing else
+  /// rebuilds this widget on a live document change by design.
+  Widget _panel() => ValueListenableBuilder<int>(
+    valueListenable: widget.document.objectCount,
+    builder: (context, count, child) => CanvasActivityPanel(
+      activityLog: widget.activityLog,
+      summary: _summary(),
+    ),
+  );
+
+  Widget _surface(AppTokens tokens) => ValueListenableBuilder<int>(
+    valueListenable: widget.document.objectCount,
+    builder: (context, count, child) => Semantics(
+      container: true,
+      label: widget.loading ? 'Canvas, loading' : 'Canvas, ${_summary()}',
+      child: child,
+    ),
+    child: Stack(
+      children: [
+        CanvasSurface(
+          document: widget.document,
+          ink: AppCanvasColors.annotation,
+          gridLine: tokens.borderSubtle,
+          placeholderFill: tokens.surfaceRaised,
+          placeholderIcon: tokens.textDisabled,
+          selectionOutline: tokens.accentFill,
+          selectionHandleFill: tokens.surfaceRaised,
+          selectionHandleBorder: tokens.accentFill,
+          onStroke: widget.onStroke,
+          tool: widget.tool,
+          onErase: widget.onErase,
+          onEraseEnd: widget.onEraseEnd,
+          onSelectStart: widget.onSelectStart,
+          onSelectDrag: widget.onSelectDrag,
+          onSelectEnd: widget.onSelectEnd,
+          cursors: widget.cursors,
+          cursorColors: widget.cursorColors,
+          onPointerMoved: widget.onPointerMoved,
+        ),
+        CanvasPresenceLayer(
+          document: widget.document,
+          participants: widget.callParticipants,
+          cameraViewFor: widget.cameraViewFor,
+        ),
+      ],
+    ),
+  );
+
+  /// "N objects on this canvas: X strokes, Y images" - so a screen-reader
+  /// user, or anyone reading the panel's own header, can tell an empty
+  /// canvas from a busy one at a glance, not only from a bare total.
+  String _summary() {
+    final counts = widget.document.liveCountsByKind;
+    final total = counts.strokes + counts.images;
+    if (total == 0) return 'no objects';
+    return '$total ${total == 1 ? 'object' : 'objects'}: '
+        '${counts.strokes} ${counts.strokes == 1 ? 'stroke' : 'strokes'}, '
+        '${counts.images} ${counts.images == 1 ? 'image' : 'images'}';
   }
 }

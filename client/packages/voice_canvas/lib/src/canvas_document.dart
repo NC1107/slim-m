@@ -21,6 +21,8 @@ import 'canvas_stroke.dart';
 
 export 'canvas_stroke.dart';
 
+part 'canvas_document_selection.dart';
+
 /// The document: index, camera, strokes, and dedupe by id.
 class CanvasDocument extends ChangeNotifier {
   CanvasDocument();
@@ -83,6 +85,27 @@ class CanvasDocument extends ChangeNotifier {
   bool isAlive(String id) {
     final slot = _slotById[id];
     return slot != null && (_strokes[slot]?.alive ?? false);
+  }
+
+  /// Live object counts by kind, across the whole document rather than only
+  /// what the last cull kept - the one query the accessibility summary
+  /// needs and nothing else here does, so it is a scan rather than a
+  /// maintained counter. Cheap even at the channel's own object ceiling (the
+  /// server itself measured a plain scan at 20,000 rows as 1.56ms), and it
+  /// is only ever asked for when a screen-reader user opens the activity
+  /// panel, never once per frame the way [objectCount] is.
+  ({int strokes, int images}) get liveCountsByKind {
+    var strokes = 0;
+    var images = 0;
+    for (final stroke in _strokes) {
+      if (stroke == null || !stroke.alive) continue;
+      if (stroke.kind == CanvasObjectKind.image) {
+        images++;
+      } else {
+        strokes++;
+      }
+    }
+    return (strokes: strokes, images: images);
   }
 
   /// Slots the last cull kept, in paint order.
@@ -223,66 +246,6 @@ class CanvasDocument extends ChangeNotifier {
     _strokes[slot] = null;
     _slotById[id] = newSlot;
     return true;
-  }
-
-  /// The kind a live object was placed as, or null if [id] is unknown or has
-  /// been removed. What a resize gesture needs to refuse a stroke: only an
-  /// image has a box with nothing thinner inside it to distort.
-  CanvasObjectKind? kindOf(String id) {
-    final slot = _slotById[id];
-    final stroke = slot == null ? null : _strokes[slot];
-    return (stroke != null && stroke.alive) ? stroke.kind : null;
-  }
-
-  /// A live object's author, or null if [id] is unknown, removed, or was
-  /// authored by a since-deleted account. What a resize or reorder gesture
-  /// on the *current selection* needs to decide authorship without a fresh
-  /// hit test - unlike a move or an erase, the pointer is over a handle or a
-  /// toolbar button, not the object itself.
-  String? authorIdOf(String id) {
-    final slot = _slotById[id];
-    final stroke = slot == null ? null : _strokes[slot];
-    return (stroke != null && stroke.alive) ? stroke.authorId : null;
-  }
-
-  /// A live object's current `zIndex`, or null if [id] is unknown or has
-  /// been removed.
-  int? zIndexOf(String id) {
-    final slot = _slotById[id];
-    final stroke = slot == null ? null : _strokes[slot];
-    return (stroke != null && stroke.alive) ? stroke.zIndex : null;
-  }
-
-  /// Sets a live object's `zIndex` directly, with no reindexing: unlike
-  /// [moveObject], paint order is not part of the spatial grid's own key,
-  /// so there is no slot to free and re-add. Returns false if [id] is
-  /// unknown or has been removed.
-  bool setZIndex(String id, int zIndex) {
-    final slot = _slotById[id];
-    final stroke = slot == null ? null : _strokes[slot];
-    if (stroke == null || !stroke.alive) return false;
-    stroke.zIndex = zIndex;
-    return true;
-  }
-
-  /// The lowest and highest `zIndex` this document currently holds live, or
-  /// null if it holds nothing.
-  ///
-  /// Scans every loaded object, not only what [paintOrder]'s cull currently
-  /// keeps: "bring to front" means in front of everything this client
-  /// knows about, not only what fits on screen right now. Correctness for
-  /// a concurrent reorder rests on the server's last-write-wins column, not
-  /// on this being the true deployment-wide extreme - see
-  /// `CanvasOpsController.bringToFront`'s own doc for why that is enough.
-  (int min, int max)? get zIndexRange {
-    int? lo;
-    int? hi;
-    for (final stroke in _strokes) {
-      if (stroke == null || !stroke.alive) continue;
-      lo = lo == null ? stroke.zIndex : math.min(lo, stroke.zIndex);
-      hi = hi == null ? stroke.zIndex : math.max(hi, stroke.zIndex);
-    }
-    return lo == null ? null : (lo, hi!);
   }
 
   /// Attaches a decoded bitmap to a live [CanvasObjectKind.image] object.

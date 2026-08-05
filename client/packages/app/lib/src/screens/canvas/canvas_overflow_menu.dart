@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The canvas bar's overflow: always present for "Paste image", since
-/// placing an image needs only the USE_CANVAS bit drawing already does,
-/// with "Bring to front"/"Send to back" appearing only while something is
-/// selected and "Clear canvas" appearing only for MANAGE_CANVAS.
+/// The canvas bar's overflow: "Paste image" and "Show/Hide activity log" are
+/// always present, since placing an image needs only the USE_CANVAS bit
+/// drawing already does and the activity log is an accessibility fallback
+/// nobody should need a permission for; "Bring to front"/"Send to back"
+/// appear only while something is selected and "Clear canvas" appears only
+/// for MANAGE_CANVAS.
 library;
 
 import 'dart:async';
@@ -29,6 +31,8 @@ class CanvasOverflowMenu extends StatefulWidget {
     required this.selection,
     required this.onBringToFront,
     required this.onSendToBack,
+    required this.activityLogOpen,
+    required this.onToggleActivityLog,
   });
 
   final VoidCallback onPasteImage;
@@ -44,6 +48,12 @@ class CanvasOverflowMenu extends StatefulWidget {
   final ValueChanged<String> onBringToFront;
   final ValueChanged<String> onSendToBack;
 
+  /// The accessibility fallback's own open state, so the item's label says
+  /// which way a tap goes rather than a bare "Activity log" that reads the
+  /// same whether it opens or closes the panel.
+  final bool activityLogOpen;
+  final VoidCallback onToggleActivityLog;
+
   @override
   State<CanvasOverflowMenu> createState() => _CanvasOverflowMenuState();
 }
@@ -55,6 +65,11 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
   void _paste() {
     _controller.hide();
     widget.onPasteImage();
+  }
+
+  void _toggleActivityLog() {
+    _controller.hide();
+    widget.onToggleActivityLog();
   }
 
   Future<void> _requestClear() async {
@@ -121,6 +136,14 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
                   label: 'Paste image',
                   leading: AppIcons.clipboardPaste,
                   onTap: _paste,
+                ),
+                const AppMenuDivider(),
+                AppMenuItem(
+                  label: widget.activityLogOpen
+                      ? 'Hide activity log'
+                      : 'Show activity log',
+                  leading: AppIcons.activityLog,
+                  onTap: _toggleActivityLog,
                 ),
                 if (selected != null) ...[
                   const AppMenuDivider(),
