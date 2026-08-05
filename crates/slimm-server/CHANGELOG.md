@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.32.0](https://github.com/NC1107/slim-m/compare/server-v0.31.0...server-v0.32.0) (2026-08-05)
+
+
+### Features
+
+* **canvas:** resize a placed image, and control what sits on top ([#416](https://github.com/NC1107/slim-m/issues/416)) ([8d388f8](https://github.com/NC1107/slim-m/commit/8d388f88eaff6b1d646e90297f7ded5d885347de))
+* paste an image onto the canvas and drag it around ([#410](https://github.com/NC1107/slim-m/issues/410)) ([b07e263](https://github.com/NC1107/slim-m/commit/b07e2637e7259091ba1b8e65ce01dabe616217a4))
+
 ## [0.31.0](https://github.com/NC1107/slim-m/compare/server-v0.30.0...server-v0.31.0) (2026-08-05)
 
 
