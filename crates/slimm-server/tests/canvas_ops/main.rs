@@ -6,6 +6,7 @@
 //! single-file version crossed the 500-line hard limit: `http_gate` is the
 //! route wired end to end, `feed` is everything below it.
 
+mod convergence;
 mod feed;
 mod fixtures;
 mod http_gate;
