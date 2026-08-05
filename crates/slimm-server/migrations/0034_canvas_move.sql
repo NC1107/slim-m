@@ -15,9 +15,12 @@
 -- dropped `canvas_ops` directly and lost every `remove`/`restore` target row
 -- in the process - caught by testing the migration against a seeded
 -- database rather than only a fresh one, not by reasoning about it first.
--- SELECT * is the point of a wholesale snapshot; naming columns would drift from the source.
-CREATE TABLE canvas_op_targets_rebuild AS SELECT * FROM canvas_op_targets; -- NOSONAR
-CREATE TABLE canvas_ops_rebuild AS SELECT * FROM canvas_ops; -- NOSONAR
+-- Columns named rather than starred: a migration runs against one known prior schema, so this documents exactly what is preserved.
+CREATE TABLE canvas_op_targets_rebuild AS
+    SELECT channel_id, seq, object_id FROM canvas_op_targets;
+CREATE TABLE canvas_ops_rebuild AS
+    SELECT channel_id, seq, id, kind, actor_id, bound_seq, target_op, created_at
+    FROM canvas_ops;
 
 DELETE FROM canvas_op_targets; -- NOSONAR
 DROP TABLE canvas_ops;
