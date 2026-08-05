@@ -51,6 +51,7 @@ class CanvasSurface extends StatefulWidget {
     this.enabled = true,
     this.cursors,
     this.cursorColors = const [],
+    this.cursorLabelFontFamily,
     this.onPointerMoved,
     this.placeholderFill = const Color(0xFFB9C0C8),
     this.placeholderIcon = const Color(0xFF6C757E),
@@ -87,6 +88,12 @@ class CanvasSurface extends StatefulWidget {
   /// The closed colour set [cursors] indexes into. Meaningless without
   /// [cursors], and ignored when it is null.
   final List<Color> cursorColors;
+
+  /// The app's own type family for a cursor's name chip. Null draws
+  /// Flutter's platform default rather than the product's own type, the same
+  /// reason [ink] and [cursorColors] arrive as plain values rather than this
+  /// package reaching for a design system it does not depend on.
+  final String? cursorLabelFontFamily;
 
   /// Fires on every hover or drag move, drawing or not, in world
   /// coordinates. The caller decides whether, and how often, to relay this
@@ -157,6 +164,7 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
           cursors: widget.cursors!,
           document: widget.document,
           colors: widget.cursorColors,
+          labelFontFamily: widget.cursorLabelFontFamily,
         );
   late final SelectionPainter? _selectionPainter = widget.selectionOutline ==
           null
