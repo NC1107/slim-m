@@ -117,6 +117,24 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
     widget.onSendToBack(objectId);
   }
 
+  Widget _shortcutHint(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const AppKbd('Ctrl'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Text(
+            '+',
+            style: AppText.micro.copyWith(color: tokens.textDisabled),
+          ),
+        ),
+        const AppKbd('V'),
+      ],
+    );
+  }
+
   Widget _buildMenu() {
     return Positioned(
       left: 0,
@@ -140,6 +158,10 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
                   AppMenuItem(
                     label: 'Paste image',
                     leading: AppIcons.clipboardPaste,
+                    // Ctrl+V already works from anywhere in the pane (see canvas_pane.dart's CallbackShortcuts); nothing said so until this hint, and a touch layout drops it, the same "no finger can press it" rule the channel search field's own Ctrl+K hint already follows.
+                    trailing: AppTouchTargets.of(context)
+                        ? null
+                        : _shortcutHint(context),
                     onTap: _paste,
                   ),
                   const AppMenuDivider(),

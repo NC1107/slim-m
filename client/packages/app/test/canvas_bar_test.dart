@@ -378,4 +378,38 @@ void main() {
 
     expect(find.text('Paste image'), findsNothing);
   });
+
+  /// Ctrl+V already works from anywhere in the pane; nothing said so until
+  /// this hint, which is why it belongs in the one menu item that duplicates
+  /// what the shortcut already does.
+  testWidgets('Paste image shows a Ctrl+V hint on a pointer layout', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap(_bar()));
+
+    await tester.tap(find.bySemanticsLabel('More canvas actions'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppKbd, 'Ctrl'), findsOneWidget);
+    expect(find.widgetWithText(AppKbd, 'V'), findsOneWidget);
+  });
+
+  /// The same "no finger can press it" rule the channel search field's own
+  /// Ctrl+K hint already follows. `AppTouchTargets.of` reads the real window
+  /// size when nothing overrides it (see its own doc), which a `SizedBox`
+  /// constraining only this widget's own render box cannot fake - the
+  /// window itself has to shrink, the way `ui_snapshot_test.dart` already
+  /// does for exactly this reason.
+  testWidgets('the Ctrl+V hint is dropped on a touch layout', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_wrap(_bar()));
+
+    await tester.tap(find.bySemanticsLabel('More canvas actions'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppKbd), findsNothing);
+  });
 }
