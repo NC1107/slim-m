@@ -163,6 +163,11 @@ void main() {
           ),
         );
         expect(button.icon, canvasShapeKindIcon(kind), reason: 'kind: $kind');
+        expect(
+          button.tooltip,
+          contains(canvasShapeKindLabel(kind)),
+          reason: 'kind: $kind, for a screen reader on the same fact',
+        );
       }
     },
   );
