@@ -33,7 +33,12 @@ enum CanvasShapeKind { rectangle, ellipse, line, arrow }
 const int maxRemovedIdsTracked = 20000;
 
 /// Half-width of the bounded world, matching the server's own `WORLD_LIMIT`.
-/// The canvas is large but finite (owner decision 0001).
+/// The canvas is large but finite (owner decision 0001) - large enough that
+/// a person can genuinely get lost in it, and nothing on the bar or in the
+/// overflow menu offers a way back to wherever the content is; the only
+/// route today is closing and reopening the pane, which happens to reset
+/// the camera to the origin. Recorded rather than built: a "recenter" or
+/// "fit to content" control is missing, not merely undiscoverable.
 const double worldLimit = 5000000.0;
 
 /// Longest side one object may declare, matching the server's
