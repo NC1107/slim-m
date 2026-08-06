@@ -137,10 +137,10 @@ void main() {
         right: right,
       );
 
-      // The canvas starts right after the rail's own drag handle (rowPointer wide here, not the 1px divider it replaced), never a second notch-width further in.
+      // The canvas starts right after the rail's own hairline divider (backlog item 58 shrank its reserved width to that, from rowPointer), never a second notch-width further in.
       expect(
         tester.getTopLeft(find.byType(CanvasSurface)).dx,
-        closeTo(ChannelRail.mediumWidth + AppSizes.rowPointer, 0.5),
+        closeTo(ChannelRail.mediumWidth + 1, 0.5),
       );
       expect(
         tester.getTopRight(find.byType(CanvasSurface)).dx,
