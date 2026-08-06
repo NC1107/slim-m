@@ -18,16 +18,28 @@
 /// past its five buttons are all real background this card paints over
 /// content, not buttons - and a right-click landing there would otherwise
 /// hit-test straight through to whatever canvas object sits underneath,
-/// opening a menu for content the card is visually hiding. Left-button
-/// gestures are deliberately untouched: `TapGestureRecognizer
-/// .isPointerAllowed` (the same guarantee `CanvasObjectContextMenu`'s own
-/// doc already cites) refuses a primary pointer the moment no primary
-/// callback is set, so this can never delay or compete with an ordinary
-/// draw, pan or erase on the surface beneath - which is also why a bare
-/// primary tap on this card's own background is left as a known, narrower
-/// residual rather than fought over: closing it would mean competing with
-/// the canvas's own pan recognizer for the same pointer, a real regression
-/// risk for no more than a few dp of padding.
+/// opening a menu for content the card is visually hiding.
+///
+/// **`HitTestBehavior.translucent`, not `opaque` - the same choice
+/// `CanvasObjectContextMenu`'s own doc already made and explains why.**
+/// `RenderProxyBoxWithHitTestBehavior.hitTest` (read from source, not
+/// assumed) only stops a hit test from reaching a target visually behind
+/// this one when the render object's own `hitTest` call *returns* true, and
+/// `opaque`'s `hitTestSelf` returns true unconditionally within its
+/// bounds - which would swallow every primary-button pointer landing
+/// anywhere on this card, not merely delay or compete for it, before
+/// `TapGestureRecognizer.isPointerAllowed` ever gets a say: refusing a
+/// pointer only stops *this* card's own tap recognizer from entering the
+/// gesture arena, it cannot undo a hit test that already decided nothing
+/// behind this card gets the event at all. `translucent`'s `hitTestSelf`
+/// returns false, so a point that hits none of this card's own children
+/// (its padding, its divider, the tool strip's own slack) returns false
+/// from the whole subtree's `hitTest` and the pointer keeps travelling to
+/// `CanvasSurface` beneath - while `translucent` still always adds this
+/// render object to the hit test result, which is what lets the
+/// secondary-tap recognizer see the pointer and absorb a right-click
+/// regardless. A point that does land on an actual button is unaffected
+/// either way, since that button's own hit test already returns true.
 library;
 
 import 'package:flutter/material.dart';
@@ -65,7 +77,7 @@ class FloatingDockCard extends StatelessWidget {
       divided.add(rows[i]);
     }
     return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+      behavior: HitTestBehavior.translucent,
       // A no-op, not an omission: see this file's own library doc for why a right-click here must never reach a canvas object menu beneath.
       onSecondaryTapUp: (_) {},
       child: Container(
