@@ -291,6 +291,49 @@ void main() {
   );
 
   testWidgets(
+    'a second pointer\'s own grab-button down mid-drag must not steal an '
+    'already-owned pan',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CanvasSurface(
+            document: document,
+            ink: const Color(0xFFE86A5C),
+            gridLine: const Color(0xFF303030),
+            onStroke: (_) {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final a = TestPointer(1, PointerDeviceKind.mouse);
+      final b = TestPointer(2, PointerDeviceKind.mouse);
+      await tester.sendEventToBinding(
+        a.down(const Offset(100, 100), buttons: kMiddleMouseButton),
+      );
+      await tester.sendEventToBinding(a.move(const Offset(80, 100)));
+      // A second pointer's own grab attempt, down then straight up - never held alongside a, or the surface's own two-finger scale gesture would confound this.
+      await tester.sendEventToBinding(
+        b.down(const Offset(200, 200), buttons: kMiddleMouseButton),
+      );
+      await tester.sendEventToBinding(b.up());
+      // Pointer a's own drag continues, and must still count toward the pan.
+      await tester.sendEventToBinding(a.move(const Offset(60, 100)));
+      await tester.sendEventToBinding(a.up());
+      await tester.pump();
+
+      expect(
+        document.camera.x,
+        40,
+        reason: 'pointer b\'s own grab-button down must not have taken '
+            'ownership of the pan pointer a already started',
+      );
+    },
+  );
+
+  testWidgets(
     'releasing only the grab button while another stays down resumes the tool, not a stuck pan',
     (tester) async {
       final document = CanvasDocument();
