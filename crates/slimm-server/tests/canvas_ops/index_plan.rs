@@ -3,9 +3,9 @@
 //! 0038, so the op-clock's restart seed and every pass of the sweep paid for
 //! a full table scan under the database's one write lock. Left to itself on
 //! a database nothing has ever `ANALYZE`d, SQLite can still pick a full scan
-//! over an index that exists but is not selective enough to look worth using
-//! - the same trap `canvas_index.rs`'s own R-Tree test exists for - so only
-//! the plan itself can catch a regression here, the same reasoning that test
+//! over an index that exists but is not selective enough to look worth using,
+//! the same trap `canvas_index.rs`'s own R-Tree test exists for, so only the
+//! plan itself can catch a regression here - the same reasoning that test
 //! gives for reading its SQL out of source rather than a copy.
 
 use std::fs;
@@ -22,7 +22,9 @@ async fn new_pool(name: &str) -> (SqlitePool, crate::support::TestDbGuard) {
         ..slimm_server::config::Config::default()
     };
     (
-        slimm_server::db::connect(&config).await.expect("connect + migrate"),
+        slimm_server::db::connect(&config)
+            .await
+            .expect("connect + migrate"),
         guard,
     )
 }
@@ -81,7 +83,8 @@ async fn plan_of(pool: &SqlitePool, sql: &str, binds: &[i64]) -> Vec<String> {
 fn assert_no_scan(plan: &[String], what: &str) {
     let scan = plan.iter().find(|step| {
         step.contains("canvas_ops")
-            && (step.starts_with("SCAN") || (step.contains("USING PRIMARY KEY") && !step.contains('(')))
+            && (step.starts_with("SCAN")
+                || (step.contains("USING PRIMARY KEY") && !step.contains('(')))
     });
     assert!(
         scan.is_none(),
@@ -115,7 +118,13 @@ async fn the_sweeps_three_passes_never_scan_canvas_ops() {
     let removes = extract_containing(&source, "o.kind = 'remove'", true);
     let clears = extract_containing(&source, "o.kind = 'clear'", true);
 
-    assert_no_scan(&plan_of(&pool, &restores, &[0, 500]).await, "the restore pass");
-    assert_no_scan(&plan_of(&pool, &removes, &[0, 500]).await, "the remove pass");
+    assert_no_scan(
+        &plan_of(&pool, &restores, &[0, 500]).await,
+        "the restore pass",
+    );
+    assert_no_scan(
+        &plan_of(&pool, &removes, &[0, 500]).await,
+        "the remove pass",
+    );
     assert_no_scan(&plan_of(&pool, &clears, &[0, 500]).await, "the clear pass");
 }
