@@ -70,9 +70,21 @@ async fn plan_of(pool: &SqlitePool, sql: &str, binds: &[i64]) -> Vec<String> {
     rows.iter().map(|r| r.get::<String, _>("detail")).collect()
 }
 
+/// `canvas_ops` is `WITHOUT ROWID`, so its own clustered primary-key b-tree
+/// *is* the table - a full scan of it plans as `SEARCH canvas_ops USING
+/// PRIMARY KEY` with no trailing constraint, not as `SCAN canvas_ops`, which
+/// is why a plain `contains("SCAN")` check would have missed the very
+/// regression this test exists to catch (confirmed by reverting migration
+/// 0038 by hand: the unindexed seed plans exactly that way). A real seek
+/// through the primary key always carries a parenthesized constraint list
+/// after it, which is the one thing that tells the two apart.
 fn assert_no_scan(plan: &[String], what: &str) {
+    let scan = plan.iter().find(|step| {
+        step.contains("canvas_ops")
+            && (step.starts_with("SCAN") || (step.contains("USING PRIMARY KEY") && !step.contains('(')))
+    });
     assert!(
-        !plan.iter().any(|step| step.contains("SCAN canvas_ops")),
+        scan.is_none(),
         "{what} fell back to scanning canvas_ops; the plan is {plan:?}"
     );
 }
