@@ -131,6 +131,10 @@ abstract final class AppIcons {
   /// surface a screen reader otherwise cannot read at all.
   static const IconData activityLog = LucideIcons.history300;
 
+  /// Jumps the canvas camera back to the world origin - the one route back
+  /// short of closing and reopening the pane, see `worldLimit`'s own doc.
+  static const IconData recenter = LucideIcons.locate300;
+
   // Account.
   static const IconData signOut = LucideIcons.logOut300;
   static const IconData account = LucideIcons.circleUser300;

@@ -34,6 +34,7 @@ class CanvasOverflowMenu extends StatefulWidget {
   const CanvasOverflowMenu({
     super.key,
     required this.onPasteImage,
+    required this.onRecenter,
     required this.canManage,
     required this.objectCount,
     required this.onClear,
@@ -49,6 +50,11 @@ class CanvasOverflowMenu extends StatefulWidget {
   });
 
   final VoidCallback onPasteImage;
+
+  /// Jumps the camera back to the world origin - always available, gated on
+  /// nothing, since it changes only where this viewer is looking rather than
+  /// anything shared. See `worldLimit`'s own doc for the gap this closes.
+  final VoidCallback onRecenter;
   final bool canManage;
   final ValueListenable<int> objectCount;
   final Future<void> Function() onClear;
@@ -90,6 +96,11 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
   void _paste() {
     _controller.hide();
     widget.onPasteImage();
+  }
+
+  void _recenter() {
+    _controller.hide();
+    widget.onRecenter();
   }
 
   void _toggleActivityLog() {
@@ -197,6 +208,11 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
                         ? null
                         : _shortcutHint(context),
                     onTap: _paste,
+                  ),
+                  AppMenuItem(
+                    label: 'Recenter view',
+                    leading: AppIcons.recenter,
+                    onTap: _recenter,
                   ),
                   const AppMenuDivider(),
                   AppMenuItem(

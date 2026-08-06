@@ -442,6 +442,8 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
             unawaited(_imagePaste.pasteFromKeystroke()),
         const SingleActivator(LogicalKeyboardKey.keyV, meta: true): () =>
             unawaited(_imagePaste.pasteFromKeystroke()),
+        const SingleActivator(LogicalKeyboardKey.delete): _onDeleteKey,
+        const SingleActivator(LogicalKeyboardKey.backspace): _onDeleteKey,
       },
       child: Focus(
         autofocus: true,
@@ -456,6 +458,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           document: _document,
           onClear: _onClear,
           onPasteImage: () => unawaited(_imagePaste.pasteFromButton()),
+          onRecenter: _onRecenter,
           error: _error,
           onDismissError: () => setState(() => _error = null),
           truncated: _truncated,

@@ -3,7 +3,9 @@
 /// full pane rather than the ops controller directly: this is what proves
 /// the tool toggle, the undo button, Ctrl+Z and the overflow clear menu are
 /// actually wired to it. `canvas_pane_test.dart` covers fetch, live frames
-/// and a plain drag.
+/// and a plain drag; `canvas_pane_view_test.dart` covers Recenter view and
+/// Delete/Backspace over a selection, split out once this file crossed the
+/// 500-line hard limit.
 library;
 
 import 'package:flutter/services.dart';

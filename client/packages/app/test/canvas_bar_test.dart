@@ -93,6 +93,22 @@ void main() {
     expect(pasted, 1);
   });
 
+  testWidgets('tapping recenter view in the overflow calls onRecenter', (
+    tester,
+  ) async {
+    var recentered = 0;
+    await tester.pumpWidget(
+      wrapCanvasBar(buildCanvasBar(onRecenter: () => recentered++)),
+    );
+
+    await tester.tap(find.bySemanticsLabel('More canvas actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Recenter view'));
+    await tester.pump();
+
+    expect(recentered, 1);
+  });
+
   testWidgets('undo is disabled when canUndo is false', (tester) async {
     var undone = 0;
     await tester.pumpWidget(

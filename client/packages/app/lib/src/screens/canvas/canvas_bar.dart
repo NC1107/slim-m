@@ -25,6 +25,7 @@ class CanvasBar extends StatelessWidget {
     required this.objectCount,
     required this.onClear,
     required this.onPasteImage,
+    required this.onRecenter,
     required this.selection,
     required this.onBringToFront,
     required this.onSendToBack,
@@ -72,6 +73,10 @@ class CanvasBar extends StatelessWidget {
   /// overflow menu, reachable regardless of MANAGE_CANVAS, since placing an
   /// image needs only the same USE_CANVAS bit drawing already does.
   final VoidCallback onPasteImage;
+
+  /// Jumps the camera back to the world origin, gated on nothing - see
+  /// `CanvasOverflowMenu`'s own doc for why.
+  final VoidCallback onRecenter;
 
   /// The one object currently selected for a resize or reorder, or null -
   /// forwarded to [CanvasOverflowMenu] so its own doc on why "Bring to
@@ -192,6 +197,7 @@ class CanvasBar extends StatelessWidget {
           const SizedBox(width: AppSpacing.s4),
           CanvasOverflowMenu(
             onPasteImage: onPasteImage,
+            onRecenter: onRecenter,
             canManage: canManage,
             objectCount: objectCount,
             onClear: onClear,

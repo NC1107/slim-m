@@ -1,0 +1,125 @@
+// SPDX-License-Identifier: Apache-2.0
+/// Recenter view and Delete/Backspace over a selection, driven through the
+/// full pane the same way `canvas_pane_ops_test.dart` drives erase, undo and
+/// clear.
+///
+/// Split out once `canvas_pane_ops_test.dart` crossed the 500-line hard
+/// limit adding these two: both act on the camera or the current selection
+/// rather than on the ops controller's own undo stack, which is what the
+/// original file is about. Both share `canvas_pane_harness.dart`'s fixture.
+library;
+
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_voice_canvas/voice_canvas.dart';
+
+import 'canvas_pane_harness.dart';
+
+void main() {
+  /// The one route back once panning or zooming has gone somewhere nothing
+  /// is - see `worldLimit`'s own doc for why this was previously missing.
+  testWidgets(
+    'the overflow\'s Recenter view jumps the camera back to the world '
+    'origin',
+    (tester) async {
+      final fixture = CanvasPaneFixture();
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      surfaceDocument(
+        tester,
+      ).setCamera(const Camera(x: 4000, y: -1500, zoom: 3.2));
+      expect(
+        surfaceDocument(tester).camera,
+        const Camera(x: 4000, y: -1500, zoom: 3.2),
+      );
+
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Recenter view'));
+      await tester.pumpAndSettle();
+
+      expect(surfaceDocument(tester).camera, const Camera());
+    },
+  );
+
+  /// The desktop convention every other drawing surface honours: Delete or
+  /// Backspace over the current Move-tool selection, not only the overflow
+  /// menu's own "Delete" item.
+  testWidgets('Delete removes the current selection and posts one remove op', (
+    tester,
+  ) async {
+    final fixture = CanvasPaneFixture()..objects = [canvasNoteJson('note')];
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+    await pumpCanvasPane(tester, container);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Move'));
+    await tester.pump();
+    final gesture = await tester.startGesture(
+      screenFor(tester, const Offset(15, 15)),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(surfaceDocument(tester).selectedObjectId.value, 'note');
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.delete);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.delete);
+    await tester.pumpAndSettle();
+
+    expect(fixture.postedOps, hasLength(1));
+    expect(fixture.postedOps.single['kind'], 'remove');
+    expect(fixture.postedOps.single['object_ids'], ['note']);
+    expect(surfaceDocument(tester).objectCount.value, 0);
+  });
+
+  /// Backspace is the second key that shape, note and text tools already
+  /// train a person to reach for; both must delete, not only one of them.
+  testWidgets('Backspace also removes the current selection', (tester) async {
+    final fixture = CanvasPaneFixture()..objects = [canvasNoteJson('note')];
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+    await pumpCanvasPane(tester, container);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Move'));
+    await tester.pump();
+    final gesture = await tester.startGesture(
+      screenFor(tester, const Offset(15, 15)),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.backspace);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.backspace);
+    await tester.pumpAndSettle();
+
+    expect(fixture.postedOps, hasLength(1));
+    expect(fixture.postedOps.single['kind'], 'remove');
+  });
+
+  /// Nothing selected must mean nothing happens - no crash reaching into a
+  /// null id, and no op posted for a selection that was never there.
+  testWidgets('Delete with nothing selected posts no op', (tester) async {
+    final fixture = CanvasPaneFixture()..objects = [canvasNoteJson('note')];
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+    await pumpCanvasPane(tester, container);
+    await tester.pumpAndSettle();
+    expect(surfaceDocument(tester).selectedObjectId.value, isNull);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.delete);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.delete);
+    await tester.pumpAndSettle();
+
+    expect(fixture.postedOps, isEmpty);
+    expect(surfaceDocument(tester).objectCount.value, 1);
+  });
+}
