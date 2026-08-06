@@ -97,4 +97,53 @@ void main() {
 
     expect(container.read(canvasSelfPresenceProvider).hidden, isTrue);
   });
+
+  test('hiding right after construction must not blank a corner a prior '
+      'session already persisted', () async {
+    SharedPreferences.setMockInitialValues({
+      canvasSelfBubbleCornerKey: CanvasSelfBubbleCorner.topLeft.name,
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(canvasSelfPresenceProvider.notifier);
+
+    // The generation guard only protects the field this call sets
+    // (hidden); it is racing the load that would have answered topLeft
+    // for corner, a field this call has no opinion about at all.
+    await notifier.setHidden(true);
+    await notifier.ready;
+
+    final state = container.read(canvasSelfPresenceProvider);
+    expect(state.hidden, isTrue);
+    expect(
+      state.corner,
+      CanvasSelfBubbleCorner.topLeft,
+      reason:
+          'a call touching only "hidden" must not leave "corner" '
+          'stuck at its constructor default just because it happened to '
+          'win the race against the load',
+    );
+  });
+
+  test('dragging to a corner right after construction must not blank a hidden '
+      'flag a prior session already persisted', () async {
+    SharedPreferences.setMockInitialValues({canvasSelfBubbleHiddenKey: true});
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(canvasSelfPresenceProvider.notifier);
+
+    await notifier.setCorner(CanvasSelfBubbleCorner.topLeft);
+    await notifier.ready;
+
+    final state = container.read(canvasSelfPresenceProvider);
+    expect(state.corner, CanvasSelfBubbleCorner.topLeft);
+    expect(
+      state.hidden,
+      isTrue,
+      reason:
+          'a call touching only "corner" must not leave "hidden" '
+          'stuck at its constructor default just because it happened to '
+          'win the race against the load',
+    );
+  });
 }
