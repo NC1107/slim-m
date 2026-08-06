@@ -13,10 +13,14 @@
 /// stroke or image repaints" - a separate layer was always the plan, and a
 /// `Texture` is the reason it has to be, not only the reason it is fastest.
 ///
-/// [IgnorePointer]-wrapped throughout: bubbles do not yet drag (see this
-/// file's own module doc in the knowledge base for why that is deferred),
-/// so nothing here may steal a pointer the canvas surface underneath still
-/// needs for drawing, panning or erasing.
+/// [IgnorePointer]-wrapped throughout: a remote bubble never drags, so
+/// nothing here may steal a pointer the canvas surface underneath still
+/// needs for drawing, panning or erasing. The caller's own bubble is the one
+/// exception - it does drag, and hide - and it lives in
+/// `canvas_self_presence_overlay.dart` instead, a separate screen-anchored
+/// layer rather than one more case in this world-anchored one. This layer
+/// therefore renders every participant *but* the caller: `[VoiceParticipant]
+/// .isLocal` is the split.
 library;
 
 import 'package:flutter/material.dart';
@@ -32,10 +36,12 @@ import '../../widgets/user_avatar.dart';
 /// "nothing here reaches Riverpod" rule one level further down.
 typedef CameraViewBuilder = Widget Function(String identity);
 
-/// The call-participant layer, positioned in world space and following the
-/// canvas's own camera. Renders nothing when [participants] is empty, so a
-/// canvas opened on a channel with no active call - or opened by someone who
-/// has not joined the call themselves - pays for none of this.
+/// The *other* call participants' layer, positioned in world space and
+/// following the canvas's own camera. Renders nothing when [participants]
+/// holds nobody but the caller - or nobody at all - so a canvas opened on a
+/// channel with no active call, or opened by someone who has not joined the
+/// call themselves, pays for none of this. The caller's own tile is never
+/// drawn here; see this file's own library doc for where it lives instead.
 class CanvasPresenceLayer extends StatefulWidget {
   const CanvasPresenceLayer({
     super.key,
@@ -87,14 +93,15 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.participants.isEmpty) return const SizedBox.shrink();
-    final bubbles = widget.layout.arrange(
-      widget.participants.map((p) => p.identity),
-    );
+    final remote = widget.participants
+        .where((p) => !p.isLocal)
+        .toList(growable: false);
+    if (remote.isEmpty) return const SizedBox.shrink();
+    final bubbles = widget.layout.arrange(remote.map((p) => p.identity));
     final visibleIds = _visibility.update(widget.document.worldView, bubbles);
     if (visibleIds.isEmpty) return const SizedBox.shrink();
     final camera = widget.document.camera;
-    final byIdentity = {for (final p in widget.participants) p.identity: p};
+    final byIdentity = {for (final p in remote) p.identity: p};
     return IgnorePointer(
       child: Stack(
         clipBehavior: Clip.none,

@@ -4,8 +4,10 @@
 /// touch. `canvas_pane_test.dart` covers the header's own affordance into
 /// the pane; `canvas_bar_shape_kind_test.dart` covers the shape-kind picker
 /// and its armed icon; `canvas_bar_touch_reach_test.dart` covers the tool
-/// strip's own scroll and edge-fade behaviour at a phone width - each split
-/// out once this file crossed the 500-line hard limit.
+/// strip's own scroll and edge-fade behaviour at a phone width;
+/// `canvas_bar_self_bubble_test.dart` covers the "Hide/Show my camera
+/// bubble" overflow item - each split out once this file crossed the
+/// 500-line hard limit.
 library;
 
 import 'package:flutter/foundation.dart';

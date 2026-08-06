@@ -7,7 +7,10 @@
 /// appears only for MANAGE_CANVAS. The four shape-kind rows appear only
 /// while the Shape tool is active - not on the fixed-height bar itself,
 /// which has no room for a fourth control per tool, and this menu already
-/// has room to grow.
+/// has room to grow. "Hide/Show my camera bubble" appears only while the
+/// caller is actually on this channel's call - there is nothing to toggle
+/// otherwise - and lives here rather than as a dedicated bar icon for the
+/// same crowding reason the activity log toggle already does.
 library;
 
 import 'dart:async';
@@ -47,6 +50,9 @@ class CanvasOverflowMenu extends StatefulWidget {
     required this.tool,
     required this.shapeKind,
     required this.onShapeKindChanged,
+    required this.hasSelfBubble,
+    required this.selfBubbleHidden,
+    required this.onToggleSelfBubbleHidden,
   });
 
   final VoidCallback onPasteImage;
@@ -85,6 +91,13 @@ class CanvasOverflowMenu extends StatefulWidget {
   final bool activityLogOpen;
   final VoidCallback onToggleActivityLog;
 
+  /// Whether the caller has a camera bubble on this canvas at all right now
+  /// - see `canvas_bar.dart`'s own doc on why the toggle below is absent
+  /// rather than merely disabled when this is false.
+  final bool hasSelfBubble;
+  final bool selfBubbleHidden;
+  final VoidCallback onToggleSelfBubbleHidden;
+
   @override
   State<CanvasOverflowMenu> createState() => _CanvasOverflowMenuState();
 }
@@ -106,6 +119,11 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
   void _toggleActivityLog() {
     _controller.hide();
     widget.onToggleActivityLog();
+  }
+
+  void _toggleSelfBubble() {
+    _controller.hide();
+    widget.onToggleSelfBubbleHidden();
   }
 
   Future<void> _requestClear() async {
@@ -222,6 +240,14 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
                     leading: AppIcons.activityLog,
                     onTap: _toggleActivityLog,
                   ),
+                  if (widget.hasSelfBubble)
+                    AppMenuItem(
+                      label: widget.selfBubbleHidden
+                          ? 'Show my camera bubble'
+                          : 'Hide my camera bubble',
+                      leading: AppIcons.camera,
+                      onTap: _toggleSelfBubble,
+                    ),
                   if (widget.tool == CanvasTool.shape) ...[
                     const AppMenuDivider(),
                     for (final kind in CanvasShapeKind.values)

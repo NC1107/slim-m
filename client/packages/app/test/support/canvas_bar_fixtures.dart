@@ -37,6 +37,9 @@ CanvasBar buildCanvasBar({
   VoidCallback? onToggleActivityLog,
   CanvasShapeKind shapeKind = CanvasShapeKind.rectangle,
   ValueChanged<CanvasShapeKind>? onShapeKindChanged,
+  bool hasSelfBubble = false,
+  bool selfBubbleHidden = false,
+  VoidCallback? onToggleSelfBubbleHidden,
 }) => CanvasBar(
   channelId: 'c1',
   onClose: () {},
@@ -57,4 +60,7 @@ CanvasBar buildCanvasBar({
   onToggleActivityLog: onToggleActivityLog ?? () {},
   shapeKind: shapeKind,
   onShapeKindChanged: onShapeKindChanged ?? (_) {},
+  hasSelfBubble: hasSelfBubble,
+  selfBubbleHidden: selfBubbleHidden,
+  onToggleSelfBubbleHidden: onToggleSelfBubbleHidden ?? () {},
 );
