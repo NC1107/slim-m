@@ -23,21 +23,33 @@ use crate::ids::{CanvasObjectId, CanvasOpId, ChannelId, Seq, UserId};
 /// own `MAX_LIMIT`.
 pub const CANVAS_OP_GAP: i64 = 2_000;
 
-/// Stops a page early once the accumulated `place` props cross this many
-/// bytes. A page bounded only by row count still varies three orders of
-/// magnitude, since a `place` op carries whole props at up to
-/// `MAX_PROPS_BYTES` (4 KiB) while `remove`, `move` and `reorder` carry a
-/// small, capped `canvas_op_targets` set.
+/// Stops a page early once the accumulated `place` props, plus an estimate
+/// of every other kind's own `canvas_op_targets` rows, cross this many bytes.
+/// A page bounded only by row count still varies three orders of magnitude,
+/// since a `place` op carries whole props at up to `MAX_PROPS_BYTES` (4 KiB)
+/// while `remove` is capped at `MAX_REMOVE_IDS_PER_OP` (64) ids - but
+/// `restore` is not: undoing a large `clear` can un-delete up to
+/// `MAX_OBJECTS_PER_CHANNEL` objects in one op, and a page bounded only by
+/// row count could gang up to `MAX_LIMIT` of those into one response with no
+/// byte ceiling at all. `list_canvas_ops` counts a `canvas_op_targets` row
+/// toward this budget at [`CANVAS_OP_TARGET_BYTES_ESTIMATE`] apiece for
+/// exactly that reason.
 ///
-/// `restore` is the one exception this budget does not see at all: undoing a
-/// large `clear` can un-delete up to `MAX_OBJECTS_PER_CHANNEL` objects in one
-/// op, each a `canvas_op_targets` row `list_canvas_ops`'s budget loop never
-/// counts (it only ever sums a `place` row's own props). Bounded rather than
-/// unbounded, and recorded as a residual in
-/// `tests/canvas_ops/feed.rs`'s own reproduction of it, rather than fixed:
-/// capping it would break undoing a mass clear in one action, the property
-/// `clear` exists to keep cheap.
+/// A single restore still may exceed this alone, same as `place` could if
+/// `MAX_PROPS_BYTES` were raised past it: the first row of a page is always
+/// admitted regardless of its own size, or a client parked behind one
+/// oversized op could never advance past it - the same livelock
+/// `message_ops`'s own sync gate refuses to risk. What this budget now stops
+/// is several such ops compounding in one page; each lands in its own,
+/// bounded page instead. See `tests/canvas_ops/feed.rs`.
 pub const CANVAS_OP_PAGE_BYTES: usize = 512 * 1024;
+
+/// A rough per-id wire cost for a `canvas_op_targets` row once serialized
+/// into a `remove` or `restore` body's `object_ids` array: a UUID's 36
+/// characters, its surrounding quotes, and a separating comma, rounded up.
+/// Deliberately approximate - the budget only needs to bound a page, not
+/// account for it to the byte.
+const CANVAS_OP_TARGET_BYTES_ESTIMATE: usize = 40;
 
 /// One page of the ops feed.
 #[derive(Debug)]
@@ -208,10 +220,39 @@ impl Store {
             &fetched[..]
         };
 
+        // Counted before the budget decides what fits, or the very kinds this closes a residual for would go uncounted.
+        let target_counts = if page.iter().any(|row| row.kind != "place") {
+            if let (Some(first), Some(last)) = (page.first(), page.last()) {
+                sqlx::query!(
+                    r#"SELECT seq AS "seq!: i64", COUNT(*) AS "count!: i64"
+                       FROM canvas_op_targets
+                       WHERE channel_id = ? AND seq >= ? AND seq <= ?
+                       GROUP BY seq"#,
+                    channel_id,
+                    first.seq,
+                    last.seq
+                )
+                .fetch_all(&mut *tx)
+                .await?
+                .into_iter()
+                .map(|row| (row.seq, row.count))
+                .collect::<HashMap<i64, i64>>()
+            } else {
+                HashMap::new()
+            }
+        } else {
+            HashMap::new()
+        };
+
         let mut budget = 0usize;
         let mut included = page.len();
         for (i, row) in page.iter().enumerate() {
-            let bytes = row.obj_props.as_ref().map_or(0, |props| props.len());
+            let bytes = if row.kind == "place" {
+                row.obj_props.as_ref().map_or(0, |props| props.len())
+            } else {
+                target_counts.get(&row.seq).copied().unwrap_or(0) as usize
+                    * CANVAS_OP_TARGET_BYTES_ESTIMATE
+            };
             if i > 0 && budget + bytes > CANVAS_OP_PAGE_BYTES {
                 included = i;
                 break;

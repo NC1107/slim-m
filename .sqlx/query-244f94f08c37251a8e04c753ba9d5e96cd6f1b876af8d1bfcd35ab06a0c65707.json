@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT seq AS \"seq!: i64\", COUNT(*) AS \"count!: i64\"\n                       FROM canvas_op_targets\n                       WHERE channel_id = ? AND seq >= ? AND seq <= ?\n                       GROUP BY seq",
+  "describe": {
+    "columns": [
+      {
+        "name": "seq!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "count!: i64",
+        "ordinal": 1,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "244f94f08c37251a8e04c753ba9d5e96cd6f1b876af8d1bfcd35ab06a0c65707"
+}

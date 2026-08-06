@@ -8,6 +8,7 @@
 
 mod convergence;
 mod feed;
+mod feed_budget;
 mod fixtures;
 mod http_gate;
 mod r#move;
