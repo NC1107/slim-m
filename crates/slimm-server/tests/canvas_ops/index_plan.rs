@@ -134,3 +134,74 @@ async fn the_sweeps_three_passes_never_scan_canvas_ops() {
     );
     assert_no_scan(&plan_of(&pool, &clears, &[0, 500]).await, "the clear pass");
 }
+
+/// The values between the first `(` and the next `)` after `anchor` - the
+/// shape both `canvas_op_kind`'s `CHECK (kind IN (...))` and the seed's own
+/// `WHERE kind IN (...)` share. None of the six kind values contain a `)` of
+/// their own, so the first close paren after the list opens is always the
+/// list's own end; a nested-paren list would need a depth counter, which
+/// nothing here has ever needed.
+fn extract_in_list(text: &str) -> Vec<String> {
+    let open = text
+        .find("IN (")
+        .unwrap_or_else(|| panic!("no \"IN (\" in {text:?}"))
+        + "IN (".len();
+    let close = text[open..]
+        .find(')')
+        .unwrap_or_else(|| panic!("no closing ) after \"IN (\" in {text:?}"))
+        + open;
+    text[open..close]
+        .split(',')
+        .map(|s| s.trim().trim_matches('\'').to_owned())
+        .collect()
+}
+
+/// `canvas_op_kind`'s own list of legal kinds, read from the live migrated
+/// schema rather than scanned out of a migration file. 0034 and 0036 each
+/// rebuilt `canvas_ops` to widen this CHECK constraint, and a future kind
+/// rebuilds it again, so "read whichever migration currently defines it"
+/// would need its own logic to find the right file among all of them - the
+/// same kind of list that goes stale the moment somebody adds a kind and
+/// forgets one place naming it, which is exactly what this test exists to
+/// catch elsewhere. `sqlite_master.sql` needs none of that: it is SQLite's
+/// own record of whichever `CREATE TABLE` last actually ran, so it is
+/// authoritative by construction and self-updates across any future rebuild
+/// with no file-discovery code here to go stale in step. `messages_rowid_alias.rs`
+/// already reads a table's `sqlite_master.sql` the same way, for the same reason.
+async fn canvas_op_kind_check_list(pool: &SqlitePool) -> Vec<String> {
+    let sql: String =
+        sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
+            .bind("canvas_ops")
+            .fetch_one(pool)
+            .await
+            .expect("canvas_ops is a real table in every migrated database");
+    let anchor = sql.find("CONSTRAINT canvas_op_kind").unwrap_or_else(|| {
+        panic!("canvas_op_kind no longer appears in canvas_ops's own schema: {sql}")
+    });
+    extract_in_list(&sql[anchor..])
+}
+
+/// The op-clock seed's `WHERE kind IN (...)` list against `canvas_op_kind`'s
+/// own CHECK constraint. A kind present in one and not the other is exactly
+/// the miss a seventh canvas review named: a future kind added to the CHECK
+/// constraint and to `canvas_ops.rs`'s own read-path match (which fails
+/// loudly, on that kind's first read, via its `anyhow::bail!`) without also
+/// being added to the seed's own list here, which fails silently - a stale
+/// restart seed narrows the same timestamp-uniqueness fence
+/// `now_ms_unique`'s own doc already names as its residual risk.
+#[tokio::test]
+async fn the_op_clock_seed_names_every_kind_the_check_constraint_allows() {
+    let (pool, _guard) = new_pool("canvas-clock-kinds").await;
+    let source = read_source("src/store/canvas_op_clock.rs");
+    let seed_sql = extract_containing(&source, "WHERE kind IN ('place'", true);
+
+    let mut seeded = extract_in_list(&seed_sql);
+    let mut allowed = canvas_op_kind_check_list(&pool).await;
+    seeded.sort();
+    allowed.sort();
+
+    assert_eq!(
+        seeded, allowed,
+        "the op-clock seed's kind list has drifted from canvas_op_kind's own CHECK constraint"
+    );
+}
