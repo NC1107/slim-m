@@ -176,8 +176,7 @@ void main() {
       final drafts = RemoteStrokeDrafts();
       addTearDown(drafts.dispose);
 
-      // A peer that never sends `ended` and keeps refreshing the same draft
-      // forever must not grow this without bound.
+      // A peer refreshing one draft forever must not grow this without bound.
       for (var i = 0; i < maxDraftPreviewPoints + 500; i++) {
         drafts.appendOrCreate(
           objectId: 'd1',

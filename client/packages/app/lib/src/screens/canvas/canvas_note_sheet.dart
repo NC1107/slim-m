@@ -29,7 +29,8 @@ import 'package:slimm_design_system/design_system.dart';
 /// the server's 4 KiB ceiling; only a control character's `\u00XX` escape is
 /// worse, at 6 bytes each. Measuring the real encoded size is what a length
 /// limit means here, not an approximation of it.
-int noteWireBytes(String text) => utf8.encode(jsonEncode({'text': text})).length;
+int noteWireBytes(String text) =>
+    utf8.encode(jsonEncode({'text': text})).length;
 
 /// A comfortable margin under the server's `MAX_PROPS_BYTES` (4 KiB), leaving
 /// room for the request's own envelope fields alongside `props`.

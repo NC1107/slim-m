@@ -292,11 +292,7 @@ async fn a_restores_touched_ids_are_not_counted_toward_the_page_byte_budget() {
     .await
     .expect("seed the restore op");
 
-    // Comfortably past CANVAS_OP_PAGE_BYTES once serialized as UUID strings
-    // (roughly 38 bytes each with JSON quoting and separators), well under
-    // MAX_OBJECTS_PER_CHANNEL - a real mass restore could carry this many.
-    // `canvas_op_targets.object_id` is a real FK onto `canvas_objects`, so
-    // the targets have to name rows that actually exist there.
+    // Real rows: `canvas_op_targets.object_id` is a genuine FK onto `canvas_objects`.
     let touched_count = 15_000i64;
     sqlx::query(
         "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)

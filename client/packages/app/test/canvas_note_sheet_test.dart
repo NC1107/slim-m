@@ -41,8 +41,7 @@ String _fieldText(WidgetTester tester) =>
 void main() {
   test('noteWireBytes is the exact JSON-escaped, UTF-8 encoded wire cost', () {
     expect(noteWireBytes('a'), '{"text":"a"}'.length);
-    // '中' is one UTF-16 code unit but three UTF-8 bytes, and serde_json
-    // never escapes it: the wrapper is 11 fixed bytes (`{"text":""}`).
+    // serde_json never escapes a 3-byte UTF-8 char; the wrapper is 11 bytes.
     expect(noteWireBytes('中'), 11 + 3);
     // A quote and a backslash each escape to two bytes.
     expect(noteWireBytes('"\\'), 11 + 4);
@@ -73,9 +72,7 @@ void main() {
     (tester) async {
       await _open(tester);
 
-      // The exact string `a_note_at_the_clients_own_character_ceiling_can_'
-      // 'still_be_refused_as_too_large` sends to the server: 1800 CJK
-      // characters, 5,412 wire bytes once wrapped, refused there as a 400.
+      // The exact reproduction the server test posts: refused there as a 400.
       await tester.enterText(find.byType(TextField), '中' * 1800);
       await tester.pump();
 
@@ -95,8 +92,7 @@ void main() {
     (tester) async {
       await _open(tester);
 
-      // Fill to exactly the CJK ceiling the byte budget allows (the fixed
-      // `{"text":"..."}` wrapper costs 11 of those bytes), then try one more.
+      // Fill to exactly the CJK ceiling the 11-byte-wrapper budget allows.
       final fits = '中' * ((maxNoteTextBytes - 11) ~/ 3);
       expect(noteWireBytes(fits), lessThanOrEqualTo(maxNoteTextBytes));
       await tester.enterText(find.byType(TextField), fits);
@@ -110,7 +106,8 @@ void main() {
       expect(
         _fieldText(tester),
         before,
-        reason: 'the one keystroke that would cross the budget must be refused whole',
+        reason:
+            'the one keystroke that would cross the budget must be refused whole',
       );
     },
   );
