@@ -10,7 +10,11 @@ extension _StrokePainterShapes on StrokePainter {
   /// `_paintImage` already projects its own box - simpler than the
   /// world-scale `save`/`translate`/`scale` the ink branch uses, and correct
   /// here because the text layout width is computed straight from the
-  /// already-projected screen box rather than from a world-space one.
+  /// already-projected screen box rather than from a world-space one. The
+  /// clip is deflated by exactly `pad` on every side, matching the text's
+  /// own `pad`-offset origin, so a bottom margin reads the same as the top
+  /// rather than the text running up to a boundary tighter than its own
+  /// [noteMaxLines]-bounded layout was ever going to reach.
   void _paintNote(
     Canvas canvas,
     CanvasStroke stroke,
@@ -36,23 +40,32 @@ extension _StrokePainterShapes on StrokePainter {
     );
     final text = stroke.text;
     const pad = 8.0;
-    if (text == null || text.isEmpty || box.width <= pad * 2) return;
+    if (text == null ||
+        text.isEmpty ||
+        box.width <= pad * 2 ||
+        box.height <= pad * 2) {
+      return;
+    }
+    const lineHeightMultiple = 1.3;
+    final fontSize = 12 * camera.zoom;
     final painter = TextPainter(
       text: TextSpan(
         text: text,
         style: TextStyle(
           fontFamily: textFontFamily,
-          fontSize: 12 * camera.zoom,
+          fontSize: fontSize,
           color: textInk,
-          height: 1.3,
+          height: lineHeightMultiple,
         ),
       ),
       textDirection: TextDirection.ltr,
-      maxLines: 200,
+      maxLines:
+          noteMaxLines(box.height, fontSize * lineHeightMultiple, pad: pad),
       ellipsis: '…',
     )..layout(maxWidth: box.width - pad * 2, minWidth: 0);
     canvas.save();
-    canvas.clipRect(box.deflate(pad / 2));
+    // A clip at exactly `pad`, matching the text's own offset below.
+    canvas.clipRect(box.deflate(pad));
     painter.paint(canvas, box.topLeft + const Offset(pad, pad));
     canvas.restore();
   }
@@ -61,6 +74,15 @@ extension _StrokePainterShapes on StrokePainter {
   /// line or an arrow is always the box's own diagonal - see
   /// [CanvasShapeKind]'s own doc for why that is what makes a resize the
   /// whole reshape mechanism, with nothing else to keep in step.
+  ///
+  /// A shape somebody drew is content by the same test a pen stroke already
+  /// is, so it is drawn under the identical `translate`/`scale` world-space
+  /// transform the ink branch uses, in [stroke]'s own local (world-unit)
+  /// coordinates - not the screen-space projected box a chrome element like
+  /// the selection outline uses. That is what makes the outline and the
+  /// arrowhead both scale with zoom the way a pen stroke's width already
+  /// does, rather than staying a fixed screen-space thickness regardless of
+  /// how large the shape has been zoomed.
   void _paintShape(
     Canvas canvas,
     CanvasStroke stroke,
@@ -68,13 +90,24 @@ extension _StrokePainterShapes on StrokePainter {
     Color color, {
     required bool elevated,
   }) {
-    final box = Rect.fromLTWH(
+    if (elevated) {
+      _paintElevation(
+        canvas,
+        Rect.fromLTWH(
+          (stroke.x - camera.x) * camera.zoom,
+          (stroke.y - camera.y) * camera.zoom,
+          stroke.w * camera.zoom,
+          stroke.h * camera.zoom,
+        ),
+      );
+    }
+    canvas.save();
+    canvas.translate(
       (stroke.x - camera.x) * camera.zoom,
       (stroke.y - camera.y) * camera.zoom,
-      stroke.w * camera.zoom,
-      stroke.h * camera.zoom,
     );
-    if (elevated) _paintElevation(canvas, box);
+    canvas.scale(camera.zoom);
+    final local = Rect.fromLTWH(0, 0, stroke.w, stroke.h);
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
@@ -82,16 +115,17 @@ extension _StrokePainterShapes on StrokePainter {
       ..isAntiAlias = true;
     switch (stroke.shapeKind) {
       case CanvasShapeKind.ellipse:
-        canvas.drawOval(box, paint);
+        canvas.drawOval(local, paint);
       case CanvasShapeKind.line:
-        canvas.drawLine(box.topLeft, box.bottomRight, paint);
+        canvas.drawLine(local.topLeft, local.bottomRight, paint);
       case CanvasShapeKind.arrow:
-        canvas.drawLine(box.topLeft, box.bottomRight, paint);
-        _paintArrowhead(canvas, box.topLeft, box.bottomRight, paint);
+        canvas.drawLine(local.topLeft, local.bottomRight, paint);
+        _paintArrowhead(canvas, local.topLeft, local.bottomRight, paint);
       case CanvasShapeKind.rectangle:
       case null:
-        canvas.drawRect(box, paint);
+        canvas.drawRect(local, paint);
     }
+    canvas.restore();
   }
 
   void _paintArrowhead(Canvas canvas, Offset from, Offset to, Paint paint) {
@@ -121,4 +155,20 @@ extension _StrokePainterShapes on StrokePainter {
       Offset(math.cos(angle + headAngle), math.sin(angle + headAngle)) *
           headLength;
   return (left, right);
+}
+
+/// How many lines of text a note's own box can show, given [pad] on every
+/// side and a [lineHeight] in the same pixel space as [boxHeight].
+///
+/// Pure geometry, no [TextPainter] involved, so it is unit-testable with no
+/// canvas at all. This replaced a fixed `maxLines: 200` that made a note's
+/// own `ellipsis` effectively dead code: a note-sized box was never going to
+/// hold 200 wrapped lines, so text past what actually fit was silently
+/// hard-clipped by the paint clip rather than truncated with an ellipsis a
+/// reader could see. Tying this to the box is what makes Flutter's own
+/// truncation fire instead.
+int noteMaxLines(double boxHeight, double lineHeight, {double pad = 8}) {
+  final usable = boxHeight - pad * 2;
+  if (usable <= 0) return 0;
+  return math.max(1, (usable / lineHeight).floor());
 }
