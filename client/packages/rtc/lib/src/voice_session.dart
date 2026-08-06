@@ -190,11 +190,15 @@ class VoiceSession {
 
     _lastDisconnect = null;
     _setState(VoiceSessionState.connecting);
+    final room = _roomFactory();
+    _room = room;
+    _listen(room);
     try {
-      final room = _roomFactory();
-      _room = room;
-      _listen(room);
       await room.connect(url, token);
+      // A leave (or a newer join) may already have taken this room while
+      // connect was in flight; whoever superseded us already tore it down,
+      // so there is nothing left here to publish to or report on.
+      if (!identical(_room, room)) return;
       // Publishing is separate from connecting on purpose: a join preview
       // can arrive muted, and a token without SPEAK must not fail the join.
       if (microphoneEnabled) {
@@ -203,9 +207,11 @@ class VoiceSession {
       if (cameraEnabled) {
         await _trySetCamera(true);
       }
+      if (!identical(_room, room)) return;
       _refreshParticipants();
       _setState(VoiceSessionState.connected);
     } catch (e) {
+      if (!identical(_room, room)) return;
       _lastError = e;
       await _teardown();
       _setState(VoiceSessionState.failed);
@@ -467,11 +473,14 @@ class VoiceSession {
   }
 
   Future<void> _teardown() async {
-    await _screenShare.dispose();
-    _cancelEvents?.call();
-    _cancelEvents = null;
+    // Cleared before anything else, and synchronously: a join racing this
+    // teardown reads `_room` to tell whether it is still the current
+    // attempt, and that answer must be final the instant teardown starts.
     final room = _room;
     _room = null;
+    _cancelEvents?.call();
+    _cancelEvents = null;
+    await _screenShare.dispose();
     if (room != null) {
       try {
         await room.disconnect();
