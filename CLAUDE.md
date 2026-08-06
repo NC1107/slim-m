@@ -28,25 +28,40 @@ So one malformed-looking line does not fail to be recognised as a footer, it abo
 A bad title makes release-please treat a commit as non-conventional and it still appears in the release, just uncategorised.
 A body the parser cannot parse at all makes the commit vanish from the changelog with nothing to show for it, and the only evidence anywhere is one line in a GitHub Actions log nobody was watching - the same "nobody is watching this" shape as the `e2e`-was-red-for-a-day entry above, on a different gate.
 
-**The gate: `scripts/commit-lint/` runs the real, pinned parser against the PR title and every individual commit in the PR, standalone, before merge.**
-Not a reimplementation of the grammar - the actual `@conventional-commits/parser` package, pinned in `scripts/commit-lint/package-lock.json` to the exact version (`0.4.1`) that `googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071` (the sha this repo's `release.yml` already pins, tag v4.4.1, release-please 17.3.0) resolves.
-A gate that disagreed with the real parser would be worse than none, so the version is read off the action's own dependency rather than guessed at, and matched by installing it and reproducing the exact failure: parsing `7eebab8`'s real message with this exact package fails at the identical `unexpected token '(' at 153:29`.
-
-**Why per-commit, standalone, rather than reconstructing GitHub's exact squash-composed message.**
-GitHub composes a squash commit from the PR title and each commit's own message (confirmed against two real merged commits, `7eebab8` and `58b9d5a`: title, then each commit as a `"* "`-prefixed bullet, then a deduplicated trailer block under a `---------` line), and the person merging can hand-edit that text, so nothing running before the merge can see the final byte-for-byte result - that part of the original task was right.
-What turned out not to be needed is reconstructing GitHub's algorithm to check it: the crash comes from a footer-detection attempt scanning body text line by line, which fires at the same relative position (right after a commit's own summary and blank line) whether that text sits alone or bundled into a bigger squash message with a `"* "` prefix on somebody else's first line.
-Verified directly: extracting `7eebab8`'s offending commit and parsing it alone crashes at `3:29`, same column, same cause.
-So checking each commit standalone is not an approximation of the real risk, it reproduces it exactly, and it is strictly more useful pre-merge - it names the one commit and line to fix, where a reconstructed composite message would only say the whole PR failed somewhere.
-
-**What the gate cannot see, stated rather than glossed over: a hand-edit made during the actual merge.**
-If whoever clicks "Confirm squash and merge" rewrites the composed message by hand, nothing that ran on the PR beforehand can know what they typed.
-That gap is inherent to squash-merge on GitHub, not a shortcut this gate took.
+~~**The gate: `scripts/commit-lint/` runs the real, pinned parser against the PR title and every individual commit in the PR, standalone, before merge.**~~
+~~Checking each commit standalone is not an approximation of the real risk, it reproduces it exactly.~~
+Over-strict, fixed the same day: see "The gate above was over-strict, and it just failed a legitimate PR" below for what it actually checks now, and why standalone-and-strict was the wrong shape for an individual commit even though it was the right one for the crash it was built to catch.
 
 **Wired into `hygiene.yml`, not a new workflow**, the same call CLAUDE.md's CI section already makes for every PR-only check: it needs a runner and `fetch-depth: 0` to walk the PR's commit range, nothing server- or client-specific, and `hygiene` already runs on every PR.
 
 **Client 0.32.1's changelog will be missing #443.**
 The work is on `main` and already shipped in every practical sense; only the changelog entry for that one PR is gone, because release-please already ran past it before this gate existed to catch it.
 `CHANGELOG.md` is generated and must never be hand-edited to patch this - recorded here instead, the same treatment client 0.8.0's omission got above.
+
+## The gate above was over-strict, and it just failed a legitimate PR (2026-08-06)
+
+The first version of `scripts/commit-lint/check-parses.mjs` parsed the PR title and, separately, every individual commit's own full message, each standalone, each against the parser's strict top-level grammar.
+That failed PR #460 on two commits (`95fb2d5`, `732c0c8`) whose only sin was an ordinary, non-conventional subject line - harmless under this repo's squash-merge flow, since CLAUDE.md's own contribution conventions already say the PR title is what release-please reads for categorisation and an individual commit becomes a bullet in the body.
+Read this before touching `scripts/commit-lint/check-parses.mjs` again, and read `lib/parser.js` before trusting an error message's line number over what production actually threw it.
+
+**The real distinction is which grammar production the failing text was parsed under, not the shape of the error string - both failures surface as `unexpected token`.**
+`message()`'s top-level call parses line 1 as `<summary>` (`type ["(" scope ")"] [!] ":" text`) and throws immediately if that fails; a plain non-conventional subject like "redesign the canvas toolbar into a floating dock shared with call controls" fails exactly there (`unexpected token ' ' at 1:9, valid tokens [(, !, :]`), because `summary()` returns that failure as an `Error` and `message()`'s own top-level call does `throw s` on it with no recovery.
+Everything after line 1 is `<body>`, whose footer-detection scan (`preFooter`/`footer`/`token`) is deliberately forgiving: `type()` grabs the first word, then `scope()` and `separator()` both fail by returning `Error` (not throwing) when the shape does not match, so `footer()` itself returns `Error` and `body()` falls through to plain text.
+One production in that chain has no such fallback: `scope()` throws unconditionally, with nothing above it catching it, whenever a `(` opens and is never closed before a newline or another `(` - the actual crash bug this gate exists to catch, and the only one of the two failure classes that is fatal to the *real* squashed parse.
+
+**The old gate manufactured the first failure class by forcing text into a grammar position it will never actually occupy.**
+Under squash-merge, only the PR title ever becomes the message's line 1 (confirmed against two real merged commits, `7eebab8` and `58b9d5a`: title, then each commit as a `"* "`-prefixed bullet, then a trailer block).
+An individual commit's own subject is always a body bullet, never a summary, so subjecting it to the strict top-level grammar - as the old standalone parse did - tests a case that structurally cannot happen in the real parse release-please runs.
+
+**The fix keeps the PR title check exactly as strict as before, and changes only what an individual commit is checked against.**
+The title really does occupy the top-level `<summary>` production in the real squash, so a title that fails this parse would throw there too, silently dropping the whole PR from the changelog - not merely miscategorising it - and the strict check on it is correct and unchanged.
+An individual commit is now parsed as body text, under a fixed synthetic `chore: placeholder` summary line standing in for whatever the real PR title will be, so `scope()`'s unrecoverable throw is exercised exactly as it would be in the real squash, with the commit's own subject line never forced through grammar it will not actually be parsed under.
+Verified against all three commits named above: `7eebab8` still fails, at the same underlying position (`153:29`, correctly reported after subtracting the two synthetic prefix lines); `95fb2d5` and `732c0c8` now pass.
+An ordinary clean commit already on main (`de55846`) passes as it did before.
+
+**No warning for an individual commit's own non-conventional subject, decided rather than defaulted to.**
+Squashing already discards that subject's standing as a changelog entry in its own right - nothing reads its "type" unless it happens to also be footer-shaped, which is an opt-in bonus a contributor can reach for, never a requirement.
+A warning here would be noise pointing at a non-problem, the exact shape of over-strictness this fix exists to remove; CLAUDE.md's own contribution conventions already say the PR title is what release-please reads for categorisation, so nothing about an individual commit's subject needs separate comment.
 
 ## A seventh canvas review: the sixth pass's own new clock, and what else shared its assumption (2026-08-06)
 
