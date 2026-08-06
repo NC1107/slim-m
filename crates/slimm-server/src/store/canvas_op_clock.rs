@@ -94,6 +94,16 @@ impl Store {
     /// writing the same database file at once - each would seed and then
     /// advance its own counter independently - but nothing in this project's
     /// single-process architecture is meant to allow that in the first place.
+    ///
+    /// The seed query names every kind explicitly rather than a bare
+    /// `SELECT MAX(created_at)`: over a `canvas_ops` growing without bound
+    /// (`move`/`reorder` rows are never swept, see `canvas_ops_sweep.rs`'s
+    /// own module doc), an unfiltered `MAX` cannot use an index at all and
+    /// pays for a full table scan under this same write lock. Matching the
+    /// `canvas_op_kind` CHECK constraint's own list against the
+    /// `canvas_ops_kind_created_at` index turns that into one index descent
+    /// per kind - a handful of steps regardless of table size, the same
+    /// optimization that also makes the sweep's own per-kind queries cheap.
     pub(super) async fn now_ms_unique(
         &self,
         tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
@@ -102,10 +112,13 @@ impl Store {
         clock
             .seeded
             .get_or_try_init(|| async {
-                let max =
-                    sqlx::query_scalar!(r#"SELECT MAX(created_at) AS "max: i64" FROM canvas_ops"#)
-                        .fetch_one(&mut **tx)
-                        .await?;
+                // See this function's own doc for why every kind is named.
+                let max = sqlx::query_scalar!(
+                    r#"SELECT MAX(created_at) AS "max: i64" FROM canvas_ops
+                       WHERE kind IN ('place', 'remove', 'clear', 'restore', 'move', 'reorder')"#
+                )
+                .fetch_one(&mut **tx)
+                .await?;
                 if let Some(max) = max {
                     clock.last.fetch_max(max, Ordering::AcqRel);
                 }

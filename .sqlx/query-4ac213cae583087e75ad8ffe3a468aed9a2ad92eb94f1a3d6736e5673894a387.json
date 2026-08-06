@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT MAX(created_at) AS \"max: i64\" FROM canvas_ops",
+  "query": "SELECT MAX(created_at) AS \"max: i64\" FROM canvas_ops\n                       WHERE kind IN ('place', 'remove', 'clear', 'restore', 'move', 'reorder')",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       true
     ]
   },
-  "hash": "bc8f853fbe146220ab55d74a8e39026ac0a86a4ed927dbfef32d94cb184dd7b2"
+  "hash": "4ac213cae583087e75ad8ffe3a468aed9a2ad92eb94f1a3d6736e5673894a387"
 }

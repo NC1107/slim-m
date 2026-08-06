@@ -48,6 +48,39 @@ That gap is inherent to squash-merge on GitHub, not a shortcut this gate took.
 The work is on `main` and already shipped in every practical sense; only the changelog entry for that one PR is gone, because release-please already ran past it before this gate existed to catch it.
 `CHANGELOG.md` is generated and must never be hand-edited to patch this - recorded here instead, the same treatment client 0.8.0's omission got above.
 
+## A seventh canvas review: the sixth pass's own new clock, and what else shared its assumption (2026-08-06)
+
+Asked to attack the sixth pass's own work rather than trust it: re-derive nothing about the authorization grid, and instead look for a shared assumption sitting underneath several already-correct fixes.
+Verdict: the authorization grid below matches the code as read, verb by verb, including the HTTP layer's permission-and-timeout checks in `http/canvas_ops_write.rs`.
+What did not hold up was `canvas_op_clock.rs`'s own restart seed, committed a few hours earlier and never load-tested: it was reading `SELECT MAX(created_at) FROM canvas_ops` with no `WHERE` clause on a table with no index reaching `created_at` at all.
+Read this before touching `canvas_op_clock.rs`, `canvas_ops_sweep.rs`, or migrations 0038/0039.
+
+**Reproduced against a real table, not reasoned about on paper.**
+A 1M-row `canvas_ops` table built directly with `sqlite3` (not through the app) turned the seed's bare `MAX(created_at)` into a 0.34-second full scan under `EXPLAIN QUERY PLAN`'s own `Rewind`/`Next` bytecode loop, confirmed at ten million rows too (~1.3 GB, ~0.3-0.4s warm-cache).
+That runs once per process lifetime, inside `Store::begin_write`'s exclusive lock, which is this database's one write lock for the whole deployment, not only for canvas routes - so every restart pays a stall proportional to how large `canvas_ops` has grown, and nothing bounds that growth: `move`/`reorder` rows are never swept, only `remove`/`clear`/`restore` are, so the table's non-eligible share only ever increases as a deployment ages.
+
+**The sweep itself turned out to be paying the same tax, worse, every six hours, forever - the real finding, once the seed sent the search there.**
+`canvas_ops_sweep.rs`'s three passes filter `WHERE kind = ? AND created_at < ?` with no index reaching either column, so a tick that finds few or no eligible rows (the common case once `move`/`reorder` dominate the table) still has to read past every ineligible row to find that out.
+Worse than the seed's single scan: `canvas_ops.target_op BLOB REFERENCES canvas_ops(id)` is a self-referential foreign key with no index on the referencing column, so SQLite's own foreign-key existence check ("does anything still point at the row I am about to delete") forces a second full scan on *every* row a sweep pass deletes, independent of the `kind`/`created_at` predicate.
+Measured directly with `foreign_keys=ON` against the same 1M-row table: deleting 500 rows took 12.1 seconds without an index on `target_op`, 5 milliseconds with one.
+This is the standard SQLite foreign-key performance trap - the documentation names it by name - and it predates this session's own work by two migrations (0034's `move` and 0036's `reorder`), neither of which reopened the sweep's own cost model when they added two more permanently-unswept kinds to the table it scans.
+
+**Two migrations, not one, each independently load-bearing and each mutation-tested separately.**
+`0038_canvas_ops_kind_created_at_index.sql` adds `(kind, created_at)`, which serves the sweep's own equality-then-range predicate directly and still lets SQLite's min/max optimization answer the seed's rewritten `WHERE kind IN ('place', 'remove', 'clear', 'restore', 'move', 'reorder')` (naming every kind from the CHECK constraint explicitly, since a bare `MAX` cannot use an index that leads with `kind`) in one index descent per kind rather than a scan.
+`0039_canvas_ops_target_op_index.sql` adds a partial index on `target_op IS NOT NULL`, the same shape `canvas_ops_author` already uses on `actor_id`, closing the foreign-key scan and also serving the sweep's own explicit `NOT EXISTS (... WHERE r.kind = 'restore' AND r.target_op = o.id)` check for free.
+`tests/canvas_ops/index_plan.rs` reads the op-clock seed and all three sweep queries straight out of their own source files, the `canvas_index.rs` technique, and asserts each plan carries no scan.
+
+**The first version of that test passed when it should have failed, caught only by mutation-testing the claim rather than trusting a green run.**
+`canvas_ops` is `WITHOUT ROWID`, so its own clustered primary-key b-tree *is* the table, and SQLite plans a full scan of it as `SEARCH canvas_ops USING PRIMARY KEY` with no trailing constraint - never as `SCAN canvas_ops`, which is the only string the first draft of `assert_no_scan` checked for.
+Reverting migration 0038 by hand and rerunning left the seed test green, scanning the whole table the entire time.
+The fix distinguishes a real seek from a full scan by the one thing that differs: a real seek through the primary key always carries a parenthesized constraint list after it, a full scan never does.
+Reverting 0038 and 0039 in turn against the corrected assertion now fails exactly the test naming each one, and both pass restored.
+
+**Everything else asked for was checked and found sound, not chased further because nothing was actually wrong.**
+`begin_write`'s exclusive lock is genuinely held on every production write path: the two `&self.pool`-level primitives that bypass it (`Store::move_canvas_object`, `Store::remove_canvas_object`) are grepped-and-confirmed test-only, used nowhere outside `tests/`, with their own doc comments saying so.
+The op stream's density invariant is unaffected by the sweep's compaction, because `list_canvas_ops` never actually checks `seq == cursor + 1` adjacency the way `message_ops` does - it answers with whatever rows exist after the cursor and relies on `latest_seq`/`floor` alone for `reset`, so a swept mid-stream hole is transparent by construction rather than something a gap detector has to reason past.
+Idempotency across a replay holds: `submit_canvas_op`'s `fetch_op` check at the top returns the stored op's own recomputed `affected` count with nothing re-executed, re-published, or re-audited, on every kind.
+
 ## A sixth canvas review: deriving the write-side authorization story from scratch, and the one place it still leaned on an unstated assumption (2026-08-06)
 
 Five adversarial passes had already run over the canvas write path, the last of which (PR #450, fixing `restoring_a_stale_remove_does_not_reach_past_a_later_independent_removal`) found a live bypass the four before it missed and then said its own fix deserved a sixth pass rather than trust.
