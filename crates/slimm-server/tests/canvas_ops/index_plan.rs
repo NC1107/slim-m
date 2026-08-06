@@ -80,15 +80,21 @@ async fn plan_of(pool: &SqlitePool, sql: &str, binds: &[i64]) -> Vec<String> {
 /// 0038 by hand: the unindexed seed plans exactly that way). A real seek
 /// through the primary key always carries a parenthesized constraint list
 /// after it, which is the one thing that tells the two apart.
+///
+/// Neither branch is gated on the string `canvas_ops` appearing in the step:
+/// SQLite's plan names a scanned table by its query alias, not its real name
+/// (`FROM canvas_ops o` scans as `SCAN o`), so that gate went blind on every
+/// aliased query in this file - confirmed by isolating the remove pass alone
+/// with migration 0038 reverted, which passed silently until the gate was
+/// dropped. None of this file's queries have a legitimate scan of anything,
+/// aliased or not, so neither branch needs a table name to stay precise.
 fn assert_no_scan(plan: &[String], what: &str) {
     let scan = plan.iter().find(|step| {
-        step.contains("canvas_ops")
-            && (step.starts_with("SCAN")
-                || (step.contains("USING PRIMARY KEY") && !step.contains('(')))
+        step.starts_with("SCAN") || (step.contains("USING PRIMARY KEY") && !step.contains('('))
     });
     assert!(
         scan.is_none(),
-        "{what} fell back to scanning canvas_ops; the plan is {plan:?}"
+        "{what} fell back to a full scan; the plan is {plan:?}"
     );
 }
 
