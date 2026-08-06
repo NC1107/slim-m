@@ -44,6 +44,7 @@ pub async fn run() -> anyhow::Result<()> {
     let media = media::Media::new(config.attachments_dir.clone(), config.attachment_max_bytes)?
         .with_total_ceiling(config.max_total_attachment_bytes);
     spawn_attachment_sweep(store.clone(), media.clone());
+    spawn_canvas_op_sweep(store.clone());
     let auth = auth::Auth::new(config.hash_concurrency)?;
     let hub = hub::Hub::new();
     let limiter = ratelimit::RateLimiter::with_trusted_hops(config.trust_proxy_hops);
@@ -134,6 +135,42 @@ fn spawn_attachment_sweep(store: store::Store, media: media::Media) {
                 }
                 Ok(_) => {}
                 Err(err) => tracing::warn!(error = %err, "attachment sweep failed"),
+            }
+        }
+    });
+}
+
+/// How often the canvas op log is compacted. Long, the same reasoning
+/// [`TOKEN_SWEEP_INTERVAL`] gives: nothing depends on a `remove`, `clear` or
+/// `restore` row going away promptly, this only bounds how far the log grows
+/// for the life of a deployment. A read-triggered sweep (the analytics
+/// sampling model) was considered and rejected: this is a real `DELETE` with
+/// a cost proportional to what it reclaims, not a cheap read, and a channel
+/// drawn in continuously but never read through whatever request would
+/// trigger it would never be swept at all - the opposite of what bounding
+/// growth needs.
+const CANVAS_OP_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
+
+/// Runs the canvas op compaction sweep in the background for the life of the
+/// process, on the same detached, best-effort, wait-first model as
+/// [`spawn_token_sweep`].
+fn spawn_canvas_op_sweep(store: store::Store) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(CANVAS_OP_SWEEP_INTERVAL);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            match store.sweep_canvas_ops().await {
+                Ok(swept) if swept.total() > 0 => {
+                    tracing::info!(
+                        restores = swept.restores,
+                        removes = swept.removes,
+                        clears = swept.clears,
+                        "compacted canvas op rows"
+                    );
+                }
+                Ok(_) => {}
+                Err(err) => tracing::warn!(error = %err, "canvas op sweep failed"),
             }
         }
     });

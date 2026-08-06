@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE canvas_audit_log SET actor_id = NULL WHERE actor_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "c1d93c7fd67f5b1be5ba2b201c9ce6138a49026b5f56f6214a020bbaf7bc648f"
+}
