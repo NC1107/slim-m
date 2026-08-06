@@ -9,8 +9,14 @@
 //! rather than assumed, and it does not apply: a report never references a
 //! canvas object or op at all, so there is nothing there to exempt. The real
 //! constraint is undo reachability instead: a `remove` or `clear` must
-//! survive for as long as anything it touched is still dead and unrestored,
-//! or deleting it makes that deletion permanently un-undoable. `place` rows
+//! survive for as long as restoring it would still touch something, or
+//! deleting it makes that specific deletion permanently un-undoable. That is
+//! narrower than "anything it touched is still dead": an object a *later,
+//! unrelated* op re-removed is still dead, but restoring the older op would
+//! not touch it any more - `apply_restore` fences a `remove`'s own targets on
+//! the exact `deleted_at` timestamp that removal set, not on bare deadness
+//! (see its own doc), and both sweep passes below check the identical fence
+//! for exactly that reason. `place` rows
 //! are never touched by any of this - `list_canvas_ops`'s own join reads a
 //! placed object straight off the `place` row's own seq, so deleting one
 //! would delete the object from every future replay, not the object's
@@ -77,7 +83,10 @@ impl Store {
         .await?
         .rows_affected();
 
-        // Pass 2a: removes, still-dead means still guarding; see the module doc.
+        // Pass 2a: removes, guarded by the same exact-timestamp fence
+        // `apply_restore` now checks rather than mere current deadness - see
+        // the module doc's own note on why "still dead" is not "still this
+        // op's doing".
         let removes = sqlx::query!(
             r#"DELETE FROM canvas_ops WHERE id IN (
                    SELECT o.id FROM canvas_ops o
@@ -92,7 +101,7 @@ impl Store {
                          JOIN canvas_objects obj
                            ON obj.id = t.object_id AND obj.channel_id = t.channel_id
                          WHERE t.channel_id = o.channel_id AND t.seq = o.seq
-                           AND obj.deleted_at IS NOT NULL
+                           AND obj.deleted_at = o.created_at
                      )
                    LIMIT ?2
                )"#,

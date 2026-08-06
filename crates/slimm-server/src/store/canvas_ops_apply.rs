@@ -34,6 +34,12 @@ pub(super) struct ExistingOp {
 struct ObjectAuth {
     author_id: Option<UserId>,
     is_dead: bool,
+    /// The exact moment this object was last soft-deleted, or `None` if
+    /// live. Distinct from [`Self::is_dead`], which only asks *whether*: a
+    /// `remove` restore has to ask *because of which removal*, or it can
+    /// restore an object into a state a *different*, later removal put it
+    /// in - see [`apply_restore`]'s own doc.
+    deleted_at: Option<i64>,
 }
 
 /// Validates every id first, in request order, before touching any row: an id
@@ -190,6 +196,19 @@ pub(super) async fn apply_reorder(
 /// permission that outlives the role it required. Restoring your own object
 /// stays free of any role check either way, since that removal never needed
 /// one either.
+///
+/// Authorization on the *op* is not authorization on the object's *current*
+/// state: a `remove` target is only ever restored back into exactly the
+/// deletion it caused (`deleted_at == target.created_at`), never into
+/// whatever deletion happens to hold now. Without that fence, a member's own
+/// past self-removal - which needed no `MANAGE_CANVAS` to create - would
+/// stay a standing credential to undo any later, unrelated removal of the
+/// same object, including one a moderator made under `MANAGE_CANVAS` for
+/// cause, as long as the member still knew their own old op id. `clear`
+/// already carried this exact fence in `restore_candidates`; `remove` did
+/// not, and `restoring_a_stale_remove_does_not_reach_past_a_later_independent_removal`
+/// (`tests/canvas_ops/restore_permission.rs`) reproduces the bypass it left
+/// open.
 pub(super) async fn apply_restore(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     channel_id: ChannelId,
@@ -224,7 +243,9 @@ pub(super) async fn apply_restore(
                     return Err(SubmitOpError::NotAuthorized);
                 }
             }
-            if found.is_some_and(|found| found.is_dead) {
+            // Exactly the deletion this remove caused, not just any current
+            // deadness - see `ObjectAuth::deleted_at`'s own doc for why.
+            if found.is_some_and(|found| found.deleted_at == Some(target.created_at)) {
                 dead.push(*object_id);
             }
         }
@@ -341,6 +362,7 @@ async fn fetch_object_for_op(
     Ok(row.map(|r| ObjectAuth {
         author_id: r.author_id,
         is_dead: r.deleted_at.is_some(),
+        deleted_at: r.deleted_at,
     }))
 }
 

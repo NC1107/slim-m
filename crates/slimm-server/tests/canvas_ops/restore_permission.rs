@@ -112,6 +112,58 @@ async fn a_demoted_moderator_cannot_restore_their_removal_of_someone_elses_objec
     assert!(!is_live(&pool, &object_id).await);
 }
 
+/// A `remove`'s restore must be tied to the exact deletion it caused, not to
+/// "this object happens to be dead right now for whatever reason". Without
+/// that fence, a member's own past self-removal - which never needed
+/// `MANAGE_CANVAS` to create - stays a standing credential to undo any
+/// *later, unrelated* removal of the same object, including one a moderator
+/// made under `MANAGE_CANVAS` for cause, as long as the member still knows
+/// their own old op id. This is the `remove` half of the same gap the
+/// `clear` branch already closed with its exact `deleted_at` fence.
+#[tokio::test]
+async fn restoring_a_stale_remove_does_not_reach_past_a_later_independent_removal() {
+    let (store, pool, _guard) = new_store_and_pool().await;
+    let (root_token, _root_id) = register(&store, "root").await;
+    let channel = general(&store).await;
+    let app = app(store.clone());
+    let (alice_token, _alice_id) = member(&store, "alice").await;
+
+    let (_, placed) = post_object(&app, channel, &alice_token, stroke(&id())).await;
+    let object_id = placed["id"].as_str().unwrap().to_owned();
+
+    // Alice removes and restores her own object once - an ordinary, self-service undo.
+    let remove_a = id();
+    submit_op(
+        &app,
+        channel,
+        &alice_token,
+        remove(&remove_a, &[&object_id]),
+    )
+    .await;
+    let (status, body) = submit_op(&app, channel, &alice_token, restore(&id(), &remove_a)).await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    assert!(is_live(&pool, &object_id).await);
+
+    // A moderator later removes the same object for cause: an independent act.
+    let remove_b = id();
+    let (status, body) =
+        submit_op(&app, channel, &root_token, remove(&remove_b, &[&object_id])).await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    assert!(!is_live(&pool, &object_id).await);
+
+    // Alice replays her own old, already-spent remove_a as a restore target.
+    let (status, body) = submit_op(&app, channel, &alice_token, restore(&id(), &remove_a)).await;
+    assert!(
+        status != StatusCode::CREATED || body["op"]["affected"] == 0,
+        "alice's stale self-removal must not be a standing credential to undo \
+         a moderator's later, independent removal of the same object: {body}"
+    );
+    assert!(
+        !is_live(&pool, &object_id).await,
+        "the moderator's removal must survive alice replaying her own old remove op"
+    );
+}
+
 /// A member may always restore a removal of their own object, with or
 /// without `MANAGE_CANVAS`, since that removal never needed the bit either -
 /// self-service undo of your own content must survive a role change that
