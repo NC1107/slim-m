@@ -7,10 +7,20 @@
 //! orchestrator (`Store::submit_canvas_op`) and the public request/result
 //! types, this one keeps everything below the per-kind dispatch.
 
+use sqlx::QueryBuilder;
+
 use super::canvas::MAX_OBJECTS_PER_CHANNEL;
 use super::canvas_move::move_canvas_object_query;
 use super::canvas_ops_write::SubmitOpError;
 use crate::ids::{CanvasObjectId, CanvasOpId, ChannelId, UserId};
+
+/// How many objects one `UPDATE ... IN (...)` names at a time, the
+/// `ORPHAN_SWEEP_BATCH`/`CANVAS_OP_SWEEP_BATCH` figure. A restore of a large
+/// `clear` can carry up to `MAX_OBJECTS_PER_CHANNEL` (20,000) dead objects;
+/// batching keeps the single write-lock hold under a few dozen statements
+/// rather than one per object, which measured at roughly half a second held
+/// against the deployment's one writer for a full channel's worth.
+const RESTORE_UNDELETE_BATCH: usize = 500;
 
 pub(super) struct ExistingOp {
     pub(super) channel_id: ChannelId,
@@ -232,24 +242,38 @@ pub(super) async fn apply_restore(
         return Err(SubmitOpError::ChannelFull);
     }
 
-    let mut touched = Vec::with_capacity(dead.len());
-    for object_id in &dead {
-        let rows = sqlx::query!(
-            "UPDATE canvas_objects SET deleted_at = NULL
-             WHERE id = ? AND channel_id = ? AND deleted_at IS NOT NULL",
-            object_id,
-            channel_id
-        )
-        .execute(&mut **tx)
-        .await?
-        .rows_affected();
-        if rows > 0 {
-            touched.push(*object_id);
-        }
-    }
+    let touched = undelete_batch(tx, channel_id, &dead).await?;
 
     let affected = touched.len() as i64;
     Ok(("restore", affected, touched, None))
+}
+
+/// Un-deletes every id in `dead`, `RESTORE_UNDELETE_BATCH` at a time rather
+/// than one round trip per object: each id already comes from
+/// `restore_candidates`, which only ever names an object already proven dead
+/// inside this same write transaction, so there is nothing left to
+/// authorize here - only the row count actually flipped is worth reporting
+/// back, which `RETURNING id` gives for free per batch.
+async fn undelete_batch(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    channel_id: ChannelId,
+    dead: &[CanvasObjectId],
+) -> Result<Vec<CanvasObjectId>, sqlx::Error> {
+    let mut touched = Vec::with_capacity(dead.len());
+    for chunk in dead.chunks(RESTORE_UNDELETE_BATCH) {
+        let mut builder =
+            QueryBuilder::new("UPDATE canvas_objects SET deleted_at = NULL WHERE channel_id = ");
+        builder.push_bind(channel_id);
+        builder.push(" AND deleted_at IS NOT NULL AND id IN (");
+        let mut separated = builder.separated(", ");
+        for id in chunk {
+            separated.push_bind(*id);
+        }
+        builder.push(") RETURNING id");
+        let rows: Vec<CanvasObjectId> = builder.build_query_scalar().fetch_all(&mut **tx).await?;
+        touched.extend(rows);
+    }
+    Ok(touched)
 }
 
 /// The objects `target` named: a `remove`'s own `canvas_op_targets` rows, or -
