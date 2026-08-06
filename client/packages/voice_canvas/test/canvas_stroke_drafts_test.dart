@@ -170,6 +170,30 @@ void main() {
     expect(drafts.all, isNotEmpty, reason: 'the refresh at 5s must count');
   });
 
+  test(
+    'accumulated points are capped, keeping the most recent and dropping the oldest',
+    () {
+      final drafts = RemoteStrokeDrafts();
+      addTearDown(drafts.dispose);
+
+      // A peer refreshing one draft forever must not grow this without bound.
+      for (var i = 0; i < maxDraftPreviewPoints + 500; i++) {
+        drafts.appendOrCreate(
+          objectId: 'd1',
+          authorId: 'alice',
+          points: [i.toDouble(), i.toDouble()],
+          colorIndex: 0,
+        );
+      }
+
+      final points = drafts.all.single.points;
+      expect(points.length, maxDraftPreviewPoints * 2);
+      // The oldest points (low indices) are the ones dropped.
+      expect(points.first, 500.0);
+      expect(points.last, (maxDraftPreviewPoints + 499).toDouble());
+    },
+  );
+
   test('clear drops every draft at once', () {
     final drafts = RemoteStrokeDrafts();
     addTearDown(drafts.dispose);

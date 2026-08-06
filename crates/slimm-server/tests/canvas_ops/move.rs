@@ -89,6 +89,43 @@ async fn a_member_cannot_move_anothers_object_but_a_moderator_can() {
     assert_eq!(body["op"]["affected"], 1);
 }
 
+/// Authorization must be checked before liveness: a non-moderator naming
+/// someone else's already-removed object must get the same `FORBIDDEN` a
+/// live foreign object gets, not `CREATED` with `affected: 0` - the latter
+/// would let anyone with `USE_CANVAS` learn whether an arbitrary object id
+/// is dead without holding any right over it at all.
+#[tokio::test]
+async fn a_member_cannot_learn_anothers_object_is_dead_by_moving_it() {
+    let (store, _guard) = new_store().await;
+    let (root_token, _root_id) = register(&store, "root").await;
+    let channel = general(&store).await;
+    let app = app(store.clone());
+    let (bob_token, _bob_id) = member(&store, "bob").await;
+
+    let (_, placed) = post_object(&app, channel, &root_token, stroke(&id())).await;
+    let object_id = placed["id"].as_str().unwrap().to_owned();
+    submit_op(
+        &app,
+        channel,
+        &root_token,
+        crate::fixtures::remove(&id(), &[&object_id]),
+    )
+    .await;
+
+    let (status, body) = submit_op(
+        &app,
+        channel,
+        &bob_token,
+        move_op(&id(), &object_id, (1.0, 2.0, 3.0, 4.0)),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "a dead foreign object must refuse the same way a live one does: {body}"
+    );
+}
+
 /// The one place a timeout reaches this op stream: `move` repositions ink
 /// rather than removing it, so the pen's freeze applies here, unlike
 /// `remove`, `clear` and `restore`.

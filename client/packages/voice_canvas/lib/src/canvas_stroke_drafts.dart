@@ -36,6 +36,20 @@ class CanvasStrokeDraft {
   final int colorIndex;
 }
 
+/// Most points one draft keeps, past which the oldest are dropped.
+///
+/// A hostile or misbehaving peer can keep one draft "open" indefinitely by
+/// refreshing it just under [strokePreviewStaleAfter] forever, never sending
+/// `ended` - the server charges this by bytes, not by a draft's total
+/// lifetime, so nothing server-side stops that. Without a ceiling here, every
+/// *other* viewer's [_drafts] entry for that id would grow without bound, and
+/// [RemoteDraftPainter] rebuilds a [Path] over the whole accumulated list on
+/// every repaint, so an unbounded draft is both unbounded memory and
+/// quadratic paint cost over the attack's duration. 4000 points is several
+/// times more than a fast continuous gesture produces in the several seconds
+/// a real stroke actually takes, so this is never visible in ordinary use.
+const int maxDraftPreviewPoints = 4000;
+
 /// Remote in-flight strokes, keyed by [CanvasStrokeDraft.objectId].
 ///
 /// There is an explicit "ended" signal, unlike a cursor - a stroke carries
@@ -63,10 +77,14 @@ class RemoteStrokeDrafts extends ChangeNotifier {
     final merged = existing == null
         ? List<double>.from(points)
         : (List<double>.from(existing.points)..addAll(points));
+    final maxDoubles = maxDraftPreviewPoints * 2;
+    final capped = merged.length > maxDoubles
+        ? merged.sublist(merged.length - maxDoubles)
+        : merged;
     _drafts[objectId] = CanvasStrokeDraft(
       objectId: objectId,
       authorId: authorId,
-      points: merged,
+      points: capped,
       colorIndex: colorIndex,
     );
     _lastSeen[objectId] = now ?? DateTime.now();

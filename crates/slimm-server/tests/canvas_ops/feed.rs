@@ -239,9 +239,110 @@ async fn has_more_is_dropped_from_the_back_and_paging_continues_correctly() {
     assert!(!third.has_more);
 }
 
+/// A residual in the byte budget above: "every other kind carries none" is
+/// false for a `restore` of a large `clear`. `clear` has no per-call cap on
+/// how many objects it may touch (a channel-wide clear has to stay one cheap
+/// write, which is the whole point of the fence rather than per-object
+/// target rows), and restoring it can therefore un-delete up to
+/// `MAX_OBJECTS_PER_CHANNEL` objects in one op - each one a `canvas_op_targets`
+/// row this budget never counts, because `budget` only ever sums a `place`
+/// row's own `obj_props.len()`. Unlike `remove`, which is capped at 64 ids
+/// per call (`MAX_REMOVE_IDS_PER_OP`) specifically because that bound was
+/// sized against a wire ceiling, a `restore` of a `clear` has no equivalent
+/// cap, so one op can legitimately carry thousands of ids and this budget
+/// says nothing about it. Bounded rather than unbounded - the ceiling is
+/// `MAX_OBJECTS_PER_CHANNEL`, not infinity, and it can only be reached by
+/// someone who already held `MANAGE_CANVAS` to run the clear and the restore
+/// that produced it - so this is recorded as a residual rather than fixed:
+/// closing it needs either capping a clear-restore's size (which would break
+/// "undo a mass clear in one action," the property `clear` exists to keep
+/// cheap) or teaching the page-budget query about `canvas_op_targets` row
+/// counts before it decides what fits, a real restructuring rather than a
+/// one-line fix.
+#[tokio::test]
+async fn a_restores_touched_ids_are_not_counted_toward_the_page_byte_budget() {
+    let (store, pool, _guard) = new_store_and_pool().await;
+    let author = store.create_user("ann", "Ann").await.unwrap().id;
+    let channel = store.create_channel("canvas", "voice").await.unwrap().id;
+
+    sqlx::query(
+        "INSERT INTO canvas_ops (channel_id, seq, id, kind, actor_id, created_at)
+         VALUES (?, 1, randomblob(16), 'remove', ?, 0)",
+    )
+    .bind(channel)
+    .bind(author)
+    .execute(&pool)
+    .await
+    .expect("seed a remove op to restore");
+    let target_op: Uuid =
+        sqlx::query_scalar("SELECT id FROM canvas_ops WHERE channel_id = ? AND seq = 1")
+            .bind(channel)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    sqlx::query(
+        "INSERT INTO canvas_ops (channel_id, seq, id, kind, actor_id, target_op, created_at)
+         VALUES (?, 2, randomblob(16), 'restore', ?, ?, 0)",
+    )
+    .bind(channel)
+    .bind(author)
+    .bind(target_op)
+    .execute(&pool)
+    .await
+    .expect("seed the restore op");
+
+    // Real rows: `canvas_op_targets.object_id` is a genuine FK onto `canvas_objects`.
+    let touched_count = 15_000i64;
+    sqlx::query(
+        "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
+         INSERT INTO canvas_objects
+             (id, channel_id, channel_key, kind, z_index, x, y, w, h, props,
+              author_id, seq, created_at)
+         SELECT randomblob(16), ?, 0, 'stroke', i, 0, 0, 1, 1, '{}', ?, i, 0 FROM n",
+    )
+    .bind(touched_count)
+    .bind(channel)
+    .bind(author)
+    .execute(&pool)
+    .await
+    .expect("seed objects for the restore to name");
+    sqlx::query(
+        "INSERT INTO canvas_op_targets (channel_id, seq, object_id)
+         SELECT channel_id, 2, id FROM canvas_objects WHERE channel_id = ?",
+    )
+    .bind(channel)
+    .execute(&pool)
+    .await
+    .expect("seed the restore's touched ids");
+    sqlx::query(
+        "UPDATE channel_seq_counters SET next_seq = 3 WHERE channel_id = ? AND stream = 'canvas'",
+    )
+    .bind(channel)
+    .execute(&pool)
+    .await
+    .expect("advance the counter to match");
+
+    let page = store.list_canvas_ops(channel, 0, 200).await.unwrap();
+    assert_eq!(page.ops.len(), 2, "the budget must not have stopped early");
+    assert!(!page.has_more);
+
+    let restored_count = match &page.ops[1].body {
+        CanvasOpBody::Restore { object_ids, .. } => object_ids.len(),
+        other => panic!("expected Restore, got {other:?}"),
+    };
+    assert_eq!(restored_count as i64, touched_count);
+    let approx_wire_bytes = restored_count * 38;
+    assert!(
+        approx_wire_bytes > CANVAS_OP_PAGE_BYTES,
+        "the reproduction must actually exceed the budget: {approx_wire_bytes} bytes",
+    );
+}
+
 /// A page bounded only by row count still varies three orders of magnitude
 /// in bytes, since a `place` op carries whole props at up to `MAX_PROPS_BYTES`
-/// while every other kind carries none.
+/// while every other kind is capped small or (see the residual test above)
+/// merely bounded by `MAX_OBJECTS_PER_CHANNEL` rather than never mattering.
 #[tokio::test]
 async fn a_page_stops_early_once_place_props_cross_the_byte_budget() {
     let (store, _guard) = new_store().await;
