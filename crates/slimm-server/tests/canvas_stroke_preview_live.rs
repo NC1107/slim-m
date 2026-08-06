@@ -1,0 +1,390 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Live in-flight stroke preview: the same two-bit authorization and
+//! appear-offline guard [`canvas_cursor_live`] already covers, plus what is
+//! new to a frame that carries drawing content rather than a bare position -
+//! a bound on how much one frame may carry, a direct timeout check, and a
+//! byte-rate limiter rather than a per-request one.
+//!
+//! [`canvas_cursor_live`]: ../tests/canvas_cursor_live.rs
+
+use std::time::Duration;
+
+use futures_util::{SinkExt, StreamExt};
+use serde_json::{Value, json};
+use slimm_server::auth::Auth;
+use slimm_server::config::Config;
+use slimm_server::db;
+use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
+use slimm_server::permissions::Permissions;
+use slimm_server::push::PushSender;
+use slimm_server::ratelimit::RateLimiter;
+use slimm_server::store::Store;
+use tokio::net::TcpListener;
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Message as WsMessage;
+
+mod support;
+
+type Client =
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-canvas-stroke-preview-live");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    (Store::new(pool), guard)
+}
+
+fn state_for(store: &Store, hub: Hub) -> AppState {
+    AppState {
+        store: store.clone(),
+        auth: Auth::new(2).unwrap(),
+        hub,
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
+    }
+}
+
+async fn user_ticket(store: &Store, name: &str) -> (String, slimm_server::ids::UserId) {
+    let user = store.create_user(name, name).await.unwrap();
+    let tokens = store.open_session(user.id, "device").await.unwrap();
+    let ctx = store
+        .authenticate(&tokens.access_token)
+        .await
+        .unwrap()
+        .unwrap();
+    let (ticket, _expires_at) = store.mint_ws_ticket(&ctx).await.unwrap();
+    (ticket, user.id)
+}
+
+async fn serve(state: AppState) -> std::net::SocketAddr {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, http::router(state)).await.unwrap();
+    });
+    addr
+}
+
+async fn connect(addr: std::net::SocketAddr, ticket: &str) -> Client {
+    let (mut ws, _response) = connect_async(format!("ws://{addr}/ws")).await.unwrap();
+    ws.send(WsMessage::Text(
+        json!({ "type": "hello", "ticket": ticket, "protocol": 1 }).to_string(),
+    ))
+    .await
+    .unwrap();
+    let ack = read_frame(&mut ws).await;
+    assert_eq!(ack["type"], "hello");
+    ws
+}
+
+async fn read_frame(ws: &mut Client) -> Value {
+    loop {
+        match ws.next().await {
+            Some(Ok(WsMessage::Text(text))) => {
+                return serde_json::from_str(text.as_str()).unwrap();
+            }
+            Some(Ok(_)) => continue,
+            other => panic!("expected a text frame, got {other:?}"),
+        }
+    }
+}
+
+async fn next_of_type(ws: &mut Client, frame_type: &str) -> Value {
+    let outcome = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let frame = read_frame(ws).await;
+            if frame["type"] == frame_type {
+                return frame;
+            }
+        }
+    })
+    .await;
+    outcome.unwrap_or_else(|_| panic!("no {frame_type} arrived in time"))
+}
+
+async fn assert_nothing_of_type(ws: &mut Client, frame_type: &str) {
+    let outcome =
+        tokio::time::timeout(Duration::from_millis(300), next_of_type(ws, frame_type)).await;
+    assert!(outcome.is_err(), "unexpected {frame_type}");
+}
+
+async fn send_preview(
+    ws: &mut Client,
+    channel_id: &str,
+    object_id: &str,
+    points: &[f64],
+    ended: bool,
+) {
+    ws.send(WsMessage::Text(
+        json!({
+            "type": "canvas.stroke_preview",
+            "channel_id": channel_id,
+            "object_id": object_id,
+            "points": points,
+            "ended": ended,
+        })
+        .to_string(),
+    ))
+    .await
+    .unwrap();
+}
+
+fn new_object_id() -> String {
+    uuid::Uuid::now_v7().to_string()
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64
+}
+
+/// The load-bearing pair: a viewer holding both bits receives the frame, with
+/// every field carried through, and a viewer denied `USE_CANVAS`
+/// specifically receives nothing even though `VIEW_CHANNEL` alone would pass
+/// a plain channel-scoped check. Mirrors `canvas_cursor_live.rs`'s own pair.
+#[tokio::test]
+async fn a_viewer_with_both_bits_receives_the_preview() {
+    let (store, _guard) = new_store().await;
+    let (alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice_id).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+    let (bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
+    let object_id = new_object_id();
+
+    let state = state_for(&store, Hub::new());
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    send_preview(
+        &mut alice_ws,
+        &channel.to_string(),
+        &object_id,
+        &[1.0, 2.0, 3.0, 4.0],
+        false,
+    )
+    .await;
+
+    let frame = next_of_type(&mut bob_ws, "canvas.stroke_preview.updated").await;
+    assert_eq!(frame["channel_id"], channel.to_string());
+    assert_eq!(frame["user_id"], alice_id.to_string());
+    assert_eq!(frame["object_id"], object_id);
+    assert_eq!(frame["points"], json!([1.0, 2.0, 3.0, 4.0]));
+    assert_eq!(frame["ended"], false);
+}
+
+#[tokio::test]
+async fn a_member_denied_use_canvas_never_sees_a_preview() {
+    let (store, _guard) = new_store().await;
+    let (alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice_id).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+
+    let (carol_ticket, carol_id) = user_ticket(&store, "carol").await;
+    store
+        .set_member_overwrite(
+            channel,
+            carol_id,
+            Permissions::NONE,
+            Permissions::USE_CANVAS,
+        )
+        .await
+        .unwrap();
+
+    let state = state_for(&store, Hub::new());
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut carol_ws = connect(addr, &carol_ticket).await;
+
+    send_preview(
+        &mut alice_ws,
+        &channel.to_string(),
+        &new_object_id(),
+        &[1.0, 1.0],
+        false,
+    )
+    .await;
+
+    assert_nothing_of_type(&mut carol_ws, "canvas.stroke_preview.updated").await;
+}
+
+/// A preview also leaks presence the same way a cursor does, so a user who
+/// chose to appear offline must not have their drawing announced.
+#[tokio::test]
+async fn a_hidden_users_preview_is_not_announced() {
+    use slimm_server::presence::Visibility;
+    let (store, _guard) = new_store().await;
+    let (alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice_id).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+    store
+        .set_presence_visibility(alice_id, Visibility::Hidden)
+        .await
+        .unwrap();
+    let (bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
+
+    let state = state_for(&store, Hub::new());
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    send_preview(
+        &mut alice_ws,
+        &channel.to_string(),
+        &new_object_id(),
+        &[1.0, 1.0],
+        false,
+    )
+    .await;
+
+    assert_nothing_of_type(&mut bob_ws, "canvas.stroke_preview.updated").await;
+}
+
+/// A point outside the bounded world (or non-finite) is dropped outright,
+/// never relayed, the same treatment `canvas.cursor` already gets.
+#[tokio::test]
+async fn an_out_of_bounds_point_is_dropped() {
+    let (store, _guard) = new_store().await;
+    let (alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice_id).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+    let (bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
+
+    let state = state_for(&store, Hub::new());
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    send_preview(
+        &mut alice_ws,
+        &channel.to_string(),
+        &new_object_id(),
+        &[50_000_000.0, 0.0],
+        false,
+    )
+    .await;
+
+    assert_nothing_of_type(&mut bob_ws, "canvas.stroke_preview.updated").await;
+}
+
+/// A frame carrying more coordinate pairs than one preview may ever hold is
+/// dropped outright - it is not something a well-behaved client's own
+/// throttle could have produced, so there is nothing to salvage by keeping
+/// the first N pairs and relaying the rest.
+#[tokio::test]
+async fn a_frame_carrying_too_many_points_is_dropped() {
+    let (store, _guard) = new_store().await;
+    let (alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice_id).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+    let (bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
+
+    let state = state_for(&store, Hub::new());
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    let too_many: Vec<f64> = (0..(25 * 2)).map(|i| i as f64).collect();
+    send_preview(
+        &mut alice_ws,
+        &channel.to_string(),
+        &new_object_id(),
+        &too_many,
+        false,
+    )
+    .await;
+
+    assert_nothing_of_type(&mut bob_ws, "canvas.stroke_preview.updated").await;
+}
+
+/// The bit a timeout cannot express reaches this path too. `TIMEOUT_DENY`
+/// spares `USE_CANVAS` because that one bit means view *and* draw, so
+/// without a direct check here a timed-out member could keep drawing over
+/// the socket even though `POST .../canvas/objects` already refuses them.
+#[tokio::test]
+async fn a_timed_out_member_cannot_send_a_preview() {
+    let (store, _guard) = new_store().await;
+    let (alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice_id).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+    let (bob_ticket, bob_id) = user_ticket(&store, "bob").await;
+
+    let until = now_ms() + 60_000;
+    store
+        .set_member_timeout(bob_id, until, Some("cool off"), alice_id)
+        .await
+        .unwrap();
+
+    let state = state_for(&store, Hub::new());
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    send_preview(
+        &mut bob_ws,
+        &channel.to_string(),
+        &new_object_id(),
+        &[1.0, 1.0],
+        false,
+    )
+    .await;
+
+    assert_nothing_of_type(&mut alice_ws, "canvas.stroke_preview.updated").await;
+}
+
+/// Preview frames are rate limited by the bytes they carry, not by count: a
+/// tight loop of frames near the per-frame point ceiling still gets capped.
+#[tokio::test]
+async fn preview_frames_are_rate_limited_by_bytes() {
+    let (store, _guard) = new_store().await;
+    let (alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice_id).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+    let (bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
+
+    let state = state_for(&store, Hub::new());
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    let object_id = new_object_id();
+    let points: Vec<f64> = (0..48).map(|i| i as f64 + 0.123_456).collect();
+    let total = 40;
+    for _ in 0..total {
+        send_preview(
+            &mut alice_ws,
+            &channel.to_string(),
+            &object_id,
+            &points,
+            false,
+        )
+        .await;
+    }
+
+    let mut seen = 0usize;
+    loop {
+        let next = tokio::time::timeout(Duration::from_millis(500), read_frame(&mut bob_ws)).await;
+        match next {
+            Ok(frame) if frame["type"] == "canvas.stroke_preview.updated" => seen += 1,
+            Ok(_) => {}
+            Err(_) => break,
+        }
+    }
+
+    assert!(seen >= 1, "at least the burst-allowed frames get through");
+    assert!(
+        seen < total,
+        "the byte-rate limiter must refuse some of {total} large rapid frames, only {seen} got through",
+    );
+}

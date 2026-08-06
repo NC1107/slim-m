@@ -143,6 +143,29 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                                 )
                                 .await;
                             }
+                            Ok(ClientFrame::CanvasStrokePreview {
+                                channel_id,
+                                object_id,
+                                points,
+                                ended,
+                            }) => {
+                                // The raw wire size, not a re-serialization: it is what this frame actually cost to send.
+                                let frame_bytes = text.as_str().len();
+                                signals::handle_canvas_stroke_preview(
+                                    &state.store,
+                                    &state.hub,
+                                    &state.limiter,
+                                    &ctx,
+                                    signals::StrokePreviewFrame {
+                                        channel_id,
+                                        object_id,
+                                        points,
+                                        ended,
+                                    },
+                                    frame_bytes,
+                                )
+                                .await;
+                            }
                             // A second hello or anything unparseable is not
                             // worth tearing the connection down over.
                             Ok(ClientFrame::Hello { .. }) | Err(_) => {}
