@@ -95,7 +95,12 @@ class CanvasSelfPresenceController
   /// Hides the bubble; reversed by calling this again with `false`, which is
   /// exactly what the canvas overflow menu's own toggle item does - there is
   /// no separate "show" method to keep in step with it.
+  ///
+  /// Waits for [ready] first - see its own doc for why a state holding two
+  /// independently-persisted fields needs that and a single-field state like
+  /// `PersonalSpaceVisibilityController`'s never did.
   Future<void> setHidden(bool hidden) async {
+    await ready;
     _generation++;
     state = state.copyWith(hidden: hidden);
     try {
@@ -108,8 +113,10 @@ class CanvasSelfPresenceController
 
   /// Where a drag settled - called by `CanvasSelfPresenceOverlay` once per
   /// released drag, never mid-drag, so a write failure costs at most one
-  /// forgotten snap rather than one per frame of motion.
+  /// forgotten snap rather than one per frame of motion. Waits for [ready]
+  /// first, the same reasoning [setHidden] carries.
   Future<void> setCorner(CanvasSelfBubbleCorner corner) async {
+    await ready;
     _generation++;
     state = state.copyWith(corner: corner);
     try {

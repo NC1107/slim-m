@@ -251,6 +251,97 @@ void main() {
   );
 
   testWidgets(
+    'an unrelated second pointer lifting mid-grab does not end someone else\'s pan',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CanvasSurface(
+            document: document,
+            ink: const Color(0xFFE86A5C),
+            gridLine: const Color(0xFF303030),
+            onStroke: (_) {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final mouse = TestPointer(1, PointerDeviceKind.mouse);
+      final touch = TestPointer(2, PointerDeviceKind.touch);
+      await tester.sendEventToBinding(
+        mouse.down(const Offset(100, 100), buttons: kMiddleMouseButton),
+      );
+      await tester.sendEventToBinding(mouse.move(const Offset(80, 100)));
+      // A second, unrelated pointer touches down and lifts mid-grab.
+      await tester.sendEventToBinding(touch.down(const Offset(10, 10)));
+      await tester.sendEventToBinding(touch.up());
+      // The mouse's own drag continues to count toward the pan afterward.
+      await tester.sendEventToBinding(mouse.move(const Offset(60, 100)));
+      await tester.sendEventToBinding(mouse.up());
+      await tester.pump();
+
+      expect(
+        document.camera.x,
+        40,
+        reason: 'the touch pointer\'s own up must not have ended the grab '
+            'the mouse was still holding',
+      );
+    },
+  );
+
+  testWidgets(
+    'releasing only the grab button while another stays down resumes the tool, not a stuck pan',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      var strokes = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CanvasSurface(
+            document: document,
+            ink: const Color(0xFFE86A5C),
+            gridLine: const Color(0xFF303030),
+            onStroke: (_) => strokes++,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final pointer = TestPointer(1, PointerDeviceKind.mouse);
+      await tester.sendEventToBinding(
+        pointer.down(
+          const Offset(20, 20),
+          buttons: kPrimaryButton | kMiddleMouseButton,
+        ),
+      );
+      await tester.sendEventToBinding(
+        pointer.move(
+          const Offset(50, 50),
+          buttons: kPrimaryButton | kMiddleMouseButton,
+        ),
+      );
+      // The grab button lets go, but the primary button is still held.
+      await tester.sendEventToBinding(
+        pointer.move(const Offset(50, 60), buttons: kPrimaryButton),
+      );
+      await tester.sendEventToBinding(
+        pointer.move(const Offset(70, 90), buttons: kPrimaryButton),
+      );
+      await tester.sendEventToBinding(pointer.up());
+      await tester.pump();
+
+      expect(
+        strokes,
+        1,
+        reason: 'the primary drag should resume drawing once the grab '
+            'button alone is released, not stay stuck panning until the '
+            'whole pointer lifts',
+      );
+    },
+  );
+
+  testWidgets(
       'the cursor shows grabbing while panning, and the prior tool cursor after',
       (
     tester,
