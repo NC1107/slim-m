@@ -225,8 +225,7 @@ impl Store {
                     tx.commit().await?;
                     return Err(SubmitOpError::NotAuthorized);
                 }
-                // RETURNING rather than a bare rows_affected(): the audit log
-                // below needs the ids, not just the count.
+                // RETURNING rather than rows_affected(): the audit log below needs the ids.
                 let touched: Vec<CanvasObjectId> = sqlx::query_scalar!(
                     r#"UPDATE canvas_objects SET deleted_at = ?
                        WHERE channel_id = ? AND deleted_at IS NULL AND seq <= ?

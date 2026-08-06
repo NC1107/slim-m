@@ -439,6 +439,4 @@ async fn canvas_audit_log_actor_is_anonymized_on_account_deletion() {
     assert_eq!(remaining, None, "the actor is nulled, the row is not");
 }
 
-// The seeded, multi-object replay-after-sweep scenario lives in
-// canvas_ops_sweep_replay.rs, split out to keep this file under the review
-// budget.
+// The seeded, multi-object replay scenario lives in canvas_ops_sweep_replay.rs.

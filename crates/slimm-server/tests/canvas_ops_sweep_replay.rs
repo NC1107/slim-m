@@ -102,16 +102,17 @@ async fn age_all_ops(pool: &SqlitePool, days: i64) {
 /// from the surviving log alone with no reference to `canvas_objects`. The
 /// replay must agree with the live table exactly: this is the property a
 /// sweep that deletes the wrong thing would break silently.
+///
+/// The clear goes first, on the channel's only object so far: `Clear` kills
+/// everything still alive at or below its fence channel-wide, so everything
+/// placed afterward has to stay above that fence.
 #[tokio::test]
 async fn a_seeded_channel_replays_correctly_after_a_sweep() {
     let (store, pool, _guard) = harness().await;
     let actor = register(&store, "root").await;
     let channel = general(&store).await;
 
-    // The clear goes first, on the channel's only object so far: `Clear`
-    // kills everything still alive at or below its fence, channel-wide, so
-    // anything placed after this point must stay above that fence or the
-    // clear would reach it too.
+    // The clear must run first; see the module-level test doc above.
     let cleared_live = place(&store, channel, actor).await;
     let head = store
         .list_canvas_ops(channel, 0, 1)
@@ -174,8 +175,7 @@ async fn a_seeded_channel_replays_correctly_after_a_sweep() {
     let untouched = place(&store, channel, actor).await;
 
     age_all_ops(&pool, AGE_DAYS).await;
-    // Recent activity after the age-back, so the sweep sees a mix of old and
-    // fresh rows in the same pass rather than a uniformly aged log.
+    // Fresh activity after aging, so the sweep sees a mix in the same pass.
     let recent = place(&store, channel, actor).await;
 
     let swept = store.sweep_canvas_ops().await.unwrap();
@@ -193,9 +193,7 @@ async fn a_seeded_channel_replays_correctly_after_a_sweep() {
     assert!(live.contains(&undone_a));
     assert!(live.contains(&undone_b));
 
-    // A cold client paging from seq 0 must not see a floor reset: `place`
-    // rows are never swept, so the floor never moves off the channel's very
-    // first op.
+    // A cold client from seq 0 sees no floor reset: place rows are never swept.
     let page = store.list_canvas_ops(channel, 0, 500).await.unwrap();
     assert!(!page.reset);
 }

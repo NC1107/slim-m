@@ -65,10 +65,7 @@ impl Store {
     pub async fn sweep_canvas_ops(&self) -> anyhow::Result<SweptCanvasOps> {
         let cutoff = now_ms() - CANVAS_OP_RETENTION_MS;
 
-        // Pass 1: restores, gated on age alone. Nothing ever names a
-        // restore's own id as a target_op - apply_restore refuses a target
-        // that is not itself a remove or clear - so no referencing-row check
-        // is needed here the way pass 2 needs one.
+        // Pass 1: restores, gated on age alone; see the module doc for why.
         let restores = sqlx::query!(
             "DELETE FROM canvas_ops WHERE id IN (
                  SELECT id FROM canvas_ops WHERE kind = 'restore' AND created_at < ? LIMIT ?
@@ -80,10 +77,7 @@ impl Store {
         .await?
         .rows_affected();
 
-        // Pass 2a: removes. A remove still guards something if any object its
-        // own canvas_op_targets rows name is currently dead - restoring
-        // through this exact op would un-delete it, so deleting the op would
-        // make that unreachable.
+        // Pass 2a: removes, still-dead means still guarding; see the module doc.
         let removes = sqlx::query!(
             r#"DELETE FROM canvas_ops WHERE id IN (
                    SELECT o.id FROM canvas_ops o
@@ -109,10 +103,7 @@ impl Store {
         .await?
         .rows_affected();
 
-        // Pass 2b: clears. A clear writes no canvas_op_targets rows - only a
-        // fence - so its own guard is the exact predicate
-        // `canvas_ops_apply::restore_candidates` already uses to find what it
-        // touched: still dead, at this op's exact deleted_at timestamp.
+        // Pass 2b: clears, guarded by the exact-timestamp fence restore_candidates uses.
         let clears = sqlx::query!(
             r#"DELETE FROM canvas_ops WHERE id IN (
                    SELECT o.id FROM canvas_ops o
