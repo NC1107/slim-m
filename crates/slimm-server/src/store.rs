@@ -23,6 +23,7 @@ mod bootstrap;
 mod canvas;
 mod canvas_audit;
 mod canvas_move;
+mod canvas_op_clock;
 mod canvas_ops;
 mod canvas_ops_apply;
 mod canvas_ops_sweep;
@@ -207,13 +208,13 @@ const DEFAULT_REUSE_GRACE_MS: i64 = 10 * 1000;
 pub struct Store {
     pool: SqlitePool,
     reuse_grace_ms: i64,
-    /// Backs [`canvas_ops_write::Store::now_ms_unique`]. `Arc`-shared so every
+    /// Backs [`canvas_op_clock::Store::now_ms_unique`]. `Arc`-shared so every
     /// clone of one `Store` sees the same clock, and fresh on every new
     /// `Store` - which is what makes it fresh on every process restart too,
     /// since a restart constructs a brand new one rather than reusing state
     /// that outlived the process. See that method's own doc for why a fresh,
     /// unseeded clock is the exact gap the seeding step closes.
-    canvas_op_clock: Arc<canvas_ops_write::CanvasOpClock>,
+    canvas_op_clock: Arc<canvas_op_clock::CanvasOpClock>,
 }
 
 impl Store {
