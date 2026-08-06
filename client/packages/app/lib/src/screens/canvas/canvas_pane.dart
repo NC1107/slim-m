@@ -30,6 +30,7 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 import '../../ids.dart';
 import '../../permissions.dart';
 import '../../providers/blocks_controller.dart';
+import '../../providers/canvas_self_presence.dart';
 import '../../providers/providers.dart';
 import '../../providers/live_events.dart';
 import '../../providers/sync_controller.dart';
@@ -49,6 +50,7 @@ import 'canvas_stroke_preview_relay.dart';
 import 'canvas_sync.dart';
 
 part 'canvas_pane_gestures.dart';
+part 'canvas_pane_self_presence.dart';
 
 /// The channel whose canvas is open, or null.
 ///
@@ -223,19 +225,6 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
         isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
         selfId: () => ref.read(meProvider).valueOrNull?.id,
       );
-
-  /// A remote cursor's label as of the last resolved answer, kicking off a
-  /// fetch for an id this session has not asked about yet - the same
-  /// resolve-then-fall-back order `authorLabel` uses for a message author,
-  /// minus the local `authorDisplayName` cache a cursor has no row to carry.
-  String _cursorLabel(String userId) {
-    final profiles = ref.read(batchProfilesControllerProvider);
-    resolveAuthorProfiles(ref, [userId]);
-    if (profiles.containsKey(userId)) {
-      return profiles[userId]?.displayName ?? 'Deleted user';
-    }
-    return 'Someone';
-  }
 
   void _onEvent(api.ServerEvent event) => dispatchCanvasLiveEvent(
     event,
@@ -429,6 +418,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     final me = ref.watch(meProvider).valueOrNull;
     final manageCanvas =
         me?.permissions.hasPermission(Perm.manageCanvas) ?? false;
+    final selfPresence = ref.watch(canvasSelfPresenceProvider);
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyZ, control: true): () =>
@@ -485,6 +475,10 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
               .read(voiceControllerProvider.notifier)
               .cameraViewFor,
           activityLog: _activityLog,
+          selfBubbleHidden: selfPresence.hidden,
+          selfBubbleCorner: selfPresence.corner,
+          onSelfBubbleCornerChanged: _onSelfBubbleCornerChanged,
+          onToggleSelfBubbleHidden: _onToggleSelfBubbleHidden,
         ),
       ),
     );

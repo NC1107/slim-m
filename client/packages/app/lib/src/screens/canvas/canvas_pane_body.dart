@@ -16,12 +16,14 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
+import '../../providers/canvas_self_presence.dart';
 import 'canvas_activity_log.dart';
 import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
 import 'canvas_object_context_menu.dart';
 import 'canvas_presence_layer.dart';
 import 'canvas_selection_semantics.dart';
+import 'canvas_self_presence_overlay.dart';
 
 class CanvasPaneBody extends StatefulWidget {
   const CanvasPaneBody({
@@ -64,6 +66,10 @@ class CanvasPaneBody extends StatefulWidget {
     this.onDraftEnded,
     this.callParticipants = const [],
     required this.cameraViewFor,
+    required this.selfBubbleHidden,
+    required this.selfBubbleCorner,
+    required this.onSelfBubbleCornerChanged,
+    required this.onToggleSelfBubbleHidden,
   });
 
   final String channelId;
@@ -140,6 +146,18 @@ class CanvasPaneBody extends StatefulWidget {
   final List<VoiceParticipant> callParticipants;
   final CameraViewBuilder cameraViewFor;
 
+  /// The caller's own bubble - see `canvas_self_presence_overlay.dart` for
+  /// why it is a separate, screen-anchored layer rather than one more entry
+  /// in [callParticipants] as far as [CanvasPresenceLayer] is concerned.
+  final bool selfBubbleHidden;
+  final CanvasSelfBubbleCorner selfBubbleCorner;
+  final ValueChanged<CanvasSelfBubbleCorner> onSelfBubbleCornerChanged;
+
+  /// Threaded to [CanvasBar]'s overflow menu, the one place this pane offers
+  /// to flip [selfBubbleHidden] - see that menu's own doc for why it lives
+  /// there rather than as a dedicated bar icon.
+  final VoidCallback onToggleSelfBubbleHidden;
+
   @override
   State<CanvasPaneBody> createState() => _CanvasPaneBodyState();
 }
@@ -190,6 +208,9 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
                   setState(() => _activityLogOpen = !_activityLogOpen),
               shapeKind: widget.shapeKind,
               onShapeKindChanged: widget.onShapeKindChanged,
+              hasSelfBubble: widget.callParticipants.any((p) => p.isLocal),
+              selfBubbleHidden: widget.selfBubbleHidden,
+              onToggleSelfBubbleHidden: widget.onToggleSelfBubbleHidden,
             ),
             if (widget.error != null)
               Padding(
@@ -300,6 +321,14 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
         CanvasSelectionSemantics(
           document: widget.document,
           onOpenActions: _menuRequests.request,
+        ),
+        // Last, on top of CanvasObjectContextMenu's hit catcher - see this overlay's own doc for why a right-click on it is absorbed rather than reaching an object underneath.
+        CanvasSelfPresenceOverlay(
+          participants: widget.callParticipants,
+          cameraViewFor: widget.cameraViewFor,
+          hidden: widget.selfBubbleHidden,
+          corner: widget.selfBubbleCorner,
+          onCornerChanged: widget.onSelfBubbleCornerChanged,
         ),
       ],
     ),

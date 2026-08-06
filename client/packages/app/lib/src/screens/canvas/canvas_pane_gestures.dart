@@ -134,6 +134,19 @@ extension _CanvasPaneGestures on _CanvasPaneState {
 
   void _onPointerMoved(Offset world) => _relay.reportLocalPointer(world);
 
+  /// A remote cursor's label as of the last resolved answer, kicking off a
+  /// fetch for an id this session has not asked about yet - the same
+  /// resolve-then-fall-back order `authorLabel` uses for a message author,
+  /// minus the local `authorDisplayName` cache a cursor has no row to carry.
+  String _cursorLabel(String userId) {
+    final profiles = ref.read(batchProfilesControllerProvider);
+    resolveAuthorProfiles(ref, [userId]);
+    if (profiles.containsKey(userId)) {
+      return profiles[userId]?.displayName ?? 'Deleted user';
+    }
+    return 'Someone';
+  }
+
   /// Who to show on the canvas as a camera bubble: nobody, unless this
   /// device itself has joined a call in this exact channel - a canvas
   /// viewer who has not joined the call has no LiveKit room to render a

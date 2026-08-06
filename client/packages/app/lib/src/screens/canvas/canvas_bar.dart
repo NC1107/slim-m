@@ -40,6 +40,9 @@ class CanvasBar extends StatefulWidget {
     required this.onToggleActivityLog,
     required this.shapeKind,
     required this.onShapeKindChanged,
+    required this.hasSelfBubble,
+    required this.selfBubbleHidden,
+    required this.onToggleSelfBubbleHidden,
   });
 
   final String channelId;
@@ -100,6 +103,14 @@ class CanvasBar extends StatefulWidget {
   /// there rather than as a dedicated bar icon.
   final bool activityLogOpen;
   final VoidCallback onToggleActivityLog;
+
+  /// Whether the caller is on this channel's call at all - the overflow's
+  /// own "Hide/Show my camera bubble" item only appears then, the same "no
+  /// button that would do nothing" rule [activityLogOpen]'s sibling item is
+  /// exempt from because the log itself always exists.
+  final bool hasSelfBubble;
+  final bool selfBubbleHidden;
+  final VoidCallback onToggleSelfBubbleHidden;
 
   @override
   State<CanvasBar> createState() => _CanvasBarState();
@@ -306,6 +317,9 @@ class _CanvasBarState extends State<CanvasBar> {
             tool: widget.tool,
             shapeKind: widget.shapeKind,
             onShapeKindChanged: widget.onShapeKindChanged,
+            hasSelfBubble: widget.hasSelfBubble,
+            selfBubbleHidden: widget.selfBubbleHidden,
+            onToggleSelfBubbleHidden: widget.onToggleSelfBubbleHidden,
           ),
           const SizedBox(width: AppSpacing.s4),
           AppIconButton(
