@@ -146,39 +146,46 @@ class CanvasPresenceBubble extends StatelessWidget {
       label:
           '${participant.name}${participant.isLocal ? ', you' : ''}, '
           'on this call\'s canvas',
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        child: Container(
-          decoration: BoxDecoration(
-            color: tokens.surfaceRaised,
-            border: Border.all(color: tokens.borderSubtle),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              if (_showsCamera)
-                DecoratedBox(
-                  decoration: const BoxDecoration(color: Color(0xFF000000)),
-                  child: cameraView,
-                )
-              else
-                UserAvatar(
-                  name: participant.name,
-                  userId: participant.identity,
-                  size: 56,
-                  speaking: participant.isSpeaking,
+      // AppRadii.window and AppShadows.float: reserved, by their own docs, for exactly a floating canvas object - a bubble is always one, never only while dragged, since nothing here is draggable yet.
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.window),
+          boxShadow: AppShadows.float,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadii.window),
+          child: Container(
+            decoration: BoxDecoration(
+              color: tokens.surfaceRaised,
+              border: Border.all(color: tokens.borderSubtle),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (_showsCamera)
+                  DecoratedBox(
+                    decoration: const BoxDecoration(color: Color(0xFF000000)),
+                    child: cameraView,
+                  )
+                else
+                  UserAvatar(
+                    name: participant.name,
+                    userId: participant.identity,
+                    size: 56,
+                    speaking: participant.isSpeaking,
+                  ),
+                Positioned(
+                  left: 6,
+                  bottom: 6,
+                  child: _NameBadge(
+                    name: participant.isLocal
+                        ? '${participant.name} (you)'
+                        : participant.name,
+                    muted: participant.isMuted,
+                  ),
                 ),
-              Positioned(
-                left: 6,
-                bottom: 6,
-                child: _NameBadge(
-                  name: participant.isLocal
-                      ? '${participant.name} (you)'
-                      : participant.name,
-                  muted: participant.isMuted,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
