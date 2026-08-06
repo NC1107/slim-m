@@ -190,11 +190,7 @@ pub(super) async fn apply_restore(
 
     let candidates = restore_candidates(tx, channel_id, &target).await?;
 
-    // A `clear`'s own candidate query already filters on `deleted_at =
-    // target.created_at`, so every id it returns is dead by construction;
-    // re-checking each one, one query at a time, would only repeat what the
-    // query above already proved, at a cost that scales with a channel-wide
-    // act rather than the small batch a `remove` is capped at.
+    // `restore_candidates`'s own `clear` query already proves each id dead.
     let dead = if target.kind == "clear" {
         candidates
     } else {
