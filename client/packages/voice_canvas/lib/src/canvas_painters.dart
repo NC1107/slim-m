@@ -228,7 +228,7 @@ class StrokePainter extends CustomPainter {
       ..color = placeholderIcon
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
-    final rounded = RRect.fromRectAndRadius(box, const Radius.circular(4));
+    final rounded = RRect.fromRectAndRadius(box, const Radius.circular(6));
     canvas.drawRRect(rounded, fill);
     canvas.drawRRect(rounded.deflate(0.75), line);
 

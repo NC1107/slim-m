@@ -43,6 +43,10 @@ class _RecordingCanvas implements Canvas {
   /// painter draws.
   int roundedRectCalls = 0;
 
+  /// The corner radius of every rounded-rect draw, so a placeholder's and a
+  /// note's own corner treatment can be compared against each other.
+  final List<double> roundedRectRadii = <double>[];
+
   /// A shape's own draw calls, one kind of primitive at a time: a rectangle
   /// or an ellipse each draw once, a line draws once via [drawLine], and an
   /// arrow draws the same line plus two more via [drawLine] for its head.
@@ -86,7 +90,10 @@ class _RecordingCanvas implements Canvas {
   }
 
   @override
-  void drawRRect(RRect rrect, Paint paint) => roundedRectCalls++;
+  void drawRRect(RRect rrect, Paint paint) {
+    roundedRectCalls++;
+    roundedRectRadii.add(rrect.tlRadiusX);
+  }
 
   @override
   void drawRect(Rect rect, Paint paint) {
@@ -288,6 +295,37 @@ void main() {
       greaterThanOrEqualTo(2),
       reason: 'a note draws a fill and a border, the same two-call shape an '
           'image placeholder already uses',
+    );
+  });
+
+  test(
+      'an image placeholder rounds its corner the same as a note, not the '
+      'radius step the design system retired', () {
+    final noteDocument = CanvasDocument()..setViewport(const Size(400, 400));
+    noteDocument.applyPlaced(_noteAt());
+    noteDocument.refresh();
+    addTearDown(noteDocument.dispose);
+    final noteCanvas = _RecordingCanvas();
+    StrokePainter(document: noteDocument, ink: _ink).paint(
+      noteCanvas,
+      const Size(400, 400),
+    );
+
+    final imageDocument = _documentWithImage(loadFailed: true);
+    addTearDown(imageDocument.dispose);
+    final imageCanvas = _RecordingCanvas();
+    StrokePainter(document: imageDocument, ink: _ink).paint(
+      imageCanvas,
+      const Size(400, 400),
+    );
+
+    expect(imageCanvas.roundedRectRadii, isNotEmpty);
+    expect(
+      imageCanvas.roundedRectRadii.toSet(),
+      noteCanvas.roundedRectRadii.toSet(),
+      reason: 'two box objects on the same canvas should share one corner '
+          'treatment, not a radius the design language dropped for being '
+          'indistinguishable from it under a hairline',
     );
   });
 
