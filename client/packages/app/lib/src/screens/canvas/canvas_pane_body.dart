@@ -322,12 +322,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           document: widget.document,
           onOpenActions: _menuRequests.request,
         ),
-        // Last, so it sits on top of CanvasObjectContextMenu's full-screen
-        // hit catcher: a right-click landing on the bubble's own tile must
-        // resolve against the bubble, never leak through to whatever canvas
-        // object happens to be underneath it - see this overlay's own doc
-        // for why that means "absorbed, does nothing" rather than opening a
-        // menu for either side.
+        // Last, on top of CanvasObjectContextMenu's hit catcher - see this overlay's own doc for why a right-click on it is absorbed rather than reaching an object underneath.
         CanvasSelfPresenceOverlay(
           participants: widget.callParticipants,
           cameraViewFor: widget.cameraViewFor,
