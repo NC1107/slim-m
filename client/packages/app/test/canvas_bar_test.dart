@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_bar.dart';
+import 'package:slimm_app/src/screens/canvas/canvas_shape_icons.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
@@ -143,6 +144,26 @@ void main() {
       await tester.tap(find.text('Ellipse'));
       await tester.pump();
       expect(chosen, CanvasShapeKind.ellipse);
+    },
+  );
+
+  /// A control whose look never changes with its own state is one a person
+  /// has to remember rather than read; this is what stops the Shape button
+  /// staying the generic glyph no matter which primitive is armed.
+  testWidgets(
+    "the Shape button's own icon reflects the currently armed kind",
+    (tester) async {
+      for (final kind in CanvasShapeKind.values) {
+        await tester.pumpWidget(_wrap(_bar(shapeKind: kind)));
+
+        final button = tester.widget<AppIconButton>(
+          find.ancestor(
+            of: find.bySemanticsLabel('Shape'),
+            matching: find.byType(AppIconButton),
+          ),
+        );
+        expect(button.icon, canvasShapeKindIcon(kind), reason: 'kind: $kind');
+      }
     },
   );
 

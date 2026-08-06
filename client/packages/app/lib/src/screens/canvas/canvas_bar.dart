@@ -8,6 +8,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_overflow_menu.dart';
+import 'canvas_shape_icons.dart';
 
 /// The canvas's own bar. It carries the close affordance because the pane
 /// replaces the conversation, header and all, at every width.
@@ -143,11 +144,13 @@ class CanvasBar extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.s4),
                   AppIconButton(
-                    icon: AppIcons.shape,
+                    // The armed kind's own glyph, not a generic one - a control whose look never changes with its state is one you have to remember rather than read.
+                    icon: canvasShapeKindIcon(shapeKind),
                     semanticLabel: 'Shape',
-                    // Which shape is picked from "More canvas actions" while this tool is active; nothing on the bar itself names it.
+                    // The tooltip is where a screen reader learns the icon's own state, since it carries as a semantics hint and the icon change is visual-only.
                     tooltip:
-                        'Shape · pick which one from "More canvas actions"',
+                        'Shape · ${canvasShapeKindLabel(shapeKind)} armed, '
+                        'pick another from "More canvas actions"',
                     active: tool == CanvasTool.shape,
                     onPressed: () => onToolChanged(CanvasTool.shape),
                   ),

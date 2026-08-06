@@ -19,6 +19,7 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/context_menu_focus.dart';
+import 'canvas_shape_icons.dart';
 
 /// The bar's own overflow trigger and the confirm dialog behind Clear.
 ///
@@ -150,13 +151,6 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
     widget.onShapeKindChanged(kind);
   }
 
-  static const _shapeKindLabels = {
-    CanvasShapeKind.rectangle: ('Rectangle', AppIcons.shapeRectangle),
-    CanvasShapeKind.ellipse: ('Ellipse', AppIcons.shapeEllipse),
-    CanvasShapeKind.line: ('Line', AppIcons.shapeLine),
-    CanvasShapeKind.arrow: ('Arrow', AppIcons.shapeArrow),
-  };
-
   Widget _shortcutHint(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Row(
@@ -214,12 +208,12 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
                   ),
                   if (widget.tool == CanvasTool.shape) ...[
                     const AppMenuDivider(),
-                    for (final entry in _shapeKindLabels.entries)
+                    for (final kind in CanvasShapeKind.values)
                       AppMenuItem(
-                        label: entry.value.$1,
-                        leading: entry.value.$2,
-                        selected: widget.shapeKind == entry.key,
-                        onTap: () => _pickShapeKind(entry.key),
+                        label: canvasShapeKindLabel(kind),
+                        leading: canvasShapeKindIcon(kind),
+                        selected: widget.shapeKind == kind,
+                        onTap: () => _pickShapeKind(kind),
                       ),
                   ],
                   if (selected != null) ...[
