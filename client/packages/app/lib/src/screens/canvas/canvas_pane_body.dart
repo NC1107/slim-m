@@ -35,6 +35,7 @@ class CanvasPaneBody extends StatefulWidget {
     required this.document,
     required this.onClear,
     required this.onPasteImage,
+    required this.onRecenter,
     required this.error,
     required this.onDismissError,
     required this.truncated,
@@ -77,6 +78,10 @@ class CanvasPaneBody extends StatefulWidget {
   /// fallback that works on every platform, the same shape the composer's
   /// own "+" sheet row already is.
   final VoidCallback onPasteImage;
+
+  /// The toolbar's "Recenter view" action, always available - see
+  /// `CanvasOverflowMenu`'s own doc for the gap this closes.
+  final VoidCallback onRecenter;
   final String? error;
   final VoidCallback onDismissError;
   final bool truncated;
@@ -156,6 +161,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
               objectCount: widget.document.objectCount,
               onClear: widget.onClear,
               onPasteImage: widget.onPasteImage,
+              onRecenter: widget.onRecenter,
               selection: widget.document.selectedObjectId,
               onBringToFront: widget.onBringToFront,
               onSendToBack: widget.onSendToBack,
