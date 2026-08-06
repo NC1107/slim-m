@@ -411,7 +411,6 @@ void main() {
     for (final tooltip in [
       'Pen',
       'Note',
-      'Eraser',
       'Undo',
       'More canvas actions',
       'Close canvas',
@@ -431,6 +430,15 @@ void main() {
       ),
       findsOneWidget,
       reason: 'Move\'s tooltip is the only place Shift-frees-aspect is said',
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Tooltip &&
+            (widget.message?.contains('pen ink only') ?? false),
+      ),
+      findsOneWidget,
+      reason: 'Eraser\'s tooltip is the only place its ink-only scope is said',
     );
   });
 

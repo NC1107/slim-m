@@ -155,7 +155,10 @@ class CanvasBar extends StatelessWidget {
                   AppIconButton(
                     icon: AppIcons.eraser,
                     semanticLabel: 'Eraser',
-                    tooltip: 'Eraser',
+                    // Erases pen ink only - it hit-tests a stroke's own path, which a note, shape or image has none of; nothing else says so.
+                    tooltip:
+                        'Eraser · pen ink only, select then Delete for a '
+                        'note, shape or image',
                     active: tool == CanvasTool.eraser,
                     onPressed: () => onToolChanged(CanvasTool.eraser),
                   ),
