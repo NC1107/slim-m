@@ -63,33 +63,95 @@ void main() {
   });
 
   testWidgets(
-    'the wide hit zone is coloured to match its neighbours, not left as a '
-    'gap between the rail and the transcript',
+    'open, the divider reserves only its own hairline width in the row - '
+    'nothing is held off the boundary to make room for a wider hit region',
     (tester) async {
       final s = setup();
       await pumpAtWidth(tester, s.container, 1400);
 
-      final colors = tester
-          .widgetList<Container>(
-            find.descendant(
-              of: find.byType(RailDragHandle),
-              matching: find.byType(Container),
-            ),
-          )
-          .map((c) => c.color)
-          .toList();
-
+      final size = tester.getSize(find.byType(RailDragHandle));
       expect(
-        colors,
-        containsAll([
-          AppTokens.light.surfaceSunken,
-          AppTokens.light.surfaceBase,
-        ]),
+        size.width,
+        1,
         reason:
-            'each side of the hairline should carry the surface it '
-            'actually borders, not a neutral strip belonging to neither',
+            'backlog item 58: a reserved gap either side of the line - '
+            'colour-matched or not - is what this fix removes',
       );
 
+      await teardown(tester, s.container, s.db);
+    },
+  );
+
+  testWidgets(
+    'clicking just left of the line still toggles - the hit region reaches '
+    "back into the rail's own already-blank edge rather than the reserved "
+    'gap this replaced',
+    (tester) async {
+      final s = setup();
+      await pumpAtWidth(tester, s.container, 1400);
+
+      final line = tester.getCenter(find.byType(RailDragHandle));
+      await tester.tapAt(line - const Offset(6, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChannelRail), findsNothing);
+
+      await teardown(tester, s.container, s.db);
+    },
+  );
+
+  testWidgets(
+    'clicking just right of the line does not toggle - a message row is '
+    'opaque edge to edge in the transcript, so the hit region must not '
+    'reach there',
+    (tester) async {
+      final s = setup();
+      await pumpAtWidth(tester, s.container, 1400);
+
+      final line = tester.getCenter(find.byType(RailDragHandle));
+      await tester.tapAt(line + const Offset(6, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChannelRail), findsOneWidget);
+
+      await teardown(tester, s.container, s.db);
+    },
+  );
+
+  testWidgets(
+    'clicking further left than the rail already leaves blank does not '
+    "toggle - the cap that keeps this from ever reaching the footer's "
+    'settings button, which sits exactly at that edge',
+    (tester) async {
+      final s = setup();
+      await pumpAtWidth(tester, s.container, 1400);
+
+      final line = tester.getCenter(find.byType(RailDragHandle));
+      await tester.tapAt(line - const Offset(10, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChannelRail), findsOneWidget);
+
+      await teardown(tester, s.container, s.db);
+    },
+  );
+
+  testWidgets(
+    'open, the semantics tree carries this control\'s label exactly once - '
+    'dumped rather than inferred, since a leaked action bled onto an '
+    'unrelated ancestor once before (backlog item 54)',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final s = setup();
+      await pumpAtWidth(tester, s.container, 1400);
+
+      final dump = tester
+          .binding
+          .pipelineOwner
+          .semanticsOwner!
+          .rootSemanticsNode!
+          .toStringDeep();
+      expect('Collapse channel list'.allMatches(dump).length, 1, reason: dump);
+      expect(find.bySemanticsLabel('Collapse channel list'), findsOneWidget);
+
+      semantics.dispose();
       await teardown(tester, s.container, s.db);
     },
   );
