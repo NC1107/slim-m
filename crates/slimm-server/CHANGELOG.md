@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.33.0](https://github.com/NC1107/slim-m/compare/server-v0.32.0...server-v0.33.0) (2026-08-06)
+
+
+### Features
+
+* **canvas:** compact the op log, and keep a moderation trail that outlives it ([#433](https://github.com/NC1107/slim-m/issues/433)) ([2eb9a10](https://github.com/NC1107/slim-m/commit/2eb9a109030a9db9dae4074ee358fa22a3a4562d))
+* **canvas:** the note and shape tools decision 0004 named ([#435](https://github.com/NC1107/slim-m/issues/435)) ([bd532de](https://github.com/NC1107/slim-m/commit/bd532de88f3a9d2416f3f8519614a302f9e15e18))
+* **canvas:** watch somebody draw, rather than watching their stroke appear ([#434](https://github.com/NC1107/slim-m/issues/434)) ([5024ab0](https://github.com/NC1107/slim-m/commit/5024ab03f4380777e8513b64d639248aa8532300))
+
+
+### Bug Fixes
+
+* **canvas:** re-check MANAGE_CANVAS when restoring another's moderation ([#429](https://github.com/NC1107/slim-m/issues/429)) ([18dafd2](https://github.com/NC1107/slim-m/commit/18dafd2ea49ae16a00fa9461d5f475a36fd7d0cd))
+
 ## [0.32.0](https://github.com/NC1107/slim-m/compare/server-v0.31.0...server-v0.32.0) (2026-08-05)
 
 
