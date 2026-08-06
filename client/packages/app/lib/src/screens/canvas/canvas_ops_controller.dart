@@ -94,16 +94,18 @@ class CanvasOpsController {
   Future<void> eraseOnConfirm(String id) => _submitRemove([id]);
 
   /// Removes [objectId] - an image, note or shape the select tool picked
-  /// up - the way the eraser removes a stroke: applied locally at once,
-  /// deselected, and pushed onto the undo stack on success. This is the
-  /// select tool's own removal, never used for a stroke: erasing one is the
-  /// eraser tool's job, and [objectId] can only ever name something
+  /// up - the way the eraser removes a stroke: applied locally at once and
+  /// pushed onto the undo stack on success. This is the select tool's own
+  /// removal, never used for a stroke: erasing one is the eraser tool's
+  /// job, and [objectId] can only ever name something
   /// `document.selectedObjectId` already holds, which `beginSelect` only
   /// ever sets to an object this caller may act on.
+  /// [CanvasDocument.removeObject]'s own `_freeSlot` already clears the
+  /// selection when the freed slot is the current one, so nothing here
+  /// deselects explicitly.
   Future<void> deleteSelected(String objectId) async {
     if (!document.isAlive(objectId)) return;
     document.removeObject(objectId);
-    document.selectedObjectId.value = null;
     document.refresh();
     const message = 'That could not be deleted.';
     final opId = await _submitRemove([objectId], errorMessage: message);

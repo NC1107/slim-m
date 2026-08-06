@@ -341,6 +341,11 @@ void main() {
       expect(fixture.postedOps.single['kind'], 'remove');
       expect(fixture.postedOps.single['object_ids'], ['note']);
       expect(surfaceDocument(tester).objectCount.value, 0);
+      expect(
+        surfaceDocument(tester).selectedObjectId.value,
+        isNull,
+        reason: 'a deleted object must not linger as the current selection',
+      );
 
       await tester.tap(find.bySemanticsLabel('Undo'));
       await tester.pumpAndSettle();
