@@ -12,6 +12,14 @@ import math
 # The three canvas ink tokens AppCanvasColors defines; only one paints today.
 COLOR_KEYS = ("annotation", "note", "shape")
 
+# Mirrors canvas_quick_placement.dart's own note/shape defaults, so a seeded object matches one placed by hand.
+DEFAULT_NOTE_WIDTH = 220
+DEFAULT_NOTE_HEIGHT = 140
+DEFAULT_SHAPE_WIDTH = 180
+DEFAULT_SHAPE_HEIGHT = 120
+
+SHAPE_KINDS = ("rectangle", "ellipse", "line", "arrow")
+
 
 def cluster_centers(rng, count, x_range=(-4000, 4000), y_range=(-2500, 2500),
                      min_gap=900):
@@ -53,6 +61,10 @@ def sample_position(rng, centers, weights, sigma_range=(120, 420),
 
 def pick_color_key(rng):
     return rng.choice(COLOR_KEYS)
+
+
+def pick_shape_kind(rng):
+    return rng.choice(SHAPE_KINDS)
 
 
 def pick_stroke_width(rng):

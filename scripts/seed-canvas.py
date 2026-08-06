@@ -15,11 +15,16 @@ a channel meant for reading chat history.
 
 A run places a clustered mix of hand-drawn-looking strokes (freehand
 doodles, rough ellipses, wavy lines, zigzags and bounded scribbles - never
-a straight two-point line, which reads as machine-made) and varied real
-images (reusing scripts/lib/seed_media.py's generators) around a handful
-of weighted cluster centers, so the result has busy regions and empty
-space rather than a uniform scatter. It then exercises the op stream for
-real: a clear-and-restore demo on a throwaway batch, plus moves, resizes,
+a straight two-point line, which reads as machine-made), varied real
+images (reusing scripts/lib/seed_media.py's generators), and a scatter of
+background notes and shapes around a handful of weighted cluster centers,
+so the result has busy regions and empty space rather than a uniform
+scatter. On top of that it composes one deliberate diagram - a box drawn
+around the busiest cluster, an arrow to a callout note, a divider line,
+and three notes at genuinely different lengths - so the board reads as
+something somebody actually made rather than only a random scatter of
+every object kind. It then exercises the op stream for real: a
+clear-and-restore demo on a throwaway batch, plus moves, resizes,
 reorders, removes and restores across the main content, some of them
 routed through a second account to exercise MANAGE_CANVAS rather than only
 the self-authored path. A handful of deliberate edge-case probes (an
@@ -74,6 +79,16 @@ def _parse_args(argv):
     parser.add_argument("--image-ratio", type=float, default=0.28,
                          help="fraction of the main pass that is images "
                               "rather than strokes (default 0.28)")
+    parser.add_argument("--note-ratio", type=float, default=0.06,
+                         help="fraction of the main pass that is "
+                              "background notes (default 0.06); the "
+                              "deliberate diagram's own three notes are "
+                              "on top of this")
+    parser.add_argument("--shape-ratio", type=float, default=0.05,
+                         help="fraction of the main pass that is "
+                              "background shapes (default 0.05); the "
+                              "deliberate diagram's own three shapes are "
+                              "on top of this")
     parser.add_argument("--clusters", type=int, default=5,
                          help="how many weighted cluster centers to scatter "
                               "content around (default 5)")
