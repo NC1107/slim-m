@@ -50,6 +50,12 @@ class _RecordingCanvas implements Canvas {
   int ovalCalls = 0;
   int lineCalls = 0;
 
+  /// Every plain-rect draw carrying a blur, which is what an elevation
+  /// shadow's `Paint` looks like once `BoxShadow.toPaint()` builds it -
+  /// nothing else this painter draws sets a `maskFilter` at all, so
+  /// [drawRect] routes here instead of [rectCalls] whenever one is set.
+  int shadowRectCalls = 0;
+
   _Transform get _current => _stack.last;
 
   @override
@@ -83,7 +89,13 @@ class _RecordingCanvas implements Canvas {
   void drawRRect(RRect rrect, Paint paint) => roundedRectCalls++;
 
   @override
-  void drawRect(Rect rect, Paint paint) => rectCalls++;
+  void drawRect(Rect rect, Paint paint) {
+    if (paint.maskFilter != null) {
+      shadowRectCalls++;
+    } else {
+      rectCalls++;
+    }
+  }
 
   @override
   void drawOval(Rect rect, Paint paint) => ovalCalls++;
@@ -276,6 +288,72 @@ void main() {
       greaterThanOrEqualTo(2),
       reason: 'a note draws a fill and a border, the same two-call shape an '
           'image placeholder already uses',
+    );
+  });
+
+  const shadow = [
+    BoxShadow(color: Color(0x85000000), blurRadius: 64, offset: Offset(0, 24)),
+  ];
+
+  test('the elevated image draws its shadow, and an idle one draws none', () {
+    final document = _documentWithImage(loadFailed: true)
+      ..elevatedObjectId.value = 'pic';
+    addTearDown(document.dispose);
+
+    final canvas = _RecordingCanvas();
+    StrokePainter(document: document, ink: _ink, elevationShadow: shadow)
+        .paint(canvas, const Size(400, 400));
+
+    expect(
+      canvas.shadowRectCalls,
+      1,
+      reason: 'only the object elevatedObjectId names earns a shadow',
+    );
+  });
+
+  test('an elevated note or shape draws its shadow too', () {
+    for (final object in [_noteAt(), _shapeAt(CanvasShapeKind.rectangle)]) {
+      final document = CanvasDocument()..setViewport(const Size(400, 400));
+      document.applyPlaced(object);
+      document.elevatedObjectId.value = object.id;
+      document.refresh();
+
+      final canvas = _RecordingCanvas();
+      StrokePainter(document: document, ink: _ink, elevationShadow: shadow)
+          .paint(canvas, const Size(400, 400));
+
+      expect(canvas.shadowRectCalls, 1, reason: 'kind: ${object.kind}');
+      document.dispose();
+    }
+  });
+
+  test('nothing draws a shadow while no object is elevated', () {
+    final document = _documentWithImage(loadFailed: true);
+    addTearDown(document.dispose);
+
+    final canvas = _RecordingCanvas();
+    StrokePainter(document: document, ink: _ink, elevationShadow: shadow)
+        .paint(canvas, const Size(400, 400));
+
+    expect(canvas.shadowRectCalls, 0);
+  });
+
+  test('an elevated image draws no shadow when none was wired in', () {
+    final document = _documentWithImage(loadFailed: true)
+      ..elevatedObjectId.value = 'pic';
+    addTearDown(document.dispose);
+
+    final canvas = _RecordingCanvas();
+    StrokePainter(document: document, ink: _ink).paint(
+      canvas,
+      const Size(400, 400),
+    );
+
+    expect(
+      canvas.shadowRectCalls,
+      0,
+      reason: 'the default elevationShadow is empty, the same '
+          '"pay nothing for it unwired" choice selectionOutline makes',
     );
   });
 

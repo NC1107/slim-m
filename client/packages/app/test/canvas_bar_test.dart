@@ -396,7 +396,7 @@ void main() {
       find.byWidgetPredicate(
         (widget) =>
             widget is Tooltip &&
-            (widget.message?.startsWith('Move an image') ?? false),
+            (widget.message?.startsWith('Move an object') ?? false),
       ),
       findsOneWidget,
       reason: 'Move\'s tooltip is the only place Shift-frees-aspect is said',

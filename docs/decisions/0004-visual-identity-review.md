@@ -221,6 +221,12 @@ Consequence: **the tool dock has three tools, not four** - pen, note, shape.
 Paste is a gesture, not a tool. A tool must be selected before touch draws, so
 every slot added is another mode to be wrong about.
 
+**Stale as written, found 2026-08-05.**
+What Phase 6 actually built is pen, eraser and select (Move) - not pen, note and shape - and this section's own "three tools" count was never checked against the shipped bar.
+Erase and select are not in this list at all, and neither is a distinct object kind for either.
+The review's "three, not four" was about content kinds becoming tools, which this document never revisits now that note and shape objects are landing (a concurrent change was adding them as this correction was written).
+Whoever lands note and shape should re-open this section rather than trust its old count, and should decide whether erase and select are additional tools this document simply never named, or a different axis - edit actions on existing content - that a "content kinds become tools" framing was never meant to cover.
+
 ## Smaller things worth keeping
 
 - **Presence is shape-first**: circle online, triangle away, barred square do not
@@ -271,3 +277,32 @@ is input to that, not a decision.
 
 Wordmark, when there is a name: Plex Mono 500, lowercase, letter-spaced +0.04em,
 mark to the left at cap height. Do not commission a drawn logotype first.
+
+## When a canvas object earns `AppShadows.float`, and whether a stroke is selectable (2026-08-05)
+
+Two things this review left as open questions for a later reviewer to settle: `AppShadows.float`'s own doc comment names a menu and "a dragged canvas object" as the only two things allowed a shadow, but nothing on the canvas ever used it; and `CanvasOpsController.beginSelect` only ever hit-tested an image, so a stroke could never be selected, moved or reordered.
+Both are decided and built now.
+Read this before touching `StrokePainter.elevationShadow`, `CanvasDocument.elevatedObjectId`, or `beginSelect`'s stroke fallback.
+
+**The shadow keys off active manipulation, not selection, and that is a narrower reading than "selected" would have been.**
+`CanvasDocument.elevatedObjectId` names the one object this client's own pointer is currently dragging or resizing - set in `beginSelect`'s drag and resize branches, cleared at the top of `endSelect` before the commit request even lands - and `StrokePainter` draws the shadow only for whichever image that names.
+Selection (the outline and, for an image, its resize handles) is `selectedObjectId`, a separate and much longer-lived notifier that stays set for as long as the Move tool holds a selection, including between one drag and the next.
+The two were kept distinct deliberately: this project's own border-first elevation is described elsewhere in this document as "the reason the canvas can float six objects without the screen turning to soup," and a shadow that persisted for the whole time an object merely sat selected would be exactly that soup on a canvas with several selected-but-idle objects - normal once several people are working on one board.
+A shadow only for the literal seconds an object is off the plane keeps the exception rare, which is what makes it read as an exception at all.
+
+**A camera bubble gets the opposite answer, unconditionally, because it is a different kind of object.**
+It is never draggable yet, so "only while dragged" would mean never; and unlike an image or a stroke, it is never part of the document plane in the first place - `CanvasPresenceLayer`'s own doc already describes it as a widget layer stacked over the surface, never painted into it.
+`CanvasPresenceBubble` now carries `AppShadows.float` unconditionally, and `AppRadii.window` - a token whose own doc comment already reserved it for "floating canvas objects" and which nothing had used until this change - in place of the plain `AppRadii.card` it borrowed before.
+
+**Rendered and checked against real pixels, not decided on paper, and it surfaced a real theme gap.**
+A throwaway `PictureRecorder`-driven render (per this file's own testing convention, and the technique this repo's history already uses) showed the shadow reading clearly on the light theme, faintly on dark, and essentially not at all on true black - `AppShadows.float`'s `0x85000000` composited against `surface.base`'s near-identical near-black leaves nothing to see.
+That is not a defect in this change: the selection outline and resize handles are `accentFill`, a token the contrast gate already holds to 4.5:1 against every surface in every theme, and they are what a person actually depends on to see what is picked up - confirmed in the same renders, where the outline stayed sharp on true black with no shadow visible at all.
+The shadow is genuinely atmospheric "extra energy" the design language grants the canvas, layered on top of a cue that already carries the whole weight on its own, the same "never one channel alone" shape this project's presence indicators and reaction chips already follow.
+Recorded here rather than "fixed": the fix would be a second, lighter shadow variant for dark surfaces, which the task that produced this section explicitly ruled out ("do not invent a second shadow"), and a literal reading of the existing token was the more disciplined choice over reaching around that constraint.
+
+**A stroke can now be selected, but only for reorder - never a drag.**
+`beginSelect` falls back to a path hit test once the tap misses every image, and accepts the result only when it is not itself an image (a stray tolerance match near a box `hitTestImageAt` already tested and rejected must not be re-admitted through a looser check).
+A selected stroke sets `selectedObjectId` exactly the way an image does, so `bringToFront`/`sendToBack` and the overflow menu's "Bring to front"/"Send to back" items work on it with no further change anywhere - both were already generic over any object kind, and the only thing stopping a stroke from reaching them was that nothing had ever selected one.
+It never sets `elevatedObjectId` and never starts a `_drag`: a freehand mark has no box a person expects to relocate the way a placed image's is, and `SelectionPainter` already draws no handles for a non-image kind, so a selected stroke reads as "here, and reorderable" with nothing suggesting it can be picked up and moved.
+This is the real answer to the moderation case the task named directly: a drawing an image now covers can be brought back above it by tapping whatever part of the stroke still pokes out past the image's own box (an image's hit test is its box, a stroke's is its own path, so the exposed part of the line is reachable even though the covered part is not) and choosing "Bring to front."
+A stroke entirely enclosed inside an image's box has no exposed tap target at all; the residual workaround is to select and send the image to the back first, which is a real but rare two-step cost, named here rather than solved, since closing it fully would need a z-order-aware hit test this change did not build.

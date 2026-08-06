@@ -245,6 +245,24 @@ void main() {
     },
   );
 
+  /// `CanvasSurface` itself only ever draws whatever `elevationShadow` it is
+  /// handed - see `canvas_painters_test.dart` for that half. This is the
+  /// wiring half: the app layer must actually pass its own `AppShadows.float`
+  /// through, or an elevated image would silently draw no shadow at all.
+  testWidgets('the pane wires its own float shadow into the surface', (
+    tester,
+  ) async {
+    final fixture = CanvasPaneFixture();
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+    await pumpCanvasPane(tester, container);
+    await tester.pumpAndSettle();
+
+    final surface = tester.widget<CanvasSurface>(find.byType(CanvasSurface));
+    expect(surface.elevationShadow, AppShadows.float);
+  });
+
   /// The reachability guard. The canvas has no route, so nothing generic can
   /// see it: this is what fails if the header's affordance is ever dropped and
   /// the feature quietly becomes unreachable again.

@@ -80,7 +80,8 @@ class StrokePainter extends CustomPainter {
     this.textFontFamily,
     this.placeholderFill = const Color(0xFFB9C0C8),
     this.placeholderIcon = const Color(0xFF6C757E),
-  }) : super(repaint: document);
+    this.elevationShadow = const [],
+  }) : super(repaint: Listenable.merge([document, document.elevatedObjectId]));
 
   final CanvasDocument document;
 
@@ -105,9 +106,17 @@ class StrokePainter extends CustomPainter {
   final Color placeholderFill;
   final Color placeholderIcon;
 
+  /// The shadow drawn under whichever image `document.elevatedObjectId`
+  /// currently names - a plain `BoxShadow` list rather than a design-system
+  /// token, this package's usual "no design-system dependency" convention.
+  /// Empty draws no elevation at all, the same "pay nothing for it unwired"
+  /// choice `CanvasSurface.selectionOutline` already makes.
+  final List<BoxShadow> elevationShadow;
+
   @override
   void paint(Canvas canvas, Size size) {
     final camera = document.camera;
+    final elevated = document.elevatedObjectId.value;
     final paint = Paint()
       ..color = ink
       ..style = PaintingStyle.stroke
@@ -117,15 +126,28 @@ class StrokePainter extends CustomPainter {
 
     for (final slot in document.paintOrder) {
       final stroke = document.strokeAt(slot);
+      final isElevated = stroke.id == elevated;
       switch (stroke.kind) {
         case CanvasObjectKind.image:
-          _paintImage(canvas, stroke, camera);
+          _paintImage(canvas, stroke, camera, elevated: isElevated);
           continue;
         case CanvasObjectKind.note:
-          _paintNote(canvas, stroke, camera, noteColor ?? ink);
+          _paintNote(
+            canvas,
+            stroke,
+            camera,
+            noteColor ?? ink,
+            elevated: isElevated,
+          );
           continue;
         case CanvasObjectKind.shape:
-          _paintShape(canvas, stroke, camera, shapeColor ?? ink);
+          _paintShape(
+            canvas,
+            stroke,
+            camera,
+            shapeColor ?? ink,
+            elevated: isElevated,
+          );
           continue;
         case CanvasObjectKind.stroke:
           break;
@@ -149,13 +171,19 @@ class StrokePainter extends CustomPainter {
   /// (the ordinary case just after a fetch or catch-up) draws nothing yet,
   /// and the object reappears the moment [CanvasDocument.setImageBitmap]
   /// lands and repaints.
-  void _paintImage(Canvas canvas, CanvasStroke stroke, Camera camera) {
+  void _paintImage(
+    Canvas canvas,
+    CanvasStroke stroke,
+    Camera camera, {
+    required bool elevated,
+  }) {
     final dst = Rect.fromLTWH(
       (stroke.x - camera.x) * camera.zoom,
       (stroke.y - camera.y) * camera.zoom,
       stroke.w * camera.zoom,
       stroke.h * camera.zoom,
     );
+    if (elevated) _paintElevation(canvas, dst);
     final bitmap = stroke.image;
     if (bitmap == null) {
       if (stroke.imageLoadFailed) _paintImagePlaceholder(canvas, dst);
@@ -169,6 +197,19 @@ class StrokePainter extends CustomPainter {
     );
     canvas.drawImageRect(
         bitmap, src, dst, Paint()..filterQuality = FilterQuality.medium);
+  }
+
+  /// Drawn first, since a shadow always sits behind whatever casts it -
+  /// before the bitmap or the placeholder, both of which paint over it.
+  /// Applies regardless of which of those two the image is currently
+  /// showing, so a drag started before a decode lands still reads as lifted.
+  void _paintElevation(Canvas canvas, Rect box) {
+    for (final shadow in elevationShadow) {
+      canvas.drawRect(
+        box.shift(shadow.offset).inflate(shadow.spreadRadius),
+        shadow.toPaint(),
+      );
+    }
   }
 
   /// A muted box plus a broken-picture glyph (a small square with a

@@ -215,6 +215,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           // AppTokens.stripe: its own doc reserves it for exactly this state.
           placeholderFill: tokens.stripe,
           placeholderIcon: tokens.textDisabled,
+          // AppShadows.float: its own doc names a dragged canvas object as exactly what this token is for.
+          elevationShadow: AppShadows.float,
           selectionOutline: tokens.accentFill,
           selectionHandleFill: tokens.surfaceRaised,
           selectionHandleBorder: tokens.accentFill,

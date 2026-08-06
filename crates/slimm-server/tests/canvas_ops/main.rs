@@ -13,6 +13,7 @@ mod http_gate;
 mod r#move;
 mod reorder;
 mod restore;
+mod restore_permission;
 #[path = "../support/mod.rs"]
 mod support;
 mod write;

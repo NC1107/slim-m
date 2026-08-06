@@ -12,13 +12,19 @@ extension _StrokePainterShapes on StrokePainter {
   /// here because the text layout width is computed straight from the
   /// already-projected screen box rather than from a world-space one.
   void _paintNote(
-      Canvas canvas, CanvasStroke stroke, Camera camera, Color color) {
+    Canvas canvas,
+    CanvasStroke stroke,
+    Camera camera,
+    Color color, {
+    required bool elevated,
+  }) {
     final box = Rect.fromLTWH(
       (stroke.x - camera.x) * camera.zoom,
       (stroke.y - camera.y) * camera.zoom,
       stroke.w * camera.zoom,
       stroke.h * camera.zoom,
     );
+    if (elevated) _paintElevation(canvas, box);
     final rounded = RRect.fromRectAndRadius(box, const Radius.circular(6));
     canvas.drawRRect(rounded, Paint()..color = color.withValues(alpha: 0.18));
     canvas.drawRRect(
@@ -56,13 +62,19 @@ extension _StrokePainterShapes on StrokePainter {
   /// [CanvasShapeKind]'s own doc for why that is what makes a resize the
   /// whole reshape mechanism, with nothing else to keep in step.
   void _paintShape(
-      Canvas canvas, CanvasStroke stroke, Camera camera, Color color) {
+    Canvas canvas,
+    CanvasStroke stroke,
+    Camera camera,
+    Color color, {
+    required bool elevated,
+  }) {
     final box = Rect.fromLTWH(
       (stroke.x - camera.x) * camera.zoom,
       (stroke.y - camera.y) * camera.zoom,
       stroke.w * camera.zoom,
       stroke.h * camera.zoom,
     );
+    if (elevated) _paintElevation(canvas, box);
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke

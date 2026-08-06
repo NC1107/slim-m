@@ -3,14 +3,13 @@
 /// outline in screen space, plus resize handles for every box-shaped kind
 /// (image, note, shape).
 ///
-/// This painter would happily draw an outline-only selection for a stroke -
-/// a stroke has no thinner shape inside its box for a corner drag to
-/// distort, so it never grows handles - but nothing upstream ever selects
-/// one: `CanvasOpsController.beginSelect` only ever hit-tests a box kind, so
-/// `selectedObjectId` can never name a stroke today. A stroke is therefore
-/// neither movable nor reorderable through the Move tool, not merely
-/// handle-less; see `canvas_pane_ops_test.dart`'s "move is scoped to box
-/// kinds" test.
+/// A stroke can be selected too - `CanvasOpsController.beginSelect` falls
+/// back to a path hit test once the tap misses every box kind (image, note,
+/// shape) - but it never grows handles: a stroke has no thinner shape
+/// inside its box for a corner drag to distort, and it is never draggable
+/// either, only reorderable (bring to front, send to back). See
+/// `canvas_pane_ops_test.dart`'s "move is scoped to box kinds" test for the
+/// drag half of that split.
 library;
 
 import 'package:flutter/foundation.dart';

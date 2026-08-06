@@ -47,6 +47,28 @@ CanvasStrokeInput _image(
   kind: CanvasObjectKind.image,
 );
 
+/// A straight horizontal stroke from (x, y) to (x + 40, y), so a tap
+/// anywhere along that line is within `hitTestStroke`'s own tolerance.
+CanvasStrokeInput _stroke(
+  String id, {
+  double x = 100,
+  double y = 100,
+  int zIndex = 1,
+  String? authorId = 'me',
+}) => CanvasStrokeInput(
+  id: id,
+  seq: 5,
+  zIndex: zIndex,
+  x: x,
+  y: y,
+  w: 40,
+  h: 0,
+  points: const [0, 0, 40, 0],
+  width: 4,
+  colorKey: 'annotation',
+  authorId: authorId,
+);
+
 class _Harness {
   _Harness() {
     final api.SlimmApi client = api.SlimmApi(
@@ -345,4 +367,122 @@ void main() {
       });
     },
   );
+
+  test('a moving image is elevated for the drag and lands back on the '
+      'plane once it commits', () {
+    fakeAsync((async) {
+      final harness = _Harness();
+      harness.document.applyPlaced(_image('a'));
+      harness.document.refresh();
+
+      harness.ops.beginSelect(
+        const Offset(120, 110),
+        manageCanvas: false,
+        selfId: 'me',
+      );
+      expect(harness.document.elevatedObjectId.value, 'a');
+
+      harness.ops.dragSelect(const Offset(220, 210), lockAspect: true);
+      expect(harness.document.elevatedObjectId.value, 'a');
+
+      unawaited(harness.ops.endSelect());
+      expect(
+        harness.document.elevatedObjectId.value,
+        isNull,
+        reason:
+            'the object is optimistically back in place the instant the '
+            'pointer lifts, before the request even lands',
+      );
+      async.flushMicrotasks();
+    });
+  });
+
+  test('a resizing image is elevated for the drag, and a failed commit '
+      'still lands it back on the plane', () {
+    fakeAsync((async) {
+      final harness = _Harness();
+      harness.document.applyPlaced(_image('a'));
+      harness.document.refresh();
+      harness.document.selectedObjectId.value = 'a';
+      harness.onOp = (_) => _json({'error': 'nope'}, 403);
+
+      harness.ops.beginSelect(
+        const Offset(140, 120),
+        manageCanvas: false,
+        selfId: 'me',
+      );
+      expect(harness.document.elevatedObjectId.value, 'a');
+
+      harness.ops.dragSelect(const Offset(180, 140), lockAspect: false);
+      unawaited(harness.ops.endSelect());
+      async.flushMicrotasks();
+
+      expect(harness.document.elevatedObjectId.value, isNull);
+    });
+  });
+
+  test('tapping a bare stroke selects it for reorder, never for a drag', () {
+    final harness = _Harness();
+    harness.document.applyPlaced(_stroke('line'));
+    harness.document.refresh();
+
+    harness.ops.beginSelect(
+      const Offset(120, 100),
+      manageCanvas: false,
+      selfId: 'me',
+    );
+
+    expect(harness.document.selectedObjectId.value, 'line');
+    expect(
+      harness.document.elevatedObjectId.value,
+      isNull,
+      reason: 'a stroke is never draggable, so nothing ever lifts it',
+    );
+
+    harness.ops.dragSelect(const Offset(220, 200), lockAspect: true);
+    unawaited(harness.ops.endSelect());
+    expect(
+      harness.opRequests,
+      isEmpty,
+      reason:
+          'a stroke selection carries no drag state for endSelect '
+          'to commit',
+    );
+  });
+
+  test('an image on top of a stroke is what a tap over it still selects', () {
+    final harness = _Harness();
+    harness.document.applyPlaced(_stroke('line', zIndex: 1));
+    harness.document.applyPlaced(_image('pic', x: 90, y: 90, zIndex: 2));
+    harness.document.refresh();
+
+    harness.ops.beginSelect(
+      const Offset(110, 100),
+      manageCanvas: false,
+      selfId: 'me',
+    );
+
+    expect(
+      harness.document.selectedObjectId.value,
+      'pic',
+      reason: 'whatever visually covers the point wins the tap',
+    );
+  });
+
+  test('bringToFront restacks a selected stroke the same as an image', () {
+    fakeAsync((async) {
+      final harness = _Harness();
+      harness.document.applyPlaced(_stroke('line', zIndex: 1));
+      harness.document.applyPlaced(_image('pic', x: 500, zIndex: 5));
+      harness.document.refresh();
+
+      unawaited(harness.ops.bringToFront('line'));
+      async.flushMicrotasks();
+
+      expect(harness.opRequests.single['kind'], 'reorder');
+      expect(harness.opRequests.single['object_id'], 'line');
+      expect(harness.opRequests.single['z_index'], 6);
+      expect(harness.document.zIndexOf('line'), 6);
+    });
+  });
 }

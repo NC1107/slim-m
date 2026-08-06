@@ -159,8 +159,18 @@ pub(super) async fn apply_reorder(
 ///
 /// A target that is absent, foreign, or not a `remove`/`clear` gets one 404:
 /// this route is not a way to learn which of the three a bad id happens to
-/// be. The authorship check reads the *op*'s actor, not the touched objects',
-/// which is what stops the person being moderated from undoing the moderation.
+/// be.
+///
+/// Authorship of the *op* is necessary but never sufficient on its own: a
+/// `clear` has no notion of "self" content at all, so undoing one always
+/// needs `MANAGE_CANVAS` held *now*, and a `remove` needs the same live
+/// re-check for any touched object the actor did not themselves author -
+/// exactly the bit that removal needed at the time. Without this, revoking a
+/// moderator's `MANAGE_CANVAS` would leave them able to keep reversing their
+/// own past bulk moderation forever, using bare authorship of an op as a
+/// permission that outlives the role it required. Restoring your own object
+/// stays free of any role check either way, since that removal never needed
+/// one either.
 pub(super) async fn apply_restore(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     channel_id: ChannelId,
@@ -174,19 +184,33 @@ pub(super) async fn apply_restore(
     if target.channel_id != channel_id || !matches!(target.kind.as_str(), "remove" | "clear") {
         return Err(SubmitOpError::NotFound);
     }
-    if !may_moderate && target.actor_id != Some(actor_id) {
+    if !may_moderate && (target.kind == "clear" || target.actor_id != Some(actor_id)) {
         return Err(SubmitOpError::NotAuthorized);
     }
 
     let candidates = restore_candidates(tx, channel_id, &target).await?;
-    let mut dead = Vec::with_capacity(candidates.len());
-    for object_id in &candidates {
-        if let Some(found) = fetch_object_for_op(tx, channel_id, *object_id).await?
-            && found.is_dead
-        {
-            dead.push(*object_id);
+
+    // `restore_candidates`'s own `clear` query already proves each id dead.
+    let dead = if target.kind == "clear" {
+        candidates
+    } else {
+        let mut dead = Vec::with_capacity(candidates.len());
+        for object_id in &candidates {
+            let found = fetch_object_for_op(tx, channel_id, *object_id).await?;
+            if !may_moderate {
+                let Some(found) = &found else {
+                    return Err(SubmitOpError::NotAuthorized);
+                };
+                if found.author_id != Some(actor_id) {
+                    return Err(SubmitOpError::NotAuthorized);
+                }
+            }
+            if found.is_some_and(|found| found.is_dead) {
+                dead.push(*object_id);
+            }
         }
-    }
+        dead
+    };
 
     let live = sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "count!: i64" FROM canvas_objects
