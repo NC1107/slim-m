@@ -99,12 +99,14 @@ class CanvasOpsController {
   /// removal, never used for a stroke: erasing one is the eraser tool's
   /// job, and [objectId] can only ever name something
   /// `document.selectedObjectId` already holds, which `beginSelect` only
-  /// ever sets to an object this caller may act on.
+  /// ever sets to an object this caller may act on and which the overflow
+  /// menu's own `ValueListenableBuilder` clears out of the tree the moment
+  /// it dies some other way, so there is no live-caller path that could
+  /// reach here with an id already gone.
   /// [CanvasDocument.removeObject]'s own `_freeSlot` already clears the
   /// selection when the freed slot is the current one, so nothing here
   /// deselects explicitly.
   Future<void> deleteSelected(String objectId) async {
-    if (!document.isAlive(objectId)) return;
     document.removeObject(objectId);
     document.refresh();
     const message = 'That could not be deleted.';
