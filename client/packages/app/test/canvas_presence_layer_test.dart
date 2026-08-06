@@ -169,6 +169,50 @@ void main() {
   );
 
   testWidgets(
+    'a bubble carries the float shadow and the window radius, the tokens '
+    'reserved for an object that is always above the plane',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      document.setViewport(const Size(1000, 800));
+
+      await tester.pumpWidget(
+        _wrap(
+          CanvasPresenceLayer(
+            document: document,
+            participants: const [_cameraOff],
+            cameraViewFor: (_) => const SizedBox(),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final decorated = tester
+          .widgetList<Container>(
+            find.descendant(
+              of: find.byType(CanvasPresenceBubble),
+              matching: find.byType(Container),
+            ),
+          )
+          .map((c) => c.decoration)
+          .whereType<BoxDecoration>();
+      expect(
+        decorated.any((d) => d.boxShadow == AppShadows.float),
+        isTrue,
+        reason:
+            'a bubble is never merely part of the plane, unlike an '
+            'image or a stroke, so it carries the shadow unconditionally',
+      );
+      expect(
+        decorated.any(
+          (d) => d.borderRadius == BorderRadius.circular(AppRadii.window),
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  testWidgets(
     'the whole layer is wrapped in an ignoring IgnorePointer, so it cannot '
     'steal a pointer the canvas surface underneath still needs',
     (tester) async {

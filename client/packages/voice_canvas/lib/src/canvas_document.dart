@@ -59,6 +59,16 @@ class CanvasDocument extends ChangeNotifier {
   /// this whole package exists to keep.
   final ValueNotifier<String?> selectedObjectId = ValueNotifier<String?>(null);
 
+  /// The one object this client's own pointer is currently dragging or
+  /// resizing, or null - a narrower, shorter-lived thing than
+  /// [selectedObjectId], which stays set for as long as the Move tool holds
+  /// a selection. `StrokePainter` reads this to decide which image earns
+  /// the app layer's `AppShadows.float` treatment (named here only, this
+  /// package carries no design-system dependency, so the shadow itself
+  /// arrives as a plain value), a shadow only while an object is literally
+  /// off the plane rather than for as long as it merely sits selected.
+  final ValueNotifier<String?> elevatedObjectId = ValueNotifier<String?>(null);
+
   Camera get camera => _camera;
   Size get viewport => _viewport;
 
@@ -385,6 +395,7 @@ class CanvasDocument extends ChangeNotifier {
     if (stroke == null) return;
     // A dying selection must not stay offered a resize or reorder action.
     if (selectedObjectId.value == stroke.id) selectedObjectId.value = null;
+    if (elevatedObjectId.value == stroke.id) elevatedObjectId.value = null;
     scene.remove(slot);
     stroke.image?.dispose();
     _strokes[slot] = null;
@@ -450,6 +461,7 @@ class CanvasDocument extends ChangeNotifier {
     _disposeImages();
     objectCount.dispose();
     selectedObjectId.dispose();
+    elevatedObjectId.dispose();
     scene.dispose();
     super.dispose();
   }

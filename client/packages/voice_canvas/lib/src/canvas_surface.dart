@@ -55,6 +55,7 @@ class CanvasSurface extends StatefulWidget {
     this.onPointerMoved,
     this.placeholderFill = const Color(0xFFB9C0C8),
     this.placeholderIcon = const Color(0xFF6C757E),
+    this.elevationShadow = const [],
     this.selectionOutline,
     this.selectionHandleFill,
     this.selectionHandleBorder,
@@ -77,6 +78,12 @@ class CanvasSurface extends StatefulWidget {
   /// something rather than nothing.
   final Color placeholderFill;
   final Color placeholderIcon;
+
+  /// The shadow `StrokePainter` draws under whichever image
+  /// `document.elevatedObjectId` currently names. Empty (the default) draws
+  /// no elevation at all, the same "pay nothing for it unwired" choice
+  /// [selectionOutline] already makes for a caller with no opinion.
+  final List<BoxShadow> elevationShadow;
   final StrokeCommitted onStroke;
   final double strokeWidth;
 
@@ -151,6 +158,7 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
     ink: widget.ink,
     placeholderFill: widget.placeholderFill,
     placeholderIcon: widget.placeholderIcon,
+    elevationShadow: widget.elevationShadow,
   );
   late final DraftPainter _draftPainter = DraftPainter(
     draft: _draft,

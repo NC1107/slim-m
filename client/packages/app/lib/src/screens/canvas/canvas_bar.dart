@@ -128,10 +128,10 @@ class CanvasBar extends StatelessWidget {
           AppIconButton(
             icon: AppIcons.select,
             semanticLabel: 'Move',
-            // Answers two things nothing else on screen says: this tool only picks up a placed image, and Shift is what frees the aspect ratio while resizing.
+            // Answers three things nothing else on screen says: dragging only picks up an image, a stroke can only be reordered, and Shift frees the aspect ratio while resizing.
             tooltip:
-                'Move an image · hold Shift while resizing to free the '
-                'aspect ratio',
+                'Move an image, or select a stroke to reorder it · hold '
+                'Shift while resizing to free the aspect ratio',
             active: tool == CanvasTool.select,
             onPressed: () => onToolChanged(CanvasTool.select),
           ),
