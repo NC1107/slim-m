@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/screens/canvas/canvas_bar.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
@@ -327,7 +328,11 @@ void main() {
   });
 
   /// Every affordance this bar adds - pen, eraser, undo, the overflow, and
-  /// the existing close - is a tap target, none of them keyboard-only.
+  /// the existing close - carries a semantics node at the narrowest
+  /// supported width, so a screen reader always reaches it. This does not
+  /// prove a sighted touch can reach the same node with a bare tap: two of
+  /// these sit past the tool strip's own scroll offset at this width, and
+  /// the tests below cover that separately.
   testWidgets('every new affordance is reachable by touch, at phone width', (
     tester,
   ) async {
@@ -353,6 +358,89 @@ void main() {
         reason: '$label must be reachable at the narrowest supported width',
       );
     }
+  });
+
+  /// A tool clipped by the strip's own scroll viewport is not the same as
+  /// a broken button: a bare tap misses it, at the exact offset the tool
+  /// strip's own layout puts it at, until a real drag reveals it first -
+  /// the same journey a thumb on a phone would need. Reproduces the report
+  /// this pass found: at every real phone width, "Move" (the only route to
+  /// select, resize, reorder or delete a placed object by touch) sat past
+  /// this offset with nothing on screen saying so.
+  testWidgets(
+    'a clipped tool is unreachable by a bare tap, and reachable once the '
+    'strip is dragged',
+    (tester) async {
+      CanvasTool? chosen;
+      await tester.pumpWidget(
+        wrapCanvasBar(
+          buildCanvasBar(onToolChanged: (tool) => chosen = tool),
+          width: 320,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Move'), warnIfMissed: false);
+      await tester.pump();
+      expect(
+        chosen,
+        isNull,
+        reason: 'a bare tap must not silently land on a clipped tool',
+      );
+
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(-1000, 0),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.pump();
+      expect(chosen, CanvasTool.select);
+    },
+  );
+
+  /// The fade is the only on-screen cue that a tool sits past the visible
+  /// strip; without it a clipped icon reads as a broken layout rather than
+  /// an invitation to scroll. Present from the very first frame - the
+  /// strip overflows before anyone has touched it - gone once nothing is
+  /// left to reveal, and never present at all once the strip has room for
+  /// every tool.
+  testWidgets(
+    'the tool strip fades its clipped edge, and only the edge with more to '
+    'reveal',
+    (tester) async {
+      await tester.pumpWidget(wrapCanvasBar(buildCanvasBar(), width: 320));
+      await tester.pumpAndSettle();
+      expect(find.byKey(canvasBarLeadingFadeKey), findsNothing);
+      expect(find.byKey(canvasBarTrailingFadeKey), findsOneWidget);
+
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(-40, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(canvasBarLeadingFadeKey), findsOneWidget);
+      expect(find.byKey(canvasBarTrailingFadeKey), findsOneWidget);
+
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(-1000, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(canvasBarLeadingFadeKey), findsOneWidget);
+      expect(find.byKey(canvasBarTrailingFadeKey), findsNothing);
+    },
+  );
+
+  testWidgets('neither edge fades once the strip has room for every tool', (
+    tester,
+  ) async {
+    await tester.pumpWidget(wrapCanvasBar(buildCanvasBar()));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(canvasBarLeadingFadeKey), findsNothing);
+    expect(find.byKey(canvasBarTrailingFadeKey), findsNothing);
   });
 
   /// A mouse hover is the only route a sighted desktop user has to learn a
