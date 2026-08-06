@@ -16,6 +16,9 @@ import 'package:flutter/rendering.dart';
 import 'canvas_cursors.dart';
 import 'canvas_document.dart';
 import 'canvas_stroke_drafts.dart';
+import 'cursor_label_contrast.dart';
+
+export 'cursor_label_contrast.dart' show cursorLabelColorFor;
 
 /// The stroke currently under the pointer, in screen coordinates.
 ///
@@ -245,7 +248,7 @@ class CursorPainter extends CustomPainter {
         style: TextStyle(
           fontFamily: labelFontFamily,
           fontSize: 11,
-          color: const Color(0xFFFFFFFF),
+          color: cursorLabelColorFor(color),
           height: 1,
         ),
       ),
@@ -259,7 +262,7 @@ class CursorPainter extends CustomPainter {
         painter.width + 8,
         painter.height + 4,
       ),
-      const Radius.circular(4),
+      const Radius.circular(6),
     );
     canvas.drawRRect(chip, Paint()..color = color);
     painter.paint(canvas, origin);
