@@ -227,16 +227,16 @@ class CanvasOpsController {
   }
 
   /// Grabs a resize handle on the current selection if [world] lands on
-  /// one, or otherwise picks up the topmost live image under [world] the
-  /// caller may move - their own, or anybody's with [manageCanvas] -
-  /// selecting it and remembering its original bounds so [dragSelect] can
-  /// preview locally and [undo] can reverse whichever this turns out to be.
-  /// Deselects, silently, if nothing is there: the same "scope at hit-test
-  /// time" choice [onErasePoint] already makes.
+  /// one, or otherwise picks up the topmost live box object (image, note or
+  /// shape) under [world] the caller may move - their own, or anybody's
+  /// with [manageCanvas] - selecting it and remembering its original bounds
+  /// so [dragSelect] can preview locally and [undo] can reverse whichever
+  /// this turns out to be. Deselects, silently, if nothing is there: the
+  /// same "scope at hit-test time" choice [onErasePoint] already makes.
   ///
-  /// A handle only exists on an image (see `SelectionPainter`'s own doc for
-  /// why a stroke never grows one), so the resize branch is skipped for any
-  /// other kind without needing its own check here.
+  /// A handle only exists on a box kind (see `SelectionPainter`'s own doc
+  /// for why a stroke never grows one), so the resize branch is skipped for
+  /// a stroke without needing its own check here.
   void beginSelect(
     Offset world, {
     required bool manageCanvas,
@@ -244,7 +244,7 @@ class CanvasOpsController {
   }) {
     final selected = document.selectedObjectId.value;
     if (selected != null &&
-        document.kindOf(selected) == CanvasObjectKind.image) {
+        document.kindOf(selected) != CanvasObjectKind.stroke) {
       final owns = manageCanvas || document.authorIdOf(selected) == selfId;
       final bounds = document.objectBounds(selected);
       if (owns && bounds != null) {
@@ -255,7 +255,7 @@ class CanvasOpsController {
         }
       }
     }
-    final id = hitTestImageAt(
+    final id = hitTestBoxAt(
       document,
       world,
       allowed: (stroke) =>

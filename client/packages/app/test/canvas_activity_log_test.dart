@@ -13,6 +13,7 @@ api.CanvasObject _object({
   String id = 'obj-1',
   String kind = 'stroke',
   String? authorId = 'alice',
+  Map<String, dynamic> props = const {},
 }) => api.CanvasObject(
   id: id,
   kind: kind,
@@ -21,7 +22,7 @@ api.CanvasObject _object({
   y: 0,
   w: 1,
   h: 1,
-  props: const {},
+  props: props,
   authorId: authorId,
   seq: 1,
   createdAt: 0,
@@ -47,6 +48,43 @@ void main() {
       expect(entry.kind, CanvasActivityKind.placed);
       expect(entry.actorId, 'alice');
       expect(entry.objectKind, 'image');
+    });
+
+    test('a note carries its own text into the entry, truncated past 80', () {
+      final log = CanvasActivityLog(isBlocked: (_) => false);
+      addTearDown(log.dispose);
+
+      log.recordOp(
+        api.CanvasPlaceOp(
+          seq: 1,
+          id: 'op-note',
+          actorId: 'alice',
+          createdAt: 0,
+          object: _object(kind: 'note', props: {'text': 'a' * 90}),
+        ),
+      );
+
+      final entry = log.entries.single;
+      expect(entry.objectKind, 'note');
+      expect(entry.detail, hasLength(81));
+      expect(entry.detail, endsWith('…'));
+    });
+
+    test('a shape and a plain stroke both carry no detail', () {
+      final log = CanvasActivityLog(isBlocked: (_) => false);
+      addTearDown(log.dispose);
+
+      log.recordOp(
+        api.CanvasPlaceOp(
+          seq: 1,
+          id: 'op-shape',
+          actorId: 'alice',
+          createdAt: 0,
+          object: _object(kind: 'shape'),
+        ),
+      );
+
+      expect(log.entries.single.detail, isNull);
     });
 
     test('a remove op carries the count and whatever actor the wire sent', () {

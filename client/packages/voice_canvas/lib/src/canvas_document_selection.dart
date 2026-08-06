@@ -10,8 +10,9 @@ part of 'canvas_document.dart';
 /// that access without exposing it beyond this library.
 extension CanvasDocumentSelection on CanvasDocument {
   /// The kind a live object was placed as, or null if [id] is unknown or has
-  /// been removed. What a resize gesture needs to refuse a stroke: only an
-  /// image has a box with nothing thinner inside it to distort.
+  /// been removed. What a resize gesture needs to refuse a stroke: an image,
+  /// a note and a shape all have a box with nothing thinner inside it to
+  /// distort, but a stroke's ink is the thing a box would distort.
   CanvasObjectKind? kindOf(String id) {
     final slot = _slotById[id];
     final stroke = slot == null ? null : _strokes[slot];

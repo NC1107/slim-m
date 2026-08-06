@@ -20,6 +20,13 @@ import 'package:flutter/rendering.dart';
 import 'canvas_cursors.dart';
 import 'canvas_document.dart';
 
+/// A note's and a shape's own paint methods, plus the arrowhead's pure
+/// geometry: split out once they pushed this file past the 300-line review
+/// budget, the same `part of` shape `canvas_document_selection.dart` and
+/// `canvas_ops_controller_reorder.dart` already use for a class that grew a
+/// second cohesive group of methods rather than a second class.
+part 'canvas_painters_shapes.dart';
+
 /// The background lattice, at a spacing quantised to the zoom so the mesh
 /// keeps roughly the same density on screen at any scale.
 class GridPainter extends CustomPainter {
@@ -67,12 +74,29 @@ class StrokePainter extends CustomPainter {
   StrokePainter({
     required this.document,
     required this.ink,
+    this.noteColor,
+    this.shapeColor,
+    this.textInk = const Color(0xFF1A1A1A),
+    this.textFontFamily,
     this.placeholderFill = const Color(0xFFB9C0C8),
     this.placeholderIcon = const Color(0xFF6C757E),
   }) : super(repaint: document);
 
   final CanvasDocument document;
+
+  /// A pen stroke's own colour, and the fallback for [noteColor] and
+  /// [shapeColor] when the caller has no opinion about either - the same
+  /// "cheap to omit" shape [CanvasSurface.cursorColors] already uses.
   final Color ink;
+  final Color? noteColor;
+  final Color? shapeColor;
+
+  /// A note's own text colour. Deliberately not derived from [noteColor]:
+  /// the note's fill is a translucent tint of its own accent hue, and text
+  /// legible against every theme needs a colour of its own rather than
+  /// riding whatever the accent happens to be.
+  final Color textInk;
+  final String? textFontFamily;
 
   /// The muted fill and glyph stroke for an image whose bytes could not be
   /// fetched or decoded. Default to plain neutral greys so a caller with no
@@ -93,9 +117,18 @@ class StrokePainter extends CustomPainter {
 
     for (final slot in document.paintOrder) {
       final stroke = document.strokeAt(slot);
-      if (stroke.kind == CanvasObjectKind.image) {
-        _paintImage(canvas, stroke, camera);
-        continue;
+      switch (stroke.kind) {
+        case CanvasObjectKind.image:
+          _paintImage(canvas, stroke, camera);
+          continue;
+        case CanvasObjectKind.note:
+          _paintNote(canvas, stroke, camera, noteColor ?? ink);
+          continue;
+        case CanvasObjectKind.shape:
+          _paintShape(canvas, stroke, camera, shapeColor ?? ink);
+          continue;
+        case CanvasObjectKind.stroke:
+          break;
       }
       canvas.save();
       // Recentering, exactly: a screen-sized translate in Dart doubles keeps Skia's float32 rasteriser away from world coordinates.

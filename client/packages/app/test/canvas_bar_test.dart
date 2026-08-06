@@ -34,6 +34,8 @@ CanvasBar _bar({
   ValueChanged<String>? onSendToBack,
   bool activityLogOpen = false,
   VoidCallback? onToggleActivityLog,
+  CanvasShapeKind shapeKind = CanvasShapeKind.rectangle,
+  ValueChanged<CanvasShapeKind>? onShapeKindChanged,
 }) => CanvasBar(
   channelId: 'c1',
   onClose: () {},
@@ -50,6 +52,8 @@ CanvasBar _bar({
   onSendToBack: onSendToBack ?? (_) {},
   activityLogOpen: activityLogOpen,
   onToggleActivityLog: onToggleActivityLog ?? () {},
+  shapeKind: shapeKind,
+  onShapeKindChanged: onShapeKindChanged ?? (_) {},
 );
 
 void main() {
@@ -92,6 +96,53 @@ void main() {
 
     expect(chosen, CanvasTool.select);
   });
+
+  testWidgets('tapping note or shape calls onToolChanged with that tool', (
+    tester,
+  ) async {
+    CanvasTool? chosen;
+    await tester.pumpWidget(
+      _wrap(_bar(onToolChanged: (tool) => chosen = tool)),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Note'));
+    await tester.pump();
+    expect(chosen, CanvasTool.note);
+
+    await tester.tap(find.bySemanticsLabel('Shape'));
+    await tester.pump();
+    expect(chosen, CanvasTool.shape);
+  });
+
+  testWidgets(
+    'the shape-kind picker only appears in the overflow while the shape '
+    'tool is active, and picking one fires onShapeKindChanged',
+    (tester) async {
+      CanvasShapeKind? chosen;
+      await tester.pumpWidget(
+        _wrap(_bar(onShapeKindChanged: (kind) => chosen = kind)),
+      );
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ellipse'), findsNothing);
+
+      await tester.pumpWidget(
+        _wrap(
+          _bar(
+            tool: CanvasTool.shape,
+            onShapeKindChanged: (kind) => chosen = kind,
+          ),
+        ),
+      );
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ellipse'), findsOneWidget);
+
+      await tester.tap(find.text('Ellipse'));
+      await tester.pump();
+      expect(chosen, CanvasShapeKind.ellipse);
+    },
+  );
 
   testWidgets('tapping paste image in the overflow calls onPasteImage', (
     tester,
@@ -302,6 +353,8 @@ void main() {
     expect(tester.takeException(), isNull);
     for (final label in [
       'Pen',
+      'Note',
+      'Shape',
       'Eraser',
       'Move',
       'Undo',
@@ -326,6 +379,7 @@ void main() {
 
     for (final tooltip in [
       'Pen',
+      'Note',
       'Eraser',
       'Undo',
       'More canvas actions',

@@ -45,6 +45,8 @@ CanvasStrokeInput? canvasStrokeInputFrom(api.CanvasObject object) {
   return switch (object.kind) {
     'stroke' => _strokeInputFrom(object),
     'image' => _imageInputFrom(object),
+    'note' => _noteInputFrom(object),
+    'shape' => _shapeInputFrom(object),
     _ => null,
   };
 }
@@ -90,6 +92,68 @@ CanvasStrokeInput? _imageInputFrom(api.CanvasObject object) {
     attachmentId: attachment,
   );
 }
+
+/// A note carries only its text; there is no in-place edit on this canvas
+/// for any kind, so this is read once at placement and never again.
+CanvasStrokeInput? _noteInputFrom(api.CanvasObject object) {
+  final text = object.props['text'];
+  if (text is! String) return null;
+  return CanvasStrokeInput(
+    id: object.id,
+    seq: object.seq,
+    zIndex: object.zIndex,
+    x: object.x,
+    y: object.y,
+    w: object.w,
+    h: object.h,
+    points: const [],
+    width: 0,
+    colorKey: 'note',
+    authorId: object.authorId,
+    kind: CanvasObjectKind.note,
+    text: text,
+  );
+}
+
+CanvasStrokeInput? _shapeInputFrom(api.CanvasObject object) {
+  final shapeKind = canvasShapeKindFromWire(object.props['shape']);
+  if (shapeKind == null) return null;
+  return CanvasStrokeInput(
+    id: object.id,
+    seq: object.seq,
+    zIndex: object.zIndex,
+    x: object.x,
+    y: object.y,
+    w: object.w,
+    h: object.h,
+    points: const [],
+    width: 0,
+    colorKey: 'shape',
+    authorId: object.authorId,
+    kind: CanvasObjectKind.shape,
+    shapeKind: shapeKind,
+  );
+}
+
+/// The wire's `props.shape` string, or null for anything this client does
+/// not recognise - the same "an unknown value paints nothing rather than
+/// guessing" rule [canvasStrokeInputFrom] already applies to a whole kind.
+CanvasShapeKind? canvasShapeKindFromWire(Object? raw) => switch (raw) {
+  'rectangle' => CanvasShapeKind.rectangle,
+  'ellipse' => CanvasShapeKind.ellipse,
+  'line' => CanvasShapeKind.line,
+  'arrow' => CanvasShapeKind.arrow,
+  _ => null,
+};
+
+/// The reverse of [canvasShapeKindFromWire], for a placement request this
+/// client sends.
+String canvasShapeKindToWire(CanvasShapeKind kind) => switch (kind) {
+  CanvasShapeKind.rectangle => 'rectangle',
+  CanvasShapeKind.ellipse => 'ellipse',
+  CanvasShapeKind.line => 'line',
+  CanvasShapeKind.arrow => 'arrow',
+};
 
 /// Reconciles [document] against one channel's canvas op stream.
 class CanvasSync {

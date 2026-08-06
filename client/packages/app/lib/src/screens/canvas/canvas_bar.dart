@@ -29,17 +29,25 @@ class CanvasBar extends StatelessWidget {
     required this.onSendToBack,
     required this.activityLogOpen,
     required this.onToggleActivityLog,
+    required this.shapeKind,
+    required this.onShapeKindChanged,
   });
 
   final String channelId;
   final VoidCallback onClose;
 
-  /// Which tool a tap or drag on the surface draws with. Three tools is
-  /// still a toggle row, not a dock: nothing here needs a picker, and a
-  /// floating panel would only add a container around the same three
-  /// buttons this bar already has room for.
+  /// Which tool a tap or drag on the surface draws with. Pen, note and
+  /// shape are decision 0004's own three tool-dock tools, each dropping a
+  /// new object where a pointer taps; eraser and select act on objects
+  /// already there rather than placing a new one.
   final CanvasTool tool;
   final ValueChanged<CanvasTool> onToolChanged;
+
+  /// The primitive the next tap with the shape tool places. Read only by
+  /// [CanvasOverflowMenu]'s own picker, which appears while [tool] is
+  /// [CanvasTool.shape]; this bar has no picker of its own.
+  final CanvasShapeKind shapeKind;
+  final ValueChanged<CanvasShapeKind> onShapeKindChanged;
 
   final bool canUndo;
   final VoidCallback onUndo;
@@ -93,47 +101,73 @@ class CanvasBar extends StatelessWidget {
             color: tokens.textSecondary,
           ),
           const SizedBox(width: AppSpacing.s8),
-          Expanded(
-            // A bare Text here merges upward into the pane's outer Focus scope rather than staying its own node - the same AppBar-title trap CLAUDE.md already names, found here only by dumping the real semantics tree.
-            child: Semantics(
-              container: true,
-              header: true,
-              child: Text(
-                'Canvas',
-                overflow: TextOverflow.ellipsis,
-                style: AppText.body.copyWith(
-                  color: tokens.textPrimary,
-                  fontWeight: AppWeights.medium,
-                ),
+          // A fixed label, not Expanded: "Canvas" is a constant string, never a channel name, so it never needs to shrink - the tool cluster is what needs the room a phone-width bar is short on.
+          Semantics(
+            container: true,
+            header: true,
+            child: Text(
+              'Canvas',
+              style: AppText.body.copyWith(
+                color: tokens.textPrimary,
+                fontWeight: AppWeights.medium,
               ),
             ),
           ),
           const SizedBox(width: AppSpacing.s8),
-          AppIconButton(
-            icon: AppIcons.pen,
-            semanticLabel: 'Pen',
-            tooltip: 'Pen',
-            active: tool == CanvasTool.pen,
-            onPressed: () => onToolChanged(CanvasTool.pen),
-          ),
-          const SizedBox(width: AppSpacing.s4),
-          AppIconButton(
-            icon: AppIcons.eraser,
-            semanticLabel: 'Eraser',
-            tooltip: 'Eraser',
-            active: tool == CanvasTool.eraser,
-            onPressed: () => onToolChanged(CanvasTool.eraser),
-          ),
-          const SizedBox(width: AppSpacing.s4),
-          AppIconButton(
-            icon: AppIcons.select,
-            semanticLabel: 'Move',
-            // Answers two things nothing else on screen says: this tool only picks up a placed image, and Shift is what frees the aspect ratio while resizing.
-            tooltip:
-                'Move an image · hold Shift while resizing to free the '
-                'aspect ratio',
-            active: tool == CanvasTool.select,
-            onPressed: () => onToolChanged(CanvasTool.select),
+          // Five tool buttons at a phone's touch-target size do not fit a phone-width bar; scrolling here, rather than folding any of them into a menu, keeps every tool a same-level, one-tap button.
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppIconButton(
+                    icon: AppIcons.pen,
+                    semanticLabel: 'Pen',
+                    tooltip: 'Pen',
+                    active: tool == CanvasTool.pen,
+                    onPressed: () => onToolChanged(CanvasTool.pen),
+                  ),
+                  const SizedBox(width: AppSpacing.s4),
+                  AppIconButton(
+                    icon: AppIcons.note,
+                    semanticLabel: 'Note',
+                    tooltip: 'Note',
+                    active: tool == CanvasTool.note,
+                    onPressed: () => onToolChanged(CanvasTool.note),
+                  ),
+                  const SizedBox(width: AppSpacing.s4),
+                  AppIconButton(
+                    icon: AppIcons.shape,
+                    semanticLabel: 'Shape',
+                    // Which shape is picked from "More canvas actions" while this tool is active; nothing on the bar itself names it.
+                    tooltip:
+                        'Shape · pick which one from "More canvas actions"',
+                    active: tool == CanvasTool.shape,
+                    onPressed: () => onToolChanged(CanvasTool.shape),
+                  ),
+                  const SizedBox(width: AppSpacing.s4),
+                  AppIconButton(
+                    icon: AppIcons.eraser,
+                    semanticLabel: 'Eraser',
+                    tooltip: 'Eraser',
+                    active: tool == CanvasTool.eraser,
+                    onPressed: () => onToolChanged(CanvasTool.eraser),
+                  ),
+                  const SizedBox(width: AppSpacing.s4),
+                  AppIconButton(
+                    icon: AppIcons.select,
+                    semanticLabel: 'Move',
+                    // Answers two things nothing else on screen says: this tool only picks up a placed image, and Shift is what frees the aspect ratio while resizing.
+                    tooltip:
+                        'Move an image · hold Shift while resizing to free '
+                        'the aspect ratio',
+                    active: tool == CanvasTool.select,
+                    onPressed: () => onToolChanged(CanvasTool.select),
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(width: AppSpacing.s8),
           AppIconButton(
@@ -154,6 +188,9 @@ class CanvasBar extends StatelessWidget {
             onSendToBack: onSendToBack,
             activityLogOpen: activityLogOpen,
             onToggleActivityLog: onToggleActivityLog,
+            tool: tool,
+            shapeKind: shapeKind,
+            onShapeKindChanged: onShapeKindChanged,
           ),
           const SizedBox(width: AppSpacing.s4),
           AppIconButton(

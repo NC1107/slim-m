@@ -15,6 +15,35 @@ extension _CanvasPaneGestures on _CanvasPaneState {
     _refresh(() => _tool = tool);
   }
 
+  /// Opens the note sheet, and places the note only once it comes back with
+  /// real text - nothing is sent, and nothing shows on the shared canvas,
+  /// for a sheet the person cancelled or left blank. Switches to the select
+  /// tool afterward, the one thing worth doing immediately after placing a
+  /// single new object, the same choice a pasted image already makes.
+  Future<void> _onNotePlace(Offset world) async {
+    final text = await showCanvasNoteSheet(context);
+    if (text == null || !_mounted) return;
+    await _quickPlacement.placeNote(
+      world,
+      text,
+      onError: (message) => _refresh(() => _error = message),
+    );
+    _refresh(() => _tool = CanvasTool.select);
+  }
+
+  /// Places a shape of the bar's own currently-picked kind at once - no
+  /// sheet, since a shape carries no text to type. Stays on the shape tool
+  /// rather than switching to select, unlike a note: placing several shapes
+  /// of the same kind in a row is a normal thing to want, and switching
+  /// tools after every tap would make that tedious.
+  Future<void> _onShapePlace(Offset world) async {
+    await _quickPlacement.placeShape(
+      world,
+      _shapeKind,
+      onError: (message) => _refresh(() => _error = message),
+    );
+  }
+
   void _onSelectStart(Offset world) {
     final me = ref.read(meProvider).valueOrNull;
     _ops.beginSelect(

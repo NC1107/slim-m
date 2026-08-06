@@ -41,8 +41,10 @@ import 'canvas_cursor_relay.dart';
 import 'canvas_image_hydrator.dart';
 import 'canvas_image_paste.dart';
 import 'canvas_live_event_dispatch.dart';
+import 'canvas_note_sheet.dart';
 import 'canvas_ops_controller.dart';
 import 'canvas_pane_body.dart';
+import 'canvas_quick_placement.dart';
 import 'canvas_sync.dart';
 
 part 'canvas_pane_gestures.dart';
@@ -88,7 +90,9 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   bool _truncated = false;
   int _localZ = provisionalLocalZIndex;
   CanvasTool _tool = CanvasTool.pen;
+  CanvasShapeKind _shapeKind = CanvasShapeKind.rectangle;
   CanvasImagePaste? _imagePasteHelper;
+  CanvasQuickPlacement? _quickPlacementHelper;
   late final CanvasImageHydrator _hydrator = CanvasImageHydrator(
     client: ref.read(apiProvider),
     document: _document,
@@ -150,6 +154,13 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       if (mounted) setState(() => _error = message);
     },
   );
+
+  CanvasQuickPlacement get _quickPlacement =>
+      _quickPlacementHelper ??= CanvasQuickPlacement(
+        client: ref.read(apiProvider),
+        channelId: widget.channelId,
+        document: _document,
+      );
 
   CanvasCommitQueue get _commits => _queue ??= CanvasCommitQueue(
     client: ref.read(apiProvider),
@@ -380,6 +391,12 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     if (mounted) setState(() {});
   }
 
+  /// The same bridge [_refresh] is, for a caller that needs the raw
+  /// boolean rather than a guarded `setState` - `mounted` itself is
+  /// unreachable from `_CanvasPaneGestures` for the same reason [_refresh]
+  /// exists at all.
+  bool get _mounted => mounted;
+
   /// `setState` and `mounted` are `@protected` on `State`, so an extension
   /// method - `_CanvasPaneGestures`'s own, in a different file even though
   /// the same library - cannot call either directly; this bridges that gap
@@ -427,6 +444,10 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           onSelectStart: _onSelectStart,
           onSelectDrag: _onSelectDrag,
           onSelectEnd: () => unawaited(_onSelectEnd()),
+          onNotePlace: (world) => unawaited(_onNotePlace(world)),
+          onShapePlace: (world) => unawaited(_onShapePlace(world)),
+          shapeKind: _shapeKind,
+          onShapeKindChanged: (kind) => setState(() => _shapeKind = kind),
           onBringToFront: (id) => unawaited(_onBringToFront(id)),
           onSendToBack: (id) => unawaited(_onSendToBack(id)),
           cursors: _cursors,

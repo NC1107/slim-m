@@ -223,6 +223,37 @@ async fn a_timed_out_member_can_still_read_the_canvas_and_cannot_draw_on_it() {
     );
 }
 
+/// Decision 0004's other two tool-dock tools: neither carries a field this
+/// route authorizes against, so both are plain rows once the allowlist knows
+/// their names, the same as a stroke.
+#[tokio::test]
+async fn a_note_and_a_shape_are_both_accepted_object_kinds() {
+    let (store, _guard) = new_store().await;
+    let (token, _) = register(&store, "root").await;
+    let channel = general(&store).await;
+    let app = app(store.clone());
+
+    let note = json!({
+        "id": id(),
+        "kind": "note",
+        "x": 0.0, "y": 0.0, "w": 120.0, "h": 80.0,
+        "props": { "text": "a reminder" },
+    });
+    let (status, body) = post(&app, channel, &token, note).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(body["kind"], "note");
+
+    let shape = json!({
+        "id": id(),
+        "kind": "shape",
+        "x": 0.0, "y": 0.0, "w": 100.0, "h": 60.0,
+        "props": { "shape": "rectangle" },
+    });
+    let (status, body) = post(&app, channel, &token, shape).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(body["kind"], "shape");
+}
+
 #[tokio::test]
 async fn an_unknown_kind_is_refused_rather_than_stored_as_a_row_nobody_can_draw() {
     let (store, _guard) = new_store().await;

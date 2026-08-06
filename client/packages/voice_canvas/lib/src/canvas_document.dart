@@ -94,18 +94,25 @@ class CanvasDocument extends ChangeNotifier {
   /// server itself measured a plain scan at 20,000 rows as 1.56ms), and it
   /// is only ever asked for when a screen-reader user opens the activity
   /// panel, never once per frame the way [objectCount] is.
-  ({int strokes, int images}) get liveCountsByKind {
+  ({int strokes, int images, int notes, int shapes}) get liveCountsByKind {
     var strokes = 0;
     var images = 0;
+    var notes = 0;
+    var shapes = 0;
     for (final stroke in _strokes) {
       if (stroke == null || !stroke.alive) continue;
-      if (stroke.kind == CanvasObjectKind.image) {
-        images++;
-      } else {
-        strokes++;
+      switch (stroke.kind) {
+        case CanvasObjectKind.image:
+          images++;
+        case CanvasObjectKind.note:
+          notes++;
+        case CanvasObjectKind.shape:
+          shapes++;
+        case CanvasObjectKind.stroke:
+          strokes++;
       }
     }
-    return (strokes: strokes, images: images);
+    return (strokes: strokes, images: images, notes: notes, shapes: shapes);
   }
 
   /// Slots the last cull kept, in paint order.
@@ -184,6 +191,8 @@ class CanvasDocument extends ChangeNotifier {
         w: input.w,
         h: input.h,
         attachmentId: input.attachmentId,
+        text: input.text,
+        shapeKind: input.shapeKind,
       ),
     );
     _slotById[input.id] = slot;
@@ -240,6 +249,8 @@ class CanvasDocument extends ChangeNotifier {
         attachmentId: stroke.attachmentId,
         image: stroke.image,
         imageLoadFailed: stroke.imageLoadFailed,
+        text: stroke.text,
+        shapeKind: stroke.shapeKind,
       ),
     );
     assert(newSlot == _strokes.length - 1, 'scene.add must stay dense');

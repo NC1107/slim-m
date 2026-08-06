@@ -45,7 +45,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.text('1 object: 1 stroke, 0 images'),
+        find.text('1 object: 1 stroke, 0 images, 0 notes, 0 shapes'),
         findsOneWidget,
         reason:
             'the panel was never closed and reopened, so this only '

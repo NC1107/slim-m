@@ -4,7 +4,9 @@
 /// drawing already does and the activity log is an accessibility fallback
 /// nobody should need a permission for; "Bring to front"/"Send to back"
 /// appear only while something is selected and "Clear canvas" appears only
-/// for MANAGE_CANVAS.
+/// for MANAGE_CANVAS. The four shape-kind rows appear only while the Shape
+/// tool is active - not on the fixed-height bar itself, which has no room
+/// for a fourth control per tool, and this menu already has room to grow.
 library;
 
 import 'dart:async';
@@ -12,6 +14,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/context_menu_focus.dart';
@@ -34,12 +37,21 @@ class CanvasOverflowMenu extends StatefulWidget {
     required this.onSendToBack,
     required this.activityLogOpen,
     required this.onToggleActivityLog,
+    required this.tool,
+    required this.shapeKind,
+    required this.onShapeKindChanged,
   });
 
   final VoidCallback onPasteImage;
   final bool canManage;
   final ValueListenable<int> objectCount;
   final Future<void> Function() onClear;
+
+  /// The bar's own current tool, read only to decide whether the shape-kind
+  /// rows below apply - this menu never changes it.
+  final CanvasTool tool;
+  final CanvasShapeKind shapeKind;
+  final ValueChanged<CanvasShapeKind> onShapeKindChanged;
 
   /// The one object currently selected for a resize or reorder, or null.
   /// "Bring to front"/"Send to back" appear only while this holds an id,
@@ -117,6 +129,18 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
     widget.onSendToBack(objectId);
   }
 
+  void _pickShapeKind(CanvasShapeKind kind) {
+    _controller.hide();
+    widget.onShapeKindChanged(kind);
+  }
+
+  static const _shapeKindLabels = {
+    CanvasShapeKind.rectangle: ('Rectangle', AppIcons.shapeRectangle),
+    CanvasShapeKind.ellipse: ('Ellipse', AppIcons.shapeEllipse),
+    CanvasShapeKind.line: ('Line', AppIcons.shapeLine),
+    CanvasShapeKind.arrow: ('Arrow', AppIcons.shapeArrow),
+  };
+
   Widget _shortcutHint(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Row(
@@ -172,6 +196,16 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
                     leading: AppIcons.activityLog,
                     onTap: _toggleActivityLog,
                   ),
+                  if (widget.tool == CanvasTool.shape) ...[
+                    const AppMenuDivider(),
+                    for (final entry in _shapeKindLabels.entries)
+                      AppMenuItem(
+                        label: entry.value.$1,
+                        leading: entry.value.$2,
+                        selected: widget.shapeKind == entry.key,
+                        onTap: () => _pickShapeKind(entry.key),
+                      ),
+                  ],
                   if (selected != null) ...[
                     const AppMenuDivider(),
                     AppMenuItem(

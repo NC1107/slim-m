@@ -14,8 +14,17 @@ import 'package:flutter/painting.dart';
 
 /// What a placed object is. `stroke` is pen ink; `image` is a pasted picture,
 /// decoded and painted by the app layer, which is the one place this package
-/// steps outside pure geometry.
-enum CanvasObjectKind { stroke, image }
+/// steps outside pure geometry; `note` carries typed text inside its own box;
+/// `shape` is one of [CanvasShapeKind] drawn from its own box.
+enum CanvasObjectKind { stroke, image, note, shape }
+
+/// Which primitive a [CanvasObjectKind.shape] object draws. A line and an
+/// arrow are always the diagonal of the object's own box - top-left corner to
+/// bottom-right - rather than an independent pair of points, which is what
+/// lets [CanvasDocument.moveObject] reshape either one with the exact same
+/// box arithmetic a rectangle or an ellipse already uses: resizing the box
+/// *is* redrawing the line, with no separate points array to keep in step.
+enum CanvasShapeKind { rectangle, ellipse, line, arrow }
 
 /// How many erased ids [CanvasDocument] remembers so an in-flight fetch
 /// cannot resurrect one, matching the server's own `MAX_OBJECTS_PER_CHANNEL`:
@@ -94,6 +103,8 @@ class CanvasStrokeInput {
     this.authorId,
     this.kind = CanvasObjectKind.stroke,
     this.attachmentId,
+    this.text,
+    this.shapeKind,
   });
 
   final String id;
@@ -105,7 +116,8 @@ class CanvasStrokeInput {
   final double h;
 
   /// Flat `[x0,y0,x1,y1,...]`, relative to [x] and [y], in world units. Empty
-  /// for an [CanvasObjectKind.image]: a picture has no path, only its box.
+  /// for an [CanvasObjectKind.image], [CanvasObjectKind.note] or
+  /// [CanvasObjectKind.shape]: none of the three has a path, only a box.
   final List<double> points;
   final double width;
 
@@ -123,8 +135,18 @@ class CanvasStrokeInput {
   final CanvasObjectKind kind;
 
   /// The attachment an [CanvasObjectKind.image] names, so the app layer knows
-  /// which bytes to fetch and decode. Null for a stroke.
+  /// which bytes to fetch and decode. Null for every other kind.
   final String? attachmentId;
+
+  /// A [CanvasObjectKind.note]'s own text, set once at creation. Null for
+  /// every other kind. There is no in-place edit on this canvas for any kind
+  /// - a stroke's ink cannot be redrawn and an image's bytes cannot be
+  /// swapped - so a note follows the same rule: revising the text means
+  /// erasing and re-placing, not editing this field after the fact.
+  final String? text;
+
+  /// A [CanvasObjectKind.shape]'s own primitive. Null for every other kind.
+  final CanvasShapeKind? shapeKind;
 }
 
 /// A stroke ready to paint: its [Path] is built once, at insert, in
@@ -147,6 +169,8 @@ class CanvasStroke {
     this.attachmentId,
     this.image,
     this.imageLoadFailed = false,
+    this.text,
+    this.shapeKind,
   });
 
   final String id;
@@ -187,6 +211,12 @@ class CanvasStroke {
   /// at. Reset to false by [CanvasDocument.setImageBitmap], defensively, in
   /// case a future retry path ever sets a real bitmap after a failure.
   bool imageLoadFailed;
+
+  /// See [CanvasStrokeInput.text].
+  final String? text;
+
+  /// See [CanvasStrokeInput.shapeKind].
+  final CanvasShapeKind? shapeKind;
 
   /// Every point in absolute world coordinates, for hit testing against a
   /// world-space pointer with no per-call offset arithmetic.
