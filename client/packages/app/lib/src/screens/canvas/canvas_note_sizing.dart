@@ -16,6 +16,16 @@ const double _noteFontSize = 12;
 const double _noteLineHeight = 1.3;
 const double _notePad = 8;
 
+/// One line's own height, and a fudge factor past a whole extra one: the
+/// painter's `noteMaxLines` (`canvas_painters_shapes.dart`) derives its own
+/// line budget from this box's height by floor-dividing, and an engine text
+/// layout is not bit-identical to the same arithmetic done twice, so a box
+/// sized to the exact boundary can floor one line short and ellipsis the
+/// note's own last line - reproduced directly against the real painter
+/// function before this margin was added, not assumed.
+const double _lineHeight = _noteFontSize * _noteLineHeight;
+const double _lineBudgetMargin = _lineHeight * 1.5;
+
 /// A note's box: fixed at [width] - a comfortable reading measure, not
 /// something a long note should widen past - with [height] grown to fit
 /// [text] wrapped at that width, never below [minHeight] so a short note
@@ -37,6 +47,6 @@ const double _notePad = 8;
     ),
     textDirection: TextDirection.ltr,
   )..layout(maxWidth: width - _notePad * 2);
-  final needed = painter.height + _notePad * 2;
+  final needed = painter.height + _notePad * 2 + _lineBudgetMargin;
   return (width: width, height: needed.clamp(minHeight, maxObjectExtent));
 }
