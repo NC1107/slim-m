@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The drawing surface: several repaint boundaries, raw pointer input, and no
-/// widget rebuild for anything the camera or the pointer does.
+/// widget rebuild for anything the camera or a drag does. Grab-panning is
+/// the one exception: starting or ending one rebuilds a single
+/// `ValueListenableBuilder` around `MouseRegion` so its cursor can change,
+/// never the painters or gesture layers it wraps - see `_panning`'s own doc.
 library;
 
 import 'package:flutter/gestures.dart';
@@ -283,9 +286,22 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
   /// pointer-up with nothing else down are both proof a pinch never started.
   Offset? _pendingErasePoint;
 
+  /// Whether a middle-mouse-button drag is currently panning the camera -
+  /// see `canvas_surface_gestures.dart`'s own doc for why this is a
+  /// [ValueNotifier] the cursor alone listens to rather than a plain field:
+  /// entering or leaving a grab needs the [MouseRegion] to show a different
+  /// cursor, and this is the one place that happens without rebuilding the
+  /// painters and gesture layers underneath it.
+  final ValueNotifier<bool> _panning = ValueNotifier<bool>(false);
+
+  /// The screen point the last pan update moved from, so only the delta
+  /// since that point is applied rather than a jump to the raw position.
+  Offset? _panFrom;
+
   @override
   void dispose() {
     _draft.dispose();
+    _panning.dispose();
     super.dispose();
   }
 
@@ -301,18 +317,22 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
         WidgetsBinding.instance.addPostFrameCallback(
           (_) => widget.document.setViewport(size),
         );
-        return MouseRegion(
-          cursor: _cursorFor(widget.tool, widget.enabled),
-          child: Listener(
-            onPointerDown: _down,
-            onPointerMove: _move,
-            onPointerHover: _hover,
-            onPointerUp: _up,
-            onPointerCancel: _up,
-            onPointerSignal: _signal,
-            child: GestureDetector(
-              onScaleStart: _scaleBegin,
-              onScaleUpdate: _scaleUpdate,
+        return Listener(
+          onPointerDown: _down,
+          onPointerMove: _move,
+          onPointerHover: _hover,
+          onPointerUp: _up,
+          onPointerCancel: _up,
+          onPointerSignal: _signal,
+          child: GestureDetector(
+            onScaleStart: _scaleBegin,
+            onScaleUpdate: _scaleUpdate,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _panning,
+              builder: (context, panning, child) => MouseRegion(
+                cursor: _cursorFor(widget.tool, widget.enabled, panning),
+                child: child,
+              ),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
