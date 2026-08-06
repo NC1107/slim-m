@@ -107,9 +107,7 @@ void main() {
     addTearDown(container.dispose);
     final notifier = container.read(canvasSelfPresenceProvider.notifier);
 
-    // The generation guard only protects the field this call sets
-    // (hidden); it is racing the load that would have answered topLeft
-    // for corner, a field this call has no opinion about at all.
+    // The generation guard only protects "hidden"; corner is the one the load, not this call, would have answered.
     await notifier.setHidden(true);
     await notifier.ready;
 

@@ -26,9 +26,7 @@ void main() {
       await pumpCanvasPane(tester, container);
 
       final cardRect = tester.getRect(find.byType(FloatingDockCard));
-      // A couple of pixels inside the card's top-left corner: inside
-      // Container's own EdgeInsets.symmetric(horizontal: s12, vertical: s8)
-      // padding, so on top of nothing but the card's painted background.
+      // A few pixels inside the card's top-left corner: its own padding, not a button.
       final onPadding = cardRect.topLeft + const Offset(3, 3);
 
       final onCard = await tester.startGesture(onPadding);
@@ -51,10 +49,7 @@ void main() {
     'a right-click on the dock\'s own padding is absorbed, never reaching a canvas object underneath it',
     (tester) async {
       final fixture = CanvasPaneFixture()
-        // A single huge note spanning the whole visible world, so the click
-        // below is guaranteed to land on it regardless of exactly where the
-        // dock's own padding falls on screen - what is under test here is
-        // whether the click reaches this object at all, not exactly where.
+        // A huge note spanning the whole visible world, so the click below always lands on it.
         ..objects = [
           {
             'id': 'under-the-dock',
