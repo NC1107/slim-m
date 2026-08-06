@@ -154,23 +154,22 @@ final _selfBubble = find.descendant(
 
 void main() {
   for (final width in [600.0, 610.0, 623.0]) {
-    testWidgets(
-      'at pane width $width, inside the dock\'s own padding-shifted '
-      'two-row band, the self bubble still rests above the dock',
-      (tester) async {
-        await _pump(tester, width);
+    testWidgets('at pane width $width, inside the dock\'s own padding-shifted '
+        'two-row band, the self bubble still rests above the dock', (
+      tester,
+    ) async {
+      await _pump(tester, width);
 
-        final bubble = tester.getRect(_selfBubble);
-        final dock = tester.getRect(find.byType(FloatingDockCard));
-        expect(
-          bubble.bottom,
-          lessThanOrEqualTo(dock.top),
-          reason:
-              'the dock paints after the bubble in the outer Stack, so any '
-              'overlap here means the dock visually covers the bubble',
-        );
-      },
-    );
+      final bubble = tester.getRect(_selfBubble);
+      final dock = tester.getRect(find.byType(FloatingDockCard));
+      expect(
+        bubble.bottom,
+        lessThanOrEqualTo(dock.top),
+        reason:
+            'the dock paints after the bubble in the outer Stack, so any '
+            'overlap here means the dock visually covers the bubble',
+      );
+    });
   }
 
   testWidgets(
