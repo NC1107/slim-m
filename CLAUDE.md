@@ -75,6 +75,32 @@ Mutation-tested: reverting the budget loop to ignore non-`place` bytes fails exa
 Also not chased: the write-side cost of a large restore-of-a-clear, which inserts one `canvas_op_targets` row per touched object sequentially inside the single write transaction `store/canvas_ops_write.rs` holds - up to 20,000 row-pairs of UPDATE-then-INSERT for one moderator action, on a database with exactly one serialized writer for the whole deployment.
 Real, but out of this pass's scope (it is a latency/throughput cost under `MANAGE_CANVAS`, not an unauthorized read), and worth a look before the object ceiling is ever raised.
 
+## A fourth canvas review, reviewing the first three's own fixes rather than assuming them (2026-08-06)
+
+Run fresh, on the instruction that a reviewer signing off on what it just wrote is not a signature worth having.
+Verdict: safe to ship, with two real findings fixed here.
+Both are in `store/canvas_ops_write.rs` and `store/canvas_ops_apply.rs`; read this before touching either, or `list_canvas_ops`'s page-byte budget a third time.
+
+**A `clear` was writing per-object `canvas_op_targets` rows despite three separate doc comments across this file, `canvas_ops.rs` and `canvas_ops_apply.rs` all independently claiming it does not.**
+`submit_canvas_op`'s shared "write one `canvas_op_targets` row per touched id" loop ran unconditionally for every kind, `clear` included, so a `clear` touching many objects wrote one row per object into a table nothing reads back for it: `restore_candidates`'s own `clear` branch reads the `deleted_at` fence, not this table, and the ops feed's `Clear` DTO never serializes an object list either.
+Reproduced directly before touching anything: a real `clear` through `submit_canvas_op` touching 50 objects left 50 rows in `canvas_op_targets`, not zero.
+Those rows were dead weight with one live cost inherited from the third pass's own fix: `list_canvas_ops`'s new page-byte budget prices a non-`place` op's `canvas_op_targets` rows as that kind's own wire payload - true for `remove`/`restore`/`move`/`reorder`, never true for `clear` - so a large `clear` was priced as though it carried an `object_ids` array its own DTO never has, needlessly forcing it onto its own page.
+Fixed by skipping the insert for `kind == "clear"`; `a_clear_writes_no_target_rows_and_costs_nothing_in_the_page_budget` (`tests/canvas_ops/feed_budget.rs`) drives a real 15,000-object clear through the store and asserts both halves.
+Mutation-tested: reverting the skip fails exactly that test.
+
+**A millisecond-precision timestamp collision let restoring one moderation action silently reach into a completely unrelated one's own removals.**
+`restore_candidates`'s `clear` branch identifies which objects to un-delete by matching `canvas_objects.deleted_at` against the clear op's own `created_at`, and two separate doc comments justified that fence as exact because "the single writer this database has means no other write can share that millisecond."
+That conflates strict ordering with distinct values: `now_ms()` is plain `SystemTime::now()` at 1ms resolution, and two sequential `submit_canvas_op` calls can read the identical millisecond well within a fast SQLite/WAL commit - single-writer serializes the calls, it does not space their clock reads apart.
+If an ordinary member removes their own object (no `MANAGE_CANVAS` needed) at the same millisecond a moderator's unrelated `clear` runs, and the clear's `before_seq` reaches that object's `seq`, restoring the clear later un-deletes the member's own separately-removed object too, attributing it in the audit log as though the clear had touched it.
+Restoring any `clear` already requires `MANAGE_CANVAS`, so this is not a privilege escalation past what that bit grants - but it is a real correctness break, one moderator's undo reaching into a member's own prior removal with no relationship between the two beyond a clock tie.
+Fixed with `now_ms_unique`, a small monotonic counter (`canvas_ops_write.rs`) used in place of plain `now_ms()` for a canvas op's shared timestamp: every canvas-op write already runs inside `Store::begin_write`'s exclusive lock, so calls into it are already totally ordered, and it only has to break a tie between two reads of the same millisecond rather than coordinate any concurrency these calls cannot have.
+A deterministic unit test (`store::canvas_ops_write::tests`) drives it through a 10,000-iteration tight loop with no I/O - which reliably lands several calls in one real millisecond on any machine - and asserts strict monotonicity; that is the actual regression guard, since forcing a real HTTP-level collision by timing alone is not reliably reproducible.
+Mutation-tested: reverting `now_ms_unique` to plain `now_ms()` fails exactly that unit test within the first handful of iterations, every time.
+
+**What held up under this pass, checked rather than assumed:** the fixes from all three prior passes compose correctly - the third pass's byte-budget query, the second pass's draft-point cap, and the first pass's `MANAGE_CANVAS`-live restore gate none interact with each other or with the sweep and gap detector in any way that broke under inspection.
+Account deletion's anonymization already covers `canvas_objects.author_id`, `canvas_ops.actor_id` and `canvas_audit_log.actor_id`; timeouts correctly freeze only the pen (`place`/`move`/`reorder`) and never the eraser; and a thread channel's canvas permissions already resolve through the same `permission_channel` fix the message-and-report work applied project-wide, since canvas routes call the same `permissions_in_channel` everything else does.
+One thing left named rather than chased: a thread channel can carry its own, entirely separate set of canvas objects from its parent's, since canvas storage is keyed on the literal `channel_id` while only permissions resolve through the parent - not unsafe (permissions are correct), just an unexplored product corner nothing in the roadmap or design docs ever specified either way.
+
 ## Two Phase 6 canvas deliverables the roadmap had marked open: collapse-to-strip and the text activity log (2026-08-05)
 
 `docs/ROADMAP.md`'s Phase 6 section named two things as still missing: "collapse-to-strip that actually unmounts and suspends the spatial index and paint layers for voice-only participants," and "a text-based canvas activity-log accessibility fallback."
