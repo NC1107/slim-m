@@ -156,7 +156,10 @@ class CanvasSurface extends StatefulWidget {
 
   /// Fires once per pointer-down and again on every move while [tool] is
   /// [CanvasTool.eraser], so a drag can wipe through several objects the way
-  /// a moderator clearing a defaced region expects.
+  /// a moderator clearing a defaced region expects. Unlike note/shape, this
+  /// still fires on a pinch's bare first finger if it lands on a stroke -
+  /// recorded rather than fixed, since closing it means deferring a whole
+  /// drag's per-point hits rather than one placement.
   final ValueChanged<Offset>? onErase;
 
   /// Fires once the whole erase gesture ends - the last pointer lifting,
@@ -363,16 +366,11 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
     }
   }
 
-  /// Fires whichever placement [_down] armed, at the world point it was
-  /// armed with, and only on the [_up] that drops [_pointers] to zero.
-  /// Called once per lifted pointer, it consumes whatever is pending on its
-  /// very first call regardless of [_pointers] - so a second pointer having
-  /// ever touched down is what stops this firing: that first call lands at
-  /// a nonzero count, not zero, and nothing is left pending by the time the
-  /// true last pointer lifts. Resolved against the tool active when the
-  /// gesture began, not [widget.tool] now, since the two can only disagree
-  /// if the tool changed mid-gesture, after the placement was already
-  /// committed to at press time.
+  /// Fires whichever placement [_down] armed, at the point it was armed
+  /// with, only on the [_up] that drops [_pointers] to zero. Runs once per
+  /// lifted pointer and consumes pending state on its first call regardless
+  /// of [_pointers], so any second pointer having touched down - landing
+  /// that first call at a nonzero count - is what stops this ever firing.
   void _resolvePendingPlacement() {
     final tool = _pendingPlacementTool;
     final world = _pendingPlacementWorld;
