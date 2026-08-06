@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The shape-kind picker in the overflow, and the bar's own Shape button
-/// reflecting whichever kind it armed - split out of `canvas_bar_test.dart`,
-/// which crossed the 500-line hard limit once the armed-icon test landed.
+/// The shape-kind picker in the overflow, and the row's own Shape button
+/// reflecting whichever kind it armed - split out of `canvas_tools_row_test.dart`
+/// for the same reason `canvas_bar_shape_kind_test.dart`, this file's
+/// predecessor, already was.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +10,7 @@ import 'package:slimm_app/src/screens/canvas/canvas_shape_icons.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
-import 'support/canvas_bar_fixtures.dart';
+import 'support/canvas_tools_row_fixtures.dart';
 
 void main() {
   testWidgets(
@@ -18,8 +19,8 @@ void main() {
     (tester) async {
       CanvasShapeKind? chosen;
       await tester.pumpWidget(
-        wrapCanvasBar(
-          buildCanvasBar(onShapeKindChanged: (kind) => chosen = kind),
+        wrapCanvasToolsRow(
+          buildCanvasToolsRow(onShapeKindChanged: (kind) => chosen = kind),
         ),
       );
       await tester.tap(find.bySemanticsLabel('More canvas actions'));
@@ -27,8 +28,8 @@ void main() {
       expect(find.text('Ellipse'), findsNothing);
 
       await tester.pumpWidget(
-        wrapCanvasBar(
-          buildCanvasBar(
+        wrapCanvasToolsRow(
+          buildCanvasToolsRow(
             tool: CanvasTool.shape,
             onShapeKindChanged: (kind) => chosen = kind,
           ),
@@ -51,7 +52,9 @@ void main() {
     tester,
   ) async {
     for (final kind in CanvasShapeKind.values) {
-      await tester.pumpWidget(wrapCanvasBar(buildCanvasBar(shapeKind: kind)));
+      await tester.pumpWidget(
+        wrapCanvasToolsRow(buildCanvasToolsRow(shapeKind: kind)),
+      );
 
       final button = tester.widget<AppIconButton>(
         find.ancestor(
