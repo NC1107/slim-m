@@ -174,7 +174,8 @@ void main() {
       await tester.sendEventToBinding(pointer.up());
       await tester.pump();
 
-      expect(ends, 1, reason: 'the pointer finally lifting must not flush a second time');
+      expect(ends, 1,
+          reason: 'the pointer finally lifting must not flush a second time');
     },
   );
 
@@ -249,7 +250,9 @@ void main() {
     },
   );
 
-  testWidgets('the cursor shows grabbing while panning, and the prior tool cursor after', (
+  testWidgets(
+      'the cursor shows grabbing while panning, and the prior tool cursor after',
+      (
     tester,
   ) async {
     final document = CanvasDocument();
