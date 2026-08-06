@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.33.1](https://github.com/NC1107/slim-m/compare/server-v0.33.0...server-v0.33.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* **canvas:** a clear that wrote rows it never reads, and a millisecond two writes can share ([#448](https://github.com/NC1107/slim-m/issues/448)) ([2a8e5ed](https://github.com/NC1107/slim-m/commit/2a8e5ed829c70fb3f6eee8743883897312eb9006))
+* **canvas:** cap an in-flight draft, and measure a note in the bytes the wire actually counts ([#438](https://github.com/NC1107/slim-m/issues/438)) ([8279d8f](https://github.com/NC1107/slim-m/commit/8279d8f9aca6abd9b0f4971598fe6ab872f10955))
+* **canvas:** count a restore's own targets against the op feed's byte budget ([#445](https://github.com/NC1107/slim-m/issues/445)) ([687b959](https://github.com/NC1107/slim-m/commit/687b95975188972102882b386bde5819c46a3cd5))
+
 ## [0.33.0](https://github.com/NC1107/slim-m/compare/server-v0.32.0...server-v0.33.0) (2026-08-06)
 
 
