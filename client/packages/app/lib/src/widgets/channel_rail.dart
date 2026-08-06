@@ -163,7 +163,13 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                           .where((c) => c.kind != dmChannelKind)
                           .toList(growable: false);
                       return ListView(
-                        padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+                        // The right inset is load-bearing beyond its own look: RailDragHandle's reach cap assumes a row's own edge sits exactly here.
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.s8,
+                          6,
+                          AppSpacing.s8,
+                          0,
+                        ),
                         children: [
                           DirectMessagesSection(
                             channels: channels
