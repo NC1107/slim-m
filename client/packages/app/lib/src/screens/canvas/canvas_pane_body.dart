@@ -20,6 +20,7 @@ import 'canvas_activity_log.dart';
 import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
 import 'canvas_presence_layer.dart';
+import 'canvas_selection_semantics.dart';
 
 class CanvasPaneBody extends StatefulWidget {
   const CanvasPaneBody({
@@ -50,6 +51,7 @@ class CanvasPaneBody extends StatefulWidget {
     required this.onShapeKindChanged,
     required this.onBringToFront,
     required this.onSendToBack,
+    required this.onDeleteSelected,
     required this.activityLog,
     this.cursors,
     this.cursorColors = const [],
@@ -94,6 +96,11 @@ class CanvasPaneBody extends StatefulWidget {
   final ValueChanged<CanvasShapeKind> onShapeKindChanged;
   final ValueChanged<String> onBringToFront;
   final ValueChanged<String> onSendToBack;
+
+  /// Removes the current selection - an image, note or shape - the select
+  /// tool's own counterpart to the eraser removing a stroke. Never offered
+  /// with nothing selected, the same gating [onBringToFront] already uses.
+  final ValueChanged<String> onDeleteSelected;
 
   /// The accessibility fallback: who placed, moved, removed, cleared or
   /// restored what, filtered for blocking exactly as a remote cursor
@@ -152,6 +159,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
               selection: widget.document.selectedObjectId,
               onBringToFront: widget.onBringToFront,
               onSendToBack: widget.onSendToBack,
+              onDeleteSelected: widget.onDeleteSelected,
               activityLogOpen: _activityLogOpen,
               onToggleActivityLog: () =>
                   setState(() => _activityLogOpen = !_activityLogOpen),
@@ -254,6 +262,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           participants: widget.callParticipants,
           cameraViewFor: widget.cameraViewFor,
         ),
+        CanvasSelectionSemantics(document: widget.document),
       ],
     ),
   );

@@ -19,10 +19,12 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../../ids.dart';
+import 'canvas_note_sizing.dart';
 import 'canvas_sync.dart';
 
 /// A note's default box: wide enough for a few sentences before wrapping,
-/// tall enough that a short note is not mostly empty padding.
+/// tall enough that a short note is not mostly empty padding - the floor
+/// [noteBoxFor] grows a longer note's height past, never the ceiling.
 const double defaultNoteWidth = 220;
 const double defaultNoteHeight = 140;
 
@@ -45,19 +47,28 @@ class CanvasQuickPlacement {
 
   /// Places a note carrying [text], centered at [world]. Text is set once
   /// here and never again - see [CanvasStrokeInput.text]'s own doc for why
-  /// there is no edit verb to revise it later.
+  /// there is no edit verb to revise it later. The box is sized to [text]
+  /// by [noteBoxFor] rather than the fixed default, so a long note simply
+  /// fits instead of clipping inside a box that never grew for it.
   Future<api.CanvasObject?> placeNote(
     Offset world,
     String text, {
     required void Function(String message) onError,
-  }) => _place(
-    kind: 'note',
-    world: world,
-    w: defaultNoteWidth,
-    h: defaultNoteHeight,
-    props: {'text': text},
-    onError: onError,
-  );
+  }) {
+    final box = noteBoxFor(
+      text,
+      width: defaultNoteWidth,
+      minHeight: defaultNoteHeight,
+    );
+    return _place(
+      kind: 'note',
+      world: world,
+      w: box.width,
+      h: box.height,
+      props: {'text': text},
+      onError: onError,
+    );
+  }
 
   /// Places a [shapeKind] shape centered at [world].
   Future<api.CanvasObject?> placeShape(

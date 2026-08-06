@@ -76,6 +76,11 @@ extension _CanvasPaneGestures on _CanvasPaneState {
     _refresh();
   }
 
+  Future<void> _onDeleteSelected(String objectId) async {
+    await _ops.deleteSelected(objectId);
+    _refresh();
+  }
+
   Future<void> _onUndo() async {
     await _ops.undo();
     _refresh();

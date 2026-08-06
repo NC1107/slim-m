@@ -8,6 +8,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_overflow_menu.dart';
+import 'canvas_shape_icons.dart';
 
 /// The canvas's own bar. It carries the close affordance because the pane
 /// replaces the conversation, header and all, at every width.
@@ -27,6 +28,7 @@ class CanvasBar extends StatelessWidget {
     required this.selection,
     required this.onBringToFront,
     required this.onSendToBack,
+    required this.onDeleteSelected,
     required this.activityLogOpen,
     required this.onToggleActivityLog,
     required this.shapeKind,
@@ -77,6 +79,10 @@ class CanvasBar extends StatelessWidget {
   final ValueListenable<String?> selection;
   final ValueChanged<String> onBringToFront;
   final ValueChanged<String> onSendToBack;
+
+  /// Removes the current selection - see [CanvasOverflowMenu]'s own doc for
+  /// why this needs no confirm dialog, unlike clearing the whole canvas.
+  final ValueChanged<String> onDeleteSelected;
 
   /// The accessibility fallback's own open state and toggle, threaded
   /// straight through to the overflow menu - see that file for why it lives
@@ -138,11 +144,13 @@ class CanvasBar extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.s4),
                   AppIconButton(
-                    icon: AppIcons.shape,
+                    // The armed kind's own glyph, not a generic one - a control whose look never changes with its state is one you have to remember rather than read.
+                    icon: canvasShapeKindIcon(shapeKind),
                     semanticLabel: 'Shape',
-                    // Which shape is picked from "More canvas actions" while this tool is active; nothing on the bar itself names it.
+                    // The tooltip is where a screen reader learns the icon's own state, since it carries as a semantics hint and the icon change is visual-only.
                     tooltip:
-                        'Shape · pick which one from "More canvas actions"',
+                        'Shape · ${canvasShapeKindLabel(shapeKind)} armed, '
+                        'pick another from "More canvas actions"',
                     active: tool == CanvasTool.shape,
                     onPressed: () => onToolChanged(CanvasTool.shape),
                   ),
@@ -150,7 +158,10 @@ class CanvasBar extends StatelessWidget {
                   AppIconButton(
                     icon: AppIcons.eraser,
                     semanticLabel: 'Eraser',
-                    tooltip: 'Eraser',
+                    // Erases pen ink only - it hit-tests a stroke's own path, which a note, shape or image has none of; nothing else says so.
+                    tooltip:
+                        'Eraser · pen ink only, select then Delete for a '
+                        'note, shape or image',
                     active: tool == CanvasTool.eraser,
                     onPressed: () => onToolChanged(CanvasTool.eraser),
                   ),
@@ -187,6 +198,7 @@ class CanvasBar extends StatelessWidget {
             selection: selection,
             onBringToFront: onBringToFront,
             onSendToBack: onSendToBack,
+            onDeleteSelected: onDeleteSelected,
             activityLogOpen: activityLogOpen,
             onToggleActivityLog: onToggleActivityLog,
             tool: tool,

@@ -472,6 +472,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           onShapeKindChanged: (kind) => setState(() => _shapeKind = kind),
           onBringToFront: (id) => unawaited(_onBringToFront(id)),
           onSendToBack: (id) => unawaited(_onSendToBack(id)),
+          onDeleteSelected: (id) => unawaited(_onDeleteSelected(id)),
           cursors: _cursors,
           cursorColors: AppCanvasColors.cursors,
           onPointerMoved: _onPointerMoved,

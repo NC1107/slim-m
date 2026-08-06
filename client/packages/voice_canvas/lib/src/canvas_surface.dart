@@ -156,7 +156,10 @@ class CanvasSurface extends StatefulWidget {
 
   /// Fires once per pointer-down and again on every move while [tool] is
   /// [CanvasTool.eraser], so a drag can wipe through several objects the way
-  /// a moderator clearing a defaced region expects.
+  /// a moderator clearing a defaced region expects. Unlike note/shape, this
+  /// still fires on a pinch's bare first finger if it lands on a stroke -
+  /// recorded rather than fixed, since closing it means deferring a whole
+  /// drag's per-point hits rather than one placement.
   final ValueChanged<Offset>? onErase;
 
   /// Fires once the whole erase gesture ends - the last pointer lifting,
@@ -180,14 +183,16 @@ class CanvasSurface extends StatefulWidget {
   /// move, the same shape [onEraseEnd] already uses.
   final VoidCallback? onSelectEnd;
 
-  /// Fires once, on pointer-down, while [tool] is [CanvasTool.note] - a tap
-  /// rather than a drag, since a note's box is a fixed default size the
-  /// caller places and the person resizes afterward with the select tool,
-  /// not a shape dragged out point by point.
+  /// Fires once for a tap while [tool] is [CanvasTool.note], at the point
+  /// the pointer went down - a tap rather than a drag, since a note's box is
+  /// a fixed default size the caller places and the person resizes it
+  /// afterward with the select tool. Resolved on pointer-up, not
+  /// pointer-down, so a second pointer touching down first (a pinch
+  /// starting) can still cancel it - see [_resolvePendingPlacement].
   final ValueChanged<Offset>? onNotePlace;
 
-  /// Fires once, on pointer-down, while [tool] is [CanvasTool.shape] - the
-  /// same single-tap placement [onNotePlace] uses, for the same reason.
+  /// Fires once for a tap while [tool] is [CanvasTool.shape] - the same
+  /// deferred single-tap placement [onNotePlace] uses, for the same reason.
   /// Which of [CanvasShapeKind] gets placed is the caller's own state, not
   /// this widget's: nothing here has a notion of shape kind at all.
   final ValueChanged<Offset>? onShapePlace;
@@ -252,6 +257,13 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
 
   int _pointers = 0;
 
+  /// A note or shape placement [_down] armed, resolved only once every
+  /// pointer has lifted - see [_resolvePendingPlacement]. Needed because
+  /// panning and zooming here are two-pointer-only ([_scaleUpdate]'s own
+  /// guard), so a pinch always starts as one finger down alone.
+  CanvasTool? _pendingPlacementTool;
+  Offset? _pendingPlacementWorld;
+
   @override
   void dispose() {
     _draft.dispose();
@@ -299,9 +311,11 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
       case CanvasTool.select:
         widget.onSelectStart?.call(_toWorld(event.localPosition));
       case CanvasTool.note:
-        widget.onNotePlace?.call(_toWorld(event.localPosition));
+        _pendingPlacementTool = CanvasTool.note;
+        _pendingPlacementWorld = _toWorld(event.localPosition);
       case CanvasTool.shape:
-        widget.onShapePlace?.call(_toWorld(event.localPosition));
+        _pendingPlacementTool = CanvasTool.shape;
+        _pendingPlacementWorld = _toWorld(event.localPosition);
       case CanvasTool.pen:
         _draft.begin(event.localPosition);
         widget.onDraftPoint?.call(_toWorld(event.localPosition));
@@ -334,6 +348,7 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
 
   void _up(PointerEvent event) {
     _pointers = (_pointers - 1).clamp(0, 10);
+    _resolvePendingPlacement();
     switch (widget.tool) {
       case CanvasTool.eraser:
         if (_pointers == 0) widget.onEraseEnd?.call();
@@ -348,6 +363,30 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
         widget.onDraftEnded?.call();
         if (screen.length < 2) return;
         widget.onStroke(screen.map(_toWorld).toList(growable: false));
+    }
+  }
+
+  /// Fires whichever placement [_down] armed, at the point it was armed
+  /// with, only on the [_up] that drops [_pointers] to zero. Runs once per
+  /// lifted pointer and consumes pending state on its first call regardless
+  /// of [_pointers], so any second pointer having touched down - landing
+  /// that first call at a nonzero count - is what stops this ever firing.
+  void _resolvePendingPlacement() {
+    final tool = _pendingPlacementTool;
+    final world = _pendingPlacementWorld;
+    if (tool == null || world == null) return;
+    _pendingPlacementTool = null;
+    _pendingPlacementWorld = null;
+    if (_pointers != 0) return;
+    switch (tool) {
+      case CanvasTool.note:
+        widget.onNotePlace?.call(world);
+      case CanvasTool.shape:
+        widget.onShapePlace?.call(world);
+      case CanvasTool.pen:
+      case CanvasTool.eraser:
+      case CanvasTool.select:
+        break;
     }
   }
 

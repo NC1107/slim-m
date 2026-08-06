@@ -239,7 +239,8 @@ void main() {
   });
 
   testWidgets(
-      'note and shape tools each place once on pointer-down, no drag needed', (
+      'note and shape tools each place once per tap, at the pointer-down point, no drag needed',
+      (
     tester,
   ) async {
     final document = CanvasDocument();
@@ -263,12 +264,90 @@ void main() {
 
     final gesture = await tester.startGesture(const Offset(20, 20));
     await gesture.moveTo(const Offset(60, 40));
+    expect(notes, isEmpty, reason: 'not yet - the pointer is still down');
     await gesture.up();
     await tester.pump();
 
     expect(notes, [const Offset(20, 20)]);
     expect(shapes, isEmpty, reason: 'the shape tool was never selected');
   });
+
+  /// Panning and zooming this surface are two-pointer-only (see
+  /// `_scaleUpdate`'s own pointer-count guard), so a two-finger pinch always
+  /// begins with exactly one finger down before the second arrives. Without
+  /// this cancellation, that first finger would drop an unwanted note or
+  /// shape every time somebody tried to pinch-zoom with either tool active.
+  testWidgets(
+    'a second pointer cancels a pending note or shape placement, with nothing placed',
+    (tester) async {
+      for (final tool in [CanvasTool.note, CanvasTool.shape]) {
+        final document = CanvasDocument();
+        addTearDown(document.dispose);
+        final notes = <Offset>[];
+        final shapes = <Offset>[];
+        await tester.pumpWidget(
+          MaterialApp(
+            home: CanvasSurface(
+              document: document,
+              ink: const Color(0xFFE86A5C),
+              gridLine: const Color(0xFF303030),
+              tool: tool,
+              onStroke: (_) {},
+              onNotePlace: notes.add,
+              onShapePlace: shapes.add,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final first = await tester.startGesture(const Offset(20, 20));
+        final second = await tester.startGesture(const Offset(200, 200));
+        await tester.pump();
+        await first.up();
+        await second.up();
+        await tester.pump();
+
+        expect(notes, isEmpty, reason: 'kind: $tool');
+        expect(shapes, isEmpty, reason: 'kind: $tool');
+      }
+    },
+  );
+
+  testWidgets(
+    'a tap that survives a would-be pinch on a later independent gesture still places',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      final notes = <Offset>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CanvasSurface(
+            document: document,
+            ink: const Color(0xFFE86A5C),
+            gridLine: const Color(0xFF303030),
+            tool: CanvasTool.note,
+            onStroke: (_) {},
+            onNotePlace: notes.add,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final first = await tester.startGesture(const Offset(20, 20));
+      final second = await tester.startGesture(const Offset(200, 200));
+      await tester.pump();
+      await first.up();
+      await second.up();
+      await tester.pump();
+      expect(notes, isEmpty, reason: 'the pinch attempt cancelled this one');
+
+      final ordinary = await tester.startGesture(const Offset(40, 40));
+      await ordinary.up();
+      await tester.pump();
+
+      expect(notes, [const Offset(40, 40)]);
+    },
+  );
 
   testWidgets(
       'onPointerMoved reports world points during a hover, no button down', (

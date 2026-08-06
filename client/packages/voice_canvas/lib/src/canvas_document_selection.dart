@@ -19,6 +19,17 @@ extension CanvasDocumentSelection on CanvasDocument {
     return (stroke != null && stroke.alive) ? stroke.kind : null;
   }
 
+  /// A live note's own full text, or null if [id] is unknown, removed, or
+  /// not a note. The one content field the current selection's own
+  /// accessibility node needs beyond [kindOf] - nothing else places text
+  /// as an object's content, and the painter's own clipping never touches
+  /// this copy of it.
+  String? textOf(String id) {
+    final slot = _slotById[id];
+    final stroke = slot == null ? null : _strokes[slot];
+    return (stroke != null && stroke.alive) ? stroke.text : null;
+  }
+
   /// A live object's author, or null if [id] is unknown, removed, or was
   /// authored by a since-deleted account. What a resize or reorder gesture
   /// on the *current selection* needs to decide authorship without a fresh

@@ -2,11 +2,12 @@
 /// The canvas bar's overflow: "Paste image" and "Show/Hide activity log" are
 /// always present, since placing an image needs only the USE_CANVAS bit
 /// drawing already does and the activity log is an accessibility fallback
-/// nobody should need a permission for; "Bring to front"/"Send to back"
-/// appear only while something is selected and "Clear canvas" appears only
-/// for MANAGE_CANVAS. The four shape-kind rows appear only while the Shape
-/// tool is active - not on the fixed-height bar itself, which has no room
-/// for a fourth control per tool, and this menu already has room to grow.
+/// nobody should need a permission for; "Bring to front"/"Send to back"/
+/// "Delete" appear only while something is selected and "Clear canvas"
+/// appears only for MANAGE_CANVAS. The four shape-kind rows appear only
+/// while the Shape tool is active - not on the fixed-height bar itself,
+/// which has no room for a fourth control per tool, and this menu already
+/// has room to grow.
 library;
 
 import 'dart:async';
@@ -18,13 +19,17 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/context_menu_focus.dart';
+import 'canvas_shape_icons.dart';
 
 /// The bar's own overflow trigger and the confirm dialog behind Clear.
 ///
 /// Clear stays behind a menu item rather than a bare button even when it is
 /// the only reason a manager opens this: the extra tap is deliberate
-/// friction on the one destructive control here, matching
-/// `manage_channel_sheet.dart`'s own danger-zone separation.
+/// friction on the one control here that removes more than the caller's own
+/// selection, matching `manage_channel_sheet.dart`'s own danger-zone
+/// separation. Delete needs no such friction: it takes exactly the one
+/// object already selected, the same immediacy the eraser tool already
+/// gives a stroke.
 class CanvasOverflowMenu extends StatefulWidget {
   const CanvasOverflowMenu({
     super.key,
@@ -35,6 +40,7 @@ class CanvasOverflowMenu extends StatefulWidget {
     required this.selection,
     required this.onBringToFront,
     required this.onSendToBack,
+    required this.onDeleteSelected,
     required this.activityLogOpen,
     required this.onToggleActivityLog,
     required this.tool,
@@ -60,6 +66,12 @@ class CanvasOverflowMenu extends StatefulWidget {
   final ValueListenable<String?> selection;
   final ValueChanged<String> onBringToFront;
   final ValueChanged<String> onSendToBack;
+
+  /// Removes the current selection outright - an image, note, shape, or a
+  /// reorder-selected stroke - with no confirm dialog, the same immediacy
+  /// the eraser tool already gives a stroke it hit-tests directly. Undo
+  /// reverses it exactly the way it reverses an erase.
+  final ValueChanged<String> onDeleteSelected;
 
   /// The accessibility fallback's own open state, so the item's label says
   /// which way a tap goes rather than a bare "Activity log" that reads the
@@ -129,17 +141,15 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
     widget.onSendToBack(objectId);
   }
 
+  void _delete(String objectId) {
+    _controller.hide();
+    widget.onDeleteSelected(objectId);
+  }
+
   void _pickShapeKind(CanvasShapeKind kind) {
     _controller.hide();
     widget.onShapeKindChanged(kind);
   }
-
-  static const _shapeKindLabels = {
-    CanvasShapeKind.rectangle: ('Rectangle', AppIcons.shapeRectangle),
-    CanvasShapeKind.ellipse: ('Ellipse', AppIcons.shapeEllipse),
-    CanvasShapeKind.line: ('Line', AppIcons.shapeLine),
-    CanvasShapeKind.arrow: ('Arrow', AppIcons.shapeArrow),
-  };
 
   Widget _shortcutHint(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -198,12 +208,12 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
                   ),
                   if (widget.tool == CanvasTool.shape) ...[
                     const AppMenuDivider(),
-                    for (final entry in _shapeKindLabels.entries)
+                    for (final kind in CanvasShapeKind.values)
                       AppMenuItem(
-                        label: entry.value.$1,
-                        leading: entry.value.$2,
-                        selected: widget.shapeKind == entry.key,
-                        onTap: () => _pickShapeKind(entry.key),
+                        label: canvasShapeKindLabel(kind),
+                        leading: canvasShapeKindIcon(kind),
+                        selected: widget.shapeKind == kind,
+                        onTap: () => _pickShapeKind(kind),
                       ),
                   ],
                   if (selected != null) ...[
@@ -217,6 +227,12 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
                       label: 'Send to back',
                       leading: AppIcons.sendToBack,
                       onTap: () => _sendToBack(selected),
+                    ),
+                    AppMenuItem(
+                      label: 'Delete',
+                      leading: AppIcons.delete,
+                      tone: AppMenuItemTone.danger,
+                      onTap: () => _delete(selected),
                     ),
                   ],
                   if (widget.canManage) ...[
