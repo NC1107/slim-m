@@ -16,10 +16,9 @@ on:
 permissions:
   contents: read
 
-# Never cancel an in-flight release run; a half-published release is worse than
-# a queued one.
+# Keyed on the commit, not the ref: a run is never left pending behind another and cancelled outright. See docs/ci.md.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
