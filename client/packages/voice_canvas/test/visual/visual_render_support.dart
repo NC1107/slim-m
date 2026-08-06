@@ -6,6 +6,12 @@
 /// of these painters without going through `testWidgets` at all, since the
 /// full canvas pane is known to hang a widget test on a loaded box. Nothing
 /// here pumps a frame or touches `WidgetTester`.
+///
+/// **Every PNG this writes is rasterised in software** (`flutter test` has
+/// no GPU), which can paint a thin diagonal stroke as broken or dotted at
+/// a low effective pixel width even when the geometry is correct - see
+/// `dpi_probe_test.dart`'s own finding on `zoom_stress_0.25x.png` before
+/// reading that one as a real gap in the ink.
 library;
 
 import 'dart:io';
