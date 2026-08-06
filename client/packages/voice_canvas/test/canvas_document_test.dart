@@ -195,7 +195,10 @@ void main() {
   group('liveCountsByKind', () {
     test('an empty document reports zero of both', () {
       final document = CanvasDocument();
-      expect(document.liveCountsByKind, (strokes: 0, images: 0));
+      expect(
+        document.liveCountsByKind,
+        (strokes: 0, images: 0, notes: 0, shapes: 0),
+      );
     });
 
     test('counts strokes and images separately, ignoring dead slots', () {
@@ -219,7 +222,10 @@ void main() {
         );
       document.kill('b');
 
-      expect(document.liveCountsByKind, (strokes: 1, images: 1));
+      expect(
+        document.liveCountsByKind,
+        (strokes: 1, images: 1, notes: 0, shapes: 0),
+      );
     });
   });
 }

@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Painting the one object [CanvasDocument.selectedObjectId] names: an
-/// outline in screen space, plus resize handles when it is an image.
+/// outline in screen space, plus resize handles for every box-shaped kind
+/// (image, note, shape).
 ///
 /// A stroke can be selected too - `CanvasOpsController.beginSelect` falls
-/// back to a path hit test once the tap misses every image - but it never
-/// grows handles: a stroke has no thinner shape inside its box for a corner
-/// drag to distort, and it is never draggable either, only reorderable
-/// (bring to front, send to back). See `canvas_pane_ops_test.dart`'s "move
-/// is scoped to images" test for the drag half of that split.
+/// back to a path hit test once the tap misses every box kind (image, note,
+/// shape) - but it never grows handles: a stroke has no thinner shape
+/// inside its box for a corner drag to distort, and it is never draggable
+/// either, only reorderable (bring to front, send to back). See
+/// `canvas_pane_ops_test.dart`'s "move is scoped to box kinds" test for the
+/// drag half of that split.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -58,7 +60,7 @@ class SelectionPainter extends CustomPainter {
       ..strokeWidth = 1.5;
     canvas.drawRect(screen, line);
 
-    if (document.kindOf(id) != CanvasObjectKind.image) return;
+    if (document.kindOf(id) == CanvasObjectKind.stroke) return;
     final fill = Paint()..color = handleFill;
     final border = Paint()
       ..color = handleBorder

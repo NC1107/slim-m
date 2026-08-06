@@ -24,6 +24,20 @@ final _png = Uint8List.fromList(
   ),
 );
 
+/// Waits for [ready] rather than for a fixed number of event-loop turns.
+///
+/// `pumpEventQueue` drains microtasks; decoding a PNG is engine work that is
+/// not one, so a fixed drain finishes it on an idle machine and does not on a
+/// loaded CI runner. This is the same shape CLAUDE.md already records for
+/// `toImage`, and it is what made this file flake once rather than fail.
+Future<void> _settleUntil(bool Function() ready) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 10));
+  while (!ready() && DateTime.now().isBefore(deadline)) {
+    await pumpEventQueue();
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+}
+
 const _tokens = api.TokenPair(
   userId: 'me',
   accessToken: 'access',
@@ -102,7 +116,12 @@ void main() {
     addTearDown(hydrator.dispose);
 
     hydrator.hydrate(_imageObject('a'));
-    await pumpEventQueue();
+    await _settleUntil(
+      () =>
+          fetches == 1 &&
+          document.paintOrder.isNotEmpty &&
+          document.strokeIfAlive(document.paintOrder.single)?.image != null,
+    );
 
     expect(fetches, 1);
     expect(document.objectBounds('a'), isNotNull);

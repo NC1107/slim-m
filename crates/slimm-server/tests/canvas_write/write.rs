@@ -6,112 +6,18 @@
 //! by default and, in this slice, there is no way to remove what it writes, so
 //! every ceiling here is one that cannot be walked back later.
 
-use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::{Value, json};
-use slimm_server::auth::Auth;
-use slimm_server::config::Config;
-use slimm_server::db;
-use slimm_server::http::{self, AppState};
-use slimm_server::hub::Hub;
-use slimm_server::ids::{ChannelId, UserId};
-use slimm_server::media::Media;
 use slimm_server::permissions::Permissions;
-use slimm_server::push::PushSender;
-use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::{MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL, Store};
-use slimm_server::voice::VoiceService;
+use slimm_server::store::{MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL};
 use tower::ServiceExt;
 use uuid::Uuid;
 
-mod support;
-
-async fn new_store() -> (Store, support::TestDbGuard) {
-    let (store, _pool, guard) = new_store_and_pool().await;
-    (store, guard)
-}
-
-async fn new_store_and_pool() -> (Store, sqlx::SqlitePool, support::TestDbGuard) {
-    let (path, guard) = support::TestDbGuard::new("slimm-canvas-write");
-    let config = Config {
-        port: 0,
-        database_path: path,
-        hash_concurrency: 2,
-        ..Config::default()
-    };
-    let pool = db::connect(&config).await.expect("connect + migrate");
-    (Store::new(pool.clone()), pool, guard)
-}
-
-fn app(store: Store) -> Router {
-    http::router(AppState {
-        store,
-        auth: Auth::new(2).unwrap(),
-        hub: Hub::new(),
-        limiter: RateLimiter::new(),
-        push: PushSender::disabled(),
-        voice: VoiceService::disabled(),
-        media: Media::for_tests(),
-    })
-}
-
-async fn register(store: &Store, username: &str) -> (String, UserId) {
-    let account = store
-        .create_account(username, username, "not-a-real-hash")
-        .await
-        .unwrap();
-    store.bootstrap_deployment(account.id).await.unwrap();
-    let tokens = store.open_session(account.id, "cli").await.unwrap();
-    (tokens.access_token, account.id)
-}
-
-const QUERY: &str = "min_x=0&min_y=0&max_x=100&max_y=100&limit=2";
-
-fn region(channel: ChannelId) -> String {
-    format!("/channels/{channel}/canvas/objects")
-}
-
-async fn general(store: &Store) -> ChannelId {
-    store.list_channels().await.unwrap()[0].id
-}
-
-async fn post(app: &Router, channel: ChannelId, token: &str, body: Value) -> (StatusCode, Value) {
-    let response = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri(format!("/channels/{channel}/canvas/objects"))
-                .header("authorization", format!("Bearer {token}"))
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&body).unwrap()))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let status = response.status();
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    (
-        status,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
-}
-
-fn stroke(id: &str) -> Value {
-    json!({
-        "id": id,
-        "kind": "stroke",
-        "x": 10.0, "y": 20.0, "w": 30.0, "h": 40.0,
-        "props": { "points": [0.0, 0.0, 30.0, 40.0], "width": 3.0, "color": "annotation" },
-    })
-}
-
-fn id() -> String {
-    Uuid::now_v7().to_string()
-}
+use crate::fixtures::{
+    QUERY, app, chrono_ms, general, id, new_store, new_store_and_pool, post, region, register,
+    stroke,
+};
 
 #[tokio::test]
 async fn a_placed_object_comes_straight_back_and_is_visible_to_a_viewport_read() {
@@ -221,6 +127,37 @@ async fn a_timed_out_member_can_still_read_the_canvas_and_cannot_draw_on_it() {
         permissions.contains(Permissions::USE_CANVAS),
         "the timeout must not blank the canvas, only freeze the pen",
     );
+}
+
+/// Decision 0004's other two tool-dock tools: neither carries a field this
+/// route authorizes against, so both are plain rows once the allowlist knows
+/// their names, the same as a stroke.
+#[tokio::test]
+async fn a_note_and_a_shape_are_both_accepted_object_kinds() {
+    let (store, _guard) = new_store().await;
+    let (token, _) = register(&store, "root").await;
+    let channel = general(&store).await;
+    let app = app(store.clone());
+
+    let note = json!({
+        "id": id(),
+        "kind": "note",
+        "x": 0.0, "y": 0.0, "w": 120.0, "h": 80.0,
+        "props": { "text": "a reminder" },
+    });
+    let (status, body) = post(&app, channel, &token, note).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(body["kind"], "note");
+
+    let shape = json!({
+        "id": id(),
+        "kind": "shape",
+        "x": 0.0, "y": 0.0, "w": 100.0, "h": 60.0,
+        "props": { "shape": "rectangle" },
+    });
+    let (status, body) = post(&app, channel, &token, shape).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(body["kind"], "shape");
 }
 
 #[tokio::test]
@@ -463,11 +400,4 @@ async fn a_full_canvas_refuses_the_next_object() {
     let (status, body) = post(&app(store), channel, &token, stroke(&id())).await;
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(body["error"], "this canvas is full");
-}
-
-fn chrono_ms() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as i64
 }

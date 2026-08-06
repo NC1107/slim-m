@@ -83,6 +83,26 @@ Map<String, dynamic> canvasImageJson(
   'created_at': 0,
 };
 
+Map<String, dynamic> canvasNoteJson(
+  String id, {
+  double x = 10,
+  int seq = 1,
+  String authorId = 'me',
+  String text = 'a note',
+}) => {
+  'id': id,
+  'kind': 'note',
+  'z_index': seq,
+  'x': x,
+  'y': 10.0,
+  'w': 20.0,
+  'h': 20.0,
+  'props': {'text': text},
+  'author_id': authorId,
+  'seq': seq,
+  'created_at': 0,
+};
+
 /// A 1x1 transparent PNG: real bytes, so a hydration fetch decodes rather
 /// than throwing. Public so other suites pumping a real canvas (rather than
 /// this file's own fixture) can serve the identical bytes.

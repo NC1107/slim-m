@@ -55,6 +55,7 @@ class CanvasActivityEntry {
     required this.kind,
     required this.actorId,
     this.objectKind,
+    this.detail,
     this.count = 1,
     required this.at,
   });
@@ -74,6 +75,13 @@ class CanvasActivityEntry {
   /// - the wire's `move` op names no kind, and a removal or a clear may
   /// cover a mix.
   final String? objectKind;
+
+  /// A note's own text, truncated - the one kind whose content is worth
+  /// naming here rather than just its kind. Null for every other
+  /// [CanvasActivityKind.placed] entry, and always null for every other
+  /// kind: a stroke's ink, an image's bytes and a shape's outline have
+  /// nothing a sentence could usefully say about them.
+  final String? detail;
 
   /// How many objects this entry covers. A real count for `removed` and
   /// `restored`; always 1 for `placed` and `moved`; ignored by the sentence
@@ -184,9 +192,23 @@ class CanvasActivityLog extends ChangeNotifier {
       kind: CanvasActivityKind.placed,
       actorId: object.authorId,
       objectKind: object.kind,
+      detail: _noteDetail(object),
       at: _now(),
     ),
   );
+
+  /// A note's own text, truncated to a length worth reading aloud in a
+  /// throttled announcement rather than reciting a note in full. Null for
+  /// every other kind, and for a note whose `props.text` this client cannot
+  /// read - the same "unparseable" case `canvasStrokeInputFrom` already
+  /// treats as nothing rather than guessing.
+  static String? _noteDetail(api.CanvasObject object) {
+    if (object.kind != 'note') return null;
+    final text = object.props['text'];
+    if (text is! String || text.isEmpty) return null;
+    const limit = 80;
+    return text.length > limit ? '${text.substring(0, limit)}…' : text;
+  }
 
   CanvasActivityEntry _entry(
     String id,
@@ -271,8 +293,16 @@ String describeCanvasActivityEntry(
   final who = entry.actorId == null ? null : nameFor?.call(entry.actorId!);
   switch (entry.kind) {
     case CanvasActivityKind.placed:
-      final what = entry.objectKind == 'image' ? 'an image' : 'a stroke';
-      return who == null ? 'Someone placed $what.' : '$who placed $what.';
+      final what = switch (entry.objectKind) {
+        'image' => 'an image',
+        'note' => 'a note',
+        'shape' => 'a shape',
+        _ => 'a stroke',
+      };
+      final detail = entry.detail == null ? '' : ': ${entry.detail}';
+      return who == null
+          ? 'Someone placed $what$detail.'
+          : '$who placed $what$detail.';
     case CanvasActivityKind.moved:
       return who == null ? 'An object was moved.' : '$who moved an object.';
     case CanvasActivityKind.reordered:

@@ -29,10 +29,13 @@ typedef DraftPointAdded = void Function(Offset worldPoint);
 
 /// Which gesture a single pointer draws.
 ///
-/// Three tools is still a toggle row, not a dock: nothing here needs a
-/// picker with more options than fit on one line, and a floating panel would
-/// only add a container around the same three buttons.
-enum CanvasTool { pen, eraser, select }
+/// Decision 0004 named the tool dock as exactly three placement tools - pen,
+/// note, shape - each dropping a new object where a pointer taps. `eraser`
+/// and `select` are not placement modes: they act on objects already there
+/// (erase, move, resize), added once this canvas grew objects worth acting
+/// on, and are additional to the three named tools rather than a fourth and
+/// fifth placement choice.
+enum CanvasTool { pen, eraser, select, note, shape }
 
 /// The canvas itself.
 ///
@@ -54,6 +57,8 @@ class CanvasSurface extends StatefulWidget {
     this.onSelectStart,
     this.onSelectDrag,
     this.onSelectEnd,
+    this.onNotePlace,
+    this.onShapePlace,
     this.tool = CanvasTool.pen,
     this.strokeWidth = 3,
     this.enabled = true,
@@ -67,6 +72,9 @@ class CanvasSurface extends StatefulWidget {
     this.selectionOutline,
     this.selectionHandleFill,
     this.selectionHandleBorder,
+    this.noteColor,
+    this.shapeColor,
+    this.noteTextInk = const Color(0xFF1A1A1A),
     this.remoteDrafts,
     this.onDraftPoint,
     this.onDraftEnded,
@@ -75,6 +83,12 @@ class CanvasSurface extends StatefulWidget {
   final CanvasDocument document;
   final Color ink;
   final Color gridLine;
+
+  /// A note's own fill/border colour, and a shape's own outline colour.
+  /// Null falls all the way back to [ink] - see [StrokePainter]'s own doc.
+  final Color? noteColor;
+  final Color? shapeColor;
+  final Color noteTextInk;
 
   /// The selection outline and resize-handle colours. Null renders no
   /// selection layer at all, the same "pay nothing for it unwired" choice
@@ -166,6 +180,18 @@ class CanvasSurface extends StatefulWidget {
   /// move, the same shape [onEraseEnd] already uses.
   final VoidCallback? onSelectEnd;
 
+  /// Fires once, on pointer-down, while [tool] is [CanvasTool.note] - a tap
+  /// rather than a drag, since a note's box is a fixed default size the
+  /// caller places and the person resizes afterward with the select tool,
+  /// not a shape dragged out point by point.
+  final ValueChanged<Offset>? onNotePlace;
+
+  /// Fires once, on pointer-down, while [tool] is [CanvasTool.shape] - the
+  /// same single-tap placement [onNotePlace] uses, for the same reason.
+  /// Which of [CanvasShapeKind] gets placed is the caller's own state, not
+  /// this widget's: nothing here has a notion of shape kind at all.
+  final ValueChanged<Offset>? onShapePlace;
+
   /// False freezes the pen and leaves pan and zoom alone, which is what a
   /// timed-out member gets: they keep seeing the canvas and cannot add to it.
   final bool enabled;
@@ -183,6 +209,10 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
   late final StrokePainter _strokes = StrokePainter(
     document: widget.document,
     ink: widget.ink,
+    noteColor: widget.noteColor,
+    shapeColor: widget.shapeColor,
+    textInk: widget.noteTextInk,
+    textFontFamily: widget.cursorLabelFontFamily,
     placeholderFill: widget.placeholderFill,
     placeholderIcon: widget.placeholderIcon,
     elevationShadow: widget.elevationShadow,
@@ -236,7 +266,11 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
   MouseCursor _cursorFor(CanvasTool tool, bool enabled) {
     if (!enabled) return SystemMouseCursors.basic;
     return switch (tool) {
-      CanvasTool.pen || CanvasTool.eraser => SystemMouseCursors.precise,
+      CanvasTool.pen ||
+      CanvasTool.eraser ||
+      CanvasTool.note ||
+      CanvasTool.shape =>
+        SystemMouseCursors.precise,
       CanvasTool.select => SystemMouseCursors.grab,
     };
   }
@@ -264,6 +298,10 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
         widget.onErase?.call(_toWorld(event.localPosition));
       case CanvasTool.select:
         widget.onSelectStart?.call(_toWorld(event.localPosition));
+      case CanvasTool.note:
+        widget.onNotePlace?.call(_toWorld(event.localPosition));
+      case CanvasTool.shape:
+        widget.onShapePlace?.call(_toWorld(event.localPosition));
       case CanvasTool.pen:
         _draft.begin(event.localPosition);
         widget.onDraftPoint?.call(_toWorld(event.localPosition));
@@ -278,6 +316,9 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
         widget.onErase?.call(_toWorld(event.localPosition));
       case CanvasTool.select:
         widget.onSelectDrag?.call(_toWorld(event.localPosition));
+      case CanvasTool.note:
+      case CanvasTool.shape:
+        break;
       case CanvasTool.pen:
         _draft.extend(event.localPosition);
         widget.onDraftPoint?.call(_toWorld(event.localPosition));
@@ -298,6 +339,9 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
         if (_pointers == 0) widget.onEraseEnd?.call();
       case CanvasTool.select:
         if (_pointers == 0) widget.onSelectEnd?.call();
+      case CanvasTool.note:
+      case CanvasTool.shape:
+        break;
       case CanvasTool.pen:
         if (_draft.isEmpty) return;
         final screen = _draft.take();

@@ -2547,11 +2547,14 @@ paths:
         every cell of a client's spatial grid.
 
 
-        `kind` is `stroke` or `image`. It is an allowlist rather than free
-        text, because the kind decides how every client renders a row and an
-        unknown one is a row nobody can draw and nobody can remove. There is
-        no `window` kind: a window is a behaviour of an object rather than an
-        object (decision 0004).
+        `kind` is `stroke`, `image`, `note` or `shape`. It is an allowlist
+        rather than free text, because the kind decides how every client
+        renders a row and an unknown one is a row nobody can draw and nobody
+        can remove. There is no `window` kind: a window is a behaviour of an
+        object rather than an object (decision 0004). `note` and `shape` are
+        the tool dock's other two tools that decision names; neither needs a
+        validation exception, since neither carries a field this route
+        authorizes against the way an image's attachment does.
 
 
         `props` is kind-specific and opaque to the server, capped at 4 KiB
@@ -2566,7 +2569,14 @@ paths:
         have uploaded it themselves, or already hold `VIEW_CHANNEL` somewhere
         it is already visible. An attachment never uploaded, already swept as
         an orphan, or not visible to this caller is a 400, the same collapse
-        a message's own attachment check already makes.
+        a message's own attachment check already makes. For a `note`, `props`
+        carries `text`, set once at creation - there is no edit verb on this
+        canvas for any kind, so revising a note's text means removing it and
+        placing a new one. For a `shape`, `props` carries `shape`, one of
+        `rectangle`, `ellipse`, `line` or `arrow`; a line or an arrow is
+        always the diagonal of the object's own `x`/`y`/`w`/`h` box, so
+        reshaping either is an ordinary `move` op against a different box,
+        with no separate points to keep in step.
 
 
         A 409 also means the channel's canvas is full: a canvas holds at most
@@ -4285,7 +4295,7 @@ components:
           description: Client-generated UUIDv7; also the idempotency key.
         kind:
           type: string
-          description: What the object is. `stroke` or `image` so far.
+          description: What the object is. `stroke`, `image`, `note` or `shape`.
         z_index:
           type: integer
           format: int64
@@ -4333,7 +4343,7 @@ components:
           description: Client-generated UUIDv7; also the idempotency key.
         kind:
           type: string
-          enum: [stroke, image]
+          enum: [stroke, image, note, shape]
         x:
           type: number
           format: double

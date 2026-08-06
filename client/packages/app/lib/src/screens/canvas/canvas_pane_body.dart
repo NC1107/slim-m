@@ -44,6 +44,10 @@ class CanvasPaneBody extends StatefulWidget {
     required this.onSelectStart,
     required this.onSelectDrag,
     required this.onSelectEnd,
+    required this.onNotePlace,
+    required this.onShapePlace,
+    required this.shapeKind,
+    required this.onShapeKindChanged,
     required this.onBringToFront,
     required this.onSendToBack,
     required this.activityLog,
@@ -81,6 +85,13 @@ class CanvasPaneBody extends StatefulWidget {
   final ValueChanged<Offset> onSelectStart;
   final ValueChanged<Offset> onSelectDrag;
   final VoidCallback onSelectEnd;
+  final ValueChanged<Offset> onNotePlace;
+  final ValueChanged<Offset> onShapePlace;
+
+  /// The primitive the next tap with the shape tool places, and the bar's
+  /// own picker for changing it.
+  final CanvasShapeKind shapeKind;
+  final ValueChanged<CanvasShapeKind> onShapeKindChanged;
   final ValueChanged<String> onBringToFront;
   final ValueChanged<String> onSendToBack;
 
@@ -144,6 +155,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
               activityLogOpen: _activityLogOpen,
               onToggleActivityLog: () =>
                   setState(() => _activityLogOpen = !_activityLogOpen),
+              shapeKind: widget.shapeKind,
+              onShapeKindChanged: widget.onShapeKindChanged,
             ),
             if (widget.error != null)
               Padding(
@@ -216,6 +229,9 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           selectionOutline: tokens.accentFill,
           selectionHandleFill: tokens.surfaceRaised,
           selectionHandleBorder: tokens.accentFill,
+          noteColor: AppCanvasColors.note,
+          shapeColor: AppCanvasColors.shape,
+          noteTextInk: tokens.textPrimary,
           onStroke: widget.onStroke,
           tool: widget.tool,
           onErase: widget.onErase,
@@ -223,6 +239,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           onSelectStart: widget.onSelectStart,
           onSelectDrag: widget.onSelectDrag,
           onSelectEnd: widget.onSelectEnd,
+          onNotePlace: widget.onNotePlace,
+          onShapePlace: widget.onShapePlace,
           cursors: widget.cursors,
           cursorColors: widget.cursorColors,
           cursorLabelFontFamily: AppFonts.sans,
@@ -262,8 +280,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
                 ),
                 const SizedBox(height: AppSpacing.s4),
                 Text(
-                  'Draw with the pen, or paste an image from '
-                  '"More canvas actions"',
+                  'Draw with the pen, drop a note or a shape, or paste an '
+                  'image from "More canvas actions"',
                   style: AppText.caption.copyWith(color: tokens.textDisabled),
                   textAlign: TextAlign.center,
                 ),
@@ -275,15 +293,18 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     ),
   );
 
-  /// "N objects on this canvas: X strokes, Y images" - so a screen-reader
-  /// user, or anyone reading the panel's own header, can tell an empty
-  /// canvas from a busy one at a glance, not only from a bare total.
+  /// "N objects on this canvas: X strokes, Y images, Z notes, W shapes" - so
+  /// a screen-reader user, or anyone reading the panel's own header, can
+  /// tell an empty canvas from a busy one at a glance, not only from a bare
+  /// total.
   String _summary() {
     final counts = widget.document.liveCountsByKind;
-    final total = counts.strokes + counts.images;
+    final total = counts.strokes + counts.images + counts.notes + counts.shapes;
     if (total == 0) return 'no objects';
     return '$total ${total == 1 ? 'object' : 'objects'}: '
         '${counts.strokes} ${counts.strokes == 1 ? 'stroke' : 'strokes'}, '
-        '${counts.images} ${counts.images == 1 ? 'image' : 'images'}';
+        '${counts.images} ${counts.images == 1 ? 'image' : 'images'}, '
+        '${counts.notes} ${counts.notes == 1 ? 'note' : 'notes'}, '
+        '${counts.shapes} ${counts.shapes == 1 ? 'shape' : 'shapes'}';
   }
 }

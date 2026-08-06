@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Which stroke, or which image, a pointer landed on.
+/// Which stroke, or which box object, a pointer landed on.
 ///
 /// A stroke is nearest-segment-within-tolerance against its own points,
 /// never its bounding box: a long diagonal stroke's box covers area its ink
 /// never touches, so testing the box would let an eraser take out a
-/// neighbour the drawn line never crossed. An image has no thinner shape
-/// inside its box to miss, so [hitTestImageAt] tests the box directly.
+/// neighbour the drawn line never crossed. An image, a note and a shape all
+/// have nothing thinner inside their own box to miss - a note's text and a
+/// shape's outline both live inside the box they were placed with, never
+/// outside it - so [hitTestBoxAt] tests the box directly for all three.
 library;
 
 import 'dart:typed_data';
@@ -67,13 +69,13 @@ String? hitTestStroke(
   return null;
 }
 
-/// Finds the topmost live image object whose box contains [world] and that
-/// [allowed] accepts, or null.
+/// Finds the topmost live image, note or shape object whose box contains
+/// [world] and that [allowed] accepts, or null.
 ///
-/// Unlike [hitTestStroke], the box itself is the hit target: an image is a
-/// filled rectangle with no thinner shape inside it to miss, so there is no
+/// Unlike [hitTestStroke], the box itself is the hit target: none of the
+/// three kinds has a thinner shape inside it to miss, so there is no
 /// tolerance to add and no reason to cull wider than the point itself.
-String? hitTestImageAt(
+String? hitTestBoxAt(
   CanvasDocument document,
   Offset world, {
   CullResult? scratch,
@@ -85,7 +87,7 @@ String? hitTestImageAt(
   final candidates = <int>[];
   for (final slot in out.slots) {
     final stroke = document.strokeIfAlive(slot);
-    if (stroke != null && stroke.kind == CanvasObjectKind.image) {
+    if (stroke != null && stroke.kind != CanvasObjectKind.stroke) {
       candidates.add(slot);
     }
   }

@@ -249,32 +249,65 @@ void main() {
     },
   );
 
-  /// Move is scoped to images: `beginSelect` hit-tests only the image kind,
-  /// so a drag starting over a stroke picks nothing up and submits nothing.
-  testWidgets('move is scoped to images: dragging over a stroke does nothing', (
-    tester,
-  ) async {
-    final fixture = CanvasPaneFixture()..objects = [canvasObjectJson('a')];
-    final container = fixture.container();
-    addTearDown(container.dispose);
-    addTearDown(fixture.events.close);
-    await pumpCanvasPane(tester, container);
-    await tester.pumpAndSettle();
+  /// Move is scoped to box kinds: `beginSelect` hit-tests everything except
+  /// a stroke, so a drag starting over one picks nothing up and submits
+  /// nothing.
+  testWidgets(
+    'move is scoped to box kinds: dragging over a stroke does nothing',
+    (tester) async {
+      final fixture = CanvasPaneFixture()..objects = [canvasObjectJson('a')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('Move'));
-    await tester.pump();
+      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.pump();
 
-    final start = screenFor(tester, const Offset(15, 15));
-    final gesture = await tester.startGesture(start);
-    await gesture.moveTo(screenFor(tester, const Offset(45, 35)));
-    await gesture.up();
-    await tester.pumpAndSettle();
+      final start = screenFor(tester, const Offset(15, 15));
+      final gesture = await tester.startGesture(start);
+      await gesture.moveTo(screenFor(tester, const Offset(45, 35)));
+      await gesture.up();
+      await tester.pumpAndSettle();
 
-    expect(fixture.postedOps, isEmpty);
-    final bounds = surfaceDocument(tester).objectBounds('a')!;
-    expect(bounds.x, 10);
-    expect(bounds.y, 10);
-  });
+      expect(fixture.postedOps, isEmpty);
+      final bounds = surfaceDocument(tester).objectBounds('a')!;
+      expect(bounds.x, 10);
+      expect(bounds.y, 10);
+    },
+  );
+
+  /// The positive half of the test above: a note is a box kind too, so the
+  /// same drag that does nothing over a stroke does move a note.
+  testWidgets(
+    'dragging with the select tool moves a note and posts one move op',
+    (tester) async {
+      final fixture = CanvasPaneFixture()..objects = [canvasNoteJson('note')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.pump();
+
+      final start = screenFor(tester, const Offset(15, 15));
+      final gesture = await tester.startGesture(start);
+      await gesture.moveTo(screenFor(tester, const Offset(45, 35)));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(fixture.postedOps, hasLength(1));
+      expect(fixture.postedOps.single['kind'], 'move');
+      expect(fixture.postedOps.single['object_id'], 'note');
+
+      final bounds = surfaceDocument(tester).objectBounds('note')!;
+      expect(bounds.x, 40);
+      expect(bounds.y, 30);
+    },
+  );
 
   /// A move already shows its new position optimistically (the property the
   /// first test above checks); a failed submit has to put that back, the

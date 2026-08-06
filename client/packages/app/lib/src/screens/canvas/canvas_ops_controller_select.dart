@@ -64,19 +64,20 @@ class _ResizeState {
 /// undo stack.
 extension CanvasOpsControllerSelect on CanvasOpsController {
   /// Grabs a resize handle on the current selection if [world] lands on
-  /// one, or otherwise picks up the topmost live image under [world] the
-  /// caller may move - their own, or anybody's with [manageCanvas] -
-  /// selecting it and remembering its original bounds so [dragSelect] can
-  /// preview locally and [undo] can reverse whichever this turns out to be.
-  /// Failing that, falls back to a stroke under [world]: selectable for
-  /// reorder (see `CanvasOpsControllerReorder`), never for a drag, since a
-  /// freehand mark has no box a person expects to relocate the way a placed
-  /// image's is. Deselects, silently, if nothing is there: the same "scope
-  /// at hit-test time" choice [onErasePoint] already makes.
+  /// one, or otherwise picks up the topmost live box object (image, note or
+  /// shape) under [world] the caller may move - their own, or anybody's
+  /// with [manageCanvas] - selecting it and remembering its original bounds
+  /// so [dragSelect] can preview locally and [undo] can reverse whichever
+  /// this turns out to be. Failing that, falls back to a stroke under
+  /// [world]: selectable for reorder (see `CanvasOpsControllerReorder`),
+  /// never for a drag, since a freehand mark has no box a person expects to
+  /// relocate the way a placed box object's is. Deselects, silently, if
+  /// nothing is there: the same "scope at hit-test time" choice
+  /// [onErasePoint] already makes.
   ///
-  /// A handle only exists on an image (see `SelectionPainter`'s own doc for
-  /// why a stroke never grows one), so the resize branch is skipped for any
-  /// other kind without needing its own check here.
+  /// A handle only exists on a box kind (see `SelectionPainter`'s own doc
+  /// for why a stroke never grows one), so the resize branch is skipped for
+  /// a stroke without needing its own check here.
   void beginSelect(
     Offset world, {
     required bool manageCanvas,
@@ -84,7 +85,7 @@ extension CanvasOpsControllerSelect on CanvasOpsController {
   }) {
     final selected = document.selectedObjectId.value;
     if (selected != null &&
-        document.kindOf(selected) == CanvasObjectKind.image) {
+        document.kindOf(selected) != CanvasObjectKind.stroke) {
       final owns = manageCanvas || document.authorIdOf(selected) == selfId;
       final bounds = document.objectBounds(selected);
       if (owns && bounds != null) {
@@ -99,10 +100,10 @@ extension CanvasOpsControllerSelect on CanvasOpsController {
     bool allowed(CanvasStroke stroke) =>
         manageCanvas || (stroke.authorId != null && stroke.authorId == selfId);
     final id =
-        hitTestImageAt(document, world, allowed: allowed) ??
+        hitTestBoxAt(document, world, allowed: allowed) ??
         _hitTestSelectableStroke(world, allowed);
     document.selectedObjectId.value = id;
-    if (id == null || document.kindOf(id) != CanvasObjectKind.image) return;
+    if (id == null || document.kindOf(id) == CanvasObjectKind.stroke) return;
     final bounds = document.objectBounds(id);
     if (bounds == null) return;
     _drag = _DragState(id, bounds.x, bounds.y, bounds.w, bounds.h, world);
@@ -110,15 +111,15 @@ extension CanvasOpsControllerSelect on CanvasOpsController {
   }
 
   /// A stroke under [world] the caller may reorder, or null. `hitTestStroke`
-  /// tests every kind's own path/tolerance, not only strokes, so an image
-  /// [beginSelect]'s own box test just missed is excluded here rather than
-  /// re-admitted through a looser one.
+  /// tests every kind's own path/tolerance, not only strokes, so a box
+  /// object [beginSelect]'s own box test just missed is excluded here
+  /// rather than re-admitted through a looser one.
   String? _hitTestSelectableStroke(
     Offset world,
     bool Function(CanvasStroke stroke) allowed,
   ) {
     final id = hitTestStroke(document, world, allowed: allowed);
-    if (id == null || document.kindOf(id) == CanvasObjectKind.image) {
+    if (id == null || document.kindOf(id) != CanvasObjectKind.stroke) {
       return null;
     }
     return id;

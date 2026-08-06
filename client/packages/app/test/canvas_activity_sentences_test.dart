@@ -12,12 +12,14 @@ CanvasActivityEntry _entry({
   CanvasActivityKind kind = CanvasActivityKind.placed,
   String? actorId,
   String? objectKind,
+  String? detail,
   int count = 1,
 }) => CanvasActivityEntry(
   id: id,
   kind: kind,
   actorId: actorId,
   objectKind: objectKind,
+  detail: detail,
   count: count,
   at: DateTime(2026),
 );
@@ -38,6 +40,23 @@ void main() {
           nameFor: (_) => 'Alice',
         ),
         'Alice placed an image.',
+      );
+    });
+
+    test('a shape names itself; a note names itself and its own text', () {
+      expect(
+        describeCanvasActivityEntry(
+          _entry(actorId: 'alice', objectKind: 'shape'),
+          nameFor: (_) => 'Alice',
+        ),
+        'Alice placed a shape.',
+      );
+      expect(
+        describeCanvasActivityEntry(
+          _entry(actorId: 'alice', objectKind: 'note', detail: 'buy milk'),
+          nameFor: (_) => 'Alice',
+        ),
+        'Alice placed a note: buy milk.',
       );
     });
 

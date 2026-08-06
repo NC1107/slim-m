@@ -172,17 +172,17 @@ void main() {
       ..applyPlaced(imageAt('pic', x: 10, y: 10, w: 50, h: 50))
       ..refresh();
 
-    expect(hitTestImageAt(document, const Offset(20, 20)), 'pic');
-    expect(hitTestImageAt(document, const Offset(200, 200)), isNull);
+    expect(hitTestBoxAt(document, const Offset(20, 20)), 'pic');
+    expect(hitTestBoxAt(document, const Offset(200, 200)), isNull);
   });
 
-  test('hitTestImageAt never matches a stroke sharing the same point', () {
+  test('hitTestBoxAt never matches a stroke sharing the same point', () {
     final document = CanvasDocument()..setViewport(const Size(800, 600));
     document
       ..applyPlaced(horizontalStroke('line'))
       ..refresh();
 
-    expect(hitTestImageAt(document, const Offset(50, 0)), isNull);
+    expect(hitTestBoxAt(document, const Offset(50, 0)), isNull);
   });
 
   test('the topmost image wins when two overlap', () {
@@ -192,7 +192,48 @@ void main() {
       ..applyPlaced(imageAt('over', x: 0, y: 0, w: 50, h: 50, zIndex: 2))
       ..refresh();
 
-    expect(hitTestImageAt(document, const Offset(10, 10)), 'over');
+    expect(hitTestBoxAt(document, const Offset(10, 10)), 'over');
+  });
+
+  test('a point inside a note or a shape box is a hit, like an image', () {
+    final document = CanvasDocument()..setViewport(const Size(800, 600));
+    document
+      ..applyPlaced(
+        const CanvasStrokeInput(
+          id: 'note',
+          seq: 1,
+          zIndex: 1,
+          x: 0,
+          y: 0,
+          w: 40,
+          h: 40,
+          points: [],
+          width: 0,
+          colorKey: 'note',
+          kind: CanvasObjectKind.note,
+          text: 'hi',
+        ),
+      )
+      ..applyPlaced(
+        const CanvasStrokeInput(
+          id: 'shape',
+          seq: 2,
+          zIndex: 2,
+          x: 100,
+          y: 100,
+          w: 40,
+          h: 40,
+          points: [],
+          width: 0,
+          colorKey: 'shape',
+          kind: CanvasObjectKind.shape,
+          shapeKind: CanvasShapeKind.rectangle,
+        ),
+      )
+      ..refresh();
+
+    expect(hitTestBoxAt(document, const Offset(10, 10)), 'note');
+    expect(hitTestBoxAt(document, const Offset(110, 110)), 'shape');
   });
 
   test('allowed skips a disallowed image for the one behind it', () {
@@ -203,7 +244,7 @@ void main() {
       ..refresh();
 
     expect(
-      hitTestImageAt(
+      hitTestBoxAt(
         document,
         const Offset(10, 10),
         allowed: (stroke) => stroke.id == 'mine',

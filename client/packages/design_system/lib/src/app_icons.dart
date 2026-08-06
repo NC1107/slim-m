@@ -110,6 +110,16 @@ abstract final class AppIcons {
   static const IconData eraser = LucideIcons.eraser300;
   static const IconData undo = LucideIcons.undo2300;
 
+  /// The canvas's two other tool-dock tools (decision 0004): a note holds
+  /// typed text, a shape is one of four primitives picked from the overflow
+  /// menu while this tool is active.
+  static const IconData note = LucideIcons.stickyNote300;
+  static const IconData shape = LucideIcons.shapes300;
+  static const IconData shapeRectangle = LucideIcons.square300;
+  static const IconData shapeEllipse = LucideIcons.circle300;
+  static const IconData shapeLine = LucideIcons.minus300;
+  static const IconData shapeArrow = LucideIcons.arrowUpRight300;
+
   /// The canvas's select-and-drag tool, for repositioning a placed object.
   static const IconData select = LucideIcons.move300;
 

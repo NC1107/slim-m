@@ -95,7 +95,7 @@ void main() {
 
     document.moveObject('pic', 50, 50, 20, 20);
 
-    final slot = hitTestImageAt(document, const Offset(60, 60));
+    final slot = hitTestBoxAt(document, const Offset(60, 60));
     expect(slot, 'pic');
     final bounds = document.objectBounds('pic')!;
     expect((bounds.x, bounds.y, bounds.w, bounds.h), (50.0, 50.0, 20.0, 20.0));

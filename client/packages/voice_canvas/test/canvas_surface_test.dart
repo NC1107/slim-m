@@ -239,6 +239,38 @@ void main() {
   });
 
   testWidgets(
+      'note and shape tools each place once on pointer-down, no drag needed', (
+    tester,
+  ) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    final notes = <Offset>[];
+    final shapes = <Offset>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          tool: CanvasTool.note,
+          onStroke: (_) {},
+          onNotePlace: notes.add,
+          onShapePlace: shapes.add,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final gesture = await tester.startGesture(const Offset(20, 20));
+    await gesture.moveTo(const Offset(60, 40));
+    await gesture.up();
+    await tester.pump();
+
+    expect(notes, [const Offset(20, 20)]);
+    expect(shapes, isEmpty, reason: 'the shape tool was never selected');
+  });
+
+  testWidgets(
       'onPointerMoved reports world points during a hover, no button down', (
     tester,
   ) async {

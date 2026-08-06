@@ -72,8 +72,12 @@ pub(super) const MAX_BODY_BYTES: usize = 8 * 1024;
 /// An allowlist rather than the free text the store takes: `kind` decides how
 /// every client renders a row, and an unknown one is a row nobody can draw and
 /// nobody can remove. Per decision 0004 there is no `window` kind: a window is
-/// a behaviour of an object, not an object.
-const KINDS: [&str; 2] = ["stroke", "image"];
+/// a behaviour of an object, not an object. `note` and `shape` are the other
+/// two tools decision 0004 names for the dock; neither needs a validation
+/// exception the way `image` does, since neither carries a field this route
+/// authorizes against - a note's text and a shape's own primitive both stay
+/// inside the opaque `props` every other kind's fields already do.
+const KINDS: [&str; 4] = ["stroke", "image", "note", "shape"];
 
 /// The only kind-specific field this server reads out of an otherwise opaque
 /// `props`: which attachment an `image` object names. A raw sha256, not a hex
