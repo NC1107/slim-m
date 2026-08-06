@@ -200,6 +200,106 @@ void main() {
     expect(erased, 0);
   });
 
+  testWidgets('a tap-only erase with no move still reports its one point', (
+    tester,
+  ) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    final erased = <Offset>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          gridLine: const Color(0xFF303030),
+          tool: CanvasTool.eraser,
+          onStroke: (_) {},
+          onErase: erased.add,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final gesture = await tester.startGesture(const Offset(20, 20));
+    await gesture.up();
+    await tester.pump();
+
+    expect(erased, [const Offset(20, 20)]);
+  });
+
+  /// The same collision `_pendingPlacementWorld` already dodges for note and
+  /// shape (see the pinch-cancellation test below): the eraser's own
+  /// pointer-down point is deferred the same way, so a pinch's bare first
+  /// finger cancels rather than erasing whatever it happened to land on.
+  testWidgets(
+    'a second pointer cancels a pending erase point, with nothing erased',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      final erased = <Offset>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CanvasSurface(
+            document: document,
+            ink: const Color(0xFFE86A5C),
+            gridLine: const Color(0xFF303030),
+            tool: CanvasTool.eraser,
+            onStroke: (_) {},
+            onErase: erased.add,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final first = await tester.startGesture(const Offset(20, 20));
+      final second = await tester.startGesture(const Offset(200, 200));
+      await tester.pump();
+      await first.up();
+      await second.up();
+      await tester.pump();
+
+      expect(erased, isEmpty, reason: 'the pinch attempt cancelled this one');
+    },
+  );
+
+  testWidgets(
+    'a real erase drag still reports every point live after a would-be '
+    'pinch on an earlier independent gesture',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      final erased = <Offset>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CanvasSurface(
+            document: document,
+            ink: const Color(0xFFE86A5C),
+            gridLine: const Color(0xFF303030),
+            tool: CanvasTool.eraser,
+            onStroke: (_) {},
+            onErase: erased.add,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final first = await tester.startGesture(const Offset(20, 20));
+      final second = await tester.startGesture(const Offset(200, 200));
+      await tester.pump();
+      await first.up();
+      await second.up();
+      await tester.pump();
+      expect(erased, isEmpty);
+
+      final drag = await tester.startGesture(const Offset(40, 40));
+      await drag.moveTo(const Offset(80, 80));
+      await drag.up();
+      await tester.pump();
+
+      expect(erased, [const Offset(40, 40), const Offset(80, 80)]);
+    },
+  );
+
   testWidgets('the select tool reports world points and commits no ink', (
     tester,
   ) async {

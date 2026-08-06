@@ -156,10 +156,11 @@ class CanvasSurface extends StatefulWidget {
 
   /// Fires once per pointer-down and again on every move while [tool] is
   /// [CanvasTool.eraser], so a drag can wipe through several objects the way
-  /// a moderator clearing a defaced region expects. Unlike note/shape, this
-  /// still fires on a pinch's bare first finger if it lands on a stroke -
-  /// recorded rather than fixed, since closing it means deferring a whole
-  /// drag's per-point hits rather than one placement.
+  /// a moderator clearing a defaced region expects. The pointer-down point
+  /// itself is deferred exactly the way [onNotePlace]'s is (see
+  /// `_pendingErasePoint`), so a pinch's bare first finger cancels rather
+  /// than erasing whatever it happened to land on; every point after that is
+  /// still live, since only the first sample can be a pinch's opening touch.
   final ValueChanged<Offset>? onErase;
 
   /// Fires once the whole erase gesture ends - the last pointer lifting,
@@ -264,6 +265,15 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
   CanvasTool? _pendingPlacementTool;
   Offset? _pendingPlacementWorld;
 
+  /// The eraser's own pointer-down point, held back for exactly the same
+  /// reason [_pendingPlacementWorld] is: at `_down` time there is no way yet
+  /// to tell a real one-finger erase from the first touch of a pinch. A
+  /// second pointer landing discards it in [_down] itself, immediately,
+  /// rather than waiting for `_up` the way a placement does - the eraser
+  /// needs no [_pointers]-zero check on release, since [_move] or a
+  /// pointer-up with nothing else down are both proof a pinch never started.
+  Offset? _pendingErasePoint;
+
   @override
   void dispose() {
     _draft.dispose();
@@ -302,12 +312,13 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
       final hadDraft = !_draft.isEmpty;
       _draft.cancel();
       if (hadDraft) widget.onDraftEnded?.call();
+      _pendingErasePoint = null;
       return;
     }
     if (!widget.enabled) return;
     switch (widget.tool) {
       case CanvasTool.eraser:
-        widget.onErase?.call(_toWorld(event.localPosition));
+        _pendingErasePoint = _toWorld(event.localPosition);
       case CanvasTool.select:
         widget.onSelectStart?.call(_toWorld(event.localPosition));
       case CanvasTool.note:
@@ -327,6 +338,10 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
     if (_pointers != 1 || !widget.enabled) return;
     switch (widget.tool) {
       case CanvasTool.eraser:
+        if (_pendingErasePoint case final pending?) {
+          widget.onErase?.call(pending);
+          _pendingErasePoint = null;
+        }
         widget.onErase?.call(_toWorld(event.localPosition));
       case CanvasTool.select:
         widget.onSelectDrag?.call(_toWorld(event.localPosition));
@@ -351,6 +366,10 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
     _resolvePendingPlacement();
     switch (widget.tool) {
       case CanvasTool.eraser:
+        if (_pendingErasePoint case final pending?) {
+          widget.onErase?.call(pending);
+          _pendingErasePoint = null;
+        }
         if (_pointers == 0) widget.onEraseEnd?.call();
       case CanvasTool.select:
         if (_pointers == 0) widget.onSelectEnd?.call();
