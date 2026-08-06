@@ -233,3 +233,67 @@ async fn advance_canvas_counter(pool: &sqlx::SqlitePool, channel: ChannelId, nex
     .await
     .expect("advance the counter to match");
 }
+
+/// A `clear`'s own wire body is `{before_seq}`, never an `object_ids` list -
+/// unlike `remove`, `restore`, `move` and `reorder`, none of which this test
+/// touches. Before this fix, the shared `canvas_op_targets` insert loop in
+/// `submit_canvas_op` ran for every kind alike, so a `clear` touching many
+/// objects wrote one row per object into a table nothing reads back for it:
+/// `restore_candidates`'s own `clear` branch reads the `deleted_at` fence,
+/// not this table, and `list_canvas_ops`'s `clear` body never serializes an
+/// object list either. Those rows were dead weight with one live cost -
+/// `list_canvas_ops`'s page-byte budget prices every non-`place` kind's
+/// `canvas_op_targets` rows as if they were that kind's own wire payload
+/// (true for `remove`/`restore`/`move`/`reorder`, never true for `clear`),
+/// so a large `clear` was priced as if it carried an object list its DTO
+/// never has, needlessly forcing it onto its own page.
+#[tokio::test]
+async fn a_clear_writes_no_target_rows_and_costs_nothing_in_the_page_budget() {
+    let (store, pool, _guard) = new_store_and_pool().await;
+    let author = store.create_user("ann", "Ann").await.unwrap().id;
+    let channel = store.create_channel("canvas", "voice").await.unwrap().id;
+
+    // Comfortably past what CANVAS_OP_TARGET_BYTES_ESTIMATE would need to blow the budget alone.
+    let touched = 15_000;
+    for _ in 0..touched {
+        place(&store, channel, author, 0).await;
+    }
+    let latest = store.latest_canvas_seq(channel).await.unwrap();
+
+    let clear_outcome = store
+        .submit_canvas_op(
+            channel,
+            author,
+            slimm_server::ids::CanvasOpId::generate(),
+            true,
+            slimm_server::store::CanvasOpRequest::Clear { before_seq: latest },
+        )
+        .await
+        .unwrap();
+    assert_eq!(clear_outcome.affected, touched);
+
+    let target_rows: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM canvas_op_targets WHERE channel_id = ? AND seq = ?",
+    )
+    .bind(channel)
+    .bind(clear_outcome.seq)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        target_rows, 0,
+        "a clear must write no canvas_op_targets rows"
+    );
+
+    // A cheap place right after must bundle with the clear: its wire cost is one integer, not 15,000 ids.
+    place(&store, channel, author, 0).await;
+    let page = store
+        .list_canvas_ops(channel, latest - 1, 200)
+        .await
+        .unwrap();
+    assert!(
+        page.ops.len() >= 3,
+        "the clear must not be priced as if it carried an object list: got {} ops",
+        page.ops.len()
+    );
+}

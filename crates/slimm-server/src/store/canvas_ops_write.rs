@@ -170,6 +170,16 @@ impl Store {
     /// `may_moderate` is the caller's already-evaluated `MANAGE_CANVAS`,
     /// resolved once by the caller alongside `VIEW_CHANNEL`/`USE_CANVAS`
     /// rather than re-read here.
+    ///
+    /// Every kind but `clear` writes one `canvas_op_targets` row per touched
+    /// id, both for `restore_candidates`'s own `remove` lookup and for
+    /// `list_canvas_ops`'s page-byte budget, which prices those rows as that
+    /// kind's own wire payload. A `clear` is a fence over `before_seq`, never
+    /// a list - `restore_candidates`'s `clear` branch reads the
+    /// `deleted_at` fence, not this table, and `CanvasOpBodyDto::Clear` never
+    /// serializes an object list either - so a row written here for it would
+    /// be dead weight with one live cost: pricing a `clear` as if it carried
+    /// an `object_ids` array its own DTO never has.
     pub async fn submit_canvas_op(
         &self,
         channel_id: ChannelId,
@@ -335,15 +345,18 @@ impl Store {
         .execute(&mut *tx)
         .await?;
 
-        for object_id in &touched_ids {
-            sqlx::query!(
-                "INSERT INTO canvas_op_targets (channel_id, seq, object_id) VALUES (?, ?, ?)",
-                channel_id,
-                seq,
-                object_id
-            )
-            .execute(&mut *tx)
-            .await?;
+        // A `clear` names no per-object row here; see this function's own doc.
+        if kind != "clear" {
+            for object_id in &touched_ids {
+                sqlx::query!(
+                    "INSERT INTO canvas_op_targets (channel_id, seq, object_id) VALUES (?, ?, ?)",
+                    channel_id,
+                    seq,
+                    object_id
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
         }
         record_canvas_audit(&mut tx, channel_id, actor_id, kind, &touched_ids, now).await?;
 
