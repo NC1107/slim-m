@@ -20,9 +20,23 @@ import 'package:flutter/widgets.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 class CanvasSelectionSemantics extends StatelessWidget {
-  const CanvasSelectionSemantics({super.key, required this.document});
+  const CanvasSelectionSemantics({
+    super.key,
+    required this.document,
+    this.onOpenActions,
+  });
 
   final CanvasDocument document;
+
+  /// A screen-reader or keyboard route to the selected object's own
+  /// bring-to-front/send-to-back/delete menu - the same one a mouse reaches
+  /// by right-click, published as `SemanticsAction.longPress` on this node
+  /// since it is the one accessibility surface a canvas object already has.
+  /// See `canvas_object_context_menu.dart`'s own doc for why this is where
+  /// that route hangs rather than a focus node of the menu's own. Null
+  /// leaves this node exactly as it always was: an announcement with
+  /// nothing to invoke.
+  final ValueChanged<String>? onOpenActions;
 
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<String?>(
@@ -34,6 +48,9 @@ class CanvasSelectionSemantics extends StatelessWidget {
       return Semantics(
         container: true,
         label: label,
+        onLongPress: onOpenActions == null
+            ? null
+            : () => onOpenActions!(selectedId!),
         child: const SizedBox.shrink(),
       );
     },

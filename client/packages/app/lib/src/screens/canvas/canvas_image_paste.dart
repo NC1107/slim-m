@@ -46,9 +46,12 @@ class CanvasImagePaste {
   final String channelId;
   final CanvasDocument document;
 
-  /// Called once a paste is placed and confirmed, so the caller can switch
-  /// to the select tool - the one thing worth doing immediately after.
-  final VoidCallback onPlaced;
+  /// Called once a paste is placed and confirmed, carrying its id so the
+  /// caller can select it directly rather than merely switch tools - the
+  /// thing worth doing immediately after, and the same closing move
+  /// `canvas_pane_gestures.dart`'s `_selectPlaced` makes for a placed note
+  /// or shape.
+  final ValueChanged<String> onPlaced;
 
   /// A sentence to show, or null to clear a previously shown one.
   final void Function(String? message) onError;
@@ -79,7 +82,7 @@ class CanvasImagePaste {
 
   Future<void> _stage(Uint8List bytes, String filename) async {
     final placed = await _place(bytes);
-    if (placed != null) onPlaced();
+    if (placed != null) onPlaced(placed.id);
   }
 
   /// Decodes [bytes], uploads them, and places an image object centered on

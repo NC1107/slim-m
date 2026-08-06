@@ -17,31 +17,58 @@ extension _CanvasPaneGestures on _CanvasPaneState {
 
   /// Opens the note sheet, and places the note only once it comes back with
   /// real text - nothing is sent, and nothing shows on the shared canvas,
-  /// for a sheet the person cancelled or left blank. Switches to the select
-  /// tool afterward, the one thing worth doing immediately after placing a
-  /// single new object, the same choice a pasted image already makes.
+  /// for a sheet the person cancelled or left blank. [_selectPlaced] is what
+  /// closes it out.
   Future<void> _onNotePlace(Offset world) async {
     final text = await showCanvasNoteSheet(context);
     if (text == null || !_mounted) return;
-    await _quickPlacement.placeNote(
+    final placed = await _quickPlacement.placeNote(
       world,
       text,
       onError: (message) => _refresh(() => _error = message),
     );
-    _refresh(() => _tool = CanvasTool.select);
+    if (placed != null) _selectPlaced(placed.id);
   }
 
   /// Places a shape of the bar's own currently-picked kind at once - no
-  /// sheet, since a shape carries no text to type. Stays on the shape tool
-  /// rather than switching to select, unlike a note: placing several shapes
-  /// of the same kind in a row is a normal thing to want, and switching
-  /// tools after every tap would make that tedious.
+  /// sheet, since a shape carries no text to type.
+  ///
+  /// Used to stay on the shape tool afterward rather than switching to
+  /// select, on the theory that placing several shapes of the same kind in
+  /// a row is a normal thing to want and switching tools after every tap
+  /// would make that tedious. That theory is what report 3 in the backlog
+  /// channel found wrong in practice: staying on the shape tool left a
+  /// freshly placed shape with no way to resize it short of a manual switch
+  /// to Move first, which is worse than the rapid-placement convenience it
+  /// was bought with. [_selectPlaced] now matches the note and paste paths.
   Future<void> _onShapePlace(Offset world) async {
-    await _quickPlacement.placeShape(
+    final placed = await _quickPlacement.placeShape(
       world,
       _shapeKind,
       onError: (message) => _refresh(() => _error = message),
     );
+    if (placed != null) _selectPlaced(placed.id);
+  }
+
+  /// After placing a new object - a placed note, a placed shape, or a
+  /// pasted image - the thing just made is the thing selected, with its
+  /// resize handles already live and the surface already in Move mode: no
+  /// separate switch is needed before it can be resized.
+  ///
+  /// Chosen over having the placement gesture itself carry a size (drag to
+  /// place, sized as dragged) because it is the smaller change: it needs no
+  /// new coexistence with the pinch-deferral already guarding a placement
+  /// tool's own first pointer-down (see `_resolvePendingPlacement`'s doc in
+  /// `canvas_surface_gestures.dart`), and no new "what does a zero-length
+  /// drag produce" case to define. The cost is real and named rather than
+  /// hidden: a person placing several same-sized shapes in a row now
+  /// switches tools once per shape rather than never, where drag-to-place
+  /// would have kept the rapid-placement flow at the cost of a heavier
+  /// gesture change.
+  void _selectPlaced(String objectId) {
+    if (!_mounted) return;
+    _document.selectedObjectId.value = objectId;
+    _refresh(() => _tool = CanvasTool.select);
   }
 
   void _onSelectStart(Offset world) {

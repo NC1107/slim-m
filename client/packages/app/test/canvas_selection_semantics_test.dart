@@ -4,6 +4,7 @@
 /// cap.
 library;
 
+import 'package:flutter/semantics.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_selection_semantics.dart';
@@ -126,6 +127,76 @@ void main() {
       await tester.pump();
 
       expect(find.bySemanticsLabel('Selected shape'), findsOneWidget);
+      handle.dispose();
+    },
+  );
+
+  testWidgets(
+    'a long-press action opens the actions menu for whatever is selected',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      document.applyPlaced(_note('note-1', 'hello'));
+
+      final opened = <String>[];
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: CanvasSelectionSemantics(
+            document: document,
+            onOpenActions: opened.add,
+          ),
+        ),
+      );
+      document.selectedObjectId.value = 'note-1';
+      await tester.pump();
+
+      final node = tester.getSemantics(
+        find.bySemanticsLabel(RegExp('^Selected')),
+      );
+      expect(
+        node.getSemanticsData().hasAction(SemanticsAction.longPress),
+        isTrue,
+      );
+      tester.binding.performSemanticsAction(
+        SemanticsActionEvent(
+          type: SemanticsAction.longPress,
+          nodeId: node.id,
+          viewId: tester.view.viewId,
+        ),
+      );
+      await tester.pump();
+      expect(opened, ['note-1']);
+      handle.dispose();
+    },
+  );
+
+  testWidgets(
+    'with no onOpenActions callback, the node carries no long-press action '
+    'to invoke',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      document.applyPlaced(_note('note-1', 'hello'));
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: CanvasSelectionSemantics(document: document),
+        ),
+      );
+      document.selectedObjectId.value = 'note-1';
+      await tester.pump();
+
+      final node = tester.getSemantics(
+        find.bySemanticsLabel(RegExp('^Selected')),
+      );
+      expect(
+        node.getSemanticsData().hasAction(SemanticsAction.longPress),
+        isFalse,
+      );
       handle.dispose();
     },
   );

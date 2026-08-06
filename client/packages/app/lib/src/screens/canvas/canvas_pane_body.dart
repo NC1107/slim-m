@@ -19,6 +19,7 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 import 'canvas_activity_log.dart';
 import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
+import 'canvas_object_context_menu.dart';
 import 'canvas_presence_layer.dart';
 import 'canvas_selection_semantics.dart';
 
@@ -53,6 +54,7 @@ class CanvasPaneBody extends StatefulWidget {
     required this.onBringToFront,
     required this.onSendToBack,
     required this.onDeleteSelected,
+    required this.selfId,
     required this.activityLog,
     this.cursors,
     this.cursorColors = const [],
@@ -107,6 +109,11 @@ class CanvasPaneBody extends StatefulWidget {
   /// with nothing selected, the same gating [onBringToFront] already uses.
   final ValueChanged<String> onDeleteSelected;
 
+  /// This caller's own id, for [CanvasObjectContextMenu]'s ownership check -
+  /// the same "own it, or hold MANAGE_CANVAS" gate `beginSelect` already
+  /// applies to a left-click select.
+  final String? selfId;
+
   /// The accessibility fallback: who placed, moved, removed, cleared or
   /// restored what, filtered for blocking exactly as a remote cursor
   /// already is. Owned by `_CanvasPaneState` and outlives a panel toggle,
@@ -139,6 +146,18 @@ class CanvasPaneBody extends StatefulWidget {
 
 class _CanvasPaneBodyState extends State<CanvasPaneBody> {
   bool _activityLogOpen = false;
+
+  /// Pure presentation, the same reason `_activityLogOpen` above is local
+  /// state rather than one more field threaded through `_CanvasPaneState`:
+  /// which object a right-click or a screen-reader action is asking about
+  /// right now outlives nothing beyond this body's own lifetime.
+  final _menuRequests = CanvasObjectMenuRequests();
+
+  @override
+  void dispose() {
+    _menuRequests.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -268,7 +287,20 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           participants: widget.callParticipants,
           cameraViewFor: widget.cameraViewFor,
         ),
-        CanvasSelectionSemantics(document: widget.document),
+        CanvasObjectContextMenu(
+          document: widget.document,
+          canManage: widget.canManage,
+          selfId: widget.selfId,
+          requests: _menuRequests,
+          onToolChanged: widget.onToolChanged,
+          onBringToFront: widget.onBringToFront,
+          onSendToBack: widget.onSendToBack,
+          onDeleteSelected: widget.onDeleteSelected,
+        ),
+        CanvasSelectionSemantics(
+          document: widget.document,
+          onOpenActions: _menuRequests.request,
+        ),
       ],
     ),
   );
