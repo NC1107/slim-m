@@ -12,9 +12,8 @@
 //! objects a named `remove` or `clear` op touched: for a `remove` that is its
 //! own `canvas_op_targets` rows, and for a `clear` (which stores no per-object
 //! targets, only a fence) it is every object whose `deleted_at` matches that
-//! exact op's timestamp, the same single-writer reasoning
-//! `canvas_ops_apply::affected_count_for` already rests a clear replay's
-//! count on. `move` and `reorder` both reuse `canvas_op_targets` too, one row
+//! exact op's timestamp - unique by construction, see `now_ms_unique` below.
+//! `move` and `reorder` both reuse `canvas_op_targets` too, one row
 //! naming the object each repositioned or restacked, so a reconnecting
 //! client's catch-up feed learns of either the same way it already learns of
 //! a remove - without it, a change made while a viewer's pane was closed
@@ -36,6 +35,8 @@
 //! `super::canvas_ops_apply`, split out once `move` joining `remove`, `clear`
 //! and `restore` crossed the 500-line hard limit.
 
+use std::sync::atomic::{AtomicI64, Ordering};
+
 use anyhow::Context;
 
 use super::canvas_audit::record_canvas_audit;
@@ -45,6 +46,37 @@ use super::canvas_ops_apply::{
 };
 use super::{PlaceError, Store, now_ms};
 use crate::ids::{CanvasObjectId, CanvasOpId, ChannelId, UserId};
+
+/// A per-op timestamp, unlike plain `now_ms()`, guaranteed never to repeat
+/// within this process.
+///
+/// `canvas_objects.deleted_at` doubles as the fence `restore_candidates`'s
+/// `clear` branch matches a whole batch of un-delete candidates against
+/// (`WHERE deleted_at = target.created_at`), on the stated assumption that
+/// "the single writer this database has means no other write can share that
+/// millisecond." That conflates strict ordering with distinct values: two
+/// sequential `submit_canvas_op` calls can read the same wall-clock
+/// millisecond from `SystemTime::now()`, which is well within reach on a
+/// fast SQLite/WAL commit. A `remove` and an unrelated `clear` sharing one
+/// timestamp would let restoring the `clear` silently un-delete whatever the
+/// `remove` touched too - even a member's own removal of their own object,
+/// with no `MANAGE_CANVAS` involved in that removal at all.
+///
+/// Every canvas-op write already runs inside `Store::begin_write`'s
+/// exclusive `BEGIN IMMEDIATE` lock, so calls into this function are already
+/// totally ordered; it only has to break a tie between two reads of the same
+/// millisecond, not coordinate concurrency none of these calls can have.
+fn now_ms_unique() -> i64 {
+    static LAST: AtomicI64 = AtomicI64::new(0);
+    let mut last = LAST.load(Ordering::Acquire);
+    loop {
+        let next = now_ms().max(last + 1);
+        match LAST.compare_exchange_weak(last, next, Ordering::AcqRel, Ordering::Acquire) {
+            Ok(_) => return next,
+            Err(actual) => last = actual,
+        }
+    }
+}
 
 /// Most object ids one `remove` may name in a single op.
 ///
@@ -211,7 +243,8 @@ impl Store {
             });
         }
 
-        let now = now_ms();
+        // Unique, not just `now_ms()`; see `now_ms_unique`'s own doc.
+        let now = now_ms_unique();
         // Only a `restore` sets this; `canvas_op_target` requires exactly that.
         let mut target_op_for_row: Option<CanvasOpId> = None;
         // Only a fresh, effective `move` sets this.
@@ -374,5 +407,25 @@ impl Store {
             moved_to: move_bounds,
             reordered_to: reorder_z,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::now_ms_unique;
+
+    /// A tight loop with no I/O reliably lands several calls in the same
+    /// real millisecond on any machine, which is exactly the case
+    /// `now_ms_unique`'s own doc names as reachable in production between
+    /// two real `submit_canvas_op` calls. Deterministic, unlike a test that
+    /// tries to race two HTTP requests against the clock.
+    #[test]
+    fn a_tight_loop_never_repeats_a_value() {
+        let mut previous = now_ms_unique();
+        for _ in 0..10_000 {
+            let next = now_ms_unique();
+            assert!(next > previous, "{next} did not advance past {previous}");
+            previous = next;
+        }
     }
 }

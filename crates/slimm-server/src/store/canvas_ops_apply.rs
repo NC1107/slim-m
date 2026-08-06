@@ -254,7 +254,9 @@ pub(super) async fn apply_restore(
 
 /// The objects `target` named: a `remove`'s own `canvas_op_targets` rows, or -
 /// since a `clear` stores no per-object targets, only a fence - every object
-/// whose `deleted_at` matches the exact moment that clear ran.
+/// whose `deleted_at` matches the exact moment that clear ran, which
+/// `canvas_ops_write::now_ms_unique` guarantees no other op's own timestamp
+/// can also equal.
 async fn restore_candidates(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     channel_id: ChannelId,
@@ -338,8 +340,9 @@ pub(super) async fn current_canvas_seq(
 /// stored column. A `remove`'s, `restore`'s, `move`'s or `reorder`'s own
 /// target row already names exactly what it touched, all keyed by the op's
 /// own seq; a `clear` shares one `now` between `deleted_at` and its own
-/// `created_at`, and the single writer this database has means no other
-/// write can share that millisecond, so matching on it is exact.
+/// `created_at`, and `canvas_ops_write::now_ms_unique` is what makes that
+/// value exact rather than merely likely - see its own doc for why a plain
+/// `now_ms()` was not enough.
 pub(super) async fn affected_count_for(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     channel_id: ChannelId,
