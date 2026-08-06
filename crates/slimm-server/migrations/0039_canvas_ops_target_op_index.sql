@@ -9,12 +9,12 @@
 -- cost the previous migration's own (kind, created_at) index does nothing
 -- for, since the foreign-key check is keyed on target_op alone.
 --
--- The same index also serves the sweep's own explicit
--- `NOT EXISTS (SELECT 1 FROM canvas_ops r WHERE r.kind = 'restore' AND
--- r.target_op = o.id)` check in its remove and clear passes: target_op is
--- non-null on a restore row alone (canvas_op_target's CHECK constraint), so
--- filtering on it already implies kind = 'restore' and the query needs
--- nothing more selective than an equality seek on this column.
+-- The same index also serves the sweep's own no-surviving-restore-points-here
+-- test in its remove and clear passes, which asks whether any restore row
+-- names the row being swept. Only a restore ever leaves target_op non-null,
+-- guaranteed by canvas_op_target's CHECK constraint, so filtering on that
+-- column already implies the kind and the test needs nothing more selective
+-- than an equality seek here.
 --
 -- Partial, the same shape canvas_ops_author already uses on actor_id: only a
 -- restore ever sets this column, so indexing the overwhelming majority of
