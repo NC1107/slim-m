@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.32.1](https://github.com/NC1107/slim-m/compare/client-v0.32.0...client-v0.32.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* **canvas:** a pinch no longer erases whatever the first finger touched ([#449](https://github.com/NC1107/slim-m/issues/449)) ([09ca591](https://github.com/NC1107/slim-m/commit/09ca591528d9e3590c7095c1f59e181279edd07d))
+* **canvas:** a way back when you are lost, and the key everybody presses to delete ([#444](https://github.com/NC1107/slim-m/issues/444)) ([6dd195a](https://github.com/NC1107/slim-m/commit/6dd195afd074f93f971b409dbcb66b90f6330c8b))
+* **canvas:** cap an in-flight draft, and measure a note in the bytes the wire actually counts ([#438](https://github.com/NC1107/slim-m/issues/438)) ([8279d8f](https://github.com/NC1107/slim-m/commit/8279d8f9aca6abd9b0f4971598fe6ab872f10955))
+* **canvas:** look at what the painters actually draw, and fix the three things that were wrong ([#440](https://github.com/NC1107/slim-m/issues/440)) ([58b9d5a](https://github.com/NC1107/slim-m/commit/58b9d5a930f27b8cc7475f91a7fb4958e99604ae))
+* **canvas:** two tools were off the edge of the bar at phone width ([#447](https://github.com/NC1107/slim-m/issues/447)) ([6f92037](https://github.com/NC1107/slim-m/commit/6f92037cc474135c8fdc3f5580279bb62f1cb29c))
+
 ## [0.32.0](https://github.com/NC1107/slim-m/compare/client-v0.31.1...client-v0.32.0) (2026-08-06)
 
 
