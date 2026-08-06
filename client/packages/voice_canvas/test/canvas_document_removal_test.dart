@@ -54,6 +54,22 @@ void main() {
     );
   });
 
+  test(
+    'removing the selected or elevated object clears both, so neither '
+    'offers a resize, reorder or shadow for something already gone',
+    () {
+      final document = CanvasDocument()..setViewport(const Size(800, 600));
+      document.applyPlaced(stroke('a'));
+      document.selectedObjectId.value = 'a';
+      document.elevatedObjectId.value = 'a';
+
+      document.removeObject('a');
+
+      expect(document.selectedObjectId.value, isNull);
+      expect(document.elevatedObjectId.value, isNull);
+    },
+  );
+
   test('an id removed before ever being placed refuses a later resurrection',
       () {
     final document = CanvasDocument()..setViewport(const Size(800, 600));
