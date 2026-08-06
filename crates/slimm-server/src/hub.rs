@@ -98,6 +98,7 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::CanvasCleared { .. }
         | Event::CanvasObjectsRestored { .. }
         | Event::CanvasCursorMoved { .. }
+        | Event::CanvasStrokePreview { .. }
         | Event::CanvasObjectMoved { .. }
         | Event::CanvasObjectReordered { .. }
         | Event::SessionRevoked(_)
@@ -274,6 +275,13 @@ mod epoch_tests {
             user_id: UserId::generate(),
             x: 0.0,
             y: 0.0,
+        });
+        hub.publish(Event::CanvasStrokePreview {
+            channel_id: ChannelId::generate(),
+            user_id: UserId::generate(),
+            object_id: crate::ids::CanvasObjectId::generate(),
+            points: vec![0.0, 0.0],
+            ended: false,
         });
         assert_eq!(hub.permissions_epoch(), before);
     }

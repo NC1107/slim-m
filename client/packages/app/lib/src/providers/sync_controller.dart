@@ -117,6 +117,23 @@ class SyncController extends StateNotifier<SyncStatus> {
   void notifyCanvasCursor(String channelId, double x, double y) =>
       _connection?.canvasCursor(channelId, x, y);
 
+  /// Tells the server this user's in-flight stroke gained points, or ended.
+  ///
+  /// The same no-op-while-down shape as [notifyCanvasCursor]: a preview
+  /// frame missed during a reconnect is worth nothing and must never surface
+  /// as an error to whoever is drawing.
+  void notifyCanvasStrokePreview(
+    String channelId,
+    String objectId,
+    List<double> points, {
+    bool ended = false,
+  }) => _connection?.canvasStrokePreview(
+    channelId,
+    objectId,
+    points,
+    ended: ended,
+  );
+
   /// Starts, or restarts, synchronisation. Safe to call repeatedly: a call
   /// superseded by a later [start] or a [stop] before it reaches a given
   /// checkpoint abandons itself there rather than finishing against a

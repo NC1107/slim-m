@@ -77,10 +77,30 @@ pub enum Class {
     /// that sustained rate with headroom for a burst, rather than reused from
     /// [`Class::Typing`]'s much sparser one.
     CanvasCursor,
+    /// In-flight stroke preview frames over the WebSocket - ephemeral,
+    /// relayed but never persisted (see `Event::CanvasStrokePreview`).
+    ///
+    /// Unlike every other class, this one is denominated in *bytes*, not
+    /// requests: a caller charges it through [`RateLimiter::check_weighted`]
+    /// with the frame's own wire size as the cost, because a preview frame's
+    /// size grows with how many points it carries while [`Class::CanvasCursor`]'s
+    /// two-number frame never does - a per-request budget sized for a small
+    /// frame would starve a legitimately larger one and a budget sized for a
+    /// large one would let a flood of tiny frames spend far more bandwidth
+    /// than a cursor ever could. This is the byte-rate half of the roadmap's
+    /// split canvas rate limits; [`Class::Canvas`] (the persisted-op half) is
+    /// unchanged.
+    ///
+    /// Sized so a capped 24-point frame (under 1.5 KiB) can be sent roughly
+    /// eight times back to back before the burst runs out, and sustained
+    /// drawing at the client's own throttle interval (90ms) stays inside the
+    /// refill with headroom to spare.
+    CanvasStrokePreview,
 }
 
 impl Class {
-    /// (burst, refill per second).
+    /// (burst, refill per second). For [`Class::CanvasStrokePreview`] the
+    /// unit is bytes, not requests; see its own doc.
     const fn budget(self) -> (f64, f64) {
         match self {
             Class::Password => (5.0, 1.0 / 6.0),
@@ -93,6 +113,8 @@ impl Class {
             Class::Upload => (10.0, 1.0 / 20.0),
             Class::Canvas => (60.0, 10.0),
             Class::CanvasCursor => (30.0, 15.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::CanvasStrokePreview => (12_288.0, 6_144.0),
         }
     }
 }
@@ -171,7 +193,25 @@ impl RateLimiter {
     /// [`RateLimiter::check`] with an explicit clock, so tests can advance time
     /// without sleeping.
     pub fn check_at(&self, class: Class, key: &str, now: Instant) -> bool {
+        self.check_weighted_at(class, key, 1.0, now)
+    }
+
+    /// [`RateLimiter::check`], charging `cost` tokens rather than the
+    /// implicit one - the mechanism [`Class::CanvasStrokePreview`] uses to
+    /// meter bytes instead of requests, by passing the frame's own wire size
+    /// as `cost`. A `cost` larger than the class's whole burst is always
+    /// refused, rather than admitted against an under-provisioned bucket.
+    pub fn check_weighted(&self, class: Class, key: &str, cost: f64) -> bool {
+        self.check_weighted_at(class, key, cost, Instant::now())
+    }
+
+    /// [`RateLimiter::check_weighted`] with an explicit clock; see
+    /// [`RateLimiter::check_at`].
+    pub fn check_weighted_at(&self, class: Class, key: &str, cost: f64, now: Instant) -> bool {
         let (burst, refill) = class.budget();
+        if cost > burst {
+            return false;
+        }
         let mut state = match self.state.lock() {
             Ok(state) => state,
             // A poisoned lock means another thread panicked mid-update. Fail
@@ -192,8 +232,8 @@ impl RateLimiter {
                 let elapsed = now.duration_since(bucket.last).as_secs_f64();
                 bucket.tokens = (bucket.tokens + elapsed * refill).min(burst);
                 bucket.last = now;
-                if bucket.tokens >= 1.0 {
-                    bucket.tokens -= 1.0;
+                if bucket.tokens >= cost {
+                    bucket.tokens -= cost;
                     true
                 } else {
                     false
@@ -208,7 +248,7 @@ impl RateLimiter {
                 state.buckets.insert(
                     map_key,
                     Bucket {
-                        tokens: burst - 1.0,
+                        tokens: burst - cost,
                         last: now,
                     },
                 );
@@ -289,5 +329,65 @@ mod tests {
         let later = start + IDLE_TTL + SWEEP_INTERVAL;
         assert!(limiter.check_at(Class::Write, "fresh", later));
         assert_eq!(limiter.tracked(), 1, "the idle bucket was swept");
+    }
+
+    /// `check_at` is `check_weighted_at` at cost 1.0, not a second code path,
+    /// so this is what actually proves the refactor kept every existing
+    /// caller's behaviour: two big frames spend the burst exactly as two big
+    /// requests would.
+    #[test]
+    fn weighted_cost_is_charged_per_call() {
+        let limiter = RateLimiter::new();
+        let now = Instant::now();
+        let (burst, _) = Class::CanvasStrokePreview.budget();
+        let half = burst / 2.0;
+        assert!(limiter.check_weighted_at(Class::CanvasStrokePreview, "a", half, now));
+        assert!(limiter.check_weighted_at(Class::CanvasStrokePreview, "a", half, now));
+        assert!(
+            !limiter.check_weighted_at(Class::CanvasStrokePreview, "a", 1.0, now),
+            "the burst is fully spent"
+        );
+    }
+
+    /// A frame nobody's own throttle could have produced is refused outright,
+    /// on its own, rather than partially admitted against an
+    /// under-provisioned bucket.
+    #[test]
+    fn a_cost_larger_than_the_burst_is_always_refused() {
+        let limiter = RateLimiter::new();
+        let (burst, _) = Class::CanvasStrokePreview.budget();
+        assert!(!limiter.check_weighted_at(
+            Class::CanvasStrokePreview,
+            "a",
+            burst + 1.0,
+            Instant::now(),
+        ));
+    }
+
+    /// The property the byte-rate cap exists for: a caller sending many small
+    /// frames survives longer than one sending the same total bytes in fewer,
+    /// larger ones - the opposite of a per-request cap, which would treat
+    /// both identically. Mutation-tested by hand: reverting
+    /// `check_weighted_at` to always charge 1.0 regardless of `cost` makes
+    /// both assertions below pass identically, which is exactly the
+    /// regression this test is for.
+    #[test]
+    fn many_small_frames_cost_less_than_few_large_ones_of_the_same_total() {
+        let limiter = RateLimiter::new();
+        let now = Instant::now();
+        let (burst, _) = Class::CanvasStrokePreview.budget();
+
+        let small_admitted = (0..1000)
+            .filter(|_| limiter.check_weighted_at(Class::CanvasStrokePreview, "small", 1.0, now))
+            .count();
+        let large_admitted = (0..1000)
+            .filter(|_| limiter.check_weighted_at(Class::CanvasStrokePreview, "large", burst, now))
+            .count();
+
+        assert!(small_admitted > large_admitted);
+        assert_eq!(
+            large_admitted, 1,
+            "the first full-burst frame spends it all"
+        );
     }
 }

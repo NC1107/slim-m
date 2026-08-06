@@ -50,6 +50,9 @@ class CanvasPaneBody extends StatefulWidget {
     this.cursors,
     this.cursorColors = const [],
     this.onPointerMoved,
+    this.remoteDrafts,
+    this.onDraftPoint,
+    this.onDraftEnded,
     this.callParticipants = const [],
     required this.cameraViewFor,
   });
@@ -94,6 +97,12 @@ class CanvasPaneBody extends StatefulWidget {
   final CanvasCursors? cursors;
   final List<Color> cursorColors;
   final PointerMoved? onPointerMoved;
+
+  /// Other participants' in-flight strokes. Null renders no layer, the same
+  /// "cheap to omit" shape [cursors] already offers.
+  final RemoteStrokeDrafts? remoteDrafts;
+  final DraftPointAdded? onDraftPoint;
+  final VoidCallback? onDraftEnded;
 
   /// Who is on this channel's call right now, already filtered for
   /// blocking - empty whenever there is no call here, or this viewer has not
@@ -218,6 +227,9 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           cursorColors: widget.cursorColors,
           cursorLabelFontFamily: AppFonts.sans,
           onPointerMoved: widget.onPointerMoved,
+          remoteDrafts: widget.remoteDrafts,
+          onDraftPoint: widget.onDraftPoint,
+          onDraftEnded: widget.onDraftEnded,
         ),
         CanvasPresenceLayer(
           document: widget.document,

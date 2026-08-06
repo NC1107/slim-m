@@ -207,6 +207,21 @@ sealed class ServerEvent {
           x: (decoded['x'] as num).toDouble(),
           y: (decoded['y'] as num).toDouble(),
         ),
+      'canvas.stroke_preview.updated'
+          when decoded['channel_id'] is String &&
+              decoded['user_id'] is String &&
+              decoded['object_id'] is String &&
+              decoded['points'] is List &&
+              decoded['ended'] is bool =>
+        CanvasStrokePreview(
+          channelId: decoded['channel_id'] as String,
+          userId: decoded['user_id'] as String,
+          objectId: decoded['object_id'] as String,
+          points: (decoded['points'] as List<dynamic>)
+              .map((p) => (p as num).toDouble())
+              .toList(growable: false),
+          ended: decoded['ended'] as bool,
+        ),
       'canvas.object.moved'
           when decoded['channel_id'] is String &&
               decoded['seq'] is int &&
@@ -398,6 +413,28 @@ class EventConnection {
           'channel_id': channelId,
           'x': x,
           'y': y,
+        }),
+      );
+
+  /// Relays this device's own in-flight stroke, a delta of [points] since
+  /// this [objectId]'s last frame. The same ephemeral shape as
+  /// [canvasCursor]: no acknowledgement, safe to call as often as the caller
+  /// likes, and the server rate-limits it (by the frame's own byte size
+  /// rather than by count) and drops the excess silently. [ended] marks the
+  /// gesture's last frame.
+  void canvasStrokePreview(
+    String channelId,
+    String objectId,
+    List<double> points, {
+    bool ended = false,
+  }) =>
+      _channel.sink.add(
+        jsonEncode({
+          'type': 'canvas.stroke_preview',
+          'channel_id': channelId,
+          'object_id': objectId,
+          'points': points,
+          'ended': ended,
         }),
       );
 

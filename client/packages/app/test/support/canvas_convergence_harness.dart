@@ -76,6 +76,9 @@ class CanvasReceiver {
       document: document,
       relay: () =>
           throw UnimplementedError('this model never generates a cursor event'),
+      strokePreviewRelay: () => throw UnimplementedError(
+        'this model never generates a stroke preview event',
+      ),
       applyPlacedObject: (object) {
         final input = canvasStrokeInputFrom(object);
         if (input != null) document.applyPlaced(input);

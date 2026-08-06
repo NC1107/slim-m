@@ -43,6 +43,7 @@ import 'canvas_image_paste.dart';
 import 'canvas_live_event_dispatch.dart';
 import 'canvas_ops_controller.dart';
 import 'canvas_pane_body.dart';
+import 'canvas_stroke_preview_relay.dart';
 import 'canvas_sync.dart';
 
 part 'canvas_pane_gestures.dart';
@@ -67,6 +68,7 @@ class CanvasPane extends ConsumerStatefulWidget {
 class _CanvasPaneState extends ConsumerState<CanvasPane> {
   final CanvasDocument _document = CanvasDocument();
   final CanvasCursors _cursors = CanvasCursors();
+  final RemoteStrokeDrafts _remoteDrafts = RemoteStrokeDrafts();
   late final CanvasActivityLog _activityLog = CanvasActivityLog(
     isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
   );
@@ -74,6 +76,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   CanvasCommitQueue? _queue;
   CanvasOpsController? _opsController;
   CanvasCursorRelay? _cursorRelay;
+  CanvasStrokePreviewRelay? _strokePreviewRelay;
   Timer? _panDebounce;
   late final CanvasSync _sync;
   ProviderSubscription<SyncStatus>? _syncStatusSubscription;
@@ -134,6 +137,8 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _document.dispose();
     _cursorRelay?.dispose();
     _cursors.dispose();
+    _strokePreviewRelay?.dispose();
+    _remoteDrafts.dispose();
     _activityLog.dispose();
     super.dispose();
   }
@@ -195,6 +200,22 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     selfId: () => ref.read(meProvider).valueOrNull?.id,
   );
 
+  CanvasStrokePreviewRelay get _strokePreview =>
+      _strokePreviewRelay ??= CanvasStrokePreviewRelay(
+        drafts: _remoteDrafts,
+        paletteSize: AppCanvasColors.cursors.length,
+        send: (objectId, points, ended) => ref
+            .read(syncControllerProvider.notifier)
+            .notifyCanvasStrokePreview(
+              widget.channelId,
+              objectId,
+              points,
+              ended: ended,
+            ),
+        isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
+        selfId: () => ref.read(meProvider).valueOrNull?.id,
+      );
+
   /// A remote cursor's label as of the last resolved answer, kicking off a
   /// fetch for an id this session has not asked about yet - the same
   /// resolve-then-fall-back order `authorLabel` uses for a message author,
@@ -214,6 +235,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     sync: _sync,
     document: _document,
     relay: () => _relay,
+    strokePreviewRelay: () => _strokePreview,
     applyPlacedObject: _apply,
     forgetFetchedRegion: () => _fetched = null,
     activityLog: _activityLog,
@@ -432,6 +454,9 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           cursors: _cursors,
           cursorColors: AppCanvasColors.cursors,
           onPointerMoved: _onPointerMoved,
+          remoteDrafts: _remoteDrafts,
+          onDraftPoint: _strokePreview.reportLocalDraftPoint,
+          onDraftEnded: _strokePreview.endLocalDraft,
           callParticipants: _callParticipants(),
           cameraViewFor: ref
               .read(voiceControllerProvider.notifier)

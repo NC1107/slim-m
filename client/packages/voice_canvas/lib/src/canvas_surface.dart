@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The drawing surface: three repaint boundaries, raw pointer input, and no
+/// The drawing surface: several repaint boundaries, raw pointer input, and no
 /// widget rebuild for anything the camera or the pointer does.
 library;
 
@@ -10,6 +10,7 @@ import 'package:flutter/widgets.dart';
 import 'canvas_cursors.dart';
 import 'canvas_document.dart';
 import 'canvas_painters.dart';
+import 'canvas_stroke_drafts.dart';
 import 'selection_painter.dart';
 
 /// A pen stroke the surface has finished and wants committed.
@@ -18,6 +19,13 @@ typedef StrokeCommitted = void Function(List<Offset> worldPoints);
 /// This pointer moved to a world position, on every hover and drag alike.
 /// The caller decides whether and how often to relay it.
 typedef PointerMoved = void Function(Offset worldPoint);
+
+/// A point was added to the pen stroke currently under this device's own
+/// pointer, in world coordinates. Fires on the same down/move events
+/// [StrokeCommitted] itself is eventually built from, but as they happen
+/// rather than once at the end - the caller decides whether, and how often,
+/// to relay it onward as an ephemeral preview.
+typedef DraftPointAdded = void Function(Offset worldPoint);
 
 /// Which gesture a single pointer draws.
 ///
@@ -59,6 +67,9 @@ class CanvasSurface extends StatefulWidget {
     this.selectionOutline,
     this.selectionHandleFill,
     this.selectionHandleBorder,
+    this.remoteDrafts,
+    this.onDraftPoint,
+    this.onDraftEnded,
   });
 
   final CanvasDocument document;
@@ -107,6 +118,22 @@ class CanvasSurface extends StatefulWidget {
   /// onward - this widget applies no throttle of its own so a test can
   /// assert on every call without needing a fake clock.
   final PointerMoved? onPointerMoved;
+
+  /// Other participants' in-flight strokes, painted between the committed
+  /// ink and this device's own draft. Null renders no layer at all, the same
+  /// "pay nothing for it unwired" shape [cursors] already uses.
+  final RemoteStrokeDrafts? remoteDrafts;
+
+  /// Fires on pointer-down (the first point) and every move while [tool] is
+  /// [CanvasTool.pen] and a draft is under way. The caller decides whether,
+  /// and how often, to relay this onward as an ephemeral preview.
+  final DraftPointAdded? onDraftPoint;
+
+  /// Fires once a pen draft ends - the pointer lifted, or a second pointer
+  /// touched down and cancelled it - whether or not it went on to call
+  /// [onStroke]. A caller relaying [onDraftPoint] should use this as the
+  /// signal to tell other participants the gesture is over.
+  final VoidCallback? onDraftEnded;
 
   /// Which gesture a pointer draws. Resolving a world point to an object is
   /// the caller's job, over [onErase], so this widget stays free of any
@@ -166,6 +193,14 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
     ink: widget.ink,
     width: widget.strokeWidth,
   );
+  late final RemoteDraftPainter? _remoteDraftPainter =
+      widget.remoteDrafts == null
+          ? null
+          : RemoteDraftPainter(
+              drafts: widget.remoteDrafts!,
+              document: widget.document,
+              colors: widget.cursorColors,
+            );
   late final CursorPainter? _cursorPainter = widget.cursors == null
       ? null
       : CursorPainter(
@@ -218,7 +253,9 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
     widget.onPointerMoved?.call(_toWorld(event.localPosition));
     _pointers++;
     if (_pointers > 1) {
+      final hadDraft = !_draft.isEmpty;
       _draft.cancel();
+      if (hadDraft) widget.onDraftEnded?.call();
       return;
     }
     if (!widget.enabled) return;
@@ -229,6 +266,7 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
         widget.onSelectStart?.call(_toWorld(event.localPosition));
       case CanvasTool.pen:
         _draft.begin(event.localPosition);
+        widget.onDraftPoint?.call(_toWorld(event.localPosition));
     }
   }
 
@@ -242,6 +280,7 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
         widget.onSelectDrag?.call(_toWorld(event.localPosition));
       case CanvasTool.pen:
         _draft.extend(event.localPosition);
+        widget.onDraftPoint?.call(_toWorld(event.localPosition));
     }
   }
 
@@ -262,6 +301,7 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
       case CanvasTool.pen:
         if (_draft.isEmpty) return;
         final screen = _draft.take();
+        widget.onDraftEnded?.call();
         if (screen.length < 2) return;
         widget.onStroke(screen.map(_toWorld).toList(growable: false));
     }
@@ -352,6 +392,9 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
                 children: [
                   RepaintBoundary(child: CustomPaint(painter: _grid)),
                   RepaintBoundary(child: CustomPaint(painter: _strokes)),
+                  if (_remoteDraftPainter case final remoteDraftPainter?)
+                    RepaintBoundary(
+                        child: CustomPaint(painter: remoteDraftPainter)),
                   RepaintBoundary(child: CustomPaint(painter: _draftPainter)),
                   if (_selectionPainter case final selectionPainter?)
                     RepaintBoundary(
