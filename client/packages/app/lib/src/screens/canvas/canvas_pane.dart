@@ -151,10 +151,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     client: ref.read(apiProvider),
     channelId: widget.channelId,
     document: _document,
-    onPlaced: () {
-      // A just-pasted image is the one thing worth repositioning immediately.
-      if (mounted) setState(() => _tool = CanvasTool.select);
-    },
+    onPlaced: _selectPlaced,
     onError: (message) {
       if (mounted) setState(() => _error = message);
     },
@@ -476,6 +473,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           onBringToFront: (id) => unawaited(_onBringToFront(id)),
           onSendToBack: (id) => unawaited(_onSendToBack(id)),
           onDeleteSelected: (id) => unawaited(_onDeleteSelected(id)),
+          selfId: me?.id,
           cursors: _cursors,
           cursorColors: AppCanvasColors.cursors,
           onPointerMoved: _onPointerMoved,
