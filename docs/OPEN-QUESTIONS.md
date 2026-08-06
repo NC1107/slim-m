@@ -317,6 +317,28 @@ Threads, the "hidden sub-channel you click Reply in Thread to open" the owner de
 
 *Question:* pick a shape (the record recommends a thread as a channel with a parent), or say the cheap filtered-view version is good enough for now, knowing it does not match the Slack model named.
 
+## 20. A live stroke changes colour the instant it commits, and only you can settle which colour is right (2026-08-06)
+
+Two independent reviewers, one reading the interaction and one reading the rendered pixels, flagged the same thing on the same night without seeing each other's work.
+That is the reason this is written down rather than decided: neither of them read it as obviously wrong, and neither could find where the intent had ever been recorded.
+
+While somebody is still drawing, their in-flight stroke paints in their own cursor-identity hue - `canvasParticipantColorIndex` gives them a colour, and `CanvasCursorRelay` gives their pointer the same one, so the ink and the cursor read as one person.
+The moment the stroke commits it repaints in the single fixed `AppCanvasColors.annotation`, the same colour every stroke uses regardless of who drew it.
+So a mark visibly changes hue at the exact moment it lands, which a first-time viewer reads as a glitch.
+
+*Question:* which of the two is the thing this is meant to say?
+
+**Commit in the author's own colour** and the change disappears, at the cost of putting permanent, visible authorship on a shared board.
+This product deliberately keeps a canvas unattributed - the moderation events carry no actor on the wire, the activity log renders a withheld moderator passively rather than naming them - and per-author ink would be the first place a canvas says who did what, forever, to everyone.
+
+**Draw in the shared colour** and the change disappears the other way, at the cost of the live cue.
+Watching four people draw at once becomes four identical coral lines appearing from nowhere, and the "that is Nick's hand moving" signal that makes a live preview worth having at all is gone.
+
+**Leave it** and the hue change stays, which is what ships today.
+It is documented as deliberate in `canvas_live_painters.dart`'s own doc comment, and the argument behind it is real - identity while drawing, anonymity once drawn - it has just never been checked against anybody actually watching it happen.
+
+Nothing here is blocked on the answer; all three are small changes to one painter.
+
 ## 19. The release-PR conflict is fixed by removing the shared file, not by removing release-please (2026-08-01)
 
 Section 6 and section 9 both pointed at the same recommendation: switch to manual tagging, because it has no standing PR left to conflict.
