@@ -13,6 +13,7 @@ mod fixtures;
 mod http_gate;
 mod r#move;
 mod reorder;
+mod restart_clock;
 mod restore;
 mod restore_permission;
 #[path = "../support/mod.rs"]
