@@ -28,6 +28,24 @@
 /// residual rather than fought over: closing it would mean competing with
 /// the canvas's own pan recognizer for the same pointer, a real regression
 /// risk for no more than a few dp of padding.
+///
+/// **`excludeFromSemantics: true` on that same hit-catcher, and it is not
+/// about the raw pointer arena at all.** `RawGestureDetector` builds a
+/// `TapGestureRecognizer` the moment any tap-family callback is wired,
+/// `onSecondaryTapUp` included, and Flutter's own default semantics
+/// delegate exposes `SemanticsAction.tap` the instant that recognizer
+/// exists - regardless of which specific tap variant it actually carries
+/// (`_DefaultSemanticsGestureDelegate._getTapHandler`, read from the
+/// framework source). Without the exclusion this card's own full-size
+/// background became a second, competing "tappable" ancestor of every real
+/// button inside it, and Flutter's semantics action routing did not
+/// resolve that competition uniformly: `Mute` still activated correctly
+/// through the accessibility tree, `Leave call` silently did not, with no
+/// error anywhere - the same shape `canvas_object_context_menu.dart`'s own
+/// identical fix already closed for the canvas surface underneath, found
+/// here because a real mouse click and a screen-reader-style activation of
+/// the same button produced different, silent outcomes for one button and
+/// not its neighbour.
 library;
 
 import 'package:flutter/material.dart';
@@ -68,6 +86,8 @@ class FloatingDockCard extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       // A no-op, not an omission: see this file's own library doc for why a right-click here must never reach a canvas object menu beneath.
       onSecondaryTapUp: (_) {},
+      // Load-bearing, not tidiness - see this file's own library doc.
+      excludeFromSemantics: true,
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s12,

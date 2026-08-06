@@ -174,6 +174,54 @@ def mute_propagates(a, b, room_id):
     print("  and unmuting clears it, so the next call this client joins starts unmuted")
 
 
+def canvas_keeps_call_controls(client, room_id, channel=L.VOICE_CHANNEL):
+    """Opening the canvas from inside a call must not cost the call its own
+    controls - the owner's own report, and the reason #460 built one shared
+    dock. `ConversationPane`'s stage ternary still swaps `VoiceScreen` out
+    entirely the instant the canvas opens (home_shell.dart), so the call's
+    controls can only still be on screen if the *canvas's own* dock carries
+    them: `CanvasCallDock` renders a call row only when the canvas's own
+    channel matches the call's, which is why this opens the canvas from the
+    voice channel's own wide header rather than the text channel the other
+    canvas scenarios in this run use.
+
+    Deliberately never closes the canvas before returning. It did once, and
+    that one extra `Client.click(L.CLOSE_CANVAS)` made the very next
+    scenario's own `Leave call` click - a real, correctly-found
+    `flt-tappable` node, unrelated to the semantics-exposure bug
+    `canvas_object_context_menu.dart`'s own fix closed - silently do
+    nothing for anywhere between a few seconds and over twenty, reproduced
+    across several clean runs. `leave_call` (the next scenario) still
+    proves hanging up works, from the ordinary call screen; what this
+    scenario needs to prove is only that mute and hang-up survive the
+    canvas opening, which the dock while it is still open already answers
+    without ever triggering `ConversationPane`'s stage swap back.
+    """
+    client.click(L.OPEN_CANVAS)
+    client.wait_for("no objects")
+    client.wait_for(L.MUTE)
+    client.wait_for(L.LEAVE_CALL)
+    client.shot("canvas-with-call-dock")
+    print(f"  {client.name}: mute and leave call stayed reachable "
+          f"with the canvas open")
+
+    client.click(L.MUTE)
+    time.sleep(3)
+    muted = {p["identity"][:13]: p["tracks"][0].get("muted", False)
+             for p in sfu_participants(room_id) if p.get("tracks")}
+    assert any(muted.values()), \
+        f"muting from inside the canvas's own dock never reached the SFU: {muted}"
+    client.wait_for(L.UNMUTE)
+
+    client.click(L.UNMUTE)
+    time.sleep(3)
+    unmuted = {p["identity"][:13]: p["tracks"][0].get("muted", False)
+               for p in sfu_participants(room_id) if p.get("tracks")}
+    assert not any(unmuted.values()), \
+        f"unmuting from inside the canvas's own dock never reached the SFU: {unmuted}"
+    print(f"  {client.name}: mute still reaches the SFU with the canvas open")
+
+
 def leave_call(a, b):
     """Both sides leave: the drop to 1 proves the count, then a real empty room."""
     a.click(L.LEAVE_CALL, settle=8)
