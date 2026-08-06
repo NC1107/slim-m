@@ -102,7 +102,10 @@ async fn age_all_ops(pool: &SqlitePool, days: i64) {
 }
 
 /// Backdates one specific op by id, for a scenario where two ops must age
-/// out on different sweeps.
+/// out on different sweeps. Does not touch `canvas_objects.deleted_at`; a
+/// caller aging a `clear` specifically also needs `age_deleted_at`, or the
+/// exact-timestamp guard desyncs the same way `age_all_ops`'s own doc
+/// explains.
 async fn age_op(pool: &SqlitePool, id: CanvasOpId, days: i64) {
     sqlx::query("UPDATE canvas_ops SET created_at = created_at - ? WHERE id = ?")
         .bind(days * DAY_MS)
@@ -110,6 +113,18 @@ async fn age_op(pool: &SqlitePool, id: CanvasOpId, days: i64) {
         .execute(pool)
         .await
         .expect("age one op");
+}
+
+/// Backdates every currently-dead object's `deleted_at`, the half of aging a
+/// `clear` op that `age_op` alone cannot do since it only knows an op id.
+async fn age_deleted_at(pool: &SqlitePool, days: i64) {
+    sqlx::query(
+        "UPDATE canvas_objects SET deleted_at = deleted_at - ? WHERE deleted_at IS NOT NULL",
+    )
+    .bind(days * DAY_MS)
+    .execute(pool)
+    .await
+    .expect("age deletions");
 }
 
 async fn op_survives(pool: &SqlitePool, id: CanvasOpId) -> bool {
@@ -271,6 +286,56 @@ async fn a_restore_protects_its_target_until_the_restore_itself_ages_out() {
     assert_eq!(second_pass.restores, 1);
     assert_eq!(second_pass.removes, 1);
     assert!(!op_survives(&pool, remove_op).await);
+    assert!(!op_survives(&pool, restore_op).await);
+}
+
+/// The same protection, for a clear rather than a remove: a distinct SQL
+/// gate in the sweep's own clear pass, so it earns its own test rather than
+/// relying on the remove case above to stand in for it.
+#[tokio::test]
+async fn a_restore_protects_its_clear_target_until_the_restore_itself_ages_out() {
+    let (store, pool, _guard) = harness().await;
+    let actor = register(&store, "root").await;
+    let channel = general(&store).await;
+    place(&store, channel, actor).await;
+    let head = store
+        .list_canvas_ops(channel, 0, 1)
+        .await
+        .unwrap()
+        .latest_seq;
+    let clear_op = submit(
+        &store,
+        channel,
+        actor,
+        CanvasOpRequest::Clear { before_seq: head },
+    )
+    .await;
+    age_op(&pool, clear_op, AGE_DAYS).await;
+    age_deleted_at(&pool, AGE_DAYS).await;
+
+    let restore_op = submit(
+        &store,
+        channel,
+        actor,
+        CanvasOpRequest::Restore {
+            target_op: clear_op,
+        },
+    )
+    .await;
+
+    let first_pass = store.sweep_canvas_ops().await.unwrap();
+    assert_eq!(
+        first_pass.total(),
+        0,
+        "the clear is old but a fresh restore still names it"
+    );
+    assert!(op_survives(&pool, clear_op).await);
+
+    age_op(&pool, restore_op, AGE_DAYS).await;
+    let second_pass = store.sweep_canvas_ops().await.unwrap();
+    assert_eq!(second_pass.clears, 1);
+    assert_eq!(second_pass.restores, 1);
+    assert!(!op_survives(&pool, clear_op).await);
     assert!(!op_survives(&pool, restore_op).await);
 }
 
