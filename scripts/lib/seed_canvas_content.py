@@ -1,8 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Builds the main pass of placed canvas objects: clustered strokes and
-images, plus the one deliberately oversized stroke that proves
-`split_stroke`'s byte-budget path runs during a real seeding pass, not just
-under a unit test.
+"""Builds the main pass of placed canvas objects: clustered strokes,
+images, notes and shapes, plus the one deliberately oversized stroke that
+proves `split_stroke`'s byte-budget path runs during a real seeding pass,
+not just under a unit test.
+
+Notes and shapes placed here are ordinary background scatter - a person
+jotting a stray label or drawing a stray box - round-robined across
+authors and small in size like everything else this pass places. The
+deliberate, hand-composed diagram (a box around a cluster, an arrow, a
+divider, and notes at genuinely different lengths) is seed_canvas_diagram's
+job, placed after history so nothing here disturbs it.
 
 Split out of seed_canvas_run.py to keep that file under the review budget.
 """
@@ -11,6 +18,20 @@ import uuid7
 import seed_canvas_geometry as geom
 import seed_canvas_layout as layout
 import seed_canvas_ops as ops
+
+# A short scatter of realistic whiteboard notes; the varied-length case is seed_canvas_diagram's job.
+_NOTE_TEXTS = (
+    "todo",
+    "ideas",
+    "ask first",
+    "not sure about this one",
+    "double check with design",
+    "waiting on feedback",
+    "looks good, ship it",
+    "circle back after the call",
+    "who owns this?",
+    "revisit next sprint",
+)
 
 _STROKE_BUILDERS = {
     "freehand": lambda rng, center: geom.freehand_stroke(
@@ -54,6 +75,33 @@ def image_placement(rng, attachment, natural_w, natural_h, cx, cy):
     }
 
 
+def note_placement(rng, cx, cy):
+    """One background note, sized close to the client's own default box
+    with a little jitter so a scatter of them does not look stamped out."""
+    text = rng.choice(_NOTE_TEXTS)
+    w = round(layout.DEFAULT_NOTE_WIDTH * rng.uniform(0.85, 1.3), 2)
+    h = round(layout.DEFAULT_NOTE_HEIGHT * rng.uniform(0.85, 1.3), 2)
+    return {
+        "id": uuid7.uuid7(), "kind": "note",
+        "x": round(cx - w / 2, 2), "y": round(cy - h / 2, 2), "w": w, "h": h,
+        "props": {"text": text},
+    }
+
+
+def shape_placement(rng, cx, cy):
+    """One background shape - a stray box, oval, line or arrow, not tied
+    to anything in particular, the way a person doodles one while thinking
+    rather than composing a diagram."""
+    kind = layout.pick_shape_kind(rng)
+    w = round(layout.DEFAULT_SHAPE_WIDTH * rng.uniform(0.6, 1.8), 2)
+    h = round(layout.DEFAULT_SHAPE_HEIGHT * rng.uniform(0.6, 1.8), 2)
+    return {
+        "id": uuid7.uuid7(), "kind": "shape",
+        "x": round(cx - w / 2, 2), "y": round(cy - h / 2, 2), "w": w, "h": h,
+        "props": {"shape": kind},
+    }
+
+
 def upload_images(api_by_index, images):
     """Uploads every fixture from seed_canvas_images.build through *every*
     account, returning `[(attachment, width, height), ...]`.
@@ -76,33 +124,41 @@ def upload_images(api_by_index, images):
 
 
 def place_main_pass(api_by_index, channel_id, centers, weights, uploaded,
-                     count, image_ratio, rng):
-    """Places `count` objects across clustered positions, mixing strokes
-    and images at `image_ratio`, round-robin across authors. Returns the
-    placed rows (each with `author_index` attached) plus per-kind counts."""
+                     count, image_ratio, note_ratio, shape_ratio, rng):
+    """Places `count` objects across clustered positions, mixing strokes,
+    images, notes and shapes at the given ratios (the remainder is
+    strokes), round-robin across authors. Returns the placed rows (each
+    with `author_index` attached) plus per-kind counts."""
     placed = []
-    image_count = 0
-    stroke_count = 0
-    split_events = 0
+    counts = {"images": 0, "notes": 0, "shapes": 0, "strokes": 0,
+              "split_stroke_events": 0}
+    note_ceiling = image_ratio + note_ratio
+    shape_ceiling = note_ceiling + shape_ratio
     for index in range(count):
         author_index = index % len(api_by_index)
         api = api_by_index[author_index]
         cx, cy = layout.sample_position(rng, centers, weights)
-        if rng.random() < image_ratio and uploaded:
+        roll = rng.random()
+        if roll < image_ratio and uploaded:
             attachment, width, height = rng.choice(uploaded)
             objects = [image_placement(rng, attachment, width, height, cx, cy)]
-            image_count += 1
+            counts["images"] += 1
+        elif roll < note_ceiling:
+            objects = [note_placement(rng, cx, cy)]
+            counts["notes"] += 1
+        elif roll < shape_ceiling:
+            objects = [shape_placement(rng, cx, cy)]
+            counts["shapes"] += 1
         else:
             objects = stroke_placements(rng, cx, cy)
-            stroke_count += 1
+            counts["strokes"] += 1
             if len(objects) > 1:
-                split_events += 1
+                counts["split_stroke_events"] += 1
         for placement in objects:
             result = ops.place_object(api, channel_id, placement)
             result["author_index"] = author_index
             placed.append(result)
-    return placed, {"images": image_count, "strokes": stroke_count,
-                     "split_stroke_events": split_events}
+    return placed, counts
 
 
 def place_oversized_stroke(api, channel_id, author_index, centers, weights, rng):

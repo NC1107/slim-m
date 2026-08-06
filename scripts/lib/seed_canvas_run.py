@@ -20,6 +20,7 @@ import urllib.error
 
 import seed_accounts
 import seed_canvas_content as content
+import seed_canvas_diagram as diagram
 import seed_canvas_geometry as geom
 import seed_canvas_history as history
 import seed_canvas_images
@@ -43,6 +44,10 @@ def run(args):
         sys.exit("refusing to run: --accounts must be at least 2, so a "
                   "moderation-gated action has someone else's object to "
                   "act on")
+    if args.image_ratio + args.note_ratio + args.shape_ratio > 1.0:
+        sys.exit("refusing to run: --image-ratio, --note-ratio and "
+                  "--shape-ratio together exceed 1.0, leaving no room "
+                  "for strokes")
 
     password = args.password or seed_credentials.load_or_create(base_url)
     username_tag = args.username_tag if args.username_tag is not None else ""
@@ -87,7 +92,7 @@ def _seed(admin_candidate, api_by_index, channel_id, args, rng, scratch):
     weights = layout.cluster_weights(rng, args.clusters)
     placed, counts = content.place_main_pass(
         api_by_index, channel_id, centers, weights, uploaded, args.objects,
-        args.image_ratio, rng)
+        args.image_ratio, args.note_ratio, args.shape_ratio, rng)
     extra, did_split = content.place_oversized_stroke(
         api_by_index[0], channel_id, 0, centers, weights, rng)
     placed += extra
@@ -97,19 +102,24 @@ def _seed(admin_candidate, api_by_index, channel_id, args, rng, scratch):
     history_stats, removed_ops, restored_ops = history.run(
         api_by_index, admin_api, channel_id, placed, rng)
 
+    # Placed after history, and never handed to it, so it stays exactly as drawn - see its own module doc.
+    diagram_placed = diagram.run(api_by_index, channel_id, centers, weights,
+                                  placed, rng)
+
     probe_target = _place_probe_target(api_by_index[0], channel_id, rng)
     member_api = _pick_member_api(api_by_index, admin_api)
     findings = probes.run(admin_api or api_by_index[0], member_api,
                            channel_id, probe_target)
 
-    readback, ops_readback = _readback(api_by_index[0], channel_id, placed,
-                                        centers)
+    readback, ops_readback = _readback(
+        api_by_index[0], channel_id, placed + diagram_placed, centers)
 
     return {
         "warnings": warnings, "throwaway": throwaway, "uploaded": len(uploaded),
         "placed_total": len(placed), "counts": counts, "history": history_stats,
         "removed_ops": len(removed_ops), "restored_ops": len(restored_ops),
-        "findings": findings, "readback": readback, "ops_readback": ops_readback,
+        "diagram_placed": len(diagram_placed), "findings": findings,
+        "readback": readback, "ops_readback": ops_readback,
     }
 
 
@@ -186,9 +196,14 @@ def _print_report(base_url, channel, channel_name, accounts, password, report):
     counts = report["counts"]
     print(f"uploaded {report['uploaded']} unique image attachments")
     print(f"placed {report['placed_total']} objects total: "
-          f"{counts['strokes']} stroke actions, {counts['images']} images "
+          f"{counts['strokes']} stroke actions, {counts['images']} images, "
+          f"{counts['notes']} notes, {counts['shapes']} shapes "
           f"({counts['split_stroke_events']} strokes needed byte-budget "
           "splitting into more than one object)")
+    print(f"composed a deliberate diagram: {report['diagram_placed']} "
+          "objects (a box around the busiest cluster, an arrow to a "
+          "callout note, a divider line, and 3 notes from a two-word "
+          "label up to one near the client's own length ceiling)")
     h = report["history"]
     print(f"history: {h['moved']} moved ({h['resized']} also resized), "
           f"{h['reordered']} reordered, {h['removed']} objects removed "
