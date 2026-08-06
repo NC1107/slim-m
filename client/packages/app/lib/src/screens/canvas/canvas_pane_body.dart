@@ -20,6 +20,7 @@ import 'canvas_activity_log.dart';
 import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
 import 'canvas_presence_layer.dart';
+import 'canvas_selection_semantics.dart';
 
 class CanvasPaneBody extends StatefulWidget {
   const CanvasPaneBody({
@@ -261,6 +262,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           participants: widget.callParticipants,
           cameraViewFor: widget.cameraViewFor,
         ),
+        CanvasSelectionSemantics(document: widget.document),
       ],
     ),
   );
