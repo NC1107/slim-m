@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.33.2](https://github.com/NC1107/slim-m/compare/server-v0.33.1...server-v0.33.2) (2026-08-06)
+
+
+### Bug Fixes
+
+* **canvas:** a spent remove op could be replayed to undo somebody else's moderation ([#450](https://github.com/NC1107/slim-m/issues/450)) ([c15e82f](https://github.com/NC1107/slim-m/commit/c15e82f94bd28c99cfd177d363e66c2c07915b25))
+* **canvas:** index the two columns the sweep and the op clock scan the whole table for ([#454](https://github.com/NC1107/slim-m/issues/454)) ([4ab71ca](https://github.com/NC1107/slim-m/commit/4ab71ca686a1a16ea094ae621d8b0fe18d1dd5cb))
+* **canvas:** seed the op clock from the database, so a restart cannot reopen a closed bypass ([#451](https://github.com/NC1107/slim-m/issues/451)) ([1e51e65](https://github.com/NC1107/slim-m/commit/1e51e655c56e3a392e5067bae9239795493d6de1))
+
 ## [0.33.1](https://github.com/NC1107/slim-m/compare/server-v0.33.0...server-v0.33.1) (2026-08-06)
 
 
