@@ -11,6 +11,7 @@ mod feed;
 mod feed_budget;
 mod fixtures;
 mod http_gate;
+mod index_plan;
 mod r#move;
 mod reorder;
 mod restart_clock;

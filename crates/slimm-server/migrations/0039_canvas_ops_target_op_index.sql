@@ -1,0 +1,23 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+-- `canvas_ops.target_op BLOB REFERENCES canvas_ops(id)` is a self-referential
+-- foreign key with no index on the referencing column, so SQLite cannot
+-- confirm "does anything still point at the row I am about to delete"
+-- without a full table scan - one for every row `canvas_ops_sweep.rs`
+-- deletes, in all three of its passes, every six hours, forever. Measured
+-- directly against a real 1M-row table with foreign_keys=ON: deleting 500
+-- rows took 12.1 seconds without this index and 5 milliseconds with it, a
+-- cost the previous migration's own (kind, created_at) index does nothing
+-- for, since the foreign-key check is keyed on target_op alone.
+--
+-- The same index also serves the sweep's own explicit
+-- `NOT EXISTS (SELECT 1 FROM canvas_ops r WHERE r.kind = 'restore' AND
+-- r.target_op = o.id)` check in its remove and clear passes: target_op is
+-- non-null on a restore row alone (canvas_op_target's CHECK constraint), so
+-- filtering on it already implies kind = 'restore' and the query needs
+-- nothing more selective than an equality seek on this column.
+--
+-- Partial, the same shape canvas_ops_author already uses on actor_id: only a
+-- restore ever sets this column, so indexing the overwhelming majority of
+-- rows that leave it null would cost write time for a filter no reader ever
+-- runs.
+CREATE INDEX canvas_ops_target_op ON canvas_ops(target_op) WHERE target_op IS NOT NULL;
