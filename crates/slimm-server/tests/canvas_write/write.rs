@@ -160,6 +160,46 @@ async fn a_note_and_a_shape_are_both_accepted_object_kinds() {
     assert_eq!(body["kind"], "shape");
 }
 
+/// The client's note sheet caps input at 1800 characters, chosen (per its own
+/// doc comment) as "a comfortable margin" under the server's 4 KiB
+/// `MAX_PROPS_BYTES`, on the assumption that JSON-escaping 1800 characters of
+/// arbitrary text always fits. It does not: `serde_json` leaves any non-ASCII
+/// byte unescaped, so a character that costs more than one UTF-8 byte costs
+/// that many wire bytes for one unit of the client's own character count. A
+/// note filled with ordinary CJK text - not a hostile string, just a
+/// full-width script - already runs 3 bytes per character, and 1800 of them
+/// (5,412 bytes once wrapped in `{"text":"..."}`) is refused here although
+/// the client's own counter reads 1800/1800 and let the person submit.
+#[tokio::test]
+async fn a_note_at_the_clients_own_character_ceiling_can_still_be_refused_as_too_large() {
+    let (store, _guard) = new_store().await;
+    let (token, _) = register(&store, "root").await;
+    let channel = general(&store).await;
+    let app = app(store);
+
+    let text: String = std::iter::repeat_n('\u{4e2d}', 1800).collect();
+    let body = json!({
+        "id": id(),
+        "kind": "note",
+        "x": 0.0, "y": 0.0, "w": 120.0, "h": 80.0,
+        "props": { "text": text },
+    });
+    let encoded_props_bytes = serde_json::to_string(&json!({ "text": text }))
+        .unwrap()
+        .len();
+    assert!(
+        encoded_props_bytes > 4 * 1024,
+        "the reproduction must actually exceed MAX_PROPS_BYTES: got {encoded_props_bytes}",
+    );
+
+    let (status, body) = post(&app, channel, &token, body).await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "a client-legal 1800-character CJK note is still too large on the wire: {body}"
+    );
+}
+
 #[tokio::test]
 async fn an_unknown_kind_is_refused_rather_than_stored_as_a_row_nobody_can_draw() {
     let (store, _guard) = new_store().await;

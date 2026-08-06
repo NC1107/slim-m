@@ -76,10 +76,18 @@ pub(super) async fn apply_remove(
 /// the caller's own object needs nothing further, anyone else's needs
 /// `MANAGE_CANVAS`.
 ///
+/// Authorization is checked before liveness, not after: a non-moderator
+/// naming an object they do not own must get the same `NotAuthorized`
+/// whether that object is alive or already dead, or a dead check run first
+/// would answer a live-versus-dead question about an object this caller was
+/// never allowed to touch, off a bit no permission gates.
+///
 /// An object already removed answers `affected: 0` rather than an error - the
 /// same "an honest retry deserves a truthful answer" reasoning `PlaceError::Removed`
 /// documents, extended here since a move naming a since-erased id is exactly
-/// that kind of race, not a caller mistake.
+/// that kind of race, not a caller mistake - but only once authorization is
+/// already settled, since that reasoning was always about a caller's own
+/// object racing its own removal, never about a foreign one.
 ///
 /// Bounds are validated inside [`move_canvas_object_query`] itself, the same
 /// check a placement makes, so this never duplicates it. And since this runs
@@ -98,11 +106,11 @@ pub(super) async fn apply_move(
     let Some(found) = fetch_object_for_op(tx, channel_id, object_id).await? else {
         return Err(SubmitOpError::NotFound);
     };
-    if found.is_dead {
-        return Ok(("move", 0, Vec::new(), None));
-    }
     if !may_moderate && found.author_id != Some(actor_id) {
         return Err(SubmitOpError::NotAuthorized);
+    }
+    if found.is_dead {
+        return Ok(("move", 0, Vec::new(), None));
     }
     let moved = move_canvas_object_query(&mut **tx, object_id, bounds).await?;
     if !moved {
@@ -113,7 +121,8 @@ pub(super) async fn apply_move(
 
 /// Restacks one live object to an explicit `z_index`, authorized identically
 /// to [`apply_move`]: the caller's own object needs nothing further, anyone
-/// else's needs `MANAGE_CANVAS`.
+/// else's needs `MANAGE_CANVAS`, and the same ordering applies - authorization
+/// is checked before liveness, for the reason `apply_move`'s own doc gives.
 ///
 /// Unlike a move, no bounds check applies - any `i64` is a legal paint order -
 /// so there is no [`SubmitOpError::OutOfBounds`] path here at all. The
@@ -131,11 +140,11 @@ pub(super) async fn apply_reorder(
     let Some(found) = fetch_object_for_op(tx, channel_id, object_id).await? else {
         return Err(SubmitOpError::NotFound);
     };
-    if found.is_dead {
-        return Ok(("reorder", 0, Vec::new(), None));
-    }
     if !may_moderate && found.author_id != Some(actor_id) {
         return Err(SubmitOpError::NotAuthorized);
+    }
+    if found.is_dead {
+        return Ok(("reorder", 0, Vec::new(), None));
     }
     let affected = sqlx::query!(
         "UPDATE canvas_objects SET z_index = ?

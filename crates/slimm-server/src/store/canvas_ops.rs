@@ -26,7 +26,17 @@ pub const CANVAS_OP_GAP: i64 = 2_000;
 /// Stops a page early once the accumulated `place` props cross this many
 /// bytes. A page bounded only by row count still varies three orders of
 /// magnitude, since a `place` op carries whole props at up to
-/// `MAX_PROPS_BYTES` (4 KiB) while every other kind carries none.
+/// `MAX_PROPS_BYTES` (4 KiB) while `remove`, `move` and `reorder` carry a
+/// small, capped `canvas_op_targets` set.
+///
+/// `restore` is the one exception this budget does not see at all: undoing a
+/// large `clear` can un-delete up to `MAX_OBJECTS_PER_CHANNEL` objects in one
+/// op, each a `canvas_op_targets` row `list_canvas_ops`'s budget loop never
+/// counts (it only ever sums a `place` row's own props). Bounded rather than
+/// unbounded, and recorded as a residual in
+/// `tests/canvas_ops/feed.rs`'s own reproduction of it, rather than fixed:
+/// capping it would break undoing a mass clear in one action, the property
+/// `clear` exists to keep cheap.
 pub const CANVAS_OP_PAGE_BYTES: usize = 512 * 1024;
 
 /// One page of the ops feed.
