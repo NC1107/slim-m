@@ -24,14 +24,9 @@ import '../providers/call_recap.dart';
 import '../providers/member_presence.dart' show membersProvider, presenceOf;
 import '../providers/presence_controller.dart';
 import '../providers/voice_controller.dart';
-import '../widgets/call_participant_tiles.dart';
-import '../widgets/camera_self_preview.dart';
+import '../widgets/call_stage_layout.dart';
 import '../widgets/floating_dock_card.dart';
-import '../widgets/fullscreen_video_overlay.dart';
 import '../widgets/member_profile.dart';
-import '../widgets/local_screen_share_banner.dart';
-import '../widgets/screen_share_stage.dart';
-import '../widgets/user_avatar.dart';
 import 'voice_call_controls.dart';
 import 'voice_join_preview.dart';
 
@@ -166,8 +161,10 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
 /// rather than merely covering them. They float over this content instead
 /// now, in the same `FloatingDockCard` a canvas's own controls use (see
 /// `canvas_call_dock.dart`), so a future viewer comparing the two screens
-/// sees one dock idea rather than two. The roster below carries its own
-/// bottom padding so the floating card never sits on top of its last tile.
+/// sees one dock idea rather than two. What sits beneath them is
+/// `CallStageLayout` (`widgets/call_stage_layout.dart`), which carries its
+/// own bottom clearance so the floating card never sits on top of its
+/// content.
 class _InCall extends ConsumerWidget {
   const _InCall({required this.channelId});
 
@@ -178,14 +175,9 @@ class _InCall extends ConsumerWidget {
     final voice = ref.watch(voiceControllerProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
 
-    final sharer = _stageSharer(voice.participants);
-    final me = voice.participants.where((p) => p.isLocal).firstOrNull;
-
     return Stack(
       children: [
-        _InCallRoster(
-          sharer: sharer,
-          me: me,
+        CallStageLayout(
           voice: voice,
           controller: controller,
           onOpenProfile: (p) => _openProfile(context, ref, p),
@@ -203,175 +195,6 @@ class _InCall extends ConsumerWidget {
       ],
     );
   }
-}
-
-/// The dock's own visible height plus its margin, so scrolling content below
-/// it can reserve room rather than have the floating card cover its last row.
-const double _dockClearance = 76;
-
-class _InCallRoster extends StatelessWidget {
-  const _InCallRoster({
-    required this.sharer,
-    required this.me,
-    required this.voice,
-    required this.controller,
-    required this.onOpenProfile,
-  });
-
-  final VoiceParticipant? sharer;
-  final VoiceParticipant? me;
-  final VoiceState voice;
-  final VoiceController controller;
-  final ValueChanged<VoiceParticipant> onOpenProfile;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    // Local reads: `sharer`/`me` are this widget's own public fields, which
-    // Dart cannot promote from nullable after an `if (x != null)` check the
-    // way it promotes a local variable - see the analyzer's own
-    // "couldn't be promoted" note for why the field access below needed this.
-    final sharer = this.sharer;
-    final me = this.me;
-    return Column(
-      children: [
-        // Pinned above the roster: a per-row glyph is too easy to scroll past.
-        if (voice.screenSharing)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.s16,
-              AppSpacing.s16,
-              AppSpacing.s16,
-              0,
-            ),
-            child: LocalScreenShareBanner(),
-          ),
-        if (sharer != null)
-          Expanded(
-            flex: 3,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.s16,
-                AppSpacing.s16,
-                AppSpacing.s16,
-                0,
-              ),
-              child: ScreenShareStage(
-                sharerName: sharer.name,
-                isLocal: sharer.isLocal,
-                onExpand: () => showFullscreenVideo(
-                  context,
-                  identity: sharer.identity,
-                  label: sharer.isLocal
-                      ? 'Your screen'
-                      : "${sharer.name}'s screen",
-                  kind: FullscreenVideoKind.screenShare,
-                ),
-                child: controller.screenShareViewFor(sharer.identity),
-              ),
-            ),
-          ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s16,
-              AppSpacing.s16,
-              AppSpacing.s16,
-              AppSpacing.s16 + _dockClearance,
-            ),
-            children: [
-              Row(
-                children: [
-                  Text(
-                    '${voice.participants.length} in call',
-                    style: TextStyle(color: tokens.textSecondary, fontSize: 12),
-                  ),
-                  if (voice.connectedAt != null) ...[
-                    Text(
-                      ' · ',
-                      style: TextStyle(
-                        color: tokens.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                    CallDuration(since: voice.connectedAt!),
-                  ],
-                ],
-              ),
-              if (me != null && me.isCameraOn)
-                Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.s16),
-                  child: CameraSelfPreview(
-                    onExpand: () => showFullscreenVideo(
-                      context,
-                      identity: me.identity,
-                      label: 'Your camera',
-                      kind: FullscreenVideoKind.camera,
-                    ),
-                    child: controller.cameraViewFor(me.identity),
-                  ),
-                ),
-              const SizedBox(height: AppSpacing.s12),
-              // Tiles centred like a call when the pane is theirs; compact
-              // rows when a share stage has taken the room.
-              if (sharer == null)
-                Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.s24),
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: AppSpacing.s16,
-                    runSpacing: AppSpacing.s16,
-                    children: [
-                      for (final p in voice.participants)
-                        CallParticipantTile(
-                          participant: p,
-                          onTap: () => onOpenProfile(p),
-                          // The local participant's camera already has its
-                          // own enlarged preview above; only a remote one
-                          // needs a view rendered onto its tile here.
-                          cameraView: (!p.isLocal && p.isCameraOn)
-                              ? controller.cameraViewFor(p.identity)
-                              : null,
-                          onExpand: (!p.isLocal && p.isCameraOn)
-                              ? () => showFullscreenVideo(
-                                  context,
-                                  identity: p.identity,
-                                  label: p.name,
-                                  kind: FullscreenVideoKind.camera,
-                                )
-                              : null,
-                        ),
-                    ],
-                  ),
-                )
-              else
-                for (final p in voice.participants)
-                  _ParticipantRow(participant: p),
-              if (voice.error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.s16),
-                  child: AppErrorState(message: voice.error!),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// The participant whose screen takes the stage: a remote sharer if any is
-/// live, or your own if you are the only one - unlike an earlier version
-/// that excluded the local participant outright and so never showed a
-/// share to somebody sharing alone.
-VoiceParticipant? _stageSharer(List<VoiceParticipant> participants) {
-  VoiceParticipant? own;
-  for (final p in participants) {
-    if (!p.isScreenSharing) continue;
-    if (!p.isLocal) return p;
-    own = p;
-  }
-  return own;
 }
 
 /// Opens a caller's profile from their tile, which is the only route to the
@@ -401,73 +224,4 @@ void _openProfile(
     profile: profile,
     status: presenceOf(ref.read(presenceControllerProvider)[profile.id]),
   );
-}
-
-class _ParticipantRow extends StatelessWidget {
-  const _ParticipantRow({required this.participant});
-
-  final VoiceParticipant participant;
-
-  /// What a screen reader hears for this row. The visual states are all bare
-  /// icons, so without this the flagship feature announced only names:
-  /// muted, speaking and sharing were entirely silent.
-  String get _semanticLabel {
-    final parts = <String>[
-      participant.isLocal ? '${participant.name}, you' : participant.name,
-      participant.isMuted ? 'muted' : 'microphone on',
-      if (participant.isSpeaking) 'speaking',
-      if (participant.isScreenSharing) 'sharing their screen',
-    ];
-    return parts.join(', ');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Semantics(
-      container: true,
-      label: _semanticLabel,
-      child: ExcludeSemantics(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
-          child: Row(
-            children: [
-              // Speaking is a ring, and never the only cue: the muted icon repeats it.
-              AuthorAvatar(
-                name: participant.name,
-                userId: participant.identity,
-                size: 32,
-                speaking: participant.isSpeaking,
-              ),
-              const SizedBox(width: AppSpacing.s12),
-              Expanded(
-                child: Text(
-                  participant.isLocal
-                      ? '${participant.name} (you)'
-                      : participant.name,
-                  style: TextStyle(color: tokens.textPrimary),
-                ),
-              ),
-              if (participant.isScreenSharing)
-                Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.s8),
-                  child: Icon(
-                    AppIcons.screenShare,
-                    size: 16,
-                    color: tokens.accent,
-                  ),
-                ),
-              Icon(
-                participant.isMuted ? AppIcons.micOff : AppIcons.mic,
-                size: 16,
-                color: participant.isMuted
-                    ? tokens.textSecondary
-                    : tokens.accent,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

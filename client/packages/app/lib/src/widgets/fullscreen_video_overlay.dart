@@ -2,8 +2,8 @@
 /// A participant's camera or a shared screen, filled to the whole window.
 ///
 /// One overlay serves both kinds rather than a second implementation for
-/// each: the live view is the exact same `Widget` `CameraSelfPreview`,
-/// `CallParticipantTile` and `ScreenShareStage` already render, from
+/// each: the live view is the exact same `Widget` `CallParticipantTile` and
+/// `ScreenShareStage` already render, from
 /// `VoiceController.cameraViewFor`/`screenShareViewFor`, so nothing here ever
 /// touches a LiveKit type or a subscription - entering or leaving full screen
 /// is a UI change, never a track change.
