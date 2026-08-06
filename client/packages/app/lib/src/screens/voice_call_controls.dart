@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The in-call control bar: mute, camera, screen share and leave.
+/// The in-call controls: mute, camera, screen share and leave.
 ///
 /// Sharing has no quality dialog of its own: the ceiling is whatever Voice
 /// settings already has saved (`voice_settings_screen.dart`'s
@@ -14,8 +14,17 @@
 /// desktop (`camera_source_sheet.dart`), the same fork `screenShareNeedsSource`
 /// already draws for sharing.
 ///
+/// This widget is a bare row now, not a bar: it used to paint its own
+/// full-width, edge-anchored strip, which is exactly what made opening the
+/// canvas make it disappear outright (`ConversationPane` swaps the whole
+/// pane, controls included) rather than merely getting out of the way. The
+/// shell - a floating card, positioned and sized by whoever is showing this
+/// call right now - lives in `FloatingDockCard` and `canvas_call_dock.dart`
+/// instead, so a call's controls can sit inside the identical card a
+/// canvas's controls do, combined, whenever both are relevant at once.
+///
 /// Its own file because `voice_screen.dart` was over this repo's hard file
-/// limit, and the bar is the one part of that screen with no dependency on
+/// limit, and this row is the one part of that screen with no dependency on
 /// which channel is being looked at.
 library;
 
@@ -56,77 +65,61 @@ class _CallControlsState extends ConsumerState<CallControls> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final voice = widget.voice;
-    // Decoration outside, SafeArea inside, the same shape the rail's bars use:
-    // insetting the bar itself would leave a scaffold-coloured band below it.
-    return Container(
-      decoration: BoxDecoration(
-        color: tokens.surfaceSunken,
-        border: Border(top: BorderSide(color: tokens.borderSubtle)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.s12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _ControlButton(
-                icon: voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
-                tooltip: voice.microphoneEnabled ? 'Mute' : 'Unmute',
-                active: voice.microphoneEnabled,
-                onPressed: widget.controller.toggleMicrophone,
-              ),
-              const SizedBox(width: AppSpacing.s12),
-              _ControlButton(
-                icon: voice.cameraEnabled
-                    ? AppIcons.camera
-                    : AppIcons.cameraOff,
-                tooltip: voice.cameraEnabled
-                    ? 'Turn off camera'
-                    : 'Turn on camera',
-                active: voice.cameraEnabled,
-                onPressed: () => unawaited(widget.controller.toggleCamera()),
-              ),
-              if (voice.cameraEnabled) ...[
-                const SizedBox(width: AppSpacing.s12),
-                _ControlButton(
-                  icon: AppIcons.switchCamera,
-                  tooltip: 'Switch camera',
-                  active: false,
-                  pending: _cameraSwitchInFlight,
-                  onPressed: () {
-                    if (_cameraSwitchInFlight) return;
-                    unawaited(_switchCamera(context));
-                  },
-                ),
-              ],
-              const SizedBox(width: AppSpacing.s12),
-              _ControlButton(
-                icon: AppIcons.screenShare,
-                tooltip: _shareTooltip(voice),
-                active: voice.screenSharing,
-                // Pending is its own look, never the active one: the lit
-                // button over a share nobody could see was the whole bug.
-                pending: voice.awaitingBroadcast,
-                onPressed: () {
-                  if (_shareRequestInFlight) return;
-                  unawaited(_share(context));
-                },
-              ),
-              const SizedBox(width: AppSpacing.s12),
-              _ControlButton(
-                icon: AppIcons.leaveCall,
-                tooltip: 'Leave call',
-                active: false,
-                destructive: true,
-                onPressed: widget.controller.leave,
-              ),
-            ],
-          ),
+    // mainAxisSize.min: this row sizes to its own content now that it has no
+    // full-width bar to fill, so whatever floating card embeds it - alone or
+    // beside a canvas's own controls - can size itself to match.
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ControlButton(
+          icon: voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
+          tooltip: voice.microphoneEnabled ? 'Mute' : 'Unmute',
+          active: voice.microphoneEnabled,
+          onPressed: widget.controller.toggleMicrophone,
         ),
-      ),
+        const SizedBox(width: AppSpacing.s12),
+        _ControlButton(
+          icon: voice.cameraEnabled ? AppIcons.camera : AppIcons.cameraOff,
+          tooltip: voice.cameraEnabled ? 'Turn off camera' : 'Turn on camera',
+          active: voice.cameraEnabled,
+          onPressed: () => unawaited(widget.controller.toggleCamera()),
+        ),
+        if (voice.cameraEnabled) ...[
+          const SizedBox(width: AppSpacing.s12),
+          _ControlButton(
+            icon: AppIcons.switchCamera,
+            tooltip: 'Switch camera',
+            active: false,
+            pending: _cameraSwitchInFlight,
+            onPressed: () {
+              if (_cameraSwitchInFlight) return;
+              unawaited(_switchCamera(context));
+            },
+          ),
+        ],
+        const SizedBox(width: AppSpacing.s12),
+        _ControlButton(
+          icon: AppIcons.screenShare,
+          tooltip: _shareTooltip(voice),
+          active: voice.screenSharing,
+          // Pending is its own look, never the active one: the lit
+          // button over a share nobody could see was the whole bug.
+          pending: voice.awaitingBroadcast,
+          onPressed: () {
+            if (_shareRequestInFlight) return;
+            unawaited(_share(context));
+          },
+        ),
+        const SizedBox(width: AppSpacing.s12),
+        _ControlButton(
+          icon: AppIcons.leaveCall,
+          tooltip: 'Leave call',
+          active: false,
+          destructive: true,
+          onPressed: widget.controller.leave,
+        ),
+      ],
     );
   }
 

@@ -37,6 +37,7 @@ import '../../providers/sync_controller.dart';
 import '../../providers/user_profiles.dart';
 import '../../providers/voice_controller.dart';
 import 'canvas_activity_log.dart';
+import 'canvas_call_dock.dart';
 import 'canvas_commit_queue.dart';
 import 'canvas_cursor_relay.dart';
 import 'canvas_image_hydrator.dart';
@@ -50,6 +51,7 @@ import 'canvas_stroke_preview_relay.dart';
 import 'canvas_sync.dart';
 
 part 'canvas_pane_gestures.dart';
+part 'canvas_pane_helpers.dart';
 part 'canvas_pane_self_presence.dart';
 
 /// The channel whose canvas is open, or null.
@@ -148,83 +150,6 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _activityLog.dispose();
     super.dispose();
   }
-
-  CanvasImagePaste get _imagePaste => _imagePasteHelper ??= CanvasImagePaste(
-    client: ref.read(apiProvider),
-    channelId: widget.channelId,
-    document: _document,
-    onPlaced: _selectPlaced,
-    onError: (message) {
-      if (mounted) setState(() => _error = message);
-    },
-  );
-
-  CanvasQuickPlacement get _quickPlacement =>
-      _quickPlacementHelper ??= CanvasQuickPlacement(
-        client: ref.read(apiProvider),
-        channelId: widget.channelId,
-        document: _document,
-      );
-
-  CanvasCommitQueue get _commits => _queue ??= CanvasCommitQueue(
-    client: ref.read(apiProvider),
-    channelId: widget.channelId,
-    onPlaced: _apply,
-    onFailed: (id, message) {
-      _document
-        ..kill(id)
-        ..refresh();
-      if (mounted) setState(() => _error = message);
-    },
-    onRemoved: (id) {
-      _document
-        ..removeObject(id)
-        ..refresh();
-      if (mounted) {
-        setState(
-          () => _error = 'That stroke was erased while it was being saved.',
-        );
-      }
-    },
-    onEraseOnConfirm: (id) => unawaited(_ops.eraseOnConfirm(id)),
-  );
-
-  CanvasOpsController get _ops => _opsController ??= CanvasOpsController(
-    channelId: widget.channelId,
-    client: ref.read(apiProvider),
-    document: _document,
-    commits: _commits,
-    onError: (message) {
-      if (mounted) setState(() => _error = message);
-    },
-  );
-
-  CanvasCursorRelay get _relay => _cursorRelay ??= CanvasCursorRelay(
-    cursors: _cursors,
-    paletteSize: AppCanvasColors.cursors.length,
-    send: (x, y) => ref
-        .read(syncControllerProvider.notifier)
-        .notifyCanvasCursor(widget.channelId, x, y),
-    resolveLabel: _cursorLabel,
-    isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
-    selfId: () => ref.read(meProvider).valueOrNull?.id,
-  );
-
-  CanvasStrokePreviewRelay get _strokePreview =>
-      _strokePreviewRelay ??= CanvasStrokePreviewRelay(
-        drafts: _remoteDrafts,
-        paletteSize: AppCanvasColors.cursors.length,
-        send: (objectId, points, ended) => ref
-            .read(syncControllerProvider.notifier)
-            .notifyCanvasStrokePreview(
-              widget.channelId,
-              objectId,
-              points,
-              ended: ended,
-            ),
-        isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
-        selfId: () => ref.read(meProvider).valueOrNull?.id,
-      );
 
   void _onEvent(api.ServerEvent event) => dispatchCanvasLiveEvent(
     event,
@@ -479,6 +404,11 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           selfBubbleCorner: selfPresence.corner,
           onSelfBubbleCornerChanged: _onSelfBubbleCornerChanged,
           onToggleSelfBubbleHidden: _onToggleSelfBubbleHidden,
+          callDock: callDockDataFor(
+            ref.watch(voiceControllerProvider),
+            ref.read(voiceControllerProvider.notifier),
+            widget.channelId,
+          ),
         ),
       ),
     );

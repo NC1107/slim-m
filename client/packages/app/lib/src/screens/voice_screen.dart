@@ -26,6 +26,7 @@ import '../providers/presence_controller.dart';
 import '../providers/voice_controller.dart';
 import '../widgets/call_participant_tiles.dart';
 import '../widgets/camera_self_preview.dart';
+import '../widgets/floating_dock_card.dart';
 import '../widgets/fullscreen_video_overlay.dart';
 import '../widgets/member_profile.dart';
 import '../widgets/local_screen_share_banner.dart';
@@ -158,6 +159,15 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
 }
 
 /// In the call: who is here, and the controls.
+///
+/// The controls used to trail this column as a full-width anchored strip,
+/// which is exactly what made opening the canvas make them disappear
+/// outright - `ConversationPane` swaps the whole pane, controls included,
+/// rather than merely covering them. They float over this content instead
+/// now, in the same `FloatingDockCard` a canvas's own controls use (see
+/// `canvas_call_dock.dart`), so a future viewer comparing the two screens
+/// sees one dock idea rather than two. The roster below carries its own
+/// bottom padding so the floating card never sits on top of its last tile.
 class _InCall extends ConsumerWidget {
   const _InCall({required this.channelId});
 
@@ -165,13 +175,64 @@ class _InCall extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final voice = ref.watch(voiceControllerProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
 
     final sharer = _stageSharer(voice.participants);
     final me = voice.participants.where((p) => p.isLocal).firstOrNull;
 
+    return Stack(
+      children: [
+        _InCallRoster(
+          sharer: sharer,
+          me: me,
+          voice: voice,
+          controller: controller,
+          onOpenProfile: (p) => _openProfile(context, ref, p),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: SafeArea(
+            top: false,
+            minimum: const EdgeInsets.all(AppSpacing.s12),
+            child: FloatingDockCard(
+              rows: [CallControls(controller: controller, voice: voice)],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The dock's own visible height plus its margin, so scrolling content below
+/// it can reserve room rather than have the floating card cover its last row.
+const double _dockClearance = 76;
+
+class _InCallRoster extends StatelessWidget {
+  const _InCallRoster({
+    required this.sharer,
+    required this.me,
+    required this.voice,
+    required this.controller,
+    required this.onOpenProfile,
+  });
+
+  final VoiceParticipant? sharer;
+  final VoiceParticipant? me;
+  final VoiceState voice;
+  final VoiceController controller;
+  final ValueChanged<VoiceParticipant> onOpenProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    // Local reads: `sharer`/`me` are this widget's own public fields, which
+    // Dart cannot promote from nullable after an `if (x != null)` check the
+    // way it promotes a local variable - see the analyzer's own
+    // "couldn't be promoted" note for why the field access below needed this.
+    final sharer = this.sharer;
+    final me = this.me;
     return Column(
       children: [
         // Pinned above the roster: a per-row glyph is too easy to scroll past.
@@ -212,7 +273,12 @@ class _InCall extends ConsumerWidget {
           ),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.all(AppSpacing.s16),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s16,
+              AppSpacing.s16,
+              AppSpacing.s16,
+              AppSpacing.s16 + _dockClearance,
+            ),
             children: [
               Row(
                 children: [
@@ -259,7 +325,7 @@ class _InCall extends ConsumerWidget {
                       for (final p in voice.participants)
                         CallParticipantTile(
                           participant: p,
-                          onTap: () => _openProfile(context, ref, p),
+                          onTap: () => onOpenProfile(p),
                           // The local participant's camera already has its
                           // own enlarged preview above; only a remote one
                           // needs a view rendered onto its tile here.
@@ -289,7 +355,6 @@ class _InCall extends ConsumerWidget {
             ],
           ),
         ),
-        CallControls(controller: controller, voice: voice),
       ],
     );
   }

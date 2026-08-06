@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The canvas pane's widget tree: the bar, the error and truncation
-/// banners, the drawing surface, and the text activity log a screen reader
-/// can browse in place of it.
+/// The canvas pane's widget tree: the identity strip, the error and
+/// truncation banners, the drawing surface, the floating call-and-canvas
+/// dock, and the text activity log a screen reader can browse in place of
+/// the surface.
 ///
 /// Split out of `canvas_pane.dart`, which was already past the review
 /// budget before this slice added the eraser, undo and clear controls to
@@ -20,8 +21,10 @@ import '../../providers/canvas_self_presence.dart';
 import 'canvas_activity_log.dart';
 import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
+import 'canvas_call_dock.dart';
 import 'canvas_object_context_menu.dart';
 import 'canvas_presence_layer.dart';
+import 'canvas_presence_roster.dart';
 import 'canvas_selection_semantics.dart';
 import 'canvas_self_presence_overlay.dart';
 
@@ -70,6 +73,7 @@ class CanvasPaneBody extends StatefulWidget {
     required this.selfBubbleCorner,
     required this.onSelfBubbleCornerChanged,
     required this.onToggleSelfBubbleHidden,
+    this.callDock,
   });
 
   final String channelId;
@@ -153,10 +157,16 @@ class CanvasPaneBody extends StatefulWidget {
   final CanvasSelfBubbleCorner selfBubbleCorner;
   final ValueChanged<CanvasSelfBubbleCorner> onSelfBubbleCornerChanged;
 
-  /// Threaded to [CanvasBar]'s overflow menu, the one place this pane offers
-  /// to flip [selfBubbleHidden] - see that menu's own doc for why it lives
-  /// there rather than as a dedicated bar icon.
+  /// Threaded to the floating dock's overflow menu, the one place this pane
+  /// offers to flip [selfBubbleHidden] - see that menu's own doc for why it
+  /// lives there rather than as a dedicated bar icon.
   final VoidCallback onToggleSelfBubbleHidden;
+
+  /// Non-null exactly when this device is connected to a call in this
+  /// channel right now - `canvas_pane.dart`'s own `callDockDataFor` decides.
+  /// The dock renders a call section only then; it always renders a canvas
+  /// section, since this widget only exists while the canvas itself is open.
+  final CallDockData? callDock;
 
   @override
   State<CanvasPaneBody> createState() => _CanvasPaneBodyState();
@@ -170,6 +180,12 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
   /// which object a right-click or a screen-reader action is asking about
   /// right now outlives nothing beyond this body's own lifetime.
   final _menuRequests = CanvasObjectMenuRequests();
+
+  /// Whether this caller has a camera bubble on the canvas at all right now
+  /// - read once per build and shared by the dock's overflow item and the
+  /// roster's own corner-avoidance below, rather than each recomputing the
+  /// identical scan of [CanvasPaneBody.callParticipants].
+  bool get _hasSelfBubble => widget.callParticipants.any((p) => p.isLocal);
 
   @override
   void dispose() {
@@ -187,31 +203,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
         left: false,
         child: Column(
           children: [
-            CanvasBar(
-              channelId: widget.channelId,
-              onClose: widget.onClose,
-              tool: widget.tool,
-              onToolChanged: widget.onToolChanged,
-              canUndo: widget.canUndo,
-              onUndo: widget.onUndo,
-              canManage: widget.canManage,
-              objectCount: widget.document.objectCount,
-              onClear: widget.onClear,
-              onPasteImage: widget.onPasteImage,
-              onRecenter: widget.onRecenter,
-              selection: widget.document.selectedObjectId,
-              onBringToFront: widget.onBringToFront,
-              onSendToBack: widget.onSendToBack,
-              onDeleteSelected: widget.onDeleteSelected,
-              activityLogOpen: _activityLogOpen,
-              onToggleActivityLog: () =>
-                  setState(() => _activityLogOpen = !_activityLogOpen),
-              shapeKind: widget.shapeKind,
-              onShapeKindChanged: widget.onShapeKindChanged,
-              hasSelfBubble: widget.callParticipants.any((p) => p.isLocal),
-              selfBubbleHidden: widget.selfBubbleHidden,
-              onToggleSelfBubbleHidden: widget.onToggleSelfBubbleHidden,
-            ),
+            const CanvasBar(),
             if (widget.error != null)
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.s12),
@@ -234,7 +226,35 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
                   ),
                 ),
               ),
-            Expanded(child: _activityLogOpen ? _panel() : _surface(tokens)),
+            Expanded(
+              child: Stack(
+                children: [
+                  _activityLogOpen ? _panel() : _surface(tokens),
+                  if (!_activityLogOpen)
+                    CanvasPresenceRoster(
+                      callParticipants: widget.callParticipants,
+                      cursors: widget.cursors,
+                      // The self bubble defaults to bottom-right and is reserved a lane above the dock below, but a caller can still drag it to top-right - the roster's own resting corner - so it yields there rather than the two silently overlapping.
+                      alignment:
+                          _hasSelfBubble &&
+                              widget.selfBubbleCorner ==
+                                  CanvasSelfBubbleCorner.topRight
+                          ? Alignment.topLeft
+                          : Alignment.topRight,
+                    ),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.s12),
+                      child: CanvasCallDock(
+                        call: widget.callDock,
+                        canvas: _dockData(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             // Mounted regardless of the panel's own open state: browsing history is optional, hearing about it is not.
             CanvasActivityAnnouncer(activityLog: widget.activityLog),
           ],
@@ -242,6 +262,31 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
       ),
     );
   }
+
+  CanvasDockData _dockData() => CanvasDockData(
+    tool: widget.tool,
+    onToolChanged: widget.onToolChanged,
+    canUndo: widget.canUndo,
+    onUndo: widget.onUndo,
+    canManage: widget.canManage,
+    objectCount: widget.document.objectCount,
+    onClear: widget.onClear,
+    onPasteImage: widget.onPasteImage,
+    onRecenter: widget.onRecenter,
+    selection: widget.document.selectedObjectId,
+    onBringToFront: widget.onBringToFront,
+    onSendToBack: widget.onSendToBack,
+    onDeleteSelected: widget.onDeleteSelected,
+    activityLogOpen: _activityLogOpen,
+    onToggleActivityLog: () =>
+        setState(() => _activityLogOpen = !_activityLogOpen),
+    shapeKind: widget.shapeKind,
+    onShapeKindChanged: widget.onShapeKindChanged,
+    onClose: widget.onClose,
+    hasSelfBubble: _hasSelfBubble,
+    selfBubbleHidden: widget.selfBubbleHidden,
+    onToggleSelfBubbleHidden: widget.onToggleSelfBubbleHidden,
+  );
 
   /// `document.objectCount` is the same trigger `_surface` already listens
   /// to, since a placed or removed object is exactly what changes
@@ -323,16 +368,48 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           onOpenActions: _menuRequests.request,
         ),
         // Last, on top of CanvasObjectContextMenu's hit catcher - see this overlay's own doc for why a right-click on it is absorbed rather than reaching an object underneath.
-        CanvasSelfPresenceOverlay(
-          participants: widget.callParticipants,
-          cameraViewFor: widget.cameraViewFor,
-          hidden: widget.selfBubbleHidden,
-          corner: widget.selfBubbleCorner,
-          onCornerChanged: widget.onSelfBubbleCornerChanged,
+        LayoutBuilder(
+          builder: (context, constraints) => CanvasSelfPresenceOverlay(
+            participants: widget.callParticipants,
+            cameraViewFor: widget.cameraViewFor,
+            hidden: widget.selfBubbleHidden,
+            corner: widget.selfBubbleCorner,
+            onCornerChanged: widget.onSelfBubbleCornerChanged,
+            bottomReserved: _dockBottomReserve(constraints.maxWidth),
+          ),
         ),
       ],
     ),
   );
+
+  /// The floating dock's own worst-case footprint at the pane's current
+  /// width, reserved so the self bubble's two bottom corners never rest
+  /// underneath it - see `canvas_self_presence_overlay.dart`'s own doc for
+  /// why the bubble is the one asked to yield rather than the dock.
+  ///
+  /// Not guessed: `FloatingDockCard`'s own vertical padding (`AppSpacing
+  /// .s8` twice), a 44dp touch row (`AppSizes.rowTouch`, what `CallControls`'
+  /// own buttons and `CanvasToolsRow`'s own icons both draw at), the
+  /// divider block between two stacked rows (`AppSpacing.s8` twice plus its
+  /// 1px line), and this body's own outer `AppSpacing.s12` margin around
+  /// the dock. Two rows below `kCompactWidth` - call and canvas stack there
+  /// - one row at or above it, the same threshold `CanvasCallDock` itself
+  /// branches on, reused rather than guessed at separately so the two can
+  /// never silently disagree.
+  ///
+  /// A self bubble only ever renders while this device is on the call in
+  /// this channel (`CanvasSelfPresenceOverlay._self()`), which is exactly
+  /// when `CanvasCallDock` is guaranteed to be showing its own call row -
+  /// so this reserve is never paid for nothing, and never skipped when it
+  /// is needed.
+  double _dockBottomReserve(double paneWidth) {
+    const cardPadding = AppSpacing.s8 * 2;
+    const dividerBlock = AppSpacing.s8 * 2 + 1;
+    final rows = paneWidth < kCompactWidth
+        ? AppSizes.rowTouch * 2 + dividerBlock
+        : AppSizes.rowTouch;
+    return cardPadding + rows + AppSpacing.s12;
+  }
 
   Widget _emptyHint(AppTokens tokens) => Positioned.fill(
     child: IgnorePointer(

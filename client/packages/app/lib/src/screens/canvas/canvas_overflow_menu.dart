@@ -205,9 +205,10 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
       child: CompositedTransformFollower(
         link: _link,
         showWhenUnlinked: false,
-        targetAnchor: Alignment.bottomRight,
-        followerAnchor: Alignment.topRight,
-        offset: const Offset(0, 4),
+        // Opens upward now: the trigger lives in the floating dock near the bottom of the pane, not a top bar.
+        targetAnchor: Alignment.topRight,
+        followerAnchor: Alignment.bottomRight,
+        offset: const Offset(0, -4),
         child: TapRegion(
           onTapOutside: (_) => _controller.hide(),
           // The same keyboard route the message context menu already earned: Tab reaches every item once open, and Escape closes it.

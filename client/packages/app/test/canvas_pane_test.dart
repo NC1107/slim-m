@@ -14,6 +14,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/screens/canvas/canvas_bar.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane.dart';
 import 'package:slimm_app/src/widgets/channel_header.dart';
+import 'package:slimm_app/src/widgets/floating_dock_card.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
@@ -298,9 +299,12 @@ void main() {
   });
 
   /// CanvasBar is the pane's only header (no AppBar sits above it), so
-  /// nothing else consumes the notch or the home indicator for it.
+  /// nothing else consumes the notch for it; the floating dock is the
+  /// pane's own bottom-most interactive content, so the same claim applies
+  /// to the home indicator now that the dock, not the drawing surface's own
+  /// edge, is what a thumb reaches last.
   testWidgets(
-    'the bar and the drawing surface clear the notch and home indicator',
+    'the bar and the floating dock clear the notch and home indicator',
     (tester) async {
       const topInset = 59.0;
       const bottomInset = 34.0;
@@ -331,9 +335,9 @@ void main() {
         reason: 'the bar painted under the status bar before this',
       );
       expect(
-        tester.getBottomLeft(find.byType(CanvasSurface)).dy,
+        tester.getBottomLeft(find.byType(FloatingDockCard)).dy,
         lessThanOrEqualTo(viewHeight - bottomInset),
-        reason: 'a stroke could start under the home indicator before this',
+        reason: 'the dock could paint under the home indicator otherwise',
       );
     },
   );

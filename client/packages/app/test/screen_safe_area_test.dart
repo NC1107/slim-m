@@ -31,6 +31,7 @@ import 'package:slimm_app/src/screens/onboarding_screen.dart';
 import 'package:slimm_app/src/screens/sign_in_screen.dart';
 import 'package:slimm_app/src/screens/voice_screen.dart';
 import 'package:slimm_app/src/screens/personal_settings_screen.dart';
+import 'package:slimm_app/src/widgets/floating_dock_card.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -379,8 +380,10 @@ void main() {
     _expectClearOfIndicator(tester, body, "onboarding's entry list");
   });
 
-  testWidgets('the in-call controls sit above the home indicator while their '
-      'bar still paints to the edge', (tester) async {
+  testWidgets('the in-call controls float clear of the home indicator, and the '
+      "screen's own background still reaches the true edge behind them", (
+    tester,
+  ) async {
     final container = await _pump(
       tester,
       const Scaffold(body: VoiceScreen(channelId: 'channel-1')),
@@ -405,18 +408,18 @@ void main() {
       'the leave-call button',
     );
 
-    // The other half: inset the bar itself and a base-coloured band appears
-    // below it, so the decoration has to keep reaching the screen edge.
-    final bar = find
-        .ancestor(
-          of: find.byIcon(AppIcons.leaveCall),
-          matching: find.byType(DecoratedBox),
-        )
+    // The dock is a floating card now, not a full-width bar; it must still clear the indicator.
+    final card = find.byType(FloatingDockCard);
+    _expectClearOfIndicator(tester, card, 'the floating dock card');
+
+    // The screen's own background, not the old bar's, is what must still reach the true edge.
+    final background = find
+        .ancestor(of: card, matching: find.byType(ColoredBox))
         .last;
     expect(
-      tester.getRect(bar).bottom,
+      tester.getRect(background).bottom,
       _view.height,
-      reason: 'the control bar background must still reach the edge',
+      reason: "the screen's own background must still reach the edge",
     );
     // Clears the heartbeat timer a connected call now keeps running.
     await container.read(voiceControllerProvider.notifier).leave();

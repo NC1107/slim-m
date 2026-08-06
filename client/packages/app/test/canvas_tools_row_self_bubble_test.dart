@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The overflow's "Hide/Show my camera bubble" item: split out of
-/// `canvas_bar_test.dart` once this fix pushed that file past the 500-line
-/// hard limit, the same reason `canvas_bar_shape_kind_test.dart` and
-/// `canvas_bar_touch_reach_test.dart` already split their own concerns out.
+/// `canvas_tools_row_test.dart` for the same reason `canvas_tools_row_shape_
+/// kind_test.dart` and `canvas_tools_row_touch_reach_test.dart` already
+/// split their own concerns out. Ported from `canvas_bar_self_bubble_test
+/// .dart`, unchanged in what it asserts, once the item's real home moved
+/// from `CanvasBar` to `CanvasToolsRow`'s own overflow menu alongside the
+/// rest of the dock's controls.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'support/canvas_bar_fixtures.dart';
+import 'support/canvas_tools_row_fixtures.dart';
 
 void main() {
   testWidgets(
@@ -15,7 +18,7 @@ void main() {
     'at all',
     (tester) async {
       await tester.pumpWidget(
-        wrapCanvasBar(buildCanvasBar(hasSelfBubble: false)),
+        wrapCanvasToolsRow(buildCanvasToolsRow(hasSelfBubble: false)),
       );
 
       await tester.tap(find.bySemanticsLabel('More canvas actions'));
@@ -32,8 +35,8 @@ void main() {
     (tester) async {
       var toggled = 0;
       await tester.pumpWidget(
-        wrapCanvasBar(
-          buildCanvasBar(
+        wrapCanvasToolsRow(
+          buildCanvasToolsRow(
             hasSelfBubble: true,
             onToggleSelfBubbleHidden: () => toggled++,
           ),
@@ -53,8 +56,8 @@ void main() {
 
   testWidgets('the label flips once the bubble is hidden', (tester) async {
     await tester.pumpWidget(
-      wrapCanvasBar(
-        buildCanvasBar(hasSelfBubble: true, selfBubbleHidden: true),
+      wrapCanvasToolsRow(
+        buildCanvasToolsRow(hasSelfBubble: true, selfBubbleHidden: true),
       ),
     );
 

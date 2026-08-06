@@ -27,6 +27,21 @@
 /// send-to-back/delete verbs that would mean anything for it, so absorbing
 /// is correct; the no-op secondary-tap handler below is what makes it a
 /// guaranteed outcome rather than an accident of stacking order.
+///
+/// **A second overlay, `CanvasCallDock`, floats over the pane's own bottom
+/// band, and the two never knew about each other until the dock existed.**
+/// A self bubble only ever renders while this device is on the call in this
+/// channel (see [_CanvasSelfPresenceOverlayState._self]), which is exactly
+/// when the dock is guaranteed to be showing its own call row too - so the
+/// two are never merely occasionally in the same place, they collide by
+/// construction whenever either is visible at all. [bottomReserved] is how
+/// the bubble yields: `canvas_pane_body.dart` measures the dock's own
+/// worst-case height from real layout constants (never a guess) and passes
+/// it here, so both of the bubble's bottom corners - and a drag's own lower
+/// bound - stay clear of the dock rather than resting under it. The bubble
+/// yields rather than the dock, because its resting corner is a saved
+/// preference somebody dragged it to on purpose, where the dock's position
+/// is fixed by the design this whole feature exists to ship.
 library;
 
 import 'package:flutter/material.dart';
@@ -52,6 +67,7 @@ class CanvasSelfPresenceOverlay extends StatefulWidget {
     required this.corner,
     required this.onCornerChanged,
     this.margin = 16,
+    this.bottomReserved = 0,
   });
 
   /// The full call roster; only the caller's own entry (`isLocal`) is ever
@@ -63,6 +79,10 @@ class CanvasSelfPresenceOverlay extends StatefulWidget {
   final CanvasSelfBubbleCorner corner;
   final ValueChanged<CanvasSelfBubbleCorner> onCornerChanged;
   final double margin;
+
+  /// Extra clearance kept below the bubble's two bottom corners, and below
+  /// a drag's own lower bound - see this file's own library doc for why.
+  final double bottomReserved;
 
   @override
   State<CanvasSelfPresenceOverlay> createState() =>
@@ -89,7 +109,7 @@ class _CanvasSelfPresenceOverlayState extends State<CanvasSelfPresenceOverlay> {
       CanvasSelfBubbleCorner.topLeft ||
       CanvasSelfBubbleCorner.topRight => widget.margin,
       CanvasSelfBubbleCorner.bottomLeft || CanvasSelfBubbleCorner.bottomRight =>
-        area.height - tile.height - widget.margin,
+        area.height - tile.height - widget.margin - widget.bottomReserved,
     };
     return Offset(left.clamp(0, area.width), top.clamp(0, area.height));
   }
@@ -133,7 +153,10 @@ class _CanvasSelfPresenceOverlayState extends State<CanvasSelfPresenceOverlay> {
         final position = _dragPosition ?? rest;
         final dragging = _dragPosition != null;
         final maxX = (area.width - tile.width).clamp(0.0, double.infinity);
-        final maxY = (area.height - tile.height).clamp(0.0, double.infinity);
+        final maxY = (area.height - tile.height - widget.bottomReserved).clamp(
+          0.0,
+          double.infinity,
+        );
         return Stack(
           children: [
             AnimatedPositioned(
