@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.33.0](https://github.com/NC1107/slim-m/compare/client-v0.32.1...client-v0.33.0) (2026-08-06)
+
+
+### Features
+
+* **canvas:** one floating dock, so a call keeps its controls while you draw ([#460](https://github.com/NC1107/slim-m/issues/460)) ([978d2e3](https://github.com/NC1107/slim-m/commit/978d2e3bc891586388e3bab49f1855cd97c0b001))
+
+
+### Bug Fixes
+
+* **canvas:** grab the canvas with the middle button, and make shift-scroll actually pan ([#455](https://github.com/NC1107/slim-m/issues/455)) ([70e46be](https://github.com/NC1107/slim-m/commit/70e46be1ca736d22ad17341e28bdb96db5abd099))
+* **canvas:** move your own camera bubble, or hide it ([#459](https://github.com/NC1107/slim-m/issues/459)) ([c407673](https://github.com/NC1107/slim-m/commit/c40767375c78b2c2ff94b169194f004333057a5d))
+* **client/app:** let the rail and the pane touch the divider line ([#458](https://github.com/NC1107/slim-m/issues/458)) ([84c2070](https://github.com/NC1107/slim-m/commit/84c207036dc51afaa1526f7cf0263e156bb5c56f))
+* **client/app:** select what you just placed, and add a right-click menu per object ([#456](https://github.com/NC1107/slim-m/issues/456)) ([0301151](https://github.com/NC1107/slim-m/commit/0301151ee8d0308b7730c68af27f4273c0b64288))
+
 ## [0.32.1](https://github.com/NC1107/slim-m/compare/client-v0.32.0...client-v0.32.1) (2026-08-06)
 
 
