@@ -16,6 +16,7 @@ import traceback
 
 import e2e_admin
 import e2e_canvas
+import e2e_canvas_shapes
 import e2e_labels as L
 import e2e_messaging
 import e2e_markdown
@@ -123,11 +124,22 @@ def scenarios(a, b, admin, member, room_id, server):
         ("canvas: moving and resizing it converges on both sides",
          lambda: e2e_canvas.move_and_resize_converges(
              a, b, admin, admin.channel_named(L.TEXT_CHANNEL)["id"])),
+        ("canvas: a note arrives on the other client live",
+         lambda: e2e_canvas_shapes.place_note_and_see_it_live(
+             a, b, admin, admin.channel_named(L.TEXT_CHANNEL)["id"])),
+        ("canvas: a shape arrives on the other client live",
+         lambda: e2e_canvas_shapes.place_shape_and_see_it_live(
+             a, b, admin, admin.channel_named(L.TEXT_CHANNEL)["id"])),
+        ("canvas: raising a stroke reorders it on both sides",
+         lambda: e2e_canvas_shapes.reorder_stroke_and_see_it_live(
+             a, b, admin, admin.channel_named(L.TEXT_CHANNEL)["id"])),
         ("canvas: erase, undo, clear, and undo again",
          lambda: e2e_canvas.erase_undo_clear_and_restore(
              a, b, admin, admin.channel_named(L.TEXT_CHANNEL)["id"])),
         ("canvas: a reload proves it actually persisted",
-         lambda: e2e_canvas.reload_persists(b, L.TEXT_CHANNEL)),
+         lambda: e2e_canvas.reload_persists(
+             b, L.TEXT_CHANNEL, admin,
+             admin.channel_named(L.TEXT_CHANNEL)["id"])),
         ("canvas: closing it", lambda: e2e_canvas.close_on_both(a, b)),
         ("voice: two clients in one call", lambda: e2e_voice.join_call(
             a, b, room_id)),
