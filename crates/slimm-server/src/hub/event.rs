@@ -302,6 +302,37 @@ pub enum Event {
         x: f64,
         y: f64,
     },
+    /// A live in-flight stroke preview on a channel's canvas: the points a
+    /// drawer's pen has added since their last preview frame for this
+    /// object, relayed as-is.
+    ///
+    /// The same "never persisted, no seq, no matching catch-up path" shape
+    /// [`Event::CanvasCursorMoved`] already uses, extended to carry drawing
+    /// content rather than a bare position - and content is exactly why
+    /// `Store::timed_out_until` is checked before this publishes, where
+    /// [`Event::CanvasCursorMoved`] deliberately is not: a cursor carries no
+    /// ink, this does, and a timed-out member may not add to the canvas by
+    /// any route, this one included.
+    ///
+    /// `points` is a delta - only what was added since the sender's last
+    /// frame for this `object_id` - never the whole path so far, or relaying
+    /// a long stroke would cost every later frame more than the last. A
+    /// receiver accumulates them locally, keyed by `object_id`. `ended`
+    /// marks the gesture's last frame, whether or not it went on to commit a
+    /// real object: a receiver drops the preview the instant it sees this
+    /// rather than waiting for staleness to age it out.
+    ///
+    /// `object_id` never names a row in `canvas_objects`: it is an id the
+    /// client mints purely to key this preview session, since the object(s)
+    /// a finished stroke actually commits are decided later, by
+    /// `POST .../canvas/objects`, and one long stroke can split into several.
+    CanvasStrokePreview {
+        channel_id: ChannelId,
+        user_id: UserId,
+        object_id: CanvasObjectId,
+        points: Vec<f64>,
+        ended: bool,
+    },
     /// A placed object was repositioned.
     ///
     /// Carries the whole new box, the same reason [`Event::CanvasObjectPlaced`]

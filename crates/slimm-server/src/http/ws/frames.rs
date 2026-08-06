@@ -134,6 +134,14 @@ pub(super) enum ServerFrame {
         x: f64,
         y: f64,
     },
+    #[serde(rename = "canvas.stroke_preview.updated")]
+    CanvasStrokePreview {
+        channel_id: String,
+        user_id: String,
+        object_id: String,
+        points: Vec<f64>,
+        ended: bool,
+    },
     #[serde(rename = "canvas.object.moved")]
     CanvasObjectMoved {
         channel_id: String,
@@ -193,4 +201,18 @@ pub(super) enum ClientFrame {
     /// the reason [`crate::hub::Event::CanvasCursorMoved`] gives.
     #[serde(rename = "canvas.cursor")]
     CanvasCursor { channel_id: String, x: f64, y: f64 },
+    /// An in-flight stroke preview on a channel's canvas. Rate-limited by the
+    /// frame's own byte size rather than by count, and authorized on the same
+    /// bar the canvas write route uses (view plus `USE_CANVAS`, plus a direct
+    /// timeout check a cursor frame does not need, since this one carries
+    /// drawing content); see
+    /// [`super::signals::handle_canvas_stroke_preview`].
+    #[serde(rename = "canvas.stroke_preview")]
+    CanvasStrokePreview {
+        channel_id: String,
+        object_id: String,
+        points: Vec<f64>,
+        #[serde(default)]
+        ended: bool,
+    },
 }

@@ -88,7 +88,7 @@ class CanvasCursorRelay {
       x: x,
       y: y,
       label: resolveLabel(userId),
-      colorIndex: _colorIndexFor(userId, paletteSize),
+      colorIndex: canvasParticipantColorIndex(userId, paletteSize),
       now: clock.now(),
     );
   }
@@ -101,9 +101,11 @@ class CanvasCursorRelay {
 
 /// A stable, evenly-spread index into a palette of [paletteSize] colours,
 /// the same sum-of-code-units hash `AppAvatar`'s own tint picker uses so a
-/// cursor and its owner's avatar do not need two different ideas of
-/// "consistent colour for this id".
-int _colorIndexFor(String userId, int paletteSize) {
+/// cursor, an in-flight stroke, and their owner's avatar do not need three
+/// different ideas of "consistent colour for this id". Shared with
+/// `canvas_stroke_preview_relay.dart` so a participant's ink and their
+/// cursor read as the same person.
+int canvasParticipantColorIndex(String userId, int paletteSize) {
   if (paletteSize <= 0) return 0;
   var sum = 0;
   for (final unit in userId.codeUnits) {

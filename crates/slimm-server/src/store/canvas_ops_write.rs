@@ -38,6 +38,7 @@
 
 use anyhow::Context;
 
+use super::canvas_audit::record_canvas_audit;
 use super::canvas_ops_apply::{
     affected_count_for, apply_move, apply_remove, apply_reorder, apply_restore, current_canvas_seq,
     fetch_op,
@@ -96,13 +97,17 @@ pub struct SubmittedOp {
     /// Whether this call is what wrote the stored op, the same meaning
     /// [`super::canvas::Placement::fresh`] carries.
     pub fresh: bool,
-    /// The ids a fresh `remove` or `restore` actually touched - a subset of
-    /// what was named, since an id already in its target state is not touched
-    /// again. Empty for a `clear` (whose caller already has `before_seq` in
-    /// hand) and for a replay, which never publishes and so never needs this.
+    /// The ids a fresh `remove`, `clear` or `restore` actually touched - a
+    /// subset of what was named (or, for `clear`, of what the fence covered),
+    /// since an id already in its target state is not touched again. Also
+    /// what [`Store::record_canvas_audit`] writes one row per, for `remove`,
+    /// `clear` and `restore`. Empty for a replay, which never publishes and
+    /// so never needs this.
     pub touched_ids: Vec<CanvasObjectId>,
-    /// The fence a fresh `clear` applied. `None` for `remove`, `restore`, and
-    /// a replay, for the same reason `touched_ids` is empty there.
+    /// The fence a fresh `clear` applied, carried separately from
+    /// `touched_ids` for the live event, which names the fence rather than
+    /// enumerating potentially many ids. `None` for `remove`, `restore`, and
+    /// a replay.
     pub cleared_before_seq: Option<i64>,
     /// The bounds a fresh `move` applied, for the live event to carry so a
     /// receiver need not refetch. `None` for every other kind and for a
@@ -220,17 +225,19 @@ impl Store {
                     tx.commit().await?;
                     return Err(SubmitOpError::NotAuthorized);
                 }
-                let affected = sqlx::query!(
-                    "UPDATE canvas_objects SET deleted_at = ?
-                     WHERE channel_id = ? AND deleted_at IS NULL AND seq <= ?",
+                // RETURNING rather than rows_affected(): the audit log below needs the ids.
+                let touched: Vec<CanvasObjectId> = sqlx::query_scalar!(
+                    r#"UPDATE canvas_objects SET deleted_at = ?
+                       WHERE channel_id = ? AND deleted_at IS NULL AND seq <= ?
+                       RETURNING id AS "id!: CanvasObjectId""#,
                     now,
                     channel_id,
                     before_seq
                 )
-                .execute(&mut *tx)
-                .await?
-                .rows_affected() as i64;
-                ("clear", affected, Vec::new(), Some(before_seq))
+                .fetch_all(&mut *tx)
+                .await?;
+                let affected = touched.len() as i64;
+                ("clear", affected, touched, Some(before_seq))
             }
             CanvasOpRequest::Restore { target_op } => {
                 target_op_for_row = Some(target_op);
@@ -338,6 +345,7 @@ impl Store {
             .execute(&mut *tx)
             .await?;
         }
+        record_canvas_audit(&mut tx, channel_id, actor_id, kind, &touched_ids, now).await?;
 
         tx.commit().await?;
 

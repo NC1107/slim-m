@@ -81,6 +81,8 @@ void main() {
     sync: sync,
     document: document,
     relay: () => throw StateError('no cursor event exercised here'),
+    strokePreviewRelay: () =>
+        throw StateError('no stroke preview event exercised here'),
     applyPlacedObject: (_) {},
     forgetFetchedRegion: () {},
     activityLog: log,
@@ -154,6 +156,8 @@ void main() {
       sync: countingSync,
       document: document,
       relay: () => throw StateError('no cursor event exercised here'),
+      strokePreviewRelay: () =>
+          throw StateError('no stroke preview event exercised here'),
       applyPlacedObject: (_) {},
       forgetFetchedRegion: () {},
       activityLog: log,

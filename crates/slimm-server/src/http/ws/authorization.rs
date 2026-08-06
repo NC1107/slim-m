@@ -60,6 +60,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::CanvasCleared { .. }
         | Event::CanvasObjectsRestored { .. }
         | Event::CanvasCursorMoved { .. }
+        | Event::CanvasStrokePreview { .. }
         | Event::CanvasObjectMoved { .. }
         | Event::CanvasObjectReordered { .. } => Some(Permissions::USE_CANVAS),
         Event::MessageCreated { .. }
@@ -188,6 +189,7 @@ pub(super) async fn authorize(
         Event::CanvasCleared { channel_id, .. } => *channel_id,
         Event::CanvasObjectsRestored { channel_id, .. } => *channel_id,
         Event::CanvasCursorMoved { channel_id, .. } => *channel_id,
+        Event::CanvasStrokePreview { channel_id, .. } => *channel_id,
         Event::CanvasObjectMoved { channel_id, .. } => *channel_id,
         Event::CanvasObjectReordered { channel_id, .. } => *channel_id,
         Event::VoiceActivityChanged { channel_id } => *channel_id,
@@ -242,10 +244,11 @@ pub(super) async fn authorize(
         return Authorization::Withhold;
     }
 
-    // Typing and a cursor both leak presence, so both must fail closed on a blip.
+    // Typing, a cursor and a stroke preview all leak presence and must fail closed on a blip.
     if let Event::TypingStarted { user_id, .. }
     | Event::TypingStopped { user_id, .. }
-    | Event::CanvasCursorMoved { user_id, .. } = event
+    | Event::CanvasCursorMoved { user_id, .. }
+    | Event::CanvasStrokePreview { user_id, .. } = event
     {
         let confirmed_visible = matches!(
             signals::presence_status(store, hub, ctx.user_id, user_id).await,
@@ -424,6 +427,19 @@ pub(super) async fn authorize(
             user_id: user_id.to_string(),
             x,
             y,
+        },
+        Event::CanvasStrokePreview {
+            channel_id,
+            user_id,
+            object_id,
+            points,
+            ended,
+        } => ServerFrame::CanvasStrokePreview {
+            channel_id: channel_id.to_string(),
+            user_id: user_id.to_string(),
+            object_id: object_id.to_string(),
+            points,
+            ended,
         },
         Event::CanvasObjectMoved {
             channel_id,

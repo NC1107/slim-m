@@ -5141,6 +5141,7 @@ components:
         - $ref: "#/components/schemas/ClientHello"
         - $ref: "#/components/schemas/ClientPing"
         - $ref: "#/components/schemas/ClientTyping"
+        - $ref: "#/components/schemas/ClientCanvasStrokePreview"
 
     ClientHello:
       type: object
@@ -5180,6 +5181,43 @@ components:
           type: string
           format: uuid
 
+    ClientCanvasStrokePreview:
+      type: object
+      required: [type, channel_id, object_id, points]
+      description: >
+        An in-flight stroke preview on a channel's canvas: ephemeral,
+        relayed but never persisted. `points` is a delta - only the points
+        added since this client's last frame for `object_id` - never the
+        whole path so far, since a full-path frame would cost more with
+        every point drawn. Rate-limited by the frame's own byte size rather
+        than by count, and refused outright for a timed-out member, since
+        unlike `typing` or `canvas.cursor` this frame carries drawing
+        content.
+      properties:
+        type:
+          type: string
+          enum: [canvas.stroke_preview]
+        channel_id:
+          type: string
+          format: uuid
+        object_id:
+          type: string
+          format: uuid
+          description: >
+            A client-minted id keying this preview session. Never a row in
+            canvas_objects: the object(s) a finished stroke commits are
+            decided later, by POST .../canvas/objects, and one stroke can
+            split into several.
+        points:
+          type: array
+          items: { type: number, format: double }
+        ended:
+          type: boolean
+          default: false
+          description: >
+            Marks this as the gesture's last frame, whether or not it went
+            on to commit a real object.
+
     ServerFrame:
       description: A frame sent by the server over the WebSocket.
       oneOf:
@@ -5211,6 +5249,7 @@ components:
         - $ref: "#/components/schemas/CanvasCleared"
         - $ref: "#/components/schemas/CanvasObjectsRestored"
         - $ref: "#/components/schemas/CanvasCursorMoved"
+        - $ref: "#/components/schemas/CanvasStrokePreviewUpdated"
         - $ref: "#/components/schemas/CanvasObjectMoved"
         - $ref: "#/components/schemas/CanvasObjectReordered"
         - $ref: "#/components/schemas/ServerPong"
@@ -5338,6 +5377,40 @@ components:
         y:
           type: number
           format: double
+
+    CanvasStrokePreviewUpdated:
+      type: object
+      required: [type, channel_id, user_id, object_id, points, ended]
+      description: >-
+        A live in-flight stroke preview on a channel's canvas, gated the
+        same way `canvas.object.placed` is, plus a direct timeout check the
+        write route itself uses - unlike `canvas.cursor.moved`, this frame
+        carries drawing content. Carries no `seq`: like a cursor it is a
+        this-instant hint, not a change to a durable object, so a receiver
+        that misses one is not stale. `object_id` never names a row in
+        canvas_objects; it only keys this preview session, since the
+        object(s) a finished stroke commits are decided later and one
+        stroke can split into several. `points` is a delta - only what was
+        added since the sender's last frame for this `object_id` - and
+        `ended` marks the gesture's last frame.
+      properties:
+        type:
+          type: string
+          enum: [canvas.stroke_preview.updated]
+        channel_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        object_id:
+          type: string
+          format: uuid
+        points:
+          type: array
+          items: { type: number, format: double }
+        ended:
+          type: boolean
 
     CanvasObjectMoved:
       type: object

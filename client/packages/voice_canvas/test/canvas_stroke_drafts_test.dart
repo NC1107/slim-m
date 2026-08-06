@@ -1,0 +1,193 @@
+// SPDX-License-Identifier: Apache-2.0
+/// [RemoteStrokeDrafts]: appending as a delta, `end`, prune-by-age, and
+/// `clear` - the same shape `canvas_cursors_test.dart` already covers, plus
+/// what is new here: accumulation across several frames.
+library;
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_voice_canvas/voice_canvas.dart';
+
+void main() {
+  test('appendOrCreate starts a draft and notifies once', () {
+    final drafts = RemoteStrokeDrafts();
+    addTearDown(drafts.dispose);
+    var notifications = 0;
+    drafts.addListener(() => notifications++);
+
+    drafts.appendOrCreate(
+      objectId: 'd1',
+      authorId: 'alice',
+      points: const [1.0, 2.0],
+      colorIndex: 0,
+    );
+
+    expect(drafts.all.single.objectId, 'd1');
+    expect(drafts.all.single.points, [1.0, 2.0]);
+    expect(notifications, 1);
+  });
+
+  test('a later frame for the same id appends to what it already holds', () {
+    final drafts = RemoteStrokeDrafts();
+    addTearDown(drafts.dispose);
+
+    drafts.appendOrCreate(
+      objectId: 'd1',
+      authorId: 'alice',
+      points: const [1.0, 2.0],
+      colorIndex: 0,
+    );
+    drafts.appendOrCreate(
+      objectId: 'd1',
+      authorId: 'alice',
+      points: const [3.0, 4.0],
+      colorIndex: 0,
+    );
+
+    expect(drafts.all.length, 1);
+    expect(drafts.all.single.points, [1.0, 2.0, 3.0, 4.0]);
+  });
+
+  test('two distinct object ids are two independent drafts', () {
+    final drafts = RemoteStrokeDrafts();
+    addTearDown(drafts.dispose);
+
+    drafts.appendOrCreate(
+      objectId: 'd1',
+      authorId: 'alice',
+      points: const [1.0, 1.0],
+      colorIndex: 0,
+    );
+    drafts.appendOrCreate(
+      objectId: 'd2',
+      authorId: 'bob',
+      points: const [2.0, 2.0],
+      colorIndex: 1,
+    );
+
+    expect(drafts.all.map((d) => d.objectId).toSet(), {'d1', 'd2'});
+  });
+
+  test('end drops one draft by id and is a silent no-op for an unknown one',
+      () {
+    final drafts = RemoteStrokeDrafts();
+    addTearDown(drafts.dispose);
+    drafts.appendOrCreate(
+      objectId: 'd1',
+      authorId: 'alice',
+      points: const [0.0, 0.0],
+      colorIndex: 0,
+    );
+
+    var notifications = 0;
+    drafts.addListener(() => notifications++);
+    drafts.end('nobody');
+    expect(notifications, 0, reason: 'ending an unknown id must not notify');
+
+    drafts.end('d1');
+    expect(drafts.all, isEmpty);
+    expect(notifications, 1);
+  });
+
+  test('pruneOlderThan drops only drafts stale past the ttl', () {
+    final drafts = RemoteStrokeDrafts();
+    addTearDown(drafts.dispose);
+    final base = DateTime(2026, 1, 1);
+
+    drafts.appendOrCreate(
+      objectId: 'stale',
+      authorId: 'alice',
+      points: const [0.0, 0.0],
+      colorIndex: 0,
+      now: base,
+    );
+    drafts.appendOrCreate(
+      objectId: 'fresh',
+      authorId: 'bob',
+      points: const [0.0, 0.0],
+      colorIndex: 1,
+      now: base.add(const Duration(seconds: 5)),
+    );
+
+    drafts.pruneOlderThan(
+      const Duration(seconds: 6),
+      now: base.add(const Duration(seconds: 8)),
+    );
+
+    expect(drafts.all.map((d) => d.objectId), ['fresh']);
+  });
+
+  test(
+    'pruneOlderThan is a no-op, and notifies nothing, when nothing is stale',
+    () {
+      final drafts = RemoteStrokeDrafts();
+      addTearDown(drafts.dispose);
+      final base = DateTime(2026, 1, 1);
+      drafts.appendOrCreate(
+        objectId: 'd1',
+        authorId: 'alice',
+        points: const [0.0, 0.0],
+        colorIndex: 0,
+        now: base,
+      );
+
+      var notifications = 0;
+      drafts.addListener(() => notifications++);
+      drafts.pruneOlderThan(
+        const Duration(seconds: 10),
+        now: base.add(const Duration(seconds: 1)),
+      );
+
+      expect(drafts.all.length, 1);
+      expect(notifications, 0);
+    },
+  );
+
+  test('a later frame refreshes the staleness clock for that id', () {
+    final drafts = RemoteStrokeDrafts();
+    addTearDown(drafts.dispose);
+    final base = DateTime(2026, 1, 1);
+
+    drafts.appendOrCreate(
+      objectId: 'd1',
+      authorId: 'alice',
+      points: const [0.0, 0.0],
+      colorIndex: 0,
+      now: base,
+    );
+    drafts.appendOrCreate(
+      objectId: 'd1',
+      authorId: 'alice',
+      points: const [1.0, 1.0],
+      colorIndex: 0,
+      now: base.add(const Duration(seconds: 5)),
+    );
+
+    drafts.pruneOlderThan(
+      const Duration(seconds: 6),
+      now: base.add(const Duration(seconds: 8)),
+    );
+
+    expect(drafts.all, isNotEmpty, reason: 'the refresh at 5s must count');
+  });
+
+  test('clear drops every draft at once', () {
+    final drafts = RemoteStrokeDrafts();
+    addTearDown(drafts.dispose);
+    drafts.appendOrCreate(
+      objectId: 'd1',
+      authorId: 'alice',
+      points: const [0.0, 0.0],
+      colorIndex: 0,
+    );
+    drafts.appendOrCreate(
+      objectId: 'd2',
+      authorId: 'bob',
+      points: const [1.0, 1.0],
+      colorIndex: 1,
+    );
+
+    drafts.clear();
+
+    expect(drafts.all, isEmpty);
+  });
+}

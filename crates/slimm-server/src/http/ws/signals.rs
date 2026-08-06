@@ -5,7 +5,7 @@
 //! file stays focused on the wire protocol itself.
 
 use crate::hub::{Event, Hub};
-use crate::ids::{ChannelId, UserId};
+use crate::ids::{CanvasObjectId, ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::presence::{self, Status, Visibility};
 use crate::ratelimit::{Class, RateLimiter};
@@ -224,5 +224,88 @@ pub(super) async fn handle_canvas_cursor(
         user_id: ctx.user_id,
         x,
         y,
+    });
+}
+
+/// Bound on how many coordinate pairs one in-flight stroke preview frame may
+/// carry. A well-behaved client never approaches this - it flushes on a
+/// timer and caps what it buffers - so this only ever refuses a frame
+/// nobody's own throttle produced, and it is checked before the frame costs
+/// anything against the byte-rate budget.
+const MAX_STROKE_PREVIEW_POINTS: usize = 24;
+
+/// One `canvas.stroke_preview` frame's fields, bundled so
+/// [`handle_canvas_stroke_preview`] stays under the project's parameter cap.
+pub(super) struct StrokePreviewFrame {
+    pub(super) channel_id: String,
+    pub(super) object_id: String,
+    pub(super) points: Vec<f64>,
+    pub(super) ended: bool,
+}
+
+/// Relays an in-flight stroke preview on a channel's canvas, if the
+/// byte-rate limiter, bounds check, permissions and timeout all allow it.
+/// Silent on every rejection, the same treatment [`handle_canvas_cursor`]
+/// gives a refused frame.
+///
+/// Two departures from [`handle_canvas_cursor`], both because this frame
+/// carries drawing content and a cursor's bare position does not: the rate
+/// limiter charges `frame_bytes` rather than one flat token (see
+/// [`crate::ratelimit::Class::CanvasStrokePreview`]), and a timed-out member
+/// is refused directly - the same check `http::canvas_write`'s own doc names
+/// as the one thing standing between a timeout and a second write path that
+/// forgot to apply it.
+pub(super) async fn handle_canvas_stroke_preview(
+    store: &Store,
+    hub: &Hub,
+    limiter: &RateLimiter,
+    ctx: &SessionContext,
+    frame: StrokePreviewFrame,
+    frame_bytes: usize,
+) {
+    let Ok(channel_id) = uuid::Uuid::parse_str(&frame.channel_id) else {
+        return;
+    };
+    let channel_id = ChannelId(channel_id);
+    let Ok(object_id) = uuid::Uuid::parse_str(&frame.object_id) else {
+        return;
+    };
+    let object_id = CanvasObjectId(object_id);
+
+    if !frame.points.len().is_multiple_of(2) || frame.points.len() / 2 > MAX_STROKE_PREVIEW_POINTS {
+        return;
+    }
+    if frame
+        .points
+        .iter()
+        .any(|v| !v.is_finite() || v.abs() > WORLD_LIMIT)
+    {
+        return;
+    }
+
+    let key = format!("u:{}", ctx.user_id);
+    if !limiter.check_weighted(Class::CanvasStrokePreview, &key, frame_bytes as f64) {
+        return;
+    }
+
+    hub.presence().touch(ctx.user_id);
+
+    let needed = Permissions::VIEW_CHANNEL.union(Permissions::USE_CANVAS);
+    match store.has_permission(ctx.user_id, channel_id, needed).await {
+        Ok(true) => {}
+        _ => return,
+    }
+    // Unlike a cursor, this frame carries ink; see this function's own doc.
+    match store.timed_out_until(ctx.user_id).await {
+        Ok(None) => {}
+        _ => return,
+    }
+
+    hub.publish(Event::CanvasStrokePreview {
+        channel_id,
+        user_id: ctx.user_id,
+        object_id,
+        points: frame.points,
+        ended: frame.ended,
     });
 }
