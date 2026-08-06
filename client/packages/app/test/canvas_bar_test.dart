@@ -2,62 +2,19 @@
 /// The canvas bar in isolation: the pen/eraser toggle, the undo button's
 /// enabled state, and the clear control's gating, confirm and reach by
 /// touch. `canvas_pane_test.dart` covers the header's own affordance into
-/// the pane; this covers what the pane hands the bar.
+/// the pane; `canvas_bar_shape_kind_test.dart` covers the shape-kind picker
+/// and its armed icon, split out once this file crossed the 500-line hard
+/// limit.
 library;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slimm_app/src/screens/canvas/canvas_bar.dart';
-import 'package:slimm_app/src/screens/canvas/canvas_shape_icons.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
-Widget _wrap(Widget child, {double width = 800}) => MaterialApp(
-  theme: buildTheme(Brightness.dark, AppTokens.dark),
-  home: Scaffold(
-    body: SizedBox(width: width, child: child),
-  ),
-);
-
-CanvasBar _bar({
-  CanvasTool tool = CanvasTool.pen,
-  ValueChanged<CanvasTool>? onToolChanged,
-  bool canUndo = false,
-  VoidCallback? onUndo,
-  bool canManage = false,
-  ValueListenable<int>? objectCount,
-  Future<void> Function()? onClear,
-  VoidCallback? onPasteImage,
-  ValueListenable<String?>? selection,
-  ValueChanged<String>? onBringToFront,
-  ValueChanged<String>? onSendToBack,
-  ValueChanged<String>? onDeleteSelected,
-  bool activityLogOpen = false,
-  VoidCallback? onToggleActivityLog,
-  CanvasShapeKind shapeKind = CanvasShapeKind.rectangle,
-  ValueChanged<CanvasShapeKind>? onShapeKindChanged,
-}) => CanvasBar(
-  channelId: 'c1',
-  onClose: () {},
-  tool: tool,
-  onToolChanged: onToolChanged ?? (_) {},
-  canUndo: canUndo,
-  onUndo: onUndo ?? () {},
-  canManage: canManage,
-  objectCount: objectCount ?? ValueNotifier<int>(3),
-  onClear: onClear ?? () async {},
-  onPasteImage: onPasteImage ?? () {},
-  selection: selection ?? ValueNotifier<String?>(null),
-  onBringToFront: onBringToFront ?? (_) {},
-  onSendToBack: onSendToBack ?? (_) {},
-  onDeleteSelected: onDeleteSelected ?? (_) {},
-  activityLogOpen: activityLogOpen,
-  onToggleActivityLog: onToggleActivityLog ?? () {},
-  shapeKind: shapeKind,
-  onShapeKindChanged: onShapeKindChanged ?? (_) {},
-);
+import 'support/canvas_bar_fixtures.dart';
 
 void main() {
   testWidgets('tapping the eraser calls onToolChanged with eraser', (
@@ -65,7 +22,7 @@ void main() {
   ) async {
     CanvasTool? chosen;
     await tester.pumpWidget(
-      _wrap(_bar(onToolChanged: (tool) => chosen = tool)),
+      wrapCanvasBar(buildCanvasBar(onToolChanged: (tool) => chosen = tool)),
     );
 
     await tester.tap(find.bySemanticsLabel('Eraser'));
@@ -77,8 +34,11 @@ void main() {
   testWidgets('tapping the pen calls onToolChanged with pen', (tester) async {
     CanvasTool? chosen;
     await tester.pumpWidget(
-      _wrap(
-        _bar(tool: CanvasTool.eraser, onToolChanged: (tool) => chosen = tool),
+      wrapCanvasBar(
+        buildCanvasBar(
+          tool: CanvasTool.eraser,
+          onToolChanged: (tool) => chosen = tool,
+        ),
       ),
     );
 
@@ -91,7 +51,7 @@ void main() {
   testWidgets('tapping select calls onToolChanged with select', (tester) async {
     CanvasTool? chosen;
     await tester.pumpWidget(
-      _wrap(_bar(onToolChanged: (tool) => chosen = tool)),
+      wrapCanvasBar(buildCanvasBar(onToolChanged: (tool) => chosen = tool)),
     );
 
     await tester.tap(find.bySemanticsLabel('Move'));
@@ -105,7 +65,7 @@ void main() {
   ) async {
     CanvasTool? chosen;
     await tester.pumpWidget(
-      _wrap(_bar(onToolChanged: (tool) => chosen = tool)),
+      wrapCanvasBar(buildCanvasBar(onToolChanged: (tool) => chosen = tool)),
     );
 
     await tester.tap(find.bySemanticsLabel('Note'));
@@ -117,66 +77,13 @@ void main() {
     expect(chosen, CanvasTool.shape);
   });
 
-  testWidgets(
-    'the shape-kind picker only appears in the overflow while the shape '
-    'tool is active, and picking one fires onShapeKindChanged',
-    (tester) async {
-      CanvasShapeKind? chosen;
-      await tester.pumpWidget(
-        _wrap(_bar(onShapeKindChanged: (kind) => chosen = kind)),
-      );
-      await tester.tap(find.bySemanticsLabel('More canvas actions'));
-      await tester.pumpAndSettle();
-      expect(find.text('Ellipse'), findsNothing);
-
-      await tester.pumpWidget(
-        _wrap(
-          _bar(
-            tool: CanvasTool.shape,
-            onShapeKindChanged: (kind) => chosen = kind,
-          ),
-        ),
-      );
-      await tester.tap(find.bySemanticsLabel('More canvas actions'));
-      await tester.pumpAndSettle();
-      expect(find.text('Ellipse'), findsOneWidget);
-
-      await tester.tap(find.text('Ellipse'));
-      await tester.pump();
-      expect(chosen, CanvasShapeKind.ellipse);
-    },
-  );
-
-  /// A control whose look never changes with its own state is one a person
-  /// has to remember rather than read; this is what stops the Shape button
-  /// staying the generic glyph no matter which primitive is armed.
-  testWidgets(
-    "the Shape button's own icon reflects the currently armed kind",
-    (tester) async {
-      for (final kind in CanvasShapeKind.values) {
-        await tester.pumpWidget(_wrap(_bar(shapeKind: kind)));
-
-        final button = tester.widget<AppIconButton>(
-          find.ancestor(
-            of: find.bySemanticsLabel('Shape'),
-            matching: find.byType(AppIconButton),
-          ),
-        );
-        expect(button.icon, canvasShapeKindIcon(kind), reason: 'kind: $kind');
-        expect(
-          button.tooltip,
-          contains(canvasShapeKindLabel(kind)),
-          reason: 'kind: $kind, for a screen reader on the same fact',
-        );
-      }
-    },
-  );
-
   testWidgets('tapping paste image in the overflow calls onPasteImage', (
     tester,
   ) async {
     var pasted = 0;
-    await tester.pumpWidget(_wrap(_bar(onPasteImage: () => pasted++)));
+    await tester.pumpWidget(
+      wrapCanvasBar(buildCanvasBar(onPasteImage: () => pasted++)),
+    );
 
     await tester.tap(find.bySemanticsLabel('More canvas actions'));
     await tester.pumpAndSettle();
@@ -189,7 +96,7 @@ void main() {
   testWidgets('undo is disabled when canUndo is false', (tester) async {
     var undone = 0;
     await tester.pumpWidget(
-      _wrap(_bar(canUndo: false, onUndo: () => undone++)),
+      wrapCanvasBar(buildCanvasBar(canUndo: false, onUndo: () => undone++)),
     );
 
     final button = tester.widget<AppIconButton>(
@@ -204,7 +111,9 @@ void main() {
 
   testWidgets('undo fires onUndo when canUndo is true', (tester) async {
     var undone = 0;
-    await tester.pumpWidget(_wrap(_bar(canUndo: true, onUndo: () => undone++)));
+    await tester.pumpWidget(
+      wrapCanvasBar(buildCanvasBar(canUndo: true, onUndo: () => undone++)),
+    );
 
     await tester.tap(find.bySemanticsLabel('Undo'));
     await tester.pump();
@@ -214,7 +123,7 @@ void main() {
 
   testWidgets('the overflow is always present, but offers no Clear canvas item '
       'without MANAGE_CANVAS', (tester) async {
-    await tester.pumpWidget(_wrap(_bar(canManage: false)));
+    await tester.pumpWidget(wrapCanvasBar(buildCanvasBar(canManage: false)));
     expect(find.bySemanticsLabel('More canvas actions'), findsOneWidget);
 
     await tester.tap(find.bySemanticsLabel('More canvas actions'));
@@ -227,7 +136,7 @@ void main() {
   testWidgets('the overflow offers Clear canvas with MANAGE_CANVAS', (
     tester,
   ) async {
-    await tester.pumpWidget(_wrap(_bar(canManage: true)));
+    await tester.pumpWidget(wrapCanvasBar(buildCanvasBar(canManage: true)));
 
     await tester.tap(find.bySemanticsLabel('More canvas actions'));
     await tester.pumpAndSettle();
@@ -240,7 +149,7 @@ void main() {
     'Bring to front and Send to back are absent with nothing selected',
     (tester) async {
       await tester.pumpWidget(
-        _wrap(_bar(selection: ValueNotifier<String?>(null))),
+        wrapCanvasBar(buildCanvasBar(selection: ValueNotifier<String?>(null))),
       );
 
       await tester.tap(find.bySemanticsLabel('More canvas actions'));
@@ -257,8 +166,8 @@ void main() {
       String? front;
       String? back;
       await tester.pumpWidget(
-        _wrap(
-          _bar(
+        wrapCanvasBar(
+          buildCanvasBar(
             selection: ValueNotifier<String?>('obj-1'),
             onBringToFront: (id) => front = id,
             onSendToBack: (id) => back = id,
@@ -287,7 +196,7 @@ void main() {
     'Delete is absent with nothing selected, and fires with an object selected',
     (tester) async {
       await tester.pumpWidget(
-        _wrap(_bar(selection: ValueNotifier<String?>(null))),
+        wrapCanvasBar(buildCanvasBar(selection: ValueNotifier<String?>(null))),
       );
       await tester.tap(find.bySemanticsLabel('More canvas actions'));
       await tester.pumpAndSettle();
@@ -295,8 +204,8 @@ void main() {
 
       String? deleted;
       await tester.pumpWidget(
-        _wrap(
-          _bar(
+        wrapCanvasBar(
+          buildCanvasBar(
             selection: ValueNotifier<String?>('obj-1'),
             onDeleteSelected: (id) => deleted = id,
           ),
@@ -318,8 +227,8 @@ void main() {
     (tester) async {
       var cleared = 0;
       await tester.pumpWidget(
-        _wrap(
-          _bar(
+        wrapCanvasBar(
+          buildCanvasBar(
             canManage: true,
             objectCount: ValueNotifier<int>(42),
             onClear: () async => cleared++,
@@ -356,7 +265,7 @@ void main() {
     (tester) async {
       var toggled = 0;
       await tester.pumpWidget(
-        _wrap(_bar(onToggleActivityLog: () => toggled++)),
+        wrapCanvasBar(buildCanvasBar(onToggleActivityLog: () => toggled++)),
       );
 
       await tester.tap(find.bySemanticsLabel('More canvas actions'));
@@ -371,7 +280,9 @@ void main() {
   );
 
   testWidgets('the overflow label flips once the log is open', (tester) async {
-    await tester.pumpWidget(_wrap(_bar(activityLogOpen: true)));
+    await tester.pumpWidget(
+      wrapCanvasBar(buildCanvasBar(activityLogOpen: true)),
+    );
 
     await tester.tap(find.bySemanticsLabel('More canvas actions'));
     await tester.pumpAndSettle();
@@ -383,7 +294,9 @@ void main() {
   testWidgets('cancelling the confirm never calls onClear', (tester) async {
     var cleared = 0;
     await tester.pumpWidget(
-      _wrap(_bar(canManage: true, onClear: () async => cleared++)),
+      wrapCanvasBar(
+        buildCanvasBar(canManage: true, onClear: () async => cleared++),
+      ),
     );
 
     await tester.tap(find.bySemanticsLabel('More canvas actions'));
@@ -403,7 +316,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _wrap(_bar(canManage: true, canUndo: true), width: 320),
+      wrapCanvasBar(buildCanvasBar(canManage: true, canUndo: true), width: 320),
     );
     await tester.pumpAndSettle();
 
@@ -432,7 +345,9 @@ void main() {
   testWidgets('every toolbar and overflow button carries a hover tooltip', (
     tester,
   ) async {
-    await tester.pumpWidget(_wrap(_bar(canManage: true, canUndo: true)));
+    await tester.pumpWidget(
+      wrapCanvasBar(buildCanvasBar(canManage: true, canUndo: true)),
+    );
 
     for (final tooltip in [
       'Pen',
@@ -471,11 +386,11 @@ void main() {
   /// A disabled control must say why, per the design language: greyed out
   /// with no explanation reads as broken rather than as "nothing to do yet".
   testWidgets('the undo tooltip explains why it is disabled', (tester) async {
-    await tester.pumpWidget(_wrap(_bar(canUndo: false)));
+    await tester.pumpWidget(wrapCanvasBar(buildCanvasBar(canUndo: false)));
     expect(find.byTooltip('Nothing to undo yet'), findsOneWidget);
     expect(find.byTooltip('Undo'), findsNothing);
 
-    await tester.pumpWidget(_wrap(_bar(canUndo: true)));
+    await tester.pumpWidget(wrapCanvasBar(buildCanvasBar(canUndo: true)));
     expect(find.byTooltip('Undo'), findsOneWidget);
     expect(find.byTooltip('Nothing to undo yet'), findsNothing);
   });
@@ -486,7 +401,7 @@ void main() {
   testWidgets('Escape closes the overflow menu once it is open', (
     tester,
   ) async {
-    await tester.pumpWidget(_wrap(_bar()));
+    await tester.pumpWidget(wrapCanvasBar(buildCanvasBar()));
 
     await tester.tap(find.bySemanticsLabel('More canvas actions'));
     await tester.pumpAndSettle();
@@ -504,7 +419,7 @@ void main() {
   testWidgets('Paste image shows a Ctrl+V hint on a pointer layout', (
     tester,
   ) async {
-    await tester.pumpWidget(_wrap(_bar()));
+    await tester.pumpWidget(wrapCanvasBar(buildCanvasBar()));
 
     await tester.tap(find.bySemanticsLabel('More canvas actions'));
     await tester.pumpAndSettle();
@@ -524,7 +439,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(_wrap(_bar()));
+    await tester.pumpWidget(wrapCanvasBar(buildCanvasBar()));
 
     await tester.tap(find.bySemanticsLabel('More canvas actions'));
     await tester.pumpAndSettle();
