@@ -27,6 +27,7 @@ class CanvasBar extends StatelessWidget {
     required this.selection,
     required this.onBringToFront,
     required this.onSendToBack,
+    required this.onDeleteSelected,
     required this.activityLogOpen,
     required this.onToggleActivityLog,
     required this.shapeKind,
@@ -77,6 +78,10 @@ class CanvasBar extends StatelessWidget {
   final ValueListenable<String?> selection;
   final ValueChanged<String> onBringToFront;
   final ValueChanged<String> onSendToBack;
+
+  /// Removes the current selection - see [CanvasOverflowMenu]'s own doc for
+  /// why this needs no confirm dialog, unlike clearing the whole canvas.
+  final ValueChanged<String> onDeleteSelected;
 
   /// The accessibility fallback's own open state and toggle, threaded
   /// straight through to the overflow menu - see that file for why it lives
@@ -187,6 +192,7 @@ class CanvasBar extends StatelessWidget {
             selection: selection,
             onBringToFront: onBringToFront,
             onSendToBack: onSendToBack,
+            onDeleteSelected: onDeleteSelected,
             activityLogOpen: activityLogOpen,
             onToggleActivityLog: onToggleActivityLog,
             tool: tool,

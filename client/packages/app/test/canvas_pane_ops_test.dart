@@ -309,6 +309,48 @@ void main() {
     },
   );
 
+  /// A note has no other way to be corrected or withdrawn once placed - see
+  /// `canvas_note_sheet.dart`'s own doc for why there is no in-place edit -
+  /// so selecting it and deleting it is the only route to fixing a mistake
+  /// short of clearing the whole canvas.
+  testWidgets(
+    'selecting a note and choosing Delete removes it in one op, and undo '
+    'restores it',
+    (tester) async {
+      final fixture = CanvasPaneFixture()..objects = [canvasNoteJson('note')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.pump();
+      final gesture = await tester.startGesture(
+        screenFor(tester, const Offset(15, 15)),
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      expect(fixture.postedOps, hasLength(1));
+      expect(fixture.postedOps.single['kind'], 'remove');
+      expect(fixture.postedOps.single['object_ids'], ['note']);
+      expect(surfaceDocument(tester).objectCount.value, 0);
+
+      await tester.tap(find.bySemanticsLabel('Undo'));
+      await tester.pumpAndSettle();
+
+      expect(fixture.postedOps, hasLength(2));
+      expect(fixture.postedOps.last['kind'], 'restore');
+      expect(fixture.postedOps.last['target_op'], 'server-op-1');
+    },
+  );
+
   /// A move already shows its new position optimistically (the property the
   /// first test above checks); a failed submit has to put that back, the
   /// same "revert what was already shown" shape a failed erase never needs

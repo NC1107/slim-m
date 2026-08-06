@@ -32,6 +32,7 @@ CanvasBar _bar({
   ValueListenable<String?>? selection,
   ValueChanged<String>? onBringToFront,
   ValueChanged<String>? onSendToBack,
+  ValueChanged<String>? onDeleteSelected,
   bool activityLogOpen = false,
   VoidCallback? onToggleActivityLog,
   CanvasShapeKind shapeKind = CanvasShapeKind.rectangle,
@@ -50,6 +51,7 @@ CanvasBar _bar({
   selection: selection ?? ValueNotifier<String?>(null),
   onBringToFront: onBringToFront ?? (_) {},
   onSendToBack: onSendToBack ?? (_) {},
+  onDeleteSelected: onDeleteSelected ?? (_) {},
   activityLogOpen: activityLogOpen,
   onToggleActivityLog: onToggleActivityLog ?? () {},
   shapeKind: shapeKind,
@@ -252,6 +254,35 @@ void main() {
       await tester.tap(find.text('Send to back'));
       await tester.pump();
       expect(back, 'obj-1');
+    },
+  );
+
+  testWidgets(
+    'Delete is absent with nothing selected, and fires with an object selected',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(_bar(selection: ValueNotifier<String?>(null))),
+      );
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete'), findsNothing);
+
+      String? deleted;
+      await tester.pumpWidget(
+        _wrap(
+          _bar(
+            selection: ValueNotifier<String?>('obj-1'),
+            onDeleteSelected: (id) => deleted = id,
+          ),
+        ),
+      );
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete'), findsOneWidget);
+
+      await tester.tap(find.text('Delete'));
+      await tester.pump();
+      expect(deleted, 'obj-1');
     },
   );
 
