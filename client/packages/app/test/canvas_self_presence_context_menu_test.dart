@@ -15,7 +15,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/canvas_self_presence.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_object_context_menu.dart';
-import 'package:slimm_app/src/screens/canvas/canvas_presence_layer.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_self_presence_overlay.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -93,13 +92,9 @@ void main() {
         );
       addTearDown(document.dispose);
       final requests = CanvasObjectMenuRequests();
-      await tester.pumpWidget(
-        _wrap(document: document, requests: requests),
-      );
+      await tester.pumpWidget(_wrap(document: document, requests: requests));
 
-      // The top-left corner's own resting centre (margin 16, a camera-off
-      // tile is 104x104): (68, 68), squarely inside the object's own
-      // 50..90 world rect - proof this is a real overlap, not a near miss.
+      // Top-left corner's own resting centre (margin 16, 104x104 tile): (68, 68), inside the object's own 50..90 world rect.
       await tester.tapAt(const Offset(68, 68), buttons: kSecondaryButton);
       await tester.pumpAndSettle();
 
@@ -132,9 +127,7 @@ void main() {
         );
       addTearDown(document.dispose);
       final requests = CanvasObjectMenuRequests();
-      await tester.pumpWidget(
-        _wrap(document: document, requests: requests),
-      );
+      await tester.pumpWidget(_wrap(document: document, requests: requests));
 
       // Well past the top-left tile's own 16..120 box on both axes.
       await tester.tapAt(const Offset(170, 170), buttons: kSecondaryButton);
