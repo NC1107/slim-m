@@ -52,7 +52,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
       _draft.cancel();
       if (hadDraft) widget.onDraftEnded?.call();
       _pendingErasePoint = null;
-      _beginPan(event.localPosition);
+      _beginPan(event.pointer, event.localPosition);
       return;
     }
     if (_pointers > 1) {
@@ -83,12 +83,20 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
   void _move(PointerMoveEvent event) {
     widget.onPointerMoved?.call(_toWorld(event.localPosition));
     if (_panning.value) {
-      _updatePan(event.localPosition);
+      // An unrelated pointer moving (a second finger, say) must not steer someone else's grab.
+      if (event.pointer != _panPointer) return;
+      if (_isPanButton(event.buttons)) {
+        _updatePan(event.localPosition);
+        return;
+      }
+      // The grab button itself let go, but this pointer still holds another - resume the tool right here rather than staying stuck panning until the whole pointer lifts.
+      _endPan();
+      if (_pointers == 1 && widget.enabled) _resumeToolAt(event.localPosition);
       return;
     }
     if (_isPanButton(event.buttons)) {
       _interruptForPan();
-      _beginPan(event.localPosition);
+      _beginPan(event.pointer, event.localPosition);
       return;
     }
     if (_pointers != 1 || !widget.enabled) return;
@@ -120,8 +128,9 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
   void _up(PointerEvent event) {
     _pointers = (_pointers - 1).clamp(0, 10);
     if (_panning.value) {
-      _panning.value = false;
-      _panFrom = null;
+      // An unrelated pointer lifting (a second finger, say) must not end someone else's grab.
+      if (event.pointer != _panPointer) return;
+      _endPan();
       return;
     }
     _resolvePendingPlacement();
@@ -171,14 +180,49 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
   }
 
   /// Starts a grab-pan from [screen], the anchor every later [_updatePan]
-  /// measures its delta against. Called from [_down] when the pan button is
+  /// measures its delta against, owned by [pointer] alone - see
+  /// `_panPointer`'s own doc. Called from [_down] when the pan button is
   /// the first (or only) one pressed, and from [_move] when it joins an
   /// already-down button - the two call sites [_isPanButton] itself is
   /// checked from, since a second button joining a mouse pointer already
   /// down is delivered as a move, never a second down.
-  void _beginPan(Offset screen) {
+  void _beginPan(int pointer, Offset screen) {
     _panning.value = true;
+    _panPointer = pointer;
     _panFrom = screen;
+  }
+
+  /// Clears every field a pan holds, so a stale [_panFrom] cannot be reused
+  /// as an anchor by whatever pans next and a stale [_panPointer] cannot
+  /// match a future pointer id by coincidence.
+  void _endPan() {
+    _panning.value = false;
+    _panPointer = null;
+    _panFrom = null;
+  }
+
+  /// Re-arms the active tool at [screen] as though this pointer had just
+  /// gone down here - the counterpart to [_interruptForPan]'s cancel, for
+  /// when a grab ends mid-gesture (the grab button released while another
+  /// stays held) rather than the whole pointer lifting. Note/shape still
+  /// resolve on this same pointer's eventual up through the normal
+  /// [_pendingPlacementTool] path, exactly as a fresh tap would.
+  void _resumeToolAt(Offset screen) {
+    switch (widget.tool) {
+      case CanvasTool.eraser:
+        _pendingErasePoint = _toWorld(screen);
+      case CanvasTool.select:
+        widget.onSelectStart?.call(_toWorld(screen));
+      case CanvasTool.note:
+        _pendingPlacementTool = CanvasTool.note;
+        _pendingPlacementWorld = _toWorld(screen);
+      case CanvasTool.shape:
+        _pendingPlacementTool = CanvasTool.shape;
+        _pendingPlacementWorld = _toWorld(screen);
+      case CanvasTool.pen:
+        _draft.begin(screen);
+        widget.onDraftPoint?.call(_toWorld(screen));
+    }
   }
 
   void _updatePan(Offset screen) {
