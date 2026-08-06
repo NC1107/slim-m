@@ -405,7 +405,9 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
   double _dockBottomReserve(double paneWidth) {
     const cardPadding = AppSpacing.s8 * 2;
     const dividerBlock = AppSpacing.s8 * 2 + 1;
-    final rows = paneWidth < kCompactWidth
+    // The dock's own LayoutBuilder sees this width minus its wrapping Padding, so this must subtract it too.
+    final dockWidth = paneWidth - AppSpacing.s12 * 2;
+    final rows = dockWidth < kCompactWidth
         ? AppSizes.rowTouch * 2 + dividerBlock
         : AppSizes.rowTouch;
     return cardPadding + rows + AppSpacing.s12;
