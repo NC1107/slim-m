@@ -1,0 +1,9 @@
+{
+  "name": "slimm-commit-lint",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@conventional-commits/parser": "0.4.1"
+  }
+}

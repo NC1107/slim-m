@@ -12,6 +12,42 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## A commit's body can crash release-please's parser, not just its title (2026-08-06)
+
+Found while reading the client's pending release PR by hand: commit `7eebab8` (PR #443, "a note nobody could delete, and a pinch that drew on your canvas") has a perfectly good conventional-commit title and is **silently absent from the changelog anyway**.
+release-please's own run log said why: `commit could not be parsed: 7eebab8...` followed by `unexpected token '(' at 153:29, valid tokens [)]`, then it moved on as if the commit did not exist.
+Read this before assuming a green release PR's changelog is complete, and before touching `scripts/commit-lint/`.
+
+**The trigger is a body line that opens like a footer token and never closes its parens on the same line, and release-please's parser does not catch its own exception when that happens.**
+`7eebab8`'s squashed body carries a line of prose quoting code: `find.bySemanticsLabel(RegExp(r'^Selected')) reads as "no node exists"`.
+release-please parses a commit's body looking for trailers (`Signed-off-by:`, `BREAKING CHANGE:`, and so on) by re-attempting a footer parse at the start of every physical line past the summary, and a line shaped like `word(` commits that attempt to `<type> "(" <scope> ")"` grammar.
+Reading `@conventional-commits/parser`'s own source (`lib/parser.js`): if the scope's closing `)` never arrives before the next `(` or a newline, `scope()` **throws** rather than returning an `Error` value the way every sibling production does, and nothing between there and the top-level `message()` call catches it.
+So one malformed-looking line does not fail to be recognised as a footer, it aborts parsing the *entire* commit, silently, from release-please's point of view.
+
+**This is the same failure shape CLAUDE.md already recorded for a bad PR title (see "Contribution conventions" above), one layer deeper.**
+A bad title makes release-please treat a commit as non-conventional and it still appears in the release, just uncategorised.
+A body the parser cannot parse at all makes the commit vanish from the changelog with nothing to show for it, and the only evidence anywhere is one line in a GitHub Actions log nobody was watching - the same "nobody is watching this" shape as the `e2e`-was-red-for-a-day entry above, on a different gate.
+
+**The gate: `scripts/commit-lint/` runs the real, pinned parser against the PR title and every individual commit in the PR, standalone, before merge.**
+Not a reimplementation of the grammar - the actual `@conventional-commits/parser` package, pinned in `scripts/commit-lint/package-lock.json` to the exact version (`0.4.1`) that `googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071` (the sha this repo's `release.yml` already pins, tag v4.4.1, release-please 17.3.0) resolves.
+A gate that disagreed with the real parser would be worse than none, so the version is read off the action's own dependency rather than guessed at, and matched by installing it and reproducing the exact failure: parsing `7eebab8`'s real message with this exact package fails at the identical `unexpected token '(' at 153:29`.
+
+**Why per-commit, standalone, rather than reconstructing GitHub's exact squash-composed message.**
+GitHub composes a squash commit from the PR title and each commit's own message (confirmed against two real merged commits, `7eebab8` and `58b9d5a`: title, then each commit as a `"* "`-prefixed bullet, then a deduplicated trailer block under a `---------` line), and the person merging can hand-edit that text, so nothing running before the merge can see the final byte-for-byte result - that part of the original task was right.
+What turned out not to be needed is reconstructing GitHub's algorithm to check it: the crash comes from a footer-detection attempt scanning body text line by line, which fires at the same relative position (right after a commit's own summary and blank line) whether that text sits alone or bundled into a bigger squash message with a `"* "` prefix on somebody else's first line.
+Verified directly: extracting `7eebab8`'s offending commit and parsing it alone crashes at `3:29`, same column, same cause.
+So checking each commit standalone is not an approximation of the real risk, it reproduces it exactly, and it is strictly more useful pre-merge - it names the one commit and line to fix, where a reconstructed composite message would only say the whole PR failed somewhere.
+
+**What the gate cannot see, stated rather than glossed over: a hand-edit made during the actual merge.**
+If whoever clicks "Confirm squash and merge" rewrites the composed message by hand, nothing that ran on the PR beforehand can know what they typed.
+That gap is inherent to squash-merge on GitHub, not a shortcut this gate took.
+
+**Wired into `hygiene.yml`, not a new workflow**, the same call CLAUDE.md's CI section already makes for every PR-only check: it needs a runner and `fetch-depth: 0` to walk the PR's commit range, nothing server- or client-specific, and `hygiene` already runs on every PR.
+
+**Client 0.32.1's changelog will be missing #443.**
+The work is on `main` and already shipped in every practical sense; only the changelog entry for that one PR is gone, because release-please already ran past it before this gate existed to catch it.
+`CHANGELOG.md` is generated and must never be hand-edited to patch this - recorded here instead, the same treatment client 0.8.0's omission got above.
+
 ## Two Phase 6 canvas deliverables the roadmap had marked open: collapse-to-strip and the text activity log (2026-08-05)
 
 `docs/ROADMAP.md`'s Phase 6 section named two things as still missing: "collapse-to-strip that actually unmounts and suspends the spatial index and paint layers for voice-only participants," and "a text-based canvas activity-log accessibility fallback."
@@ -1660,7 +1696,10 @@ What guards it now is a test asserting the ceiling override keeps the temp guard
 ## Contribution conventions
 
 - Branch, then PR, then squash-merge to main. release-please plus conventional-commit PR titles.
-  **The PR title is the only thing release-please reads**, because squashing throws the individual commits away and keeps them as bullets in the body, which it does not parse. A title without a `feat:`/`fix:` prefix produces a release whose changelog silently omits everything in that PR; client 0.8.0 shipped that way (#117) and the omission was only caught by reading the release PR afterwards. Hand-editing `CHANGELOG.md` to patch it is not the fix, since that file is generated.
+  ~~The PR title is the only thing release-please reads~~ - incomplete, corrected 2026-08-06: the body matters too, and a body release-please cannot parse at all is worse than a badly-titled one, since it drops silently rather than miscategorising.
+  See "A commit's body can crash release-please's parser, not just its title" near the top of this file for what broke and what now catches it before merge.
+  Squashing throws the individual commits away and keeps them as bullets in the body, which release-please **does** parse, and a title without a `feat:`/`fix:` prefix produces a release whose changelog silently omits everything in that PR; client 0.8.0 shipped that way (#117) and the omission was only caught by reading the release PR afterwards.
+  Hand-editing `CHANGELOG.md` to patch either failure is not the fix, since that file is generated.
 - Commit with `git commit -s` (DCO sign-off). NEVER add an AI attribution or co-author trailer to anything.
 - Never use the em dash character; use a plain dash. In long Markdown files, put each full sentence on its own physical line.
 - No emoji as interface chrome (a CI gate enforces this); use Lucide icons. SPDX headers on every source file (a CI gate checks the Rust ones).

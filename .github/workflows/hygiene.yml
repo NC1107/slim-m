@@ -17,11 +17,31 @@ jobs:
   hygiene:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 is for the commit-parse check below to walk the PR range.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        if: github.event_name == 'pull_request'
+        with:
+          node-version: lts/*
+
+      # A commit release-please cannot parse is dropped from the changelog silently; see CLAUDE.md.
+      - name: PR title and commits parse as conventional commits
+        if: github.event_name == 'pull_request'
+        working-directory: scripts/commit-lint
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          npm ci
+          node check-parses.mjs
 
       # e2e.yml runs these too, but only post-merge and advisory; this is the
       # pull_request gate on them, and needs no server to do it.
