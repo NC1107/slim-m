@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.32.0](https://github.com/NC1107/slim-m/compare/client-v0.31.1...client-v0.32.0) (2026-08-06)
+
+
+### Features
+
+* **canvas:** lift an object while it is being moved, and let a stroke be reordered ([#431](https://github.com/NC1107/slim-m/issues/431)) ([4d8ed66](https://github.com/NC1107/slim-m/commit/4d8ed66c1aa2f1b745b1f7e30b457b2c28eb1977))
+* **canvas:** the note and shape tools decision 0004 named ([#435](https://github.com/NC1107/slim-m/issues/435)) ([bd532de](https://github.com/NC1107/slim-m/commit/bd532de88f3a9d2416f3f8519614a302f9e15e18))
+* **canvas:** watch somebody draw, rather than watching their stroke appear ([#434](https://github.com/NC1107/slim-m/issues/434)) ([5024ab0](https://github.com/NC1107/slim-m/commit/5024ab03f4380777e8513b64d639248aa8532300))
+
 ## [0.31.1](https://github.com/NC1107/slim-m/compare/client-v0.31.0...client-v0.31.1) (2026-08-05)
 
 
