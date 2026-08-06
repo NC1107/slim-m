@@ -1,0 +1,16 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+-- `canvas_ops` had no index reaching `created_at` at all, so three separate
+-- readers were paying for a full table scan under the database's one write
+-- lock: `canvas_ops_sweep.rs`'s three passes (`WHERE kind = ? AND created_at
+-- < ?`, every six hours, forever), and `canvas_op_clock.rs`'s restart seed
+-- (`SELECT MAX(created_at)`, once per process lifetime but on the same
+-- ever-growing table). `move` and `reorder` rows are never swept, so the
+-- table's non-eligible share only grows, and a sweep pass finding few or no
+-- eligible rows had to read past all of them to find that out.
+--
+-- `(kind, created_at)` rather than `(created_at)` alone: it serves the sweep's
+-- own equality-then-range predicate directly, and it still lets SQLite's
+-- min/max optimization answer the seed's `WHERE kind IN (...)` in the same
+-- handful of index descents rather than a scan, since an `IN`-list over an
+-- indexed leading column is treated as one OR'd branch per value.
+CREATE INDEX canvas_ops_kind_created_at ON canvas_ops(kind, created_at);
