@@ -208,6 +208,42 @@ void main() {
   });
 
   testWidgets(
+    "a real channel row's own right edge never falls inside the divider's "
+    "widened reach - the two are pinned to the same AppSpacing.s8, and "
+    "channel_rail.dart's own row-list padding is a bare literal 8 with "
+    "nothing tying it to that token",
+    (tester) async {
+      final s = setup(httpClient: quietClient(), signedIn: true);
+      await MessageStore(s.db).upsertChannels([
+        const api.Channel(
+          id: 'c1',
+          name: 'general',
+          kind: 'text',
+          createdAt: 0,
+        ),
+      ]);
+      await pumpAtWidth(tester, s.container, 1400);
+      await tester.pumpAndSettle();
+
+      final railRect = tester.getRect(find.byType(ChannelRail));
+      final rowRect = tester.getRect(find.byType(AppListRow).first);
+      final reachLeftEdge = railRect.right - AppSpacing.s8;
+
+      expect(
+        rowRect.right,
+        lessThanOrEqualTo(reachLeftEdge),
+        reason:
+            "if channel_rail.dart's own row padding ever drifts from "
+            "AppSpacing.s8, a real row's own tap target would sit under "
+            "the divider's widened hit area and lose its own right edge "
+            'to a rail-collapse tap instead of a channel switch',
+      );
+
+      await teardown(tester, s.container, s.db);
+    },
+  );
+
+  testWidgets(
     'the compact drawer from #301 is untouched: no rail handle at compact '
     'width, and the edge-swipe drawer still opens the rail',
     (tester) async {
