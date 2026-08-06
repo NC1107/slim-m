@@ -10,9 +10,15 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 import 'canvas_overflow_menu.dart';
 import 'canvas_shape_icons.dart';
 
+/// Read by `canvas_bar_test.dart` to find the tool strip's edge fades
+/// without matching on any decorated container that merely happens to
+/// carry a gradient.
+const canvasBarLeadingFadeKey = Key('canvas-bar-tools-fade-leading');
+const canvasBarTrailingFadeKey = Key('canvas-bar-tools-fade-trailing');
+
 /// The canvas's own bar. It carries the close affordance because the pane
 /// replaces the conversation, header and all, at every width.
-class CanvasBar extends StatelessWidget {
+class CanvasBar extends StatefulWidget {
   const CanvasBar({
     super.key,
     required this.channelId,
@@ -96,6 +102,69 @@ class CanvasBar extends StatelessWidget {
   final VoidCallback onToggleActivityLog;
 
   @override
+  State<CanvasBar> createState() => _CanvasBarState();
+}
+
+class _CanvasBarState extends State<CanvasBar> {
+  final _toolsScroll = ScrollController();
+
+  /// Whether the tool strip has content scrolled past on that side right
+  /// now - the only two things that ever change these, a drag or the strip
+  /// itself gaining or losing overflow (a resize), both reach here through
+  /// [_onToolsScrollMetrics], never through `widget` fields, since neither
+  /// is a property of what this bar was built with.
+  bool _fadeLeading = false;
+  bool _fadeTrailing = false;
+
+  @override
+  void dispose() {
+    _toolsScroll.dispose();
+    super.dispose();
+  }
+
+  /// A tool clipped off the visible strip has no other cue it exists - see
+  /// this file's own library doc. Fires on a real drag and, since
+  /// [ScrollMetricsNotification] carries no offset change of its own, on a
+  /// resize that starts or stops overflowing with the scroll position
+  /// untouched, which a plain [ScrollController] listener would miss.
+  bool _onToolsScrollMetrics(ScrollMetricsNotification notification) =>
+      _applyToolsScrollMetrics(notification.metrics);
+
+  bool _onToolsScroll(ScrollNotification notification) =>
+      _applyToolsScrollMetrics(notification.metrics);
+
+  bool _applyToolsScrollMetrics(ScrollMetrics metrics) {
+    final leading = metrics.pixels > metrics.minScrollExtent;
+    final trailing = metrics.pixels < metrics.maxScrollExtent;
+    if (leading != _fadeLeading || trailing != _fadeTrailing) {
+      setState(() {
+        _fadeLeading = leading;
+        _fadeTrailing = trailing;
+      });
+    }
+    return false;
+  }
+
+  /// A hairline-thin gradient the same colour as what the bar already
+  /// paints over, so a tool cut off by it still reads as "more here" rather
+  /// than as a hard edge - the same reasoning `AppTokens.stripe` and
+  /// `AppShadows.float` already document for a token existing to name one
+  /// specific visual job.
+  Widget _edgeFade(AppTokens tokens, {required bool leading}) => IgnorePointer(
+    child: Container(
+      key: leading ? canvasBarLeadingFadeKey : canvasBarTrailingFadeKey,
+      width: AppSpacing.s24,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: leading ? Alignment.centerLeft : Alignment.centerRight,
+          end: leading ? Alignment.centerRight : Alignment.centerLeft,
+          colors: [tokens.surfaceBase, tokens.surfaceBase.withAlpha(0)],
+        ),
+      ),
+    ),
+  );
+
+  @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Container(
@@ -125,65 +194,92 @@ class CanvasBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.s8),
-          // Five tool buttons at a phone's touch-target size do not fit a phone-width bar; scrolling here, rather than folding any of them into a menu, keeps every tool a same-level, one-tap button.
+          // Five tool buttons at a phone's touch-target size do not fit a phone-width bar; scrolling here, rather than folding any of them into a menu, keeps every tool a same-level, one-tap button. The edge fades are what say so - a bare clipped icon reads as a broken layout, not an invitation to swipe.
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIconButton(
-                    icon: AppIcons.pen,
-                    semanticLabel: 'Pen',
-                    tooltip: 'Pen',
-                    active: tool == CanvasTool.pen,
-                    onPressed: () => onToolChanged(CanvasTool.pen),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                NotificationListener<ScrollMetricsNotification>(
+                  onNotification: _onToolsScrollMetrics,
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _onToolsScroll,
+                    child: SingleChildScrollView(
+                      controller: _toolsScroll,
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppIconButton(
+                            icon: AppIcons.pen,
+                            semanticLabel: 'Pen',
+                            tooltip: 'Pen',
+                            active: widget.tool == CanvasTool.pen,
+                            onPressed: () =>
+                                widget.onToolChanged(CanvasTool.pen),
+                          ),
+                          const SizedBox(width: AppSpacing.s4),
+                          AppIconButton(
+                            icon: AppIcons.note,
+                            semanticLabel: 'Note',
+                            tooltip: 'Note',
+                            active: widget.tool == CanvasTool.note,
+                            onPressed: () =>
+                                widget.onToolChanged(CanvasTool.note),
+                          ),
+                          const SizedBox(width: AppSpacing.s4),
+                          AppIconButton(
+                            // The armed kind's own glyph, not a generic one - a control whose look never changes with its state is one you have to remember rather than read.
+                            icon: canvasShapeKindIcon(widget.shapeKind),
+                            semanticLabel: 'Shape',
+                            // The tooltip is where a screen reader learns the icon's own state, since it carries as a semantics hint and the icon change is visual-only.
+                            tooltip:
+                                'Shape · ${canvasShapeKindLabel(widget.shapeKind)} armed, '
+                                'pick another from "More canvas actions"',
+                            active: widget.tool == CanvasTool.shape,
+                            onPressed: () =>
+                                widget.onToolChanged(CanvasTool.shape),
+                          ),
+                          const SizedBox(width: AppSpacing.s4),
+                          AppIconButton(
+                            icon: AppIcons.eraser,
+                            semanticLabel: 'Eraser',
+                            // Erases pen ink only - it hit-tests a stroke's own path, which a note, shape or image has none of; nothing else says so.
+                            tooltip:
+                                'Eraser · pen ink only, select then Delete for a '
+                                'note, shape or image',
+                            active: widget.tool == CanvasTool.eraser,
+                            onPressed: () =>
+                                widget.onToolChanged(CanvasTool.eraser),
+                          ),
+                          const SizedBox(width: AppSpacing.s4),
+                          AppIconButton(
+                            icon: AppIcons.select,
+                            semanticLabel: 'Move',
+                            // Answers three things nothing else on screen says: dragging only picks up a box object (image, note, shape), a stroke can only be reordered, and Shift frees the aspect ratio while resizing.
+                            tooltip:
+                                'Move an object, or select a stroke to reorder it '
+                                '· hold Shift while resizing to free the aspect '
+                                'ratio',
+                            active: widget.tool == CanvasTool.select,
+                            onPressed: () =>
+                                widget.onToolChanged(CanvasTool.select),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: AppSpacing.s4),
-                  AppIconButton(
-                    icon: AppIcons.note,
-                    semanticLabel: 'Note',
-                    tooltip: 'Note',
-                    active: tool == CanvasTool.note,
-                    onPressed: () => onToolChanged(CanvasTool.note),
+                ),
+                if (_fadeLeading)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _edgeFade(tokens, leading: true),
                   ),
-                  const SizedBox(width: AppSpacing.s4),
-                  AppIconButton(
-                    // The armed kind's own glyph, not a generic one - a control whose look never changes with its state is one you have to remember rather than read.
-                    icon: canvasShapeKindIcon(shapeKind),
-                    semanticLabel: 'Shape',
-                    // The tooltip is where a screen reader learns the icon's own state, since it carries as a semantics hint and the icon change is visual-only.
-                    tooltip:
-                        'Shape · ${canvasShapeKindLabel(shapeKind)} armed, '
-                        'pick another from "More canvas actions"',
-                    active: tool == CanvasTool.shape,
-                    onPressed: () => onToolChanged(CanvasTool.shape),
+                if (_fadeTrailing)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _edgeFade(tokens, leading: false),
                   ),
-                  const SizedBox(width: AppSpacing.s4),
-                  AppIconButton(
-                    icon: AppIcons.eraser,
-                    semanticLabel: 'Eraser',
-                    // Erases pen ink only - it hit-tests a stroke's own path, which a note, shape or image has none of; nothing else says so.
-                    tooltip:
-                        'Eraser · pen ink only, select then Delete for a '
-                        'note, shape or image',
-                    active: tool == CanvasTool.eraser,
-                    onPressed: () => onToolChanged(CanvasTool.eraser),
-                  ),
-                  const SizedBox(width: AppSpacing.s4),
-                  AppIconButton(
-                    icon: AppIcons.select,
-                    semanticLabel: 'Move',
-                    // Answers three things nothing else on screen says: dragging only picks up a box object (image, note, shape), a stroke can only be reordered, and Shift frees the aspect ratio while resizing.
-                    tooltip:
-                        'Move an object, or select a stroke to reorder it '
-                        '· hold Shift while resizing to free the aspect '
-                        'ratio',
-                    active: tool == CanvasTool.select,
-                    onPressed: () => onToolChanged(CanvasTool.select),
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
           const SizedBox(width: AppSpacing.s8),
@@ -191,32 +287,32 @@ class CanvasBar extends StatelessWidget {
             icon: AppIcons.undo,
             semanticLabel: 'Undo',
             // Disabled must say why, not only look greyed out - the same "state why unavailable" rule the design language sets for every other disabled control here.
-            tooltip: canUndo ? 'Undo' : 'Nothing to undo yet',
-            onPressed: canUndo ? onUndo : null,
+            tooltip: widget.canUndo ? 'Undo' : 'Nothing to undo yet',
+            onPressed: widget.canUndo ? widget.onUndo : null,
           ),
           const SizedBox(width: AppSpacing.s4),
           CanvasOverflowMenu(
-            onPasteImage: onPasteImage,
-            onRecenter: onRecenter,
-            canManage: canManage,
-            objectCount: objectCount,
-            onClear: onClear,
-            selection: selection,
-            onBringToFront: onBringToFront,
-            onSendToBack: onSendToBack,
-            onDeleteSelected: onDeleteSelected,
-            activityLogOpen: activityLogOpen,
-            onToggleActivityLog: onToggleActivityLog,
-            tool: tool,
-            shapeKind: shapeKind,
-            onShapeKindChanged: onShapeKindChanged,
+            onPasteImage: widget.onPasteImage,
+            onRecenter: widget.onRecenter,
+            canManage: widget.canManage,
+            objectCount: widget.objectCount,
+            onClear: widget.onClear,
+            selection: widget.selection,
+            onBringToFront: widget.onBringToFront,
+            onSendToBack: widget.onSendToBack,
+            onDeleteSelected: widget.onDeleteSelected,
+            activityLogOpen: widget.activityLogOpen,
+            onToggleActivityLog: widget.onToggleActivityLog,
+            tool: widget.tool,
+            shapeKind: widget.shapeKind,
+            onShapeKindChanged: widget.onShapeKindChanged,
           ),
           const SizedBox(width: AppSpacing.s4),
           AppIconButton(
             icon: AppIcons.dismiss,
             semanticLabel: 'Close canvas',
             tooltip: 'Close canvas',
-            onPressed: onClose,
+            onPressed: widget.onClose,
           ),
         ],
       ),

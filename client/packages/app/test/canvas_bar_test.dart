@@ -3,8 +3,9 @@
 /// enabled state, and the clear control's gating, confirm and reach by
 /// touch. `canvas_pane_test.dart` covers the header's own affordance into
 /// the pane; `canvas_bar_shape_kind_test.dart` covers the shape-kind picker
-/// and its armed icon, split out once this file crossed the 500-line hard
-/// limit.
+/// and its armed icon; `canvas_bar_touch_reach_test.dart` covers the tool
+/// strip's own scroll and edge-fade behaviour at a phone width - each split
+/// out once this file crossed the 500-line hard limit.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -327,7 +328,11 @@ void main() {
   });
 
   /// Every affordance this bar adds - pen, eraser, undo, the overflow, and
-  /// the existing close - is a tap target, none of them keyboard-only.
+  /// the existing close - carries a semantics node at the narrowest
+  /// supported width, so a screen reader always reaches it. This does not
+  /// prove a sighted touch can reach the same node with a bare tap: two of
+  /// these sit past the tool strip's own scroll offset at this width, and
+  /// the tests below cover that separately.
   testWidgets('every new affordance is reachable by touch, at phone width', (
     tester,
   ) async {
