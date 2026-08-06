@@ -61,9 +61,11 @@ tile is not a published track.
 | permissions | the API | that a member is refused and an admin is not |
 | a voice call, mute, leaving | the UI | the SFU's participant and track list |
 | sharing a screen | the UI | a `SCREEN_SHARE` track on the SFU |
+| the canvas dock keeps a call's own controls reachable | the UI | mute and unmute, clicked from inside the canvas's own dock, both reach the SFU |
 | calling in a DM | the UI | the SFU's participant and track list, keyed by the DM's own channel id |
 | edit, delete, search, pins, polls, invites, DMs, channel admin, devices, read state, sync | the API | the effect of each, not its status code |
 | the Voice Canvas: draw, paste an image, place a note and a shape, move, resize, reorder, erase, clear, undo, reload | the UI (`e2e_canvas.py`, `e2e_canvas_shapes.py`; see below) | `GET /channels/{id}/canvas/objects`, `z_index` for the reorder, and the second client's own `performance` resource log for the pasted image's bytes |
+| placing a shape selects it and arms Move, with no manual tool switch | the UI | a drag right after placing moves the object rather than adding a second one |
 
 The run ends by reporting how many documented API paths it actually touched,
 counted from what the harness and both browsers requested rather than from a
@@ -174,6 +176,25 @@ traffic over CDP, which would only prove a frame arrived, not that it
 painted anything. `draw_stroke_and_see_it_live` already checks the *result*
 of a draw on both clients; the preview itself is named here as an honest gap
 rather than a test that would pass whether or not it worked.
+
+**Not covered, deliberately: whether the dock's own controls are reachable
+by touch at a narrow width**, the class of bug #460's own commit message
+names (an overflow menu that opened off-screen until it learned to open
+upward, caught by a widget test rather than by a person). `e2e_js.click`
+finds a labelled control and calls `.click()` on the DOM element directly;
+that fires the framework's own tap handler regardless of whether the
+element is actually visible or covered, so a scenario built the same way -
+launch a browser at a phone width, click every dock label, assert each is
+found - would pass whether or not a real thumb could reach it, which is the
+class of false pass this file's own touch-reach tests were written against
+once already (see this file's own history, and `CLAUDE.md`'s canvas
+entries). `canvas_call_dock_touch_reach_test.dart` and
+`canvas_tools_row_touch_reach_test.dart` are the real check: both drive
+`tester.tap(..., warnIfMissed: false)`, Flutter's own hit-test, at 320
+logical pixels, and assert a clipped control is unreachable until a real
+drag reveals it. Widening this harness's browsers to a second, narrower
+size would only add a scenario that cannot tell "found" from "reachable" -
+an honest gap declined for the same reason the stroke preview above is.
 
 ## What it drives at the API, on purpose
 

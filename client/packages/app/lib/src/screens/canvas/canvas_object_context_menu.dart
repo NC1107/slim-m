@@ -69,6 +69,26 @@
 /// fallback covers for a message row, anchored here at the selected
 /// object's own screen-space centre rather than a fixed corner, since
 /// unlike a row this widget always knows exactly what it is opening for.
+///
+/// **`excludeFromSemantics: true` on the hit-catcher, and it is load-bearing
+/// rather than tidiness.** Wiring `onSecondaryTapUp` alone still makes
+/// `RawGestureDetector` build a `TapGestureRecognizer` (needed to detect any
+/// tap variant, secondary included), and Flutter's own default semantics
+/// delegate (`_DefaultSemanticsGestureDelegate._getTapHandler`, read from
+/// the framework source rather than assumed) exposes `SemanticsAction.tap`
+/// the moment *any* `TapGestureRecognizer` exists, regardless of which tap
+/// callback it actually carries. Without the exclusion this childless
+/// `SizedBox.expand()` became a full-canvas `role="button"` node the moment
+/// semantics were ever engaged (a screen reader, or anything else that
+/// turns Flutter's accessibility tree on) - Flutter's web renderer sets
+/// `pointer-events: all` on any such actionable node, which sits in front
+/// of `CanvasSurface` and silently swallows every draw, erase, select and
+/// placement gesture with no visible error, since the recognizer this
+/// invented "tap" would actually invoke has no `onTap` of its own to call.
+/// The accessible route to these three actions was never this node's job in
+/// the first place - see the paragraph above - so nothing is lost by
+/// telling Flutter this hit-catcher has no accessibility meaning of its
+/// own.
 library;
 
 import 'package:flutter/material.dart';
@@ -278,6 +298,8 @@ class _CanvasObjectContextMenuState extends State<CanvasObjectContextMenu> {
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onSecondaryTapUp: _onSecondaryTapUp,
+        // Load-bearing, not tidiness - see this file's own library doc.
+        excludeFromSemantics: true,
         child: const SizedBox.expand(),
       ),
     );

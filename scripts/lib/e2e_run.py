@@ -136,6 +136,10 @@ def scenarios(a, b, admin, member, room_id, server):
         ("canvas: erase, undo, clear, and undo again",
          lambda: e2e_canvas.erase_undo_clear_and_restore(
              a, b, admin, admin.channel_named(L.TEXT_CHANNEL)["id"])),
+        ("canvas: placing a shape selects it, and a drag right after moves "
+         "it rather than placing a second one",
+         lambda: e2e_canvas_shapes.place_then_move_without_switching_tools(
+             a, admin, admin.channel_named(L.TEXT_CHANNEL)["id"])),
         ("canvas: a reload proves it actually persisted",
          lambda: e2e_canvas.reload_persists(
              b, L.TEXT_CHANNEL, admin,
@@ -147,6 +151,8 @@ def scenarios(a, b, admin, member, room_id, server):
             a, b, room_id)),
         ("voice: mute reaches the server", lambda: e2e_voice.mute_propagates(
             a, b, room_id)),
+        ("voice: the canvas dock keeps mute and hang-up reachable",
+         lambda: e2e_voice.canvas_keeps_call_controls(a, room_id)),
         ("voice: leaving", lambda: e2e_voice.leave_call(a, b)),
         ("voice: calling in a dm", lambda: e2e_dm_call.start_dm_and_call(
             a, b, admin, member)),
