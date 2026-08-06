@@ -153,7 +153,7 @@ class CanvasPresenceBubble extends StatelessWidget {
       label:
           '${participant.name}${participant.isLocal ? ', you' : ''}, '
           'on this call\'s canvas',
-      // AppRadii.window and AppShadows.float: reserved, by their own docs, for exactly a floating canvas object - a bubble is always one, never only while dragged, since nothing here is draggable yet.
+      // AppRadii.window and AppShadows.float: reserved, by their own docs, for exactly a floating canvas object - a bubble is always one, whether or not this particular tile ever drags.
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppRadii.window),
