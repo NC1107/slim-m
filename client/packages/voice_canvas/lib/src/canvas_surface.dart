@@ -298,6 +298,11 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
   /// since that point is applied rather than a jump to the raw position.
   Offset? _panFrom;
 
+  /// Which pointer's grab started the current pan, so an unrelated second
+  /// pointer's own up (or move) cannot end or steer it - see `_beginPan`'s
+  /// own doc for why `_panning` alone is not enough to answer that.
+  int? _panPointer;
+
   @override
   void dispose() {
     _draft.dispose();
