@@ -103,9 +103,9 @@ async fn age_all_ops(pool: &SqlitePool, days: i64) {
 
 /// Backdates one specific op by id, for a scenario where two ops must age
 /// out on different sweeps. Does not touch `canvas_objects.deleted_at`; a
-/// caller aging a `clear` specifically also needs `age_deleted_at`, or the
-/// exact-timestamp guard desyncs the same way `age_all_ops`'s own doc
-/// explains.
+/// caller aging a `remove` or a `clear` specifically also needs
+/// `age_deleted_at`, or the exact-timestamp fence both kinds are restored
+/// and swept through desyncs the same way `age_all_ops`'s own doc explains.
 async fn age_op(pool: &SqlitePool, id: CanvasOpId, days: i64) {
     sqlx::query("UPDATE canvas_ops SET created_at = created_at - ? WHERE id = ?")
         .bind(days * DAY_MS)
@@ -241,6 +241,78 @@ async fn a_remove_with_a_still_dead_target_is_never_swept() {
     assert!(!is_alive(&pool, object).await, "still dead, as it must be");
 }
 
+/// The narrower half of the rule above: an object being *currently* dead is
+/// not the same as being dead *because of this specific remove*. Once a
+/// later, independent removal supersedes an old one - restored, then
+/// re-removed by someone else entirely - the old remove can no longer
+/// restore anything (`apply_restore`'s own exact-timestamp fence refuses
+/// it), so retaining it any longer buys nothing. This is the sweep-side
+/// half of the same authorization fix `restore_permission.rs`'s
+/// `restoring_a_stale_remove_does_not_reach_past_a_later_independent_removal`
+/// covers on the write side.
+#[tokio::test]
+async fn a_remove_superseded_by_a_later_independent_removal_is_swept() {
+    let (store, pool, _guard) = harness().await;
+    let actor = register(&store, "root").await;
+    let channel = general(&store).await;
+    let object = place(&store, channel, actor).await;
+
+    let remove_a = submit(
+        &store,
+        channel,
+        actor,
+        CanvasOpRequest::Remove(vec![object]),
+    )
+    .await;
+    let restore_a = submit(
+        &store,
+        channel,
+        actor,
+        CanvasOpRequest::Restore {
+            target_op: remove_a,
+        },
+    )
+    .await;
+    assert!(
+        is_alive(&pool, object).await,
+        "restored before the re-remove"
+    );
+
+    let remove_b = submit(
+        &store,
+        channel,
+        actor,
+        CanvasOpRequest::Remove(vec![object]),
+    )
+    .await;
+    assert!(
+        !is_alive(&pool, object).await,
+        "dead again, now because of B"
+    );
+
+    age_all_ops(&pool, AGE_DAYS).await;
+    let swept = store.sweep_canvas_ops().await.unwrap();
+
+    assert!(
+        !op_survives(&pool, remove_a).await,
+        "A can no longer restore anything and must be reclaimed"
+    );
+    assert!(
+        !op_survives(&pool, restore_a).await,
+        "A's own restore is equally spent"
+    );
+    assert!(
+        op_survives(&pool, remove_b).await,
+        "B is the one guarding the object's current, still-dead state"
+    );
+    assert_eq!(swept.removes, 1, "only A, not B");
+    assert_eq!(swept.restores, 1);
+    assert!(
+        !is_alive(&pool, object).await,
+        "B's deletion must survive the sweep"
+    );
+}
+
 /// A restore blocks its own target's deletion regardless of the target's
 /// age, until the restore itself ages out too - the FK direction the module
 /// doc names: `target_op` points from the restore at the remove, so the
@@ -260,6 +332,7 @@ async fn a_restore_protects_its_target_until_the_restore_itself_ages_out() {
     )
     .await;
     age_op(&pool, remove_op, AGE_DAYS).await;
+    age_deleted_at(&pool, AGE_DAYS).await;
 
     // The restore is fresh: submitted after the remove was already aged out.
     let restore_op = submit(
@@ -287,127 +360,6 @@ async fn a_restore_protects_its_target_until_the_restore_itself_ages_out() {
     assert_eq!(second_pass.removes, 1);
     assert!(!op_survives(&pool, remove_op).await);
     assert!(!op_survives(&pool, restore_op).await);
-}
-
-/// The same protection, for a clear rather than a remove: a distinct SQL
-/// gate in the sweep's own clear pass, so it earns its own test rather than
-/// relying on the remove case above to stand in for it.
-#[tokio::test]
-async fn a_restore_protects_its_clear_target_until_the_restore_itself_ages_out() {
-    let (store, pool, _guard) = harness().await;
-    let actor = register(&store, "root").await;
-    let channel = general(&store).await;
-    place(&store, channel, actor).await;
-    let head = store
-        .list_canvas_ops(channel, 0, 1)
-        .await
-        .unwrap()
-        .latest_seq;
-    let clear_op = submit(
-        &store,
-        channel,
-        actor,
-        CanvasOpRequest::Clear { before_seq: head },
-    )
-    .await;
-    age_op(&pool, clear_op, AGE_DAYS).await;
-    age_deleted_at(&pool, AGE_DAYS).await;
-
-    let restore_op = submit(
-        &store,
-        channel,
-        actor,
-        CanvasOpRequest::Restore {
-            target_op: clear_op,
-        },
-    )
-    .await;
-
-    let first_pass = store.sweep_canvas_ops().await.unwrap();
-    assert_eq!(
-        first_pass.total(),
-        0,
-        "the clear is old but a fresh restore still names it"
-    );
-    assert!(op_survives(&pool, clear_op).await);
-
-    age_op(&pool, restore_op, AGE_DAYS).await;
-    let second_pass = store.sweep_canvas_ops().await.unwrap();
-    assert_eq!(second_pass.clears, 1);
-    assert_eq!(second_pass.restores, 1);
-    assert!(!op_survives(&pool, clear_op).await);
-    assert!(!op_survives(&pool, restore_op).await);
-}
-
-/// A clear that still holds a dead object survives, symmetrically with the
-/// remove case, checked against the exact-timestamp fence
-/// `canvas_ops_apply::restore_candidates` uses for a clear rather than
-/// `canvas_op_targets`, which a clear never writes.
-#[tokio::test]
-async fn a_clear_with_a_still_dead_target_is_never_swept() {
-    let (store, pool, _guard) = harness().await;
-    let actor = register(&store, "root").await;
-    let channel = general(&store).await;
-    let object = place(&store, channel, actor).await;
-    let head = store
-        .list_canvas_ops(channel, 0, 1)
-        .await
-        .unwrap()
-        .latest_seq;
-    let clear_op = submit(
-        &store,
-        channel,
-        actor,
-        CanvasOpRequest::Clear { before_seq: head },
-    )
-    .await;
-
-    age_all_ops(&pool, AGE_DAYS).await;
-    let swept = store.sweep_canvas_ops().await.unwrap();
-
-    assert_eq!(swept.total(), 0);
-    assert!(op_survives(&pool, clear_op).await);
-    assert!(!is_alive(&pool, object).await);
-}
-
-/// The clear counterpart of the fully-undone remove case: once its object is
-/// back, and both ops are old, both are reclaimed.
-#[tokio::test]
-async fn a_fully_undone_clear_and_its_restore_are_swept_once_old_enough() {
-    let (store, pool, _guard) = harness().await;
-    let actor = register(&store, "root").await;
-    let channel = general(&store).await;
-    let object = place(&store, channel, actor).await;
-    let head = store
-        .list_canvas_ops(channel, 0, 1)
-        .await
-        .unwrap()
-        .latest_seq;
-    let clear_op = submit(
-        &store,
-        channel,
-        actor,
-        CanvasOpRequest::Clear { before_seq: head },
-    )
-    .await;
-    let restore_op = submit(
-        &store,
-        channel,
-        actor,
-        CanvasOpRequest::Restore {
-            target_op: clear_op,
-        },
-    )
-    .await;
-
-    age_all_ops(&pool, AGE_DAYS).await;
-    let swept = store.sweep_canvas_ops().await.unwrap();
-
-    assert_eq!(swept.clears, 1);
-    assert_eq!(swept.restores, 1);
-    assert!(!op_survives(&pool, clear_op).await);
-    assert!(!op_survives(&pool, restore_op).await);
-    assert!(is_alive(&pool, object).await);
 }
 
 /// The account-deletion anonymization this table needs, the same treatment
@@ -439,4 +391,4 @@ async fn canvas_audit_log_actor_is_anonymized_on_account_deletion() {
     assert_eq!(remaining, None, "the actor is nulled, the row is not");
 }
 
-// The seeded, multi-object replay scenario lives in canvas_ops_sweep_replay.rs.
+// The replay scenario lives in canvas_ops_sweep_replay.rs, the clear pass's own coverage in canvas_ops_sweep_clear.rs.

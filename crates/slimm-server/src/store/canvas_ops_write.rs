@@ -78,6 +78,33 @@ fn now_ms_unique() -> i64 {
     }
 }
 
+/// How many `canvas_op_targets` rows one `INSERT` writes at a time. A
+/// `restore` of a large `clear` can touch up to `MAX_OBJECTS_PER_CHANNEL`
+/// (20,000) ids; batching this the same way `undelete_batch` batches the
+/// un-delete itself is what keeps the second half of that write cheap too.
+const TARGET_ROW_INSERT_BATCH: usize = 500;
+
+/// Writes one `canvas_op_targets` row per id in `touched_ids`, batched rather
+/// than one round trip per row - see [`TARGET_ROW_INSERT_BATCH`].
+async fn insert_targets_batch(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    channel_id: ChannelId,
+    seq: i64,
+    touched_ids: &[CanvasObjectId],
+) -> Result<(), sqlx::Error> {
+    for chunk in touched_ids.chunks(TARGET_ROW_INSERT_BATCH) {
+        let mut builder =
+            sqlx::QueryBuilder::new("INSERT INTO canvas_op_targets (channel_id, seq, object_id) ");
+        builder.push_values(chunk, |mut row, object_id| {
+            row.push_bind(channel_id)
+                .push_bind(seq)
+                .push_bind(*object_id);
+        });
+        builder.build().execute(&mut **tx).await?;
+    }
+    Ok(())
+}
+
 /// Most object ids one `remove` may name in a single op.
 ///
 /// The event this produces has to fit the WebSocket's own 4 KiB frame ceiling:
@@ -380,16 +407,7 @@ impl Store {
 
         // A `clear` names no per-object row here; see this function's own doc.
         if kind != "clear" {
-            for object_id in &touched_ids {
-                sqlx::query!(
-                    "INSERT INTO canvas_op_targets (channel_id, seq, object_id) VALUES (?, ?, ?)",
-                    channel_id,
-                    seq,
-                    object_id
-                )
-                .execute(&mut *tx)
-                .await?;
-            }
+            insert_targets_batch(&mut tx, channel_id, seq, &touched_ids).await?;
         }
         record_canvas_audit(&mut tx, channel_id, actor_id, kind, &touched_ids, now).await?;
 

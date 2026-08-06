@@ -5,13 +5,14 @@
 
 use axum::http::StatusCode;
 use serde_json::json;
+use slimm_server::ids::CanvasOpId;
 use slimm_server::permissions::Permissions;
-use slimm_server::store::MAX_OBJECTS_PER_CHANNEL;
+use slimm_server::store::{CanvasOpRequest, MAX_OBJECTS_PER_CHANNEL};
 use uuid::Uuid;
 
 use crate::fixtures::{
-    app, clear, general, get_ops, id, member, new_store, new_store_and_pool, post_object, register,
-    remove, restore, stroke, submit_op,
+    app, clear, general, get_ops, id, member, new_store, new_store_and_pool, place, post_object,
+    register, remove, restore, stroke, submit_op,
 };
 
 async fn is_live(pool: &sqlx::SqlitePool, object_id: &str) -> bool {
@@ -400,5 +401,78 @@ async fn account_deletion_nulls_the_actor_id_of_a_restore_op() {
     assert_eq!(
         page.ops[0].actor_id, None,
         "a deleted account must not stay named as the restorer of a canvas op"
+    );
+}
+
+/// `apply_restore`'s un-delete and `submit_canvas_op`'s own
+/// `canvas_op_targets` insert both batch 500 ids at a time now rather than
+/// one round trip per object (measured: a 20,000-object restore held the
+/// deployment's single write lock for roughly half a second unbatched).
+/// 1,200 objects crosses two batch boundaries, which is what a
+/// first-chunk-only bug - correct at 500, silently wrong past it - needs to
+/// be visible: every existing test named an object count either under one
+/// batch or seeded a `canvas_op_targets` row directly rather than exercising
+/// the write loop itself.
+#[tokio::test]
+async fn a_restore_spanning_several_batches_touches_every_object() {
+    let (store, pool, _guard) = new_store_and_pool().await;
+    let author = store.create_user("ann", "Ann").await.unwrap().id;
+    let channel = store.create_channel("canvas", "voice").await.unwrap().id;
+
+    let n = 1_200;
+    for _ in 0..n {
+        place(&store, channel, author, 0).await;
+    }
+    let latest = store.latest_canvas_seq(channel).await.unwrap();
+
+    let clear_outcome = store
+        .submit_canvas_op(
+            channel,
+            author,
+            CanvasOpId::generate(),
+            true,
+            CanvasOpRequest::Clear { before_seq: latest },
+        )
+        .await
+        .unwrap();
+    assert_eq!(clear_outcome.affected, n);
+
+    let restore_outcome = store
+        .submit_canvas_op(
+            channel,
+            author,
+            CanvasOpId::generate(),
+            true,
+            CanvasOpRequest::Restore {
+                target_op: clear_outcome.id,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        restore_outcome.affected, n,
+        "every object across every batch must come back, not just the first chunk"
+    );
+
+    let live: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM canvas_objects WHERE channel_id = ? AND deleted_at IS NULL",
+    )
+    .bind(channel)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(live, n, "every object must actually be live in the table");
+
+    let target_rows: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM canvas_op_targets WHERE channel_id = ? AND seq = ?",
+    )
+    .bind(channel)
+    .bind(restore_outcome.seq)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        target_rows, n,
+        "every batch's canvas_op_targets rows must be written, not just the first"
     );
 }
