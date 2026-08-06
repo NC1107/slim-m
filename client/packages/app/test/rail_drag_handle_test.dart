@@ -117,6 +117,23 @@ void main() {
   );
 
   testWidgets(
+    'clicking further left than the rail already leaves blank does not '
+    "toggle - the cap that keeps this from ever reaching the footer's "
+    'settings button, which sits exactly at that edge',
+    (tester) async {
+      final s = setup();
+      await pumpAtWidth(tester, s.container, 1400);
+
+      final line = tester.getCenter(find.byType(RailDragHandle));
+      await tester.tapAt(line - const Offset(10, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChannelRail), findsOneWidget);
+
+      await teardown(tester, s.container, s.db);
+    },
+  );
+
+  testWidgets(
     'open, the semantics tree carries this control\'s label exactly once - '
     'dumped rather than inferred, since a leaked action bled onto an '
     'unrelated ancestor once before (backlog item 54)',
