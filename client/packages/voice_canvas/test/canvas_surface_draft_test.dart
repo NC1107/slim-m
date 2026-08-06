@@ -173,4 +173,43 @@ void main() {
     expect(points, 0);
     expect(ended, 0);
   });
+
+  /// A note or a shape is placed once, not drawn, so there is no draft
+  /// worth previewing to anyone else - see `CanvasQuickPlacement`'s own doc
+  /// for the app-layer half of this: nothing is sent until the note sheet
+  /// submits, so there is nothing on the shared canvas to preview in the
+  /// first place.
+  testWidgets(
+    'the note and shape tools never report a draft point either',
+    (tester) async {
+      for (final tool in [CanvasTool.note, CanvasTool.shape]) {
+        final document = CanvasDocument();
+        addTearDown(document.dispose);
+        var points = 0;
+        var ended = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: CanvasSurface(
+              document: document,
+              ink: const Color(0xFFE86A5C),
+              gridLine: const Color(0xFF303030),
+              tool: tool,
+              onStroke: (_) {},
+              onDraftPoint: (_) => points++,
+              onDraftEnded: () => ended++,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final gesture = await tester.startGesture(const Offset(20, 20));
+        await gesture.moveTo(const Offset(60, 40));
+        await gesture.up();
+        await tester.pump();
+
+        expect(points, 0, reason: 'kind: $tool');
+        expect(ended, 0, reason: 'kind: $tool');
+      }
+    },
+  );
 }

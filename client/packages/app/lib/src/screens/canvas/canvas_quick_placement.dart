@@ -3,6 +3,15 @@
 /// direct-await shape `CanvasImagePaste` already uses for a pasted image,
 /// right for a one-off placement rather than the continuous stream
 /// `CanvasCommitQueue` exists to serialize a pen's many segments through.
+///
+/// Deliberately no `CanvasStrokePreviewRelay` frame from either verb: the
+/// relay previews a pen stroke's own draft points as they are drawn, and a
+/// note or a shape is never drawn at all - a shape is placed at its default
+/// box in one request, and a note's text is composed in a sheet with
+/// nothing sent until submit, so there is no in-progress state on the wire
+/// for anyone else to watch. `CanvasSurface` enforces this structurally: its
+/// `onDraftPoint`/`onDraftEnded` callbacks only ever fire for
+/// `CanvasTool.pen`, see its own `_down`/`_move`/`_up` switches.
 library;
 
 import 'package:flutter/painting.dart';
