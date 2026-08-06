@@ -12,14 +12,14 @@
 //! objects a named `remove` or `clear` op touched: for a `remove` that is its
 //! own `canvas_op_targets` rows, and for a `clear` (which stores no per-object
 //! targets, only a fence) it is every object whose `deleted_at` matches that
-//! exact op's timestamp - unique by construction, see `now_ms_unique` below.
-//! `move` and `reorder` both reuse `canvas_op_targets` too, one row
-//! naming the object each repositioned or restacked, so a reconnecting
-//! client's catch-up feed learns of either the same way it already learns of
-//! a remove - without it, a change made while a viewer's pane was closed
-//! would never reach them, since neither a coordinate nor a `z_index` update
-//! advances the object's own `seq` the way `canvas_objects.seq` is fixed at
-//! placement.
+//! exact op's timestamp - unique by construction, see the sibling
+//! `canvas_op_clock` module. `move` and `reorder` both reuse
+//! `canvas_op_targets` too, one row naming the object each repositioned or
+//! restacked, so a reconnecting client's catch-up feed learns of either the
+//! same way it already learns of a remove - without it, a change made while
+//! a viewer's pane was closed would never reach them, since neither a
+//! coordinate nor a `z_index` update advances the object's own `seq` the way
+//! `canvas_objects.seq` is fixed at placement.
 //!
 //! `reorder` carries an explicit target `z_index` rather than a relative
 //! "bring to front"/"send to back" flag, the same choice `move` already makes
@@ -35,8 +35,6 @@
 //! `super::canvas_ops_apply`, split out once `move` joining `remove`, `clear`
 //! and `restore` crossed the 500-line hard limit.
 
-use std::sync::atomic::{AtomicI64, Ordering};
-
 use anyhow::Context;
 
 use super::canvas_audit::record_canvas_audit;
@@ -44,39 +42,8 @@ use super::canvas_ops_apply::{
     affected_count_for, apply_move, apply_remove, apply_reorder, apply_restore, current_canvas_seq,
     fetch_op,
 };
-use super::{PlaceError, Store, now_ms};
+use super::{PlaceError, Store};
 use crate::ids::{CanvasObjectId, CanvasOpId, ChannelId, UserId};
-
-/// A per-op timestamp, unlike plain `now_ms()`, guaranteed never to repeat
-/// within this process.
-///
-/// `canvas_objects.deleted_at` doubles as the fence `restore_candidates`'s
-/// `clear` branch matches a whole batch of un-delete candidates against
-/// (`WHERE deleted_at = target.created_at`), on the stated assumption that
-/// "the single writer this database has means no other write can share that
-/// millisecond." That conflates strict ordering with distinct values: two
-/// sequential `submit_canvas_op` calls can read the same wall-clock
-/// millisecond from `SystemTime::now()`, which is well within reach on a
-/// fast SQLite/WAL commit. A `remove` and an unrelated `clear` sharing one
-/// timestamp would let restoring the `clear` silently un-delete whatever the
-/// `remove` touched too - even a member's own removal of their own object,
-/// with no `MANAGE_CANVAS` involved in that removal at all.
-///
-/// Every canvas-op write already runs inside `Store::begin_write`'s
-/// exclusive `BEGIN IMMEDIATE` lock, so calls into this function are already
-/// totally ordered; it only has to break a tie between two reads of the same
-/// millisecond, not coordinate concurrency none of these calls can have.
-fn now_ms_unique() -> i64 {
-    static LAST: AtomicI64 = AtomicI64::new(0);
-    let mut last = LAST.load(Ordering::Acquire);
-    loop {
-        let next = now_ms().max(last + 1);
-        match LAST.compare_exchange_weak(last, next, Ordering::AcqRel, Ordering::Acquire) {
-            Ok(_) => return next,
-            Err(actual) => last = actual,
-        }
-    }
-}
 
 /// How many `canvas_op_targets` rows one `INSERT` writes at a time. A
 /// `restore` of a large `clear` can touch up to `MAX_OBJECTS_PER_CHANNEL`
@@ -271,7 +238,7 @@ impl Store {
         }
 
         // Unique, not just `now_ms()`; see `now_ms_unique`'s own doc.
-        let now = now_ms_unique();
+        let now = self.now_ms_unique(&mut tx).await?;
         // Only a `restore` sets this; `canvas_op_target` requires exactly that.
         let mut target_op_for_row: Option<CanvasOpId> = None;
         // Only a fresh, effective `move` sets this.
@@ -425,25 +392,5 @@ impl Store {
             moved_to: move_bounds,
             reordered_to: reorder_z,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::now_ms_unique;
-
-    /// A tight loop with no I/O reliably lands several calls in the same
-    /// real millisecond on any machine, which is exactly the case
-    /// `now_ms_unique`'s own doc names as reachable in production between
-    /// two real `submit_canvas_op` calls. Deterministic, unlike a test that
-    /// tries to race two HTTP requests against the clock.
-    #[test]
-    fn a_tight_loop_never_repeats_a_value() {
-        let mut previous = now_ms_unique();
-        for _ in 0..10_000 {
-            let next = now_ms_unique();
-            assert!(next > previous, "{next} did not advance past {previous}");
-            previous = next;
-        }
     }
 }
