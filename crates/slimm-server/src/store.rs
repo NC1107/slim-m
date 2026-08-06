@@ -19,9 +19,11 @@ mod analytics;
 mod attachments;
 mod bootstrap;
 mod canvas;
+mod canvas_audit;
 mod canvas_move;
 mod canvas_ops;
 mod canvas_ops_apply;
+mod canvas_ops_sweep;
 mod canvas_ops_write;
 mod categories;
 mod channel_order;
@@ -63,6 +65,7 @@ pub use canvas::{
 pub use canvas_ops::{
     CANVAS_OP_GAP, CANVAS_OP_PAGE_BYTES, CanvasOpBody, CanvasOpEntry, CanvasOpsPage,
 };
+pub use canvas_ops_sweep::{CANVAS_OP_RETENTION_MS, SweptCanvasOps};
 pub use canvas_ops_write::{CanvasOpRequest, MAX_REMOVE_IDS_PER_OP, SubmitOpError, SubmittedOp};
 pub use channel_order::{ChannelOrderGroup, ReorderChannelsError, ReorderOutcome};
 pub use channels::DeleteChannelError;
