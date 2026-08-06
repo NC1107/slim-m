@@ -14,6 +14,7 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_activity_log.dart';
 import 'canvas_cursor_relay.dart';
+import 'canvas_stroke_preview_relay.dart';
 import 'canvas_sync.dart';
 
 /// Applies one server event to [document] if it names [paneChannelId], the
@@ -34,6 +35,7 @@ void dispatchCanvasLiveEvent(
   required CanvasSync sync,
   required CanvasDocument document,
   required CanvasCursorRelay Function() relay,
+  required CanvasStrokePreviewRelay Function() strokePreviewRelay,
   required void Function(api.CanvasObject object) applyPlacedObject,
   required VoidCallback forgetFetchedRegion,
   CanvasActivityLog? activityLog,
@@ -106,6 +108,16 @@ void dispatchCanvasLiveEvent(
         when channelId == paneChannelId:
       // Never through sync.applyLive: a cursor carries no seq to catch up on.
       relay().applyRemote(userId, x, y);
+    case api.CanvasStrokePreview(
+          :final channelId,
+          :final userId,
+          :final objectId,
+          :final points,
+          :final ended,
+        )
+        when channelId == paneChannelId:
+      // Never through sync.applyLive, the same reason a cursor is not: no seq.
+      strokePreviewRelay().applyRemote(userId, objectId, points, ended);
     case api.CanvasObjectMoved(
           :final channelId,
           :final seq,

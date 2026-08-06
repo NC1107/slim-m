@@ -381,6 +381,30 @@ class CanvasCursorMoved extends ServerEvent {
   final double y;
 }
 
+/// A live in-flight stroke preview on a channel's canvas: ephemeral, never
+/// persisted, carries no `seq`. `points` is a delta - only what was added
+/// since the sender's last frame for this [objectId] - so a receiver
+/// accumulates them locally rather than replacing what it has. [objectId]
+/// never names a row the server stores: it only keys this preview session,
+/// since the object(s) a finished stroke commits are decided later and one
+/// stroke can split into several. [ended] marks the gesture's last frame,
+/// whether or not it went on to commit a real object.
+class CanvasStrokePreview extends ServerEvent {
+  const CanvasStrokePreview({
+    required this.channelId,
+    required this.userId,
+    required this.objectId,
+    required this.points,
+    required this.ended,
+  });
+
+  final String channelId;
+  final String userId;
+  final String objectId;
+  final List<double> points;
+  final bool ended;
+}
+
 /// A placed object was repositioned.
 ///
 /// Carries the whole new box, so a receiver needs no refetch to draw it in

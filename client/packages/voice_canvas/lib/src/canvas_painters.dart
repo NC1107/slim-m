@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The three paint layers: the lattice, the committed ink, and the stroke
-/// still under the pointer.
+/// The canvas paint layers: the lattice, the committed ink, the stroke still
+/// under this device's own pointer, and everyone else's in-flight strokes.
 ///
 /// Each takes its own `repaint` listenable and answers `shouldRepaint` false,
 /// which is the shape the Phase 5 spike's `benchmark/paint_paths.dart` proved:
@@ -19,6 +19,7 @@ import 'package:flutter/rendering.dart';
 
 import 'canvas_cursors.dart';
 import 'canvas_document.dart';
+import 'canvas_stroke_drafts.dart';
 
 /// The background lattice, at a spacing quantised to the zoom so the mesh
 /// keeps roughly the same density on screen at any scale.
@@ -277,6 +278,64 @@ class DraftPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(DraftPainter oldDelegate) => false;
+}
+
+/// Other participants' in-flight strokes, in world coordinates.
+///
+/// Its own layer and its own listening `repaint`, the same reasoning
+/// [DraftPainter] already gives for keeping a drawer's own preview off
+/// [StrokePainter]'s repaint: a remote pointer moving mid-stroke must not
+/// force the whole committed-ink layer to repaint, and vice versa. Colours
+/// are drawn at 70% opacity - lighter than [StrokePainter]'s committed ink -
+/// so an in-flight ghost never reads as though it has already landed.
+class RemoteDraftPainter extends CustomPainter {
+  RemoteDraftPainter({
+    required this.drafts,
+    required this.document,
+    required this.colors,
+  }) : super(repaint: Listenable.merge([drafts, document]));
+
+  final RemoteStrokeDrafts drafts;
+  final CanvasDocument document;
+
+  /// The caller's own closed cursor-colour set, indexed by
+  /// [CanvasStrokeDraft.colorIndex] - the same palette [CursorPainter]
+  /// draws from, so a participant's in-flight ink and their cursor read as
+  /// the same person.
+  final List<Color> colors;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (colors.isEmpty) return;
+    final camera = document.camera;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = 3 * camera.zoom
+      ..isAntiAlias = true;
+    for (final draft in drafts.all) {
+      final points = draft.points;
+      if (points.length < 4) continue;
+      paint.color =
+          colors[draft.colorIndex % colors.length].withValues(alpha: 0.7);
+      final path = Path()
+        ..moveTo(
+          (points[0] - camera.x) * camera.zoom,
+          (points[1] - camera.y) * camera.zoom,
+        );
+      for (var i = 2; i < points.length; i += 2) {
+        path.lineTo(
+          (points[i] - camera.x) * camera.zoom,
+          (points[i + 1] - camera.y) * camera.zoom,
+        );
+      }
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(RemoteDraftPainter oldDelegate) => false;
 }
 
 /// Other participants' live pointers.

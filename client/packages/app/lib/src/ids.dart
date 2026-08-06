@@ -20,6 +20,12 @@ String newCanvasObjectId() => _uuidV7();
 /// which is idempotent by id the same way a placement is.
 String newCanvasOpId() => _uuidV7();
 
+/// The same generator for an in-flight stroke preview session. Never a real
+/// canvas object id: it only keys an ephemeral relay frame, and the object(s)
+/// a finished stroke commits are minted separately by [newCanvasObjectId]
+/// once the gesture ends.
+String newCanvasDraftId() => _uuidV7();
+
 String _uuidV7() {
   final now = DateTime.now().millisecondsSinceEpoch;
   final random = Random.secure();
