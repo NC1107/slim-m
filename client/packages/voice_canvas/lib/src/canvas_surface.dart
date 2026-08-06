@@ -254,11 +254,10 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
 
   int _pointers = 0;
 
-  /// A note or shape placement [_down] armed, resolved only by [_up] - the
-  /// same cancel-on-second-pointer protection [_draft] gives the pen tool,
-  /// needed because panning and zooming here are two-pointer-only
-  /// ([_scaleUpdate]'s own guard), so a pinch always starts as one finger
-  /// alone and would otherwise drop an object before the second arrives.
+  /// A note or shape placement [_down] armed, resolved only once every
+  /// pointer has lifted - see [_resolvePendingPlacement]. Needed because
+  /// panning and zooming here are two-pointer-only ([_scaleUpdate]'s own
+  /// guard), so a pinch always starts as one finger down alone.
   CanvasTool? _pendingPlacementTool;
   Offset? _pendingPlacementWorld;
 
@@ -300,8 +299,6 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
       final hadDraft = !_draft.isEmpty;
       _draft.cancel();
       if (hadDraft) widget.onDraftEnded?.call();
-      _pendingPlacementTool = null;
-      _pendingPlacementWorld = null;
       return;
     }
     if (!widget.enabled) return;
@@ -367,11 +364,15 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
   }
 
   /// Fires whichever placement [_down] armed, at the world point it was
-  /// armed with, as long as it survived to the last pointer lifting with no
-  /// second pointer ever cancelling it - resolved against the tool that was
-  /// active when the gesture began, not [widget.tool] now, since the two can
-  /// only disagree if the tool changed mid-gesture and the placement was
-  /// already committed to at press time either way.
+  /// armed with, and only on the [_up] that drops [_pointers] to zero.
+  /// Called once per lifted pointer, it consumes whatever is pending on its
+  /// very first call regardless of [_pointers] - so a second pointer having
+  /// ever touched down is what stops this firing: that first call lands at
+  /// a nonzero count, not zero, and nothing is left pending by the time the
+  /// true last pointer lifts. Resolved against the tool active when the
+  /// gesture began, not [widget.tool] now, since the two can only disagree
+  /// if the tool changed mid-gesture, after the placement was already
+  /// committed to at press time.
   void _resolvePendingPlacement() {
     final tool = _pendingPlacementTool;
     final world = _pendingPlacementWorld;
