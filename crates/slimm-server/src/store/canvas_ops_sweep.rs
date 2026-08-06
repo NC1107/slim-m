@@ -83,10 +83,7 @@ impl Store {
         .await?
         .rows_affected();
 
-        // Pass 2a: removes, guarded by the same exact-timestamp fence
-        // `apply_restore` now checks rather than mere current deadness - see
-        // the module doc's own note on why "still dead" is not "still this
-        // op's doing".
+        // Pass 2a: removes, guarded by the same exact-timestamp fence `apply_restore` checks.
         let removes = sqlx::query!(
             r#"DELETE FROM canvas_ops WHERE id IN (
                    SELECT o.id FROM canvas_ops o

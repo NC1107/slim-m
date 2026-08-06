@@ -243,8 +243,7 @@ pub(super) async fn apply_restore(
                     return Err(SubmitOpError::NotAuthorized);
                 }
             }
-            // Exactly the deletion this remove caused, not just any current
-            // deadness - see `ObjectAuth::deleted_at`'s own doc for why.
+            // Exactly this removal's own deletion; see `ObjectAuth::deleted_at`'s doc.
             if found.is_some_and(|found| found.deleted_at == Some(target.created_at)) {
                 dead.push(*object_id);
             }
