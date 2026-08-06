@@ -39,7 +39,8 @@ void main() {
       ),
     );
 
-    expect(find.bySemanticsLabel(RegExp(r'^Selected')), findsNothing);
+    // byType, not bySemanticsLabel: an empty-labelled node would still pass a label-content check while being exactly the stop this must not add.
+    expect(find.byType(Semantics), findsNothing);
     handle.dispose();
   });
 
@@ -84,11 +85,11 @@ void main() {
     );
     document.selectedObjectId.value = 'note-1';
     await tester.pump();
-    expect(find.bySemanticsLabel(RegExp(r'^Selected')), findsOneWidget);
+    expect(find.byType(Semantics), findsOneWidget);
 
     document.selectedObjectId.value = null;
     await tester.pump();
-    expect(find.bySemanticsLabel(RegExp(r'^Selected')), findsNothing);
+    expect(find.byType(Semantics), findsNothing);
     handle.dispose();
   });
 
