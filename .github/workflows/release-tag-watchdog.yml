@@ -19,9 +19,17 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: release-tag-watchdog
-  cancel-in-progress: true
+# No concurrency group at all, and that is the whole point rather than an
+# omission. This workflow was written on 2026-08-06 to catch a release run
+# cancelled while pending, and it shipped carrying that same bug: a
+# `cancel-in-progress: true` group over a 15-minute cron means a run that
+# takes longer than its own interval - which is every run while GitHub's
+# runners are slow, exactly when a release is most likely to go wrong - is
+# cancelled by the next one and reported as a failure. Three consecutive
+# runs failed that way within an hour of it landing. Worse than the noise:
+# a cancelled run never asked the question, so the silent failure this
+# exists to catch could pass underneath it unseen. The job is read-only and
+# idempotent, so two of it overlapping costs nothing worth preventing.
 
 jobs:
   check:
