@@ -31,8 +31,8 @@ jobs:
         with:
           node-version: lts/*
 
-      # A commit release-please cannot parse is dropped from the changelog silently; see CLAUDE.md.
-      - name: PR title and commits parse as conventional commits
+      # A commit body release-please's parser crashes on is dropped from the changelog silently; see CLAUDE.md.
+      - name: PR title parses, and no commit body crashes the parser
         if: github.event_name == 'pull_request'
         working-directory: scripts/commit-lint
         env:
