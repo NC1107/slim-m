@@ -63,7 +63,7 @@ tile is not a published track.
 | sharing a screen | the UI | a `SCREEN_SHARE` track on the SFU |
 | calling in a DM | the UI | the SFU's participant and track list, keyed by the DM's own channel id |
 | edit, delete, search, pins, polls, invites, DMs, channel admin, devices, read state, sync | the API | the effect of each, not its status code |
-| the Voice Canvas: draw, paste an image, move, resize, erase, clear, undo, reload | the UI (`e2e_canvas.py`; see below) | `GET /channels/{id}/canvas/objects`, and the second client's own `performance` resource log for the pasted image's bytes |
+| the Voice Canvas: draw, paste an image, place a note and a shape, move, resize, reorder, erase, clear, undo, reload | the UI (`e2e_canvas.py`, `e2e_canvas_shapes.py`; see below) | `GET /channels/{id}/canvas/objects`, `z_index` for the reorder, and the second client's own `performance` resource log for the pasted image's bytes |
 
 The run ends by reporting how many documented API paths it actually touched,
 counted from what the harness and both browsers requested rather than from a
@@ -91,7 +91,7 @@ prints it every time so it cannot quietly grow.
 | `lib/e2e_js.py` | the browser-side half: reading and driving the semantics tree |
 | `lib/e2e_labels.py` | every accessible name the app is driven by, in one place |
 | `lib/e2e_api.py` | the server's own answer, for checking against |
-| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py`, `e2e_markdown.py`, `e2e_reconcile.py`, `e2e_replies.py`, `e2e_threads.py`, `e2e_dm_call.py`, `e2e_canvas.py` | the scenarios |
+| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py`, `e2e_markdown.py`, `e2e_reconcile.py`, `e2e_replies.py`, `e2e_threads.py`, `e2e_dm_call.py`, `e2e_canvas.py`, `e2e_canvas_shapes.py` | the scenarios |
 | `lib/e2e_sweep.py` | the API-level routes the scenarios do not reach |
 | `lib/e2e_seed.py`, `e2e_fixtures.py` | the accounts and the two PNGs a run uploads |
 
@@ -135,7 +135,9 @@ Four things cost real time to learn, and each fails silently rather than loudly:
 
 The signature feature is a `CustomPainter`, so it publishes almost nothing
 else to the tree beyond what the general rules above already cover. Two more
-things `e2e_canvas.py` leans on, documented at length in its own module doc:
+things `e2e_canvas.py` and `e2e_canvas_shapes.py` (note, shape, reorder -
+split out to stay under the file budget) lean on, documented at length in
+`e2e_canvas.py`'s own module doc:
 
 - **The one container `Semantics` node whose label starts "Canvas,"** states
   the live object count ("Canvas, 2 objects: 1 stroke, 1 image") and updates
@@ -144,18 +146,34 @@ things `e2e_canvas.py` leans on, documented at length in its own module doc:
   coordinate frame every drawing and dragging gesture is placed in, since the
   camera starts at world `(0, 0)` with `zoom: 1` and this scenario never pans
   or zooms - a page coordinate and a world coordinate differ by exactly one
-  constant offset for the whole scenario.
-- **`CanvasActivityPanel`, the text activity log**, is reached for exactly
-  one thing the object count cannot show: that a move or a resize actually
+  constant offset for the whole scenario. A note or a shape is placed at a
+  *fraction* of that rect's own live width and height rather than a fixed
+  offset, because both run after the pasted image has already been dragged
+  and resized once and a blind fixed offset risks landing on top of it.
+- **`CanvasActivityPanel`, the text activity log**, is reached for what the
+  object count cannot show: that a move, a resize, or a reorder actually
   arrived on the client that did not make it, not only that the server's own
   row changed. It replaces the drawing surface while open, so it is toggled
   on, read, and toggled back off rather than left open.
 
-Drawing, moving and resizing all still need `gestures(True)` and raw pointer
-events, the same as the react button; the pasted image goes through the same
-`paste` DOM event a real Ctrl+V produces (`e2e_js.paste_image`), not the API,
-because the bug this scenario exists to catch was a client-side hydration
-gap that calling the API directly would never have exercised.
+Drawing, moving, resizing, reordering and placing a note or shape all still
+need `gestures(True)` and raw pointer events, the same as the react button -
+a note or a shape places on pointer-down alone, so a one-point `drag()` call
+is a real tap; the pasted image goes through the same `paste` DOM event a
+real Ctrl+V produces (`e2e_js.paste_image`), not the API, because the bug
+this scenario exists to catch was a client-side hydration gap that calling
+the API directly would never have exercised.
+
+**Not covered, deliberately: the in-flight stroke preview** a second client
+sees while the first is still drawing (`canvas_stroke_preview_relay.dart`).
+It paints through a second `CustomPainter` with nothing in the accessibility
+tree at all, not even during the gesture, so proving a frame reached the
+other browser mid-draw would need either a pixel comparison (this harness is
+label-driven by design) or sniffing the receiving browser's own WebSocket
+traffic over CDP, which would only prove a frame arrived, not that it
+painted anything. `draw_stroke_and_see_it_live` already checks the *result*
+of a draw on both clients; the preview itself is named here as an honest gap
+rather than a test that would pass whether or not it worked.
 
 ## What it drives at the API, on purpose
 
