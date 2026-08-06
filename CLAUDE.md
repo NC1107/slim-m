@@ -47,6 +47,33 @@ That gap is inherent to squash-merge on GitHub, not a shortcut this gate took.
 **Client 0.32.1's changelog will be missing #443.**
 The work is on `main` and already shipped in every practical sense; only the changelog entry for that one PR is gone, because release-please already ran past it before this gate existed to catch it.
 `CHANGELOG.md` is generated and must never be hand-edited to patch this - recorded here instead, the same treatment client 0.8.0's omission got above.
+## A third canvas review, and the residual the second pass accepted turned out to compound (2026-08-06)
+
+A third adversarial pass over the whole canvas, run fresh rather than reviewing the first two passes' own fixes.
+Verdict: safe to ship, with one real finding fixed here and nothing else found that a fourth pass would be likely to earn its cost on.
+Read this before touching `store/canvas_ops.rs`'s page-byte budget, or before citing the second pass's residual as still open - it is closed now.
+
+**Camera bubbles and image resize, the two surfaces named as unread by the prior pass, held up.**
+Camera bubbles are client-only rendering with no wire cost of their own: `CanvasPresenceLayer` (`canvas_presence_layer.dart`) renders a live camera texture in a layer stacked over the surface, fed a `callParticipants` list `canvas_pane_gestures.dart`'s `_callParticipants()` already filters to the caller's own joined channel and to unblocked identities before it ever reaches the layer, matching the cursor-relay precedent exactly.
+A resize is not a distinct wire kind at all - `endSelect` in `canvas_ops_controller_select.dart` commits it as an ordinary `move` op, and the server's `apply_move` (`store/canvas_ops_apply.rs`) authorizes and bounds-checks it identically to a drag (`valid_bounds`, the same `MAX_OBJECT_EXTENT`/`WORLD_LIMIT` a placement already enforces), so resize inherits every guarantee move already had rather than needing its own.
+
+**The second pass's own residual was real but understated: "bounded" undersold it, and "MANAGE_CANVAS-gated" was true only for who could create it, not for who paid the cost of reading it.**
+`list_canvas_ops`'s page-byte budget (`CANVAS_OP_PAGE_BYTES`, 512 KiB) summed a `place` row's own `obj_props.len()` and nothing else, so a `remove`'s or `restore`'s `canvas_op_targets` rows contributed a flat zero regardless of count.
+The prior pass's own reproduction (`tests/canvas_ops/feed.rs`, now `feed_budget.rs`) proved a single 15,000-id `restore` sailed past the budget, and named the ceiling as `MAX_OBJECTS_PER_CHANNEL` (20,000) - true for one op, but the loop's blindness was not scoped to one op.
+Nothing in it stopped several such ops from the same channel compounding in one page: up to `MAX_LIMIT` (200) oversized `remove`/`restore` ops could land in a single response with the byte check never firing once, since `budget` never left zero.
+And reading that response needs only `VIEW_CHANNEL` and `USE_CANVAS` - `@everyone`'s own default grant - not `MANAGE_CANVAS`, so "it can only be reached by someone who already held MANAGE_CANVAS" was true of creating the exposure and false of paying for it: every ordinary viewer of a channel that had ever had a large clear undone would download it, repeatedly, for up to the 30-day sweep retention.
+A completely benign moderator action - undoing one big accidental clear - was enough to produce this for every future viewer, no malice required.
+
+**The fix teaches the budget about `canvas_op_targets` row counts, the second option the prior pass's own doc comment named and declined as "a real restructuring rather than a one-line fix."**
+`list_canvas_ops` now runs one extra `COUNT(*) ... GROUP BY seq` over the candidate page's own seq range - skipped entirely when every row in the page is a `place`, so the common case pays nothing - and prices a `remove`/`restore` row at `CANVAS_OP_TARGET_BYTES_ESTIMATE` (40, a UUID plus its quotes and comma) per target.
+The livelock guarantee `place` already relied on is untouched: the first row of a page is still force-included regardless of its own size, so a lone oversized `restore` still lands whole rather than never advancing the cursor - what changed is that a *second* one no longer rides along for free.
+The prior residual test asserted the old, bundled behaviour by name ("the budget must not have stopped early"); it is rewritten as `a_restore_that_would_blow_the_page_budget_pages_rather_than_bundles`, now asserting the restore pages on its own rather than bundling with the cheap op ahead of it, and a new `several_large_restores_do_not_compound_in_one_page` drives three 15,000-id restores back to back and asserts each lands on its own page rather than one ~1.8 MB response.
+Mutation-tested: reverting the budget loop to ignore non-`place` bytes fails exactly those two tests and nothing else.
+`feed.rs` had grown past the 500-line hard ceiling once the fix's own tests and shared seed helpers landed in it; they moved into a new sibling, `tests/canvas_ops/feed_budget.rs`, the same split `main.rs`'s own module doc already used once for `http_gate`.
+
+**Not fixed, and deliberately not reopened:** a single oversized `restore` can still exceed the budget alone, by the same design `place` already accepted - closing that needs either capping a clear-restore's size (breaking "undo a mass clear in one action," the property `clear` exists to keep cheap) or splitting one op's targets across pages, a real wire-shape change this pass did not make.
+Also not chased: the write-side cost of a large restore-of-a-clear, which inserts one `canvas_op_targets` row per touched object sequentially inside the single write transaction `store/canvas_ops_write.rs` holds - up to 20,000 row-pairs of UPDATE-then-INSERT for one moderator action, on a database with exactly one serialized writer for the whole deployment.
+Real, but out of this pass's scope (it is a latency/throughput cost under `MANAGE_CANVAS`, not an unauthorized read), and worth a look before the object ceiling is ever raised.
 
 ## Two Phase 6 canvas deliverables the roadmap had marked open: collapse-to-strip and the text activity log (2026-08-05)
 
@@ -1665,8 +1692,14 @@ After adding or changing any macro query you MUST regenerate the offline cache, 
 export DATABASE_URL="sqlite:////tmp/slimm-dev.db"     # four slashes = absolute path
 ( cd crates/slimm-server && sqlx database create && sqlx migrate run --source migrations )
 cargo build                                            # checks queries against the db
-cargo sqlx prepare --workspace                         # writes .sqlx/, commit it
+cargo sqlx prepare --workspace -- --all-targets        # writes .sqlx/, commit it
 ```
+
+**The `-- --all-targets` is load-bearing, and this instruction was missing it until 2026-08-06.**
+`cargo sqlx prepare` *prunes* an entry it cannot see a caller for, and without that flag it only builds the library, so every `sqlx::query!` living in a test is invisible to it and its cache entry is deleted.
+The failure then lands nowhere near the change that caused it: this PR touched one query in `store/canvas_ops.rs`, and its prepare run silently deleted the entry for `UPDATE channels SET position = 9999`, a query belonging to `tests/channel_position_excludes_threads.rs` that nothing here went near.
+CI fails at *compile* time under `SQLX_OFFLINE=true` naming that unrelated test, which reads as somebody else's breakage rather than as the prepare run's own doing.
+Check `git status` on `.sqlx/` before committing: a deletion there you cannot explain is this, and restoring the file from main is the whole fix.
 
 Test databases are temp SQLite files (`Config { port, database_path }` then `db::connect`); do not use `:memory:` with the multi-connection pool.
 
