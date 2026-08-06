@@ -221,11 +221,17 @@ Consequence: **the tool dock has three tools, not four** - pen, note, shape.
 Paste is a gesture, not a tool. A tool must be selected before touch draws, so
 every slot added is another mode to be wrong about.
 
-**Stale as written, found 2026-08-05.**
+~~**Stale as written, found 2026-08-05.**
 What Phase 6 actually built is pen, eraser and select (Move) - not pen, note and shape - and this section's own "three tools" count was never checked against the shipped bar.
 Erase and select are not in this list at all, and neither is a distinct object kind for either.
 The review's "three, not four" was about content kinds becoming tools, which this document never revisits now that note and shape objects are landing (a concurrent change was adding them as this correction was written).
-Whoever lands note and shape should re-open this section rather than trust its old count, and should decide whether erase and select are additional tools this document simply never named, or a different axis - edit actions on existing content - that a "content kinds become tools" framing was never meant to cover.
+Whoever lands note and shape should re-open this section rather than trust its old count, and should decide whether erase and select are additional tools this document simply never named, or a different axis - edit actions on existing content - that a "content kinds become tools" framing was never meant to cover.~~
+
+**Closed, 2026-08-05: note and shape are built, and the axis question above is answered.**
+Pen, note and shape are the three placement tools this section always meant: each drops a new object where a pointer taps, and the tool dock reads exactly as this section originally specified.
+Erase and select are the other axis the note above asked about - they act on an object already there (erase it, or move/resize/reorder it), never place a new one, so they were never a fourth and fifth placement choice this section needed to count.
+A shape is one of `CanvasShapeKind` (rectangle, ellipse, line, arrow), picked from the overflow menu while the shape tool is active; a note holds text entered once through a sheet before anything is sent, since this canvas has no in-place edit for any kind.
+Colour for both is fixed per kind (`AppCanvasColors.note`, `.shape`), not user-chosen, the same closed-role treatment the seven accent roles above already establish.
 
 ## Smaller things worth keeping
 
