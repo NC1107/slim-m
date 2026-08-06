@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: Apache-2.0
+name: release-tag-watchdog
+
+# Nothing else notices a release-please manifest bumping to a new version on
+# main with no tag ever following it - the exact silent failure the
+# release-${{ github.ref }} concurrency group produced on 2026-08-06 (a run
+# cancelled while pending behind another, zero jobs run, nothing anywhere
+# says so). A push-triggered check cannot close this gap, because the push
+# that should have cut the tag is the same one that did not, so this runs on
+# a schedule instead and asks the git history a plain question a cancelled
+# run cannot have lied to. See CLAUDE.md's "A release can succeed and still
+# ship no store build" entry and docs/ci.md's release section.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-tag-watchdog
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: release manifests match their tags
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: compare manifest versions against their tags
+        run: bash scripts/check-release-tag-lag.sh

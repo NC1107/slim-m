@@ -22,6 +22,7 @@ Each section below is named for its workflow file.
 | `e2e` | every push to `main`, a nightly schedule, and by hand | the whole product through two real headless browsers; advisory, not required |
 | `push-relay-contract` | changes to the server's push path | a server-generated envelope through the relay repo's real HTTP handler |
 | `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline |
+| `release-tag-watchdog` | a 15-minute schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it |
 | `main-builds` | changes under `client/` or `crates/` on every push to `main`, excluding a release commit's own files | continuous TestFlight, a Fedora COPR snapshot, an Android artifact, and `latest` on the live server image; never a version bump, changelog or GitHub Release |
 
 ## server-ci
@@ -358,7 +359,40 @@ Every job that pushes to GHCR, signs, attaches release assets, or touches TestFl
 Secrets are referenced by name only and never invented; jobs stay inert, showing a visible warning and producing no fake artifact, until the corresponding secrets and packaging inputs exist.
 
 The workflow-level `permissions` is a minimal default that individual jobs widen to exactly what they require.
-Concurrency never cancels an in-flight release run, because a half-published release is worse than a queued one.
+
+### A queued run is not an in-flight run
+
+`cancel-in-progress: false` protects a run that has already started; it says nothing about one still queued.
+GitHub allows at most one pending run per concurrency group, and when a newer run is queued behind an already-pending one, the older pending run is cancelled outright - a different rule from `cancel-in-progress`, and one that flag cannot reach.
+The group used to be keyed on `github.ref`, which is identical for every push to `main`, so two merges landing within one release run's runtime (roughly ten minutes end to end) put the second push's run in exactly that position.
+
+This happened for real on 2026-08-06.
+Run `31083287291` (the server 0.33.1 release commit) was in progress from 08:02:48.
+Run `31083316052` (the client 0.32.1 release commit, pushed 26 seconds later) queued pending behind it.
+A third, unrelated push (`c15e82f`, a canvas fix) landed at 08:13:40, while the server run was still going, and that new run replaced the pending client run in the group - `31083316052` shows `cancelled` with zero jobs ever started, confirmed against the real run history via `gh api repos/.../actions/runs/<id>/jobs`, which returns an empty job list for it.
+Had the third push not arrived, main would have been left with a merged release PR, a bumped manifest, a changelog commit, no tag, and no store build, with nothing anywhere saying so - the same failure shape as "A release can succeed and still ship no store build" above, one layer deeper: there the required check itself was cancelled and read as a failure; here the *release run* is cancelled before any check can even run, and nothing polls for a run that never happened.
+The only reason client 0.32.1 shipped that night is that the third push's own release-please invocation, running to completion at 08:13:40-08:14:36, found the already-merged-but-untagged client release PR and cut `client-v0.32.1` from it - confirmed by that tag pointing at the release commit's own SHA, not the third push's.
+
+**The fix is keying the concurrency group on the commit, `release-${{ github.sha }}`, rather than the ref.**
+Every push produces a distinct SHA, so two different commits' runs are never in the same group and neither can ever be left pending behind the other; each runs to completion independently, which is what actually guarantees a queued run is never silently dropped - not a narrower `cancel-in-progress` condition, which only ever governs a run already in progress.
+This was checked against what serialization by ref was actually protecting, rather than assumed to be free: two release-please invocations running concurrently each touch only their own package's config and manifest file (see the manifest-split entry above), so a client run and a server run were already independent; and two *ordinary* pushes (no releasable commits) running their release-please refresh of a standing PR concurrently, rather than queued one after another, trades a rare git-ref race for never dropping a push's refresh entirely - a race there surfaces as one release-please job step failing visibly, which the standing-PR-conflict pattern documented above already establishes self-heals on the next push, where the previous behavior's silent full-run cancellation did not surface anywhere at all.
+A job-level concurrency group scoped to just the `release-please` job, rather than the whole run, was considered and rejected: since every other job in this workflow transitively depends on `release-please`'s outputs, a cancelled-while-pending `release-please` job would starve the same downstream jobs a cancelled-while-pending *run* does today, reproducing the identical failure at job granularity rather than closing it.
+`cancel-in-progress: false` is kept, now only relevant to the SHA appearing twice in the group (a re-triggered run against the same commit), which release-please's own tag creation cannot cause here: it creates the tag through the default `GITHUB_TOKEN`, which GitHub's own anti-recursion rule excludes from raising a new `push` event, so a release-please-cut tag does not re-trigger this workflow at that SHA either.
+
+**`schema-ci.yml` had the identical hole, unrelated to this incident and found only by checking every other release-adjacent workflow for the same shape rather than assuming this was the only file with it.**
+Its `breaking-change-gate-main` job is required by both `verify-server-ci` and `verify-client-ci` and runs on every push to `main`, but the workflow's `concurrency` block was `cancel-in-progress: true` unconditionally - the exact bug "A release can succeed and still ship no store build" above already fixed on `client-ci`, `client-ios-ci`, `hygiene` and `licenses`, left unapplied on the one workflow added after that fix landed.
+It now carries the same `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` condition those four already use.
+The other unconditionally-`true` workflows (`compose-smoke`, `audio-ci`, `push-relay-contract`, `perf`, `e2e`) were checked too and are not required checks in either `required_checks` string above, so a cancellation there cannot block a release the way `schema-ci`'s could; `main-builds.yml`'s own `cancel-in-progress: true` is unrelated to this release pipeline entirely and is documented as deliberate in its own section below.
+
+**Proven versus reasoned, stated plainly.** The 2026-08-06 sequence above (run IDs, timestamps, an empty job list, the tag's own commit) is read from the real run history through `gh`, not inferred. That a SHA-keyed group can never produce a pending run is a property of the group key having no collisions across distinct pushes, which is git's own guarantee rather than something this repo can test against a real two-workflow-runs-racing GitHub instance; the git-ref-race trade for an ordinary push's release-please refresh is reasoned from how release-please's own standing-PR mechanism is documented to behave and from this repository's own recorded experience of it self-healing, not measured against a live race.
+See CLAUDE.md's "A release can succeed and still ship no store build" entry for the fuller incident record and the earlier variant of this bug.
+
+### release-tag-watchdog closes the detection gap the fix alone leaves open
+
+The SHA-keyed group stops a run from being silently cancelled, but nothing before this watched for the state that cancellation already produced once: a release-please manifest bumped to a new version, meaning its release PR merged, with no tag ever following it.
+A push-triggered check cannot close this on its own, because the push that should have cut the tag is the same one that did not - there is no later event to hang a check on.
+`release-tag-watchdog.yml` runs on a 15-minute schedule instead (plus `workflow_dispatch`) and asks a plain question of git history: for each package, does the current manifest version have a matching `<component>-v<version>` tag, and if not, how long has the manifest read that version?
+`scripts/check-release-tag-lag.sh` does the check itself, pulled out so `scripts/lib/test_check_release_tag_lag.py` can drive it against a real temp git repo rather than the live one; a missing tag inside a 15-minute grace window is normal (the same run that merges a release PR usually tags it within its own run) and a missing tag past it is reported with `::error::`, naming the tag, the version, and how long it has been missing.
 
 ### server-image and server-image-merge
 

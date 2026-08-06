@@ -603,6 +603,28 @@ Worth noticing as a shape: a lesson learned once and applied to a single file is
 Nothing should cancel those checks on main now, so the path should be unreachable, but if it ever is again the symptom is once more a silently missing store build rather than a red release.
 Whether it should re-run and keep waiting instead is a trade about how long a release may block, and it is in `docs/OPEN-QUESTIONS.md` rather than decided here.
 
+**A third variant, found 2026-08-06: the fix above closed the mechanism this section named, and `release.yml`'s own concurrency block had a different mechanism producing the identical silent-loss shape.**
+`cancel-in-progress: false` on `release.yml` protects a run already in progress; it says nothing about a run still queued.
+GitHub allows at most one pending run per concurrency group, and a newer run queued behind an already-pending one cancels that older pending run outright, a separate rule `cancel-in-progress` cannot reach.
+The group was keyed on `github.ref`, identical for every push to main, so two merges landing within one release run's ten-or-so-minute runtime put the second push's whole run, not just one check inside it, in that position.
+
+This happened for real, confirmed against the actual run history through `gh` rather than inferred from symptoms.
+Run `31083287291` (the server 0.33.1 release commit, merged 08:02:48) was in progress.
+Run `31083316052` (the client 0.32.1 release commit, merged 26 seconds later) queued pending behind it.
+A third, unrelated push (`c15e82f`, a canvas fix) landed at 08:13:40 while the server run was still going, and that new run replaced the pending client run in the group: `31083316052` shows `cancelled` with an empty job list, zero jobs ever started.
+Had the third push not arrived, main would have been left with a merged release PR, a bumped manifest, a changelog commit, no tag, and no store build, with nothing anywhere saying so.
+Client 0.32.1 shipped only because the third push's own release-please invocation found the already-merged-but-untagged release PR and cut `client-v0.32.1` from it eleven minutes late, confirmed by that tag pointing at the release commit's own SHA rather than the rescuing push's.
+
+**The fix keys the group on the commit, `release-${{ github.sha }}`, not the ref.**
+Distinct pushes are never in the same group, so neither can ever be left pending behind the other; each release run completes independently, which is what actually guarantees a queued run is never silently dropped, not a narrower `cancel-in-progress` condition, since that flag only ever governs a run already in progress.
+`schema-ci.yml` had the identical unconditional `cancel-in-progress: true` on its own workflow-level group, covering `breaking-change-gate-main`, a required check for both release gates, on every push to main - the exact bug this section already named, left unapplied on the one workflow added after the fix above landed.
+It carries the same `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` condition the other four now use.
+The other unconditionally-cancelling workflows (`compose-smoke`, `audio-ci`, `push-relay-contract`, `perf`, `e2e`) were checked too and are not required checks, so a cancellation there cannot block a release the way `schema-ci`'s could; `main-builds.yml`'s own unconditional cancellation is unrelated to this pipeline and stays, by its own design, since a newer commit's continuous build is meant to supersede an older one's.
+
+**A gate now watches for the state a silent loss like this produces, rather than trusting the mechanism fix alone.**
+`release-tag-watchdog.yml` runs `scripts/check-release-tag-lag.sh` on a 15-minute schedule: for each package, does the manifest's current version have a matching tag, and if not, how long has it been missing past a grace window a normal in-flight release comfortably clears.
+See `docs/ci.md`'s release section for the full mechanism writeup, what is proven against the real run history versus reasoned from release-please's documented behaviour, and why a job-level concurrency group scoped to just `release-please` was considered and rejected.
+
 ## The owner reports bugs in the app itself, and expects reactions back (2026-08-01)
 
 There is a **`backlog` text channel on the live instance** (`https://slim.npc-server.top`) where the owner posts bugs and issues from real device use, usually as a screenshot with a line of context.
