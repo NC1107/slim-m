@@ -3,9 +3,10 @@
 ///
 /// A call used to render as a top-anchored list of small rows over a mostly
 /// empty pane, which read as a debug view rather than a place people are.
-/// With nobody sharing a screen, participants now sit as centred tiles sized
-/// for the two-to-eight-person calls this product is for; the compact rows
-/// remain for under a share stage, where vertical room is spoken for.
+/// One tile size now covers both places a participant can appear -
+/// `call_stage_layout.dart`'s centred grid when nobody is sharing, and its
+/// horizontal filmstrip beneath the stage when somebody is - sized for the
+/// two-to-eight-person calls this product is for.
 library;
 
 import 'dart:async';
@@ -19,10 +20,10 @@ import 'user_avatar.dart';
 
 /// One participant as a tile: a large avatar with the speaking ring, the
 /// name beneath, and the mute or share state as a small badge - or, once a
-/// *remote* camera is actually on, the live feed in place of the avatar. The
-/// local participant's own camera already has its own enlarged preview above
-/// this grid (`CameraSelfPreview`), so [cameraView] is only ever passed for
-/// somebody else.
+/// camera is actually on, the live feed in place of the avatar. [cameraView]
+/// is passed for the local participant too now (`call_stage_layout.dart`
+/// builds every tile the same way), so there is no separate enlarged
+/// self-preview outside this grid any more.
 class CallParticipantTile extends StatelessWidget {
   const CallParticipantTile({
     super.key,

@@ -20,11 +20,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/main.dart' show appChromeBuilder;
+import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane.dart'
     show canvasOpenProvider;
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_rtc/rtc.dart';
 
 import 'ui_snapshot_support.dart';
+import 'voice_controller_harness.dart' show FakeSession;
 
 /// The widths that take a different branch, not a catalogue of devices.
 ///
@@ -181,6 +184,95 @@ const _canvasSurfaces =
       ),
     };
 
+/// The connected in-call surface, forced through `voiceControllerProvider`
+/// the same way the canvas surfaces above force `canvasOpenProvider` - the
+/// ordinary `voice` entry in [_surfaces] only ever reaches the join preview,
+/// since nothing there drives a real join. One person sharing their screen
+/// with their camera on, plus a second camera-only participant, is the
+/// shape the owner reported as three boxes that did not fit a phone;
+/// `phone-portrait` is tall and narrow on purpose, the case that report
+/// named, with `phone-landscape` (short and wide) as its counterpart.
+const _voiceCallSurfaces = <String, ({String route, List<String> viewports})>{
+  'voice-in-call': (
+    route: '/channels/c-main',
+    viewports: [
+      'phone-portrait',
+      'phone-landscape',
+      'desktop',
+      ..._compactBracket,
+    ],
+  ),
+};
+
+/// A visible stand-in for a live camera or screen-share track: a real
+/// deployment has actual pixels to show, and this box only exists to prove
+/// the *layout* holds one, so a flat colour and a label are enough.
+class _VisibleSnapshotSession extends FakeSession {
+  @override
+  Widget cameraViewFor(String identity) => const ColoredBox(
+    color: Color(0xFF2D5F7C),
+    child: Center(
+      child: Text('camera', style: TextStyle(color: Colors.white)),
+    ),
+  );
+
+  @override
+  Widget screenShareViewFor(String identity) => const ColoredBox(
+    color: Color(0xFF39633B),
+    child: Center(
+      child: Text('screen share', style: TextStyle(color: Colors.white)),
+    ),
+  );
+}
+
+/// Pinned to a fixed [VoiceState] rather than driven through a real join,
+/// the same shape `voice_controller_harness.dart`'s own `FixedVoiceController`
+/// uses - kept local since that one is hardcoded to a non-visible session.
+class _SnapshotVoiceController extends VoiceController {
+  _SnapshotVoiceController(super.ref, VoiceState fixed)
+    : super(session: _VisibleSnapshotSession()) {
+    state = fixed;
+  }
+}
+
+/// Fixed rather than read from a real call, so the render is deterministic:
+/// a caller with the camera off, a sharer whose camera is also on (the
+/// owner's exact report), and a third, camera-only participant to prove the
+/// filmstrip actually scrolls rather than merely fitting two tiles.
+final _voiceCallState = VoiceState(
+  channelId: 'c-main',
+  state: VoiceSessionState.connected,
+  connectedAt: DateTime(2026, 8, 6, 12),
+  participants: const [
+    VoiceParticipant(
+      identity: 'user-nick',
+      name: 'Nick',
+      isLocal: true,
+      isSpeaking: false,
+      isMuted: false,
+      isScreenSharing: false,
+    ),
+    VoiceParticipant(
+      identity: 'user-ada',
+      name: 'Ada',
+      isLocal: false,
+      isSpeaking: true,
+      isMuted: false,
+      isScreenSharing: true,
+      isCameraOn: true,
+    ),
+    VoiceParticipant(
+      identity: 'user-bob',
+      name: 'Bob',
+      isLocal: false,
+      isSpeaking: false,
+      isMuted: true,
+      isScreenSharing: false,
+      isCameraOn: true,
+    ),
+  ],
+);
+
 /// Builds the router at [route], pumps two frames to settle on-mount
 /// animations, writes the snapshot and asserts no overflow. Shared by both
 /// loops in [main] so the canvas surfaces below render exactly the way the
@@ -269,6 +361,28 @@ void main() {
               overrides: [
                 canvasOpenProvider.overrideWith(
                   (ref) => surface.value.channelId,
+                ),
+              ],
+            );
+          },
+        );
+      }
+    }
+
+    for (final surface in _voiceCallSurfaces.entries) {
+      for (final viewportName in surface.value.viewports) {
+        testWidgets(
+          '${surface.key} at $viewportName ($theme) fits its viewport',
+          (tester) async {
+            await _renderSurface(
+              tester,
+              surface.value.route,
+              viewportName,
+              theme,
+              '${surface.key}-$viewportName-$theme',
+              overrides: [
+                voiceControllerProvider.overrideWith(
+                  (ref) => _SnapshotVoiceController(ref, _voiceCallState),
                 ),
               ],
             );
