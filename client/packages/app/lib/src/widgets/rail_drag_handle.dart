@@ -62,6 +62,13 @@ import 'channel_rail.dart';
 /// object this build() returns directly, falling back to an ancestor only
 /// when that object owns no semantics of its own - still finds it directly.
 ///
+/// **"Already-blank" is an assumption this file cannot see enforced.**
+/// `channel_rail.dart`'s own row-list `ListView` pins its right inset to
+/// this exact same [AppSpacing.s8] (with a comment pointing back here) so a
+/// real channel row's own tap target never sits under the widened reach -
+/// `rail_drag_handle_test.dart` pins the geometry, since nothing about the
+/// type system ties two different files' padding together on its own.
+///
 /// [GestureDetector] carries `excludeFromSemantics: true`: a real pointer
 /// tap needs its own recognizer now that a plain click has to work (it did
 /// not before item 54, when only a drag was handled here), but letting it
