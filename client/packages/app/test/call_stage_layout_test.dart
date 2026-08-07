@@ -200,11 +200,30 @@ void main() {
 
   testWidgets(
     'a remote sharer takes the stage over a local participant sharing at '
-    'the same time',
+    'the same time, local listed first',
     (tester) async {
       final harness = await _connected(tester, const [
         _meSharing,
         _aliceSharing,
+      ]);
+      addTearDown(harness.dispose);
+
+      expect(find.byType(ScreenShareStage), findsOneWidget);
+      expect(find.byKey(const Key('fake-share-view-user-2')), findsOneWidget);
+      expect(find.byKey(const Key('fake-share-view-user-1')), findsNothing);
+
+      await _leave(harness);
+    },
+  );
+
+  testWidgets(
+    'a remote sharer takes the stage over a local participant sharing at '
+    'the same time, remote listed first - the order a "last sharer found '
+    'wins" bug would get right by accident',
+    (tester) async {
+      final harness = await _connected(tester, const [
+        _aliceSharing,
+        _meSharing,
       ]);
       addTearDown(harness.dispose);
 
