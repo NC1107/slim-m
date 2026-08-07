@@ -291,8 +291,7 @@ void main() {
     await session.leave();
     expect(session.state, VoiceSessionState.idle);
 
-    // The stale connect resolves well after the leave already reset things;
-    // it must not resurrect a call nobody is in any more.
+    // The stale connect resolves late; it must not resurrect the call.
     gate.complete();
     await joining;
     await pumpEventQueue();

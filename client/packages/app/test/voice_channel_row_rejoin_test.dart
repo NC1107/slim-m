@@ -127,8 +127,7 @@ void main() {
           container: harness.container,
           child: MaterialApp.router(
             theme: buildTheme(Brightness.light, AppTokens.light),
-            // Not yet selected: this is a fresh arrival, which
-            // `VoiceScreen`'s own auto-join already owns.
+            // Not yet selected: a fresh arrival, VoiceScreen's own job.
             routerConfig: _router(
               initialLocation: '/channels/elsewhere',
               selected: false,

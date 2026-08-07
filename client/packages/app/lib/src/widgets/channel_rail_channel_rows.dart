@@ -208,9 +208,7 @@ class VoiceChannelRow extends ConsumerWidget {
           trailingExtra: trailingExtra,
           onTap: () {
             context.go(Routes.channel(channel.id));
-            // A re-click of the channel already open: `VoiceScreen`'s own
-            // auto-join only fires on a fresh arrival, so this is the one
-            // case nothing else asks to rejoin; see voice_channel_tap.dart.
+            // A re-click already open; see voice_channel_tap.dart for why.
             if (voiceChannelTapShouldRejoin(
               voice: voice,
               channelId: channel.id,
