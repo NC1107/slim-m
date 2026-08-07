@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Who is here, drawn as a face-pile: real presence only, deduped across
-/// the call roster and live cursors, and nothing shown at all when nobody
-/// but this device can be proven present.
+/// Who is here, drawn as a face-pile: cursor-only presence, excluding
+/// anyone already on this channel's call (they have their own canvas tile
+/// already - see `canvas_presence_roster.dart`'s own doc for why), and
+/// nothing shown at all when nobody but this device can be proven present.
 library;
 
 import 'package:flutter/material.dart';
@@ -65,18 +66,18 @@ void main() {
     expect(find.byType(AppAvatar), findsNothing);
   });
 
-  testWidgets('a remote call participant renders one avatar with a named '
-      'semantics label', (tester) async {
-    final handle = tester.ensureSemantics();
-    await tester.pumpWidget(
-      _wrap(CanvasPresenceRoster(callParticipants: [_remote('u1', 'Ada')])),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'a remote call participant renders no avatar - they already have their '
+    'own canvas tile',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(CanvasPresenceRoster(callParticipants: [_remote('u1', 'Ada')])),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byType(AppAvatar), findsOneWidget);
-    expect(find.bySemanticsLabel('On this canvas: Ada'), findsOneWidget);
-    handle.dispose();
-  });
+      expect(find.byType(AppAvatar), findsNothing);
+    },
+  );
 
   testWidgets('a live cursor with no call renders one avatar too', (
     tester,
@@ -94,40 +95,41 @@ void main() {
     expect(find.bySemanticsLabel('On this canvas: Priya'), findsOneWidget);
   });
 
-  testWidgets('the same id present as both a call participant and a live '
-      'cursor renders once, not twice', (tester) async {
+  testWidgets(
+    'a live cursor whose id is also on this call is excluded - the call '
+    'roster wins, since that id already has a canvas tile',
+    (tester) async {
+      final cursors = CanvasCursors();
+      addTearDown(cursors.dispose);
+      cursors.upsert(id: 'u1', x: 0, y: 0, label: 'Ada', colorIndex: 0);
+
+      await tester.pumpWidget(
+        _wrap(
+          CanvasPresenceRoster(
+            callParticipants: [_remote('u1', 'Ada')],
+            cursors: cursors,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppAvatar), findsNothing);
+    },
+  );
+
+  testWidgets('past four cursor-only readers, the rest collapse into a +N '
+      'chip', (tester) async {
     final cursors = CanvasCursors();
     addTearDown(cursors.dispose);
-    cursors.upsert(id: 'u1', x: 0, y: 0, label: 'Ada', colorIndex: 0);
+    cursors
+      ..upsert(id: 'u1', x: 0, y: 0, label: 'Ada', colorIndex: 0)
+      ..upsert(id: 'u2', x: 0, y: 0, label: 'Bob', colorIndex: 1)
+      ..upsert(id: 'u3', x: 0, y: 0, label: 'Cy', colorIndex: 2)
+      ..upsert(id: 'u4', x: 0, y: 0, label: 'Dee', colorIndex: 3)
+      ..upsert(id: 'u5', x: 0, y: 0, label: 'Eve', colorIndex: 0);
 
     await tester.pumpWidget(
-      _wrap(
-        CanvasPresenceRoster(
-          callParticipants: [_remote('u1', 'Ada')],
-          cursors: cursors,
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byType(AppAvatar), findsOneWidget);
-  });
-
-  testWidgets('past four present, the rest collapse into a +N chip', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrap(
-        CanvasPresenceRoster(
-          callParticipants: [
-            _remote('u1', 'Ada'),
-            _remote('u2', 'Bob'),
-            _remote('u3', 'Cy'),
-            _remote('u4', 'Dee'),
-            _remote('u5', 'Eve'),
-          ],
-        ),
-      ),
+      _wrap(CanvasPresenceRoster(callParticipants: const [], cursors: cursors)),
     );
     await tester.pumpAndSettle();
 

@@ -1,40 +1,39 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Who is here, drawn as a small face-pile rather than left implicit.
+/// Who is here and has no tile of their own, drawn as a small face-pile
+/// rather than left implicit.
 ///
 /// The owner's third report: "the voice canvas feels like its missing life
-/// from it." Reading that literally rather than reaching for decoration -
-/// this canvas already has real presence machinery (live cursors, in-flight
-/// stroke previews, camera bubbles), and almost none of it is visible while
-/// the board is quiet: a cursor only exists while somebody is moving a
-/// pointer, and a camera bubble only exists while somebody's camera is on.
-/// Between those two moments - which is most of a real conversation - a
-/// shared canvas with people actually on it reads identically to an empty
-/// one nobody has ever opened.
+/// from it." Written when a camera bubble only existed while somebody's
+/// camera was on, and only for whoever this device had already subscribed
+/// to - most of a real conversation showed nothing here at all. Since
+/// `docs/decisions/0010-canvas-media-tiles.md`, that premise is gone: every
+/// call participant now has a standing tile on the canvas
+/// (`CanvasPresenceLayer`), camera on or off, so this widget's own job
+/// narrowed to the one case a tile still cannot cover - somebody reading the
+/// board with a live cursor but on no call here at all. Naming a call
+/// participant a second time, in a small avatar stacked beside their own
+/// full tile, is not "more life," it is the same person counted twice.
 ///
-/// This closes that gap honestly rather than by inventing a signal the wire
-/// does not carry. There is no "has this canvas open" event from the server
-/// (see this file's own knowledge-base entry for why one would need a real
-/// server change, left for the owner rather than faked here) - only two
-/// things a client already knows for certain: who is on this channel's call,
-/// and whose cursor has moved recently enough that [CanvasCursors] has not
-/// pruned it. Both are real, both are already flowing through this pane, and
-/// their union is exactly "who this canvas can currently prove is present."
-/// A quiet call with nobody drawing renders nothing here, which is the
-/// honest answer, not a bug this widget should paper over.
+/// This closes that narrower gap honestly rather than by inventing a signal
+/// the wire does not carry. There is no "has this canvas open" event from
+/// the server (see this file's own knowledge-base entry for why one would
+/// need a real server change, left for the owner rather than faked here) -
+/// only whose cursor has moved recently enough that [CanvasCursors] has not
+/// pruned it, for somebody this device did not already give a tile.
 ///
 /// Membership changes swap instantly, deliberately not cross-faded: a new
 /// face appearing already carries the meaning on its own, and animating the
 /// swap on top of that would be motion for its own sake rather than motion
 /// that says anything a plain appearance does not already say.
 ///
-/// **A known boundary, not a bug: somebody with the canvas open but neither
-/// on the call nor moving a pointer is invisible here.** Silently reading a
+/// **A known boundary, not a bug: somebody with the canvas open, on no call
+/// here, and not moving a pointer is invisible here.** Silently reading a
 /// shared board is a real, common thing to do, and there is genuinely no
 /// wire signal for it - "has this canvas open" is not an event the server
 /// sends, and inventing one client-side would be exactly the fabrication
 /// this file's own opening paragraph already rejected. So a quiet reader
-/// reads as absent, the same honest gap a cursor-only or call-only signal
-/// always had; closing it needs a real server change, left for the owner.
+/// reads as absent; closing it needs a real server change, left for the
+/// owner.
 library;
 
 import 'package:flutter/material.dart';
@@ -53,39 +52,36 @@ class _Present {
   final String name;
 }
 
-/// Positioned top-right by default - the error/truncation banners already
-/// claim the top-left-to-center band, and the floating dock owns the bottom.
+/// Positioned top-right, fixed - the error/truncation banners already claim
+/// the top-left-to-center band, and the floating dock owns the bottom.
 /// [IgnorePointer]-wrapped throughout, the same treatment `CanvasPresenceLayer`
 /// already gives camera bubbles: this is presence chrome, never a drawing
 /// target.
 ///
-/// **Top-right is also the self camera bubble's own top corner**, and the
-/// two are drawn by widgets that otherwise know nothing about each other.
-/// `canvas_pane_body.dart` is what breaks the tie: it watches the bubble's
-/// current corner and passes [alignment] as top-left whenever the bubble is
-/// both visible and sitting in top-right, so this widget only ever has to
-/// honour whatever corner it is told rather than reason about the bubble
-/// itself. The bubble is never asked to yield instead, because its resting
-/// corner is a saved preference a person dragged it to on purpose, where
-/// this widget's own corner is not.
+/// **A world-anchored tile can still pan underneath this fixed screen
+/// corner**, the same collision `docs/decisions/0010-canvas-media-tiles.md`
+/// already names for a media tile's own controls - recorded there rather
+/// than solved here, since this widget cannot see where a tile has been
+/// dragged to and a media tile is not this widget's own concern. Excluding
+/// every call participant from [_present] (see below) shrinks how often
+/// this actually collides with anything, since the one person a viewer is
+/// most likely to have dragged into this corner - a call participant - can
+/// no longer appear here at all.
 class CanvasPresenceRoster extends StatefulWidget {
   const CanvasPresenceRoster({
     super.key,
     required this.callParticipants,
     this.cursors,
-    this.alignment = Alignment.topRight,
   });
 
-  /// Already filtered for blocking by the caller - `_callParticipants()`
-  /// for this, `CanvasCursorRelay.applyRemote` for [cursors] - the same
-  /// upstream-filtering shape every other presence surface on this canvas
-  /// already follows, so this widget has nothing left to filter itself.
+  /// Read only to exclude anyone already on this channel's call from
+  /// [_present] - see that method's own doc for why - not filtered for
+  /// blocking here, since a blocked call participant is excluded by this
+  /// same check regardless of the reason. [cursors] is filtered upstream by
+  /// `CanvasCursorRelay.applyRemote`, the same "filter before it reaches
+  /// this widget" shape every other presence surface on this canvas follows.
   final List<VoiceParticipant> callParticipants;
   final CanvasCursors? cursors;
-
-  /// See this class's own doc for why this is ever anything but the
-  /// default top-right.
-  final Alignment alignment;
 
   @override
   State<CanvasPresenceRoster> createState() => _CanvasPresenceRosterState();
@@ -117,17 +113,22 @@ class _CanvasPresenceRosterState extends State<CanvasPresenceRoster> {
     if (mounted) setState(() {});
   }
 
+  /// Cursor-only presence: somebody moving a pointer on this canvas who is
+  /// not on this channel's call. A call participant - this device's own
+  /// included - is never listed here, whatever their cursor is doing:
+  /// `CanvasPresenceLayer` already gives every one of them a standing tile,
+  /// camera on or off, so naming them again in this small face-pile would
+  /// be the same person counted twice rather than "more life" on a quiet
+  /// board - the redundancy `docs/decisions/0010-canvas-media-tiles.md`
+  /// names once every call participant became a real tile.
   List<_Present> _present() {
+    final onCall = <String>{
+      for (final p in widget.callParticipants) p.identity,
+    };
     final byId = <String, _Present>{};
-    for (final p in widget.callParticipants) {
-      if (p.isLocal) continue;
-      byId[p.identity] = _Present(id: p.identity, name: p.name);
-    }
     for (final cursor in widget.cursors?.all ?? const <CanvasCursor>[]) {
-      byId.putIfAbsent(
-        cursor.id,
-        () => _Present(id: cursor.id, name: cursor.label),
-      );
+      if (onCall.contains(cursor.id)) continue;
+      byId[cursor.id] = _Present(id: cursor.id, name: cursor.label);
     }
     final present = byId.values.toList()..sort((a, b) => a.id.compareTo(b.id));
     return present;
@@ -137,7 +138,7 @@ class _CanvasPresenceRosterState extends State<CanvasPresenceRoster> {
   Widget build(BuildContext context) {
     final present = _present();
     return Align(
-      alignment: widget.alignment,
+      alignment: Alignment.topRight,
       child: SafeArea(
         minimum: const EdgeInsets.all(AppSpacing.s12),
         child: IgnorePointer(
