@@ -218,3 +218,70 @@ content it wraps.
   same as before, now stronger: a tile can be dragged away, resized down, or
   locked so drawing tools reach through it, where previously a remote bubble
   could only be dragged nowhere at all.
+
+## Depth order: front and back, a follow-up
+
+The owner asked for one more thing after using the above, in his own words:
+"at best right now it would be nice to be able to move something back or
+move it to the front or have layers." He had already been offered ink that
+sticks to a tile as it moves and scrapped it as too complex; this is scoped
+to depth alone, matching that.
+
+**The bug this closes: locking a tile let a drawing tool reach it, but the
+ink it drew still rendered underneath the tile.** `CanvasPresenceLayer` was
+a sibling of `CanvasSurface`, mounted after it, so every tile painted above
+every stroke, note, shape and image unconditionally - "draw on it" was
+"draw behind it" in practice.
+
+**The obvious fix - move a sent-to-back tile physically behind
+`CanvasSurface` in the pane's `Stack` - does not work, proved by rendering
+rather than reasoned about.** `CanvasSurface` wraps its whole paint stack in
+a `MouseRegion` with the Flutter default `opaque: true`, which claims every
+pointer within its bounds regardless of what is drawn there; Flutter's own
+`Stack` hit-testing stops at the first child that claims a point, topmost
+first. A widget painted behind `CanvasSurface` in the same `Stack` is
+therefore never hit-tested again - not dimmed, not merely hard to reach,
+genuinely unreachable. A tile sent to the back that way would have no route
+back: its own unlock and bring-to-front buttons would be exactly the
+controls this made unreachable.
+
+**The fix splits a tile's content from its controls into two widgets that
+never move together.** `CanvasPresenceTileOverrides` gains a `sentToBack`
+flag, purely a paint-order concern. `CanvasPresenceBackdrop`
+(`canvas_presence_backdrop.dart`) is new: it renders only the currently
+sent-to-back tiles' own content - video and name badge, wrapped in
+`IgnorePointer` - and is mounted *before* `CanvasSurface` in
+`canvas_pane_body.dart`'s `Stack`, so real ink composites on top of it.
+`CanvasPresenceLayer` keeps its own position, unchanged, after
+`CanvasSurface`: every tile's manipulable shell - drag area, resize grip,
+lock, hide, and the new depth toggle - renders there regardless of depth,
+with only its visible content swapped for an invisible same-sized
+placeholder when the real content has moved to the backdrop. Dragging,
+resizing, locking and hiding a sent-to-back tile therefore behave exactly as
+they did before this change; only where its pixels land changed.
+`canvas_presence_geometry.dart` factors the shared rect and paint-order math
+so the two widgets can never compute a different answer for the same tile.
+
+**One toggle, not a middle position.** Full z-index interleaving with
+individual canvas objects was considered and rejected: a tile is personal
+and per-viewer while an object is shared, so the two cannot share one
+ordering space without either putting a tile's arrangement on the wire (the
+thing this feature's own parent decision above already rejected) or faking
+an interleave that would not agree between two viewers. Front-and-back
+covers what was asked for.
+
+**The control reuses the object menu's own verbs rather than inventing a
+second concept**: the tile's on-tile control row gets a third icon button
+beside lock and hide, labelled "Bring to front"/"Send to back" and using
+the identical `AppIcons.bringToFront`/`AppIcons.sendToBack` glyphs
+`CanvasObjectContextMenu` already uses for a selected object. It lives
+on-tile rather than in a right-click menu because a tile already absorbs
+its own right-click (see `canvas_presence_tile.dart`'s own doc).
+
+**Default is front**, matching every tile shipped before this change and
+the ordinary case - a floating camera or share nobody has drawn on yet.
+Rendered proof: `canvas_assembled_snapshot_test.dart`'s "tile locked and
+sent to the back" scene shows the existing busy scene's ink (which already
+overlapped a tile's default position, by that scene's own design) painting
+over a sent-to-back tile while an untouched tile alongside it still hides
+ink behind it, the same frame.

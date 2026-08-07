@@ -235,9 +235,7 @@ class _TileControls extends StatelessWidget {
             active: locked,
             onPressed: onToggleLocked,
           ),
-          // Same idea as the object menu's "Bring to front"/"Send to back",
-          // reached here instead of a right-click menu since a tile absorbs
-          // its own right-click - see this file's own library doc.
+          // The object menu's own "Bring to front"/"Send to back", reached here since a tile absorbs its own right-click - see this file's own library doc.
           AppIconButton(
             icon: sentToBack ? AppIcons.sendToBack : AppIcons.bringToFront,
             semanticLabel: sentToBack

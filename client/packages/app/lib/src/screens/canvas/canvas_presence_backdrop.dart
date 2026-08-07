@@ -57,10 +57,7 @@ class CanvasPresenceBackdrop extends StatefulWidget {
 }
 
 class _CanvasPresenceBackdropState extends State<CanvasPresenceBackdrop> {
-  // Its own instance, deliberately: this widget's hysteresis is computed
-  // over the exact same onCanvas map CanvasPresenceLayer's own instance
-  // sees (every tile, not just sent-to-back ones - see build() below), so
-  // the two never disagree about which keys are currently visible.
+  // Its own instance, computed over the same full onCanvas map CanvasPresenceLayer's own instance sees - see build() below for why that keeps the two in step.
   final CanvasPresenceVisibility _visibility = CanvasPresenceVisibility();
 
   @override
@@ -107,9 +104,7 @@ class _CanvasPresenceBackdropState extends State<CanvasPresenceBackdrop> {
       hideSelfCamera: widget.hideSelfCamera,
     );
     if (onCanvas.isEmpty) return const SizedBox.shrink();
-    // The full onCanvas map, not a pre-filtered one: keeping this in step
-    // with CanvasPresenceLayer's own culling is what stops the two widgets'
-    // separate CanvasPresenceVisibility instances from ever drifting apart.
+    // The full onCanvas map, not a pre-filtered one - the two widgets' separate CanvasPresenceVisibility instances would drift apart otherwise.
     final visibleIds = _visibility.update(widget.document.worldView, onCanvas);
     final backKeys = visibleIds
         .where((key) => widget.overrides.stateFor(key).sentToBack)

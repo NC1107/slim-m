@@ -188,10 +188,7 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
                 : "${participant.name}'s screen share, on this call's canvas")
           : '${participant.name}${participant.isLocal ? ', you' : ''}, '
                 "on this call's canvas",
-      // A sent-to-back tile's real content paints in CanvasPresenceBackdrop
-      // instead - see this file's own doc for why the control shell never
-      // moves with it. SizedBox.expand, not .shrink: a zero-size child would
-      // shrink the wrapping GestureDetector's own opaque hit box with it.
+      // Real content moves to CanvasPresenceBackdrop when sent to back; .expand, not .shrink, or the wrapping GestureDetector's own opaque hit box shrinks with it.
       child: sentToBack
           ? const SizedBox.expand()
           : isScreen

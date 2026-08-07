@@ -168,6 +168,30 @@ void main() {
     },
   );
 
+  testWidgets(
+    'busy desktop-1400 with a tile locked and sent to the back, so real ink '
+    'lands on top of it, dark',
+    (tester) async {
+      final document = buildBusyDocument();
+      addTearDown(document.dispose);
+      final overrides = CanvasPresenceTileOverrides();
+      addTearDown(overrides.dispose);
+      // Avery's camera sits at its own default position, which buildBusyDocument's own doc already says overlaps the box-cluster ink - the case send-to-back exists for.
+      overrides.setLocked('camera:user-avery', true);
+      overrides.setSentToBack('camera:user-avery', true);
+
+      await renderCanvasAssembledPane(
+        tester,
+        name: 'busy-desktop-1400-tile-sent-to-back-dark',
+        width: 1400,
+        theme: 'dark',
+        document: document,
+        participants: busyParticipants,
+        tileOverrides: overrides,
+      );
+    },
+  );
+
   testWidgets('busy phone-390 with the truncation banner, dark', (
     tester,
   ) async {
