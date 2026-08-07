@@ -35,6 +35,12 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
   /// right-press, which middle-drag simply never collides with.
   bool _isPanButton(int buttons) => buttons & kMiddleMouseButton != 0;
 
+  /// This surface's own pointer count plus [CanvasDocument.externalPointers]
+  /// - a second finger a presence tile absorbed before this widget's own
+  /// [Listener] ever saw its down event still has to count as a real second
+  /// pointer for the pinch-cancellation and grab-pan logic below.
+  int get _totalPointers => _pointers + widget.document.externalPointers.count;
+
   Offset _toWorld(Offset screen) {
     final camera = widget.document.camera;
     return Offset(
@@ -57,7 +63,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
       _beginPan(event.pointer, event.localPosition);
       return;
     }
-    if (_pointers > 1) {
+    if (_totalPointers > 1) {
       final hadDraft = !_draft.isEmpty;
       _draft.cancel();
       if (hadDraft) widget.onDraftEnded?.call();
@@ -93,7 +99,9 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
       }
       // The grab button itself let go, but this pointer still holds another - resume the tool right here rather than staying stuck panning until the whole pointer lifts.
       _endPan();
-      if (_pointers == 1 && widget.enabled) _resumeToolAt(event.localPosition);
+      if (_totalPointers == 1 && widget.enabled) {
+        _resumeToolAt(event.localPosition);
+      }
       return;
     }
     if (_isPanButton(event.buttons)) {
@@ -101,7 +109,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
       _beginPan(event.pointer, event.localPosition);
       return;
     }
-    if (_pointers != 1 || !widget.enabled) return;
+    if (_totalPointers != 1 || !widget.enabled) return;
     switch (widget.tool) {
       case CanvasTool.eraser:
         if (_pendingErasePoint case final pending?) {
@@ -142,9 +150,9 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
           widget.onErase?.call(pending);
           _pendingErasePoint = null;
         }
-        if (_pointers == 0) widget.onEraseEnd?.call();
+        if (_totalPointers == 0) widget.onEraseEnd?.call();
       case CanvasTool.select:
-        if (_pointers == 0) widget.onSelectEnd?.call();
+        if (_totalPointers == 0) widget.onSelectEnd?.call();
       case CanvasTool.note:
       case CanvasTool.shape:
         break;
@@ -168,7 +176,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
     if (tool == null || world == null) return;
     _pendingPlacementTool = null;
     _pendingPlacementWorld = null;
-    if (_pointers != 0) return;
+    if (_totalPointers != 0) return;
     switch (tool) {
       case CanvasTool.note:
         widget.onNotePlace?.call(world);

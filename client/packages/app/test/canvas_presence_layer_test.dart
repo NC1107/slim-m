@@ -11,6 +11,7 @@
 /// own doc comment states for its sibling.
 library;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -393,5 +394,36 @@ void main() {
     await tester.pump();
 
     expect(overrides.stateFor('camera:user-noor').rect, isNull);
+  });
+
+  testWidgets('a tile removed mid-drag (its owner left the call) balances '
+      'CanvasDocument.externalPointers rather than leaving it stuck high', (
+    tester,
+  ) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    document.setViewport(const Size(1000, 800));
+    final overrides = CanvasPresenceTileOverrides();
+
+    await tester.pumpWidget(
+      _wrap(_layer(document, const [_cameraOff], overrides)),
+    );
+    await tester.pump();
+
+    final pointer = TestPointer(1, PointerDeviceKind.touch);
+    await tester.sendEventToBinding(pointer.down(const Offset(50, 50)));
+    expect(document.externalPointers.count, 1);
+
+    // Noor leaves with the pointer still down: no `.up()`, no `.cancel()`, the tile's own element is simply gone.
+    await tester.pumpWidget(_wrap(_layer(document, const [], overrides)));
+    await tester.pump();
+
+    expect(
+      document.externalPointers.count,
+      0,
+      reason:
+          'a stuck-high count would block every future single-finger '
+          'placement on this canvas, forever',
+    );
   });
 }

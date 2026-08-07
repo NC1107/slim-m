@@ -155,6 +155,23 @@ void main() {
     expect(overrides.zFor('camera:alice'), isNull);
   });
 
+  test(
+      'setRect clamps a position far past the bounded world, the same '
+      'limit the camera itself is already held to', () {
+    final overrides = CanvasPresenceTileOverrides();
+
+    overrides.setRect(
+      'camera:alice',
+      const Rect.fromLTWH(50000000, -50000000, 140, 140),
+    );
+
+    final rect = overrides.stateFor('camera:alice').rect!;
+    expect(rect.left, lessThanOrEqualTo(worldLimit));
+    expect(rect.top, greaterThanOrEqualTo(-worldLimit));
+    expect(rect.width, 140, reason: 'clamping moves a tile, never resizes it');
+    expect(rect.height, 140);
+  });
+
   test('every mutator notifies listeners exactly once', () {
     final overrides = CanvasPresenceTileOverrides();
     var notifications = 0;

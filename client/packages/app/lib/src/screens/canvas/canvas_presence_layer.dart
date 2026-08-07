@@ -116,8 +116,12 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
       oldWidget.overrides.removeListener(_onChanged);
       widget.overrides.addListener(_onChanged);
     }
-    // Before build, never during it: a participant who left the call must not keep their drag, lock or hide the next time they rejoin.
-    widget.overrides.prune(presenceTileKeys(widget.participants));
+    // After this frame, not inside didUpdateWidget: overrides is shared with the dock's own still-mid-reconciliation ListenableBuilder, and notifyListeners() reaching it here throws "setState() called during build".
+    final overrides = widget.overrides;
+    final keys = presenceTileKeys(widget.participants);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.overrides == overrides) overrides.prune(keys);
+    });
   }
 
   @override
@@ -177,6 +181,7 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
       camera: camera,
       locked: locked,
       sentToBack: sentToBack,
+      document: widget.document,
       onRectChanged: (next) => widget.overrides.setRect(key, next),
       onToggleLocked: () => widget.overrides.setLocked(key, !locked),
       onToggleSentToBack: () =>

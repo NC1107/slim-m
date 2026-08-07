@@ -16,6 +16,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
+import 'canvas_external_pointers.dart';
 import 'canvas_scene.dart';
 import 'canvas_stroke.dart';
 
@@ -47,6 +48,10 @@ class CanvasDocument extends ChangeNotifier {
 
   Camera _camera = const Camera();
   Size _viewport = Size.zero;
+
+  /// Pointers `CanvasSurface` itself never receives a down event for - see
+  /// `canvas_external_pointers.dart`'s own doc.
+  final externalPointers = CanvasExternalPointers();
 
   /// Bumped whenever the set of objects changes, never when the camera moves,
   /// so an announcement can be rebuilt on content without firing at pan rate.

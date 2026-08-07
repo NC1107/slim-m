@@ -17,6 +17,8 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
+import 'canvas_stroke.dart';
+
 /// One tile's departure from its default position, size and interactivity.
 /// [rect] is null until the first drag or resize; a null field always means
 /// "use whatever [CanvasPresenceLayout] would otherwise say," never "hide."
@@ -86,8 +88,20 @@ class CanvasPresenceTileOverrides extends ChangeNotifier {
   /// dragged or resized - the render order [CanvasPresenceLayer] sorts by.
   int? zFor(String key) => _z[key];
 
+  /// [rect]'s position is clamped to [worldLimit], the same bound
+  /// [CanvasDocument]'s own camera is held to - a real canvas object is
+  /// bounded at the server, and a tile has no server round trip to enforce
+  /// that for it, so an unclamped drag could otherwise carry it a million
+  /// units away with no way back. Size is left alone: the widget that calls
+  /// this already clamps a resize to `canvasPresenceTileMinSize`/`Max`.
   void setRect(String key, Rect rect) {
-    _states[key] = stateFor(key).copyWith(rect: rect);
+    final clamped = Rect.fromLTWH(
+      rect.left.clamp(-worldLimit, worldLimit),
+      rect.top.clamp(-worldLimit, worldLimit),
+      rect.width,
+      rect.height,
+    );
+    _states[key] = stateFor(key).copyWith(rect: clamped);
     _z[key] = _nextZ++;
     notifyListeners();
   }
