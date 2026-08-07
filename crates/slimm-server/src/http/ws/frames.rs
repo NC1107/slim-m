@@ -161,6 +161,18 @@ pub(super) enum ServerFrame {
         object_id: String,
         z_index: i64,
     },
+    #[serde(rename = "canvas.media_slot.changed")]
+    CanvasMediaSlotChanged {
+        channel_id: String,
+        kind: String,
+        user_id: String,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+        locked: bool,
+        sent_to_back: bool,
+    },
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]

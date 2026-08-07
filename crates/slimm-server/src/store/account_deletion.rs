@@ -141,6 +141,11 @@ impl Store {
         sqlx::query!("DELETE FROM read_states WHERE user_id = ?", user_id)
             .execute(&mut *tx)
             .await?;
+        // A slot names the participant it represents, not who arranged it,
+        // so nothing is left to anonymize once that participant is gone.
+        sqlx::query!("DELETE FROM canvas_media_slots WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query!("DELETE FROM member_roles WHERE user_id = ?", user_id)
             .execute(&mut *tx)
             .await?;

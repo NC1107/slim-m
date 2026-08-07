@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT user_id AS \"user_id!: UserId\", kind AS \"kind!\",\n                      x AS \"x!: f64\", y AS \"y!: f64\", w AS \"w!: f64\", h AS \"h!: f64\",\n                      locked AS \"locked!: bool\", sent_to_back AS \"sent_to_back!: bool\",\n                      updated_at AS \"updated_at!: i64\"\n               FROM canvas_media_slots WHERE channel_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "kind!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "x!: f64",
+        "ordinal": 2,
+        "type_info": "Float"
+      },
+      {
+        "name": "y!: f64",
+        "ordinal": 3,
+        "type_info": "Float"
+      },
+      {
+        "name": "w!: f64",
+        "ordinal": 4,
+        "type_info": "Float"
+      },
+      {
+        "name": "h!: f64",
+        "ordinal": 5,
+        "type_info": "Float"
+      },
+      {
+        "name": "locked!: bool",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "sent_to_back!: bool",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "updated_at!: i64",
+        "ordinal": 8,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1117f6426cb71ad3d339e0fe4edb1f77ab6e61c63af53ad97f2bfa14a150ba5d"
+}

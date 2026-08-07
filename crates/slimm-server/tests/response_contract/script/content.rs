@@ -270,6 +270,25 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         root,
     )
     .await;
+    // Named for bob, not root, so this also exercises the no-own-tile gate:
+    // anyone with USE_CANVAS may arrange anyone's media slot.
+    c.json(
+        "putCanvasMediaSlot",
+        "PUT",
+        &format!("/channels/{channel}/canvas/media-slots/screen/{bob_id}"),
+        root,
+        json!({
+            "x": 40.0, "y": 40.0, "w": 360.0, "h": 203.0,
+            "locked": false, "sent_to_back": false,
+        }),
+    )
+    .await;
+    c.get(
+        "listCanvasMediaSlots",
+        &format!("/channels/{channel}/canvas/media-slots"),
+        root,
+    )
+    .await;
 
     let overwrite = format!("/channels/{channel}/overwrites/member/{bob_id}");
     c.json(

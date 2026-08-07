@@ -2774,6 +2774,101 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
+  /channels/{channelId}/canvas/media-slots:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: listCanvasMediaSlots
+      tags: [canvas]
+      summary: Read every camera or screen-share tile a channel's canvas remembers.
+      description: >
+        Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel,
+        byte-identical to the viewport read's gate. No timeout check: this is
+        a read.
+
+
+        A slot is a place saying "this participant's video goes here",
+        remembered whether or not that participant is on a call right now -
+        rejoining a call tomorrow finds a tile exactly where it was left
+        yesterday. There is no pagination: the set is bounded by however many
+        distinct participants have ever had a tile touched in this channel,
+        which is small enough on this product's target scale that no page
+        limit earns its cost the way `listCanvasOps` needed one.
+      responses:
+        "200":
+          description: Every slot this channel's canvas currently remembers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CanvasMediaSlotPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /channels/{channelId}/canvas/media-slots/{kind}/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+      - name: kind
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [camera, screen]
+      - name: userId
+        in: path
+        required: true
+        description: >-
+          The participant this tile represents, never necessarily the
+          caller: anyone holding `VIEW_CHANNEL` and `USE_CANVAS` may
+          rearrange anyone's tile, the same shared-editing trust this
+          channel already grants over drawing.
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: putCanvasMediaSlot
+      tags: [canvas]
+      summary: Move, resize, lock or restack one participant's camera or screen-share tile.
+      description: >
+        Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel,
+        and is additionally refused while the caller is timed out, the same
+        gate `placeCanvasObject` uses.
+
+
+        Unlike a real canvas object there is no own-tile-versus-`MANAGE_CANVAS`
+        split: `userId` names the participant a tile represents, not who
+        arranged it, so this is a plain upsert on `(channelId, userId, kind)`
+        rather than a moderation act. Every field is sent on every call, and
+        the stored row is replaced outright rather than merged.
+
+
+        Not idempotent by a client id the way `placeCanvasObject` is: every
+        call names a real intended arrangement, so every successful call
+        publishes a live update, including a retry after a lost response.
+        Applying the same state twice is a no-op for every receiver.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CanvasMediaSlotUpdate"
+      responses:
+        "200":
+          description: The slot's current, now-shared state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CanvasMediaSlot"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /channels/{channelId}/voice/token:
     post:
       operationId: mintVoiceToken
@@ -4592,6 +4687,72 @@ components:
             Whether this call is what wrote the op. A replayed id answers
             `false` with the originally stored op and publishes nothing.
 
+    CanvasMediaSlot:
+      type: object
+      required: [kind, user_id, x, y, w, h, locked, sent_to_back, updated_at]
+      properties:
+        kind:
+          type: string
+          enum: [camera, screen]
+        user_id:
+          type: string
+          format: uuid
+          description: The participant this tile represents.
+        x:
+          type: number
+          format: double
+        y:
+          type: number
+          format: double
+        w:
+          type: number
+          format: double
+        h:
+          type: number
+          format: double
+        locked:
+          type: boolean
+          description: >-
+            Shared, not personal: a locked tile stops intercepting the
+            pointer for every viewer, protecting an arrangement everyone
+            relies on the same way Figma's own layer lock does.
+        sent_to_back:
+          type: boolean
+          description: Whether this tile paints behind the canvas's drawn content.
+        updated_at:
+          type: integer
+          format: int64
+
+    CanvasMediaSlotUpdate:
+      type: object
+      required: [x, y, w, h, locked, sent_to_back]
+      properties:
+        x:
+          type: number
+          format: double
+        y:
+          type: number
+          format: double
+        w:
+          type: number
+          format: double
+        h:
+          type: number
+          format: double
+        locked:
+          type: boolean
+        sent_to_back:
+          type: boolean
+
+    CanvasMediaSlotPage:
+      type: object
+      required: [slots]
+      properties:
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/CanvasMediaSlot"
+
     Message:
       type: object
       required: [id, channel_id, seq, content, created_at]
@@ -5252,6 +5413,7 @@ components:
         - $ref: "#/components/schemas/CanvasStrokePreviewUpdated"
         - $ref: "#/components/schemas/CanvasObjectMoved"
         - $ref: "#/components/schemas/CanvasObjectReordered"
+        - $ref: "#/components/schemas/CanvasMediaSlotChanged"
         - $ref: "#/components/schemas/ServerPong"
         - $ref: "#/components/schemas/ServerError"
 
@@ -5484,6 +5646,50 @@ components:
         z_index:
           type: integer
           format: int64
+
+    CanvasMediaSlotChanged:
+      type: object
+      required: [type, channel_id, kind, user_id, x, y, w, h, locked, sent_to_back]
+      description: >-
+        A participant's camera or screen-share tile was moved, resized,
+        locked, or sent to the back or front, gated the same way
+        `canvas.object.placed` is. Carries the whole current row, so a
+        receiver needs no refetch to redraw the tile. `user_id` names the
+        participant the tile represents, never who moved it: anyone holding
+        `USE_CANVAS` may rearrange anyone's tile, so there is no actor field
+        the way a moderation act on a real canvas object carries one.
+        Carries no `seq`: a slot mutates in place rather than joining the
+        canvas op stream, so there is nothing here for a reconnecting client
+        to catch up on beyond a fresh `listCanvasMediaSlots`.
+      properties:
+        type:
+          type: string
+          enum: [canvas.media_slot.changed]
+        channel_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [camera, screen]
+        user_id:
+          type: string
+          format: uuid
+        x:
+          type: number
+          format: double
+        y:
+          type: number
+          format: double
+        w:
+          type: number
+          format: double
+        h:
+          type: number
+          format: double
+        locked:
+          type: boolean
+        sent_to_back:
+          type: boolean
 
     ServerHello:
       type: object
