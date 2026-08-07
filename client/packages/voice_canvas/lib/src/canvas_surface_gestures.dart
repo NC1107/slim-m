@@ -47,6 +47,8 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
     widget.onPointerMoved?.call(_toWorld(event.localPosition));
     _pointers++;
     if (_isPanButton(event.buttons)) {
+      // A second pointer's own grab button must not steal an already-owned pan - see _move's identical guard.
+      if (_panning.value) return;
       // Nothing has begun for this pointer yet, so there is only a stray draft to drop, not flush.
       final hadDraft = !_draft.isEmpty;
       _draft.cancel();
