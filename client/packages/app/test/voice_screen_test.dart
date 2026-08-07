@@ -17,7 +17,7 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_roster.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/voice_screen.dart';
-import 'package:slimm_app/src/widgets/camera_self_preview.dart';
+import 'package:slimm_app/src/widgets/call_participant_tiles.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -429,44 +429,43 @@ void main() {
     },
   );
 
-  testWidgets('a local camera track shows the self preview once in a call', (
-    tester,
-  ) async {
-    final container = _connectedContainer(isCameraOn: true);
-    addTearDown(container.dispose);
+  testWidgets(
+    "a local camera track renders inside the local participant's own tile, "
+    'not a separate preview',
+    (tester) async {
+      final container = _connectedContainer(isCameraOn: true);
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(
-      _harness(const VoiceScreen(channelId: 'channel-1'), container),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _harness(const VoiceScreen(channelId: 'channel-1'), container),
+      );
+      await tester.pumpAndSettle();
 
-    expect(
-      find.byType(CameraSelfPreview),
-      findsOneWidget,
-      reason:
-          "the local participant's camera is on, so the preview `me != "
-          'null && me.isCameraOn` guards must have rendered',
-    );
-    expect(find.byKey(const Key('fake-camera-view-user-1')), findsOneWidget);
+      expect(find.byType(CallParticipantTile), findsOneWidget);
+      expect(find.byKey(const Key('fake-camera-view-user-1')), findsOneWidget);
 
-    // Stops the heartbeat timer `connected` started: the pending-timer
-    // check runs before `addTearDown`, so this has to happen in the body.
-    await container.read(voiceControllerProvider.notifier).leave();
-  });
+      // Stops the heartbeat timer `connected` started: the pending-timer
+      // check runs before `addTearDown`, so this has to happen in the body.
+      await container.read(voiceControllerProvider.notifier).leave();
+    },
+  );
 
-  testWidgets('no self preview shows once in a call with the camera off', (
-    tester,
-  ) async {
-    final container = _connectedContainer(isCameraOn: false);
-    addTearDown(container.dispose);
+  testWidgets(
+    "a local participant with the camera off renders their tile as an "
+    'avatar, with no camera view mounted',
+    (tester) async {
+      final container = _connectedContainer(isCameraOn: false);
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(
-      _harness(const VoiceScreen(channelId: 'channel-1'), container),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _harness(const VoiceScreen(channelId: 'channel-1'), container),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byType(CameraSelfPreview), findsNothing);
+      expect(find.byType(CallParticipantTile), findsOneWidget);
+      expect(find.byKey(const Key('fake-camera-view-user-1')), findsNothing);
 
-    await container.read(voiceControllerProvider.notifier).leave();
-  });
+      await container.read(voiceControllerProvider.notifier).leave();
+    },
+  );
 }
