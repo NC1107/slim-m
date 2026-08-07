@@ -62,6 +62,25 @@ const busyParticipants = <VoiceParticipant>[
   ),
 ];
 
+/// [busyParticipants] with Sam sharing their screen too - the scenario the
+/// owner actually asked for: a participant's screen as a second, distinct
+/// tile from their camera.
+final busyParticipantsSharing = [
+  for (final p in busyParticipants)
+    if (p.identity == 'user-sam')
+      VoiceParticipant(
+        identity: p.identity,
+        name: p.name,
+        isSpeaking: p.isSpeaking,
+        isMuted: p.isMuted,
+        isLocal: p.isLocal,
+        isScreenSharing: true,
+        isCameraOn: p.isCameraOn,
+      )
+    else
+      p,
+];
+
 /// A sixth person, present only by cursor - never on the call - so the
 /// roster's own honest union (call roster plus live cursors) has something
 /// to prove: someone who is drawing but never joined voice still counts as

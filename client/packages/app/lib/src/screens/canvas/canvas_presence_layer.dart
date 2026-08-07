@@ -1,59 +1,82 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Camera bubbles for whoever is on this channel's call, positioned in the
-/// canvas's own world-coordinate space.
+/// Camera and screen-share tiles for whoever is on this channel's call -
+/// including the caller's own - positioned in the canvas's own
+/// world-coordinate space, exactly the AR-glasses framing the owner asked
+/// for: "make the screen as big or small as you want, draw on it, hide it,
+/// lock it in place."
 ///
 /// A widget layer stacked over [CanvasSurface], never painted into it: a
-/// live camera track is a platform `Texture` (`VoiceSession.cameraViewFor`
-/// already returns one wrapped as a plain `Widget`, per that method's own
-/// doc), and there is no supported way to sample a `Texture`'s pixels into a
-/// `CustomPainter`'s `Canvas` without an expensive manual frame capture this
-/// package does not do anywhere else. So presence is the topmost layer in
-/// its own `Stack` entry, exactly the shape `docs/STRATEGY.md` names: "a
-/// presence video-texture layer so LiveKit's video updates never trigger
-/// stroke or image repaints" - a separate layer was always the plan, and a
-/// `Texture` is the reason it has to be, not only the reason it is fastest.
+/// live camera or screen-share track is a platform `Texture`
+/// (`VoiceSession.cameraViewFor`/`screenShareViewFor` already return one
+/// wrapped as a plain `Widget`, per their own docs), and there is no
+/// supported way to sample a `Texture`'s pixels into a `CustomPainter`'s
+/// `Canvas` without an expensive manual frame capture this package does not
+/// do anywhere else. So presence is the topmost layer in its own `Stack`
+/// entry, exactly the shape `docs/STRATEGY.md` names: "a presence
+/// video-texture layer so LiveKit's video updates never trigger stroke or
+/// image repaints."
 ///
-/// [IgnorePointer]-wrapped throughout: a remote bubble never drags, so
-/// nothing here may steal a pointer the canvas surface underneath still
-/// needs for drawing, panning or erasing. The caller's own bubble is the one
-/// exception - it does drag, and hide - and it lives in
-/// `canvas_self_presence_overlay.dart` instead, a separate screen-anchored
-/// layer rather than one more case in this world-anchored one. This layer
-/// therefore renders every participant *but* the caller: `[VoiceParticipant]
-/// .isLocal` is the split.
+/// **Every tile is presence, never a [CanvasObjectKind]**, and that is a
+/// decision recorded in `docs/decisions/0010-canvas-media-tiles.md`, not an
+/// oversight: STRATEGY already called camera bubbles and screen-share tiles
+/// "ephemeral presence objects never written to the op log and reset on
+/// rejoin", and this file extends that same line to position, size, lock and
+/// hide, kept in [CanvasPresenceTileOverrides] rather than a
+/// `canvas_objects` row. It is a *personal* arrangement, one viewer's own -
+/// see that decision record for why a shared one was rejected.
+///
+/// This used to render the caller's own bubble nowhere at all (a separate,
+/// screen-anchored overlay owned that), which is exactly the "stuck to the
+/// dock" complaint the owner reported: a fixed screen corner blocks whatever
+/// world content happens to pan underneath it, forever, rather than sitting
+/// at one place a person chose. Self and remote are one list now.
 library;
 
 import 'package:flutter/material.dart';
-import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
-import '../../widgets/user_avatar.dart';
+import 'canvas_presence_bubble.dart';
+import 'canvas_presence_tile.dart';
 
-/// Builds the live camera widget for one participant, exactly
-/// `VoiceController.cameraViewFor`'s signature - a plain function so this
-/// file never imports the provider layer, matching `CanvasPaneBody`'s own
-/// "nothing here reaches Riverpod" rule one level further down.
+export 'canvas_presence_bubble.dart';
+
 typedef CameraViewBuilder = Widget Function(String identity);
+typedef ScreenShareViewBuilder = Widget Function(String identity);
 
-/// The *other* call participants' layer, positioned in world space and
-/// following the canvas's own camera. Renders nothing when [participants]
-/// holds nobody but the caller - or nobody at all - so a canvas opened on a
-/// channel with no active call, or opened by someone who has not joined the
-/// call themselves, pays for none of this. The caller's own tile is never
-/// drawn here; see this file's own library doc for where it lives instead.
+const _cameraOnSize = Size(220, 160);
+const _cameraOffSize = Size(140, 140);
+const _screenShareSize = Size(360, 203);
+
+/// Every call participant's tiles, world-anchored and individually
+/// draggable, resizable, lockable and hideable through [overrides]. Renders
+/// nothing when [participants] is empty, so a canvas opened on a channel
+/// with no active call pays for none of this.
 class CanvasPresenceLayer extends StatefulWidget {
   const CanvasPresenceLayer({
     super.key,
     required this.document,
     required this.participants,
     required this.cameraViewFor,
+    required this.screenShareViewFor,
+    required this.overrides,
+    this.hideSelfCamera = false,
     this.layout = const CanvasPresenceLayout(),
   });
 
   final CanvasDocument document;
   final List<VoiceParticipant> participants;
   final CameraViewBuilder cameraViewFor;
+  final ScreenShareViewBuilder screenShareViewFor;
+  final CanvasPresenceTileOverrides overrides;
+
+  /// The caller's own standing "never show my own camera" preference
+  /// (`canvas_self_presence.dart`), layered on top of whatever
+  /// [overrides] says for `camera:<selfId>` - distinct from a per-call hide,
+  /// since this one is meant to survive a rejoin rather than reset with it.
+  /// Never suppresses a self screen-share tile: that preference is about a
+  /// face, not about whatever this device is sharing.
+  final bool hideSelfCamera;
   final CanvasPresenceLayout layout;
 
   @override
@@ -61,180 +84,147 @@ class CanvasPresenceLayer extends StatefulWidget {
 }
 
 class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
-  /// Kept across builds, not rebuilt per frame: the hysteresis band this
-  /// class exists for only works if "was this bubble mounted a moment ago"
-  /// survives from one recomputation to the next.
   final CanvasPresenceVisibility _visibility = CanvasPresenceVisibility();
 
   @override
   void initState() {
     super.initState();
-    widget.document.addListener(_onDocumentChanged);
+    widget.document.addListener(_onChanged);
+    widget.overrides.addListener(_onChanged);
   }
 
   @override
   void didUpdateWidget(covariant CanvasPresenceLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.document != widget.document) {
-      oldWidget.document.removeListener(_onDocumentChanged);
-      widget.document.addListener(_onDocumentChanged);
+      oldWidget.document.removeListener(_onChanged);
+      widget.document.addListener(_onChanged);
     }
+    if (oldWidget.overrides != widget.overrides) {
+      oldWidget.overrides.removeListener(_onChanged);
+      widget.overrides.addListener(_onChanged);
+    }
+    // Before build, never during it: a participant who left the call must not keep their drag, lock or hide the next time they rejoin.
+    widget.overrides.prune(_currentKeys());
   }
 
   @override
   void dispose() {
-    widget.document.removeListener(_onDocumentChanged);
+    widget.document.removeListener(_onChanged);
+    widget.overrides.removeListener(_onChanged);
     super.dispose();
   }
 
-  void _onDocumentChanged() {
+  void _onChanged() {
     if (mounted) setState(() {});
   }
 
+  Set<String> _currentKeys() {
+    final keys = <String>{};
+    for (final p in widget.participants) {
+      keys.add('camera:${p.identity}');
+      if (p.isScreenSharing) keys.add('screen:${p.identity}');
+    }
+    return keys;
+  }
+
+  Size _sizeFor(String key, Map<String, VoiceParticipant> byIdentity) {
+    if (key.startsWith('screen:')) return _screenShareSize;
+    final participant = byIdentity[key.substring('camera:'.length)];
+    return (participant?.isCameraOn ?? false) ? _cameraOnSize : _cameraOffSize;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final remote = widget.participants
-        .where((p) => !p.isLocal)
-        .toList(growable: false);
-    if (remote.isEmpty) return const SizedBox.shrink();
-    final bubbles = widget.layout.arrange(remote.map((p) => p.identity));
-    final visibleIds = _visibility.update(widget.document.worldView, bubbles);
+    final keys = _currentKeys();
+    if (keys.isEmpty) return const SizedBox.shrink();
+    final byIdentity = {for (final p in widget.participants) p.identity: p};
+    final defaults = widget.layout.arrange(
+      keys,
+      sizeFor: (key) => _sizeFor(key, byIdentity),
+    );
+    final onCanvas = <String, Rect>{};
+    for (final key in keys) {
+      final state = widget.overrides.stateFor(key);
+      if (state.hidden) continue;
+      if (widget.hideSelfCamera &&
+          key.startsWith('camera:') &&
+          byIdentity[key.substring('camera:'.length)]?.isLocal == true) {
+        continue;
+      }
+      onCanvas[key] = state.rect ?? defaults[key]!;
+    }
+    if (onCanvas.isEmpty) return const SizedBox.shrink();
+    final visibleIds = _visibility.update(widget.document.worldView, onCanvas);
     if (visibleIds.isEmpty) return const SizedBox.shrink();
     final camera = widget.document.camera;
-    final byIdentity = {for (final p in remote) p.identity: p};
-    return IgnorePointer(
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          for (final id in visibleIds)
-            if (byIdentity[id] case final participant?)
-              _positioned(bubbles[id]!, camera, participant),
-        ],
-      ),
+    final painted = _paintOrder(visibleIds);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        for (final key in painted)
+          if (_tile(key, onCanvas[key]!, camera, byIdentity) case final tile?)
+            tile,
+      ],
     );
   }
 
-  Widget _positioned(Rect world, Camera camera, VoiceParticipant participant) {
-    return Positioned(
-      left: (world.left - camera.x) * camera.zoom,
-      top: (world.top - camera.y) * camera.zoom,
-      width: world.width * camera.zoom,
-      height: world.height * camera.zoom,
-      child: CanvasPresenceBubble(
-        participant: participant,
-        cameraView: participant.isCameraOn
-            ? widget.cameraViewFor(participant.identity)
-            : null,
-      ),
-    );
+  /// [visibleIds] sorted so a tile this viewer has ever dragged or resized
+  /// paints above every untouched one, most recently touched last (topmost),
+  /// and untouched tiles keep their own relative order - a real sheet of
+  /// paper does not slide under the pile just because somebody else's is
+  /// also on the table.
+  List<String> _paintOrder(Set<String> visibleIds) {
+    final ordered = visibleIds.toList(growable: false);
+    final rank = <String, int>{
+      for (var i = 0; i < ordered.length; i++) ordered[i]: i,
+    };
+    final withZ = ordered
+        .map((key) => (key: key, z: widget.overrides.zFor(key) ?? -1))
+        .toList();
+    withZ.sort((a, b) {
+      final byZ = a.z.compareTo(b.z);
+      return byZ != 0 ? byZ : rank[a.key]!.compareTo(rank[b.key]!);
+    });
+    return [for (final entry in withZ) entry.key];
   }
-}
 
-/// One participant's tile: their live camera when it is on, an avatar with
-/// the usual speaking ring otherwise - `CallParticipantTile`'s own fallback,
-/// reused rather than redrawn, since the answer to "no video, still present"
-/// is the same question that tile already answers for the in-call screen.
-class CanvasPresenceBubble extends StatelessWidget {
-  const CanvasPresenceBubble({
-    super.key,
-    required this.participant,
-    this.cameraView,
-  });
-
-  final VoiceParticipant participant;
-  final Widget? cameraView;
-
-  bool get _showsCamera => cameraView != null && participant.isCameraOn;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Semantics(
-      label:
-          '${participant.name}${participant.isLocal ? ', you' : ''}, '
-          'on this call\'s canvas',
-      // AppRadii.window and AppShadows.float: reserved, by their own docs, for exactly a floating canvas object - a bubble is always one, whether or not this particular tile ever drags.
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadii.window),
-          boxShadow: AppShadows.float,
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadii.window),
-          child: Container(
-            decoration: BoxDecoration(
-              color: tokens.surfaceRaised,
-              border: Border.all(color: tokens.borderSubtle),
+  Widget? _tile(
+    String key,
+    Rect rect,
+    Camera camera,
+    Map<String, VoiceParticipant> byIdentity,
+  ) {
+    final isScreen = key.startsWith('screen:');
+    final identity = key.substring(key.indexOf(':') + 1);
+    final participant = byIdentity[identity];
+    if (participant == null) return null;
+    final locked = widget.overrides.stateFor(key).locked;
+    return CanvasPresenceManipulableTile(
+      key: ValueKey(key),
+      worldRect: rect,
+      camera: camera,
+      locked: locked,
+      onRectChanged: (next) => widget.overrides.setRect(key, next),
+      onToggleLocked: () => widget.overrides.setLocked(key, !locked),
+      onHide: () => widget.overrides.setHidden(key, true),
+      semanticLabel: isScreen
+          ? (participant.isLocal
+                ? "Your screen share, on this call's canvas"
+                : "${participant.name}'s screen share, on this call's canvas")
+          : '${participant.name}${participant.isLocal ? ', you' : ''}, '
+                "on this call's canvas",
+      child: isScreen
+          ? CanvasScreenShareBubble(
+              participant: participant,
+              view: widget.screenShareViewFor(identity),
+            )
+          : CanvasPresenceBubble(
+              participant: participant,
+              cameraView: participant.isCameraOn
+                  ? widget.cameraViewFor(identity)
+                  : null,
             ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                if (_showsCamera)
-                  DecoratedBox(
-                    decoration: const BoxDecoration(color: Color(0xFF000000)),
-                    child: cameraView,
-                  )
-                else
-                  UserAvatar(
-                    name: participant.name,
-                    userId: participant.identity,
-                    size: 56,
-                    speaking: participant.isSpeaking,
-                  ),
-                Positioned(
-                  left: 6,
-                  bottom: 6,
-                  child: _NameBadge(
-                    name: participant.isLocal
-                        ? '${participant.name} (you)'
-                        : participant.name,
-                    muted: participant.isMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NameBadge extends StatelessWidget {
-  const _NameBadge({required this.name, required this.muted});
-
-  final String name;
-  final bool muted;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s8,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        color: tokens.surfaceBase.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(AppRadii.full),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            muted ? AppIcons.micOff : AppIcons.mic,
-            size: 12,
-            color: muted ? tokens.textSecondary : tokens.accent,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppText.caption.copyWith(color: tokens.textPrimary),
-          ),
-        ],
-      ),
     );
   }
 }

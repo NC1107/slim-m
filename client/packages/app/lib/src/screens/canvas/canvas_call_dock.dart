@@ -54,6 +54,8 @@ class CallDockData {
   final VoiceController controller;
 }
 
+// CanvasHiddenTile lives in canvas_tools_row.dart, imported below - defining it there rather than here avoids a two-way import with CanvasOverflowMenu, its only other user.
+
 /// The canvas half of the dock: exactly what [CanvasToolsRow] already needs.
 class CanvasDockData {
   const CanvasDockData({
@@ -78,6 +80,8 @@ class CanvasDockData {
     required this.hasSelfBubble,
     required this.selfBubbleHidden,
     required this.onToggleSelfBubbleHidden,
+    required this.hiddenTiles,
+    required this.onShowTile,
   });
 
   final CanvasTool tool;
@@ -106,6 +110,12 @@ class CanvasDockData {
   final bool hasSelfBubble;
   final bool selfBubbleHidden;
   final VoidCallback onToggleSelfBubbleHidden;
+
+  /// Every remote camera or screen-share tile hidden on this viewer's own
+  /// canvas right now, and the recovery action for each - a hide must stay
+  /// reversible without leaving the call.
+  final List<CanvasHiddenTile> hiddenTiles;
+  final ValueChanged<String> onShowTile;
 }
 
 /// [call] whenever this device is actually connected to a call in
@@ -207,6 +217,8 @@ class _ToolsRow extends StatelessWidget {
     hasSelfBubble: canvas.hasSelfBubble,
     selfBubbleHidden: canvas.selfBubbleHidden,
     onToggleSelfBubbleHidden: canvas.onToggleSelfBubbleHidden,
+    hiddenTiles: canvas.hiddenTiles,
+    onShowTile: canvas.onShowTile,
     showTools: !canvas.activityLogOpen,
   );
 }

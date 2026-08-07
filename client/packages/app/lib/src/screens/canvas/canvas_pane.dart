@@ -75,6 +75,14 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   final CanvasDocument _document = CanvasDocument();
   final CanvasCursors _cursors = CanvasCursors();
   final RemoteStrokeDrafts _remoteDrafts = RemoteStrokeDrafts();
+
+  /// Every camera and screen-share tile's own drag, resize, lock and hide -
+  /// see `canvas_presence_layer.dart`'s own doc for why this is personal and
+  /// ephemeral rather than a `canvas_objects` row. Lives for exactly this
+  /// pane's own mount, so closing and reopening the canvas resets it, the
+  /// same "reset on rejoin" STRATEGY already calls for on presence objects.
+  final CanvasPresenceTileOverrides _tileOverrides =
+      CanvasPresenceTileOverrides();
   late final CanvasActivityLog _activityLog = CanvasActivityLog(
     isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
   );
@@ -148,6 +156,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _strokePreviewRelay?.dispose();
     _remoteDrafts.dispose();
     _activityLog.dispose();
+    _tileOverrides.dispose();
     super.dispose();
   }
 
@@ -399,10 +408,12 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           cameraViewFor: ref
               .read(voiceControllerProvider.notifier)
               .cameraViewFor,
+          screenShareViewFor: ref
+              .read(voiceControllerProvider.notifier)
+              .screenShareViewFor,
+          tileOverrides: _tileOverrides,
           activityLog: _activityLog,
           selfBubbleHidden: selfPresence.hidden,
-          selfBubbleCorner: selfPresence.corner,
-          onSelfBubbleCornerChanged: _onSelfBubbleCornerChanged,
           onToggleSelfBubbleHidden: _onToggleSelfBubbleHidden,
           callDock: callDockDataFor(
             ref.watch(voiceControllerProvider),

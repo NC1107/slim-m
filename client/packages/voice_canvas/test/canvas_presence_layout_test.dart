@@ -2,6 +2,7 @@
 /// [CanvasPresenceLayout]: deterministic, order-independent placement.
 library;
 
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
@@ -51,5 +52,31 @@ void main() {
     final placed = layout.arrange(['a', 'b']);
 
     expect(placed['b']!.left, placed['a']!.right + 10);
+  });
+
+  test(
+      'sizeFor gives each key its own tile size, and the next tile still '
+      'starts past the wider one\'s own right edge', () {
+    const layout = CanvasPresenceLayout(gap: 10, margin: 0);
+
+    final placed = layout.arrange(
+      ['camera:a', 'screen:a'],
+      sizeFor: (key) => key.startsWith('screen:')
+          ? const Size(360, 200)
+          : const Size(100, 80),
+    );
+
+    expect(placed['camera:a']!.size, const Size(100, 80));
+    expect(placed['screen:a']!.size, const Size(360, 200));
+    expect(placed['screen:a']!.left, placed['camera:a']!.right + 10);
+  });
+
+  test('sizeFor left null falls back to the uniform tileWidth/tileHeight', () {
+    const layout = CanvasPresenceLayout();
+
+    final withCallback = layout.arrange(['alice', 'bob'], sizeFor: null);
+    final without = layout.arrange(['alice', 'bob']);
+
+    expect(withCallback, without);
   });
 }

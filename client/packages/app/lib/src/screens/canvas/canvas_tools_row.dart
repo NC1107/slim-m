@@ -27,6 +27,17 @@ import 'canvas_shape_icons.dart';
 const canvasToolsLeadingFadeKey = Key('canvas-tools-fade-leading');
 const canvasToolsTrailingFadeKey = Key('canvas-tools-fade-trailing');
 
+/// One camera or screen-share tile this viewer has hidden on their own
+/// canvas - the overflow menu's own recovery list names it by [label]
+/// rather than the raw `'camera:<identity>'` key, and hands [key] straight
+/// back to `CanvasPresenceTileOverrides.setHidden` on tap.
+class CanvasHiddenTile {
+  const CanvasHiddenTile({required this.key, required this.label});
+
+  final String key;
+  final String label;
+}
+
 class CanvasToolsRow extends StatefulWidget {
   const CanvasToolsRow({
     super.key,
@@ -51,6 +62,8 @@ class CanvasToolsRow extends StatefulWidget {
     required this.hasSelfBubble,
     required this.selfBubbleHidden,
     required this.onToggleSelfBubbleHidden,
+    required this.hiddenTiles,
+    required this.onShowTile,
     this.showTools = true,
   });
 
@@ -100,6 +113,11 @@ class CanvasToolsRow extends StatefulWidget {
   final bool hasSelfBubble;
   final bool selfBubbleHidden;
   final VoidCallback onToggleSelfBubbleHidden;
+
+  /// Every remote tile hidden on this viewer's own canvas right now, and
+  /// the recovery action for each - the overflow's own "N hidden" section.
+  final List<CanvasHiddenTile> hiddenTiles;
+  final ValueChanged<String> onShowTile;
 
   /// False while the activity panel has replaced the drawing surface: there
   /// is nothing to draw on, so the five placement/edit tools fold away and
@@ -189,6 +207,8 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
           hasSelfBubble: widget.hasSelfBubble,
           selfBubbleHidden: widget.selfBubbleHidden,
           onToggleSelfBubbleHidden: widget.onToggleSelfBubbleHidden,
+          hiddenTiles: widget.hiddenTiles,
+          onShowTile: widget.onShowTile,
         ),
         const SizedBox(width: AppSpacing.s4),
         AppIconButton(

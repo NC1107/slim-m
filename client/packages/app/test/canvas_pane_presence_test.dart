@@ -8,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/blocks_controller.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_presence_layer.dart';
-import 'package:slimm_app/src/screens/canvas/canvas_self_presence_overlay.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import 'canvas_pane_harness.dart';
@@ -79,8 +78,8 @@ void main() {
   );
 
   testWidgets(
-    'the caller\'s own entry renders through the self overlay, never through '
-    'the world-space layer meant for everyone else',
+    'the caller\'s own entry renders through the same world-space layer as '
+    'everyone else\'s, one bubble each',
     (tester) async {
       final fixture = CanvasPaneFixture();
       final container = fixture.container(
@@ -100,21 +99,13 @@ void main() {
 
       await pumpCanvasPane(tester, container);
 
-      // One bubble each: the caller's own through the self overlay, Priya's through the world-space layer.
       expect(find.byType(CanvasPresenceBubble), findsNWidgets(2));
-      expect(
-        find.descendant(
-          of: find.byType(CanvasSelfPresenceOverlay),
-          matching: find.byType(CanvasPresenceBubble),
-        ),
-        findsOneWidget,
-      );
       expect(
         find.descendant(
           of: find.byType(CanvasPresenceLayer),
           matching: find.byType(CanvasPresenceBubble),
         ),
-        findsOneWidget,
+        findsNWidgets(2),
       );
     },
   );

@@ -23,6 +23,7 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/context_menu_focus.dart';
 import 'canvas_shape_icons.dart';
+import 'canvas_tools_row.dart' show CanvasHiddenTile;
 
 /// The bar's own overflow trigger and the confirm dialog behind Clear.
 ///
@@ -53,6 +54,8 @@ class CanvasOverflowMenu extends StatefulWidget {
     required this.hasSelfBubble,
     required this.selfBubbleHidden,
     required this.onToggleSelfBubbleHidden,
+    required this.hiddenTiles,
+    required this.onShowTile,
   });
 
   final VoidCallback onPasteImage;
@@ -98,6 +101,12 @@ class CanvasOverflowMenu extends StatefulWidget {
   final bool selfBubbleHidden;
   final VoidCallback onToggleSelfBubbleHidden;
 
+  /// Every remote tile hidden on this viewer's own canvas this call, and
+  /// the recovery action for each - see [CanvasHiddenTile]'s own doc for
+  /// why a hide must stay reversible.
+  final List<CanvasHiddenTile> hiddenTiles;
+  final ValueChanged<String> onShowTile;
+
   @override
   State<CanvasOverflowMenu> createState() => _CanvasOverflowMenuState();
 }
@@ -124,6 +133,11 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
   void _toggleSelfBubble() {
     _controller.hide();
     widget.onToggleSelfBubbleHidden();
+  }
+
+  void _showTile(String key) {
+    _controller.hide();
+    widget.onShowTile(key);
   }
 
   Future<void> _requestClear() async {
@@ -249,6 +263,15 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
                       leading: AppIcons.camera,
                       onTap: _toggleSelfBubble,
                     ),
+                  if (widget.hiddenTiles.isNotEmpty) ...[
+                    const AppMenuDivider(),
+                    for (final tile in widget.hiddenTiles)
+                      AppMenuItem(
+                        label: 'Show ${tile.label}',
+                        leading: AppIcons.tileHide,
+                        onTap: () => _showTile(tile.key),
+                      ),
+                  ],
                   if (widget.tool == CanvasTool.shape) ...[
                     const AppMenuDivider(),
                     for (final kind in CanvasShapeKind.values)

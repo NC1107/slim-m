@@ -135,6 +135,20 @@ abstract final class AppIcons {
   /// short of closing and reopening the pane, see `worldLimit`'s own doc.
   static const IconData recenter = LucideIcons.locate300;
 
+  /// A camera or screen-share tile on the canvas: locked in place (so a
+  /// drawing tool reaches through it) or free to drag and resize. Distinct
+  /// from [permissions], which shares [tileLocked]'s glyph for an unrelated
+  /// role-based bit.
+  static const IconData tileLocked = LucideIcons.lock300;
+  static const IconData tileUnlocked = LucideIcons.lockOpen300;
+
+  /// Removing one tile from this viewer's own canvas - distinct from
+  /// [micOff]/[cameraOff], which mute a signal rather than remove a tile.
+  static const IconData tileHide = LucideIcons.eyeOff300;
+
+  /// A tile's own resize grip, drawn at its bottom-right corner.
+  static const IconData tileResize = LucideIcons.moveDiagonal2300;
+
   // Account.
   static const IconData signOut = LucideIcons.logOut300;
   static const IconData account = LucideIcons.circleUser300;

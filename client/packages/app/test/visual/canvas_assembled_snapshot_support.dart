@@ -13,7 +13,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/avatar_bytes.dart';
-import 'package:slimm_app/src/providers/canvas_self_presence.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/user_profiles.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
@@ -79,7 +78,7 @@ Future<void> renderCanvasAssembledPane(
   bool truncated = false,
   String? selectedObjectId,
   double height = 844,
-  CanvasSelfBubbleCorner selfBubbleCorner = CanvasSelfBubbleCorner.bottomRight,
+  CanvasPresenceTileOverrides? tileOverrides,
 }) async {
   tester.view.physicalSize = Size(width, height);
   tester.view.devicePixelRatio = 1.0;
@@ -114,6 +113,8 @@ Future<void> renderCanvasAssembledPane(
   if (selectedObjectId != null) {
     document.selectedObjectId.value = selectedObjectId;
   }
+  final overrides = tileOverrides ?? CanvasPresenceTileOverrides();
+  if (tileOverrides == null) addTearDown(overrides.dispose);
 
   final themeSpec = canvasAssembledThemes[theme]!;
   await tester.pumpWidget(
@@ -167,9 +168,17 @@ Future<void> renderCanvasAssembledPane(
                   ),
                 ),
               ),
+              screenShareViewFor: (identity) => ColoredBox(
+                color: const Color(0xFF1D3A2E),
+                child: Center(
+                  child: Text(
+                    "$identity's screen",
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ),
+              tileOverrides: overrides,
               selfBubbleHidden: false,
-              selfBubbleCorner: selfBubbleCorner,
-              onSelfBubbleCornerChanged: (_) {},
               onToggleSelfBubbleHidden: () {},
               callDock: controller == null
                   ? null

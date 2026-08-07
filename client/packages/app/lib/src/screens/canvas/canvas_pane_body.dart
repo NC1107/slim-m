@@ -17,7 +17,6 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
-import '../../providers/canvas_self_presence.dart';
 import 'canvas_activity_log.dart';
 import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
@@ -26,7 +25,7 @@ import 'canvas_object_context_menu.dart';
 import 'canvas_presence_layer.dart';
 import 'canvas_presence_roster.dart';
 import 'canvas_selection_semantics.dart';
-import 'canvas_self_presence_overlay.dart';
+import 'canvas_tools_row.dart' show CanvasHiddenTile;
 
 class CanvasPaneBody extends StatefulWidget {
   const CanvasPaneBody({
@@ -69,9 +68,9 @@ class CanvasPaneBody extends StatefulWidget {
     this.onDraftEnded,
     this.callParticipants = const [],
     required this.cameraViewFor,
+    required this.screenShareViewFor,
+    required this.tileOverrides,
     required this.selfBubbleHidden,
-    required this.selfBubbleCorner,
-    required this.onSelfBubbleCornerChanged,
     required this.onToggleSelfBubbleHidden,
     this.callDock,
   });
@@ -146,16 +145,23 @@ class CanvasPaneBody extends StatefulWidget {
 
   /// Who is on this channel's call right now, already filtered for
   /// blocking - empty whenever there is no call here, or this viewer has not
-  /// joined it, in which case [CanvasPresenceLayer] renders nothing.
+  /// joined it, in which case [CanvasPresenceLayer] renders nothing. Self and
+  /// remote are one list now - see that layer's own doc for why the caller's
+  /// own tile used to live in a separate, screen-anchored overlay and no
+  /// longer does.
   final List<VoiceParticipant> callParticipants;
   final CameraViewBuilder cameraViewFor;
+  final ScreenShareViewBuilder screenShareViewFor;
 
-  /// The caller's own bubble - see `canvas_self_presence_overlay.dart` for
-  /// why it is a separate, screen-anchored layer rather than one more entry
-  /// in [callParticipants] as far as [CanvasPresenceLayer] is concerned.
+  /// Every tile's own drag, resize, lock and hide - see
+  /// `canvas_presence_layer.dart`'s own doc for why this lives here rather
+  /// than as a `CanvasDocument` field.
+  final CanvasPresenceTileOverrides tileOverrides;
+
+  /// The caller's own standing "never show my own camera" preference -
+  /// distinct from [tileOverrides], which is per-call; see
+  /// `canvas_self_presence.dart`'s own doc for why the two are split.
   final bool selfBubbleHidden;
-  final CanvasSelfBubbleCorner selfBubbleCorner;
-  final ValueChanged<CanvasSelfBubbleCorner> onSelfBubbleCornerChanged;
 
   /// Threaded to the floating dock's overflow menu, the one place this pane
   /// offers to flip [selfBubbleHidden] - see that menu's own doc for why it
@@ -182,9 +188,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
   final _menuRequests = CanvasObjectMenuRequests();
 
   /// Whether this caller has a camera bubble on the canvas at all right now
-  /// - read once per build and shared by the dock's overflow item and the
-  /// roster's own corner-avoidance below, rather than each recomputing the
-  /// identical scan of [CanvasPaneBody.callParticipants].
+  /// - the dock's overflow item's own gate for whether "hide my camera
+  /// bubble" means anything to offer.
   bool get _hasSelfBubble => widget.callParticipants.any((p) => p.isLocal);
 
   @override
@@ -234,21 +239,18 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
                     CanvasPresenceRoster(
                       callParticipants: widget.callParticipants,
                       cursors: widget.cursors,
-                      // The self bubble defaults to bottom-right and is reserved a lane above the dock below, but a caller can still drag it to top-right - the roster's own resting corner - so it yields there rather than the two silently overlapping.
-                      alignment:
-                          _hasSelfBubble &&
-                              widget.selfBubbleCorner ==
-                                  CanvasSelfBubbleCorner.topRight
-                          ? Alignment.topLeft
-                          : Alignment.topRight,
                     ),
                   Align(
                     alignment: Alignment.bottomCenter,
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.s12),
-                      child: CanvasCallDock(
-                        call: widget.callDock,
-                        canvas: _dockData(),
+                      // The dock's own hidden-tiles list has to notice a hide or show landing in tileOverrides, which nothing else here rebuilds this widget for.
+                      child: ListenableBuilder(
+                        listenable: widget.tileOverrides,
+                        builder: (context, _) => CanvasCallDock(
+                          call: widget.callDock,
+                          canvas: _dockData(),
+                        ),
                       ),
                     ),
                   ),
@@ -286,7 +288,37 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     hasSelfBubble: _hasSelfBubble,
     selfBubbleHidden: widget.selfBubbleHidden,
     onToggleSelfBubbleHidden: widget.onToggleSelfBubbleHidden,
+    hiddenTiles: _hiddenTiles(),
+    onShowTile: (key) => widget.tileOverrides.setHidden(key, false),
   );
+
+  /// Every remote camera or screen-share tile this viewer has hidden on
+  /// their own canvas this call, named for the dock's own recovery list -
+  /// a hide must stay reversible without leaving the call, or it is a
+  /// delete wearing a softer name. This is a second route to hiding the
+  /// caller's own camera bubble too - its on-tile control works the same as
+  /// anyone else's - distinct from [selfBubbleHidden]'s own dedicated,
+  /// persisted toggle, so both need their own way back.
+  List<CanvasHiddenTile> _hiddenTiles() {
+    final byIdentity = {for (final p in widget.callParticipants) p.identity: p};
+    final tiles = <CanvasHiddenTile>[];
+    for (final key in widget.tileOverrides.hiddenKeys) {
+      final isScreen = key.startsWith('screen:');
+      final identity = key.substring(key.indexOf(':') + 1);
+      final participant = byIdentity[identity];
+      if (participant == null) continue;
+      final label = isScreen
+          ? (participant.isLocal
+                ? 'Your screen share'
+                : "${participant.name}'s screen share")
+          : (participant.isLocal
+                ? 'Your camera'
+                : "${participant.name}'s camera");
+      tiles.add(CanvasHiddenTile(key: key, label: label));
+    }
+    tiles.sort((a, b) => a.label.compareTo(b.label));
+    return tiles;
+  }
 
   /// `document.objectCount` is the same trigger `_surface` already listens
   /// to, since a placed or removed object is exactly what changes
@@ -348,11 +380,6 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           onDraftPoint: widget.onDraftPoint,
           onDraftEnded: widget.onDraftEnded,
         ),
-        CanvasPresenceLayer(
-          document: widget.document,
-          participants: widget.callParticipants,
-          cameraViewFor: widget.cameraViewFor,
-        ),
         CanvasObjectContextMenu(
           document: widget.document,
           canManage: widget.canManage,
@@ -367,51 +394,18 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           document: widget.document,
           onOpenActions: _menuRequests.request,
         ),
-        // Last, on top of CanvasObjectContextMenu's hit catcher - see this overlay's own doc for why a right-click on it is absorbed rather than reaching an object underneath.
-        LayoutBuilder(
-          builder: (context, constraints) => CanvasSelfPresenceOverlay(
-            participants: widget.callParticipants,
-            cameraViewFor: widget.cameraViewFor,
-            hidden: widget.selfBubbleHidden,
-            corner: widget.selfBubbleCorner,
-            onCornerChanged: widget.onSelfBubbleCornerChanged,
-            bottomReserved: _dockBottomReserve(constraints.maxWidth),
-          ),
+        // Last, on top of CanvasObjectContextMenu's hit catcher - see canvas_presence_tile.dart's own doc for why a right-click on a tile is absorbed rather than reaching an object underneath it.
+        CanvasPresenceLayer(
+          document: widget.document,
+          participants: widget.callParticipants,
+          cameraViewFor: widget.cameraViewFor,
+          screenShareViewFor: widget.screenShareViewFor,
+          overrides: widget.tileOverrides,
+          hideSelfCamera: widget.selfBubbleHidden,
         ),
       ],
     ),
   );
-
-  /// The floating dock's own worst-case footprint at the pane's current
-  /// width, reserved so the self bubble's two bottom corners never rest
-  /// underneath it - see `canvas_self_presence_overlay.dart`'s own doc for
-  /// why the bubble is the one asked to yield rather than the dock.
-  ///
-  /// Not guessed: `FloatingDockCard`'s own vertical padding (`AppSpacing
-  /// .s8` twice), a 44dp touch row (`AppSizes.rowTouch`, what `CallControls`'
-  /// own buttons and `CanvasToolsRow`'s own icons both draw at), the
-  /// divider block between two stacked rows (`AppSpacing.s8` twice plus its
-  /// 1px line), and this body's own outer `AppSpacing.s12` margin around
-  /// the dock. Two rows below `kCompactWidth` - call and canvas stack there
-  /// - one row at or above it, the same threshold `CanvasCallDock` itself
-  /// branches on, reused rather than guessed at separately so the two can
-  /// never silently disagree.
-  ///
-  /// A self bubble only ever renders while this device is on the call in
-  /// this channel (`CanvasSelfPresenceOverlay._self()`), which is exactly
-  /// when `CanvasCallDock` is guaranteed to be showing its own call row -
-  /// so this reserve is never paid for nothing, and never skipped when it
-  /// is needed.
-  double _dockBottomReserve(double paneWidth) {
-    const cardPadding = AppSpacing.s8 * 2;
-    const dividerBlock = AppSpacing.s8 * 2 + 1;
-    // The dock's own LayoutBuilder sees this width minus its wrapping Padding, so this must subtract it too.
-    final dockWidth = paneWidth - AppSpacing.s12 * 2;
-    final rows = dockWidth < kCompactWidth
-        ? AppSizes.rowTouch * 2 + dividerBlock
-        : AppSizes.rowTouch;
-    return cardPadding + rows + AppSpacing.s12;
-  }
 
   Widget _emptyHint(AppTokens tokens) => Positioned.fill(
     child: IgnorePointer(

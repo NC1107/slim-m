@@ -67,6 +67,8 @@ CanvasToolsRow buildCanvasToolsRow({
   bool hasSelfBubble = false,
   bool selfBubbleHidden = false,
   VoidCallback? onToggleSelfBubbleHidden,
+  List<CanvasHiddenTile> hiddenTiles = const [],
+  ValueChanged<String>? onShowTile,
   bool showTools = true,
 }) => CanvasToolsRow(
   tool: tool,
@@ -90,5 +92,7 @@ CanvasToolsRow buildCanvasToolsRow({
   hasSelfBubble: hasSelfBubble,
   selfBubbleHidden: selfBubbleHidden,
   onToggleSelfBubbleHidden: onToggleSelfBubbleHidden ?? () {},
+  hiddenTiles: hiddenTiles,
+  onShowTile: onShowTile ?? (_) {},
   showTools: showTools,
 );
