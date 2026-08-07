@@ -33,6 +33,8 @@ import 'voice_disconnect_reason.dart';
 import 'voice_models.dart';
 import 'voice_roster_snapshot.dart';
 
+part 'voice_session_tracks.dart';
+
 /// Builds the LiveKit room a session drives. The injection seam.
 typedef RoomFactory = lk.Room Function();
 
@@ -265,41 +267,11 @@ class VoiceSession {
   /// rather than what was requested, or the button lies.
   Future<bool> setMicrophoneEnabled(bool enabled) => _trySetMicrophone(enabled);
 
-  Future<bool> _trySetMicrophone(bool enabled) async {
-    final room = _room;
-    if (room == null) return false;
-    try {
-      await room.localParticipant?.setMicrophoneEnabled(enabled);
-      _refreshParticipants();
-      return true;
-    } catch (e) {
-      _lastError = e;
-      _refreshParticipants();
-      return false;
-    }
-  }
-
   /// Enables or disables the local camera live, mid-call. The [join]-time
   /// `cameraEnabled` parameter is only the pre-toggle for before you connect;
   /// this is the same call `toggleMicrophone`'s equivalent already used, now
   /// reachable while already in the call.
   Future<bool> setCameraEnabled(bool enabled) => _trySetCamera(enabled);
-
-  /// Publishes (or stops) a camera track. Failure is swallowed exactly as
-  /// [_trySetMicrophone]'s is: a camera pre-toggle a device cannot honour
-  /// (permission denied, no hardware) must not fail the join, since a call
-  /// with no camera track is still a call.
-  Future<bool> _trySetCamera(bool enabled) async {
-    final room = _room;
-    if (room == null) return false;
-    final result = await _cameraSwitching.setEnabled(
-      room.localParticipant,
-      enabled,
-    );
-    if (result.error != null) _lastError = result.error;
-    _refreshParticipants();
-    return result.ok;
-  }
 
   /// Starts or stops sharing a screen, bounded by [quality].
   ///
@@ -417,13 +389,6 @@ class VoiceSession {
     _audio.deafened = deafened;
     await _applyLocalAudioState(room);
     return true;
-  }
-
-  /// Delegates to [LocalAudioState.applyTo]; see that class for why this
-  /// runs on every room event rather than only when a control moves.
-  Future<void> _applyLocalAudioState(lk.Room room) async {
-    final failure = await _audio.applyTo(room);
-    if (failure != null) _lastError = failure;
   }
 
   /// One coarse listener rather than a subscription per event type. Every
