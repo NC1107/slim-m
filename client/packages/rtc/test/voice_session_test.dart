@@ -59,7 +59,8 @@ class _GatedRoom extends lk.Room {
     lk.ConnectOptions? connectOptions,
     lk.RoomOptions? roomOptions,
     lk.FastConnectOptions? fastConnectOptions,
-  }) => gate;
+  }) =>
+      gate;
 }
 
 /// Stands in for the iOS host. [available] is what the app reports about its
