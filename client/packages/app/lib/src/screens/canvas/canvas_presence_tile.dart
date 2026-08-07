@@ -14,11 +14,21 @@
 /// [IgnorePointer]: the resize grip disappears (nothing to resize while
 /// locked) but the lock control itself never does, or a locked tile would be
 /// a dead end with no way back.
+///
+/// [CanvasPresenceManipulableTile.sentToBack] never touches this widget's
+/// own layout, gesture handling or paint position at all - see
+/// `canvas_presence_layer.dart`'s own doc for why. Only [child] differs
+/// (an invisible placeholder when sent to back, the real content
+/// otherwise), so the drag area, resize grip and corner controls stay
+/// exactly where a person last saw them, whichever side of the drawing
+/// surface the tile's own pixels are currently painting on.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
+
+import 'canvas_presence_geometry.dart' show presenceScreenRect;
 
 /// The world-space box a resize may not shrink below or grow past - small
 /// enough that the name badge and controls still fit, large enough that a
@@ -32,8 +42,10 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
     required this.worldRect,
     required this.camera,
     required this.locked,
+    required this.sentToBack,
     required this.onRectChanged,
     required this.onToggleLocked,
+    required this.onToggleSentToBack,
     required this.onHide,
     required this.semanticLabel,
     required this.child,
@@ -43,11 +55,18 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
   final Camera camera;
   final bool locked;
 
+  /// Whether this tile's own content currently paints behind
+  /// [CanvasSurface] rather than above it - purely informational here, for
+  /// the corner control's own icon and label; see this file's own doc for
+  /// why depth never changes anything else about this widget.
+  final bool sentToBack;
+
   /// Fired on every drag/resize update, in world space - the caller owns
   /// persisting it (`CanvasPresenceTileOverrides.setRect`), this widget owns
   /// only the arithmetic and the live-while-dragging feel.
   final ValueChanged<Rect> onRectChanged;
   final VoidCallback onToggleLocked;
+  final VoidCallback onToggleSentToBack;
   final VoidCallback onHide;
   final String semanticLabel;
   final Widget child;
@@ -95,13 +114,7 @@ class _CanvasPresenceManipulableTileState
   @override
   Widget build(BuildContext context) {
     final rect = _rect;
-    final camera = widget.camera;
-    final screen = Rect.fromLTWH(
-      (rect.left - camera.x) * camera.zoom,
-      (rect.top - camera.y) * camera.zoom,
-      rect.width * camera.zoom,
-      rect.height * camera.zoom,
-    );
+    final screen = presenceScreenRect(rect, widget.camera);
     return Positioned(
       left: screen.left,
       top: screen.top,
@@ -135,7 +148,9 @@ class _CanvasPresenceManipulableTileState
               top: 2,
               child: _TileControls(
                 locked: widget.locked,
+                sentToBack: widget.sentToBack,
                 onToggleLocked: widget.onToggleLocked,
+                onToggleSentToBack: widget.onToggleSentToBack,
                 onHide: widget.onHide,
               ),
             ),
@@ -184,12 +199,16 @@ class _ResizeGrip extends StatelessWidget {
 class _TileControls extends StatelessWidget {
   const _TileControls({
     required this.locked,
+    required this.sentToBack,
     required this.onToggleLocked,
+    required this.onToggleSentToBack,
     required this.onHide,
   });
 
   final bool locked;
+  final bool sentToBack;
   final VoidCallback onToggleLocked;
+  final VoidCallback onToggleSentToBack;
   final VoidCallback onHide;
 
   @override
@@ -215,6 +234,21 @@ class _TileControls extends StatelessWidget {
             size: AppIconButtonSize.sm,
             active: locked,
             onPressed: onToggleLocked,
+          ),
+          // Same idea as the object menu's "Bring to front"/"Send to back",
+          // reached here instead of a right-click menu since a tile absorbs
+          // its own right-click - see this file's own library doc.
+          AppIconButton(
+            icon: sentToBack ? AppIcons.sendToBack : AppIcons.bringToFront,
+            semanticLabel: sentToBack
+                ? 'Bring this tile to the front'
+                : 'Send this tile to the back',
+            tooltip: sentToBack
+                ? 'Bring to front - back above the ink'
+                : 'Send to back - draw over it',
+            size: AppIconButtonSize.sm,
+            active: sentToBack,
+            onPressed: onToggleSentToBack,
           ),
           AppIconButton(
             icon: AppIcons.tileHide,

@@ -30,6 +30,21 @@
 /// dock" complaint the owner reported: a fixed screen corner blocks whatever
 /// world content happens to pan underneath it, forever, rather than sitting
 /// at one place a person chose. Self and remote are one list now.
+///
+/// **Sending a tile to the back never moves this widget, or any tile's own
+/// controls with it.** A rendered probe proved the obvious version of that
+/// feature - reordering the whole manipulable tile below [CanvasSurface] in
+/// the pane's Stack - does not merely dim a control, it deletes it:
+/// [CanvasSurface] covers its full bounds with an opaque `MouseRegion` for
+/// pan and draw, and Flutter's own Stack hit-testing stops at the first
+/// child claiming a hit, topmost first, so nothing painted behind it is ever
+/// hit-tested again. `CanvasPresenceBackdrop` is the fix: only a
+/// sent-to-back tile's *content* (its video, its name badge) moves into that
+/// separate, non-interactive, `IgnorePointer`-wrapped widget, painted before
+/// [CanvasSurface] so real ink lands over it; the drag area, resize grip and
+/// corner controls stay here, at the same screen position, regardless of
+/// depth - the same "never a dead end" guarantee `locked` already makes for
+/// its own unlock button.
 library;
 
 import 'package:flutter/material.dart';
@@ -37,16 +52,13 @@ import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_presence_bubble.dart';
+import 'canvas_presence_geometry.dart';
 import 'canvas_presence_tile.dart';
 
+export 'canvas_presence_backdrop.dart';
 export 'canvas_presence_bubble.dart';
-
-typedef CameraViewBuilder = Widget Function(String identity);
-typedef ScreenShareViewBuilder = Widget Function(String identity);
-
-const _cameraOnSize = Size(220, 160);
-const _cameraOffSize = Size(140, 140);
-const _screenShareSize = Size(360, 203);
+export 'canvas_presence_geometry.dart'
+    show CameraViewBuilder, ScreenShareViewBuilder;
 
 /// Every call participant's tiles, world-anchored and individually
 /// draggable, resizable, lockable and hideable through [overrides]. Renders
@@ -105,7 +117,7 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
       widget.overrides.addListener(_onChanged);
     }
     // Before build, never during it: a participant who left the call must not keep their drag, lock or hide the next time they rejoin.
-    widget.overrides.prune(_currentKeys());
+    widget.overrides.prune(presenceTileKeys(widget.participants));
   }
 
   @override
@@ -119,46 +131,23 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
     if (mounted) setState(() {});
   }
 
-  Set<String> _currentKeys() {
-    final keys = <String>{};
-    for (final p in widget.participants) {
-      keys.add('camera:${p.identity}');
-      if (p.isScreenSharing) keys.add('screen:${p.identity}');
-    }
-    return keys;
-  }
-
-  Size _sizeFor(String key, Map<String, VoiceParticipant> byIdentity) {
-    if (key.startsWith('screen:')) return _screenShareSize;
-    final participant = byIdentity[key.substring('camera:'.length)];
-    return (participant?.isCameraOn ?? false) ? _cameraOnSize : _cameraOffSize;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final keys = _currentKeys();
+    final keys = presenceTileKeys(widget.participants);
     if (keys.isEmpty) return const SizedBox.shrink();
     final byIdentity = {for (final p in widget.participants) p.identity: p};
-    final defaults = widget.layout.arrange(
-      keys,
-      sizeFor: (key) => _sizeFor(key, byIdentity),
+    final onCanvas = presenceOnCanvasRects(
+      keys: keys,
+      layout: widget.layout,
+      overrides: widget.overrides,
+      byIdentity: byIdentity,
+      hideSelfCamera: widget.hideSelfCamera,
     );
-    final onCanvas = <String, Rect>{};
-    for (final key in keys) {
-      final state = widget.overrides.stateFor(key);
-      if (state.hidden) continue;
-      if (widget.hideSelfCamera &&
-          key.startsWith('camera:') &&
-          byIdentity[key.substring('camera:'.length)]?.isLocal == true) {
-        continue;
-      }
-      onCanvas[key] = state.rect ?? defaults[key]!;
-    }
     if (onCanvas.isEmpty) return const SizedBox.shrink();
     final visibleIds = _visibility.update(widget.document.worldView, onCanvas);
     if (visibleIds.isEmpty) return const SizedBox.shrink();
     final camera = widget.document.camera;
-    final painted = _paintOrder(visibleIds);
+    final painted = presencePaintOrder(visibleIds, widget.overrides.zFor);
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -167,26 +156,6 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
             tile,
       ],
     );
-  }
-
-  /// [visibleIds] sorted so a tile this viewer has ever dragged or resized
-  /// paints above every untouched one, most recently touched last (topmost),
-  /// and untouched tiles keep their own relative order - a real sheet of
-  /// paper does not slide under the pile just because somebody else's is
-  /// also on the table.
-  List<String> _paintOrder(Set<String> visibleIds) {
-    final ordered = visibleIds.toList(growable: false);
-    final rank = <String, int>{
-      for (var i = 0; i < ordered.length; i++) ordered[i]: i,
-    };
-    final withZ = ordered
-        .map((key) => (key: key, z: widget.overrides.zFor(key) ?? -1))
-        .toList();
-    withZ.sort((a, b) {
-      final byZ = a.z.compareTo(b.z);
-      return byZ != 0 ? byZ : rank[a.key]!.compareTo(rank[b.key]!);
-    });
-    return [for (final entry in withZ) entry.key];
   }
 
   Widget? _tile(
@@ -199,14 +168,19 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
     final identity = key.substring(key.indexOf(':') + 1);
     final participant = byIdentity[identity];
     if (participant == null) return null;
-    final locked = widget.overrides.stateFor(key).locked;
+    final state = widget.overrides.stateFor(key);
+    final locked = state.locked;
+    final sentToBack = state.sentToBack;
     return CanvasPresenceManipulableTile(
       key: ValueKey(key),
       worldRect: rect,
       camera: camera,
       locked: locked,
+      sentToBack: sentToBack,
       onRectChanged: (next) => widget.overrides.setRect(key, next),
       onToggleLocked: () => widget.overrides.setLocked(key, !locked),
+      onToggleSentToBack: () =>
+          widget.overrides.setSentToBack(key, !sentToBack),
       onHide: () => widget.overrides.setHidden(key, true),
       semanticLabel: isScreen
           ? (participant.isLocal
@@ -214,7 +188,13 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
                 : "${participant.name}'s screen share, on this call's canvas")
           : '${participant.name}${participant.isLocal ? ', you' : ''}, '
                 "on this call's canvas",
-      child: isScreen
+      // A sent-to-back tile's real content paints in CanvasPresenceBackdrop
+      // instead - see this file's own doc for why the control shell never
+      // moves with it. SizedBox.expand, not .shrink: a zero-size child would
+      // shrink the wrapping GestureDetector's own opaque hit box with it.
+      child: sentToBack
+          ? const SizedBox.expand()
+          : isScreen
           ? CanvasScreenShareBubble(
               participant: participant,
               view: widget.screenShareViewFor(identity),

@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 void main() {
-  test('an unset key defaults to no rect, unlocked, not hidden', () {
+  test('an unset key defaults to no rect, unlocked, not hidden, in front', () {
     final overrides = CanvasPresenceTileOverrides();
 
     final state = overrides.stateFor('camera:alice');
@@ -17,6 +17,7 @@ void main() {
     expect(state.rect, isNull);
     expect(state.locked, isFalse);
     expect(state.hidden, isFalse);
+    expect(state.sentToBack, isFalse);
   });
 
   test('setRect stores a rect for its own key only', () {
@@ -40,16 +41,40 @@ void main() {
     expect(state.rect, const Rect.fromLTWH(1, 2, 3, 4));
   });
 
-  test('setHidden does not touch locked or rect', () {
+  test('setSentToBack does not touch locked, hidden or rect', () {
     final overrides = CanvasPresenceTileOverrides();
     overrides.setRect('camera:alice', const Rect.fromLTWH(1, 2, 3, 4));
     overrides.setLocked('camera:alice', true);
+
+    overrides.setSentToBack('camera:alice', true);
+
+    final state = overrides.stateFor('camera:alice');
+    expect(state.sentToBack, isTrue);
+    expect(state.locked, isTrue);
+    expect(state.rect, const Rect.fromLTWH(1, 2, 3, 4));
+  });
+
+  test('setSentToBack(false) reverses it, leaving everything else alone', () {
+    final overrides = CanvasPresenceTileOverrides();
+    overrides.setSentToBack('camera:alice', true);
+
+    overrides.setSentToBack('camera:alice', false);
+
+    expect(overrides.stateFor('camera:alice').sentToBack, isFalse);
+  });
+
+  test('setHidden does not touch locked, rect or sentToBack', () {
+    final overrides = CanvasPresenceTileOverrides();
+    overrides.setRect('camera:alice', const Rect.fromLTWH(1, 2, 3, 4));
+    overrides.setLocked('camera:alice', true);
+    overrides.setSentToBack('camera:alice', true);
 
     overrides.setHidden('camera:alice', true);
 
     final state = overrides.stateFor('camera:alice');
     expect(state.hidden, isTrue);
     expect(state.locked, isTrue);
+    expect(state.sentToBack, isTrue);
     expect(state.rect, const Rect.fromLTWH(1, 2, 3, 4));
   });
 
@@ -137,10 +162,11 @@ void main() {
 
     overrides.setRect('camera:alice', const Rect.fromLTWH(1, 2, 3, 4));
     overrides.setLocked('camera:alice', true);
+    overrides.setSentToBack('camera:alice', true);
     overrides.setHidden('camera:alice', true);
     overrides.clearRect('camera:alice');
     overrides.prune(const {});
 
-    expect(notifications, 5);
+    expect(notifications, 6);
   });
 }

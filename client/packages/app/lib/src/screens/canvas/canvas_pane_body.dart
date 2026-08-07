@@ -348,6 +348,18 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     ),
     child: Stack(
       children: [
+        // Before CanvasSurface, deliberately: a sent-to-back tile's own
+        // pixels paint here, so real ink drawn over it lands on top - see
+        // canvas_presence_layer.dart's own doc for why its controls stay in
+        // the layer below rather than moving down here with the content.
+        CanvasPresenceBackdrop(
+          document: widget.document,
+          participants: widget.callParticipants,
+          cameraViewFor: widget.cameraViewFor,
+          screenShareViewFor: widget.screenShareViewFor,
+          overrides: widget.tileOverrides,
+          hideSelfCamera: widget.selfBubbleHidden,
+        ),
         CanvasSurface(
           document: widget.document,
           ink: AppCanvasColors.annotation,

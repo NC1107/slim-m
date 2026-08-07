@@ -26,6 +26,7 @@ class CanvasPresenceTileState {
     this.rect,
     this.locked = false,
     this.hidden = false,
+    this.sentToBack = false,
   });
 
   final Rect? rect;
@@ -37,11 +38,25 @@ class CanvasPresenceTileState {
   final bool locked;
   final bool hidden;
 
-  CanvasPresenceTileState copyWith({Rect? rect, bool? locked, bool? hidden}) =>
+  /// Whether this tile's own pixels paint behind the drawing surface rather
+  /// than above it - see `canvas_presence_backdrop.dart`'s own doc for why
+  /// that has to be a second widget rather than a reorder of this one.
+  /// Never touches whether the tile's controls hit-test: those stay on
+  /// `CanvasPresenceLayer`'s own interactive shell regardless, the same
+  /// "never a dead end" guarantee [locked] already makes.
+  final bool sentToBack;
+
+  CanvasPresenceTileState copyWith({
+    Rect? rect,
+    bool? locked,
+    bool? hidden,
+    bool? sentToBack,
+  }) =>
       CanvasPresenceTileState(
         rect: rect ?? this.rect,
         locked: locked ?? this.locked,
         hidden: hidden ?? this.hidden,
+        sentToBack: sentToBack ?? this.sentToBack,
       );
 }
 
@@ -91,6 +106,11 @@ class CanvasPresenceTileOverrides extends ChangeNotifier {
 
   void setLocked(String key, bool locked) {
     _states[key] = stateFor(key).copyWith(locked: locked);
+    notifyListeners();
+  }
+
+  void setSentToBack(String key, bool sentToBack) {
+    _states[key] = stateFor(key).copyWith(sentToBack: sentToBack);
     notifyListeners();
   }
 
