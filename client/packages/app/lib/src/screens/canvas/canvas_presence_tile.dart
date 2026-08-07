@@ -41,10 +41,10 @@ library;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_presence_geometry.dart' show presenceScreenRect;
+import 'canvas_presence_tile_controls.dart';
 
 /// The world-space box a resize may not shrink below or grow past - small
 /// enough that the name badge and controls still fit, large enough that a
@@ -230,12 +230,12 @@ class _CanvasPresenceManipulableTileState
                 Positioned(
                   right: -4,
                   bottom: -4,
-                  child: _ResizeGrip(onUpdate: _resize, onEnd: _settle),
+                  child: TileResizeGrip(onUpdate: _resize, onEnd: _settle),
                 ),
               Positioned(
                 right: 2,
                 top: 2,
-                child: _TileControls(
+                child: TileControls(
                   locked: widget.locked,
                   sentToBack: widget.sentToBack,
                   onToggleLocked: widget.onToggleLocked,
@@ -246,106 +246,6 @@ class _CanvasPresenceManipulableTileState
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ResizeGrip extends StatelessWidget {
-  const _ResizeGrip({required this.onUpdate, required this.onEnd});
-
-  final GestureDragUpdateCallback onUpdate;
-  final GestureDragEndCallback onEnd;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return MouseRegion(
-      cursor: SystemMouseCursors.resizeUpLeftDownRight,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onPanUpdate: onUpdate,
-        onPanEnd: onEnd,
-        child: Container(
-          width: AppSizes.controlSm,
-          height: AppSizes.controlSm,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: tokens.surfaceBase.withValues(alpha: 0.85),
-            shape: BoxShape.circle,
-            border: Border.all(color: tokens.borderSubtle),
-          ),
-          child: Icon(
-            AppIcons.tileResize,
-            size: AppSizes.icon16,
-            color: tokens.textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TileControls extends StatelessWidget {
-  const _TileControls({
-    required this.locked,
-    required this.sentToBack,
-    required this.onToggleLocked,
-    required this.onToggleSentToBack,
-    required this.onHide,
-  });
-
-  final bool locked;
-  final bool sentToBack;
-  final VoidCallback onToggleLocked;
-  final VoidCallback onToggleSentToBack;
-  final VoidCallback onHide;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: tokens.surfaceBase.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(AppRadii.full),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppIconButton(
-            icon: locked ? AppIcons.tileLocked : AppIcons.tileUnlocked,
-            semanticLabel: locked
-                ? 'Unlock this tile'
-                : 'Lock this tile in place',
-            tooltip: locked
-                ? 'Unlock - drag and resize again'
-                : 'Lock in place - a drawing tool reaches through it',
-            size: AppIconButtonSize.sm,
-            active: locked,
-            onPressed: onToggleLocked,
-          ),
-          // The object menu's own "Bring to front"/"Send to back", reached here since a tile absorbs its own right-click - see this file's own library doc.
-          AppIconButton(
-            icon: sentToBack ? AppIcons.sendToBack : AppIcons.bringToFront,
-            semanticLabel: sentToBack
-                ? 'Bring this tile to the front'
-                : 'Send this tile to the back',
-            tooltip: sentToBack
-                ? 'Bring to front - back above the ink'
-                : 'Send to back - draw over it',
-            size: AppIconButtonSize.sm,
-            active: sentToBack,
-            onPressed: onToggleSentToBack,
-          ),
-          AppIconButton(
-            icon: AppIcons.tileHide,
-            semanticLabel: 'Hide this tile on your canvas',
-            tooltip: 'Hide on your canvas',
-            size: AppIconButtonSize.sm,
-            onPressed: onHide,
-          ),
-        ],
       ),
     );
   }
