@@ -158,7 +158,7 @@ def scenarios(a, b, admin, member, room_id, server):
          lambda: e2e_media_slots.move_converges_and_persists(
              a, b, admin, admin.channel_named(L.VOICE_CHANNEL)["id"],
              room_id)),
-        ("voice: leaving", lambda: e2e_voice.leave_call(a, b)),
+        ("voice: leaving", lambda: e2e_voice.leave_call(a, b, room_id)),
         ("voice: re-clicking a channel already left rejoins it",
          lambda: e2e_voice.rejoin_after_leaving(a, room_id)),
         ("voice: calling in a dm", lambda: e2e_dm_call.start_dm_and_call(
