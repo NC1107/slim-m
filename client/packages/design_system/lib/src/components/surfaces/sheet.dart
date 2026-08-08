@@ -30,6 +30,14 @@ const double kSheetMaxWidth = 460;
 /// which is right for the columns most of these are. [bare] is for content
 /// that already draws its own surface, an [AppMenu] being the case: without it
 /// the dialog's panel and the menu's panel nest, one border inside another.
+///
+/// The bottom-sheet branch wraps [builder] in its own `SafeArea(top: false)`,
+/// so a sheet's own bottom-most content - routinely a primary action button -
+/// is never left sitting under a phone's home indicator: nothing about
+/// `showModalBottomSheet` reserves that inset on its own, and only one caller
+/// out of a dozen remembered to. A caller that already wraps its own content
+/// in one nests harmlessly, since the inner `SafeArea` then has nothing left
+/// to reserve.
 Future<T?> showAppSheet<T>(
   BuildContext context, {
   required WidgetBuilder builder,
@@ -42,7 +50,7 @@ Future<T?> showAppSheet<T>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: builder,
+      builder: (context) => SafeArea(top: false, child: builder(context)),
     );
   }
   return showDialog<T>(

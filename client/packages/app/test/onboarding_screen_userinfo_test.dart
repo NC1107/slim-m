@@ -71,7 +71,7 @@ void main() {
       await tester.tap(find.text('Connect to a Space'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), typed);
-      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
 
       expect(probedWith, Uri.parse(reduced));
@@ -134,7 +134,7 @@ void main() {
       await tester.enterText(find.byType(TextField).at(1), 'CODE123');
       await tester.tap(find.byType(CheckboxListTile));
       await tester.pump();
-      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
 
       expect(probedWith, Uri.parse(reduced));

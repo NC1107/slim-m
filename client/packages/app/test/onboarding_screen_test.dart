@@ -3,7 +3,8 @@
 /// a server" flow: pin on first connect, stay silent on a later match, and
 /// force an explicit, non-default action through if the key ever changes.
 ///
-/// Userinfo-stripping coverage lives in onboarding_screen_userinfo_test.dart.
+/// Userinfo stripping lives in onboarding_screen_userinfo_test.dart, and
+/// phone-width modal presentation in onboarding_screen_phone_test.dart.
 library;
 
 import 'dart:convert';
@@ -102,7 +103,7 @@ Future<void> _enterManualServer(WidgetTester tester) async {
   await tester.tap(find.text('Connect to a Space'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField), _server);
-  await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+  await tester.tap(find.text('Continue'));
   await tester.pumpAndSettle();
 }
 
@@ -310,7 +311,7 @@ void main() {
       await tester.tap(find.text('Connect to a Space'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'http://chat.example.com');
-      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Use https'), findsOneWidget);
@@ -449,7 +450,7 @@ void main() {
       await tester.enterText(find.byType(TextField).at(1), 'CODE123');
       await tester.tap(find.byType(CheckboxListTile));
       await tester.pump();
-      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
 
       expect(

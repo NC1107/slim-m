@@ -21,6 +21,7 @@ import '../providers/push_controller.dart';
 import '../providers/sync_controller.dart';
 import '../providers/user_profiles.dart';
 import '../providers/voice_controller.dart';
+import 'confirm_dialog.dart';
 import 'run_guarded.dart';
 import 'settings_section_header.dart';
 
@@ -306,35 +307,19 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
   /// with no idea why nothing updates any more; sync and push, stopped ahead
   /// of the request, are restarted on that same failure for the same reason.
   Future<void> _confirmDeletion(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete this account?'),
-        content: const Text(
+    final confirmed = await confirmDangerousAction(
+      context,
+      title: 'Delete this account?',
+      message:
           'Your devices, read state, and blocks are erased, and the username '
           'becomes available again.\n\n'
           'Messages you posted in shared channels stay, so conversations do not '
           'develop holes, but they will no longer be attributed to you.\n\n'
           'This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep my account'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(
-                context,
-              ).extension<AppTokens>()!.dangerText,
-            ),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete permanently'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete permanently',
+      cancelLabel: 'Keep my account',
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     /// All three read before the request, and sync and push restarted
     /// without consulting [mounted]: what they undo is app-global, so
