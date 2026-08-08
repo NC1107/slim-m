@@ -5,9 +5,13 @@
 /// here: it stays the one field `CanvasPresenceTileOverrides` keeps purely
 /// local, exactly as it always has.
 ///
-/// One cold fetch on opening the canvas, then live `canvas.media_slot
-/// .changed` frames keep the picture current - the same "cold fetch, then
-/// live" shape the viewport read and the canvas op stream already use.
+/// A cold fetch on opening the canvas and again on every reconnect
+/// (`CanvasPane`'s own `SyncStatus.live` listener calls both this and
+/// `CanvasSync.catchUp` on the same transition), with live
+/// `canvas.media_slot.changed` frames keeping the picture current in
+/// between - a slot carries no seq, so a reconnect has no gap-detector of
+/// its own the way the canvas op stream does, and a missed live frame
+/// during a disconnect would otherwise never be corrected.
 library;
 
 import 'dart:ui';
