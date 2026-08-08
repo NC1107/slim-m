@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/personal_space_visibility.dart';
+import 'context_menu_focus.dart';
 
 /// The message shown when the row is hidden, naming the one way back:
 /// searching the caller's own display name surfaces it again in the command
@@ -72,15 +73,20 @@ class _PersonalSpaceKebabState extends ConsumerState<PersonalSpaceKebab> {
             offset: const Offset(0, 4),
             child: TapRegion(
               onTapOutside: (_) => _controller.hide(),
-              child: AppMenu(
-                width: 220,
-                children: [
-                  AppMenuItem(
-                    label: 'Remove from list',
-                    leading: AppIcons.removeFromList,
-                    onTap: () => unawaited(_remove()),
-                  ),
-                ],
+              // The same keyboard route the context menus already earned:
+              // Tab reaches every item once open, and Escape closes it.
+              child: ContextMenuKeyboardScope(
+                onDismiss: _controller.hide,
+                child: AppMenu(
+                  width: 220,
+                  children: [
+                    AppMenuItem(
+                      label: 'Remove from list',
+                      leading: AppIcons.removeFromList,
+                      onTap: () => unawaited(_remove()),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

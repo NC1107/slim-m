@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../permissions.dart';
 import '../providers/admin_providers.dart';
 import '../routing/routes.dart';
+import 'context_menu_focus.dart';
 import 'create_channel_sheet.dart';
 import 'space_settings_section.dart';
 
@@ -59,36 +60,44 @@ class _SpaceMenuButtonState extends ConsumerState<SpaceMenuButton> {
             offset: const Offset(0, 4),
             child: TapRegion(
               onTapOutside: (_) => _controller.hide(),
-              child: AppMenu(
-                width: 200,
-                children: [
-                  if (canManageChannels) ...[
+              // The same keyboard route the context menus already earned:
+              // Tab reaches every item once open, and Escape closes it.
+              child: ContextMenuKeyboardScope(
+                onDismiss: _controller.hide,
+                child: AppMenu(
+                  width: 200,
+                  children: [
+                    if (canManageChannels) ...[
+                      AppMenuItem(
+                        label: 'Add channel',
+                        leading: AppIcons.add,
+                        onTap: () {
+                          _controller.hide();
+                          showCreateChannelSheet(
+                            context,
+                            initialKind: 'text',
+                          );
+                        },
+                      ),
+                      AppMenuItem(
+                        label: 'Add category',
+                        leading: AppIcons.add,
+                        onTap: () {
+                          _controller.hide();
+                          context.push(Routes.adminCategories);
+                        },
+                      ),
+                    ],
                     AppMenuItem(
-                      label: 'Add channel',
-                      leading: AppIcons.add,
+                      label: 'Space settings',
+                      leading: AppIcons.settings,
                       onTap: () {
                         _controller.hide();
-                        showCreateChannelSheet(context, initialKind: 'text');
-                      },
-                    ),
-                    AppMenuItem(
-                      label: 'Add category',
-                      leading: AppIcons.add,
-                      onTap: () {
-                        _controller.hide();
-                        context.push(Routes.adminCategories);
+                        context.push(Routes.spaceSettings);
                       },
                     ),
                   ],
-                  AppMenuItem(
-                    label: 'Space settings',
-                    leading: AppIcons.settings,
-                    onTap: () {
-                      _controller.hide();
-                      context.push(Routes.spaceSettings);
-                    },
-                  ),
-                ],
+                ),
               ),
             ),
           ),
