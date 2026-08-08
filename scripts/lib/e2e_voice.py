@@ -247,7 +247,10 @@ def rejoin_after_leaving(client, room_id, channel=L.VOICE_CHANNEL):
     than sits beside while open - the same reason `e2e_media_slots.py`
     checks the SFU directly too.
     """
+    matches = [n["t"] for n in client.nodes() if channel.lower() in n["t"].lower()]
+    print(f"  DEBUG {client.name}: nodes matching {channel!r} before click: {matches}")
     client.click(channel)
+    client.shot(f"debug-rejoin-after-click-{client.name}")
     parts = participants_with_mics(room_id, expected=1)
     assert len(parts) == 1, \
         f"SFU has {len(parts)} participants after rejoining, expected 1"
