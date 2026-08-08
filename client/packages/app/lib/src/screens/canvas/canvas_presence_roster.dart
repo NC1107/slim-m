@@ -59,15 +59,16 @@ class _Present {
 /// already gives camera bubbles: this is presence chrome, never a drawing
 /// target.
 ///
-/// **Top-right is also the self camera bubble's own top corner**, and the
-/// two are drawn by widgets that otherwise know nothing about each other.
-/// `canvas_pane_body.dart` is what breaks the tie: it watches the bubble's
-/// current corner and passes [alignment] as top-left whenever the bubble is
-/// both visible and sitting in top-right, so this widget only ever has to
-/// honour whatever corner it is told rather than reason about the bubble
-/// itself. The bubble is never asked to yield instead, because its resting
-/// corner is a saved preference a person dragged it to on purpose, where
-/// this widget's own corner is not.
+/// **There is no tie-break against the self camera bubble any more.**
+/// Before decision 0010's media-tile work the self bubble was a
+/// screen-anchored overlay with its own resting corner, and this class used
+/// to watch it and swap to top-left when the two would collide. The self
+/// bubble is a world-anchored, freely draggable tile now, like every other
+/// camera or screen-share tile, so it has no screen corner of its own left
+/// to collide with - [alignment] is unused with any value but the default
+/// today. What a world-anchored tile *can* still do is pan underneath this
+/// fixed corner, controls included; that residual is recorded, not solved,
+/// in decision 0010's own "What was left" section.
 class CanvasPresenceRoster extends StatefulWidget {
   const CanvasPresenceRoster({
     super.key,
