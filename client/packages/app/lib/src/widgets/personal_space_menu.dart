@@ -73,8 +73,7 @@ class _PersonalSpaceKebabState extends ConsumerState<PersonalSpaceKebab> {
             offset: const Offset(0, 4),
             child: TapRegion(
               onTapOutside: (_) => _controller.hide(),
-              // The same keyboard route the context menus already earned:
-              // Tab reaches every item once open, and Escape closes it.
+              // Escape closes it and Tab reaches every item once open.
               child: ContextMenuKeyboardScope(
                 onDismiss: _controller.hide,
                 child: AppMenu(
