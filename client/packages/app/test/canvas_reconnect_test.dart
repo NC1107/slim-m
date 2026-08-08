@@ -5,6 +5,11 @@
 /// Mirrors `canvas_pane_test.dart`'s own "exactly one viewport request"
 /// guard, which the same class of bug (a subscription re-registered on every
 /// rebuild) would also break.
+///
+/// Also covers `CanvasMediaSlotSync.fetch`, which rides the identical
+/// transition for the identical reason: a slot carries no seq, so nothing
+/// else notices a `canvas.media_slot.changed` frame missed while the socket
+/// was down.
 library;
 
 import 'dart:async';
@@ -52,6 +57,7 @@ void main() {
     final events = StreamController<api.ServerEvent>.broadcast();
     addTearDown(events.close);
     var opsGets = 0;
+    var slotGets = 0;
     final container = ProviderContainer(
       overrides: [
         keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
@@ -76,6 +82,7 @@ void main() {
                 });
               }
               if (request.url.path.endsWith('/canvas/media-slots')) {
+                slotGets++;
                 return _json({'slots': <Object>[]});
               }
               if (!request.url.path.endsWith('/canvas/objects')) {
@@ -108,6 +115,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     final afterMount = opsGets;
+    expect(slotGets, 1, reason: 'initState fetches the slots once');
 
     final controller =
         container.read(syncControllerProvider.notifier)
@@ -121,6 +129,14 @@ void main() {
       afterMount + 1,
       reason: 'one transition into live must run exactly one catch-up',
     );
+    expect(
+      slotGets,
+      2,
+      reason:
+          'a slot carries no seq of its own, so a reconnect must refetch it '
+          'the same way it refetches canvas ops, or a live frame missed '
+          'during the gap leaves the tile stale forever',
+    );
 
     // A rebuild with no further transition must not run a second one.
     controller.emit(SyncStatus.live);
@@ -131,6 +147,7 @@ void main() {
       afterMount + 1,
       reason: 'the same value again is not a transition, and must not re-fire',
     );
+    expect(slotGets, 2, reason: 'the same value again must not re-fire');
 
     // A genuine second reconnect - offline, then live again - does.
     controller.emit(SyncStatus.offline);
@@ -138,5 +155,6 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(opsGets, afterMount + 2);
+    expect(slotGets, 3);
   });
 }

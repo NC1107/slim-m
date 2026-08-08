@@ -142,7 +142,10 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _syncStatusSubscription = ref.listenManual<SyncStatus>(
       syncControllerProvider,
       (previous, next) {
-        if (next == SyncStatus.live) unawaited(_sync.catchUp());
+        if (next == SyncStatus.live) {
+          unawaited(_sync.catchUp());
+          unawaited(_slotSync.fetch());
+        }
       },
     );
     // No fetch here: CanvasSurface's first setViewport call reaches _onCameraMoved below and fetches the real region, not a wasted one against a zero viewport.
