@@ -331,7 +331,25 @@ row, the same trade this project already made for a canvas object's
 `move`. `CanvasPresenceTileOverrides.applyServer` never merges a partial
 answer - every field it touches (`rect`, `locked`, `sentToBack`) is
 replaced outright, so a live frame can never leave two fields from two
-different writers standing together. A live frame naming a tile key the
+different writers standing together.
+
+~~That framing has no exception for a locked tile, and it should have.~~
+Wrong, fixed 2026-08-08: migration `0040`'s own comment, written the same
+day, says lock "protects an arrangement everyone relies on... rather than
+a personal setting that would let someone else drag a tile its own
+arranger just locked" - a claim this paragraph's blanket last-write-wins
+never carved an exception for, and `upsert_canvas_media_slot` never
+enforced one either, so the migration's promise and the code disagreed
+from the day both landed until a review caught it. The migration's
+statement is the one that stands: the server now refuses (403) a write
+that would change a locked slot's position or size while leaving it
+locked, checked inside the same `begin_write` transaction as the upsert.
+Last-write-wins is otherwise untouched - unlocking, relocking at
+unchanged geometry, and a depth toggle are all still free of the check,
+and two viewers dragging the same *unlocked* tile still resolve exactly
+as this paragraph always said. See `tests/canvas_media_slots/lock.rs`.
+
+A live frame naming a tile key the
 receiver has never seen (nobody has moved it yet this session, or its
 owning participant has not yet joined the call) is applied unconditionally
 to `CanvasPresenceTileOverrides`, keyed only by the opaque string, with

@@ -1,142 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Shared, persistent media-tile placement: decision 0010's reversal.
-//!
-//! The owner's own test was explicit - move a tile, leave, come back
-//! tomorrow, and it is still where it was left. `persists_across_a_restart`
-//! is that test, driven against a fresh `Store` reconnected to the same
-//! database file rather than the same process's in-memory state, so it
-//! cannot pass by accident on a cache neither restart nor a real deployment
-//! would have.
+//! Placement, authorization, validation and persistence for a channel's
+//! media slots - everything the shared lock invariant does not need on its
+//! own; see `lock.rs` for that.
 
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use futures_util::{SinkExt, StreamExt};
-use serde_json::{Value, json};
-use slimm_server::auth::Auth;
+use axum::http::StatusCode;
+use serde_json::Value;
 use slimm_server::config::Config;
 use slimm_server::db;
-use slimm_server::http::{self, AppState};
-use slimm_server::hub::Hub;
-use slimm_server::ids::{ChannelId, UserId};
+use slimm_server::http;
+use slimm_server::ids::UserId;
 use slimm_server::permissions::Permissions;
-use slimm_server::push::PushSender;
-use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
-use tokio::net::TcpListener;
-use tokio_tungstenite::connect_async;
-use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tower::ServiceExt;
 
-mod support;
-
-type Client =
-    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
-
-fn state_for(store: &Store) -> AppState {
-    AppState {
-        store: store.clone(),
-        auth: Auth::new(2).unwrap(),
-        hub: Hub::new(),
-        limiter: RateLimiter::new(),
-        push: PushSender::disabled(),
-        voice: slimm_server::voice::VoiceService::disabled(),
-        media: slimm_server::media::Media::for_tests(),
-    }
-}
-
-async fn user_ticket(store: &Store, name: &str) -> (String, String, UserId) {
-    let user = store.create_user(name, name).await.unwrap();
-    let tokens = store.open_session(user.id, "device").await.unwrap();
-    let ctx = store
-        .authenticate(&tokens.access_token)
-        .await
-        .unwrap()
-        .unwrap();
-    let (ticket, _expires_at) = store.mint_ws_ticket(&ctx).await.unwrap();
-    (tokens.access_token, ticket, user.id)
-}
-
-async fn serve(state: AppState) -> std::net::SocketAddr {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    tokio::spawn(async move {
-        axum::serve(listener, http::router(state)).await.unwrap();
-    });
-    addr
-}
-
-async fn connect(addr: std::net::SocketAddr, ticket: &str) -> Client {
-    let (mut ws, _response) = connect_async(format!("ws://{addr}/ws")).await.unwrap();
-    ws.send(WsMessage::Text(
-        json!({ "type": "hello", "ticket": ticket, "protocol": 1 }).to_string(),
-    ))
-    .await
-    .unwrap();
-    let ack = read_frame(&mut ws).await;
-    assert_eq!(ack["type"], "hello");
-    ws
-}
-
-async fn read_frame(ws: &mut Client) -> Value {
-    tokio::time::timeout(std::time::Duration::from_secs(2), async {
-        loop {
-            match ws.next().await {
-                Some(Ok(WsMessage::Text(text))) => {
-                    let frame: Value = serde_json::from_str(text.as_str()).unwrap();
-                    if frame["type"] == "presence.changed" {
-                        continue;
-                    }
-                    return frame;
-                }
-                Some(Ok(_)) => continue,
-                other => panic!("expected a text frame, got {other:?}"),
-            }
-        }
-    })
-    .await
-    .expect("timed out waiting for a frame")
-}
-
-fn put_slot_request(
-    channel: ChannelId,
-    token: &str,
-    kind: &str,
-    user_id: UserId,
-    body: Value,
-) -> Request<Body> {
-    Request::builder()
-        .method("PUT")
-        .uri(format!(
-            "/channels/{channel}/canvas/media-slots/{kind}/{user_id}"
-        ))
-        .header("authorization", format!("Bearer {token}"))
-        .header("content-type", "application/json")
-        .body(Body::from(body.to_string()))
-        .unwrap()
-}
-
-fn list_slots_request(channel: ChannelId, token: &str) -> Request<Body> {
-    Request::builder()
-        .method("GET")
-        .uri(format!("/channels/{channel}/canvas/media-slots"))
-        .header("authorization", format!("Bearer {token}"))
-        .body(Body::empty())
-        .unwrap()
-}
-
-fn screen_body(x: f64, y: f64) -> Value {
-    json!({
-        "x": x, "y": y, "w": 360.0, "h": 203.0,
-        "locked": false, "sent_to_back": false,
-    })
-}
+use crate::fixtures::{
+    chrono_now_plus_ms, connect, list_slots_request, put_slot_request, read_frame, screen_body,
+    serve, state_for, user_ticket,
+};
 
 /// The owner's own scenario, verbatim: move a tile, then come back to a
 /// *fresh* `Store` over the same database file - the shape a real restart
 /// takes, not merely a second read against a process that never stopped.
 #[tokio::test]
 async fn persists_across_a_restart() {
-    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-restart");
+    let (path, _guard) = crate::support::TestDbGuard::new("slimm-media-slot-restart");
     let config = Config {
         port: 0,
         database_path: path.clone(),
@@ -185,7 +72,7 @@ async fn persists_across_a_restart() {
 /// beyond ordinary `USE_CANVAS`.
 #[tokio::test]
 async fn anyone_with_use_canvas_may_move_anyone_elses_slot() {
-    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-anyone");
+    let (path, _guard) = crate::support::TestDbGuard::new("slimm-media-slot-anyone");
     let config = Config {
         port: 0,
         database_path: path,
@@ -221,7 +108,7 @@ async fn anyone_with_use_canvas_may_move_anyone_elses_slot() {
 /// `http/canvas_media_slots.rs::upsert` fails exactly this test.
 #[tokio::test]
 async fn a_member_denied_use_canvas_is_forbidden() {
-    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-denied");
+    let (path, _guard) = crate::support::TestDbGuard::new("slimm-media-slot-denied");
     let config = Config {
         port: 0,
         database_path: path,
@@ -256,7 +143,7 @@ async fn a_member_denied_use_canvas_is_forbidden() {
 /// from `upsert` fails exactly this test.
 #[tokio::test]
 async fn a_timed_out_member_may_not_move_a_slot() {
-    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-timeout");
+    let (path, _guard) = crate::support::TestDbGuard::new("slimm-media-slot-timeout");
     let config = Config {
         port: 0,
         database_path: path,
@@ -286,20 +173,12 @@ async fn a_timed_out_member_may_not_move_a_slot() {
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
 
-fn chrono_now_plus_ms(ms: i64) -> i64 {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as i64;
-    now + ms
-}
-
 /// Every successful move publishes live, unconditionally - there is no
 /// idempotency-by-id to dedupe against the way a placement has, so unlike
 /// `placeCanvasObject` even a byte-identical repeat still fans out.
 #[tokio::test]
 async fn moving_a_slot_publishes_live_to_other_viewers() {
-    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-live");
+    let (path, _guard) = crate::support::TestDbGuard::new("slimm-media-slot-live");
     let config = Config {
         port: 0,
         database_path: path,
@@ -348,7 +227,7 @@ async fn moving_a_slot_publishes_live_to_other_viewers() {
 /// overwriting the first.
 #[tokio::test]
 async fn two_concurrent_first_touches_leave_exactly_one_row() {
-    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-race");
+    let (path, _guard) = crate::support::TestDbGuard::new("slimm-media-slot-race");
     let config = Config {
         port: 0,
         database_path: path,
@@ -388,7 +267,7 @@ async fn two_concurrent_first_touches_leave_exactly_one_row() {
 /// drawn content.
 #[tokio::test]
 async fn an_out_of_bounds_slot_is_refused() {
-    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-bounds");
+    let (path, _guard) = crate::support::TestDbGuard::new("slimm-media-slot-bounds");
     let config = Config {
         port: 0,
         database_path: path,
@@ -420,7 +299,7 @@ async fn an_out_of_bounds_slot_is_refused() {
 /// exactly this test.
 #[tokio::test]
 async fn deleting_an_account_removes_its_slots() {
-    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-deletion");
+    let (path, _guard) = crate::support::TestDbGuard::new("slimm-media-slot-deletion");
     let config = Config {
         port: 0,
         database_path: path,
@@ -455,4 +334,39 @@ async fn deleting_an_account_removes_its_slots() {
         store.list_canvas_media_slots(channel).await.unwrap().len(),
         0
     );
+}
+
+/// A `userId` with no matching account is refused by name rather than
+/// falling through to `canvas_media_slots.user_id`'s own foreign key and
+/// surfacing as a 500 - the same "a client-triggerable constraint violation
+/// is a bug, not an acceptable error shape" this project has fixed before
+/// (see `store/canvas.rs`'s own idempotency-lookup note). Mutation-tested:
+/// dropping the existence check in `http/canvas_media_slots.rs::upsert`
+/// fails exactly this test, turning it back into a 500.
+#[tokio::test]
+async fn a_slot_naming_no_real_user_is_not_found_rather_than_a_500() {
+    let (path, _guard) = crate::support::TestDbGuard::new("slimm-media-slot-no-such-user");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let store = Store::new(db::connect(&config).await.unwrap());
+    let (access, _ticket, alice) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+    let fake_user = UserId(uuid::Uuid::now_v7());
+
+    let response = http::router(state_for(&store))
+        .oneshot(put_slot_request(
+            channel,
+            &access,
+            "camera",
+            fake_user,
+            screen_body(0.0, 0.0),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }

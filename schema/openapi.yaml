@@ -2833,9 +2833,9 @@ paths:
       tags: [canvas]
       summary: Move, resize, lock or restack one participant's camera or screen-share tile.
       description: >
-        Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel,
-        and is additionally refused while the caller is timed out, the same
-        gate `placeCanvasObject` uses.
+        Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel, and is additionally refused
+        while the caller is timed out, the same gate `placeCanvasObject` uses, or while a move would
+        leave an already-locked slot locked. `userId` must name a real account, or the call is a 404.
 
 
         Unlike a real canvas object there is no own-tile-versus-`MANAGE_CANVAS`
@@ -2868,6 +2868,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /channels/{channelId}/voice/token:
     post:

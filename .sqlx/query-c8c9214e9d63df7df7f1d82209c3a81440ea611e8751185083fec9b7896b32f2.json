@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT x AS \"x!: f64\", y AS \"y!: f64\", w AS \"w!: f64\", h AS \"h!: f64\",\n                      locked AS \"locked!: bool\"\n               FROM canvas_media_slots WHERE channel_id = ? AND user_id = ? AND kind = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "x!: f64",
+        "ordinal": 0,
+        "type_info": "Float"
+      },
+      {
+        "name": "y!: f64",
+        "ordinal": 1,
+        "type_info": "Float"
+      },
+      {
+        "name": "w!: f64",
+        "ordinal": 2,
+        "type_info": "Float"
+      },
+      {
+        "name": "h!: f64",
+        "ordinal": 3,
+        "type_info": "Float"
+      },
+      {
+        "name": "locked!: bool",
+        "ordinal": 4,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c8c9214e9d63df7df7f1d82209c3a81440ea611e8751185083fec9b7896b32f2"
+}
