@@ -73,10 +73,7 @@ class _SpaceMenuButtonState extends ConsumerState<SpaceMenuButton> {
                         leading: AppIcons.add,
                         onTap: () {
                           _controller.hide();
-                          showCreateChannelSheet(
-                            context,
-                            initialKind: 'text',
-                          );
+                          showCreateChannelSheet(context, initialKind: 'text');
                         },
                       ),
                       AppMenuItem(
