@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.34.0](https://github.com/NC1107/slim-m/compare/client-v0.33.0...client-v0.34.0) (2026-08-08)
+
+
+### Features
+
+* **canvas:** camera and screen-share tiles as movable AR objects ([#470](https://github.com/NC1107/slim-m/issues/470)) ([3eb30c5](https://github.com/NC1107/slim-m/commit/3eb30c5f7b8befb73fc0913b2b8ce62abffdeac3))
+
+
+### Bug Fixes
+
+* **canvas:** a full-surface phantom tap node was silently eating gestures under accessibility ([#465](https://github.com/NC1107/slim-m/issues/465)) ([8421ecc](https://github.com/NC1107/slim-m/commit/8421ecca2e261d433689401112da6dd9b304068c))
+* **canvas:** a second pointer's own grab button could steal an in-progress pan ([#467](https://github.com/NC1107/slim-m/issues/467)) ([283964e](https://github.com/NC1107/slim-m/commit/283964eba45109a7614b82840af81c68c9314583))
+* **canvas:** four defects in the interaction code nobody had reviewed ([#463](https://github.com/NC1107/slim-m/issues/463)) ([f91f808](https://github.com/NC1107/slim-m/commit/f91f8089b2a88dba955b37580583d3d77ddcaef3))
+* **canvas:** the dock covered the self bubble at a band of widths nobody rendered ([#462](https://github.com/NC1107/slim-m/issues/462)) ([586297a](https://github.com/NC1107/slim-m/commit/586297a2a88dc864a4b9349f0db41fce3da562f5))
+* **client:** a stale join could resurrect a call already left, and re-clicking a channel stranded you ([#469](https://github.com/NC1107/slim-m/issues/469)) ([7ee1733](https://github.com/NC1107/slim-m/commit/7ee1733d59e24538012b42052de0620f91a43f78))
+* **client:** replace the voice screen's three call boxes with one stage and a filmstrip ([#468](https://github.com/NC1107/slim-m/issues/468)) ([795b220](https://github.com/NC1107/slim-m/commit/795b2207a2f333f5cb4ef9b1980593be666c84ae))
+
 ## [0.33.0](https://github.com/NC1107/slim-m/compare/client-v0.32.1...client-v0.33.0) (2026-08-06)
 
 
