@@ -3,7 +3,8 @@
 /// a server" flow: pin on first connect, stay silent on a later match, and
 /// force an explicit, non-default action through if the key ever changes.
 ///
-/// Userinfo-stripping coverage lives in onboarding_screen_userinfo_test.dart.
+/// Userinfo stripping lives in onboarding_screen_userinfo_test.dart, and
+/// phone-width modal presentation in onboarding_screen_phone_test.dart.
 library;
 
 import 'dart:convert';
@@ -466,58 +467,5 @@ void main() {
         _identityA['public_key'],
       );
     });
-  });
-
-  group('phone-width presentation', () {
-    testWidgets(
-      'the manual server dialog collapses to a bottom sheet, like every '
-      'other modal in the app, rather than staying a fixed-size dialog',
-      (tester) async {
-        tester.view.physicalSize = const Size(360, 800);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
-        await _pumpOnboarding(
-          tester,
-          versionBody: const {
-            'name': 'slim-m',
-            'version': '0.6.0',
-            'protocol': 1,
-          },
-          onServerChosen: (server, invite) {},
-        );
-
-        await tester.tap(find.text('Connect to a Space'));
-        await tester.pumpAndSettle();
-
-        expect(find.byType(Dialog), findsNothing);
-        expect(find.byType(BottomSheet), findsOneWidget);
-      },
-    );
-
-    testWidgets(
-      'the invite dialog collapses to a bottom sheet at phone width too',
-      (tester) async {
-        tester.view.physicalSize = const Size(360, 800);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
-        await _pumpOnboarding(
-          tester,
-          versionBody: const {
-            'name': 'slim-m',
-            'version': '0.6.0',
-            'protocol': 1,
-          },
-          onServerChosen: (server, invite) {},
-        );
-
-        await tester.tap(find.text('I have an invite'));
-        await tester.pumpAndSettle();
-
-        expect(find.byType(Dialog), findsNothing);
-        expect(find.byType(BottomSheet), findsOneWidget);
-      },
-    );
   });
 }
