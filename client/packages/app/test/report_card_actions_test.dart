@@ -149,7 +149,7 @@ void main() {
 
       await tester.tap(find.widgetWithText(AppButton, 'Delete message'));
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(Dialog), findsOneWidget);
       expect(
         harness.calls.where((c) => c.method == 'DELETE'),
         isEmpty,
@@ -158,7 +158,7 @@ void main() {
 
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(Dialog),
           matching: find.widgetWithText(AppButton, 'Delete'),
         ),
       );
@@ -200,7 +200,7 @@ void main() {
       await tester.tap(find.widgetWithText(AppButton, '1h'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(Dialog), findsNothing);
       expect(
         harness.calls,
         contains(const Call('PUT', '/members/author-1/timeout')),
@@ -250,7 +250,7 @@ void main() {
 
       await tester.tap(find.widgetWithText(AppButton, 'Remove from Space...'));
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(Dialog), findsOneWidget);
       expect(
         harness.calls.where((c) => c.method == 'PUT'),
         isEmpty,
@@ -259,7 +259,7 @@ void main() {
 
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(Dialog),
           matching: find.widgetWithText(AppButton, 'Remove'),
         ),
       );

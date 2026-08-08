@@ -17,6 +17,10 @@ import 'channel_rail.dart' show selectedChannelId;
 import 'message_jump.dart';
 import 'user_avatar.dart';
 
+/// Marks the sizing box around the sheet's body, so a test can measure it
+/// directly rather than inferring the fix from a screenshot.
+const pinnedMessagesBodyBoxKey = Key('pinned_messages_body_box');
+
 /// The router and current channel are captured here, not inside the sheet:
 /// `GoRouterState.of` (which [selectedChannelId] needs) only resolves inside
 /// a route's own builder subtree, and the sheet's own context is a dialog
@@ -51,47 +55,50 @@ class _PinnedMessagesSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final pins = ref.watch(pinsControllerProvider(channelId));
+    final body = _Body(
+      channelId: channelId,
+      pins: pins,
+      router: router,
+      currentChannelId: currentChannelId,
+    );
+    // Only a real, scrollable list earns the tall box; an empty or loading state is one centred line.
+    final hasList = pins.pinned != null && pins.pinned!.isNotEmpty;
 
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.6,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s16,
-              0,
-              AppSpacing.s16,
-              AppSpacing.s12,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  AppIcons.pin,
-                  size: AppSizes.icon16,
-                  color: tokens.textSecondary,
-                ),
-                const SizedBox(width: AppSpacing.s8),
-                Text(
-                  'Pinned messages',
-                  style: AppText.body.copyWith(
-                    color: tokens.textPrimary,
-                    fontWeight: AppWeights.semi,
-                  ),
-                ),
-              ],
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.s16,
+            0,
+            AppSpacing.s16,
+            AppSpacing.s12,
           ),
-          Expanded(
-            child: _Body(
-              channelId: channelId,
-              pins: pins,
-              router: router,
-              currentChannelId: currentChannelId,
-            ),
+          child: Row(
+            children: [
+              Icon(
+                AppIcons.pin,
+                size: AppSizes.icon16,
+                color: tokens.textSecondary,
+              ),
+              const SizedBox(width: AppSpacing.s8),
+              Text(
+                'Pinned messages',
+                style: AppText.body.copyWith(
+                  color: tokens.textPrimary,
+                  fontWeight: AppWeights.semi,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        SizedBox(
+          key: pinnedMessagesBodyBoxKey,
+          height: hasList ? MediaQuery.of(context).size.height * 0.6 : 160,
+          child: body,
+        ),
+      ],
     );
   }
 }

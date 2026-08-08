@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /// A destructive-action confirmation, shared by the moderation and
-/// administration screens rather than each hand-rolling `settings_screen.dart`'s
-/// account-deletion dialog again.
+/// administration screens rather than each hand-rolling its own dialog.
+///
+/// Routed through [showAppSheet] rather than a bare `AlertDialog`, so it gets
+/// the same border-first card, radius and phone/desktop split every other
+/// modal in the app already has - a raw `AlertDialog` draws Material's own
+/// 28dp-radius, shadowed card, which reads as a different app mid-flow.
 library;
 
 import 'package:flutter/material.dart';
@@ -20,26 +24,77 @@ Future<bool> confirmDangerousAction(
   required String confirmLabel,
   String cancelLabel = 'Cancel',
 }) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
-      content: Text(message),
-      // Danger is outlined, never filled: the destructive choice must be
-      // unmistakable without being the brightest thing in the dialog.
-      actions: [
-        AppButton(
-          label: cancelLabel,
-          variant: AppButtonVariant.ghost,
-          onPressed: () => Navigator.of(context).pop(false),
-        ),
-        AppButton(
-          label: confirmLabel,
-          variant: AppButtonVariant.danger,
-          onPressed: () => Navigator.of(context).pop(true),
-        ),
-      ],
+  final confirmed = await showAppSheet<bool>(
+    context,
+    builder: (context) => _ConfirmDialog(
+      title: title,
+      message: message,
+      confirmLabel: confirmLabel,
+      cancelLabel: cancelLabel,
     ),
   );
   return confirmed ?? false;
+}
+
+class _ConfirmDialog extends StatelessWidget {
+  const _ConfirmDialog({
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+    required this.cancelLabel,
+  });
+
+  final String title;
+  final String message;
+  final String confirmLabel;
+  final String cancelLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.s16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: AppText.body.copyWith(
+              color: tokens.textPrimary,
+              fontWeight: AppWeights.semi,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          Text(
+            message,
+            style: AppText.body.copyWith(color: tokens.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: cancelLabel,
+                  variant: AppButtonVariant.ghost,
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s8),
+              Expanded(
+                // Danger is outlined, never filled: the destructive choice
+                // must be unmistakable without being the brightest thing on
+                // screen.
+                child: AppButton(
+                  label: confirmLabel,
+                  variant: AppButtonVariant.danger,
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

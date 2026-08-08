@@ -71,6 +71,44 @@ void main() {
     expect(find.byType(Dialog), findsNothing);
   });
 
+  testWidgets(
+    'a bottom sheet keeps its content clear of a home indicator, even when '
+    'the sheet itself never asked to',
+    (tester) async {
+      tester.view.physicalSize = _phone;
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.padding = const FakeViewPadding(bottom: 34);
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.dark, AppTokens.dark),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: TextButton(
+                  onPressed: () => showAppSheet<void>(
+                    context,
+                    // A caller that never wraps its own content in SafeArea, the common shape.
+                    builder: (_) => const Text('sheet body'),
+                  ),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SafeArea), findsOneWidget);
+      final safeArea = tester.widget<SafeArea>(find.byType(SafeArea));
+      expect(safeArea.bottom, isTrue);
+      expect(safeArea.top, isFalse);
+    },
+  );
+
   testWidgets('a desktop window gets a dialog', (tester) async {
     await _open(tester, _desktop);
 

@@ -145,4 +145,16 @@ void main() {
       }
     });
   }
+
+  testWidgets(
+    "'Use picture' is the sheet's one filled action, not an outline",
+    (tester) async {
+      await _openSheet(tester, const Size(1280, 900));
+
+      final button = tester.widget<AppButton>(
+        find.widgetWithText(AppButton, 'Use picture'),
+      );
+      expect(button.variant, AppButtonVariant.primary);
+    },
+  );
 }

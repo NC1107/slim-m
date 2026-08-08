@@ -136,6 +136,50 @@ void main() {
     },
   );
 
+  testWidgets(
+    'an empty list stays a modest size instead of a mostly-blank box',
+    (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient(
+                (request) async => http.Response(
+                  '[]',
+                  200,
+                  headers: {'content-type': 'application/json'},
+                ),
+              ),
+            );
+            ref.onDispose(api.close);
+            return api;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await _pump(tester, container, 'c1');
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nothing pinned yet.'), findsOneWidget);
+      final height = tester
+          .getSize(find.byKey(pinnedMessagesBodyBoxKey))
+          .height;
+      expect(
+        height,
+        lessThan(200),
+        reason:
+            'a genuinely empty list must not be forced into the same box '
+            'a long scrollable list needs',
+      );
+    },
+  );
+
   testWidgets('a 403 explains the denial and offers no retry', (tester) async {
     final container = ProviderContainer(
       overrides: [

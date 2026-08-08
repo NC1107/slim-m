@@ -76,8 +76,8 @@ class OnboardingScreen extends ConsumerWidget {
   /// [_manualFlow] uses: identity confirmation navigates full-screen, and
   /// that must never happen underneath a still-open dialog.
   Future<void> _redeemFlow(BuildContext context, WidgetRef ref) async {
-    final result = await showDialog<(Uri, String)>(
-      context: context,
+    final result = await showAppSheet<(Uri, String)>(
+      context,
       builder: (context) => const _InviteDialog(),
     );
     if (result == null || !context.mounted) return;
@@ -89,8 +89,8 @@ class OnboardingScreen extends ConsumerWidget {
   }
 
   Future<void> _manualFlow(BuildContext context, WidgetRef ref) async {
-    final server = await showDialog<Uri>(
-      context: context,
+    final server = await showAppSheet<Uri>(
+      context,
       builder: (context) => const _ManualServerDialog(),
     );
     if (server == null || !context.mounted) return;
@@ -249,26 +249,39 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Redeem an invite'),
-      content: Column(
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.s16,
+        AppSpacing.s16,
+        AppSpacing.s16,
+        MediaQuery.of(context).viewInsets.bottom + AppSpacing.s16,
+      ),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            controller: _server,
-            decoration: const InputDecoration(
-              labelText: 'Server',
-              hintText: 'https://chat.example',
+          Text(
+            'Redeem an invite',
+            style: AppText.body.copyWith(
+              color: tokens.textPrimary,
+              fontWeight: AppWeights.semi,
             ),
-            autocorrect: false,
           ),
-          const SizedBox(height: AppSpacing.s16),
-          TextField(
+          const SizedBox(height: AppSpacing.s12),
+          AppInput(
+            controller: _server,
+            placeholder: 'https://chat.example',
+            keyboardType: TextInputType.url,
+            semanticLabel: 'Server',
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          AppInput(
             controller: _code,
-            decoration: const InputDecoration(labelText: 'Invite code'),
-            autocorrect: false,
+            placeholder: 'Invite code',
+            semanticLabel: 'Invite code',
           ),
-          const SizedBox(height: AppSpacing.s16),
+          const SizedBox(height: AppSpacing.s12),
           // Terms are accepted at the point of joining, which is where the
           // decision actually is, not buried in a later settings screen.
           CheckboxListTile(
@@ -276,33 +289,38 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
             onChanged: (v) => setState(() => _accepted = v ?? false),
             contentPadding: EdgeInsets.zero,
             controlAffinity: ListTileControlAffinity.leading,
-            title: const Text(
+            title: Text(
               'I accept the terms of use for this Space.',
-              style: TextStyle(fontSize: 13),
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
           ),
-          if (_error != null)
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                _error!,
-                style: TextStyle(
-                  color: Theme.of(context).extension<AppTokens>()!.dangerText,
+          if (_error != null) ...[
+            const SizedBox(height: AppSpacing.s4),
+            AppErrorState(message: _error!),
+          ],
+          const SizedBox(height: AppSpacing.s12),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: 'Cancel',
+                  variant: AppButtonVariant.ghost,
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
               ),
-            ),
+              const SizedBox(width: AppSpacing.s8),
+              Expanded(
+                child: AppButton(
+                  label: _busy ? 'Checking...' : 'Continue',
+                  variant: AppButtonVariant.primary,
+                  disabled: _busy || !_accepted,
+                  onPressed: _verify,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _busy || !_accepted ? null : _verify,
-          child: const Text('Continue'),
-        ),
-      ],
     );
   }
 }
@@ -343,51 +361,66 @@ class _ManualServerDialogState extends State<_ManualServerDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Connect to a Space'),
-      content: Column(
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.s16,
+        AppSpacing.s16,
+        AppSpacing.s16,
+        MediaQuery.of(context).viewInsets.bottom + AppSpacing.s16,
+      ),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            controller: _server,
-            decoration: const InputDecoration(
-              labelText: 'Server address',
-              hintText: 'https://chat.example',
+          Text(
+            'Connect to a Space',
+            style: AppText.body.copyWith(
+              color: tokens.textPrimary,
+              fontWeight: AppWeights.semi,
             ),
-            autocorrect: false,
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          AppInput(
+            controller: _server,
+            placeholder: 'https://chat.example',
+            autofocus: true,
+            keyboardType: TextInputType.url,
+            semanticLabel: 'Server address',
             onSubmitted: (_) => _submit(),
           ),
-          const SizedBox(height: AppSpacing.s16),
+          const SizedBox(height: AppSpacing.s12),
           Text(
             'Whoever runs this Space can read the messages sent through it. '
             'Only connect to one you trust.',
-            style: TextStyle(
-              fontSize: 13,
-              color: Theme.of(context).extension<AppTokens>()!.textSecondary,
-            ),
+            style: AppText.caption.copyWith(color: tokens.textSecondary),
           ),
           if (_error != null) ...[
             const SizedBox(height: AppSpacing.s12),
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                _error!,
-                style: TextStyle(
-                  color: Theme.of(context).extension<AppTokens>()!.dangerText,
+            AppErrorState(message: _error!),
+          ],
+          const SizedBox(height: AppSpacing.s12),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: 'Cancel',
+                  variant: AppButtonVariant.ghost,
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: AppSpacing.s8),
+              Expanded(
+                child: AppButton(
+                  label: 'Continue',
+                  variant: AppButtonVariant.primary,
+                  onPressed: _submit,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(onPressed: _submit, child: const Text('Continue')),
-      ],
     );
   }
 }

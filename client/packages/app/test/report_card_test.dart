@@ -156,7 +156,7 @@ void main() {
       // Disambiguated from the card's own "Resolve" button, still mounted beneath the dialog.
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(Dialog),
           matching: find.widgetWithText(AppButton, 'Resolve'),
         ),
       );

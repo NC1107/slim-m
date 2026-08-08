@@ -124,6 +124,7 @@ class _AvatarCropSheetState extends State<_AvatarCropSheet> {
                 Expanded(
                   child: AppButton(
                     label: _busy ? 'Working...' : 'Use picture',
+                    variant: AppButtonVariant.primary,
                     onPressed: _busy ? null : _confirm,
                   ),
                 ),

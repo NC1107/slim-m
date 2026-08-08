@@ -102,7 +102,7 @@ Future<void> _enterManualServer(WidgetTester tester) async {
   await tester.tap(find.text('Connect to a Space'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField), _server);
-  await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+  await tester.tap(find.text('Continue'));
   await tester.pumpAndSettle();
 }
 
@@ -310,7 +310,7 @@ void main() {
       await tester.tap(find.text('Connect to a Space'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'http://chat.example.com');
-      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Use https'), findsOneWidget);
@@ -449,7 +449,7 @@ void main() {
       await tester.enterText(find.byType(TextField).at(1), 'CODE123');
       await tester.tap(find.byType(CheckboxListTile));
       await tester.pump();
-      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
 
       expect(
@@ -466,5 +466,58 @@ void main() {
         _identityA['public_key'],
       );
     });
+  });
+
+  group('phone-width presentation', () {
+    testWidgets(
+      'the manual server dialog collapses to a bottom sheet, like every '
+      'other modal in the app, rather than staying a fixed-size dialog',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        await _pumpOnboarding(
+          tester,
+          versionBody: const {
+            'name': 'slim-m',
+            'version': '0.6.0',
+            'protocol': 1,
+          },
+          onServerChosen: (server, invite) {},
+        );
+
+        await tester.tap(find.text('Connect to a Space'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(Dialog), findsNothing);
+        expect(find.byType(BottomSheet), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'the invite dialog collapses to a bottom sheet at phone width too',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        await _pumpOnboarding(
+          tester,
+          versionBody: const {
+            'name': 'slim-m',
+            'version': '0.6.0',
+            'protocol': 1,
+          },
+          onServerChosen: (server, invite) {},
+        );
+
+        await tester.tap(find.text('I have an invite'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(Dialog), findsNothing);
+        expect(find.byType(BottomSheet), findsOneWidget);
+      },
+    );
   });
 }
