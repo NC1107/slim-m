@@ -72,7 +72,7 @@ tile is not a published track.
 The run ends by reporting how many documented API paths it actually touched,
 counted from what the harness and both browsers requested rather than from a
 list kept by hand, since a hand-kept list overstates coverage the moment a
-scenario changes. A full run currently reaches **42 of 70** documented paths
+scenario changes. A full run currently reaches **43 of 72** documented paths
 (confirmed against a live run rather than assumed; the schema has grown
 since this number was first written, the harness's own reach has grown with it).
 
