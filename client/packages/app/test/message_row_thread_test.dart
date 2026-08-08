@@ -12,11 +12,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/message_context_menu.dart';
 import 'package:slimm_app/src/widgets/message_row.dart';
 import 'package:slimm_app/src/widgets/message_row_identity.dart';
 import 'package:slimm_app/src/widgets/message_row_parts.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 import 'message_row_harness.dart';
 
@@ -111,6 +113,29 @@ void main() {
       expect(opened, isTrue);
     },
   );
+
+  testWidgets('a count plus an absolute last-reply date does not overflow a '
+      'phone-width row', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: SizedBox(
+              width: 342,
+              // A date months in the past renders the long absolute form, not "Today"/"Yesterday".
+              child: ThreadReplySummary(
+                replyCount: 3,
+                lastReplyAt: 1700000000000,
+                onTap: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'the affordance is inert, with no tap handler, when the caller cannot '

@@ -85,9 +85,14 @@ class AttachmentView extends ConsumerWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              attachment.filename,
-              style: AppText.ui.copyWith(color: tokens.textPrimary),
+            // Flexible, not a bare Text: a long real filename would otherwise overflow the row.
+            Flexible(
+              child: Text(
+                attachment.filename,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.ui.copyWith(color: tokens.textPrimary),
+              ),
             ),
             const SizedBox(width: AppSpacing.s8),
             Text(
@@ -105,19 +110,11 @@ class AttachmentView extends ConsumerWidget {
       error: (error, _) => _tappable(
         label: 'Retry loading ${attachment.filename}',
         onTap: () => ref.invalidate(attachmentBytesProvider(attachment.id)),
-        child: Container(
+        child: _FailureBox(
+          tokens: tokens,
+          message: 'Could not load ${attachment.filename}. Tap to retry.',
           width: 420,
           height: 168,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: tokens.stripe,
-            border: Border.all(color: tokens.borderSubtle),
-            borderRadius: BorderRadius.circular(AppRadii.control),
-          ),
-          child: Text(
-            'Could not load ${attachment.filename}. Tap to retry.',
-            style: TextStyle(color: tokens.textSecondary),
-          ),
         ),
       ),
       data: (bytes) => _tappable(
@@ -152,6 +149,13 @@ class AttachmentView extends ConsumerWidget {
                     fit: BoxFit.contain,
                     semanticLabel: attachment.filename,
                     cacheWidth: decodeEdge(context, kInlineImageMax),
+                    // Bytes can decode-fail after a successful fetch; without this it paints as Flutter's raw error box.
+                    errorBuilder: (context, error, stackTrace) => _FailureBox(
+                      tokens: tokens,
+                      message: 'Could not open ${attachment.filename}.',
+                      width: kInlineImageMax,
+                      height: 168,
+                    ),
                   ),
                 ),
               ),
@@ -181,6 +185,39 @@ class AttachmentView extends ConsumerWidget {
         cursor: SystemMouseCursors.click,
         child: GestureDetector(onTap: onTap, child: child),
       ),
+    );
+  }
+}
+
+/// The bordered "something went wrong" placeholder shared by a failed fetch
+/// and a fetch that succeeded but handed back bytes the codec refuses to
+/// decode - the same box, the same stripe token, so both read as one visual
+/// language rather than two.
+class _FailureBox extends StatelessWidget {
+  const _FailureBox({
+    required this.tokens,
+    required this.message,
+    required this.width,
+    required this.height,
+  });
+
+  final AppTokens tokens;
+  final String message;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: tokens.stripe,
+        border: Border.all(color: tokens.borderSubtle),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Text(message, style: TextStyle(color: tokens.textSecondary)),
     );
   }
 }

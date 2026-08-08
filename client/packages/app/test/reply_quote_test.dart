@@ -7,8 +7,11 @@
 /// specifically; this file is the plain rendering contract underneath both.
 library;
 
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/reply_quote.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 import 'message_row_harness.dart';
 
@@ -30,8 +33,9 @@ void main() {
       ),
     );
 
-    expect(find.text('Priya'), findsOneWidget);
-    expect(find.text('the original text'), findsOneWidget);
+    // One merged Text.rich now, not two Text widgets - see reply_quote.dart.
+    expect(find.textContaining('Priya'), findsOneWidget);
+    expect(find.textContaining('the original text'), findsOneWidget);
     expect(find.text('Message unavailable'), findsNothing);
   });
 
@@ -62,6 +66,34 @@ void main() {
 
     expect(find.text(long), findsNothing, reason: 'a quote is compact');
   });
+
+  testWidgets(
+    'a long real display name does not overflow a phone-width column',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: Scaffold(
+              body: SizedBox(
+                width: 342,
+                child: ReplyQuote(
+                  resolved: message(
+                    id: 'parent',
+                    authorDisplayName:
+                        'Christoph Bartholomew Fitzgerald-Huang III',
+                    content: 'short reply',
+                  ),
+                  onTap: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('tapping the quote calls onTap, resolved or not', (tester) async {
     var tapped = 0;

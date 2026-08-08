@@ -68,4 +68,44 @@ void main() {
     final resized = image.image as ResizeImage;
     expect(resized.width, kInlineImageMax.round());
   });
+
+  testWidgets(
+    'bytes a fetch succeeded on but the codec refuses to decode show this '
+    'surface\'s own failure box, not Flutter\'s raw error widget',
+    (tester) async {
+      await _pump(tester, Uint8List.fromList(const [1, 2, 3, 4]));
+
+      expect(find.byType(ErrorWidget), findsNothing);
+      expect(
+        find.text('Could not open ${_attachment.filename}.'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('a non-image chip with a long real filename elides instead of '
+      'overflowing a phone-width column', (tester) async {
+    const longName = api.Attachment(
+      id: 'a2',
+      filename: 'quarterly-report-final-v3-actually-final-honestly.pdf',
+      contentType: 'application/pdf',
+      size: 1800000,
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: SizedBox(
+              width: 342,
+              child: AttachmentView(attachment: longName),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+  });
 }

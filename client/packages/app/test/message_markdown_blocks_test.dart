@@ -95,4 +95,22 @@ void main() {
     expect(blocks[1], isA<ListBlock>());
     expect(blocks[2], isA<HeadingBlock>());
   });
+
+  test('a blank line between a quote and a list carries no phantom empty '
+      'paragraph block', () {
+    final blocks = splitMarkdownBlocks('> quoted\n\n- one\n- two');
+    expect(blocks, [isA<QuoteBlock>(), isA<ListBlock>()]);
+  });
+
+  test('a blank line between a list and a heading carries no phantom empty '
+      'paragraph block', () {
+    final blocks = splitMarkdownBlocks('- one\n- two\n\n# done');
+    expect(blocks, [isA<ListBlock>(), isA<HeadingBlock>()]);
+  });
+
+  test('a blank line between two headings carries no phantom empty paragraph '
+      'block', () {
+    final blocks = splitMarkdownBlocks('# one\n\n# two');
+    expect(blocks, [isA<HeadingBlock>(), isA<HeadingBlock>()]);
+  });
 }

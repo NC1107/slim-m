@@ -220,47 +220,45 @@ void main() {
     },
   );
 
-  testWidgets(
-    'a reply to a since-deleted message renders honestly once the delete '
-    'is applied',
-    (tester) async {
-      final container = await _wire(
-        tester,
-        messages: [
-          _message(id: 'm1', authorId: 'friend', seq: 1, content: 'original'),
-          _message(
-            id: 'm2',
-            authorId: 'friend',
-            seq: 2,
-            content: 'a reply to it',
-            replyToId: 'm1',
-          ),
-        ],
-      );
+  testWidgets('a reply to a since-deleted message renders honestly once the delete '
+      'is applied', (tester) async {
+    final container = await _wire(
+      tester,
+      messages: [
+        _message(id: 'm1', authorId: 'friend', seq: 1, content: 'original'),
+        _message(
+          id: 'm2',
+          authorId: 'friend',
+          seq: 2,
+          content: 'a reply to it',
+          replyToId: 'm1',
+        ),
+      ],
+    );
 
-      // Twice: once as m1's own body, once as the quote's honest echo of it.
-      expect(find.text('original'), findsNWidgets(2));
-      expect(find.text('Message unavailable'), findsNothing);
+    // m1's own body is an exact match; the quote's echo now merges the author label and snippet, so it is a substring match.
+    expect(find.text('original'), findsOneWidget);
+    expect(find.textContaining('original'), findsNWidgets(2));
+    expect(find.text('Message unavailable'), findsNothing);
 
-      // A delete, own or a live `message.deleted` frame, always lands as `MessageStore.discard`.
-      final store = await container.read(storeProvider.future);
-      await store.discard('m1');
-      for (var i = 0; i < 12; i++) {
-        await tester.pump(const Duration(milliseconds: 20));
-      }
+    // A delete, own or a live `message.deleted` frame, always lands as `MessageStore.discard`.
+    final store = await container.read(storeProvider.future);
+    await store.discard('m1');
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
 
-      expect(
-        find.text('original'),
-        findsNothing,
-        reason: 'the deleted message itself is gone',
-      );
-      expect(find.text('a reply to it'), findsOneWidget);
-      expect(
-        find.text('Message unavailable'),
-        findsOneWidget,
-        reason: 'the reply now honestly says its parent cannot be shown',
-      );
-      await _unmount(tester);
-    },
-  );
+    expect(
+      find.text('original'),
+      findsNothing,
+      reason: 'the deleted message itself is gone',
+    );
+    expect(find.text('a reply to it'), findsOneWidget);
+    expect(
+      find.text('Message unavailable'),
+      findsOneWidget,
+      reason: 'the reply now honestly says its parent cannot be shown',
+    );
+    await _unmount(tester);
+  });
 }
