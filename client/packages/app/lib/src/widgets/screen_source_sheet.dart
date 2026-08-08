@@ -52,9 +52,13 @@ class _ScreenSourceSheet extends StatelessWidget {
             ),
           ),
           for (final source in sources)
-            ListTile(
-              leading: const Icon(AppIcons.screenShare),
-              title: Text(source.name),
+            AppListRow(
+              label: source.name,
+              leading: Icon(
+                AppIcons.screenShare,
+                size: AppSizes.icon16,
+                color: tokens.textSecondary,
+              ),
               onTap: () => Navigator.of(context).pop(source),
             ),
           const SizedBox(height: AppSpacing.s8),

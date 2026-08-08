@@ -25,6 +25,7 @@ class _CameraDeviceSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -40,9 +41,13 @@ class _CameraDeviceSheet extends StatelessWidget {
             child: Text('Choose a camera', style: AppText.heading),
           ),
           for (final device in devices)
-            ListTile(
-              leading: const Icon(AppIcons.camera),
-              title: Text(device.label),
+            AppListRow(
+              label: device.label,
+              leading: Icon(
+                AppIcons.camera,
+                size: AppSizes.icon16,
+                color: tokens.textSecondary,
+              ),
               onTap: () => Navigator.of(context).pop(device),
             ),
           const SizedBox(height: AppSpacing.s8),
