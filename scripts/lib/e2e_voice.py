@@ -234,6 +234,31 @@ def leave_call(a, b):
     print("  and the remaining client leaves too, so no call is left open")
 
 
+def _click_channel_row(client, channel, timeout=90):
+    """A plain `client.click(channel)` risks landing on the row's own
+    kebab ('Manage <channel>') instead of the row, once the roster grows
+    a participant count and the row's own text stops being an exact match
+    ('lounge' becomes 'lounge\\n1') - `e2e_js.click`'s containment rule
+    then prefers the kebab, since it sits nested inside the row's own
+    tappable container, the same rule that correctly favours a reply's
+    quote button over its enclosing row for a different search. Picking
+    the row by its own name as a *prefix* sidesteps that rule entirely,
+    without touching it and risking every other scenario that depends on
+    it: `join_call`'s own first click of this channel worked precisely
+    because the roster was still empty then, and this is that same click
+    repeated once the roster is not.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        for n in client.nodes():
+            if n["t"].lower().startswith(channel.lower()):
+                client.tap(n["x"], n["y"])
+                time.sleep(1.5)
+                return
+        time.sleep(1)
+    raise AssertionError(f"{client.name}: no row named {channel!r} found")
+
+
 def rejoin_after_leaving(client, room_id, channel=L.VOICE_CHANNEL):
     """Re-clicking a voice channel already left rejoins it rather than
     stranding the caller on a dead rejoin screen with nothing to press.
@@ -247,10 +272,7 @@ def rejoin_after_leaving(client, room_id, channel=L.VOICE_CHANNEL):
     than sits beside while open - the same reason `e2e_media_slots.py`
     checks the SFU directly too.
     """
-    matches = [n["t"] for n in client.nodes() if channel.lower() in n["t"].lower()]
-    print(f"  DEBUG {client.name}: nodes matching {channel!r} before click: {matches}")
-    client.click(channel)
-    client.shot(f"debug-rejoin-after-click-{client.name}")
+    _click_channel_row(client, channel)
     parts = participants_with_mics(room_id, expected=1)
     assert len(parts) == 1, \
         f"SFU has {len(parts)} participants after rejoining, expected 1"
