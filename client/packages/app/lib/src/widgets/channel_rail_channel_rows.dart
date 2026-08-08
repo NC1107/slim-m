@@ -21,6 +21,7 @@ import '../routing/routes.dart';
 import 'context_menu_region.dart';
 import 'manage_channel_sheet.dart';
 import 'user_avatar.dart';
+import 'voice_channel_tap.dart';
 
 /// The right-click/long-press menu every channel row gets: opening it always,
 /// managing it (rename, topic, delete) only for the caller [canManage] already
@@ -205,7 +206,17 @@ class VoiceChannelRow extends ConsumerWidget {
                   ),
                 ),
           trailingExtra: trailingExtra,
-          onTap: () => context.go(Routes.channel(channel.id)),
+          onTap: () {
+            context.go(Routes.channel(channel.id));
+            // A re-click already open; see voice_channel_tap.dart for why.
+            if (voiceChannelTapShouldRejoin(
+              voice: voice,
+              channelId: channel.id,
+              alreadySelected: selected,
+            )) {
+              ref.read(voiceControllerProvider.notifier).join(channel.id);
+            }
+          },
         ),
         if (participants.isNotEmpty)
           _ParticipantStrip(participants: participants),

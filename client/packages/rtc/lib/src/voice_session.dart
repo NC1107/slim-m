@@ -33,6 +33,8 @@ import 'voice_disconnect_reason.dart';
 import 'voice_models.dart';
 import 'voice_roster_snapshot.dart';
 
+part 'voice_session_tracks.dart';
+
 /// Builds the LiveKit room a session drives. The injection seam.
 typedef RoomFactory = lk.Room Function();
 
@@ -190,11 +192,15 @@ class VoiceSession {
 
     _lastDisconnect = null;
     _setState(VoiceSessionState.connecting);
+    final room = _roomFactory();
+    _room = room;
+    _listen(room);
     try {
-      final room = _roomFactory();
-      _room = room;
-      _listen(room);
       await room.connect(url, token);
+      // A leave (or a newer join) may already have taken this room while
+      // connect was in flight; whoever superseded us already tore it down,
+      // so there is nothing left here to publish to or report on.
+      if (!identical(_room, room)) return;
       // Publishing is separate from connecting on purpose: a join preview
       // can arrive muted, and a token without SPEAK must not fail the join.
       if (microphoneEnabled) {
@@ -203,9 +209,11 @@ class VoiceSession {
       if (cameraEnabled) {
         await _trySetCamera(true);
       }
+      if (!identical(_room, room)) return;
       _refreshParticipants();
       _setState(VoiceSessionState.connected);
     } catch (e) {
+      if (!identical(_room, room)) return;
       _lastError = e;
       await _teardown();
       _setState(VoiceSessionState.failed);
@@ -259,41 +267,11 @@ class VoiceSession {
   /// rather than what was requested, or the button lies.
   Future<bool> setMicrophoneEnabled(bool enabled) => _trySetMicrophone(enabled);
 
-  Future<bool> _trySetMicrophone(bool enabled) async {
-    final room = _room;
-    if (room == null) return false;
-    try {
-      await room.localParticipant?.setMicrophoneEnabled(enabled);
-      _refreshParticipants();
-      return true;
-    } catch (e) {
-      _lastError = e;
-      _refreshParticipants();
-      return false;
-    }
-  }
-
   /// Enables or disables the local camera live, mid-call. The [join]-time
   /// `cameraEnabled` parameter is only the pre-toggle for before you connect;
   /// this is the same call `toggleMicrophone`'s equivalent already used, now
   /// reachable while already in the call.
   Future<bool> setCameraEnabled(bool enabled) => _trySetCamera(enabled);
-
-  /// Publishes (or stops) a camera track. Failure is swallowed exactly as
-  /// [_trySetMicrophone]'s is: a camera pre-toggle a device cannot honour
-  /// (permission denied, no hardware) must not fail the join, since a call
-  /// with no camera track is still a call.
-  Future<bool> _trySetCamera(bool enabled) async {
-    final room = _room;
-    if (room == null) return false;
-    final result = await _cameraSwitching.setEnabled(
-      room.localParticipant,
-      enabled,
-    );
-    if (result.error != null) _lastError = result.error;
-    _refreshParticipants();
-    return result.ok;
-  }
 
   /// Starts or stops sharing a screen, bounded by [quality].
   ///
@@ -413,13 +391,6 @@ class VoiceSession {
     return true;
   }
 
-  /// Delegates to [LocalAudioState.applyTo]; see that class for why this
-  /// runs on every room event rather than only when a control moves.
-  Future<void> _applyLocalAudioState(lk.Room room) async {
-    final failure = await _audio.applyTo(room);
-    if (failure != null) _lastError = failure;
-  }
-
   /// One coarse listener rather than a subscription per event type. Every
   /// event this cares about ends in the same place, "recompute who is in the
   /// call and what they are doing", so an event LiveKit adds later is picked
@@ -467,11 +438,14 @@ class VoiceSession {
   }
 
   Future<void> _teardown() async {
-    await _screenShare.dispose();
-    _cancelEvents?.call();
-    _cancelEvents = null;
+    // Cleared before anything else, and synchronously: a join racing this
+    // teardown reads `_room` to tell whether it is still the current
+    // attempt, and that answer must be final the instant teardown starts.
     final room = _room;
     _room = null;
+    _cancelEvents?.call();
+    _cancelEvents = null;
+    await _screenShare.dispose();
     if (room != null) {
       try {
         await room.disconnect();

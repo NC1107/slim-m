@@ -6,6 +6,8 @@
 /// reliably produce the happy one.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 import 'package:slimm_rtc/rtc.dart';
@@ -41,6 +43,24 @@ class _EmptyRoom extends lk.Room {
     lk.RoomOptions? roomOptions,
     lk.FastConnectOptions? fastConnectOptions,
   }) async {}
+}
+
+/// A room whose `connect` blocks on [gate] rather than resolving on its own,
+/// standing in for a slow network so a test can race a leave against a join
+/// still in flight.
+class _GatedRoom extends lk.Room {
+  _GatedRoom(this.gate);
+  final Future<void> gate;
+
+  @override
+  Future<void> connect(
+    String url,
+    String token, {
+    lk.ConnectOptions? connectOptions,
+    lk.RoomOptions? roomOptions,
+    lk.FastConnectOptions? fastConnectOptions,
+  }) =>
+      gate;
 }
 
 /// Stands in for the iOS host. [available] is what the app reports about its
@@ -254,6 +274,33 @@ void main() {
     expect(built, 2,
         reason: 'the second join runs after, not inside, the first');
     expect(session.state, VoiceSessionState.connected);
+  });
+
+  test(
+      'leaving while a join is still connecting is not undone once that '
+      'connect finally resolves', () async {
+    final gate = Completer<void>();
+    final session = VoiceSession(roomFactory: () => _GatedRoom(gate.future));
+    addTearDown(session.dispose);
+
+    final joining = session.join(url: 'wss://a.invalid', token: 't');
+    // Let _join reach its `await room.connect(...)` before racing it.
+    await pumpEventQueue();
+    expect(session.state, VoiceSessionState.connecting);
+
+    await session.leave();
+    expect(session.state, VoiceSessionState.idle);
+
+    // The stale connect resolves late; it must not resurrect the call.
+    gate.complete();
+    await joining;
+    await pumpEventQueue();
+
+    expect(
+      session.state,
+      VoiceSessionState.idle,
+      reason: 'a join superseded by an explicit leave must stay left',
+    );
   });
 
   test('dispose is idempotent and survives never having joined', () async {
