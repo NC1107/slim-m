@@ -130,6 +130,9 @@ async fn upsert(
     if state.store.timed_out_until(ctx.user_id).await?.is_some() {
         return Err(ApiError::Forbidden);
     }
+    if state.store.user_profile(user_id).await?.is_none() {
+        return Err(ApiError::NotFound("user not found"));
+    }
 
     let slot = state
         .store
@@ -149,6 +152,7 @@ async fn upsert(
                 "the tile is outside the world or too large",
             ));
         }
+        Err(MediaSlotError::Locked) => return Err(ApiError::Forbidden),
         Err(MediaSlotError::Internal(err)) => return Err(err.into()),
     };
 

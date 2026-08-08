@@ -413,6 +413,171 @@ async fn an_out_of_bounds_slot_is_refused() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
+fn locked_body(x: f64, y: f64, locked: bool) -> Value {
+    json!({
+        "x": x, "y": y, "w": 360.0, "h": 203.0,
+        "locked": locked, "sent_to_back": false,
+    })
+}
+
+/// Migration `0040`'s own doc calls this "the same shared-lock behaviour
+/// Figma and FigJam themselves use" - nobody may drag a locked tile, not
+/// only the arranging client's own UI. Mutation-tested: dropping the lock
+/// check in `store/canvas_media_slots.rs::upsert_canvas_media_slot` fails
+/// exactly this test.
+#[tokio::test]
+async fn a_locked_slot_refuses_a_move_that_would_leave_it_locked() {
+    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-locked-move");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let store = Store::new(db::connect(&config).await.unwrap());
+    let (access, _ticket, alice) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+    let (bob_access, _ticket, _bob) = user_ticket(&store, "bob").await;
+    let state = state_for(&store);
+
+    let response = http::router(state.clone())
+        .oneshot(put_slot_request(
+            channel,
+            &access,
+            "screen",
+            alice,
+            locked_body(10.0, 10.0, true),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response = http::router(state.clone())
+        .oneshot(put_slot_request(
+            channel,
+            &bob_access,
+            "screen",
+            alice,
+            locked_body(500.0, 500.0, true),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    let slots = store.list_canvas_media_slots(channel).await.unwrap();
+    assert_eq!(slots.len(), 1);
+    assert_eq!(slots[0].x, 10.0, "the locked tile must not have moved");
+    assert_eq!(slots[0].y, 10.0);
+}
+
+/// Unlocking is itself unrestricted - anyone with `USE_CANVAS` may unlock
+/// whatever anyone else locked - and a move is free again once it lands.
+#[tokio::test]
+async fn unlocking_a_slot_frees_the_next_move() {
+    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-unlock");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let store = Store::new(db::connect(&config).await.unwrap());
+    let (access, _ticket, alice) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+    let (bob_access, _ticket, _bob) = user_ticket(&store, "bob").await;
+    let state = state_for(&store);
+
+    let response = http::router(state.clone())
+        .oneshot(put_slot_request(
+            channel,
+            &access,
+            "screen",
+            alice,
+            locked_body(10.0, 10.0, true),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response = http::router(state.clone())
+        .oneshot(put_slot_request(
+            channel,
+            &bob_access,
+            "screen",
+            alice,
+            locked_body(10.0, 10.0, false),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "unlocking is always allowed"
+    );
+
+    let response = http::router(state.clone())
+        .oneshot(put_slot_request(
+            channel,
+            &bob_access,
+            "screen",
+            alice,
+            locked_body(500.0, 500.0, false),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "a move is free once unlocked"
+    );
+
+    let slots = store.list_canvas_media_slots(channel).await.unwrap();
+    assert_eq!(slots[0].x, 500.0);
+}
+
+/// Toggling depth, or re-posting the same geometry, is never gated by lock -
+/// only a move or resize that would leave the tile locked is refused.
+#[tokio::test]
+async fn a_locked_slots_depth_may_still_be_toggled() {
+    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-locked-depth");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let store = Store::new(db::connect(&config).await.unwrap());
+    let (access, _ticket, alice) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+    let state = state_for(&store);
+
+    let response = http::router(state.clone())
+        .oneshot(put_slot_request(
+            channel,
+            &access,
+            "camera",
+            alice,
+            locked_body(10.0, 10.0, true),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let mut body = locked_body(10.0, 10.0, true);
+    body["sent_to_back"] = json!(true);
+    let response = http::router(state.clone())
+        .oneshot(put_slot_request(channel, &access, "camera", alice, body))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let slots = store.list_canvas_media_slots(channel).await.unwrap();
+    assert!(slots[0].sent_to_back);
+}
+
 /// Account deletion removes a departed member's own slots outright, since a
 /// slot names the participant it represents and there is nobody left to
 /// name once that account is gone - mutation-tested: dropping the
@@ -455,4 +620,39 @@ async fn deleting_an_account_removes_its_slots() {
         store.list_canvas_media_slots(channel).await.unwrap().len(),
         0
     );
+}
+
+/// A `userId` with no matching account is refused by name rather than
+/// falling through to `canvas_media_slots.user_id`'s own foreign key and
+/// surfacing as a 500 - the same "a client-triggerable constraint violation
+/// is a bug, not an acceptable error shape" this project has fixed before
+/// (see `store/canvas.rs`'s own idempotency-lookup note). Mutation-tested:
+/// dropping the existence check in `http/canvas_media_slots.rs::upsert`
+/// fails exactly this test, turning it back into a 500.
+#[tokio::test]
+async fn a_slot_naming_no_real_user_is_not_found_rather_than_a_500() {
+    let (path, _guard) = support::TestDbGuard::new("slimm-media-slot-no-such-user");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let store = Store::new(db::connect(&config).await.unwrap());
+    let (access, _ticket, alice) = user_ticket(&store, "alice").await;
+    store.bootstrap_deployment(alice).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+    let fake_user = UserId(uuid::Uuid::now_v7());
+
+    let response = http::router(state_for(&store))
+        .oneshot(put_slot_request(
+            channel,
+            &access,
+            "camera",
+            fake_user,
+            screen_body(0.0, 0.0),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }

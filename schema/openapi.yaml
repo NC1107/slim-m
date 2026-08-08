@@ -2824,7 +2824,8 @@ paths:
           The participant this tile represents, never necessarily the
           caller: anyone holding `VIEW_CHANNEL` and `USE_CANVAS` may
           rearrange anyone's tile, the same shared-editing trust this
-          channel already grants over drawing.
+          channel already grants over drawing. Must name a real account
+          (404 otherwise); membership of this channel is not required.
         schema:
           type: string
           format: uuid
@@ -2843,6 +2844,11 @@ paths:
         arranged it, so this is a plain upsert on `(channelId, userId, kind)`
         rather than a moderation act. Every field is sent on every call, and
         the stored row is replaced outright rather than merged.
+
+
+        A currently-locked slot refuses (403) a call that would change its
+        position or size while leaving it locked; unlocking it, or resending
+        its current geometry, is always accepted.
 
 
         Not idempotent by a client id the way `placeCanvasObject` is: every
@@ -2868,6 +2874,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /channels/{channelId}/voice/token:
     post:

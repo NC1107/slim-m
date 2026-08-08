@@ -59,6 +59,10 @@ pub enum MediaSlotError {
     /// Not finite, negative extent, or outside the bounded world - the same
     /// check a real canvas object's own bounds already take.
     OutOfBounds,
+    /// The slot is currently locked and this request would move or resize
+    /// it while leaving it locked - see [`Store::upsert_canvas_media_slot`]'s
+    /// own doc for why that is refused rather than silently applied.
+    Locked,
     Internal(anyhow::Error),
 }
 
@@ -76,6 +80,14 @@ impl Store {
     /// viewers racing to touch the same tile for the first time cannot
     /// create two rows, since SQLite's single writer serializes the pair and
     /// the second commit simply overwrites the first with its own answer.
+    ///
+    /// A currently-locked slot refuses a geometry change that would leave it
+    /// locked - migration `0040`'s own doc calls this "the same shared-lock
+    /// behaviour Figma and FigJam themselves use", which means nobody may
+    /// drag a locked tile, not merely that the arranging client's own UI
+    /// disables the gesture. Unlocking, relocking with the same geometry,
+    /// and a depth toggle are all still free of this check: only a move or
+    /// resize that would leave the tile locked is refused.
     pub async fn upsert_canvas_media_slot(
         &self,
         channel_id: ChannelId,
@@ -91,6 +103,28 @@ impl Store {
         }
         let kind_str = kind.as_str();
         let now = now_ms();
+
+        // Reads before deciding to write, so the write lock is taken up front (see `Store::begin_write`).
+        let mut tx = self.begin_write().await?;
+        let existing = sqlx::query!(
+            r#"SELECT x AS "x!: f64", y AS "y!: f64", w AS "w!: f64", h AS "h!: f64",
+                      locked AS "locked!: bool"
+               FROM canvas_media_slots WHERE channel_id = ? AND user_id = ? AND kind = ?"#,
+            channel_id,
+            user_id,
+            kind_str,
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(row) = &existing
+            && row.locked
+            && locked
+            && (row.x != x || row.y != y || row.w != w || row.h != h)
+        {
+            tx.commit().await?;
+            return Err(MediaSlotError::Locked);
+        }
+
         sqlx::query!(
             r#"INSERT INTO canvas_media_slots
                    (channel_id, user_id, kind, x, y, w, h, locked, sent_to_back, updated_at)
@@ -110,8 +144,9 @@ impl Store {
             sent_to_back,
             now,
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+        tx.commit().await?;
         Ok(CanvasMediaSlot {
             channel_id,
             user_id,
