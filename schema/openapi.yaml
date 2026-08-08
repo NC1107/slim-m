@@ -2824,8 +2824,7 @@ paths:
           The participant this tile represents, never necessarily the
           caller: anyone holding `VIEW_CHANNEL` and `USE_CANVAS` may
           rearrange anyone's tile, the same shared-editing trust this
-          channel already grants over drawing. Must name a real account
-          (404 otherwise); membership of this channel is not required.
+          channel already grants over drawing.
         schema:
           type: string
           format: uuid
@@ -2834,9 +2833,9 @@ paths:
       tags: [canvas]
       summary: Move, resize, lock or restack one participant's camera or screen-share tile.
       description: >
-        Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel,
-        and is additionally refused while the caller is timed out, the same
-        gate `placeCanvasObject` uses.
+        Requires `VIEW_CHANNEL` and `USE_CANVAS`, evaluated for this channel, and is additionally refused
+        while the caller is timed out, the same gate `placeCanvasObject` uses, or while a move would
+        leave an already-locked slot locked. `userId` must name a real account, or the call is a 404.
 
 
         Unlike a real canvas object there is no own-tile-versus-`MANAGE_CANVAS`
@@ -2844,11 +2843,6 @@ paths:
         arranged it, so this is a plain upsert on `(channelId, userId, kind)`
         rather than a moderation act. Every field is sent on every call, and
         the stored row is replaced outright rather than merged.
-
-
-        A currently-locked slot refuses (403) a call that would change its
-        position or size while leaving it locked; unlocking it, or resending
-        its current geometry, is always accepted.
 
 
         Not idempotent by a client id the way `placeCanvasObject` is: every
