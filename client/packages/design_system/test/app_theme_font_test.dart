@@ -25,9 +25,7 @@ void main() {
     );
     await tester.pump();
 
-    // The style resolved by RenderParagraph is what Skia actually paints
-    // with; Text.style itself is null here (the widget was built with none),
-    // so asserting on the widget's own field would pass on a regression too.
+    // Text.style is null here regardless of the fix, so read RenderParagraph.
     final paragraph = tester.renderObject<RenderParagraph>(
       find.text('choose a channel'),
     );
