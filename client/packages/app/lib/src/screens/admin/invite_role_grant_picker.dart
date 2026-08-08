@@ -16,6 +16,10 @@ import '../../providers/admin_providers.dart';
 /// Absent rather than disabled for a caller without MANAGE_ROLES: the server
 /// refuses that combination outright, and a control that can only fail is the
 /// thing this codebase keeps taking back out.
+///
+/// A failed roles fetch renders its own retryable error rather than the same
+/// nothing a caller with genuinely no grantable role sees below, so the two
+/// cannot be confused for each other.
 class InviteRoleGrantPicker extends ConsumerWidget {
   const InviteRoleGrantPicker({
     super.key,
@@ -37,9 +41,7 @@ class InviteRoleGrantPicker extends ConsumerWidget {
     final roles = ref.watch(rolesProvider);
     return roles.when(
       loading: () => const SizedBox.shrink(),
-      // Distinct from "nothing to grant" below: a failed fetch says so and
-      // offers a way back, rather than reading as though this caller simply
-      // held no grantable role.
+      // See this widget's own doc comment for why this differs from below.
       error: (_, _) => Padding(
         padding: const EdgeInsets.only(top: AppSpacing.s12),
         child: AppErrorState(

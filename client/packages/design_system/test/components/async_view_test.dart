@@ -4,6 +4,12 @@
 /// same time - a refresh that fails after an earlier fetch already
 /// succeeded, which Riverpod's own retained-previous-value behaviour makes
 /// routine rather than rare.
+///
+/// Two of those stale-plus-error tests reproduce a real call site's own
+/// layout shape rather than a synthetic one: an `Expanded` ancestor handing
+/// down a bounded box with a `ListView` as the data widget (roles, removed
+/// members, member role assignment), and the settings frame's own default
+/// unbounded `ListView(children: [child])` (invites, emoji, analytics).
 library;
 
 import 'package:flutter/material.dart';
@@ -63,11 +69,7 @@ void main() {
     'the same stale-plus-error shape works when data is a viewport that '
     'needs the bounded height an Expanded ancestor gives it',
     (tester) async {
-      // Reproduces roles_screen/removed_members_screen/member_roles_sheet's
-      // own shape: an Expanded ancestor handing this a bounded box, and a
-      // ListView as the data widget - the one shape a bare, unwrapped
-      // Column would crash with "unbounded height" the moment it needed to
-      // paint a real, unstubbed list of rows rather than a single Text.
+      // See this file's own doc comment for what real shape this stands in for.
       await _pump(
         tester,
         Column(
@@ -96,10 +98,7 @@ void main() {
     'the same stale-plus-error shape works inside the unbounded scrollable '
     'frame most settings screens use',
     (tester) async {
-      // Reproduces invites_screen/emoji_screen/analytics_screen's own
-      // shape: the settings frame's default `ListView(children: [child])`,
-      // which hands this an unbounded height - the shape an Expanded child
-      // would crash with "incoming height constraints are unbounded".
+      // See this file's own doc comment for what real shape this stands in for.
       await tester.pumpWidget(
         MaterialApp(
           theme: buildTheme(Brightness.light, AppTokens.light),

@@ -141,8 +141,7 @@ void main() {
       await tester.pumpWidget(_harness(container));
       await tester.pumpAndSettle();
 
-      // The row still renders (its own label reads "Unknown" for the value)
-      // but the failure is visible and offers a way back, not silence.
+      // The row still renders ("Unknown"), but the failure is visible with a way back.
       expect(find.text('Notify me for'), findsOneWidget);
       expect(
         find.text('Could not load your notification preference.'),

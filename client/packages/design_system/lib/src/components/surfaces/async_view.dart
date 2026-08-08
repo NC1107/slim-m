@@ -26,6 +26,16 @@ import 'error_state.dart';
 /// is the list" are different messages, and collapsing them is how a screen
 /// ends up rendering a blank page. Give [emptyMessage] and an [isEmpty] test
 /// to get it; without them an empty list simply reaches [data].
+///
+/// A refresh that fails after a successful fetch keeps its last known value
+/// (Riverpod's own retained-previous-data behaviour), so a caller building
+/// [value] straight off an `AsyncValue` can carry a real error and real data
+/// at once. This renders that data with the error banner above it rather
+/// than wiping a perfectly good list for no better reason than a retry not
+/// having landed yet, and it does that inside both the shapes a caller
+/// embeds this in: a bounded box (an `Expanded` ancestor, so [data] can be a
+/// `ListView` that needs one) and an unbounded one (the default scrollable
+/// settings frame, where [data] is already written to size itself instead).
 class AppAsyncView<T> extends StatelessWidget {
   const AppAsyncView({
     super.key,
@@ -72,25 +82,14 @@ class AppAsyncView<T> extends StatelessWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     if (value.error != null) {
-      // A refresh that fails after a successful fetch keeps its last known
-      // value (Riverpod's own retained-previous-data behaviour), and a
-      // caller building this state straight off that value carries both a
-      // real error and real data at once. Wiping the list to a bare error
-      // would throw away something the caller still knows, for no better
-      // reason than the retry that would have refreshed it not landing yet.
+      // Kept and shown below rather than discarded; see this class's own doc.
       final stale = value.data;
       if (stale != null) {
         final banner = Padding(
           padding: const EdgeInsets.all(AppSpacing.s12),
           child: AppErrorState(message: errorMessage, onRetry: onRetry),
         );
-        // A caller embeds this both inside a bounded box (a settings
-        // screen's own `Expanded`, so [data] can be a `ListView` that needs
-        // one) and inside an unbounded one (the default scrollable settings
-        // frame, where [data] is already written to size itself instead).
-        // `Expanded` would crash the second shape; a bare `Column` would
-        // crash the first the moment [data] is a viewport, so which one
-        // this renders has to follow the constraint it was actually given.
+        // Which layout is safe follows the constraint actually given here.
         return LayoutBuilder(
           builder: (context, constraints) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -67,10 +67,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
           ],
           const SizedBox(height: AppSpacing.s16),
           AppAsyncView<api.SpaceAnalytics>(
-            // A retry that fails after stats already loaded keeps its last
-            // known answer (Riverpod's own retained-value behaviour); see
-            // AppAsyncView's own doc for why that stays on screen rather
-            // than being replaced by the bare error.
+            // A failed retry keeps the stats on screen; see AppAsyncView's own doc.
             value: AppAsyncState(
               data: analytics.valueOrNull,
               error: analytics.error,
