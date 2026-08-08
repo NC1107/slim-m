@@ -65,7 +65,7 @@ MockClient quietClient() => MockClient((request) async {
       'created_at': 0,
       'permissions': 0,
     },
-    // The canvas viewport, ops feed and voice roster each decode a shape; a plain list fails those casts.
+    // The canvas viewport, ops feed, media slots and voice roster each decode a shape; a plain list fails those casts.
     _ when path.endsWith('/canvas/objects') => const {
       'objects': <Object>[],
       'has_more': false,
@@ -77,6 +77,7 @@ MockClient quietClient() => MockClient((request) async {
       'has_more': false,
       'reset': false,
     },
+    _ when path.endsWith('/canvas/media-slots') => const {'slots': <Object>[]},
     _ when path.endsWith('/voice/roster') => const {'participants': <Object>[]},
     _ => const <Object>[],
   };

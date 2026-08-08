@@ -440,6 +440,38 @@ class CanvasObjectMoved extends ServerEvent {
 /// absent, matching [CanvasObjectMoved]: restacking another member's object
 /// needs `MANAGE_CANVAS` and so can be a moderation act the same way a move
 /// is.
+/// A participant's camera or screen-share tile was moved, resized, locked
+/// or sent to the back or front - shared and persistent since decision
+/// 0010's reversal, so this reaches every viewer, not only the one who
+/// touched it. Carries the whole current row, so a receiver needs no
+/// refetch. [userId] names the participant the tile represents, never who
+/// moved it: anyone who can draw on this canvas may rearrange anyone's
+/// tile. Carries no seq: a slot mutates in place rather than joining the
+/// canvas op stream.
+class CanvasMediaSlotChanged extends ServerEvent {
+  const CanvasMediaSlotChanged({
+    required this.channelId,
+    required this.kind,
+    required this.userId,
+    required this.x,
+    required this.y,
+    required this.w,
+    required this.h,
+    required this.locked,
+    required this.sentToBack,
+  });
+
+  final String channelId;
+  final String kind;
+  final String userId;
+  final double x;
+  final double y;
+  final double w;
+  final double h;
+  final bool locked;
+  final bool sentToBack;
+}
+
 class CanvasObjectReordered extends ServerEvent {
   const CanvasObjectReordered({
     required this.channelId,

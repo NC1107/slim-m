@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Where a call participant's camera or screen-share tile actually sits on
-/// *this* viewer's own canvas, once they have dragged, resized, locked or
-/// hidden it away from [CanvasPresenceLayout]'s default arrangement.
+/// a channel's canvas, once somebody has dragged, resized, locked or
+/// restacked it away from [CanvasPresenceLayout]'s default arrangement.
 ///
-/// Deliberately local and ephemeral: never written to the op log, never
-/// carried on the wire, never shared with the other end of the call. See
-/// `docs/decisions/0010-canvas-media-tiles.md` for why a personal,
-/// per-viewer arrangement is the answer here rather than a synchronised one.
-/// [prune] is what makes "reset on rejoin" (STRATEGY's own phrase for
-/// presence objects, extended here from position to the whole override) hold
-/// literally: an override keyed to an identity no longer on the call is
-/// dropped, so a rejoin starts back at [CanvasPresenceLayout]'s default
-/// rather than remembering a drag from a call that already ended.
+/// Position, size, lock and depth are shared and persistent - decision
+/// 0010's reversal of its own first call, made on the owner's own
+/// instruction: "when i join the canvas, move something to a specific X, Y
+/// position... it should still be at X and Y, not reset". The server
+/// (`canvas_media_slots` table) is the source of truth; this class is the
+/// client's own mirror of it, kept current by a fetch on open and by live
+/// `canvas.media_slot.changed` frames (`CanvasMediaSlotSync`, in the app
+/// package, owns both). [hidden] is the one field that stays exactly as it
+/// was: local, personal, and reset on rejoin via [prune].
 library;
 
 import 'package:flutter/foundation.dart';
@@ -20,8 +20,9 @@ import 'package:flutter/painting.dart';
 import 'canvas_stroke.dart';
 
 /// One tile's departure from its default position, size and interactivity.
-/// [rect] is null until the first drag or resize; a null field always means
-/// "use whatever [CanvasPresenceLayout] would otherwise say," never "hide."
+/// [rect] is null until the server (or a not-yet-committed local drag) has
+/// ever answered for this key; a null field always means "use whatever
+/// [CanvasPresenceLayout] would otherwise say," never "hide."
 @immutable
 class CanvasPresenceTileState {
   const CanvasPresenceTileState({
@@ -33,19 +34,21 @@ class CanvasPresenceTileState {
 
   final Rect? rect;
 
-  /// Locked content ignores the pointer entirely - a drawing tool, or a pan,
-  /// reaches straight through it - and offers no resize handle; only the
-  /// lock control itself stays reachable, so a locked tile is never a dead
-  /// end.
+  /// Shared, not personal: a locked tile stops intercepting the pointer for
+  /// *every* viewer - a drawing tool, or a pan, reaches straight through it
+  /// - protecting an arrangement everyone relies on the same way Figma's
+  /// own layer lock does, rather than describing only this viewer's own
+  /// pointer.
   final bool locked;
+
+  /// Personal. Never sent to the server, never touched by [applyServer] -
+  /// see this file's own library doc.
   final bool hidden;
 
-  /// Whether this tile's own pixels paint behind the drawing surface rather
-  /// than above it - see `canvas_presence_backdrop.dart`'s own doc for why
-  /// that has to be a second widget rather than a reorder of this one.
-  /// Never touches whether the tile's controls hit-test: those stay on
-  /// `CanvasPresenceLayer`'s own interactive shell regardless, the same
-  /// "never a dead end" guarantee [locked] already makes.
+  /// Shared, the same reason [locked] is: whether this tile's own pixels
+  /// paint behind the drawing surface rather than above it - see
+  /// `canvas_presence_backdrop.dart`'s own doc for why that has to be a
+  /// second widget rather than a reorder of this one.
   final bool sentToBack;
 
   CanvasPresenceTileState copyWith({
@@ -64,20 +67,23 @@ class CanvasPresenceTileState {
 
 const _defaultTileState = CanvasPresenceTileState();
 
-/// Keyed by a tile key of the shape `'camera:<identity>'` or
-/// `'screen:<identity>'` - an opaque string, the same convention
+/// Keyed by a tile key of the shape `'camera:<userId>'` or
+/// `'screen:<userId>'` - an opaque string, the same convention
 /// [CanvasPresenceVisibility] and `CanvasPresenceLayout.arrange` already
 /// accept unmodified, so nothing here has to know what kind of tile a key
 /// names.
 class CanvasPresenceTileOverrides extends ChangeNotifier {
   final Map<String, CanvasPresenceTileState> _states = {};
 
-  /// Which tile last had its rect touched, most recent last - a drag or
-  /// resize is "bring to front" the same way picking up a real sheet of
-  /// paper puts it on top of the pile, so an untouched participant's
-  /// default-positioned tile can never sit over one this viewer just moved.
-  /// A key absent here has never been touched and paints in [_states]'
-  /// insertion order, behind every touched one.
+  /// Which tile last had its rect touched *this session*, most recent last -
+  /// a drag or resize is "bring to front" the same way picking up a real
+  /// sheet of paper puts it on top of the pile, so an untouched
+  /// participant's default-positioned tile can never sit over one this
+  /// viewer just moved. Deliberately local and per-mount, unlike everything
+  /// else this class stores: it orders same-screen overlap for one viewer's
+  /// own eye, never sent anywhere, and [sentToBack] (front-versus-drawing-
+  /// surface depth) is the shared concept the owner's own "front or back"
+  /// request actually asked for.
   int _nextZ = 0;
   final Map<String, int> _z = {};
 
@@ -85,15 +91,39 @@ class CanvasPresenceTileOverrides extends ChangeNotifier {
       _states[key] ?? _defaultTileState;
 
   /// This key's own place in the touch order, or null if it has never been
-  /// dragged or resized - the render order [CanvasPresenceLayer] sorts by.
+  /// dragged or resized this session - the render order [CanvasPresenceLayer]
+  /// sorts by.
   int? zFor(String key) => _z[key];
 
-  /// [rect]'s position is clamped to [worldLimit], the same bound
-  /// [CanvasDocument]'s own camera is held to - a real canvas object is
-  /// bounded at the server, and a tile has no server round trip to enforce
-  /// that for it, so an unclamped drag could otherwise carry it a million
-  /// units away with no way back. Size is left alone: the widget that calls
-  /// this already clamps a resize to `canvasPresenceTileMinSize`/`Max`.
+  /// Replaces [rect]/[locked]/[sentToBack] with the server's current answer
+  /// for [key] - a fetch on opening the canvas, or a live
+  /// `canvas.media_slot.changed` frame - leaving [hidden] untouched, since
+  /// that field is never shared. The server already enforces its own world
+  /// bound on write, so this does not re-clamp [rect].
+  void applyServer(
+    String key, {
+    required Rect rect,
+    required bool locked,
+    required bool sentToBack,
+  }) {
+    _states[key] = stateFor(key).copyWith(
+      rect: rect,
+      locked: locked,
+      sentToBack: sentToBack,
+    );
+    notifyListeners();
+  }
+
+  /// Optimistic, local-only update for the live-while-dragging feel; the
+  /// caller (`CanvasPresenceLayer`) is responsible for also committing the
+  /// result to the server once the gesture settles, or this drifts from
+  /// what every other viewer sees. [rect]'s position is clamped to
+  /// [worldLimit], the same bound [CanvasDocument]'s own camera is held to -
+  /// a real canvas object is bounded at the server, and an in-flight local
+  /// drag has not reached that check yet, so an unclamped drag could
+  /// otherwise carry it a million units away with no way back before the
+  /// commit lands. Size is left alone: the widget that calls this already
+  /// clamps a resize to `canvasPresenceTileMinSize`/`Max`.
   void setRect(String key, Rect rect) {
     final clamped = Rect.fromLTWH(
       rect.left.clamp(-worldLimit, worldLimit),
@@ -106,28 +136,22 @@ class CanvasPresenceTileOverrides extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Drops a stored position without touching lock or hidden state - the
-  /// "reset position" a tile's own controls may offer, distinct from
-  /// [prune], which drops the whole entry.
-  void clearRect(String key) {
-    final current = stateFor(key);
-    _states[key] = CanvasPresenceTileState(
-      locked: current.locked,
-      hidden: current.hidden,
-    );
-    notifyListeners();
-  }
-
+  /// Optimistic, local-only; see [setRect]'s own doc for why the caller
+  /// still has to commit this onward.
   void setLocked(String key, bool locked) {
     _states[key] = stateFor(key).copyWith(locked: locked);
     notifyListeners();
   }
 
+  /// Optimistic, local-only; see [setRect]'s own doc for why the caller
+  /// still has to commit this onward.
   void setSentToBack(String key, bool sentToBack) {
     _states[key] = stateFor(key).copyWith(sentToBack: sentToBack);
     notifyListeners();
   }
 
+  /// Local and personal - never sent to the server. Unlike [setRect] and
+  /// its siblings, this one needs no further commit.
   void setHidden(String key, bool hidden) {
     _states[key] = stateFor(key).copyWith(hidden: hidden);
     notifyListeners();
@@ -138,15 +162,25 @@ class CanvasPresenceTileOverrides extends ChangeNotifier {
   Iterable<String> get hiddenKeys =>
       _states.entries.where((e) => e.value.hidden).map((e) => e.key);
 
-  /// Drops every override whose key is not in [present] - call once per
-  /// roster change. A participant who left and later rejoins starts back at
-  /// the default arrangement rather than inheriting a drag, a lock or a hide
-  /// from a call that has, from this override store's point of view,
-  /// already ended.
+  /// Drops [hidden] for every key not in [present] - call once per roster
+  /// change. That field alone still resets on rejoin, the "reset on
+  /// rejoin" shape STRATEGY calls for on presence objects generally; a
+  /// participant who left and later rejoins starts back with their tile
+  /// unhidden. [rect], [locked] and [sentToBack] are shared and persistent
+  /// now and are never dropped here: the server, not roster membership, is
+  /// their source of truth, and a departed participant's tile is still
+  /// worth remembering for whenever they - or whoever moved it - is back.
+  /// The local touch order in [_z] is dropped too, since it is a purely
+  /// this-session paint-stacking concern with nothing to persist.
   void prune(Set<String> present) {
-    final before = _states.length;
-    _states.removeWhere((key, _) => !present.contains(key));
+    var changed = false;
+    for (final entry in _states.entries.toList()) {
+      if (present.contains(entry.key) || !entry.value.hidden) continue;
+      _states[entry.key] = entry.value.copyWith(hidden: false);
+      changed = true;
+    }
+    final beforeZ = _z.length;
     _z.removeWhere((key, _) => !present.contains(key));
-    if (_states.length != before) notifyListeners();
+    if (changed || _z.length != beforeZ) notifyListeners();
   }
 }

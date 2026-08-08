@@ -60,6 +60,7 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
     required this.locked,
     required this.sentToBack,
     required this.onRectChanged,
+    required this.onRectCommitted,
     required this.onToggleLocked,
     required this.onToggleSentToBack,
     required this.onHide,
@@ -87,6 +88,11 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
   /// persisting it (`CanvasPresenceTileOverrides.setRect`), this widget owns
   /// only the arithmetic and the live-while-dragging feel.
   final ValueChanged<Rect> onRectChanged;
+
+  /// Fired once, when a drag or resize settles - the caller's cue to send
+  /// the now-final rect onward to the server (`CanvasPresenceLayer.onCommit`),
+  /// since every intermediate [onRectChanged] frame stays purely local.
+  final VoidCallback onRectCommitted;
   final VoidCallback onToggleLocked;
   final VoidCallback onToggleSentToBack;
   final VoidCallback onHide;
@@ -131,7 +137,10 @@ class _CanvasPresenceManipulableTileState
     widget.onRectChanged(next);
   }
 
-  void _settle(DragEndDetails details) => setState(() => _liveRect = null);
+  void _settle(DragEndDetails details) {
+    setState(() => _liveRect = null);
+    widget.onRectCommitted();
+  }
 
   /// This tile's own pan pointer, so an unrelated second pointer's own
   /// button cannot steer or end a grab it did not start - the same guard

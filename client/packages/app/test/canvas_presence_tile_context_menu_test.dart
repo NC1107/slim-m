@@ -59,6 +59,7 @@ Widget _wrap({
               cameraViewFor: (_) => const SizedBox(),
               screenShareViewFor: (_) => const SizedBox(),
               overrides: overrides,
+              onCommit: (_, __) {},
             ),
           ],
         ),

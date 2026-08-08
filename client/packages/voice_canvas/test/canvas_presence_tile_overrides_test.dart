@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /// [CanvasPresenceTileOverrides]: default state, that each mutator both
 /// stores its own field and leaves the others untouched, that [prune] drops
-/// exactly what left the roster, and that every mutation notifies.
+/// only [CanvasPresenceTileState.hidden] for a key that left the roster
+/// while position, lock and depth survive it, and that every mutation
+/// notifies.
 library;
 
 import 'package:flutter/painting.dart';
@@ -78,16 +80,22 @@ void main() {
     expect(state.rect, const Rect.fromLTWH(1, 2, 3, 4));
   });
 
-  test('clearRect drops only the rect, leaving lock and hidden alone', () {
+  test('applyServer replaces rect, locked and sentToBack but not hidden', () {
     final overrides = CanvasPresenceTileOverrides();
-    overrides.setRect('camera:alice', const Rect.fromLTWH(1, 2, 3, 4));
-    overrides.setLocked('camera:alice', true);
+    overrides.setHidden('camera:alice', true);
 
-    overrides.clearRect('camera:alice');
+    overrides.applyServer(
+      'camera:alice',
+      rect: const Rect.fromLTWH(1, 2, 3, 4),
+      locked: true,
+      sentToBack: true,
+    );
 
     final state = overrides.stateFor('camera:alice');
-    expect(state.rect, isNull);
+    expect(state.rect, const Rect.fromLTWH(1, 2, 3, 4));
     expect(state.locked, isTrue);
+    expect(state.sentToBack, isTrue);
+    expect(state.hidden, isTrue, reason: 'hidden is never shared');
   });
 
   test('hiddenKeys names exactly the keys marked hidden', () {
@@ -99,16 +107,39 @@ void main() {
     expect(overrides.hiddenKeys.toSet(), {'camera:alice', 'screen:alice'});
   });
 
-  test('prune drops an override for a key no longer present', () {
+  test(
+      'prune leaves rect, locked and sentToBack alone for a key that left '
+      'the roster - they are shared and persistent now, not reset on '
+      'rejoin', () {
     final overrides = CanvasPresenceTileOverrides();
     overrides.setRect('camera:alice', const Rect.fromLTWH(1, 2, 3, 4));
-    overrides.setRect('camera:bob', const Rect.fromLTWH(5, 6, 7, 8));
+    overrides.setLocked('camera:alice', true);
+    overrides.setSentToBack('camera:alice', true);
 
-    overrides.prune({'camera:bob'});
+    overrides.prune(const {});
 
-    expect(overrides.stateFor('camera:alice').rect, isNull);
-    expect(
-        overrides.stateFor('camera:bob').rect, const Rect.fromLTWH(5, 6, 7, 8));
+    final state = overrides.stateFor('camera:alice');
+    expect(state.rect, const Rect.fromLTWH(1, 2, 3, 4));
+    expect(state.locked, isTrue);
+    expect(state.sentToBack, isTrue);
+  });
+
+  test('prune drops hidden for a key that left the roster', () {
+    final overrides = CanvasPresenceTileOverrides();
+    overrides.setHidden('camera:alice', true);
+
+    overrides.prune(const {});
+
+    expect(overrides.stateFor('camera:alice').hidden, isFalse);
+  });
+
+  test('prune leaves hidden alone for a key still in the roster', () {
+    final overrides = CanvasPresenceTileOverrides();
+    overrides.setHidden('camera:alice', true);
+
+    overrides.prune({'camera:alice'});
+
+    expect(overrides.stateFor('camera:alice').hidden, isTrue);
   });
 
   test('prune with nothing to drop does not notify', () {
@@ -181,7 +212,12 @@ void main() {
     overrides.setLocked('camera:alice', true);
     overrides.setSentToBack('camera:alice', true);
     overrides.setHidden('camera:alice', true);
-    overrides.clearRect('camera:alice');
+    overrides.applyServer(
+      'camera:alice',
+      rect: const Rect.fromLTWH(5, 6, 7, 8),
+      locked: false,
+      sentToBack: false,
+    );
     overrides.prune(const {});
 
     expect(notifications, 6);

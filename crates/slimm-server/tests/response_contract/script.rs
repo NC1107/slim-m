@@ -17,9 +17,11 @@ use uuid::Uuid;
 use super::world::{Contract, Payload};
 
 mod content;
+mod content_media_slots;
 mod people;
 
 use content::{channel_calls, emoji_calls, message_calls};
+use content_media_slots::media_slot_calls;
 use people::{moderation_calls, profile_calls, safety_calls};
 
 const PASSWORD: &str = "a-long-enough-password";

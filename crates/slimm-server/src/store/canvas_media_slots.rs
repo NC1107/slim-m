@@ -147,10 +147,7 @@ impl Store {
         .await?;
         Ok(rows
             .into_iter()
-            // A kind the CHECK constraint would refuse cannot exist in a row
-            // this server wrote; skipped rather than trusted, the same
-            // "unknown degrades away" treatment a viewport read gives an
-            // unparseable `props` object.
+            // Skipped rather than trusted, the same degrade-away treatment an unparseable `props` object gets.
             .filter_map(|r| {
                 Some(CanvasMediaSlot {
                     channel_id,

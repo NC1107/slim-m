@@ -140,4 +140,44 @@ extension SlimmApiCanvas on SlimmApi {
     );
     return CanvasOpsPage.fromJson(json as Map<String, dynamic>);
   }
+
+  /// Every media slot this channel's canvas currently remembers - a cold
+  /// fetch to run once on opening the canvas, before live
+  /// `canvas.media_slot.changed` frames keep the picture current.
+  Future<CanvasMediaSlotPage> canvasMediaSlots(String channelId) async {
+    final json = await _send('GET', '/channels/$channelId/canvas/media-slots');
+    return CanvasMediaSlotPage.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Moves, resizes, locks or restacks one participant's camera or
+  /// screen-share tile. [userId] names the participant the tile represents,
+  /// never necessarily the caller: anyone who can draw on this canvas may
+  /// rearrange anyone's tile, the same shared-editing trust this channel
+  /// already grants over drawing. Every field is sent on every call; the
+  /// stored row is replaced outright rather than merged.
+  Future<CanvasMediaSlot> putCanvasMediaSlot(
+    String channelId, {
+    required String kind,
+    required String userId,
+    required double x,
+    required double y,
+    required double w,
+    required double h,
+    required bool locked,
+    required bool sentToBack,
+  }) async {
+    final json = await _send(
+      'PUT',
+      '/channels/$channelId/canvas/media-slots/$kind/$userId',
+      body: {
+        'x': x,
+        'y': y,
+        'w': w,
+        'h': h,
+        'locked': locked,
+        'sent_to_back': sentToBack,
+      },
+    );
+    return CanvasMediaSlot.fromJson(json as Map<String, dynamic>);
+  }
 }

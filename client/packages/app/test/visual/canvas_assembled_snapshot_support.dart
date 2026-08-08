@@ -178,6 +178,7 @@ Future<void> renderCanvasAssembledPane(
                 ),
               ),
               tileOverrides: overrides,
+              onCommitTile: (_, __) {},
               selfBubbleHidden: false,
               onToggleSelfBubbleHidden: () {},
               callDock: controller == null

@@ -69,6 +69,9 @@ MockClient _imageCanvasClient() => MockClient((request) async {
       headers: {'content-type': 'image/png'},
     );
   }
+  if (path.endsWith('/canvas/media-slots')) {
+    return _jsonResponse({'slots': <Object>[]});
+  }
   return _jsonResponse(<Object>[]);
 });
 

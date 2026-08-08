@@ -46,6 +46,7 @@ Widget _layer(CanvasDocument document, CanvasPresenceTileOverrides overrides) =>
       cameraViewFor: (_) => const SizedBox(),
       screenShareViewFor: (_) => const SizedBox(),
       overrides: overrides,
+      onCommit: (_, __) {},
     );
 
 Widget _backdrop(
@@ -107,6 +108,7 @@ Widget _pane(CanvasDocument document, CanvasPresenceTileOverrides overrides) =>
               cameraViewFor: (_) => const SizedBox(),
               screenShareViewFor: (_) => const SizedBox(),
               tileOverrides: overrides,
+              onCommitTile: (_, __) {},
               selfBubbleHidden: false,
               onToggleSelfBubbleHidden: () {},
             ),

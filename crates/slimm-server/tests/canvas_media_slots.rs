@@ -160,8 +160,7 @@ async fn persists_across_a_restart() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    // A new pool, over the same file - nothing here is the same process's
-    // in-memory state, the same guarantee a real server restart needs.
+    // A new pool over the same file - nothing here is in-memory state, the same guarantee a restart needs.
     let restarted = Store::new(db::connect(&config).await.unwrap());
     let response = http::router(state_for(&restarted))
         .oneshot(list_slots_request(channel, &access))

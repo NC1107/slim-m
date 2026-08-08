@@ -14,6 +14,7 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_activity_log.dart';
 import 'canvas_cursor_relay.dart';
+import 'canvas_media_slot_sync.dart';
 import 'canvas_stroke_preview_relay.dart';
 import 'canvas_sync.dart';
 
@@ -38,6 +39,7 @@ void dispatchCanvasLiveEvent(
   required CanvasStrokePreviewRelay Function() strokePreviewRelay,
   required void Function(api.CanvasObject object) applyPlacedObject,
   required VoidCallback forgetFetchedRegion,
+  required CanvasMediaSlotSync mediaSlotSync,
   CanvasActivityLog? activityLog,
 }) {
   switch (event) {
@@ -147,6 +149,10 @@ void dispatchCanvasLiveEvent(
         document.refresh();
         activityLog?.recordReorderedLive(opId);
       });
+    case api.CanvasMediaSlotChanged(:final channelId)
+        when channelId == paneChannelId:
+      // Never through sync.applyLive: a slot carries no seq, the same reason a cursor does not.
+      mediaSlotSync.applyRemote(event);
     default:
       break;
   }

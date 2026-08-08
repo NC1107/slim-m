@@ -29,6 +29,15 @@ Set<String> presenceTileKeys(List<VoiceParticipant> participants) {
   return keys;
 }
 
+/// `'screen'` or `'camera'` - the same two strings the server's own
+/// `CanvasMediaSlot.kind` uses, so a key can be sent straight through with
+/// no translation.
+String presenceTileKind(String key) =>
+    key.startsWith('screen:') ? 'screen' : 'camera';
+
+/// The participant a tile key names, stripped of its `kind:` prefix.
+String presenceTileIdentity(String key) => key.substring(key.indexOf(':') + 1);
+
 Size presenceTileSize(String key, Map<String, VoiceParticipant> byIdentity) {
   if (key.startsWith('screen:')) return presenceScreenShareSize;
   final participant = byIdentity[key.substring('camera:'.length)];

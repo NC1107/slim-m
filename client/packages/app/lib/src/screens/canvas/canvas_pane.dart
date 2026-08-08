@@ -43,6 +43,7 @@ import 'canvas_cursor_relay.dart';
 import 'canvas_image_hydrator.dart';
 import 'canvas_image_paste.dart';
 import 'canvas_live_event_dispatch.dart';
+import 'canvas_media_slot_sync.dart';
 import 'canvas_note_sheet.dart';
 import 'canvas_ops_controller.dart';
 import 'canvas_pane_body.dart';
@@ -76,13 +77,23 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   final CanvasCursors _cursors = CanvasCursors();
   final RemoteStrokeDrafts _remoteDrafts = RemoteStrokeDrafts();
 
-  /// Every camera and screen-share tile's own drag, resize, lock and hide -
-  /// see `canvas_presence_layer.dart`'s own doc for why this is personal and
-  /// ephemeral rather than a `canvas_objects` row. Lives for exactly this
-  /// pane's own mount, so closing and reopening the canvas resets it, the
-  /// same "reset on rejoin" STRATEGY already calls for on presence objects.
+  /// Every camera and screen-share tile's own drag, resize, lock and depth -
+  /// shared and persistent, mirroring the server's own `canvas_media_slots`
+  /// table (`_slotSync`, below, is what keeps it current); only `hidden`
+  /// stays local to this field. Lives for exactly this pane's own mount, so
+  /// closing and reopening the canvas re-fetches rather than remembering -
+  /// harmless, since the server is the real source of truth either way.
   final CanvasPresenceTileOverrides _tileOverrides =
       CanvasPresenceTileOverrides();
+
+  /// Reads and writes [_tileOverrides]' shared fields against the server -
+  /// see that class's own doc for the split between what this syncs and
+  /// what stays local.
+  late final CanvasMediaSlotSync _slotSync = CanvasMediaSlotSync(
+    channelId: widget.channelId,
+    client: ref.read(apiProvider),
+    overrides: _tileOverrides,
+  );
   late final CanvasActivityLog _activityLog = CanvasActivityLog(
     isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
   );
@@ -138,6 +149,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _document.addListener(_onCameraMoved);
     // This pane is the only content mounted while it exists, so one listener for the whole mount is safe: nothing else here could hold it at the same time.
     _imagePaste.start();
+    unawaited(_slotSync.fetch());
   }
 
   @override
@@ -170,6 +182,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     applyPlacedObject: _apply,
     forgetFetchedRegion: () => _fetched = null,
     activityLog: _activityLog,
+    mediaSlotSync: _slotSync,
   );
 
   void _apply(api.CanvasObject object) {
@@ -412,6 +425,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
               .read(voiceControllerProvider.notifier)
               .screenShareViewFor,
           tileOverrides: _tileOverrides,
+          onCommitTile: (key, rect) => unawaited(_slotSync.commit(key, rect)),
           activityLog: _activityLog,
           selfBubbleHidden: selfPresence.hidden,
           onToggleSelfBubbleHidden: _onToggleSelfBubbleHidden,
