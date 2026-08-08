@@ -44,6 +44,8 @@ SHARING_NOTICE = "You are sharing your screen"
 STOP_SHARING = "Stop sharing"
 MUTE = "Mute"
 UNMUTE = "Unmute"
+TURN_ON_CAMERA = "Turn on camera"
+TURN_OFF_CAMERA = "Turn off camera"
 LEAVE_CALL = "Leave call"
 
 # Calling in a DM

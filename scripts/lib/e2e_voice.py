@@ -232,3 +232,26 @@ def leave_call(a, b):
     # which would let the next scenario's own IN_CALL wait pass on nothing.
     b.click(L.LEAVE_CALL, settle=4)
     print("  and the remaining client leaves too, so no call is left open")
+
+
+def rejoin_after_leaving(client, room_id, channel=L.VOICE_CHANNEL):
+    """Re-clicking a voice channel already left rejoins it rather than
+    stranding the caller on a dead rejoin screen with nothing to press.
+
+    PR #469's second fix: `VoiceScreen`'s own auto-join guard cannot tell a
+    re-click of the same channel apart from an incidental ancestor rebuild,
+    so the row asks `voiceChannelTapShouldRejoin` directly instead. Checked
+    at the SFU, the same way `join_call` is, rather than trusted from the
+    "in call" label alone.
+    """
+    client.click(channel)
+    client.wait_for(L.IN_CALL)
+    client.wait_for("1 in call")
+    parts = participants_with_mics(room_id, expected=1)
+    assert len(parts) == 1, \
+        f"SFU has {len(parts)} participants after rejoining, expected 1"
+    assert parts[0]["state"] == "ACTIVE", f'{parts[0]["identity"]} is {parts[0]["state"]}'
+    print(f"  {client.name} rejoined by re-clicking the channel already "
+          f"left, confirmed ACTIVE at the SFU")
+    client.click(L.LEAVE_CALL, settle=4)
+    print(f"  and {client.name} left again, so no call is left open")

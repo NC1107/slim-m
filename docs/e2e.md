@@ -62,6 +62,8 @@ tile is not a published track.
 | a voice call, mute, leaving | the UI | the SFU's participant and track list |
 | sharing a screen | the UI | a `SCREEN_SHARE` track on the SFU |
 | the canvas dock keeps a call's own controls reachable | the UI | mute and unmute, clicked from inside the canvas's own dock, both reach the SFU |
+| a shared camera tile: two drags, a live update on the peer, a call rejoin, a cold canvas reopen | the UI (`e2e_media_slots.py`) | `GET /channels/{id}/canvas/media-slots`, and the peer's own screen position, twice over |
+| re-clicking a voice channel already left rejoins it | the UI | the SFU's participant list, ACTIVE with a published mic |
 | calling in a DM | the UI | the SFU's participant and track list, keyed by the DM's own channel id |
 | edit, delete, search, pins, polls, invites, DMs, channel admin, devices, read state, sync | the API | the effect of each, not its status code |
 | the Voice Canvas: draw, paste an image, place a note and a shape, move, resize, reorder, erase, clear, undo, reload | the UI (`e2e_canvas.py`, `e2e_canvas_shapes.py`; see below) | `GET /channels/{id}/canvas/objects`, `z_index` for the reorder, and the second client's own `performance` resource log for the pasted image's bytes |
@@ -93,7 +95,7 @@ prints it every time so it cannot quietly grow.
 | `lib/e2e_js.py` | the browser-side half: reading and driving the semantics tree |
 | `lib/e2e_labels.py` | every accessible name the app is driven by, in one place |
 | `lib/e2e_api.py` | the server's own answer, for checking against |
-| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py`, `e2e_markdown.py`, `e2e_reconcile.py`, `e2e_replies.py`, `e2e_threads.py`, `e2e_dm_call.py`, `e2e_canvas.py`, `e2e_canvas_shapes.py` | the scenarios |
+| `lib/e2e_messaging.py`, `e2e_settings.py`, `e2e_admin.py`, `e2e_voice.py`, `e2e_markdown.py`, `e2e_reconcile.py`, `e2e_replies.py`, `e2e_threads.py`, `e2e_dm_call.py`, `e2e_canvas.py`, `e2e_canvas_shapes.py`, `e2e_media_slots.py` | the scenarios |
 | `lib/e2e_sweep.py` | the API-level routes the scenarios do not reach |
 | `lib/e2e_seed.py`, `e2e_fixtures.py` | the accounts and the two PNGs a run uploads |
 
@@ -176,6 +178,36 @@ traffic over CDP, which would only prove a frame arrived, not that it
 painted anything. `draw_stroke_and_see_it_live` already checks the *result*
 of a draw on both clients; the preview itself is named here as an honest gap
 rather than a test that would pass whether or not it worked.
+
+### Driving a shared camera or screen-share tile
+
+`e2e_media_slots.py` is the one canvas scenario whose entire claim is that
+two clients agree about something neither of them drew: a camera or
+screen-share tile's position, size, lock and depth are shared and
+server-persisted (decision 0010's reversal), not a purely local presence
+artifact the way the tile's video itself is. `CanvasPresenceManipulableTile`
+carries a container `Semantics` node too - `"<name>, on this call's
+canvas"`, or `"<name>, you, ..."` for the caller's own tile
+(`canvas_presence_layer.dart`'s own `_tile`) - findable and draggable the
+same way the drawing surface's own object handles are, with the same
+`gestures(True)`/raw-pointer requirement, since it sits over `CanvasSurface`
+too. Two things this scenario checks that no unit test on either side can:
+the second client's own on-screen tile position moves, live, after the
+first drags theirs (proving the `canvas.media_slot.changed` frame actually
+reached and repainted a second client, not only that the server's own row
+changed); and a *cold* reopen of the canvas pane - which reconstructs
+`CanvasPresenceTileOverrides` from scratch, dropping every local override -
+still finds the tile exactly where it was left, which only the server's own
+persisted row could answer from.
+
+**A canvas viewer sees no presence tile at all for a call they have not
+themselves joined**, even for a channel whose canvas they can otherwise
+read and draw on: `canvas_pane_gestures.dart`'s own `_callParticipants`
+answers empty unless `voiceControllerProvider.channelId` matches the pane's
+own channel, since there is no LiveKit room to render a live texture from
+otherwise. So this scenario opens `b`'s own canvas from the same voice
+channel's wide header, mid-call, rather than reusing whichever canvas
+`b` already had open on the text channel earlier in the run.
 
 **Not covered, deliberately: whether the dock's own controls are reachable
 by touch at a narrow width**, the class of bug #460's own commit message
