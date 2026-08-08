@@ -153,5 +153,19 @@ class Api:
                 return obj
         raise AssertionError(f"no live canvas object {object_id!r}")
 
+    def canvas_media_slots(self, channel_id):
+        got = self.call("GET", f"/channels/{channel_id}/canvas/media-slots")
+        return got["slots"] if isinstance(got, dict) else got
+
+    def canvas_media_slot(self, channel_id, kind, user_id):
+        """None until a drag, resize, lock or depth toggle has ever
+        committed one - see CanvasMediaSlotSync's own doc for why turning a
+        camera on alone writes nothing.
+        """
+        for slot in self.canvas_media_slots(channel_id):
+            if slot["kind"] == kind and slot["user_id"] == user_id:
+                return slot
+        return None
+
     def version(self):
         return Api(self.base).call("GET", "/version")
