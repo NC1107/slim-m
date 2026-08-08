@@ -172,6 +172,9 @@ class _NotificationPreferenceRowState
     if (preference.hasError && preference.error is api.NotFoundException) {
       return const SizedBox.shrink();
     }
+    // A 404 above reads as "not offered"; any other failure with nothing
+    // cached would otherwise sit at "Unknown" forever with no way back.
+    final loadFailed = preference.hasError && preference.valueOrNull == null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,6 +189,19 @@ class _NotificationPreferenceRowState
           ],
           onChanged: _set,
         ),
+        if (loadFailed)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s8,
+              0,
+              AppSpacing.s8,
+              AppSpacing.s8,
+            ),
+            child: AppErrorState(
+              message: 'Could not load your notification preference.',
+              onRetry: () => ref.invalidate(notificationPreferenceProvider),
+            ),
+          ),
         if (actionError != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(
