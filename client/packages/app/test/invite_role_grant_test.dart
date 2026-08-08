@@ -51,8 +51,15 @@ const _roles = [
   },
 ];
 
-Future<void> _pump(WidgetTester tester, int myPermissions) async {
+Future<void> _pump(
+  WidgetTester tester,
+  int myPermissions, {
+  bool rolesFetchFails = false,
+}) async {
   final client = MockClient((request) async {
+    if (rolesFetchFails && request.url.path == '/roles') {
+      return http.Response('', 500);
+    }
     final body = request.url.path == '/roles' ? _roles : const <Object>[];
     return http.Response(
       jsonEncode(body),
@@ -105,6 +112,25 @@ void main() {
     // Absent, not disabled: the server refuses this combination outright.
     expect(find.text('Role granted'), findsNothing);
   });
+
+  testWidgets(
+    'a failed roles fetch says so, rather than reading as no grantable role',
+    (tester) async {
+      await _pump(
+        tester,
+        Perm.manageRoles | Perm.manageMessages,
+        rolesFetchFails: true,
+      );
+
+      // Not the same absence a caller with genuinely nothing to grant sees.
+      expect(find.text('Role granted'), findsNothing);
+      expect(
+        find.text('Could not check which roles you can grant.'),
+        findsOneWidget,
+      );
+      expect(find.byType(AppErrorState), findsOneWidget);
+    },
+  );
 
   testWidgets('only roles the caller could grant are offered', (tester) async {
     await _pump(tester, Perm.manageRoles | Perm.manageMessages);

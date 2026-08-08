@@ -37,7 +37,16 @@ class InviteRoleGrantPicker extends ConsumerWidget {
     final roles = ref.watch(rolesProvider);
     return roles.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
+      // Distinct from "nothing to grant" below: a failed fetch says so and
+      // offers a way back, rather than reading as though this caller simply
+      // held no grantable role.
+      error: (_, _) => Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.s12),
+        child: AppErrorState(
+          message: 'Could not check which roles you can grant.',
+          onRetry: () => ref.invalidate(rolesProvider),
+        ),
+      ),
       data: (all) {
         // Only what this caller could grant: the server refuses a role
         // carrying a bit they do not hold, so offering it invites a 403.
