@@ -19,7 +19,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slimm_app/src/providers/canvas_self_presence.dart';
+import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../ui_snapshot_support.dart' show loadRealFonts;
 import 'canvas_assembled_scene.dart';
@@ -135,22 +135,59 @@ void main() {
   });
 
   testWidgets(
-    'busy desktop-1400 with the self bubble dragged to top-right, dark',
+    'busy desktop-1400 with a tile dragged, a tile resized, and a screen '
+    'share tile alongside a locked camera, dark',
     (tester) async {
       final document = buildBusyDocument();
       addTearDown(document.dispose);
       final cursors = buildBusyCursors();
       addTearDown(cursors.dispose);
+      final overrides = CanvasPresenceTileOverrides();
+      addTearDown(overrides.dispose);
+      // Priya's camera dragged well clear of the top-left row and shrunk small; Jordan's camera locked in place over on the right - the owner's own "make the screen as big or small as you want... lock it in place" ask, rendered rather than reasoned about.
+      overrides.setRect(
+        'camera:user-priya',
+        const Rect.fromLTWH(900, 620, 110, 90),
+      );
+      overrides.setRect(
+        'camera:user-jordan',
+        const Rect.fromLTWH(1180, 60, 160, 120),
+      );
+      overrides.setLocked('camera:user-jordan', true);
 
       await renderCanvasAssembledPane(
         tester,
-        name: 'busy-desktop-1400-self-topright-dark',
+        name: 'busy-desktop-1400-tiles-manipulated-dark',
+        width: 1400,
+        theme: 'dark',
+        document: document,
+        participants: busyParticipantsSharing,
+        cursors: cursors,
+        tileOverrides: overrides,
+      );
+    },
+  );
+
+  testWidgets(
+    'busy desktop-1400 with a tile locked and sent to the back, so real ink '
+    'lands on top of it, dark',
+    (tester) async {
+      final document = buildBusyDocument();
+      addTearDown(document.dispose);
+      final overrides = CanvasPresenceTileOverrides();
+      addTearDown(overrides.dispose);
+      // Avery's camera sits at its own default position, which buildBusyDocument's own doc already says overlaps the box-cluster ink - the case send-to-back exists for.
+      overrides.setLocked('camera:user-avery', true);
+      overrides.setSentToBack('camera:user-avery', true);
+
+      await renderCanvasAssembledPane(
+        tester,
+        name: 'busy-desktop-1400-tile-sent-to-back-dark',
         width: 1400,
         theme: 'dark',
         document: document,
         participants: busyParticipants,
-        cursors: cursors,
-        selfBubbleCorner: CanvasSelfBubbleCorner.topRight,
+        tileOverrides: overrides,
       );
     },
   );

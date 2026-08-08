@@ -129,5 +129,7 @@ CanvasDockData buildCanvasDockData({
     hasSelfBubble: row.hasSelfBubble,
     selfBubbleHidden: row.selfBubbleHidden,
     onToggleSelfBubbleHidden: row.onToggleSelfBubbleHidden,
+    hiddenTiles: row.hiddenTiles,
+    onShowTile: row.onShowTile,
   );
 }

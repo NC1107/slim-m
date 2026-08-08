@@ -12,11 +12,15 @@ library;
 
 import 'package:flutter/painting.dart';
 
-/// Deterministic placement for camera bubbles, purely a function of who is
-/// present. No drag, no persistence, no per-client state: a bubble's
-/// position is recomputed fresh from the current roster every time, which is
-/// what "reset on rejoin" (STRATEGY's own phrase for presence objects) means
-/// taken literally - there is nothing to reset because nothing is kept.
+/// Deterministic placement for camera and screen-share tiles, purely a
+/// function of who is present. It is the *fallback* a tile starts at, not
+/// the whole story any more: `CanvasPresenceTileOverrides` is where a drag,
+/// a resize, a lock or a hide actually lives now, one viewer at a time (see
+/// its own doc for why that is personal rather than shared). This class
+/// still has no drag and no persistence of its own - a tile with no override
+/// on record is recomputed fresh from the current roster every time, which
+/// is what "reset on rejoin" (STRATEGY's own phrase for presence objects)
+/// means taken literally for the tiles nobody has ever touched.
 class CanvasPresenceLayout {
   const CanvasPresenceLayout({
     this.tileWidth = 220,
@@ -34,15 +38,24 @@ class CanvasPresenceLayout {
   /// in view rather than off past the edge of the initial viewport.
   final double margin;
 
-  /// One world-space [Rect] per identity, in a single row ordered by sorted
-  /// identity - not join order, which is never the same string twice in a
-  /// row across two clients that learned about a join at different times.
-  Map<String, Rect> arrange(Iterable<String> identities) {
+  /// One world-space [Rect] per key, in a single row ordered by sorted
+  /// key - not join order, which is never the same string twice in a row
+  /// across two clients that learned about a join at different times.
+  ///
+  /// [sizeFor], when given, answers each key's own tile size (a screen
+  /// share is wider than a camera tile); left null every key gets
+  /// [tileWidth]/[tileHeight], [arrange]'s original uniform behaviour.
+  Map<String, Rect> arrange(
+    Iterable<String> identities, {
+    Size Function(String key)? sizeFor,
+  }) {
     final sorted = identities.toList()..sort();
     final placed = <String, Rect>{};
-    for (var i = 0; i < sorted.length; i++) {
-      final left = margin + i * (tileWidth + gap);
-      placed[sorted[i]] = Rect.fromLTWH(left, margin, tileWidth, tileHeight);
+    var left = margin;
+    for (final key in sorted) {
+      final size = sizeFor?.call(key) ?? Size(tileWidth, tileHeight);
+      placed[key] = Rect.fromLTWH(left, margin, size.width, size.height);
+      left += size.width + gap;
     }
     return placed;
   }
