@@ -82,6 +82,16 @@ const _bobOnCameraOnly = VoiceParticipant(
   isCameraOn: true,
 );
 
+const _bobSharing = VoiceParticipant(
+  identity: 'user-3',
+  name: 'Bob',
+  isLocal: false,
+  isSpeaking: false,
+  isMuted: false,
+  isScreenSharing: true,
+  isCameraOn: true,
+);
+
 Widget _harness(Widget child, ProviderContainer container) =>
     UncontrolledProviderScope(
       container: container,
@@ -230,6 +240,122 @@ void main() {
       expect(find.byType(ScreenShareStage), findsOneWidget);
       expect(find.byKey(const Key('fake-share-view-user-2')), findsOneWidget);
       expect(find.byKey(const Key('fake-share-view-user-1')), findsNothing);
+
+      await _leave(harness);
+    },
+  );
+
+  testWidgets(
+    'a hand-off between two live sharers keeps the filmstrip mounted rather '
+    'than fading every tile in it from blank',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final harness = VoiceHarness();
+      final session = FakeSession();
+      final controller = harness.controllerWith(
+        session,
+        voiceApi(),
+        extraOverrides: [
+          voiceRosterProvider.overrideWith(
+            (ref, channelId) =>
+                const Stream<List<VoiceRosterParticipant>>.empty(),
+          ),
+        ],
+      );
+      addTearDown(harness.dispose);
+
+      await tester.pumpWidget(
+        _harness(const VoiceScreen(channelId: 'channel-1'), harness.container),
+      );
+      await controller.join('channel-1');
+      session.emitState(VoiceSessionState.connected);
+      await tester.pump();
+      session.emitParticipants(const [_aliceSharing, _bobOnCameraOnly]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      final bobTileOpacity = find.ancestor(
+        of: find.byKey(const Key('fake-camera-view-user-3')),
+        matching: find.byType(Opacity),
+      );
+
+      // Alice stops, Bob starts: a stage exists throughout, so Bob's own tile must never go dark.
+      session.emitParticipants(const [
+        VoiceParticipant(
+          identity: 'user-2',
+          name: 'Alice',
+          isLocal: false,
+          isSpeaking: false,
+          isMuted: false,
+          isScreenSharing: false,
+        ),
+        _bobSharing,
+      ]);
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        tester.widget<Opacity>(bobTileOpacity.first).opacity,
+        1.0,
+        reason:
+            'the stage-to-stage hand-off must update in place, not remount '
+            'the whole filmstrip',
+      );
+
+      await _leave(harness);
+    },
+  );
+
+  testWidgets(
+    'a share appearing where there was none still fades in, since that is '
+    'genuinely new content rather than a hand-off',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final harness = VoiceHarness();
+      final session = FakeSession();
+      final controller = harness.controllerWith(
+        session,
+        voiceApi(),
+        extraOverrides: [
+          voiceRosterProvider.overrideWith(
+            (ref, channelId) =>
+                const Stream<List<VoiceRosterParticipant>>.empty(),
+          ),
+        ],
+      );
+      addTearDown(harness.dispose);
+
+      await tester.pumpWidget(
+        _harness(const VoiceScreen(channelId: 'channel-1'), harness.container),
+      );
+      await controller.join('channel-1');
+      session.emitState(VoiceSessionState.connected);
+      await tester.pump();
+      session.emitParticipants(const [_me, _aliceOnCameraOnly]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      session.emitParticipants(const [_me, _aliceSharingWithCameraOn]);
+      await tester.pump();
+      await tester.pump();
+
+      final stageOpacity = find.ancestor(
+        of: find.byType(ScreenShareStage),
+        matching: find.byType(Opacity),
+      );
+      expect(
+        tester.widget<Opacity>(stageOpacity.first).opacity,
+        lessThan(1.0),
+        reason:
+            'a stage appearing where there was only a grid is real new '
+            'content, and still deserves its entrance fade',
+      );
 
       await _leave(harness);
     },

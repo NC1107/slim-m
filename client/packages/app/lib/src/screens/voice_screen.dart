@@ -108,6 +108,8 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
         inThisChannel && voice.state == VoiceSessionState.connected;
     final connectingHere =
         inThisChannel && voice.state == VoiceSessionState.connecting;
+    // Without this, `join`'s own in-flight window (see its own comment) reads as `attemptedThis` and briefly flashes the rejoin screen.
+    final joiningHere = inThisChannel && voice.joining;
     final busyElsewhere = _busyElsewhere(voice, channelId);
     final attemptedThis = _autoJoinedFor == channelId;
 
@@ -120,7 +122,7 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
 
     final stage = connectedHere
         ? 'call'
-        : connectingHere
+        : (connectingHere || joiningHere)
         ? 'connecting'
         : busyElsewhere
         ? 'switch'
