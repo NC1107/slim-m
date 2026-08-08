@@ -142,7 +142,9 @@ class _NoopSyncController extends SyncController {
 /// swapped (a fake voice call, say) without duplicating this whole setup.
 Future<({ProviderContainer container, SlimmDatabase db})> fixtureContainer({
   List<Override> extraOverrides = const [],
+  List<api.Message>? messages,
 }) async {
+  final resolvedMessages = messages ?? fixtureMessages;
   // The voice settings screen reads SharedPreferences, which is a platform
   // channel with no host in a test; empty mock values are its real defaults.
   SharedPreferences.setMockInitialValues(const {});
@@ -177,10 +179,12 @@ Future<({ProviderContainer container, SlimmDatabase db})> fixtureContainer({
   final store = await container.read(storeProvider.future);
   await store.upsertChannels(fixtureChannels);
   await store.replaceCategories(fixtureCategories);
-  await store.applyMessages(fixtureMessages);
+  await store.applyMessages(resolvedMessages);
   // Reactions, attachments and polls live in an in-memory controller rather
   // than the store, so seeding the store alone renders none of them.
-  container.read(messageExtrasProvider.notifier).applyMessages(fixtureMessages);
+  container
+      .read(messageExtrasProvider.notifier)
+      .applyMessages(resolvedMessages);
   return (container: container, db: db);
 }
 

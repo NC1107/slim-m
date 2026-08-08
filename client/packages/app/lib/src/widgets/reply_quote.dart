@@ -70,19 +70,22 @@ class ReplyQuote extends ConsumerWidget {
             children: [
               Icon(AppIcons.reply, size: 13, color: tokens.textSecondary),
               const SizedBox(width: AppSpacing.s4),
-              if (label != null) ...[
-                Text(
-                  label,
-                  style: textStyle.copyWith(fontWeight: AppWeights.semi),
-                ),
-                const SizedBox(width: AppSpacing.s4),
-              ],
+              // One Flexible for both spans: a long display name alone would overflow the row otherwise.
               Flexible(
-                child: Text(
-                  snippet,
+                child: Text.rich(
+                  TextSpan(
+                    style: textStyle,
+                    children: [
+                      if (label != null)
+                        TextSpan(
+                          text: '$label  ',
+                          style: const TextStyle(fontWeight: AppWeights.semi),
+                        ),
+                      TextSpan(text: snippet),
+                    ],
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: textStyle,
                 ),
               ),
             ],

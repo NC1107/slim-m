@@ -65,7 +65,9 @@ List<MarkdownBlock> splitMarkdownBlocks(String text) {
 
   void flushParagraph() {
     if (paragraph.isNotEmpty) {
-      blocks.add(ParagraphBlock(paragraph.join('\n')));
+      final text = paragraph.join('\n');
+      // A blank line between two other blocks lands here as an empty paragraph; drop it, not a real block.
+      if (text.trim().isNotEmpty) blocks.add(ParagraphBlock(text));
       paragraph.clear();
     }
   }

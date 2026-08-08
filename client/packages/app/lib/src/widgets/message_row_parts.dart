@@ -181,7 +181,15 @@ class ThreadReplySummary extends ConsumerWidget {
       children: [
         Icon(AppIcons.thread, size: 13, color: color),
         const SizedBox(width: AppSpacing.s4),
-        Text(text, style: AppText.caption.copyWith(color: color)),
+        // Flexible, not a bare Text: an absolute "Last reply" date can overflow a phone-width row otherwise.
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.caption.copyWith(color: color),
+          ),
+        ),
       ],
     );
     final padded = Padding(
