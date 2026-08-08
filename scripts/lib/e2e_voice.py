@@ -238,7 +238,10 @@ def leave_call(a, b, room_id=None):
     print("  the remaining client dropped to 1 in call")
     # A lingering call here reads as "in call" on b's own rail summary too,
     # which would let the next scenario's own IN_CALL wait pass on nothing.
+    matches = [n["t"] for n in b.nodes() if "leave call" in n["t"].lower()]
+    print(f"  DEBUG bob: nodes matching 'leave call' before click: {matches}")
     b.click(L.LEAVE_CALL, settle=4)
+    b.shot("debug-bob-after-leave-click")
     if room_id is not None:
         deadline = time.time() + 20
         parts = sfu_participants(room_id)
