@@ -251,6 +251,14 @@ def leave_call(a, b, room_id=None):
     When given, waits out that gap directly rather than leaving it for
     whichever later scenario happens to be the first to actually depend
     on the room being empty (`rejoin_after_leaving` is).
+
+    One retry, not a shrug, on bob's own half: his second leave in this
+    session (his first is inside the media-slot scenario's own rejoin
+    cycle) has been seen to leave the SFU reporting him ACTIVE well past a
+    first 25-second wait. Retapping only if `L.LEAVE_CALL` is still on his
+    own screen too - if his client already believes it left, clicking a
+    button no longer there would only raise a worse error than the one
+    this retry exists to recover from.
     """
     _tap_label(a, L.LEAVE_CALL, settle=8)
     b.wait_for("1 in call")
@@ -260,13 +268,22 @@ def leave_call(a, b, room_id=None):
     # which would let the next scenario's own IN_CALL wait pass on nothing.
     _tap_label(b, L.LEAVE_CALL, settle=4)
     if room_id is not None:
-        deadline = time.time() + 20
-        parts = sfu_participants(room_id)
-        while parts and time.time() < deadline:
-            time.sleep(1)
-            parts = sfu_participants(room_id)
+        parts = _wait_for_empty_room(room_id, timeout=25)
+        if parts and b.find(L.LEAVE_CALL):
+            _tap_label(b, L.LEAVE_CALL, settle=4)
+        if parts:
+            parts = _wait_for_empty_room(room_id, timeout=25)
         assert not parts, f"the room is not actually empty at the SFU: {parts}"
     print("  and the remaining client leaves too, so no call is left open")
+
+
+def _wait_for_empty_room(room_id, timeout):
+    deadline = time.time() + timeout
+    parts = sfu_participants(room_id)
+    while parts and time.time() < deadline:
+        time.sleep(1)
+        parts = sfu_participants(room_id)
+    return parts
 
 
 def _click_channel_row(client, channel, timeout=90):
