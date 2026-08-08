@@ -12,6 +12,28 @@ import 'app_metrics.dart';
 import 'app_tokens.dart';
 import 'app_typography.dart';
 
+/// Names [AppFonts.sans] on [style] explicitly, for a style handed straight
+/// to a Material component theme that resolves it with `??` rather than
+/// merging it over its own default.
+///
+/// No `AppText.*` style carries its own `fontFamily`; a leaf `Text` merges
+/// its style with the ambient `DefaultTextStyle`, and `ThemeData` applies
+/// [AppFonts.sans] onto every entry of `textTheme` for exactly that reason
+/// (see `buildTheme`'s own doc comment). `ListTile` does not go through that
+/// merge: it resolves its title as `titleTextStyle ?? tileTheme.titleTextStyle
+/// ?? defaults.titleTextStyle`, so a family-less style assigned to
+/// [ListTileThemeData.titleTextStyle] wins outright and silently renders in
+/// the platform's default face rather than IBM Plex Sans. Checked and found
+/// not to apply to `InputDecorationTheme`'s label, hint, helper and error
+/// styles: `InputDecorator` resolves each of those through a proper merge
+/// with its own family-carrying default, confirmed empirically rather than
+/// assumed, so they are deliberately left unwrapped here.
+/// `app_theme_font_test.dart` is the regression guard.
+TextStyle _familyNamed(TextStyle style) => style.copyWith(
+      fontFamily: AppFonts.sans,
+      fontFamilyFallback: AppFonts.emoji,
+    );
+
 /// Builds a theme from the token set, so widgets read colours from tokens and
 /// never from raw literals. Shared by the app and the golden tests, which is
 /// what keeps goldens representative of what ships.
@@ -49,13 +71,9 @@ ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
   final controlShape = RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(AppRadii.control),
   );
-  // The family is named explicitly: a button theme's textStyle replaces the
-  // inherited style wholesale, so without it every Material button silently
-  // fell back to the platform default face.
-  final buttonLabel = AppText.ui.copyWith(
-    fontWeight: AppWeights.semi,
-    fontFamily: AppFonts.sans,
-    fontFamilyFallback: AppFonts.emoji,
+  // Named explicitly; see _familyNamed's own doc comment for why.
+  final buttonLabel = _familyNamed(
+    AppText.ui.copyWith(fontWeight: AppWeights.semi),
   );
 
   return ThemeData(
@@ -157,8 +175,12 @@ ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
     listTileTheme: ListTileThemeData(
       textColor: tokens.textPrimary,
       iconColor: tokens.textSecondary,
-      titleTextStyle: AppText.body.copyWith(color: tokens.textPrimary),
-      subtitleTextStyle: AppText.caption.copyWith(color: tokens.textSecondary),
+      titleTextStyle: _familyNamed(
+        AppText.body.copyWith(color: tokens.textPrimary),
+      ),
+      subtitleTextStyle: _familyNamed(
+        AppText.caption.copyWith(color: tokens.textSecondary),
+      ),
     ),
   );
 }
