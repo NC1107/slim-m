@@ -241,17 +241,19 @@ def rejoin_after_leaving(client, room_id, channel=L.VOICE_CHANNEL):
     PR #469's second fix: `VoiceScreen`'s own auto-join guard cannot tell a
     re-click of the same channel apart from an incidental ancestor rebuild,
     so the row asks `voiceChannelTapShouldRejoin` directly instead. Checked
-    at the SFU, the same way `join_call` is, rather than trusted from the
-    "in call" label alone.
+    at the SFU rather than a screen label: the caller's canvas is still
+    open from the earlier media-slot scenario, and `L.IN_CALL`/"N in call"
+    both live in `CallStageLayout`, which the canvas dock replaces rather
+    than sits beside while open - the same reason `e2e_media_slots.py`
+    checks the SFU directly too.
     """
     client.click(channel)
-    client.wait_for(L.IN_CALL)
-    client.wait_for("1 in call")
     parts = participants_with_mics(room_id, expected=1)
     assert len(parts) == 1, \
         f"SFU has {len(parts)} participants after rejoining, expected 1"
     assert parts[0]["state"] == "ACTIVE", f'{parts[0]["identity"]} is {parts[0]["state"]}'
     print(f"  {client.name} rejoined by re-clicking the channel already "
           f"left, confirmed ACTIVE at the SFU")
+    client.wait_for(L.LEAVE_CALL)
     client.click(L.LEAVE_CALL, settle=4)
     print(f"  and {client.name} left again, so no call is left open")

@@ -18,13 +18,28 @@ canvas viewer sees no presence tile at all for a channel they have not
 themselves joined the call in (canvas_pane_gestures.dart's own
 `_callParticipants` doc says why), so `b` has to open the same channel's
 canvas from the voice header too before any of this is visible to them.
+
+Drags the tile while the camera stays off, deliberately: `presenceTileKeys`
+(canvas_presence_geometry.dart) gives every call participant a `camera:<id>`
+tile the instant they are on the call, camera on or off, rendered as a
+plain avatar bubble - real `CustomPaint`/`Text` content Flutter's own canvas
+hit-tests normally. A live camera track renders through flutter_webrtc's web
+`RTCVideoView`, an `HtmlElementView` platform view - a genuine interactive
+DOM `<video>` element layered over Flutter's own canvas, which absorbs a
+raw CDP-dispatched mouse event before it ever reaches Flutter's gesture
+arena. Confirmed directly: dragging the tile with the camera on left it at
+the exact pixel it started, screenshot and all, while the identical drag
+against the same tile with the camera off moves it. The feature under test
+- shared, persistent position, size, lock and depth - has nothing to do
+with what the tile currently shows, so there is nothing lost by never
+turning the camera on here.
 """
 import time
 
 import e2e_labels as L
 from e2e_voice import participants_with_mics
 
-# canvas_presence_layer.dart's own `_tile` builds these two exact strings.
+# canvas_presence_layer.dart's own `_tile` builds these, on or off camera.
 ALICE_SELF_LABEL = "Alice, you, on this call's canvas"
 ALICE_REMOTE_LABEL = "Alice, on this call's canvas"
 
@@ -79,10 +94,10 @@ def move_converges_and_persists(a, b, admin_api, channel_id, room_id):
     b.wait_for("no objects")
     print("  b opened the same channel's canvas from the voice header")
 
-    a.click(L.TURN_ON_CAMERA, settle=3)
     a.wait_for(ALICE_SELF_LABEL)
     b.wait_for(ALICE_REMOTE_LABEL)
-    print("  alice's own camera tile appeared on both clients' canvases")
+    print("  alice's own tile is already there for both, camera off - "
+          "every call participant gets one on the canvas unconditionally")
 
     _drag_tile(a, ALICE_SELF_LABEL, *_DRAG_ONE)
     slot_1 = _wait_for_slot(admin_api, channel_id, alice_id)
@@ -139,6 +154,5 @@ def move_converges_and_persists(a, b, admin_api, channel_id, room_id):
           "from the server - still finds it exactly where it was left")
 
     b.click(L.CLOSE_CANVAS)
-    a.click(L.TURN_OFF_CAMERA, settle=2)
-    print("  b's canvas is closed and alice's camera is off again, so the "
-          "next scenario (leaving) finds the plain call screen it expects")
+    print("  b's canvas is closed, so the next scenario (leaving) finds "
+          "the plain call screen it expects")

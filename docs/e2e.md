@@ -209,6 +209,22 @@ otherwise. So this scenario opens `b`'s own canvas from the same voice
 channel's wide header, mid-call, rather than reusing whichever canvas
 `b` already had open on the text channel earlier in the run.
 
+**A tile showing a live camera track cannot be dragged this way, and it
+fails silently rather than loudly.** First written to toggle the camera on
+before dragging; the drag consistently left the tile at the exact pixel it
+started, confirmed with a screenshot before and after. `presenceTileKeys`
+(`canvas_presence_geometry.dart`) gives every call participant a
+`camera:<id>` tile the instant they join, camera on or off, rendered as a
+plain avatar bubble - real canvas-painted content - until the camera
+actually turns on, at which point flutter_webrtc's web `RTCVideoView`
+takes over as an `HtmlElementView` platform view, a genuine interactive DOM
+`<video>` element layered over Flutter's own canvas. A raw CDP mouse event
+lands on that element and never reaches Flutter's gesture arena at all. The
+scenario never turns the camera on, since the feature under test - shared,
+persistent position, size, lock and depth - is identical either way, and
+the avatar bubble is real Flutter canvas the same drag mechanism already
+works against everywhere else in this file.
+
 **Not covered, deliberately: whether the dock's own controls are reachable
 by touch at a narrow width**, the class of bug #460's own commit message
 names (an overflow menu that opened off-screen until it learned to open
