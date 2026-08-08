@@ -72,6 +72,25 @@ class AppAsyncView<T> extends StatelessWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     if (value.error != null) {
+      // A refresh that fails after a successful fetch keeps its last known
+      // value (Riverpod's own retained-previous-data behaviour), and a
+      // caller building this state straight off that value carries both a
+      // real error and real data at once. Wiping the list to a bare error
+      // would throw away something the caller still knows, for no better
+      // reason than the retry that would have refreshed it not landing yet.
+      final stale = value.data;
+      if (stale != null) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.s12),
+              child: AppErrorState(message: errorMessage, onRetry: onRetry),
+            ),
+            Expanded(child: data(context, stale)),
+          ],
+        );
+      }
       return _wrap(
         Padding(
           padding: const EdgeInsets.all(AppSpacing.s16),
