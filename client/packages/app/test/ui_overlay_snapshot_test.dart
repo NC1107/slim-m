@@ -35,6 +35,7 @@ import 'package:slimm_app/src/widgets/report_dialog.dart';
 import 'package:slimm_app/src/widgets/screen_source_sheet.dart';
 import 'package:slimm_app/src/widgets/whats_new_sheet.dart';
 import 'package:slimm_app/src/whats_new/whats_new_content.dart';
+import 'package:slimm_app/src/screens/admin/overwrite_target_picker_sheets.dart';
 import 'package:slimm_app/src/screens/admin/role_editor_sheet.dart';
 import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_design_system/design_system.dart';
@@ -139,6 +140,19 @@ final _overlays = <String, FutureOr<void> Function(BuildContext, WidgetRef)>{
       showEmojiPickerSheet(context, onSelect: (_) {}),
   'space-emoji-sheet': (context, ref) =>
       showSpaceEmojiSheet(context, onSelect: (_) {}),
+  // The three ChannelOverwritesScreen picker sheets, spot-checked before.
+  'channel-picker-sheet': (context, ref) => showAppSheet<Channel>(
+    context,
+    builder: (context) => ChannelPickerSheet(channels: [_localChannel]),
+  ),
+  'role-picker-sheet': (context, ref) => showAppSheet<api.Role>(
+    context,
+    builder: (context) => const RolePickerSheet(),
+  ),
+  'member-picker-sheet': (context, ref) => showAppSheet<api.UserProfile>(
+    context,
+    builder: (context) => const MemberPickerSheet(),
+  ),
 };
 
 const _viewports = <String, Size>{

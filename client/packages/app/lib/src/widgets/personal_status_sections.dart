@@ -88,7 +88,7 @@ class NotificationsSection extends ConsumerWidget {
     return SettingsSectionCard(
       title: 'Notifications',
       children: [
-        ListTile(
+        AppListRow(
           leading: Icon(
             registered ? AppIcons.notificationsOn : AppIcons.notificationsOff,
             color: registered
@@ -97,7 +97,7 @@ class NotificationsSection extends ConsumerWidget {
                 ? tokens.dangerText
                 : tokens.textSecondary,
           ),
-          title: Text(status.label),
+          label: status.label,
         ),
         Padding(
           padding: const EdgeInsets.symmetric(

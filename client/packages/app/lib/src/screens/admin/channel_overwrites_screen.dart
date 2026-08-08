@@ -214,18 +214,17 @@ class _ChannelOverwritesScreenState
           const SizedBox(height: AppSpacing.s16),
           AppCard(
             title: 'Channel',
-
-            /// The card's own background sits between a bare ListTile and the
-            /// Scaffold's Material, which swallows its ink splash; a
-            /// transparent Material here gives the splash somewhere to paint.
-            child: Material(
-              type: MaterialType.transparency,
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(_channel?.name ?? 'Choose a channel'),
-                trailing: const Icon(AppIcons.chevronRight),
-                onTap: _pickChannel,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s8,
+              vertical: AppSpacing.s8,
+            ),
+            child: AppListRow(
+              label: _channel?.name ?? 'Choose a channel',
+              trailing: const Icon(
+                AppIcons.chevronRight,
+                size: AppSizes.icon16,
               ),
+              onTap: _pickChannel,
             ),
           ),
           if (_channel != null) ...[
@@ -247,17 +246,19 @@ class _ChannelOverwritesScreenState
             const SizedBox(height: AppSpacing.s12),
             AppCard(
               title: _kind == api.OverwriteTarget.role ? 'Role' : 'Member',
-              child: Material(
-                type: MaterialType.transparency,
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s8,
+                vertical: AppSpacing.s8,
+              ),
+              child: AppListRow(
+                label:
                     _targetLabel ??
-                        'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}',
-                  ),
-                  trailing: const Icon(AppIcons.chevronRight),
-                  onTap: _pickTarget,
+                    'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}',
+                trailing: const Icon(
+                  AppIcons.chevronRight,
+                  size: AppSizes.icon16,
                 ),
+                onTap: _pickTarget,
               ),
             ),
           ],

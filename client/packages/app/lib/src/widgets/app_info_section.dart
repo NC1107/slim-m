@@ -31,35 +31,28 @@ class AppInfoSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final info = ref.watch(appInfoProvider);
     final errors = ref.watch(debugLogProvider);
-    final tokens = Theme.of(context).extension<AppTokens>()!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SettingsGroupHeader('App'),
         const SizedBox(height: AppSpacing.s8),
-        ListTile(
+        AppListRow(
           leading: const Icon(AppIcons.info),
-          title: const Text('Version'),
-          subtitle: Text(
-            info.when(
-              data: (i) => '${i.version} (${i.buildNumber})',
-              loading: () => 'Loading…',
-              error: (e, _) => 'Unknown',
-            ),
-            style: TextStyle(color: tokens.textSecondary),
+          label: 'Version',
+          meta: info.when(
+            data: (i) => '${i.version} (${i.buildNumber})',
+            loading: () => 'Loading…',
+            error: (e, _) => 'Unknown',
           ),
         ),
-        ListTile(
+        AppListRow(
           leading: const Icon(AppIcons.info),
-          title: const Text('Debug log'),
-          subtitle: Text(
-            errors.isEmpty
-                ? 'Nothing caught this session'
-                : '${errors.length} caught this session',
-            style: TextStyle(color: tokens.textSecondary),
-          ),
-          trailing: const Icon(AppIcons.chevronRight),
+          label: 'Debug log',
+          meta: errors.isEmpty
+              ? 'Nothing caught this session'
+              : '${errors.length} caught this session',
+          trailing: const Icon(AppIcons.chevronRight, size: AppSizes.icon16),
           onTap: () => context.push(Routes.debugLog),
         ),
       ],

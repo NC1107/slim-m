@@ -100,19 +100,15 @@ class _DeviceRowState extends ConsumerState<_DeviceRow>
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final device = widget.device;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ListTile(
+        AppListRow(
           leading: const Icon(AppIcons.account),
-          title: Text(device.name),
-          subtitle: Text(
-            device.isCurrent ? 'This device' : 'Signed in',
-            style: TextStyle(color: tokens.textSecondary),
-          ),
+          label: device.name,
+          meta: device.isCurrent ? 'This device' : 'Signed in',
           trailing: device.isCurrent
               ? null
               : TextButton(
@@ -208,17 +204,14 @@ class _BlockedRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(userProfileProvider(userId));
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     // A deleted account resolves to null, and its id is all there is left of it.
     final name =
         profile.valueOrNull?.displayName ?? profile.valueOrNull?.username;
 
-    return ListTile(
+    return AppListRow(
       leading: const Icon(AppIcons.account),
-      title: Text(name ?? 'Deleted account'),
-      subtitle: name == null
-          ? Text(userId, style: TextStyle(color: tokens.textSecondary))
-          : null,
+      label: name ?? 'Deleted account',
+      meta: name == null ? userId : null,
       trailing: TextButton(
         onPressed: () => _unblock(context, ref),
         child: const Text('Unblock'),
@@ -256,18 +249,14 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
     return SettingsSectionCard(
       title: 'Account',
       children: [
-        ListTile(
+        AppListRow(
+          // Matches SignOutRow: only the leading glyph carries the danger tone.
           leading: Icon(
             AppIcons.failed,
             color: Theme.of(context).extension<AppTokens>()!.dangerText,
           ),
-          title: Text(
-            'Delete account',
-            style: TextStyle(
-              color: Theme.of(context).extension<AppTokens>()!.dangerText,
-            ),
-          ),
-          subtitle: const Text('Permanent. This cannot be undone.'),
+          label: 'Delete account',
+          meta: 'Permanent. This cannot be undone.',
           onTap: () => _confirmDeletion(context, ref),
         ),
         if (_deleteError case final error?)
