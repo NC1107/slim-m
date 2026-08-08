@@ -66,13 +66,19 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
             AppErrorState(message: actionError!, onDismiss: clearActionError),
           ],
           const SizedBox(height: AppSpacing.s16),
-          analytics.when(
-            loading: () => const SizedBox.shrink(),
-            error: (e, _) => AppErrorState(
-              message: 'Could not load analytics.',
-              onRetry: () => ref.invalidate(spaceAnalyticsProvider),
+          AppAsyncView<api.SpaceAnalytics>(
+            // A retry that fails after stats already loaded keeps its last
+            // known answer (Riverpod's own retained-value behaviour); see
+            // AppAsyncView's own doc for why that stays on screen rather
+            // than being replaced by the bare error.
+            value: AppAsyncState(
+              data: analytics.valueOrNull,
+              error: analytics.error,
             ),
-            data: (value) => value.stats == null
+            center: false,
+            errorMessage: 'Could not load analytics.',
+            onRetry: () => ref.invalidate(spaceAnalyticsProvider),
+            data: (context, value) => value.stats == null
                 ? const _OffNotice()
                 : _StatsView(stats: value.stats!),
           ),

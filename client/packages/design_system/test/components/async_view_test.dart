@@ -11,13 +11,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 Future<void> _pump(WidgetTester tester, Widget child) => tester.pumpWidget(
-  MaterialApp(
-    theme: buildTheme(Brightness.light, AppTokens.light),
-    home: Scaffold(
-      body: SizedBox(height: 400, width: 300, child: child),
-    ),
-  ),
-);
+      MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: Scaffold(
+          body: SizedBox(height: 400, width: 300, child: child),
+        ),
+      ),
+    );
 
 void main() {
   testWidgets('a bare fetch failure with no prior data shows only the error', (
@@ -56,6 +56,74 @@ void main() {
 
       await tester.tap(find.text('Retry'));
       expect(retried, isTrue);
+    },
+  );
+
+  testWidgets(
+    'the same stale-plus-error shape works when data is a viewport that '
+    'needs the bounded height an Expanded ancestor gives it',
+    (tester) async {
+      // Reproduces roles_screen/removed_members_screen/member_roles_sheet's
+      // own shape: an Expanded ancestor handing this a bounded box, and a
+      // ListView as the data widget - the one shape a bare, unwrapped
+      // Column would crash with "unbounded height" the moment it needed to
+      // paint a real, unstubbed list of rows rather than a single Text.
+      await _pump(
+        tester,
+        Column(
+          children: [
+            Expanded(
+              child: AppAsyncView<List<int>>(
+                value: AppAsyncState(data: const [1, 2, 3], error: 'boom'),
+                data: (context, list) => ListView.builder(
+                  itemCount: list.length,
+                  itemBuilder: (context, i) => Text('row ${list[i]}'),
+                ),
+                errorMessage: 'Could not load the list.',
+              ),
+            ),
+          ],
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Could not load the list.'), findsOneWidget);
+      expect(find.text('row 1'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'the same stale-plus-error shape works inside the unbounded scrollable '
+    'frame most settings screens use',
+    (tester) async {
+      // Reproduces invites_screen/emoji_screen/analytics_screen's own
+      // shape: the settings frame's default `ListView(children: [child])`,
+      // which hands this an unbounded height - the shape an Expanded child
+      // would crash with "incoming height constraints are unbounded".
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: ListView(
+              children: [
+                AppAsyncView<List<int>>(
+                  value: AppAsyncState(data: const [1, 2, 3], error: 'boom'),
+                  data: (context, list) => Column(
+                    children: [
+                      for (final n in list) Text('row $n'),
+                    ],
+                  ),
+                  errorMessage: 'Could not load the list.',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Could not load the list.'), findsOneWidget);
+      expect(find.text('row 1'), findsOneWidget);
     },
   );
 

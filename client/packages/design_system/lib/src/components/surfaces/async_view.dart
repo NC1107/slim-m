@@ -80,15 +80,30 @@ class AppAsyncView<T> extends StatelessWidget {
       // reason than the retry that would have refreshed it not landing yet.
       final stale = value.data;
       if (stale != null) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.s12),
-              child: AppErrorState(message: errorMessage, onRetry: onRetry),
-            ),
-            Expanded(child: data(context, stale)),
-          ],
+        final banner = Padding(
+          padding: const EdgeInsets.all(AppSpacing.s12),
+          child: AppErrorState(message: errorMessage, onRetry: onRetry),
+        );
+        // A caller embeds this both inside a bounded box (a settings
+        // screen's own `Expanded`, so [data] can be a `ListView` that needs
+        // one) and inside an unbounded one (the default scrollable settings
+        // frame, where [data] is already written to size itself instead).
+        // `Expanded` would crash the second shape; a bare `Column` would
+        // crash the first the moment [data] is a viewport, so which one
+        // this renders has to follow the constraint it was actually given.
+        return LayoutBuilder(
+          builder: (context, constraints) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: constraints.hasBoundedHeight
+                ? MainAxisSize.max
+                : MainAxisSize.min,
+            children: [
+              banner,
+              constraints.hasBoundedHeight
+                  ? Expanded(child: data(context, stale))
+                  : data(context, stale),
+            ],
+          ),
         );
       }
       return _wrap(
