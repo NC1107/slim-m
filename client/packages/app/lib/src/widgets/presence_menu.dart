@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
+import 'context_menu_focus.dart';
 import 'run_guarded.dart';
 import 'user_avatar.dart';
 
@@ -177,31 +178,35 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
         offset: const Offset(0, -4),
         child: TapRegion(
           onTapOutside: (_) => _controller.hide(),
-          child: AppMenu(
-            width: 220,
-            children: [
-              const AppMenuLabel('Status'),
-              for (final (visibility, label, presence) in presenceOptions)
-                AppMenuItem(
-                  label: label,
-                  selected: visibility == selected,
-                  // surfaceRaised, not the default, because the dnd notch and
-                  // the appear-offline slash punch their mark in this colour.
-                  trailing: AppStatusDot(
-                    status: presence,
-                    backgroundColor: tokens.surfaceRaised,
+          // Escape closes it and Tab reaches every item once open.
+          child: ContextMenuKeyboardScope(
+            onDismiss: _controller.hide,
+            child: AppMenu(
+              width: 220,
+              children: [
+                const AppMenuLabel('Status'),
+                for (final (visibility, label, presence) in presenceOptions)
+                  AppMenuItem(
+                    label: label,
+                    selected: visibility == selected,
+                    // surfaceRaised, not the default, because the dnd notch
+                    // and the appear-offline slash punch their mark here.
+                    trailing: AppStatusDot(
+                      status: presence,
+                      backgroundColor: tokens.surfaceRaised,
+                    ),
+                    onTap: () => unawaited(_select(visibility)),
                   ),
-                  onTap: () => unawaited(_select(visibility)),
-                ),
-              if (actionError != null)
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.s8),
-                  child: AppErrorState(
-                    message: actionError!,
-                    onDismiss: clearActionError,
+                if (actionError != null)
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.s8),
+                    child: AppErrorState(
+                      message: actionError!,
+                      onDismiss: clearActionError,
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

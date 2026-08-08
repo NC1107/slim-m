@@ -21,19 +21,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/widgets/avatar_crop_sheet.dart';
+import 'package:slimm_app/src/widgets/camera_source_sheet.dart';
 import 'package:slimm_app/src/widgets/command_palette.dart';
+import 'package:slimm_app/src/widgets/composer_extras.dart';
 import 'package:slimm_app/src/widgets/confirm_dialog.dart';
 import 'package:slimm_app/src/widgets/create_channel_sheet.dart';
+import 'package:slimm_app/src/widgets/emoji_picker.dart';
 import 'package:slimm_app/src/widgets/manage_channel_sheet.dart';
 import 'package:slimm_app/src/widgets/member_profile.dart';
 import 'package:slimm_app/src/widgets/member_roles_sheet.dart';
 import 'package:slimm_app/src/widgets/pinned_messages_sheet.dart';
 import 'package:slimm_app/src/widgets/report_dialog.dart';
+import 'package:slimm_app/src/widgets/screen_source_sheet.dart';
 import 'package:slimm_app/src/widgets/whats_new_sheet.dart';
 import 'package:slimm_app/src/whats_new/whats_new_content.dart';
 import 'package:slimm_app/src/screens/admin/role_editor_sheet.dart';
 import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_rtc/rtc.dart' show CameraDevice, ScreenShareSource;
 
 import 'ui_snapshot_support.dart';
 
@@ -72,6 +77,18 @@ const _adaProfile = api.UserProfile(
   createdAt: 0,
 );
 
+/// Two entries, the same as `camera_source_sheet_test.dart`'s own fixture:
+/// enough to show the picker choosing between more than one device.
+const _cameraDevices = [
+  CameraDevice(id: 'cam-0', label: 'FaceTime HD Camera'),
+  CameraDevice(id: 'cam-1', label: 'Logitech BRIO'),
+];
+
+const _screenSources = [
+  ScreenShareSource(id: 'screen-0', name: 'Screen 1'),
+  ScreenShareSource(id: 'screen-1', name: 'Screen 2'),
+];
+
 /// Every overlay under review, keyed by name; each opens itself given a
 /// mounted [BuildContext] and [WidgetRef].
 final _overlays = <String, FutureOr<void> Function(BuildContext, WidgetRef)>{
@@ -105,6 +122,23 @@ final _overlays = <String, FutureOr<void> Function(BuildContext, WidgetRef)>{
     status: AppPresence.online,
   ),
   'command-palette': (context, ref) => openCommandPalette(context),
+  'composer-actions-sheet': (context, ref) => showComposerActionsSheet(
+    context,
+    onPhotoLibrary: () {},
+    onBrowseFiles: () {},
+    canPasteImage: Future.value(false),
+    onPasteImage: () {},
+    onPoll: () {},
+    onCode: () {},
+  ),
+  'camera-source-sheet': (context, ref) =>
+      showCameraDeviceSheet(context, _cameraDevices),
+  'screen-source-sheet': (context, ref) =>
+      showScreenSourceSheet(context, _screenSources),
+  'emoji-picker-sheet': (context, ref) =>
+      showEmojiPickerSheet(context, onSelect: (_) {}),
+  'space-emoji-sheet': (context, ref) =>
+      showSpaceEmojiSheet(context, onSelect: (_) {}),
 };
 
 const _viewports = <String, Size>{
