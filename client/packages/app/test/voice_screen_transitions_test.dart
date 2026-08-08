@@ -162,8 +162,7 @@ void main() {
               baseUrl: Uri.parse('http://localhost:8080'),
               session: ref.watch(sessionProvider),
               httpClient: MockClient((request) async {
-                // Holds the join in the exact window between `joining: true`
-                // being set and the session's own state ever moving off idle.
+                // Holds the join between joining being set and state moving off idle.
                 await tokenGate.future;
                 return http.Response(
                   jsonEncode({
@@ -190,8 +189,7 @@ void main() {
       await tester.pumpWidget(
         _harness(const VoiceScreen(channelId: 'channel-1'), container),
       );
-      // The post-frame callback that actually calls `join` runs here, which
-      // is what sets `joining: true` and rebuilds mid-flight.
+      // The post-frame callback calling join runs here, setting joining mid-flight.
       await tester.pump();
       await tester.pump();
 
