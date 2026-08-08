@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.0](https://github.com/NC1107/slim-m/compare/server-v0.33.2...server-v0.34.0) (2026-08-08)
+
+
+### Features
+
+* **canvas:** media tile placement is shared and persists between calls ([#471](https://github.com/NC1107/slim-m/issues/471)) ([a16267b](https://github.com/NC1107/slim-m/commit/a16267bb47cc7a7a6c2997f207619ce11f2fc738))
+
 ## [0.33.2](https://github.com/NC1107/slim-m/compare/server-v0.33.1...server-v0.33.2) (2026-08-06)
 
 
