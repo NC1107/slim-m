@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM canvas_media_slots WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "b17e2d32edfd82a813fd6954cb3d8cb08c23d12dbe01aa143dfc932aae882bfb"
+}

@@ -27,6 +27,7 @@ mod analytics;
 mod attachments;
 mod auth;
 mod canvas;
+mod canvas_media_slots;
 mod canvas_ops;
 mod canvas_ops_write;
 mod canvas_write;
@@ -115,6 +116,7 @@ pub fn router(state: AppState) -> Router {
         .merge(analytics::routes())
         .merge(auth::routes())
         .merge(canvas::routes())
+        .merge(canvas_media_slots::routes())
         .merge(categories::routes())
         .merge(channels::routes())
         .merge(channel_order::routes())

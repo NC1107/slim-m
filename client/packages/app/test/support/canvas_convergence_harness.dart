@@ -13,6 +13,7 @@ import 'dart:math' as math;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/screens/canvas/canvas_live_event_dispatch.dart';
+import 'package:slimm_app/src/screens/canvas/canvas_media_slot_sync.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_sync.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
@@ -68,6 +69,13 @@ class CanvasReceiver {
   final String _channelId;
   late final CanvasSync sync;
 
+  // Never actually asked anything - present only because dispatchCanvasLiveEvent requires one.
+  late final CanvasMediaSlotSync _mediaSlotSync = CanvasMediaSlotSync(
+    channelId: _channelId,
+    client: fakeClientFor(const []),
+    overrides: CanvasPresenceTileOverrides(),
+  );
+
   void deliver(CanonOp op) {
     dispatchCanvasLiveEvent(
       eventFor(op, _channelId),
@@ -84,6 +92,7 @@ class CanvasReceiver {
         if (input != null) document.applyPlaced(input);
       },
       forgetFetchedRegion: () {},
+      mediaSlotSync: _mediaSlotSync,
     );
   }
 }

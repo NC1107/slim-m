@@ -75,6 +75,9 @@ void main() {
                   'reset': false,
                 });
               }
+              if (request.url.path.endsWith('/canvas/media-slots')) {
+                return _json({'slots': <Object>[]});
+              }
               if (!request.url.path.endsWith('/canvas/objects')) {
                 return _json(<Object>[]);
               }

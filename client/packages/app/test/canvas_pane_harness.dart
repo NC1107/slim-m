@@ -231,6 +231,23 @@ class CanvasPaneFixture {
                 'reset': false,
               });
             }
+            if (request.url.path.endsWith('/canvas/media-slots')) {
+              return jsonResponse({'slots': <Object>[]});
+            }
+            if (request.url.path.contains('/canvas/media-slots/')) {
+              final segments = request.url.pathSegments;
+              return jsonResponse({
+                'kind': segments[segments.length - 2],
+                'user_id': segments.last,
+                'x': 0.0,
+                'y': 0.0,
+                'w': 1.0,
+                'h': 1.0,
+                'locked': false,
+                'sent_to_back': false,
+                'updated_at': 0,
+              });
+            }
             if (request.url.path.startsWith('/attachments/')) {
               attachmentFetches++;
               if (attachmentFetchStatus != 200) {

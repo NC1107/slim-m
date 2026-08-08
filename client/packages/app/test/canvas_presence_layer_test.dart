@@ -69,6 +69,7 @@ Widget _layer(
   cameraViewFor: cameraViewFor,
   screenShareViewFor: screenShareViewFor,
   overrides: overrides,
+  onCommit: (_, __) {},
   hideSelfCamera: hideSelfCamera,
 );
 
@@ -377,23 +378,51 @@ void main() {
     expect(find.byType(CanvasPresenceBubble), findsNothing);
   });
 
-  testWidgets('a participant who leaves the call has their override pruned, '
-      'so a rejoin starts back at the default position', (tester) async {
+  testWidgets(
+    'a participant who leaves the call keeps their shared position, lock '
+    'and depth - decision 0010\'s reversal made those persistent rather '
+    'than reset on rejoin',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      document.setViewport(const Size(1000, 800));
+      final overrides = CanvasPresenceTileOverrides()
+        ..setRect('camera:user-noor', const Rect.fromLTWH(500, 500, 100, 100))
+        ..setLocked('camera:user-noor', true)
+        ..setSentToBack('camera:user-noor', true);
+
+      final widget = _wrap(_layer(document, const [_cameraOff], overrides));
+      await tester.pumpWidget(widget);
+      await tester.pump();
+      expect(overrides.stateFor('camera:user-noor').rect, isNotNull);
+
+      await tester.pumpWidget(_wrap(_layer(document, const [], overrides)));
+      await tester.pump();
+
+      final state = overrides.stateFor('camera:user-noor');
+      expect(state.rect, const Rect.fromLTWH(500, 500, 100, 100));
+      expect(state.locked, isTrue);
+      expect(state.sentToBack, isTrue);
+    },
+  );
+
+  testWidgets('a participant who leaves the call has their hide reset, so a '
+      'rejoin shows their tile again', (tester) async {
     final document = CanvasDocument();
     addTearDown(document.dispose);
     document.setViewport(const Size(1000, 800));
     final overrides = CanvasPresenceTileOverrides()
-      ..setRect('camera:user-noor', const Rect.fromLTWH(500, 500, 100, 100));
+      ..setHidden('camera:user-noor', true);
 
     final widget = _wrap(_layer(document, const [_cameraOff], overrides));
     await tester.pumpWidget(widget);
     await tester.pump();
-    expect(overrides.stateFor('camera:user-noor').rect, isNotNull);
+    expect(overrides.stateFor('camera:user-noor').hidden, isTrue);
 
     await tester.pumpWidget(_wrap(_layer(document, const [], overrides)));
     await tester.pump();
 
-    expect(overrides.stateFor('camera:user-noor').rect, isNull);
+    expect(overrides.stateFor('camera:user-noor').hidden, isFalse);
   });
 
   testWidgets('a tile removed mid-drag (its owner left the call) balances '
@@ -426,4 +455,43 @@ void main() {
           'placement on this canvas, forever',
     );
   });
+
+  testWidgets(
+    'settling a drag commits the final rect, not the last live frame',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      document.setViewport(const Size(1000, 800));
+      final overrides = CanvasPresenceTileOverrides();
+      String? committedKey;
+      Rect? committedRect;
+
+      await tester.pumpWidget(
+        _wrap(
+          CanvasPresenceLayer(
+            document: document,
+            participants: const [_cameraOff],
+            cameraViewFor: _noView,
+            screenShareViewFor: _noView,
+            overrides: overrides,
+            onCommit: (key, rect) {
+              committedKey = key;
+              committedRect = rect;
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(committedKey, isNull, reason: 'nothing settled yet');
+
+      await tester.drag(
+        find.byKey(const ValueKey('camera:user-noor')),
+        const Offset(40, 15),
+      );
+      await tester.pump();
+
+      expect(committedKey, 'camera:user-noor');
+      expect(committedRect, overrides.stateFor('camera:user-noor').rect);
+    },
+  );
 }

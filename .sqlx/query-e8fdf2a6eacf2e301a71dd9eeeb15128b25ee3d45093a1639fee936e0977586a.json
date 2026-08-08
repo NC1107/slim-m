@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO canvas_media_slots\n                   (channel_id, user_id, kind, x, y, w, h, locked, sent_to_back, updated_at)\n               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n               ON CONFLICT (channel_id, user_id, kind) DO UPDATE SET\n                   x = excluded.x, y = excluded.y, w = excluded.w, h = excluded.h,\n                   locked = excluded.locked, sent_to_back = excluded.sent_to_back,\n                   updated_at = excluded.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "e8fdf2a6eacf2e301a71dd9eeeb15128b25ee3d45093a1639fee936e0977586a"
+}

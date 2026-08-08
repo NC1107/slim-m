@@ -21,9 +21,12 @@
 /// oversight: STRATEGY already called camera bubbles and screen-share tiles
 /// "ephemeral presence objects never written to the op log and reset on
 /// rejoin", and this file extends that same line to position, size, lock and
-/// hide, kept in [CanvasPresenceTileOverrides] rather than a
-/// `canvas_objects` row. It is a *personal* arrangement, one viewer's own -
-/// see that decision record for why a shared one was rejected.
+/// depth, kept in [CanvasPresenceTileOverrides] rather than a
+/// `canvas_objects` row. Position, size, lock and depth are shared and
+/// persistent now - decision 0010's own reversal of its first call, mirrored
+/// from the server's `canvas_media_slots` table by `CanvasMediaSlotSync` in
+/// the app's own canvas screen. Only [CanvasPresenceTileOverrides.hidden]
+/// stays personal and per-call; see that class's own doc for why.
 ///
 /// This used to render the caller's own bubble nowhere at all (a separate,
 /// screen-anchored overlay owned that), which is exactly the "stuck to the
@@ -72,6 +75,7 @@ class CanvasPresenceLayer extends StatefulWidget {
     required this.cameraViewFor,
     required this.screenShareViewFor,
     required this.overrides,
+    required this.onCommit,
     this.hideSelfCamera = false,
     this.layout = const CanvasPresenceLayout(),
   });
@@ -81,6 +85,13 @@ class CanvasPresenceLayer extends StatefulWidget {
   final CameraViewBuilder cameraViewFor;
   final ScreenShareViewBuilder screenShareViewFor;
   final CanvasPresenceTileOverrides overrides;
+
+  /// Sends [overrides]' current answer for one tile key onward to the
+  /// server - see `CanvasMediaSlotSync.commit` in the app's own canvas
+  /// screen, which is what this closes over. Fired once a drag or resize
+  /// settles, and immediately on a lock or depth toggle; never fired for
+  /// [overrides.setHidden], which needs no commit at all.
+  final void Function(String key, Rect rect) onCommit;
 
   /// The caller's own standing "never show my own camera" preference
   /// (`canvas_self_presence.dart`), layered on top of whatever
@@ -168,13 +179,16 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
     Camera camera,
     Map<String, VoiceParticipant> byIdentity,
   ) {
-    final isScreen = key.startsWith('screen:');
-    final identity = key.substring(key.indexOf(':') + 1);
+    final isScreen = presenceTileKind(key) == 'screen';
+    final identity = presenceTileIdentity(key);
     final participant = byIdentity[identity];
     if (participant == null) return null;
     final state = widget.overrides.stateFor(key);
     final locked = state.locked;
     final sentToBack = state.sentToBack;
+    // Never null: the override's own rect once set, this build's resolved default otherwise.
+    void commit() =>
+        widget.onCommit(key, widget.overrides.stateFor(key).rect ?? rect);
     return CanvasPresenceManipulableTile(
       key: ValueKey(key),
       worldRect: rect,
@@ -183,9 +197,15 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
       sentToBack: sentToBack,
       document: widget.document,
       onRectChanged: (next) => widget.overrides.setRect(key, next),
-      onToggleLocked: () => widget.overrides.setLocked(key, !locked),
-      onToggleSentToBack: () =>
-          widget.overrides.setSentToBack(key, !sentToBack),
+      onRectCommitted: commit,
+      onToggleLocked: () {
+        widget.overrides.setLocked(key, !locked);
+        commit();
+      },
+      onToggleSentToBack: () {
+        widget.overrides.setSentToBack(key, !sentToBack);
+        commit();
+      },
       onHide: () => widget.overrides.setHidden(key, true),
       semanticLabel: isScreen
           ? (participant.isLocal

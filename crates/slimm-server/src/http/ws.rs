@@ -38,6 +38,7 @@ use frames::ServerFrame;
 use permission_cache::PermissionCache;
 
 mod authorization;
+mod canvas_frames;
 mod frames;
 mod permission_cache;
 mod signals;

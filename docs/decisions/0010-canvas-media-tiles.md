@@ -59,6 +59,10 @@ does not already give for free - a tile's presence is derived from
 
 ### Is the arrangement shared or personal?
 
+**Reversed 2026-08-06 - see "Reversed: placement is shared and persistent,
+not personal" at the end of this document.** The answer below was the
+first call; it is not what shipped.
+
 **Personal, one viewer at a time.** The owner's own example is a personal
 act: arranging a friend's camera over their gameplay to take his own notes,
 for his own reference. Nothing in the request asks for a second viewer to
@@ -86,6 +90,10 @@ build the cheap answer until real evidence says otherwise.
 
 ### Lock: what does it mean, and does it bind for everyone?
 
+**"Does it bind for everyone" is reversed 2026-08-06: yes, now - see the
+end of this document.** What follows on what locking itself does to a
+tile's own pointer handling is still accurate.
+
 **Local, per-tile, per-viewer. Locked means the tile stops intercepting the
 pointer at all**, not merely "can't be dragged." An unlocked tile behaves
 like every other movable thing on this canvas: it wins the pointer within
@@ -98,9 +106,9 @@ interact with it with draw tools." The lock control itself is never wrapped
 in that `IgnorePointer` - a locked tile is never a dead end, since the one
 thing still reachable is the button that unlocks it.
 
-Locking does not bind for the other party, for the same reason position
+~~Locking does not bind for the other party, for the same reason position
 does not: it is a property of a personal arrangement, not a fact about the
-call.
+call.~~ Reversed along with position; see the end of this document.
 
 ### Hide: does it mean the same thing it already means for the self bubble?
 
@@ -285,3 +293,65 @@ sent to the back" scene shows the existing busy scene's ink (which already
 overlapped a tile's default position, by that scene's own design) painting
 over a sent-to-back tile while an untouched tile alongside it still hides
 ink behind it, the same frame.
+
+## Reversed: placement is shared and persistent, not personal (2026-08-06)
+
+The "Is the arrangement shared or personal?" answer above, "Personal, one
+viewer at a time," is overturned. The owner, in his own words: "when i join
+the canvas, move something to a specific X, Y position, if nobody moves it
+between the time I leave and tomorrow when i join back, it should still be
+at X and Y, not reset" - explicitly comparing it to Figma. That is a
+different request from the AR-glasses framing this document's original
+answer leaned on, and it wins: every viewer now sees the same arrangement,
+and it survives a call ending or a server restart.
+
+**A slot, not a `canvas_objects` row and not a `canvas_ops` kind.**
+`canvas_media_slots` (migration `0040`) is a new table, one row per
+`(channel_id, user_id, kind)`, mutated in place rather than appended -
+`move`/`reorder` are never swept from `canvas_ops`, so logging one op per
+drag frame would grow that table forever for state nobody needs a history
+of. `GET .../canvas/media-slots` and
+`PUT .../canvas/media-slots/{kind}/{user_id}` are the two routes
+(`http/canvas_media_slots.rs`); a `canvas.media_slot.changed` event fans a
+successful write out live. Position, size, lock and depth are all shared
+now; **hidden alone stays exactly as this document originally specified**:
+personal, client-only, kept in `CanvasPresenceTileOverrides` and reset on
+rejoin.
+
+**Authorization did not become the own-object-versus-`MANAGE_CANVAS` split
+a real canvas object gets.** A slot names the participant it represents,
+not who arranged it, so anyone holding `VIEW_CHANNEL` and `USE_CANVAS` may
+rearrange anyone's tile - the Figma precedent the owner asked for, applied
+literally: any editor may drag any sticky note.
+
+**Concurrency is last-write-wins, deliberately not operational
+transform.** Two viewers dragging the same tile at once each send their
+own full, final state on settle; the later `PUT` simply overwrites the
+row, the same trade this project already made for a canvas object's
+`move`. `CanvasPresenceTileOverrides.applyServer` never merges a partial
+answer - every field it touches (`rect`, `locked`, `sentToBack`) is
+replaced outright, so a live frame can never leave two fields from two
+different writers standing together. A live frame naming a tile key the
+receiver has never seen (nobody has moved it yet this session, or its
+owning participant has not yet joined the call) is applied unconditionally
+to `CanvasPresenceTileOverrides`, keyed only by the opaque string, with
+nothing keyed on roster membership - the tile itself is simply not
+rendered until its participant is on the call, the same "empty when
+nobody is sharing" framing this document opened with.
+
+**"Draw on it" and the depth toggle each lose one supporting sentence, not
+their conclusion.** The "Draw on it" section's claim that attachment "has
+no single answer once two viewers can have the tile in two different
+places" no longer holds - positions now converge to one value - but the
+conclusion is unchanged: attachment is still a real structural feature
+(object groups, relative coordinates, a parent-child z-order rule) that
+this slice does not build, for its own reasons rather than the
+now-outdated one. Likewise "One toggle, not a middle position" no longer
+gets to say "a tile is personal and per-viewer while an object is shared";
+front-and-back stays the shipped answer regardless, since full z-index
+interleaving with real canvas objects is still unbuilt wire shape, not a
+consequence of who owns the arrangement.
+
+Everything else this document decided - lock's own pointer-absorption
+meaning, hide's meaning, and one manipulation contract for two tile kinds -
+is unaffected by the reversal and still holds.

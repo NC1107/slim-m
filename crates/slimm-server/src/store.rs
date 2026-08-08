@@ -22,6 +22,7 @@ mod attachments;
 mod bootstrap;
 mod canvas;
 mod canvas_audit;
+mod canvas_media_slots;
 mod canvas_move;
 mod canvas_op_clock;
 mod canvas_ops;
@@ -65,6 +66,7 @@ pub use canvas::{
     CanvasObject, MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL, PlaceError, PlaceRequest, Placement,
     Rect, ViewportQuery, WORLD_LIMIT,
 };
+pub use canvas_media_slots::{CanvasMediaSlot, MediaSlotError, MediaSlotKind};
 pub use canvas_ops::{
     CANVAS_OP_GAP, CANVAS_OP_PAGE_BYTES, CanvasOpBody, CanvasOpEntry, CanvasOpsPage,
 };

@@ -11,7 +11,7 @@ use std::time::Instant;
 use super::frames::{PollOptionCountDto, ReactionCountDto, ServerFrame};
 use super::permission_cache::PermissionCache;
 use super::signals;
-use super::{AttachmentDto, CanvasObjectDto, ChannelDto, MessageDto};
+use super::{AttachmentDto, ChannelDto, MessageDto};
 use crate::hub::{Event, Hub};
 use crate::permissions::Permissions;
 use crate::store::{SessionContext, Store};
@@ -62,7 +62,8 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::CanvasCursorMoved { .. }
         | Event::CanvasStrokePreview { .. }
         | Event::CanvasObjectMoved { .. }
-        | Event::CanvasObjectReordered { .. } => Some(Permissions::USE_CANVAS),
+        | Event::CanvasObjectReordered { .. }
+        | Event::CanvasMediaSlotChanged { .. } => Some(Permissions::USE_CANVAS),
         Event::MessageCreated { .. }
         | Event::MessageEdited { .. }
         | Event::MessageDeleted { .. }
@@ -169,40 +170,45 @@ pub(super) async fn authorize(
         };
     }
 
-    let channel_id = match &event {
-        Event::MessageCreated { message, .. } | Event::MessageEdited { message, .. } => {
-            message.channel_id
-        }
-        Event::MessageDeleted { channel_id, .. } => *channel_id,
-        Event::ReactionsChanged { channel_id, .. } => *channel_id,
-        Event::ThreadUpdated { channel_id, .. } => *channel_id,
-        Event::MessagePinned { channel_id, .. } => *channel_id,
-        Event::MessageUnpinned { channel_id, .. } => *channel_id,
-        Event::PollVoted { channel_id, .. } => *channel_id,
-        Event::TypingStarted { channel_id, .. } | Event::TypingStopped { channel_id, .. } => {
-            *channel_id
-        }
-        Event::ChannelCreated(channel) | Event::ChannelUpdated(channel) => channel.id,
-        Event::OverwriteChanged { channel_id, .. } => *channel_id,
-        Event::CanvasObjectPlaced { channel_id, .. } => *channel_id,
-        Event::CanvasObjectsRemoved { channel_id, .. } => *channel_id,
-        Event::CanvasCleared { channel_id, .. } => *channel_id,
-        Event::CanvasObjectsRestored { channel_id, .. } => *channel_id,
-        Event::CanvasCursorMoved { channel_id, .. } => *channel_id,
-        Event::CanvasStrokePreview { channel_id, .. } => *channel_id,
-        Event::CanvasObjectMoved { channel_id, .. } => *channel_id,
-        Event::CanvasObjectReordered { channel_id, .. } => *channel_id,
-        Event::VoiceActivityChanged { channel_id } => *channel_id,
-        // Control events are handled in the loop; the rest already returned above.
-        Event::SessionRevoked(_)
-        | Event::PresenceChanged(_)
-        | Event::MemberTimeoutChanged { .. }
-        | Event::MemberRemoved(_)
-        | Event::ProfileChanged(_)
-        | Event::RoleChanged { .. }
-        | Event::MemberRoleChanged { .. }
-        | Event::ChannelDeleted { .. }
-        | Event::CategoryChanged => return Authorization::Withhold,
+    let channel_id = match super::canvas_frames::channel_id(&event) {
+        Some(channel_id) => channel_id,
+        None => match &event {
+            Event::MessageCreated { message, .. } | Event::MessageEdited { message, .. } => {
+                message.channel_id
+            }
+            Event::MessageDeleted { channel_id, .. } => *channel_id,
+            Event::ReactionsChanged { channel_id, .. } => *channel_id,
+            Event::ThreadUpdated { channel_id, .. } => *channel_id,
+            Event::MessagePinned { channel_id, .. } => *channel_id,
+            Event::MessageUnpinned { channel_id, .. } => *channel_id,
+            Event::PollVoted { channel_id, .. } => *channel_id,
+            Event::TypingStarted { channel_id, .. } | Event::TypingStopped { channel_id, .. } => {
+                *channel_id
+            }
+            Event::ChannelCreated(channel) | Event::ChannelUpdated(channel) => channel.id,
+            Event::OverwriteChanged { channel_id, .. } => *channel_id,
+            Event::VoiceActivityChanged { channel_id } => *channel_id,
+            // canvas_frames::channel_id already answered Some for any of these.
+            Event::CanvasObjectPlaced { .. }
+            | Event::CanvasObjectsRemoved { .. }
+            | Event::CanvasCleared { .. }
+            | Event::CanvasObjectsRestored { .. }
+            | Event::CanvasCursorMoved { .. }
+            | Event::CanvasStrokePreview { .. }
+            | Event::CanvasObjectMoved { .. }
+            | Event::CanvasObjectReordered { .. }
+            | Event::CanvasMediaSlotChanged { .. } => unreachable!("canvas_frames::channel_id"),
+            // Control events are handled in the loop; the rest already returned above.
+            Event::SessionRevoked(_)
+            | Event::PresenceChanged(_)
+            | Event::MemberTimeoutChanged { .. }
+            | Event::MemberRemoved(_)
+            | Event::ProfileChanged(_)
+            | Event::RoleChanged { .. }
+            | Event::MemberRoleChanged { .. }
+            | Event::ChannelDeleted { .. }
+            | Event::CategoryChanged => return Authorization::Withhold,
+        },
     };
     // The one event whose subject may have just lost this very view.
     let held_it_before = matches!(
@@ -259,6 +265,10 @@ pub(super) async fn authorize(
         }
     }
 
+    let event = match super::canvas_frames::to_frame(event) {
+        Ok(frame) => return Authorization::Deliver(Box::new(frame)),
+        Err(event) => *event,
+    };
     Authorization::Deliver(Box::new(match event {
         Event::MessageCreated {
             message,
@@ -376,103 +386,19 @@ pub(super) async fn authorize(
         Event::OverwriteChanged { channel_id, .. } => ServerFrame::OverwriteChanged {
             channel_id: channel_id.to_string(),
         },
-        Event::CanvasObjectPlaced { channel_id, object } => ServerFrame::CanvasObjectPlaced {
-            channel_id: channel_id.to_string(),
-            seq: object.seq.0,
-            object: CanvasObjectDto::from(object),
-        },
-        Event::CanvasObjectsRemoved {
-            channel_id,
-            seq,
-            op_id,
-            object_ids,
-        } => ServerFrame::CanvasObjectsRemoved {
-            channel_id: channel_id.to_string(),
-            seq: seq.0,
-            op_id: op_id.to_string(),
-            object_ids: object_ids.iter().map(ToString::to_string).collect(),
-        },
-        Event::CanvasCleared {
-            channel_id,
-            seq,
-            op_id,
-            before_seq,
-        } => ServerFrame::CanvasCleared {
-            channel_id: channel_id.to_string(),
-            seq: seq.0,
-            op_id: op_id.to_string(),
-            before_seq: before_seq.0,
-        },
-        Event::CanvasObjectsRestored {
-            channel_id,
-            seq,
-            op_id,
-            object_ids,
-        } => ServerFrame::CanvasObjectsRestored {
-            channel_id: channel_id.to_string(),
-            seq: seq.0,
-            op_id: op_id.to_string(),
-            object_ids: object_ids.iter().map(ToString::to_string).collect(),
-        },
         Event::VoiceActivityChanged { channel_id } => ServerFrame::VoiceActivityChanged {
             channel_id: channel_id.to_string(),
         },
-        Event::CanvasCursorMoved {
-            channel_id,
-            user_id,
-            x,
-            y,
-        } => ServerFrame::CanvasCursorMoved {
-            channel_id: channel_id.to_string(),
-            user_id: user_id.to_string(),
-            x,
-            y,
-        },
-        Event::CanvasStrokePreview {
-            channel_id,
-            user_id,
-            object_id,
-            points,
-            ended,
-        } => ServerFrame::CanvasStrokePreview {
-            channel_id: channel_id.to_string(),
-            user_id: user_id.to_string(),
-            object_id: object_id.to_string(),
-            points,
-            ended,
-        },
-        Event::CanvasObjectMoved {
-            channel_id,
-            seq,
-            op_id,
-            object_id,
-            x,
-            y,
-            w,
-            h,
-        } => ServerFrame::CanvasObjectMoved {
-            channel_id: channel_id.to_string(),
-            seq: seq.0,
-            op_id: op_id.to_string(),
-            object_id: object_id.to_string(),
-            x,
-            y,
-            w,
-            h,
-        },
-        Event::CanvasObjectReordered {
-            channel_id,
-            seq,
-            op_id,
-            object_id,
-            z_index,
-        } => ServerFrame::CanvasObjectReordered {
-            channel_id: channel_id.to_string(),
-            seq: seq.0,
-            op_id: op_id.to_string(),
-            object_id: object_id.to_string(),
-            z_index,
-        },
+        // canvas_frames::to_frame already answered Ok for any of these.
+        Event::CanvasObjectPlaced { .. }
+        | Event::CanvasObjectsRemoved { .. }
+        | Event::CanvasCleared { .. }
+        | Event::CanvasObjectsRestored { .. }
+        | Event::CanvasCursorMoved { .. }
+        | Event::CanvasStrokePreview { .. }
+        | Event::CanvasObjectMoved { .. }
+        | Event::CanvasObjectReordered { .. }
+        | Event::CanvasMediaSlotChanged { .. } => unreachable!("canvas_frames::to_frame"),
         // The deployment-wide and channel-deletion cases already returned above.
         Event::SessionRevoked(_)
         | Event::PresenceChanged(_)

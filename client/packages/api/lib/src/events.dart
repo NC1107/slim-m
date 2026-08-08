@@ -254,6 +254,27 @@ sealed class ServerEvent {
           objectId: decoded['object_id'] as String,
           zIndex: decoded['z_index'] as int,
         ),
+      'canvas.media_slot.changed'
+          when decoded['channel_id'] is String &&
+              decoded['kind'] is String &&
+              decoded['user_id'] is String &&
+              decoded['x'] is num &&
+              decoded['y'] is num &&
+              decoded['w'] is num &&
+              decoded['h'] is num &&
+              decoded['locked'] is bool &&
+              decoded['sent_to_back'] is bool =>
+        CanvasMediaSlotChanged(
+          channelId: decoded['channel_id'] as String,
+          kind: decoded['kind'] as String,
+          userId: decoded['user_id'] as String,
+          x: (decoded['x'] as num).toDouble(),
+          y: (decoded['y'] as num).toDouble(),
+          w: (decoded['w'] as num).toDouble(),
+          h: (decoded['h'] as num).toDouble(),
+          locked: decoded['locked'] as bool,
+          sentToBack: decoded['sent_to_back'] as bool,
+        ),
       'pong' => const PongEvent(),
       'error' => ErrorEvent(decoded['message'] as String? ?? 'unknown'),
       _ => null,

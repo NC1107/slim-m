@@ -8,7 +8,7 @@ use serde_json::json;
 use slimm_server::permissions::Permissions;
 use uuid::Uuid;
 
-use super::{PNG, THUMBS_UP, text};
+use super::{PNG, THUMBS_UP, media_slot_calls, text};
 use crate::world::{Contract, Payload};
 
 /// Builds the channel the message calls run in, plus the role, overwrite and
@@ -270,6 +270,7 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         root,
     )
     .await;
+    media_slot_calls(c, root, &channel, bob_id).await;
 
     let overwrite = format!("/channels/{channel}/overwrites/member/{bob_id}");
     c.json(

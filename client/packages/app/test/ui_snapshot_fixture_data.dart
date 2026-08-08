@@ -180,6 +180,18 @@ MockClient fixtureClient() => MockClient((request) async {
       'has_more': false,
       'reset': false,
     },
+    _ when path.endsWith('/canvas/media-slots') => const {'slots': <Object>[]},
+    _ when path.contains('/canvas/media-slots/') => const {
+      'kind': 'camera',
+      'user_id': 'user-nick',
+      'x': 0.0,
+      'y': 0.0,
+      'w': 1.0,
+      'h': 1.0,
+      'locked': false,
+      'sent_to_back': false,
+      'updated_at': 0,
+    },
     '/space/settings' => const {'join_policy': 'invite'},
     _ => const <Object>[],
   };

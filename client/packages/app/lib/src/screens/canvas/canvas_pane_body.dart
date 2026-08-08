@@ -22,6 +22,8 @@ import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
 import 'canvas_call_dock.dart';
 import 'canvas_object_context_menu.dart';
+import 'canvas_presence_geometry.dart'
+    show presenceTileIdentity, presenceTileKind;
 import 'canvas_presence_layer.dart';
 import 'canvas_presence_roster.dart';
 import 'canvas_selection_semantics.dart';
@@ -70,6 +72,7 @@ class CanvasPaneBody extends StatefulWidget {
     required this.cameraViewFor,
     required this.screenShareViewFor,
     required this.tileOverrides,
+    required this.onCommitTile,
     required this.selfBubbleHidden,
     required this.onToggleSelfBubbleHidden,
     this.callDock,
@@ -157,6 +160,10 @@ class CanvasPaneBody extends StatefulWidget {
   /// `canvas_presence_layer.dart`'s own doc for why this lives here rather
   /// than as a `CanvasDocument` field.
   final CanvasPresenceTileOverrides tileOverrides;
+
+  /// Sends one tile key's current arrangement to the server - see
+  /// `CanvasPresenceLayer.onCommit`'s own doc for exactly when this fires.
+  final void Function(String key, Rect rect) onCommitTile;
 
   /// The caller's own standing "never show my own camera" preference -
   /// distinct from [tileOverrides], which is per-call; see
@@ -303,8 +310,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     final byIdentity = {for (final p in widget.callParticipants) p.identity: p};
     final tiles = <CanvasHiddenTile>[];
     for (final key in widget.tileOverrides.hiddenKeys) {
-      final isScreen = key.startsWith('screen:');
-      final identity = key.substring(key.indexOf(':') + 1);
+      final isScreen = presenceTileKind(key) == 'screen';
+      final identity = presenceTileIdentity(key);
       final participant = byIdentity[identity];
       if (participant == null) continue;
       final label = isScreen
@@ -410,6 +417,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           cameraViewFor: widget.cameraViewFor,
           screenShareViewFor: widget.screenShareViewFor,
           overrides: widget.tileOverrides,
+          onCommit: widget.onCommitTile,
           hideSelfCamera: widget.selfBubbleHidden,
         ),
       ],

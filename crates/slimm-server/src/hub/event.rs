@@ -9,7 +9,7 @@
 use crate::ids::{
     CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
 };
-use crate::store::{AttachmentSummary, CanvasObject, Channel, Message};
+use crate::store::{AttachmentSummary, CanvasObject, Channel, MediaSlotKind, Message};
 
 /// Something that happened and should reach interested connections.
 #[derive(Debug, Clone)]
@@ -371,5 +371,31 @@ pub enum Event {
         op_id: CanvasOpId,
         object_id: CanvasObjectId,
         z_index: i64,
+    },
+    /// A participant's camera or screen-share tile was moved, resized,
+    /// locked or sent to the back - decision 0010's reversal, which made
+    /// this shared state rather than a per-viewer local one.
+    ///
+    /// Carries the whole current row, the same reason [`Event::CanvasObjectMoved`]
+    /// does: a receiver needs no refetch to redraw the tile. `user_id` names
+    /// the participant the tile represents, never who moved it - anyone with
+    /// `USE_CANVAS` may rearrange anyone's tile, so there is no moderation
+    /// story here for an actor field to serve the way a canvas object's
+    /// move or reorder has one.
+    ///
+    /// Carries no `seq` and is never part of the canvas op stream: a slot
+    /// mutates in place rather than appending a history, so there is
+    /// nothing here for a reconnecting client to catch up on beyond a
+    /// fresh `GET .../canvas/media-slots`.
+    CanvasMediaSlotChanged {
+        channel_id: ChannelId,
+        kind: MediaSlotKind,
+        user_id: UserId,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+        locked: bool,
+        sent_to_back: bool,
     },
 }

@@ -2,7 +2,9 @@
 /// `dispatchCanvasLiveEvent`'s own activity-log recording: every live kind
 /// this client currently handles - place, remove, clear, restore, move,
 /// reorder - must reach [CanvasActivityLog] the moment it lands, not only
-/// through `CanvasSync`'s own catch-up path.
+/// through `CanvasSync`'s own catch-up path. Also covers the one kind that
+/// deliberately never reaches the log at all: a media-slot frame, which
+/// routes to `CanvasMediaSlotSync` instead - see the tests at the end.
 library;
 
 import 'package:flutter/painting.dart';
@@ -11,6 +13,7 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/screens/canvas/canvas_activity_log.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_live_event_dispatch.dart';
+import 'package:slimm_app/src/screens/canvas/canvas_media_slot_sync.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_sync.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
@@ -75,6 +78,13 @@ void main() {
     document.dispose();
   });
 
+  // Only for the activity-log cases below; the media-slot cases build their own.
+  CanvasMediaSlotSync mediaSlotSync() => CanvasMediaSlotSync(
+    channelId: 'c1',
+    client: _inertApi(),
+    overrides: CanvasPresenceTileOverrides(),
+  );
+
   void dispatch(api.ServerEvent event) => dispatchCanvasLiveEvent(
     event,
     paneChannelId: 'c1',
@@ -86,6 +96,7 @@ void main() {
     applyPlacedObject: (_) {},
     forgetFetchedRegion: () {},
     activityLog: log,
+    mediaSlotSync: mediaSlotSync(),
   );
 
   test('a live placement records with its own actor', () {
@@ -161,6 +172,7 @@ void main() {
       applyPlacedObject: (_) {},
       forgetFetchedRegion: () {},
       activityLog: log,
+      mediaSlotSync: mediaSlotSync(),
     );
 
     expect(
@@ -239,5 +251,84 @@ void main() {
     dispatch(api.CanvasObjectPlaced(channelId: 'other', object: _object('a')));
 
     expect(log.entries, isEmpty);
+  });
+
+  test('a live media-slot frame for this pane\'s own channel reaches '
+      'mediaSlotSync, never sync.applyLive - it carries no seq', () {
+    final overrides = CanvasPresenceTileOverrides();
+    addTearDown(overrides.dispose);
+    final slotSync = CanvasMediaSlotSync(
+      channelId: 'c1',
+      client: _inertApi(),
+      overrides: overrides,
+    );
+
+    dispatchCanvasLiveEvent(
+      const api.CanvasMediaSlotChanged(
+        channelId: 'c1',
+        kind: 'camera',
+        userId: 'alice',
+        x: 5,
+        y: 6,
+        w: 100,
+        h: 90,
+        locked: true,
+        sentToBack: false,
+      ),
+      paneChannelId: 'c1',
+      sync: sync,
+      document: document,
+      relay: () => throw StateError('no cursor event exercised here'),
+      strokePreviewRelay: () =>
+          throw StateError('no stroke preview event exercised here'),
+      applyPlacedObject: (_) =>
+          throw StateError('a media slot never places an object'),
+      forgetFetchedRegion: () {},
+      activityLog: log,
+      mediaSlotSync: slotSync,
+    );
+
+    final state = overrides.stateFor('camera:alice');
+    expect(state.rect, const Rect.fromLTWH(5, 6, 100, 90));
+    expect(state.locked, isTrue);
+    expect(log.entries, isEmpty, reason: 'a slot is never an activity');
+  });
+
+  test('a live media-slot frame for a different pane never reaches this '
+      'pane\'s own mediaSlotSync', () {
+    final overrides = CanvasPresenceTileOverrides();
+    addTearDown(overrides.dispose);
+    final slotSync = CanvasMediaSlotSync(
+      channelId: 'c1',
+      client: _inertApi(),
+      overrides: overrides,
+    );
+
+    dispatchCanvasLiveEvent(
+      const api.CanvasMediaSlotChanged(
+        channelId: 'other',
+        kind: 'camera',
+        userId: 'alice',
+        x: 5,
+        y: 6,
+        w: 100,
+        h: 90,
+        locked: true,
+        sentToBack: false,
+      ),
+      paneChannelId: 'c1',
+      sync: sync,
+      document: document,
+      relay: () => throw StateError('no cursor event exercised here'),
+      strokePreviewRelay: () =>
+          throw StateError('no stroke preview event exercised here'),
+      applyPlacedObject: (_) =>
+          throw StateError('a media slot never places an object'),
+      forgetFetchedRegion: () {},
+      activityLog: log,
+      mediaSlotSync: slotSync,
+    );
+
+    expect(overrides.stateFor('camera:alice').rect, isNull);
   });
 }
