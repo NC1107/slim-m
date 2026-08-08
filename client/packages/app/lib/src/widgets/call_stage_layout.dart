@@ -90,7 +90,8 @@ class CallStageLayout extends StatelessWidget {
           const SizedBox(height: AppSpacing.s12),
           Expanded(
             child: AppFadeIn(
-              key: ValueKey('call-stage-${sharer?.identity ?? 'grid'}'),
+              // Keyed on whether a stage exists, not who is sharing: a hand-off between sharers must not re-fade the whole filmstrip.
+              key: ValueKey(sharer != null ? 'stage' : 'grid'),
               child: sharer != null
                   ? _StageWithFilmstrip(
                       sharer: sharer,
