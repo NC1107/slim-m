@@ -29,6 +29,7 @@ import e2e_coverage
 import e2e_sweep
 import e2e_threads
 import e2e_voice
+import e2e_voice_rejoin
 import e2e_api
 from e2e_api import Api
 from e2e_client import Client
@@ -160,7 +161,7 @@ def scenarios(a, b, admin, member, room_id, server):
              room_id)),
         ("voice: leaving", lambda: e2e_voice.leave_call(a, b, room_id)),
         ("voice: re-clicking a channel already left rejoins it",
-         lambda: e2e_voice.rejoin_after_leaving(a, room_id)),
+         lambda: e2e_voice_rejoin.rejoin_after_leaving(a, room_id)),
         ("voice: calling in a dm", lambda: e2e_dm_call.start_dm_and_call(
             a, b, admin, member)),
     ]
