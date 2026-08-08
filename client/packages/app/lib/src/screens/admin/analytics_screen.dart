@@ -66,13 +66,16 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
             AppErrorState(message: actionError!, onDismiss: clearActionError),
           ],
           const SizedBox(height: AppSpacing.s16),
-          analytics.when(
-            loading: () => const SizedBox.shrink(),
-            error: (e, _) => AppErrorState(
-              message: 'Could not load analytics.',
-              onRetry: () => ref.invalidate(spaceAnalyticsProvider),
+          AppAsyncView<api.SpaceAnalytics>(
+            // A failed retry keeps the stats on screen; see AppAsyncView's own doc.
+            value: AppAsyncState(
+              data: analytics.valueOrNull,
+              error: analytics.error,
             ),
-            data: (value) => value.stats == null
+            center: false,
+            errorMessage: 'Could not load analytics.',
+            onRetry: () => ref.invalidate(spaceAnalyticsProvider),
+            data: (context, value) => value.stats == null
                 ? const _OffNotice()
                 : _StatsView(stats: value.stats!),
           ),

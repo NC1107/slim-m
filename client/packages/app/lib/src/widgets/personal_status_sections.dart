@@ -147,6 +147,11 @@ const _notificationPreferenceOptions = <(api.NotificationPreference, String)>[
 /// "no handler rather than a button that would just fail" treatment
 /// `VoiceState.retryable` already established for a voice join button a 501
 /// would only refuse the same way again.
+///
+/// A 404 reads as "not offered" above; any other fetch failure with nothing
+/// cached is a different thing entirely, and stays "Unknown" forever with no
+/// way back unless it is told apart from that case, so it renders its own
+/// retryable error instead.
 class _NotificationPreferenceRow extends ConsumerStatefulWidget {
   const _NotificationPreferenceRow();
 
@@ -172,6 +177,8 @@ class _NotificationPreferenceRowState
     if (preference.hasError && preference.error is api.NotFoundException) {
       return const SizedBox.shrink();
     }
+    // See this row's own doc comment for the 404-versus-everything-else split.
+    final loadFailed = preference.hasError && preference.valueOrNull == null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,6 +193,19 @@ class _NotificationPreferenceRowState
           ],
           onChanged: _set,
         ),
+        if (loadFailed)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s8,
+              0,
+              AppSpacing.s8,
+              AppSpacing.s8,
+            ),
+            child: AppErrorState(
+              message: 'Could not load your notification preference.',
+              onRetry: () => ref.invalidate(notificationPreferenceProvider),
+            ),
+          ),
         if (actionError != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(

@@ -129,4 +129,48 @@ void main() {
       expect(find.text('All messages'), findsNothing);
     },
   );
+
+  testWidgets(
+    'a genuine fetch failure shows a retryable error, not a silent Unknown',
+    (tester) async {
+      final container = _containerWith(
+        (request) async => http.Response('', 500),
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_harness(container));
+      await tester.pumpAndSettle();
+
+      // The row still renders ("Unknown"), but the failure is visible with a way back.
+      expect(find.text('Notify me for'), findsOneWidget);
+      expect(
+        find.text('Could not load your notification preference.'),
+        findsOneWidget,
+      );
+      expect(find.byType(AppErrorState), findsOneWidget);
+    },
+  );
+
+  testWidgets('retrying after a fetch failure re-fetches the preference', (
+    tester,
+  ) async {
+    var attempt = 0;
+    final container = _containerWith((request) async {
+      if (request.url.path != '/push/preference') return http.Response('', 404);
+      attempt++;
+      if (attempt == 1) return http.Response('', 500);
+      return _json({'preference': 'nothing'});
+    });
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_harness(container));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppErrorState), findsOneWidget);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppErrorState), findsNothing);
+    expect(find.text('Nothing'), findsOneWidget);
+  });
 }

@@ -26,6 +26,16 @@ import 'error_state.dart';
 /// is the list" are different messages, and collapsing them is how a screen
 /// ends up rendering a blank page. Give [emptyMessage] and an [isEmpty] test
 /// to get it; without them an empty list simply reaches [data].
+///
+/// A refresh that fails after a successful fetch keeps its last known value
+/// (Riverpod's own retained-previous-data behaviour), so a caller building
+/// [value] straight off an `AsyncValue` can carry a real error and real data
+/// at once. This renders that data with the error banner above it rather
+/// than wiping a perfectly good list for no better reason than a retry not
+/// having landed yet, and it does that inside both the shapes a caller
+/// embeds this in: a bounded box (an `Expanded` ancestor, so [data] can be a
+/// `ListView` that needs one) and an unbounded one (the default scrollable
+/// settings frame, where [data] is already written to size itself instead).
 class AppAsyncView<T> extends StatelessWidget {
   const AppAsyncView({
     super.key,
@@ -72,6 +82,29 @@ class AppAsyncView<T> extends StatelessWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     if (value.error != null) {
+      // Kept and shown below rather than discarded; see this class's own doc.
+      final stale = value.data;
+      if (stale != null) {
+        final banner = Padding(
+          padding: const EdgeInsets.all(AppSpacing.s12),
+          child: AppErrorState(message: errorMessage, onRetry: onRetry),
+        );
+        // Which layout is safe follows the constraint actually given here.
+        return LayoutBuilder(
+          builder: (context, constraints) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: constraints.hasBoundedHeight
+                ? MainAxisSize.max
+                : MainAxisSize.min,
+            children: [
+              banner,
+              constraints.hasBoundedHeight
+                  ? Expanded(child: data(context, stale))
+                  : data(context, stale),
+            ],
+          ),
+        );
+      }
       return _wrap(
         Padding(
           padding: const EdgeInsets.all(AppSpacing.s16),

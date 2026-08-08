@@ -16,6 +16,10 @@ import '../../providers/admin_providers.dart';
 /// Absent rather than disabled for a caller without MANAGE_ROLES: the server
 /// refuses that combination outright, and a control that can only fail is the
 /// thing this codebase keeps taking back out.
+///
+/// A failed roles fetch renders its own retryable error rather than the same
+/// nothing a caller with genuinely no grantable role sees below, so the two
+/// cannot be confused for each other.
 class InviteRoleGrantPicker extends ConsumerWidget {
   const InviteRoleGrantPicker({
     super.key,
@@ -37,7 +41,14 @@ class InviteRoleGrantPicker extends ConsumerWidget {
     final roles = ref.watch(rolesProvider);
     return roles.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
+      // See this widget's own doc comment for why this differs from below.
+      error: (_, _) => Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.s12),
+        child: AppErrorState(
+          message: 'Could not check which roles you can grant.',
+          onRetry: () => ref.invalidate(rolesProvider),
+        ),
+      ),
       data: (all) {
         // Only what this caller could grant: the server refuses a role
         // carrying a bit they do not hold, so offering it invites a 403.

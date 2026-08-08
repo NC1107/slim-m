@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/admin/analytics_screen.dart';
 import 'package:slimm_app/src/widgets/analytics_bar_chart.dart';
@@ -156,6 +157,37 @@ void main() {
       );
       expect(daySemantics.label, contains('2026-08-01: 5'));
       expect(daySemantics.label, contains('2026-08-02: 9'));
+    },
+  );
+
+  testWidgets(
+    'retrying after stats already loaded and the retry itself fails keeps '
+    'the stats on screen instead of wiping them',
+    (tester) async {
+      var requests = 0;
+      final client = MockClient((request) async {
+        requests++;
+        // First answer succeeds; the retry (second GET) fails.
+        if (requests > 1) return http.Response('', 500);
+        return http.Response(
+          jsonEncode(_enabledBody),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final container = _containerFor(client);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_app(container));
+      await tester.pumpAndSettle();
+      expect(find.text('42'), findsOneWidget);
+
+      container.invalidate(spaceAnalyticsProvider);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not load analytics.'), findsOneWidget);
+      // The stats already on screen stay there rather than being replaced.
+      expect(find.text('42'), findsOneWidget);
     },
   );
 }
