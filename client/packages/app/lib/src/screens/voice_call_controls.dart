@@ -240,32 +240,39 @@ class _ControlButton extends StatelessWidget {
       child: Semantics(
         button: true,
         label: tooltip,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          child: Container(
-            // AppSizes.rowTouch is the touch minimum; it does not shrink on
-            // desktop, because one control size across widths is what "one
-            // layout" has to mean.
-            width: AppSizes.rowTouch,
-            height: AppSizes.rowTouch,
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: BorderRadius.circular(AppRadii.control),
-              border: Border.all(color: border),
-            ),
-            child: pending
-                ? Center(
-                    child: SizedBox(
-                      width: AppSizes.icon16,
-                      height: AppSizes.icon16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: tokens.textSecondary,
+        child: AppFocusRing(
+          radius: AppRadii.control,
+          builder: (context, onFocusChange) => InkWell(
+            onTap: onPressed,
+            // The ring above replaces this rather than layering under it; see
+            // AppFocusRing's own doc comment.
+            focusColor: Colors.transparent,
+            onFocusChange: onFocusChange,
+            borderRadius: BorderRadius.circular(AppRadii.control),
+            child: Container(
+              // AppSizes.rowTouch is the touch minimum; it does not shrink on
+              // desktop, because one control size across widths is what "one
+              // layout" has to mean.
+              width: AppSizes.rowTouch,
+              height: AppSizes.rowTouch,
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: BorderRadius.circular(AppRadii.control),
+                border: Border.all(color: border),
+              ),
+              child: pending
+                  ? Center(
+                      child: SizedBox(
+                        width: AppSizes.icon16,
+                        height: AppSizes.icon16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: tokens.textSecondary,
+                        ),
                       ),
-                    ),
-                  )
-                : Icon(icon, size: 18, color: foreground),
+                    )
+                  : Icon(icon, size: 18, color: foreground),
+            ),
           ),
         ),
       ),

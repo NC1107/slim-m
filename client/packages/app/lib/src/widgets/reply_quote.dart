@@ -62,33 +62,40 @@ class ReplyQuote extends ConsumerWidget {
         label: label == null
             ? 'Reply to a message that is not available'
             : 'Reply to $label: $snippet',
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(AppIcons.reply, size: 13, color: tokens.textSecondary),
-              const SizedBox(width: AppSpacing.s4),
-              // One Flexible for both spans: a long display name alone would overflow the row otherwise.
-              Flexible(
-                child: Text.rich(
-                  TextSpan(
-                    style: textStyle,
-                    children: [
-                      if (label != null)
-                        TextSpan(
-                          text: '$label  ',
-                          style: const TextStyle(fontWeight: AppWeights.semi),
-                        ),
-                      TextSpan(text: snippet),
-                    ],
+        child: AppFocusRing(
+          radius: AppRadii.control,
+          builder: (context, onFocusChange) => InkWell(
+            onTap: onTap,
+            // The ring above replaces this rather than layering under it; see
+            // AppFocusRing's own doc comment.
+            focusColor: Colors.transparent,
+            onFocusChange: onFocusChange,
+            borderRadius: BorderRadius.circular(AppRadii.control),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(AppIcons.reply, size: 13, color: tokens.textSecondary),
+                const SizedBox(width: AppSpacing.s4),
+                // One Flexible for both spans: a long display name alone would overflow the row otherwise.
+                Flexible(
+                  child: Text.rich(
+                    TextSpan(
+                      style: textStyle,
+                      children: [
+                        if (label != null)
+                          TextSpan(
+                            text: '$label  ',
+                            style: const TextStyle(fontWeight: AppWeights.semi),
+                          ),
+                        TextSpan(text: snippet),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

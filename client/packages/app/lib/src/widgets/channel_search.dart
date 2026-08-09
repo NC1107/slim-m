@@ -133,28 +133,35 @@ class ChannelSearchResults extends ConsumerWidget {
           cachedDisplayName: message.authorDisplayName,
           profiles: profiles,
         );
-        return InkWell(
-          onTap: () => onSelect(message),
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.s4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: AppText.ui.copyWith(
-                    color: tokens.textPrimary,
-                    fontWeight: AppWeights.semi,
+        return AppFocusRing(
+          radius: AppRadii.control,
+          builder: (context, onFocusChange) => InkWell(
+            onTap: () => onSelect(message),
+            // The ring above replaces this rather than layering under it; see
+            // AppFocusRing's own doc comment.
+            focusColor: Colors.transparent,
+            onFocusChange: onFocusChange,
+            borderRadius: BorderRadius.circular(AppRadii.control),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.s4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: AppText.ui.copyWith(
+                      color: tokens.textPrimary,
+                      fontWeight: AppWeights.semi,
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.s4),
-                MessageBody(
-                  content: message.content,
-                  knownUsernames: knownUsernames,
-                  customEmoji: customEmoji,
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.s4),
+                  MessageBody(
+                    content: message.content,
+                    knownUsernames: knownUsernames,
+                    customEmoji: customEmoji,
+                  ),
+                ],
+              ),
             ),
           ),
         );
