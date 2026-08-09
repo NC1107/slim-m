@@ -57,9 +57,7 @@ void main() {
       await tester.tap(find.bySemanticsLabel('More canvas actions'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Paste image'));
-      // A real codec decode needs real asynchrony; pumpAndSettle alone
-      // never observes it, the same trap canvas_pane_test.dart's own
-      // hydration tests already document.
+      // A real codec decode needs real asynchrony; pumpAndSettle alone never observes it, the same trap canvas_pane_test.dart's own hydration tests already document.
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 20)),
       );
@@ -77,9 +75,7 @@ void main() {
             'knowing about on its own',
       );
 
-      // A fresh paste already selects itself and switches to Move (see
-      // canvas_pane_gestures.dart's `_selectPlaced`), so no tool tap is
-      // needed here - dragging its own body is the real next gesture.
+      // A fresh paste already selects itself and switches to Move (see canvas_pane_gestures.dart's `_selectPlaced`), so no tool tap is needed here - dragging its own body is the real next gesture.
       final start = screenFor(
         tester,
         Offset(

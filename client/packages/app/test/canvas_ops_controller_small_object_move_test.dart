@@ -111,9 +111,7 @@ void main() {
       harness.document.refresh();
       harness.document.selectedObjectId.value = 'small';
 
-      // Dead centre of the 10x10 box - within resizeHandleHitRadius (14)
-      // of every one of its four corners, and exactly the point the bug
-      // resolved to a resize from.
+      // Dead centre of the 10x10 box - within resizeHandleHitRadius (14) of every one of its four corners, and exactly the point the bug resolved to a resize from.
       harness.ops.beginSelect(
         const Offset(105, 105),
         manageCanvas: false,
@@ -144,8 +142,7 @@ void main() {
       harness.document.refresh();
       harness.document.selectedObjectId.value = 'small';
 
-      // The bottom-right corner of the 100,100,10,10 box is 110,110 -
-      // outside the deep-interior zone [102.5, 107.5] on both axes.
+      // The bottom-right corner of the 100,100,10,10 box is 110,110 - outside the deep-interior zone [102.5, 107.5] on both axes.
       harness.ops.beginSelect(
         const Offset(110, 110),
         manageCanvas: false,

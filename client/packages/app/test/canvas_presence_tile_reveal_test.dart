@@ -181,9 +181,7 @@ void main() {
       await tester.pumpWidget(_wrapLayer(_layer(document, overrides)));
       await tester.pump();
 
-      // The content area is IgnorePointer'd while locked, so the down event
-      // reaches straight through to whatever the tile is stacked over -
-      // exactly the surface this test proves the reveal still fires above.
+      // The content area is IgnorePointer'd while locked, so the down event reaches straight through to whatever the tile is stacked over - exactly the surface this test proves the reveal still fires above.
       await tester.tap(find.byKey(_tileKey), warnIfMissed: false);
       await tester.pump(AppMotion.fast);
 
