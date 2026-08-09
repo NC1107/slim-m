@@ -3,6 +3,16 @@
 /// a seeded local store, and a container wired like the app's.
 ///
 /// Kept out of the test file so the matrix there stays a list of sizes.
+///
+/// **Every PNG this writes is rasterised in software** (`flutter test` has
+/// no GPU), which lies about two things in a way that has already been
+/// mistaken for a real defect twice: a soft translucent `BoxShadow` paints
+/// as flat opaque black with a hard edge instead of blurring, and a thin
+/// diagonal stroke can appear broken or dotted even when the underlying
+/// geometry is correct. See `visual_render_support.dart`'s own doc comment
+/// in the voice_canvas package for the full write-up and how each was
+/// disproved against a live browser; do not read either as a real gap
+/// on the strength of one of these PNGs.
 library;
 
 import 'dart:async';

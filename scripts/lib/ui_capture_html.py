@@ -22,6 +22,13 @@ CAVEATS = [
         "shadow blurs correctly; see visual_render_support.dart's own doc "
         "comment. Do not read a hard shadow edge here as a real defect."
     ),
+    (
+        "The same rasterizer can also paint a thin diagonal stroke as "
+        "broken or dotted at a low effective pixel width, even when the "
+        "underlying geometry is correct; see visual_render_support.dart's "
+        "own doc comment for how this was disproved. Do not read a broken "
+        "hairline here as a real gap in the ink."
+    ),
 ]
 
 CATEGORY_INFO = {
