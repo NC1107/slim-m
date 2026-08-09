@@ -33,8 +33,7 @@ import 'ui_snapshot_support.dart';
 /// from the surfaces harness entirely before this file. Each renders the
 /// fixture's default answer for its own reads.
 const _surfaces = <String, ({String route, List<String> viewports})>{
-  // Reads the local drift store's categories directly, already seeded by
-  // fixtureContainer, so the populated case needs no HTTP wiring at all.
+  // Reads drift directly, seeded by fixtureContainer: no HTTP wiring needed.
   'admin-categories': (
     route: '/settings/categories',
     viewports: [...phoneAndDesktop, ...compactBracket],
@@ -49,8 +48,7 @@ const _surfaces = <String, ({String route, List<String> viewports})>{
     route: '/settings/removed-members',
     viewports: [...phoneAndDesktop, ...compactBracket],
   ),
-  // fixtureResponse answers '/space/analytics' with the feature's real
-  // default: recording off, no stats computed at all.
+  // fixtureResponse answers '/space/analytics' with its real default: off.
   'admin-analytics': (
     route: '/settings/analytics',
     viewports: [...phoneAndDesktop, ...compactBracket],
@@ -88,17 +86,13 @@ final _overrideSurfaces =
           ),
         ],
       ),
-      // Reached only by a direct navigation: the rail's own Space menu and
-      // this screen's section both hide themselves on the identical
-      // condition, so nothing in the app ever opens this screen for a
-      // caller holding none of the six gating bits.
+      // Direct navigation only: menu and section hide on the same condition.
       'space-settings-no-access': (
         route: '/settings/space',
         viewports: phoneAndDesktop,
         overrides: () => [myPermissionsProvider.overrideWithValue(0)],
       ),
-      // One bit only, so just the Access group's Invites row renders -
-      // proof the section really is partial and not all-or-nothing.
+      // One bit only: just the Invites row, so the section really is partial.
       'space-settings-partial': (
         route: '/settings/space',
         viewports: phoneAndDesktop,
