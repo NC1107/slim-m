@@ -9,93 +9,18 @@ library;
 
 import 'dart:convert';
 
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
-import 'package:slimm_api/api.dart' hide Channel;
-import 'package:slimm_api/api.dart' as api show Channel;
-import 'package:slimm_app/src/providers/providers.dart';
-import 'package:slimm_app/src/screens/admin/channel_overwrites_screen.dart';
-import 'package:slimm_data/data.dart' show MessageStore, SlimmDatabase;
 import 'package:slimm_design_system/design_system.dart';
-import 'package:slimm_platform/platform.dart';
 
-const _tokens = TokenPair(
-  userId: 'user-1',
-  accessToken: 'access',
-  refreshToken: 'refresh',
-  accessExpiresAt: 0,
-);
-
-const _me = Me(
-  id: 'user-1',
-  username: 'admin',
-  displayName: 'Admin',
-  createdAt: 0,
-  permissions: -1,
-);
-
-/// Mirrors `channel_management_test.dart`'s harness: a session, an
-/// [apiProvider] backed by [handler], and an in-memory local store seeded
-/// with one channel, since the target picker only appears once a channel is
-/// chosen. Picking a channel reads the local store's real (native) sqlite
-/// stream, which needs [WidgetTester.runAsync] to resolve inside a widget
-/// test: the fake test clock never advances it otherwise.
-Future<void> _pumpToTargetPicker(
-  WidgetTester tester, {
-  required http.Response Function(http.Request) handler,
-}) async {
-  final db = SlimmDatabase(NativeDatabase.memory());
-  await MessageStore(db).upsertChannels(const [
-    api.Channel(id: 'c1', name: 'general', kind: 'text', createdAt: 0),
-  ]);
-
-  await tester.pumpWidget(
-    UncontrolledProviderScope(
-      container: ProviderContainer(
-        overrides: [
-          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-          meProvider.overrideWith((ref) async => _me),
-          apiProvider.overrideWith((ref) {
-            final api = SlimmApi(
-              baseUrl: Uri.parse('http://localhost:8080'),
-              session: ref.watch(sessionProvider),
-              httpClient: MockClient((request) async => handler(request)),
-            );
-            ref.onDispose(api.close);
-            return api;
-          }),
-          storeProvider.overrideWith((ref) async {
-            ref.onDispose(db.close);
-            return MessageStore(db);
-          }),
-        ],
-      ),
-      child: MaterialApp(
-        theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const ChannelOverwritesScreen(),
-      ),
-    ),
-  );
-  await tester.pumpAndSettle();
-
-  await tester.runAsync(() async {
-    await tester.tap(find.text('Choose a channel'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('general'));
-    await tester.pumpAndSettle();
-  });
-}
+import 'channel_overwrites_harness.dart';
 
 void main() {
   testWidgets('the role picker sheet lists the roles once they load', (
     tester,
   ) async {
-    await _pumpToTargetPicker(
+    await pumpToTargetPicker(
       tester,
       handler: (request) => request.url.path == '/roles'
           ? http.Response(
@@ -129,7 +54,7 @@ void main() {
   testWidgets('the member picker sheet lists the members once they load', (
     tester,
   ) async {
-    await _pumpToTargetPicker(
+    await pumpToTargetPicker(
       tester,
       handler: (request) => request.url.path == '/members'
           ? http.Response(
@@ -169,7 +94,7 @@ void main() {
       addTearDown(tester.view.reset);
 
       var deleted = false;
-      await _pumpToTargetPicker(
+      await pumpToTargetPicker(
         tester,
         handler: (request) {
           if (request.url.path == '/roles') {
@@ -227,7 +152,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
-      await _pumpToTargetPicker(
+      await pumpToTargetPicker(
         tester,
         handler: (request) => request.url.path == '/roles'
             ? http.Response(
@@ -270,7 +195,7 @@ void main() {
       addTearDown(tester.view.reset);
 
       var putCount = 0;
-      await _pumpToTargetPicker(
+      await pumpToTargetPicker(
         tester,
         handler: (request) {
           if (request.url.path == '/roles') {

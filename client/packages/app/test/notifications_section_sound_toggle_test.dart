@@ -59,4 +59,14 @@ void main() {
       isFalse,
     );
   });
+
+  testWidgets('the push-status row is an AppListRow, never a bare ListTile', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap(const NotificationsSection()));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ListTile), findsNothing);
+    expect(find.byType(AppListRow), findsWidgets);
+  });
 }

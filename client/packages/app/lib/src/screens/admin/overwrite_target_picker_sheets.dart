@@ -39,9 +39,9 @@ class ChannelPickerSheet extends StatelessWidget {
       shrinkWrap: true,
       children: [
         for (final c in channels)
-          ListTile(
+          AppListRow(
             leading: Icon(c.kind == 'voice' ? AppIcons.voice : AppIcons.hash),
-            title: Text(c.name),
+            label: c.name,
             onTap: () => Navigator.of(context).pop(c),
           ),
       ],
@@ -69,9 +69,9 @@ class RolePickerSheet extends ConsumerWidget {
                 itemCount: list.length,
                 itemBuilder: (context, i) {
                   final role = list[i];
-                  return ListTile(
+                  return AppListRow(
                     leading: const Icon(AppIcons.shield),
-                    title: Text(role.name),
+                    label: role.name,
                     onTap: () => Navigator.of(context).pop(role),
                   );
                 },
@@ -101,10 +101,10 @@ class MemberPickerSheet extends ConsumerWidget {
                 itemCount: list.length,
                 itemBuilder: (context, i) {
                   final member = list[i];
-                  return ListTile(
+                  return AppListRow(
                     leading: const Icon(AppIcons.account),
-                    title: Text(member.displayName),
-                    subtitle: Text('@${member.username}'),
+                    label: member.displayName,
+                    meta: '@${member.username}',
                     onTap: () => Navigator.of(context).pop(member),
                   );
                 },
