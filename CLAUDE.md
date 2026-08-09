@@ -12,6 +12,28 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The e2e harness after thirteen-plus polish PRs: still green, and the join race stays a unit test (2026-08-08)
+
+Asked to check whether `scripts/e2e.sh` still passed after the picker-row, sheet, keyboard-activation, focus-ring, stale-data and join-race polish pass (PRs #468 through #488, three more than the task named having landed while this ran).
+Read this before assuming a green harness a few hours old is still green, and before reaching for this harness to reproduce a timing race.
+
+**The label guard passed, both before and after three more commits landed underneath the check mid-task.**
+`python3 -m pytest scripts/lib/test_e2e_labels.py` found every `e2e_labels.py` constant still present verbatim somewhere in client source, so none of the row-component swaps (`AppListRow` replacing a bare `ListTile` in nine places) or the dialog-to-sheet conversions renamed or removed an accessible name the harness depends on.
+
+**A full run is green** - every scenario, checked against the server as well as the UI, 43/72 documented API paths touched, the same figure `docs/e2e.md` already records, so the polish pass changed no route the harness reaches.
+Teardown was confirmed clean afterward: no leftover SFU container, server process, browser process, or held port.
+
+**The first attempt failed to compile, and it was not a real regression.**
+Run from the shared top-level checkout at `/home/npc/Documents/projects/slim-m`, cargo died mid-build with a missing `.rcgu.o` object file.
+That checkout is shared: another concurrent session reset it from under the build to a newer `origin/main` while `cargo` was still writing to `target/` (confirmed in `git reflog`, several `reset: moving to origin/main` entries landing during the build).
+**The lesson for the next agent working here: never build or run anything that takes more than a few seconds directly in that shared top-level checkout.**
+A real `git worktree add` plus a build inside the new tree is what isolation actually requires; the second attempt, from `.claude/worktrees/e2e-verify-polish` on its own branch off `origin/main`, rebuilt clean and passed.
+
+**Declined new e2e coverage for the join-race fix (#487), the row/sheet component swap, keyboard activation, and the stale-data-on-refresh fix, because each already has deterministic, mutation-tested coverage at the level that actually suits it.**
+`voice_controller_join_race_test.dart` reproduces the exact race with `Completer`-gated fake responses; a real network round trip through this harness cannot reproduce that reliably without flakiness, or a test-only delay hook neither the client nor server carries.
+This harness has no keyboard-event dispatch at all, CDP mouse and DOM events only, so Escape-to-close and the three newly-focusable controls are outside what it can drive without new infrastructure - Flutter's own widget-test focus and key APIs are already the right layer for that, the same split `docs/e2e.md` documents for the pre-existing context-menu keyboard gap.
+The nine row-component swaps and two dialog-to-sheet conversions are structural under the hood, and the scenarios that already exercise those screens (settings, admin role creation, canvas source sheets) passed unchanged; the sheets' phone-width collapse is the same class of narrow-width gap `docs/e2e.md` already declines to fake with a DOM click that cannot tell found from reachable.
+
 ## A commit's body can crash release-please's parser, not just its title (2026-08-06)
 
 Found while reading the client's pending release PR by hand: commit `7eebab8` (PR #443, "a note nobody could delete, and a pinch that drew on your canvas") has a perfectly good conventional-commit title and is **silently absent from the changelog anyway**.
