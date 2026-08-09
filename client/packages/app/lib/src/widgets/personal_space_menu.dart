@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/dock_reservation.dart';
 import '../providers/personal_space_visibility.dart';
 import 'app_snackbar.dart';
 import 'context_menu_focus.dart';
@@ -51,10 +52,12 @@ class _PersonalSpaceKebabState extends ConsumerState<PersonalSpaceKebab> {
     _controller.hide();
     final messenger = ScaffoldMessenger.maybeOf(context);
     final reduceMotion = AppMotion.isReduced(context);
+    final reserveBottom = ref.read(bottomDockReservationProvider);
     await ref.read(personalSpaceVisibilityProvider.notifier).hide();
     showResolvedSnackbar(
       messenger,
       reduceMotion: reduceMotion,
+      reserveBottom: reserveBottom,
       message: personalSpaceHiddenNotice,
     );
   }
