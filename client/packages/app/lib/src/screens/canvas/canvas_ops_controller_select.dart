@@ -88,7 +88,7 @@ extension CanvasOpsControllerSelect on CanvasOpsController {
         document.kindOf(selected) != CanvasObjectKind.stroke) {
       final owns = manageCanvas || document.authorIdOf(selected) == selfId;
       final bounds = document.objectBounds(selected);
-      if (owns && bounds != null) {
+      if (owns && bounds != null && !_isDeepInterior(bounds, world)) {
         final corner = hitTestResizeHandle(bounds, world, document.camera.zoom);
         if (corner != null) {
           _resize = _ResizeState(selected, corner, bounds);
@@ -108,6 +108,30 @@ extension CanvasOpsControllerSelect on CanvasOpsController {
     if (bounds == null) return;
     _drag = _DragState(id, bounds.x, bounds.y, bounds.w, bounds.h, world);
     document.elevatedObjectId.value = id;
+  }
+
+  /// Whether [world] lands in the innermost half of [bounds] - the zone a
+  /// plain move-drag always wins, regardless of how far
+  /// `hitTestResizeHandle`'s own zoom-scaled radius reaches (its own doc:
+  /// "never becomes unhittable zoomed out", a deliberate, unbounded growth
+  /// as zoom shrinks). Without this, a selected object small enough that
+  /// its whole body sits inside that fixed screen-space radius - a
+  /// resized-down or naturally small pasted image is the easy way there,
+  /// with `minObjectSize` (8) well under it at zoom 1 - could never be
+  /// grabbed for a plain move again: every click, including dead centre,
+  /// resolved to a resize. The guard only ever narrows where a resize may
+  /// start; a click anywhere near an edge or corner, or outside the box
+  /// entirely, is untouched.
+  bool _isDeepInterior(
+    ({double x, double y, double w, double h}) bounds,
+    Offset world,
+  ) {
+    final marginX = bounds.w / 4;
+    final marginY = bounds.h / 4;
+    return world.dx >= bounds.x + marginX &&
+        world.dx <= bounds.x + bounds.w - marginX &&
+        world.dy >= bounds.y + marginY &&
+        world.dy <= bounds.y + bounds.h - marginY;
   }
 
   /// A stroke under [world] the caller may reorder, or null. `hitTestStroke`

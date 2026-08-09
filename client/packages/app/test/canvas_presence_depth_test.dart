@@ -139,11 +139,20 @@ void main() {
             .first,
       );
       final types = stack.children.map((w) => w.runtimeType).toList();
+      final gridIndex = types.indexOf(CanvasGridLayer);
       final backdropIndex = types.indexOf(CanvasPresenceBackdrop);
       final surfaceIndex = types.indexOf(CanvasSurface);
       final frontLayerIndex = types.indexOf(CanvasPresenceLayer);
 
+      expect(gridIndex, isNot(-1));
       expect(backdropIndex, isNot(-1));
+      expect(
+        gridIndex,
+        lessThan(backdropIndex),
+        reason:
+            'the grid must sit under a sent-to-back tile\'s own video, not '
+            'paint over it - report 1 in the backlog channel',
+      );
       expect(
         backdropIndex,
         lessThan(surfaceIndex),
@@ -273,6 +282,10 @@ void main() {
       findsOneWidget,
       reason: 'front is the default, so its state glyph shows first',
     );
+
+    // A first tap reveals the control row - report 3 asked for it gone until asked for.
+    await tester.tap(tileFinder);
+    await tester.pump();
 
     await tester.tap(
       find.descendant(

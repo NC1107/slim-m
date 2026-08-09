@@ -27,7 +27,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           onStroke: (_) {},
         ),
       ),
@@ -64,7 +63,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           onStroke: (points) => committed = points,
         ),
       ),
@@ -97,7 +95,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           enabled: false,
           onStroke: (_) => strokes++,
         ),
@@ -125,7 +122,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           onStroke: (_) {},
           onPointerMoved: moved.add,
         ),
@@ -156,7 +152,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           onStroke: (_) {},
           onPointerMoved: moved.add,
         ),
@@ -186,7 +181,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           onStroke: (_) {},
           cursors: cursors,
           cursorColors: const [Color(0xFFE0699A)],
@@ -212,7 +206,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           onStroke: (_) {},
         ),
       ),

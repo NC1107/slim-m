@@ -48,7 +48,13 @@ const _here = VoiceParticipant(
 /// Sends Noor's tile to the back through its own corner control, the same
 /// tap a person would make - not by reaching into overrides directly, so
 /// this exercises the real toggle wired into the full pane.
+///
+/// A first tap reveals the control row (report 3: it no longer sits
+/// permanently on screen), so this taps the tile itself once before the
+/// control - the same two-tap sequence a real touch does.
 Future<void> _sendToBack(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('camera:user-noor')));
+  await tester.pump();
   await tester.tap(find.bySemanticsLabel('Send this tile to the back'));
   await tester.pump();
 }

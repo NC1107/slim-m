@@ -2,6 +2,13 @@
 /// The two small presentational pieces `canvas_presence_tile.dart` paints
 /// over a tile's own content - split out to keep that file, which also
 /// carries the tile's gesture handling, under the review budget.
+///
+/// Neither carries a background plate any more - report 3 in the backlog
+/// channel asked for the permanent translucent bubble behind them gone,
+/// alongside `canvas_presence_tile.dart`'s own reveal-on-hover/press gate
+/// that already keeps both off screen until asked for. Each `AppIconButton`
+/// still paints its own hover fill, the same affordance every other icon
+/// button in this design system already has.
 library;
 
 import 'package:flutter/material.dart';
@@ -31,15 +38,11 @@ class TileResizeGrip extends StatelessWidget {
           width: AppSizes.controlSm,
           height: AppSizes.controlSm,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: tokens.surfaceBase.withValues(alpha: 0.85),
-            shape: BoxShape.circle,
-            border: Border.all(color: tokens.borderSubtle),
-          ),
           child: Icon(
             AppIcons.tileResize,
             size: AppSizes.icon16,
             color: tokens.textSecondary,
+            shadows: [Shadow(color: tokens.surfaceBase, blurRadius: 4)],
           ),
         ),
       ),
@@ -68,50 +71,42 @@ class TileControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: tokens.surfaceBase.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(AppRadii.full),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppIconButton(
-            icon: locked ? AppIcons.tileLocked : AppIcons.tileUnlocked,
-            semanticLabel: locked
-                ? 'Unlock this tile'
-                : 'Lock this tile in place',
-            tooltip: locked
-                ? 'Unlock - drag and resize again'
-                : 'Lock in place - a drawing tool reaches through it',
-            size: AppIconButtonSize.sm,
-            active: locked,
-            onPressed: onToggleLocked,
-          ),
-          // The object menu's own "Bring to front"/"Send to back", reached here since a tile absorbs its own right-click - see `canvas_presence_tile.dart`'s own library doc.
-          AppIconButton(
-            icon: sentToBack ? AppIcons.sendToBack : AppIcons.bringToFront,
-            semanticLabel: sentToBack
-                ? 'Bring this tile to the front'
-                : 'Send this tile to the back',
-            tooltip: sentToBack
-                ? 'Bring to front - back above the ink'
-                : 'Send to back - draw over it',
-            size: AppIconButtonSize.sm,
-            active: sentToBack,
-            onPressed: onToggleSentToBack,
-          ),
-          AppIconButton(
-            icon: AppIcons.tileHide,
-            semanticLabel: 'Hide this tile on your canvas',
-            tooltip: 'Hide on your canvas',
-            size: AppIconButtonSize.sm,
-            onPressed: onHide,
-          ),
-        ],
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AppIconButton(
+          icon: locked ? AppIcons.tileLocked : AppIcons.tileUnlocked,
+          semanticLabel: locked
+              ? 'Unlock this tile'
+              : 'Lock this tile in place',
+          tooltip: locked
+              ? 'Unlock - drag and resize again'
+              : 'Lock in place - a drawing tool reaches through it',
+          size: AppIconButtonSize.sm,
+          active: locked,
+          onPressed: onToggleLocked,
+        ),
+        // The object menu's own "Bring to front"/"Send to back", reached here since a tile absorbs its own right-click - see `canvas_presence_tile.dart`'s own library doc.
+        AppIconButton(
+          icon: sentToBack ? AppIcons.sendToBack : AppIcons.bringToFront,
+          semanticLabel: sentToBack
+              ? 'Bring this tile to the front'
+              : 'Send this tile to the back',
+          tooltip: sentToBack
+              ? 'Bring to front - back above the ink'
+              : 'Send to back - draw over it',
+          size: AppIconButtonSize.sm,
+          active: sentToBack,
+          onPressed: onToggleSentToBack,
+        ),
+        AppIconButton(
+          icon: AppIcons.tileHide,
+          semanticLabel: 'Hide this tile on your canvas',
+          tooltip: 'Hide on your canvas',
+          size: AppIconButtonSize.sm,
+          onPressed: onHide,
+        ),
+      ],
     );
   }
 }

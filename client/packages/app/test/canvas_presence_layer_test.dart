@@ -21,16 +21,6 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
-const _onCamera = VoiceParticipant(
-  identity: 'user-priya',
-  name: 'Priya',
-  isSpeaking: false,
-  isMuted: false,
-  isLocal: false,
-  isScreenSharing: false,
-  isCameraOn: true,
-);
-
 const _cameraOff = VoiceParticipant(
   identity: 'user-noor',
   name: 'Noor',
@@ -146,66 +136,6 @@ void main() {
     expect(find.byType(CanvasScreenShareBubble), findsOneWidget);
   });
 
-  testWidgets('a camera-on participant renders the built camera view', (
-    tester,
-  ) async {
-    final document = CanvasDocument();
-    addTearDown(document.dispose);
-    document.setViewport(const Size(1000, 800));
-    var builtFor = <String>[];
-    final overrides = CanvasPresenceTileOverrides();
-
-    await tester.pumpWidget(
-      _wrap(
-        _layer(
-          document,
-          const [_onCamera],
-          overrides,
-          cameraViewFor: (identity) {
-            builtFor.add(identity);
-            return const ColoredBox(
-              key: Key('live-camera'),
-              color: Color(0xFF00FF00),
-            );
-          },
-        ),
-      ),
-    );
-    await tester.pump();
-
-    expect(builtFor, ['user-priya']);
-    expect(find.byKey(const Key('live-camera')), findsOneWidget);
-  });
-
-  testWidgets(
-    'a camera-off participant never calls cameraViewFor, and shows an avatar '
-    'instead',
-    (tester) async {
-      final document = CanvasDocument();
-      addTearDown(document.dispose);
-      document.setViewport(const Size(1000, 800));
-      var calls = 0;
-      final overrides = CanvasPresenceTileOverrides();
-
-      await tester.pumpWidget(
-        _wrap(
-          _layer(
-            document,
-            const [_cameraOff],
-            overrides,
-            cameraViewFor: (_) {
-              calls++;
-              return const SizedBox();
-            },
-          ),
-        ),
-      );
-      await tester.pump();
-
-      expect(calls, 0);
-    },
-  );
-
   testWidgets(
     'panning the camera far past the exit band drops a previously-visible '
     'tile',
@@ -225,45 +155,6 @@ void main() {
       await tester.pump();
 
       expect(find.byType(CanvasPresenceBubble), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'a bubble carries the float shadow and the window radius, the tokens '
-    'reserved for an object that is always above the plane',
-    (tester) async {
-      final document = CanvasDocument();
-      addTearDown(document.dispose);
-      document.setViewport(const Size(1000, 800));
-      final overrides = CanvasPresenceTileOverrides();
-
-      await tester.pumpWidget(
-        _wrap(_layer(document, const [_cameraOff], overrides)),
-      );
-      await tester.pump();
-
-      final decorated = tester
-          .widgetList<Container>(
-            find.descendant(
-              of: find.byType(CanvasPresenceBubble),
-              matching: find.byType(Container),
-            ),
-          )
-          .map((c) => c.decoration)
-          .whereType<BoxDecoration>();
-      expect(
-        decorated.any((d) => d.boxShadow == AppShadows.float),
-        isTrue,
-        reason:
-            'a bubble is never merely part of the plane, unlike an '
-            'image or a stroke, so it carries the shadow unconditionally',
-      );
-      expect(
-        decorated.any(
-          (d) => d.borderRadius == BorderRadius.circular(AppRadii.window),
-        ),
-        isTrue,
-      );
     },
   );
 

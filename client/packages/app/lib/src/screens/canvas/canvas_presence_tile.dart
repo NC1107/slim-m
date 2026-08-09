@@ -15,6 +15,19 @@
 /// locked) but the lock control itself never does, or a locked tile would be
 /// a dead end with no way back.
 ///
+/// The resize grip and the lock/depth/hide row are hidden - both visually
+/// and to hit-testing - until this tile is hovered (desktop) or pressed
+/// once (touch, where there is no hover): permanently painting three
+/// buttons over every participant's video was report 3 in the backlog
+/// channel. The reveal has to live on the outer [Listener] that already
+/// wraps this whole tile, not on the controls themselves, because that is
+/// the one piece of this widget [locked]'s own [IgnorePointer] never
+/// reaches - see this file's own doc above for why the outer `Listener`
+/// already has to see every pointer within the tile regardless of lock
+/// state. So a locked tile still reveals its own unlock button on a hover
+/// or a first press, the same "never a dead end" guarantee [locked] itself
+/// already makes.
+///
 /// [CanvasPresenceManipulableTile.sentToBack] never touches this widget's
 /// own layout, gesture handling or paint position at all - see
 /// `canvas_presence_layer.dart`'s own doc for why. Only [child] differs
@@ -39,8 +52,11 @@
 /// place on it as though no second finger had come down at all.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_presence_geometry.dart' show presenceScreenRect;
@@ -51,6 +67,11 @@ import 'canvas_presence_tile_controls.dart';
 /// single tile can never swallow a typical viewport.
 const canvasPresenceTileMinSize = Size(72, 54);
 const canvasPresenceTileMaxSize = Size(720, 540);
+
+/// How long a touch reveal stays up with nothing else keeping it there - a
+/// mouse instead relies on [MouseRegion.onExit] firing the moment the
+/// pointer actually leaves, so this only ever governs touch.
+const canvasPresenceTileTouchRevealDuration = Duration(seconds: 3);
 
 class CanvasPresenceManipulableTile extends StatefulWidget {
   const CanvasPresenceManipulableTile({
@@ -157,6 +178,34 @@ class _CanvasPresenceManipulableTileState
 
   bool _isPanButton(int buttons) => buttons & kMiddleMouseButton != 0;
 
+  /// True while a mouse sits over this tile - [MouseRegion.onEnter]/
+  /// [MouseRegion.onExit] track it directly and need no timer, since a
+  /// mouse always reports leaving.
+  bool _hovering = false;
+
+  /// True while a touch's own reveal is still active - [_revealForTouch]
+  /// (re)starts [_hideTimer] on every press, so a held or repeated touch
+  /// keeps the controls up rather than letting them vanish mid-interaction.
+  bool _revealedForTouch = false;
+  Timer? _hideTimer;
+
+  bool get _controlsVisible => _hovering || _revealedForTouch;
+
+  void _onHoverEnter(PointerEnterEvent _) => setState(() => _hovering = true);
+  void _onHoverExit(PointerExitEvent _) => setState(() => _hovering = false);
+
+  /// Called on every pointer down within this tile, mouse or touch alike -
+  /// harmless for a mouse, which already reveals through [_hovering] and
+  /// will have exited (clearing this too) well before [_hideTimer] could
+  /// ever fire.
+  void _revealForTouch() {
+    _hideTimer?.cancel();
+    if (!_revealedForTouch) setState(() => _revealedForTouch = true);
+    _hideTimer = Timer(canvasPresenceTileTouchRevealDuration, () {
+      if (mounted) setState(() => _revealedForTouch = false);
+    });
+  }
+
   void _pointerDown(PointerDownEvent event) {
     _countedPointers.add(event.pointer);
     widget.document.externalPointers.add();
@@ -164,6 +213,7 @@ class _CanvasPresenceManipulableTileState
       _panPointer = event.pointer;
       _panFrom = event.position;
     }
+    _revealForTouch();
   }
 
   void _pointerMove(PointerMoveEvent event) {
@@ -201,8 +251,32 @@ class _CanvasPresenceManipulableTileState
       widget.document.externalPointers.remove();
     }
     _countedPointers.clear();
+    _hideTimer?.cancel();
     super.dispose();
   }
+
+  /// Wraps [child] so it is invisible and unreachable by a pointer while
+  /// this tile's own reveal is inactive, and both otherwise - the grip and
+  /// the controls row share this, never the tile's own content, which draws
+  /// and hit-tests exactly as before.
+  ///
+  /// `alwaysIncludeSemantics: true` is load-bearing, not tidiness:
+  /// [AnimatedOpacity] excludes its child from the semantics tree at zero
+  /// opacity by default, which would have made a screen reader's own swipe
+  /// navigation lose these controls entirely rather than only the pointer
+  /// route this fix means to gate - a strictly worse accessibility position
+  /// than before this file ever hid anything. [IgnorePointer] still blocks
+  /// an ordinary pointer tap while hidden; a screen reader's own activation
+  /// reaches straight through it regardless, the same way it always could.
+  Widget _revealable(BuildContext context, Widget child) => IgnorePointer(
+    ignoring: !_controlsVisible,
+    child: AnimatedOpacity(
+      opacity: _controlsVisible ? 1 : 0,
+      duration: AppMotion.reduced(context, AppMotion.fast),
+      alwaysIncludeSemantics: true,
+      child: child,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -213,46 +287,58 @@ class _CanvasPresenceManipulableTileState
       top: screen.top,
       width: screen.width,
       height: screen.height,
-      child: Listener(
-        onPointerDown: _pointerDown,
-        onPointerMove: _pointerMove,
-        onPointerUp: _pointerUp,
-        onPointerCancel: _pointerUp,
-        child: Semantics(
-          container: true,
-          label: widget.semanticLabel,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IgnorePointer(
-                ignoring: widget.locked,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  // A no-op, not an omission: a right-click on a tile must never leak to a canvas object underneath it, `canvas_self_presence_overlay.dart`'s old precedent for this exact absorption.
-                  onSecondaryTapUp: (_) {},
-                  onPanUpdate: _drag,
-                  onPanEnd: _settle,
-                  child: widget.child,
+      child: MouseRegion(
+        onEnter: _onHoverEnter,
+        onExit: _onHoverExit,
+        child: Listener(
+          // Default is deferToChild, which would leave this Listener silent for a locked, not-yet-revealed tile: content is IgnorePointer'd and the controls are IgnorePointer'd too until revealed, so nothing below ever hits - a real dead end this fixes.
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: _pointerDown,
+          onPointerMove: _pointerMove,
+          onPointerUp: _pointerUp,
+          onPointerCancel: _pointerUp,
+          child: Semantics(
+            container: true,
+            label: widget.semanticLabel,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IgnorePointer(
+                  ignoring: widget.locked,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    // A no-op, not an omission: a right-click on a tile must never leak to a canvas object underneath it, `canvas_self_presence_overlay.dart`'s old precedent for this exact absorption.
+                    onSecondaryTapUp: (_) {},
+                    onPanUpdate: _drag,
+                    onPanEnd: _settle,
+                    child: widget.child,
+                  ),
                 ),
-              ),
-              if (!widget.locked)
+                if (!widget.locked)
+                  Positioned(
+                    right: -4,
+                    bottom: -4,
+                    child: _revealable(
+                      context,
+                      TileResizeGrip(onUpdate: _resize, onEnd: _settle),
+                    ),
+                  ),
                 Positioned(
-                  right: -4,
-                  bottom: -4,
-                  child: TileResizeGrip(onUpdate: _resize, onEnd: _settle),
+                  right: 2,
+                  top: 2,
+                  child: _revealable(
+                    context,
+                    TileControls(
+                      locked: widget.locked,
+                      sentToBack: widget.sentToBack,
+                      onToggleLocked: widget.onToggleLocked,
+                      onToggleSentToBack: widget.onToggleSentToBack,
+                      onHide: widget.onHide,
+                    ),
+                  ),
                 ),
-              Positioned(
-                right: 2,
-                top: 2,
-                child: TileControls(
-                  locked: widget.locked,
-                  sentToBack: widget.sentToBack,
-                  onToggleLocked: widget.onToggleLocked,
-                  onToggleSentToBack: widget.onToggleSentToBack,
-                  onHide: widget.onHide,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
