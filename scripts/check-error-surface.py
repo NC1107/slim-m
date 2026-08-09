@@ -21,10 +21,19 @@ rather than to `GuardedActionState`/`AppErrorState`, the two `run_guarded.dart`
 actually offers for that failure. That is exactly the shape the three
 regressions had, and exactly the shape every fixed site does not.
 
-Reads the `on api.<Something>Exception catch` blocks straight out of each
-`.dart` file's own text rather than keeping a list of what to check: a case
-this cannot see is a case that was never written the wrong way in the first
+Reads the `on api.<Something>Exception` blocks straight out of each `.dart`
+file's own text rather than keeping a list of what to check: a case this
+cannot see is a case that was never written the wrong way in the first
 place, so there is nothing to fall out of date.
+
+The `catch (e)` clause is optional in the pattern on purpose: `on
+api.ApiException { ... }` with no bound variable is valid Dart, and an
+earlier version of this regex required the literal word `catch`, so that
+exact shape - unreachable to the interpolation risk `describeApiFailure`
+guards against, but just as reachable to a raw `ScaffoldMessenger` call -
+sailed through unseen. `presence_controller.dart` alone already has one;
+none of them show a SnackBar today, so nothing here was retroactively wrong,
+only the gate meant to keep it that way.
 
 `EXCEPTIONS` below is a short, named allowlist rather than a growing file, the
 same discipline `type_scale_literal_test.dart` already holds everyone else to:
@@ -43,7 +52,9 @@ from pathlib import Path
 
 EXCEPTIONS: dict[tuple[str, int], str] = {}
 
-CATCH_HEADER = re.compile(r"^(?P<indent>\s*)\}?\s*on\s+api\.\w*Exception\s+catch\b.*\{\s*$")
+CATCH_HEADER = re.compile(
+    r"^(?P<indent>\s*)\}?\s*on\s+api\.\w*Exception(\s+catch\b[^{]*)?\s*\{\s*$"
+)
 SHOWS_SNACKBAR = re.compile(r"ScaffoldMessenger|SnackBar\(")
 
 
