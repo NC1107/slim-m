@@ -14,6 +14,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -454,4 +455,47 @@ void main() {
 
     expect(session.cameraSwitchCalls, ['select:cam-2']);
   });
+
+  testWidgets(
+    'a focused control button draws the design system\'s own focus ring, '
+    'not the Material default overlay',
+    (tester) async {
+      FocusManager.instance.highlightStrategy =
+          FocusHighlightStrategy.alwaysTraditional;
+      addTearDown(
+        () => FocusManager.instance.highlightStrategy =
+            FocusHighlightStrategy.automatic,
+      );
+
+      await pumpControls(
+        tester,
+        const VoiceState(state: VoiceSessionState.connected),
+      );
+
+      expect(_hasControlFocusRing(tester), isFalse);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+
+      expect(
+        _hasControlFocusRing(tester),
+        isTrue,
+        reason:
+            'InkWell draws Material\'s own translucent focus overlay by '
+            'default; AppFocusRing is what replaces it with this design '
+            'language\'s own outline token',
+      );
+    },
+  );
 }
+
+/// Mirrors `context_menu_reachability_test.dart`'s own `_hasFocusRing`
+/// helper, adapted for [AppFocusRing]'s `Container`-based ring rather than a
+/// `foregroundDecoration` one.
+bool _hasControlFocusRing(WidgetTester tester) => tester.any(
+  find.byWidgetPredicate((w) {
+    if (w is! Container) return false;
+    final decoration = w.decoration;
+    return decoration is BoxDecoration &&
+        decoration.border?.top.color == AppTokens.light.focusRing;
+  }),
+);
