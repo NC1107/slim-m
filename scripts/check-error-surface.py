@@ -68,6 +68,16 @@ naming `showAppSnackbar` in its own body - the call is one file away, at the
 composer's own call site. A regex reading one function at a time cannot see
 across that indirection; `composer_affordances_test.dart`'s own regression
 test is what actually guards that site, mutation-tested the same way.
+
+A Future's own `.catchError((e) { ... })` is the same inline shape as a
+`catch` block - the body sits in the same file, on plain text a regex can
+still read - and this codebase already uses that idiom (`sync_controller.dart`,
+`providers.dart`) for the swallow-and-log case, so it is exactly as reachable
+for a SnackBar as `catch` ever was. It carried no pattern until an adversarial
+review planted `().catchError((e) { showAppSnackbar(context, e.toString()); })`
+in a tracked file and the gate reported zero offenders. A `.catchError` whose
+callback is a named function reference rather than an inline literal shares
+the composer's own cross-file indirection and is accepted the same way.
 """
 
 import re
@@ -84,21 +94,29 @@ CATCH_HEADER = re.compile(
 BARE_CATCH_HEADER = re.compile(
     r"^(?P<indent>[ \t]*)(?:\}[ \t]*)?catch[ \t]*\([^)]*\)[ \t]*\{[ \t]*$"
 )
+CATCH_ERROR_HEADER = re.compile(
+    r"^(?P<indent>[ \t]*)[^\n]*\.catchError\([ \t]*\([^)]*\)[ \t]*\{[ \t]*$"
+)
 SHOWS_SNACKBAR = re.compile(r"ScaffoldMessenger|SnackBar\(|showAppSnackbar\(")
 
 
 def catch_blocks(lines: list[str]):
     """Yields (1-based header line, body lines) for each caught-exception block.
 
-    Either an `on api.*Exception catch { ... }` or a bare `catch (e) { ... }`
-    header; see this file's own module doc for why both are in scope. The
-    block's end is the next line, at the header's indentation or less, that
-    opens with `}` - the same section-by-indentation technique `hygiene.yml`'s
-    own `section()` helper already uses for a Dart brace this project has no
-    AST tool handy for in a plain hygiene step.
+    An `on api.*Exception catch { ... }` header, a bare `catch (e) { ... }`
+    one, or a Future's own `.catchError((e) { ... })`; see this file's own
+    module doc for why all three are in scope. The block's end is the next
+    line, at the header's indentation or less, that opens with `}` - the same
+    section-by-indentation technique `hygiene.yml`'s own `section()` helper
+    already uses for a Dart brace this project has no AST tool handy for in a
+    plain hygiene step.
     """
     for i, line in enumerate(lines):
-        header = CATCH_HEADER.match(line) or BARE_CATCH_HEADER.match(line)
+        header = (
+            CATCH_HEADER.match(line)
+            or BARE_CATCH_HEADER.match(line)
+            or CATCH_ERROR_HEADER.match(line)
+        )
         if not header:
             continue
         indent = header.group("indent")
