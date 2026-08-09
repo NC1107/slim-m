@@ -5,14 +5,16 @@
 # widths, every theme that matters: a single set of PNGs plus a manifest and
 # a contact sheet, for a reviewer to walk once rather than four times.
 #
-# This orchestrates four existing test harnesses rather than adding a fifth:
-# `test/ui_snapshot_test.dart` (resting screens), `test/ui_overlay_snapshot_
-# test.dart` plus `test/ui_overlay_snapshot_menus_test.dart` (sheets, dialogs,
-# popovers, gesture-opened menus), `test/visual/canvas_assembled_snapshot_
-# test.dart` (the assembled canvas pane), and voice_canvas's `test/visual/
-# canvas_visual_render.dart` (the canvas painters, no widget tree at all).
-# Each already knows how to render its own surfaces; this only runs them
-# with the right env var in the right directory and gathers what they wrote.
+# This orchestrates existing test harnesses rather than adding new ones:
+# `test/ui_snapshot_test.dart` plus `test/ui_snapshot_settings_test.dart`
+# (resting screens, split the same way the overlay pair below is), `test/
+# ui_overlay_snapshot_test.dart` plus `test/ui_overlay_snapshot_menus_test.
+# dart` (sheets, dialogs, popovers, gesture-opened menus), `test/visual/
+# canvas_assembled_snapshot_test.dart` (the assembled canvas pane), and
+# voice_canvas's `test/visual/canvas_visual_render.dart` (the canvas
+# painters, no widget tree at all). Each already knows how to render its own
+# surfaces; this only runs them with the right env var in the right
+# directory and gathers what they wrote.
 #
 # A newly discovered screen, sheet or state does not need a change here: add
 # it to the relevant harness's own table (`_surfaces` or `_overlays` in the
@@ -33,6 +35,7 @@ mkdir -p "$OUT/images" "$WORK"
 # id|category|cwd (relative to ROOT)|env var|src dir (relative to cwd)|test file
 JOBS=(
   "screens|screens|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_snapshot_test.dart"
+  "screens-settings|screens|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_snapshot_settings_test.dart"
   "overlays|overlays|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_overlay_snapshot_test.dart"
   "overlay-menus|overlays|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_overlay_snapshot_menus_test.dart"
   "overlay-confirm|overlays|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_overlay_snapshot_confirm_test.dart"
