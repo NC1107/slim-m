@@ -244,10 +244,11 @@ class _ControlButton extends StatelessWidget {
           onTap: onPressed,
           borderRadius: BorderRadius.circular(AppRadii.control),
           child: Container(
-            // 44 is the touch minimum; it does not shrink on desktop, because
-            // one control size across widths is what "one layout" has to mean.
-            width: 44,
-            height: 44,
+            // AppSizes.rowTouch is the touch minimum; it does not shrink on
+            // desktop, because one control size across widths is what "one
+            // layout" has to mean.
+            width: AppSizes.rowTouch,
+            height: AppSizes.rowTouch,
             decoration: BoxDecoration(
               color: background,
               borderRadius: BorderRadius.circular(AppRadii.control),
@@ -256,8 +257,8 @@ class _ControlButton extends StatelessWidget {
             child: pending
                 ? Center(
                     child: SizedBox(
-                      width: 16,
-                      height: 16,
+                      width: AppSizes.icon16,
+                      height: AppSizes.icon16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         color: tokens.textSecondary,

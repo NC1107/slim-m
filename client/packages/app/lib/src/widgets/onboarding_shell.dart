@@ -264,7 +264,7 @@ class _Pip extends StatelessWidget {
               : Text(
                   '${index + 1}',
                   style: AppText.code.copyWith(
-                    fontSize: 10,
+                    fontSize: AppText.micro.fontSize,
                     color: lit ? tokens.accent : tokens.textSecondary,
                   ),
                 ),

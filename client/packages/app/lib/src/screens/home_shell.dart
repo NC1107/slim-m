@@ -364,7 +364,7 @@ class _ChannelTitle extends ConsumerWidget {
               const SizedBox(width: AppSpacing.s8),
               Text(
                 channel?.name ?? '',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: const TextStyle(fontWeight: AppWeights.semi),
               ),
             ],
           );

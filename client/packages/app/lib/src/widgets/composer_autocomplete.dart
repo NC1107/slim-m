@@ -100,7 +100,8 @@ class _Row extends StatelessWidget {
     } else if (suggestion.glyph != null) {
       leading = Text(
         suggestion.glyph!,
-        style: const TextStyle(fontSize: 16, height: 1.1),
+        // Matches the icon fallback below's own size, so the leading slot reads level.
+        style: const TextStyle(fontSize: AppSizes.icon16, height: 1.1),
       );
     } else {
       leading = Icon(

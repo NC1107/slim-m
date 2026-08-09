@@ -68,10 +68,9 @@ class VoiceSwitchPrompt extends StatelessWidget {
               Text(
                 'Already in a call',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: AppText.heading.copyWith(
                   color: tokens.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppWeights.semi,
                 ),
               ),
               const SizedBox(height: AppSpacing.s8),
@@ -79,7 +78,7 @@ class VoiceSwitchPrompt extends StatelessWidget {
                 "You're in a call somewhere else. Switching leaves it and "
                 'joins this one instead.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: tokens.textSecondary, fontSize: 13),
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
               ),
               const SizedBox(height: AppSpacing.s16),
               FilledButton(
@@ -151,10 +150,9 @@ class VoiceRejoinScreen extends StatelessWidget {
                     Text(
                       isDm ? 'Call' : 'Voice channel',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: AppText.heading.copyWith(
                         color: tokens.textPrimary,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppWeights.semi,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.s16),
@@ -176,9 +174,8 @@ class VoiceRejoinScreen extends StatelessWidget {
                         child: Text(
                           'You left this call.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: AppText.caption.copyWith(
                             color: tokens.textSecondary,
-                            fontSize: 13,
                           ),
                         ),
                       ),

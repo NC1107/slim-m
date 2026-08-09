@@ -134,7 +134,7 @@ class _CallHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final style = TextStyle(color: tokens.textSecondary, fontSize: 12);
+    final style = AppText.caption.copyWith(color: tokens.textSecondary);
     return Row(
       children: [
         Text('${voice.participants.length} in call', style: style),

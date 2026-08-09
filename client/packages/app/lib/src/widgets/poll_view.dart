@@ -113,7 +113,7 @@ class _PollOptionRow extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          height: 34,
+          height: AppSizes.controlMd,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             // Always the plain separator: an accent border means focus here, not selection.

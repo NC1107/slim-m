@@ -70,10 +70,9 @@ class SettingsSectionHeader extends StatelessWidget {
             header: true,
             child: Text(
               title,
-              style: TextStyle(
+              style: AppText.ui.copyWith(
                 color: tokens.textPrimary,
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
+                fontWeight: AppWeights.semi,
               ),
             ),
           ),
@@ -81,7 +80,7 @@ class SettingsSectionHeader extends StatelessWidget {
             const SizedBox(height: AppSpacing.s4),
             Text(
               description!,
-              style: TextStyle(color: tokens.textSecondary, fontSize: 13),
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
           ],
         ],

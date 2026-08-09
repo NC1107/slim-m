@@ -35,7 +35,7 @@ class ServerNotice extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(color: tokens.textSecondary, fontSize: 13),
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
               ),
             ),
           ],
