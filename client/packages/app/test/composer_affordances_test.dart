@@ -188,6 +188,9 @@ void main() {
         findsOneWidget,
         reason: 'a pick that never opened has to say so, not fail silently',
       );
+      // Stays on screen, not a SnackBar that floats away with no record.
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byType(AppErrorState), findsOneWidget);
       expect(
         fieldHasFocus(tester),
         isTrue,
@@ -230,5 +233,33 @@ void main() {
         reason: 'the document browser must not be asked to filter to Photos',
       );
     });
+
+    // Proven at the width where the band's own space is actually scarce.
+    testWidgets(
+      'the inline failure fits at phone width, reached through the sheet',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        usePicker(null, failure: StateError('no portal'));
+        await tester.pumpWidget(
+          composerHarness(
+            controller: controller,
+            sends: sends,
+            platform: TargetPlatform.iOS,
+          ),
+        );
+
+        await tester.tap(moreActionsButton);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Photo library'));
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(find.byType(AppErrorState), findsOneWidget);
+      },
+    );
   });
 }

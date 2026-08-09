@@ -61,6 +61,13 @@ mixin GuardedActionState<T extends StatefulWidget> on State<T> {
     if (_actionError != null) setState(() => _actionError = null);
   }
 
+  /// Sets the failure directly, for one [guard] cannot cover because it
+  /// never carries an [api.ApiException] - a native file picker throwing,
+  /// say, which is not a request [runGuarded] could have wrapped.
+  void setActionError(String message) {
+    if (mounted) setState(() => _actionError = message);
+  }
+
   /// [runGuarded], with the result stored and a `mounted` check after the
   /// await - the guard every one of the twenty-six copies had to remember.
   Future<bool> guard({

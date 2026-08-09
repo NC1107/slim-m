@@ -264,8 +264,9 @@ class ComposerInlineError extends StatelessWidget {
   );
 }
 
-/// The composer's two optional bands above the action bar: a clipboard-paste
-/// failure, if there is one to show, and the staged-attachment tiles.
+/// The composer's two optional bands above the action bar: an attachment
+/// failure (a picker that would not open, or a clipboard paste that failed),
+/// if there is one to show, and the staged-attachment tiles.
 ///
 /// One widget rather than two calls at the build site, since both are
 /// "nothing, unless" content and `composer.dart` has no line budget left to
@@ -273,16 +274,16 @@ class ComposerInlineError extends StatelessWidget {
 class ComposerBanners extends StatelessWidget {
   const ComposerBanners({
     super.key,
-    required this.clipboardPasteError,
-    required this.onDismissClipboardPasteError,
+    required this.attachmentError,
+    required this.onDismissAttachmentError,
     required this.overLimitBy,
     required this.stagedAttachments,
     required this.onRemoveAttachment,
     required this.onRetryAttachment,
   });
 
-  final String? clipboardPasteError;
-  final VoidCallback onDismissClipboardPasteError;
+  final String? attachmentError;
+  final VoidCallback onDismissAttachmentError;
 
   /// How many characters over [kMessageMaxChars] the composed text sits, or
   /// null when it is within the limit. Non-null both disables the send
@@ -294,7 +295,7 @@ class ComposerBanners extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final error = clipboardPasteError;
+    final error = attachmentError;
     final overBy = overLimitBy;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -302,7 +303,7 @@ class ComposerBanners extends StatelessWidget {
         if (error != null)
           ComposerInlineError(
             message: error,
-            onDismiss: onDismissClipboardPasteError,
+            onDismiss: onDismissAttachmentError,
           ),
         if (overBy != null)
           ComposerInlineError(

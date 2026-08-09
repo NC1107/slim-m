@@ -18,7 +18,6 @@ import 'package:slimm_api/api.dart' show SlimmApiUsers;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart';
-import 'app_snackbar.dart';
 import 'attachment_picker.dart';
 import 'avatar_crop_sheet.dart';
 import 'run_guarded.dart';
@@ -96,8 +95,7 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
     try {
       result = await ref.read(attachmentPickerProvider(source))();
     } catch (e) {
-      if (!mounted) return;
-      showAppSnackbar(context, 'Could not open the file picker.');
+      setActionError('Could not open the file picker.');
       return;
     }
     final files = result?.files ?? const <PlatformFile>[];

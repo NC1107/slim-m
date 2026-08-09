@@ -78,6 +78,49 @@ void main() {
     },
   );
 
+  /// The card's own `_refusal` field already carried a submit failure inline;
+  /// the picker-open failure used to bypass it with a `SnackBar` instead. See
+  /// `check-error-surface.py` for the gate this shape is now caught by.
+  testWidgets('a picker that throws is refused inline, not with a SnackBar', (
+    tester,
+  ) async {
+    // Phone width: the inline callout takes space a SnackBar never claimed.
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final container = ProviderContainer(
+      overrides: [
+        customEmojiProvider.overrideWith((ref) async => _existing),
+        emojiImagePickerProvider.overrideWithValue(
+          () => throw StateError('no portal'),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(body: EmojiUploadCard()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Choose image'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(AppCallout), findsOneWidget);
+    expect(
+      find.textContaining('Could not open the file picker'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('choosing an image shows it, and it can be unchosen', (
     tester,
   ) async {
