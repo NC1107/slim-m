@@ -9,11 +9,14 @@
 /// share reads by contrast alone rather than needing the percentage text to
 /// do all the work, and `accentSoft` for the one you voted for - one of the
 /// seven closed accent roles in `docs/decisions/0004-visual-identity-review.md`.
-/// The option's own border is always `borderSubtle`, never accent-coloured:
-/// `AppTokens.focusRing`'s own doc draws the house rule that selection is a
-/// fill plus a marker (the checkmark, already here) while an accent outline
-/// means keyboard focus, and an accent border marking selection here was
-/// exactly backwards against that.
+/// The option's own border is `borderSubtle` for selection, never accent-
+/// coloured: `AppTokens.focusRing`'s own doc draws the house rule that
+/// selection is a fill plus a marker (the checkmark, already here) while an
+/// accent outline means keyboard focus, and an accent border marking
+/// selection here was exactly backwards against that. The border does turn
+/// `focusRing` on real keyboard focus - the one case that rule reserves it
+/// for - since an option row used to be a bare `GestureDetector` with no
+/// focus node at all, so a poll could never be voted on from the keyboard.
 library;
 
 import 'package:flutter/material.dart';
@@ -85,7 +88,7 @@ class PollView extends StatelessWidget {
   }
 }
 
-class _PollOptionRow extends StatelessWidget {
+class _PollOptionRow extends StatefulWidget {
   const _PollOptionRow({
     required this.option,
     required this.totalVotes,
@@ -99,78 +102,111 @@ class _PollOptionRow extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
+  State<_PollOptionRow> createState() => _PollOptionRowState();
+}
+
+class _PollOptionRowState extends State<_PollOptionRow> {
+  bool _focused = false;
+
+  void _activate() {
+    if (widget.onTap != null) widget.onTap!();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final totalVotes = widget.totalVotes;
+    final option = widget.option;
+    final selected = widget.selected;
     final fraction = totalVotes == 0 ? 0.0 : option.votes / totalVotes;
     final percent = (fraction * 100).round();
 
     return Semantics(
-      button: onTap != null,
+      button: widget.onTap != null,
       selected: selected,
       label:
           '${option.label}, $percent percent, ${option.votes} votes'
           '${selected ? ', your vote' : ''}',
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: AppSizes.controlMd,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            // Always the plain separator: an accent border means focus here, not selection.
-            border: Border.all(color: tokens.borderSubtle),
-            borderRadius: BorderRadius.circular(AppRadii.control),
+      child: FocusableActionDetector(
+        enabled: widget.onTap != null,
+        mouseCursor: widget.onTap != null
+            ? SystemMouseCursors.click
+            : MouseCursor.defer,
+        onShowFocusHighlight: (v) => setState(() => _focused = v),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) => _activate(),
           ),
-          child: Stack(
-            children: [
-              // The track, always visible, so a zero-vote option still reads as a bar.
-              Positioned.fill(child: Container(color: tokens.borderSubtle)),
-              FractionallySizedBox(
-                widthFactor: fraction.clamp(0, 1),
-                child: Container(
-                  color: selected ? tokens.accentSoft : tokens.borderStrong,
-                ),
+        },
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: Container(
+            height: AppSizes.controlMd,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              // Plain separator normally; focusRing on keyboard focus only, never for selection.
+              border: Border.all(
+                color: _focused ? tokens.focusRing : tokens.borderSubtle,
+                width: _focused ? 2 : 1,
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
-                child: Row(
-                  children: [
-                    // The vote is never colour alone: a check beside the label carries it too, like presence elsewhere.
-                    if (selected) ...[
-                      Icon(
-                        AppIcons.check,
-                        size: AppSizes.icon16,
-                        color: tokens.accentFill,
+              borderRadius: BorderRadius.circular(AppRadii.control),
+            ),
+            child: Stack(
+              children: [
+                // The track, always visible, so a zero-vote option still reads as a bar.
+                Positioned.fill(child: Container(color: tokens.borderSubtle)),
+                FractionallySizedBox(
+                  widthFactor: fraction.clamp(0, 1),
+                  child: Container(
+                    color: selected ? tokens.accentSoft : tokens.borderStrong,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s8,
+                  ),
+                  child: Row(
+                    children: [
+                      // The vote is never colour alone: a check beside the label carries it too, like presence elsewhere.
+                      if (selected) ...[
+                        Icon(
+                          AppIcons.check,
+                          size: AppSizes.icon16,
+                          color: tokens.accentFill,
+                        ),
+                        const SizedBox(width: AppSpacing.s4),
+                      ],
+                      Expanded(
+                        child: Text(
+                          option.label,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.ui.copyWith(
+                            color: tokens.textPrimary,
+                            fontWeight: selected
+                                ? AppWeights.semi
+                                : AppWeights.regular,
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: AppSpacing.s4),
+                      // Fixed and right-aligned, so a run of options lines its percentages up rather than each shifting by digit count.
+                      SizedBox(
+                        width: _percentColumnWidth,
+                        child: Text(
+                          '$percent%',
+                          textAlign: TextAlign.right,
+                          style: AppText.caption.copyWith(
+                            color: tokens.textSecondary,
+                            fontFeatures: const [
+                              FontFeature.tabularFigures(),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
-                    Expanded(
-                      child: Text(
-                        option.label,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.ui.copyWith(
-                          color: tokens.textPrimary,
-                          fontWeight: selected
-                              ? AppWeights.semi
-                              : AppWeights.regular,
-                        ),
-                      ),
-                    ),
-                    // Fixed and right-aligned, so a run of options lines its percentages up rather than each shifting by digit count.
-                    SizedBox(
-                      width: _percentColumnWidth,
-                      child: Text(
-                        '$percent%',
-                        textAlign: TextAlign.right,
-                        style: AppText.caption.copyWith(
-                          color: tokens.textSecondary,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

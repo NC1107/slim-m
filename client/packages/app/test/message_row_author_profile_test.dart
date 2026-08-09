@@ -14,6 +14,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
@@ -51,6 +52,33 @@ Widget _row({String? authorId = 'author-1', bool grouped = false}) =>
 List<Override> _resolvedProfile() => [
   userProfileProvider('author-1').overrideWith((ref) async => _author),
 ];
+
+/// The [AuthorProfileTapTarget] keyboard focus currently sits inside, by its
+/// own semantic label - null when focus is elsewhere entirely.
+String? _focusedTapTargetLabel() => FocusManager
+    .instance
+    .primaryFocus
+    ?.context
+    ?.findAncestorWidgetOfExactType<AuthorProfileTapTarget>()
+    ?.semanticLabel;
+
+/// Tabs forward until focus lands inside the [AuthorProfileTapTarget] whose
+/// label matches [label], so neither test depends on how many other focusable
+/// things (the row's own context-menu stop, say) happen to sit ahead of it.
+Future<bool> _tabTo(WidgetTester tester, String label) async {
+  for (var step = 0; step < 8; step++) {
+    if (_focusedTapTargetLabel() == label) return true;
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+  }
+  return _focusedTapTargetLabel() == label;
+}
+
+Future<bool> _tabToAvatar(WidgetTester tester) =>
+    _tabTo(tester, 'View profile');
+
+Future<bool> _tabToName(WidgetTester tester) =>
+    _tabTo(tester, 'Priya, view profile');
 
 void main() {
   testWidgets('tapping the avatar opens the author\'s profile popover', (
@@ -116,6 +144,47 @@ void main() {
       semantics.dispose();
     },
   );
+
+  group('keyboard', () {
+    setUp(() {
+      FocusManager.instance.highlightStrategy =
+          FocusHighlightStrategy.alwaysTraditional;
+    });
+    tearDown(() {
+      FocusManager.instance.highlightStrategy =
+          FocusHighlightStrategy.automatic;
+    });
+
+    testWidgets('Tab reaches the avatar and Enter opens the popover', (
+      tester,
+    ) async {
+      await tester.pumpWidget(harness(_row(), overrides: _resolvedProfile()));
+      await tester.pumpAndSettle();
+
+      expect(await _tabToAvatar(tester), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Message'),
+        findsOneWidget,
+        reason: 'the avatar was reachable but never runnable',
+      );
+    });
+
+    testWidgets('the name is reachable too, and Space also opens it', (
+      tester,
+    ) async {
+      await tester.pumpWidget(harness(_row(), overrides: _resolvedProfile()));
+      await tester.pumpAndSettle();
+
+      expect(await _tabToName(tester), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Message'), findsOneWidget);
+    });
+  });
 
   group('semantics', () {
     testWidgets(

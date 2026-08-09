@@ -6,6 +6,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/widgets/poll_view.dart';
@@ -196,6 +197,109 @@ void main() {
               'complaint the percentage-only bars drew',
         );
       }
+    });
+  });
+
+  group('an option row is reachable and votable from the keyboard', () {
+    setUp(() {
+      FocusManager.instance.highlightStrategy =
+          FocusHighlightStrategy.alwaysTraditional;
+    });
+    tearDown(() {
+      FocusManager.instance.highlightStrategy =
+          FocusHighlightStrategy.automatic;
+    });
+
+    testWidgets('Tab lands on the first option and draws a focus ring', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_app(_poll()));
+
+      final row = tester.widget<Container>(_optionRow('Option 0'));
+      expect(
+        ((row.decoration! as BoxDecoration).border! as Border).top.color,
+        AppTokens.light.borderSubtle,
+        reason: 'nothing has been tabbed to yet',
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+
+      final focused = tester.widget<Container>(_optionRow('Option 0'));
+      expect(
+        ((focused.decoration! as BoxDecoration).border! as Border).top.color,
+        AppTokens.light.focusRing,
+        reason:
+            'a row a keyboard cannot land on has no route to voting, and '
+            'one that takes focus silently is a route nobody can see',
+      );
+    });
+
+    testWidgets('Enter casts a vote for the focused option', (tester) async {
+      int? voted;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: PollView(poll: _poll(), onVote: (i) => voted = i),
+          ),
+        ),
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(voted, 0, reason: 'Enter was reachable but never runnable');
+    });
+
+    testWidgets('Space also casts a vote', (tester) async {
+      int? voted;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: PollView(poll: _poll(), onVote: (i) => voted = i),
+          ),
+        ),
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+
+      expect(voted, 0);
+    });
+
+    testWidgets('a closed poll never takes keyboard focus at all', (
+      tester,
+    ) async {
+      int? voted;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: PollView(
+              poll: _poll(closed: true),
+              onVote: (i) => voted = i,
+            ),
+          ),
+        ),
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(
+        voted,
+        isNull,
+        reason: 'a closed poll refuses the vote server-side regardless; a '
+            'focusable, activatable row here would just be a false promise',
+      );
     });
   });
 }
