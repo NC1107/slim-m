@@ -116,9 +116,7 @@ void main() {
         reason: 'the first, real failure must still be said',
       );
 
-      // The channel now answers rather than throws, the same shape a
-      // cancelled pick returns - the picker opened and closed with nothing
-      // chosen, not a repeat of the earlier failure.
+      // The channel now answers rather than throws, the same shape a cancelled pick returns.
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(_filePickerChannel, (call) async => null);
 

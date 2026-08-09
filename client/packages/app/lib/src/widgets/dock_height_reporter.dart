@@ -42,9 +42,17 @@ class _DockHeightReporterState extends ConsumerState<DockHeightReporter> {
     _reservation.state = height;
   }
 
+  /// Deferred to a microtask: Riverpod refuses a provider write made
+  /// synchronously inside `dispose`, since the tree is still mid-teardown -
+  /// caught only by a real unmount, never by a unit test on this class alone.
+  /// The `mounted` check guards the other half of that same race: by the
+  /// time the microtask runs, the whole `ProviderContainer` (this app's own
+  /// at shutdown, or a test's own during teardown) may already be gone.
   @override
   void dispose() {
-    _reservation.state = 0;
+    Future.microtask(() {
+      if (_reservation.mounted) _reservation.state = 0;
+    });
     super.dispose();
   }
 

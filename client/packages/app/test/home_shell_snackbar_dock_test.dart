@@ -70,9 +70,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      // The visible card's own content, not the SnackBar element's whole
-      // bounding box: that box also carries the invisible bottom margin
-      // this fix grows, and checking it would pass even unfixed.
+      // The visible card's own content, not the whole SnackBar element - that box's invisible bottom margin would pass even unfixed.
       final snackRect = tester.getRect(find.text(message));
 
       expect(

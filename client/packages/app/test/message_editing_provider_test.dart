@@ -48,15 +48,11 @@ void main() {
       await tester.pump();
       expect(find.text('editing'), findsOneWidget);
 
-      // The switch itself: channel A's own row (and its watch) is gone,
-      // replaced by channel B's - the same swap `MessageTranscript` makes
-      // when `ChannelScreen`'s own `widget.channelId` changes underneath a
-      // `State` that outlives the switch.
+      // The switch itself: channel A's own watcher is gone, replaced by channel B's, the same swap `MessageTranscript` makes across a channel switch.
       await tester.pumpWidget(
         UncontrolledProviderScope(container: container, child: _watcher('B')),
       );
-      // Lets the now-unwatched autoDispose provider actually dispose,
-      // rather than asserting against a value still mid-teardown.
+      // Lets the now-unwatched autoDispose provider actually dispose.
       await tester.pump();
       await tester.pump();
 
