@@ -91,7 +91,7 @@ class DmRow extends ConsumerWidget {
         if (blocked)
           AppMenuItem(
             label: 'Unblock',
-            leading: AppIcons.revoke,
+            leading: AppIcons.restoreAccess,
             onTap: () => run(() => unblockUser(context, container, peerId)),
           )
         else

@@ -353,7 +353,11 @@ class TimeoutDurationChips extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(AppIcons.clock, size: 16, color: tokens.textSecondary),
+              Icon(
+                AppIcons.clock,
+                size: AppSizes.icon16,
+                color: tokens.textSecondary,
+              ),
               const SizedBox(width: AppSpacing.s8),
               Text(
                 'Time out for...',

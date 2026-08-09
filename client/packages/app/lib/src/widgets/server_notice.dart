@@ -30,7 +30,7 @@ class ServerNotice extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 16, color: tokens.textSecondary),
+            Icon(icon, size: AppSizes.icon16, color: tokens.textSecondary),
             const SizedBox(width: AppSpacing.s8),
             Expanded(
               child: Text(
