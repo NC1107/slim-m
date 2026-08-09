@@ -40,8 +40,19 @@ CATEGORY_INFO = {
         "grow": (
             "Add an entry to the _overlays table in "
             "client/packages/app/test/ui_overlay_snapshot_test.dart, or, for "
-            "something only reachable by a long-press or right-click, add a "
-            "case to test/ui_overlay_snapshot_menus_test.dart."
+            "something only reachable by a long-press, right-click, or a "
+            "multi-step interaction (typing, submitting, waiting on a "
+            "mocked response), add a case to one of its sibling files: "
+            "ui_overlay_snapshot_menus_test.dart (gesture-opened menus), "
+            "ui_overlay_snapshot_confirm_test.dart (confirmDangerousAction "
+            "variants), ui_overlay_snapshot_onboarding_test.dart (the "
+            "invite dialog, the manual-server dialog, and the TOFU "
+            "identity screens), ui_overlay_snapshot_signin_test.dart "
+            "(sign-in probe notices and submit-path errors), ui_overlay_"
+            "snapshot_moderation_test.dart (the member popover matrix), "
+            "ui_overlay_snapshot_blocking_test.dart (the blocked-DM "
+            "states), or ui_overlay_snapshot_reports_test.dart (report "
+            "card variants)."
         ),
     },
     "canvas-assembled": {
