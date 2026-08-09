@@ -411,6 +411,18 @@ Future<void> teardownFixture(
 /// animations, writes the snapshot and asserts no overflow. Shared by every
 /// surface table across every `ui_snapshot_*_test.dart` file, so a surface
 /// added in one file renders exactly the way the rest of the matrix does.
+///
+/// [settleJoinTransition] is for a controller whose *outcome* (not its
+/// initial state) is what the snapshot wants, `AttemptedJoinVoiceController`'s
+/// own shape: its first build still shows `VoiceScreen`'s 'joining' stage,
+/// and the real terminal state only lands from a post-frame callback fired
+/// during the first `pump()` below, one frame after `AppFadeIn` remounts
+/// under a new key for the new stage. That remount's own entrance ticker
+/// has not been given a frame to start on yet - the same t=0 trap the
+/// two-pump comment below already names, one layer later - so it needs a
+/// third pump to settle rather than the usual two. Confirmed by looking:
+/// without this, `voice-rejoin-*` and `who-is-here-*` rendered a fully
+/// blank body, not merely an unsettled fade.
 Future<void> renderSurface(
   WidgetTester tester,
   String route,
@@ -418,6 +430,7 @@ Future<void> renderSurface(
   String theme,
   String snapshotName, {
   List<Override> overrides = const [],
+  bool settleJoinTransition = false,
 }) async {
   tester.view.physicalSize = viewports[viewportName]!;
   tester.view.devicePixelRatio = 1.0;
@@ -450,6 +463,9 @@ Future<void> renderSurface(
   // Two pumps settle on-mount entrance animations (a ticker's first frame is its own t=0) without pumpAndSettle, which would hang on the states that show a perpetual spinner.
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 350));
+  if (settleJoinTransition) {
+    await tester.pump(const Duration(milliseconds: 350));
+  }
 
   await writeSnapshot(tester, snapshotName);
 

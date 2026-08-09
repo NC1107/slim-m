@@ -3,6 +3,16 @@
 /// every scene through, split out the same way `ui_snapshot_support.dart`
 /// is split from `ui_snapshot_test.dart`: the widths, the themes and the
 /// rendering are not what a reader of the test file's scenarios cares about.
+///
+/// The capture boundary wraps the whole `MaterialApp`, not just the pane.
+/// An `OverlayPortal`-based popup - the overflow menu, its own Clear confirm
+/// dialog - mounts into the Navigator's own `Overlay`, an *ancestor* of
+/// `Scaffold.body` in the tree, as an independent `OverlayEntry` sibling
+/// rather than a descendant of anything inside `CanvasPaneBody`. A boundary
+/// drawn any narrower than this silently captures the pane underneath the
+/// menu instead of the menu itself, confirmed by looking: the first version
+/// wrapped only `CanvasPaneBody` and every `interact`-driven menu screenshot
+/// came back showing the resting scene with no menu in it at all.
 library;
 
 import 'dart:io';
@@ -79,6 +89,11 @@ Future<void> renderCanvasAssembledPane(
   String? selectedObjectId,
   double height = 844,
   CanvasPresenceTileOverrides? tileOverrides,
+  CanvasTool tool = CanvasTool.pen,
+  bool canManage = false,
+  String? error,
+  bool loading = false,
+  Future<void> Function(WidgetTester tester)? interact,
 }) async {
   tester.view.physicalSize = Size(width, height);
   tester.view.devicePixelRatio = 1.0;
@@ -120,27 +135,30 @@ Future<void> renderCanvasAssembledPane(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(
-        theme: buildTheme(themeSpec.brightness, themeSpec.tokens),
-        home: Scaffold(
-          body: RepaintBoundary(
-            key: _boundaryKey,
-            child: CanvasPaneBody(
+      // See this file's own doc comment for why the boundary is here, not narrower.
+      child: RepaintBoundary(
+        key: _boundaryKey,
+        child: MaterialApp(
+          // Otherwise visible now the boundary wraps this whole widget.
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(themeSpec.brightness, themeSpec.tokens),
+          home: Scaffold(
+            body: CanvasPaneBody(
               channelId: 'c1',
               onClose: () {},
-              tool: CanvasTool.pen,
+              tool: tool,
               onToolChanged: (_) {},
               canUndo: false,
               onUndo: () {},
-              canManage: false,
+              canManage: canManage,
               document: document,
               onClear: () async {},
               onPasteImage: () {},
               onRecenter: () {},
-              error: null,
+              error: error,
               onDismissError: () {},
               truncated: truncated,
-              loading: false,
+              loading: loading,
               onStroke: (_) {},
               onErase: (_) {},
               onEraseEnd: () {},
@@ -201,6 +219,26 @@ Future<void> renderCanvasAssembledPane(
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 350));
 
+  // A state past the resting one - a menu open, a dialog confirmed - is driven here, on the mounted, settled pane.
+  if (interact != null) await interact(tester);
+
   await _writePng(tester, name);
   expect(tester.takeException(), isNull);
+}
+
+/// Opens the dock's "More canvas actions" overflow, the one route to the
+/// activity log toggle and Clear canvas - both live behind a menu item, not
+/// a bare icon, per `canvas_overflow_menu.dart`'s own doc on the deliberate
+/// extra tap. A plain `pump()` is enough: `OverlayPortal` mounts its child
+/// synchronously on `_controller.toggle`, with no animation to settle.
+Future<void> openCanvasOverflowMenu(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('More canvas actions'));
+  await tester.pump();
+}
+
+/// Taps a menu item by its exact visible [label] - the overflow menu's own
+/// `AppMenuItem`s, found the same way a real tap would find them.
+Future<void> tapCanvasMenuItem(WidgetTester tester, String label) async {
+  await tester.tap(find.text(label));
+  await tester.pump();
 }
