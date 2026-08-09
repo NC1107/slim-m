@@ -121,6 +121,87 @@ class Foo {
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("0 offender(s)", result.stdout)
 
+    def test_a_bare_unaliased_catch_showing_a_snackbar_is_caught(self):
+        """`on ApiException catch (e)` with no `api.` prefix - an unaliased
+        `import 'package:slimm_api/api.dart';` writes it exactly this way,
+        and roughly a fifth of the real app does. The original `CATCH_HEADER`
+        hard-required the prefix and missed this shape entirely; there is no
+        `exceptions.dart` in this test's own synthetic repo, so this also
+        proves the fallback name list alone is enough to catch the one name
+        every call site used before the fix could read the real hierarchy."""
+        self._write("bad_bare.dart", """
+class Foo {
+  Future<void> go() async {
+    try {
+      await api.thing();
+    } on ApiException catch (e) {
+      showAppSnackbar(context, e.toString());
+    }
+  }
+}
+""")
+        result = self._run()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("file=client/packages/app/lib/bad_bare.dart,line=6",
+                       result.stdout + result.stderr)
+
+    def test_a_bare_sealed_subtype_is_caught_via_the_real_hierarchy(self):
+        """Plants a minimal `exceptions.dart` so the gate reads a subtype
+        name (`ForbiddenException`) rather than falling back, proving the
+        dynamic read - not just the hardcoded `ApiException` fallback -
+        is what closes the gap for the sealed hierarchy's other members."""
+        exceptions_dir = self.repo / "client" / "packages" / "api" / "lib" / "src"
+        exceptions_dir.mkdir(parents=True)
+        (exceptions_dir / "exceptions.dart").write_text("""
+sealed class ApiException implements Exception {}
+class ForbiddenException extends ApiException {}
+""")
+        self._git("add", "client/packages/api/lib/src/exceptions.dart")
+        self._write("bad_subtype.dart", """
+class Foo {
+  Future<void> go() async {
+    try {
+      await api.thing();
+    } on ForbiddenException catch (e) {
+      showAppSnackbar(context, e.toString());
+    }
+  }
+}
+""")
+        result = self._run()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("file=client/packages/app/lib/bad_subtype.dart,line=6",
+                       result.stdout + result.stderr)
+
+    def test_an_unrelated_typed_exception_showing_a_snackbar_stays_out_of_scope(self):
+        """`PlatformException` is not in the sealed `ApiException` hierarchy,
+        so a typed catch of it stays outside this gate even when it shows a
+        SnackBar - this gate is about a failure caught from the server, not
+        every typed catch in the app; a fully bare `catch (e)` already covers
+        the native-picker case some of these represent."""
+        self._write("ok_unrelated_typed.dart", """
+class Foo {
+  Future<void> pick() async {
+    try {
+      await plugin.thing();
+    } on PlatformException catch (e) {
+      showAppSnackbar(context, e.toString());
+    }
+  }
+
+  Future<void> go() async {
+    try {
+      await api.thing();
+    } on api.ApiException catch (e) {
+      setState(() => _error = describeApiFailure('do the thing', e));
+    }
+  }
+}
+""")
+        result = self._run()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("0 offender(s)", result.stdout)
+
     def test_a_catcherror_callback_showing_a_snackbar_is_caught(self):
         """A Future's own `.catchError((e) { ... })`, not a `catch` block at
         all - reproduced by an adversarial pass, which found the gate said

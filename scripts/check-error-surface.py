@@ -21,9 +21,9 @@ rather than to `GuardedActionState`/`AppErrorState`, the two `run_guarded.dart`
 actually offers for that failure. That is exactly the shape the three
 regressions had, and exactly the shape every fixed site does not.
 
-Reads the `on api.<Something>Exception` blocks straight out of each `.dart`
-file's own text rather than keeping a list of what to check: a case this
-cannot see is a case that was never written the wrong way in the first
+Reads the `on (api.)?<Something>Exception` blocks straight out of each
+`.dart` file's own text rather than keeping a list of what to check: a case
+this cannot see is a case that was never written the wrong way in the first
 place, so there is nothing to fall out of date.
 
 The `catch (e)` clause is optional in the pattern on purpose: `on
@@ -78,6 +78,23 @@ review planted `().catchError((e) { showAppSnackbar(context, e.toString()); })`
 in a tracked file and the gate reported zero offenders. A `.catchError` whose
 callback is a named function reference rather than an inline literal shares
 the composer's own cross-file indirection and is accepted the same way.
+
+The `api.` prefix on `CATCH_HEADER` assumed every caller imports
+`slimm_api/api.dart` aliased as `api`; roughly a fifth of this package does
+not, and four bare `on ApiException` catches already exist
+(`channel_refresher.dart`, `sign_in_screen.dart`) with nothing showing a
+SnackBar in them today - but nothing stopped one from starting to. Reproduced
+directly: a planted `on ApiException catch (e) { showAppSnackbar(...); }` with
+an unaliased import passed this gate silently. The exception names it now
+matches, prefixed or bare, are read from `exceptions.dart`'s own sealed
+hierarchy rather than hand-kept, the same reason `catch_blocks` reads a file's
+own text instead of a maintained list: a future subtype added there is
+covered the moment it exists, with nothing here to remember to update.
+Deliberately still scoped to that hierarchy rather than any typed exception -
+`PlatformException`, `MissingPluginException` and this file's own
+`ClipboardImageReadException` stay out of it, matching the module doc's own
+line above: this gate is about a failure caught *from the server* becoming a
+SnackBar, not every typed catch in the app becoming one.
 """
 
 import re
@@ -87,10 +104,10 @@ from pathlib import Path
 
 EXCEPTIONS: dict[tuple[str, int], str] = {}
 
-CATCH_HEADER = re.compile(
-    r"^(?P<indent>[ \t]*)(?:\}[ \t]*)?on[ \t]+api\.\w*Exception"
-    r"(?:[ \t]+catch\b[^{]*)?[ \t]*\{[ \t]*$"
-)
+EXCEPTIONS_SOURCE = "client/packages/api/lib/src/exceptions.dart"
+# Falls back to this alone when EXCEPTIONS_SOURCE is unreadable, e.g. a test's own synthetic repo.
+FALLBACK_EXCEPTION_NAMES = ("ApiException",)
+
 BARE_CATCH_HEADER = re.compile(
     r"^(?P<indent>[ \t]*)(?:\}[ \t]*)?catch[ \t]*\([^)]*\)[ \t]*\{[ \t]*$"
 )
@@ -100,20 +117,45 @@ CATCH_ERROR_HEADER = re.compile(
 SHOWS_SNACKBAR = re.compile(r"ScaffoldMessenger|SnackBar\(|showAppSnackbar\(")
 
 
-def catch_blocks(lines: list[str]):
+def api_exception_names(root: Path) -> list[str]:
+    """Every class in `exceptions.dart`'s sealed `ApiException` hierarchy,
+    read from its own source so a subtype added there needs no matching edit
+    here to stay covered.
+    """
+    path = root / EXCEPTIONS_SOURCE
+    if not path.exists():
+        return list(FALLBACK_EXCEPTION_NAMES)
+    names = sorted(set(re.findall(r"class (\w*Exception)\b", path.read_text())))
+    return names or list(FALLBACK_EXCEPTION_NAMES)
+
+
+def catch_header_pattern(root: Path) -> re.Pattern[str]:
+    """`on api.ApiException` and `on ApiException` alike, and every other
+    member of the sealed hierarchy [api_exception_names] reads - the `api.`
+    prefix is only ever a convention some callers use, never something the
+    type itself requires.
+    """
+    names = "|".join(re.escape(name) for name in api_exception_names(root))
+    return re.compile(
+        rf"^(?P<indent>[ \t]*)(?:\}}[ \t]*)?on[ \t]+(?:api\.)?(?:{names})\b"
+        r"(?:[ \t]+catch\b[^{]*)?[ \t]*\{[ \t]*$"
+    )
+
+
+def catch_blocks(lines: list[str], catch_header: re.Pattern[str]):
     """Yields (1-based header line, body lines) for each caught-exception block.
 
-    An `on api.*Exception catch { ... }` header, a bare `catch (e) { ... }`
-    one, or a Future's own `.catchError((e) { ... })`; see this file's own
-    module doc for why all three are in scope. The block's end is the next
-    line, at the header's indentation or less, that opens with `}` - the same
-    section-by-indentation technique `hygiene.yml`'s own `section()` helper
-    already uses for a Dart brace this project has no AST tool handy for in a
-    plain hygiene step.
+    An `on (api.)?ApiException catch { ... }` header (prefixed or bare, see
+    [catch_header_pattern]), a bare `catch (e) { ... }` one, or a Future's own
+    `.catchError((e) { ... })`; see this file's own module doc for why all
+    three are in scope. The block's end is the next line, at the header's
+    indentation or less, that opens with `}` - the same section-by-indentation
+    technique `hygiene.yml`'s own `section()` helper already uses for a Dart
+    brace this project has no AST tool handy for in a plain hygiene step.
     """
     for i, line in enumerate(lines):
         header = (
-            CATCH_HEADER.match(line)
+            catch_header.match(line)
             or BARE_CATCH_HEADER.match(line)
             or CATCH_ERROR_HEADER.match(line)
         )
@@ -148,11 +190,12 @@ def main() -> int:
         print("::error::no files matched client/packages/app/lib/*.dart; the gate is not reading anything")
         return 1
 
+    catch_header = catch_header_pattern(root)
     checked = 0
     offenders: list[str] = []
     for rel in files:
         lines = (root / rel).read_text().splitlines()
-        for lineno, body in catch_blocks(lines):
+        for lineno, body in catch_blocks(lines, catch_header):
             checked += 1
             if not any(SHOWS_SNACKBAR.search(candidate) for candidate in body):
                 continue
