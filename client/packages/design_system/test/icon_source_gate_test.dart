@@ -14,6 +14,15 @@
 /// `package:flutter/cupertino.dart`, one import away from any file. Nothing
 /// stops a raw `Icon(Icons.close)` or `Icon(CupertinoIcons.heart)` from
 /// compiling today.
+///
+/// Nor does naming `Icons`/`CupertinoIcons` at all: `IconData` is the class
+/// both of those are just named constant instances of, and constructing one
+/// directly from a bare codepoint (`IconData(0xe5cd, fontFamily:
+/// 'MaterialIcons')`) reaches the identical glyph with neither name in the
+/// source text - reproduced directly, a planted `IconData(...)` literal in
+/// `design_system/lib` passed this gate silently before the third pattern
+/// below existed. Every legitimate reason to construct one still belongs in
+/// [AppIcons], the same as every other icon source this gate names.
 library;
 
 import 'dart:io';
@@ -33,10 +42,12 @@ final _lucideReference = RegExp(r'LucideIcons\.\w+');
 /// either - the same non-boundary `AppIcons.` already relies on to stay
 /// unmatched. Reproduced directly: a `CupertinoIcons.heart` reference
 /// planted in `design_system/lib` passed this gate silently before this list
-/// grew a third entry.
+/// grew a third entry, and a bare `IconData(...)` construction did the same
+/// before it grew a fourth - see this file's own library doc.
 final _iconProviderReferences = [
   RegExp(r'\bIcons\.\w+'),
   RegExp(r'CupertinoIcons\.\w+'),
+  RegExp(r'\bIconData\('),
 ];
 
 void main() {
@@ -82,18 +93,24 @@ void main() {
     );
   });
 
-  /// The regex-level regression for the `CupertinoIcons` gap: reverting the
-  /// second pattern in [_iconProviderReferences] fails exactly this test,
-  /// since the file-scan test above only fails when the real tree carries an
-  /// offender, and this tree carries none right now.
+  /// The regex-level regression for the `CupertinoIcons` and `IconData`
+  /// gaps: reverting either pattern in [_iconProviderReferences] fails
+  /// exactly this test, since the file-scan test above only fails when the
+  /// real tree carries an offender, and this tree carries none right now.
   test(
-      'the material pattern list reaches Icons and CupertinoIcons alike, '
-      'and never AppIcons', () {
+      'the material pattern list reaches Icons, CupertinoIcons and a bare '
+      'IconData alike, and never AppIcons', () {
     bool matchesAny(String source) =>
         _iconProviderReferences.any((p) => p.hasMatch(source));
 
     expect(matchesAny('Icon(Icons.close)'), isTrue);
     expect(matchesAny('Icon(CupertinoIcons.heart)'), isTrue);
+    expect(
+      matchesAny("IconData(0xe5cd, fontFamily: 'MaterialIcons')"),
+      isTrue,
+      reason: 'a codepoint reaches the identical glyph with neither name in '
+          'the source text',
+    );
     expect(
       matchesAny('AppIcons.close'),
       isFalse,
