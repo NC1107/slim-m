@@ -31,8 +31,7 @@ void main() {
             body: SizedBox(
               width: 400,
               height: 300,
-              // Deliberately the plain, no-fit-argument Stack() every real
-              // call site uses - the exact shape that shipped broken.
+              // The plain no-fit Stack every real call site uses, as shipped.
               child: Stack(
                 children: [
                   CanvasGridLayer(
