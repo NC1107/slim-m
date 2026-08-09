@@ -78,9 +78,12 @@ from pathlib import Path
 EXCEPTIONS: dict[tuple[str, int], str] = {}
 
 CATCH_HEADER = re.compile(
-    r"^(?P<indent>\s*)\}?\s*on\s+api\.\w*Exception(\s+catch\b[^{]*)?\s*\{\s*$"
+    r"^(?P<indent>[ \t]*)(?:\}[ \t]*)?on[ \t]+api\.\w*Exception"
+    r"(?:[ \t]+catch\b[^{]*)?[ \t]*\{[ \t]*$"
 )
-BARE_CATCH_HEADER = re.compile(r"^(?P<indent>\s*)\}?\s*catch\s*\([^)]*\)\s*\{\s*$")
+BARE_CATCH_HEADER = re.compile(
+    r"^(?P<indent>[ \t]*)(?:\}[ \t]*)?catch[ \t]*\([^)]*\)[ \t]*\{[ \t]*$"
+)
 SHOWS_SNACKBAR = re.compile(r"ScaffoldMessenger|SnackBar\(|showAppSnackbar\(")
 
 
