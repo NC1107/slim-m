@@ -137,8 +137,7 @@ class ChannelSearchResults extends ConsumerWidget {
           radius: AppRadii.control,
           builder: (context, onFocusChange) => InkWell(
             onTap: () => onSelect(message),
-            // The ring above replaces this rather than layering under it; see
-            // AppFocusRing's own doc comment.
+            // AppFocusRing replaces this overlay; see its own doc comment.
             focusColor: Colors.transparent,
             onFocusChange: onFocusChange,
             borderRadius: BorderRadius.circular(AppRadii.control),

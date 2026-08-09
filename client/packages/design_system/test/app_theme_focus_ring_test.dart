@@ -43,8 +43,7 @@ void main() {
     expect(unfocused?.width ?? 0, 0);
 
     node.requestFocus();
-    // FocusManager settles a real focus change over two frames; one pump
-    // leaves the resolved shape still reflecting the pre-focus state.
+    // A focus change needs a second pump before the resolved side updates.
     await tester.pump();
     await tester.pump();
 
@@ -72,8 +71,7 @@ void main() {
     );
     await tester.pump();
     node.requestFocus();
-    // FocusManager settles a real focus change over two frames; one pump
-    // leaves the resolved shape still reflecting the pre-focus state.
+    // A focus change needs a second pump before the resolved side updates.
     await tester.pump();
     await tester.pump();
 
@@ -102,8 +100,7 @@ void main() {
     );
     await tester.pump();
     node.requestFocus();
-    // FocusManager settles a real focus change over two frames; one pump
-    // leaves the resolved shape still reflecting the pre-focus state.
+    // A focus change needs a second pump before the resolved side updates.
     await tester.pump();
     await tester.pump();
 

@@ -134,8 +134,7 @@ class _Entry extends StatelessWidget {
         radius: AppRadii.card,
         builder: (context, onFocusChange) => InkWell(
           onTap: onTap,
-          // The ring above replaces this rather than layering under it; see
-          // AppFocusRing's own doc comment.
+          // AppFocusRing replaces this overlay; see its own doc comment.
           focusColor: Colors.transparent,
           onFocusChange: onFocusChange,
           borderRadius: BorderRadius.circular(AppRadii.card),

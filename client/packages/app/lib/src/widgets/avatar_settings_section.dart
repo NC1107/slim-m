@@ -164,8 +164,7 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
                   radius: _avatarSize / 2,
                   builder: (context, onFocusChange) => InkWell(
                     onTap: enabled ? _onTapChange : null,
-                    // The ring above replaces this rather than layering under
-                    // it; see AppFocusRing's own doc comment.
+                    // AppFocusRing replaces this overlay; see its own doc comment.
                     focusColor: Colors.transparent,
                     onFocusChange: onFocusChange,
                     customBorder: const CircleBorder(),
