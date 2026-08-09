@@ -153,15 +153,14 @@ class _Entry extends StatelessWidget {
                       title,
                       style: TextStyle(
                         color: tokens.textPrimary,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppWeights.semi,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.s4),
                     Text(
                       description,
-                      style: TextStyle(
+                      style: AppText.caption.copyWith(
                         color: tokens.textSecondary,
-                        fontSize: 13,
                       ),
                     ),
                   ],

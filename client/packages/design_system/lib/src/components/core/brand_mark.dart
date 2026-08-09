@@ -39,7 +39,7 @@ class AppBrandMark extends StatelessWidget {
       dimension: size,
       child: CustomPaint(
         painter: _MarkPainter(
-          color: color ?? tokens?.accent ?? const Color(0xFF58B4D8),
+          color: color ?? tokens?.accent ?? AppTokens.dark.accentFill,
           lattice: size >= _latticeFloor,
         ),
       ),

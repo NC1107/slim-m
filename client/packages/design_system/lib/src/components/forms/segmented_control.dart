@@ -118,7 +118,7 @@ class AppSegmentedControl extends StatelessWidget {
         return AnimatedContainer(
           duration:
               AppMotion.reduced(context, const Duration(milliseconds: 150)),
-          height: 26,
+          height: AppSizes.controlSm,
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12),
           decoration: BoxDecoration(
