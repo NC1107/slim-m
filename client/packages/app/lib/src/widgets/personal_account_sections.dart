@@ -14,7 +14,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../api_failure.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
@@ -196,38 +195,58 @@ class BlockedSection extends ConsumerWidget {
 /// through. It used to render the raw 36-character uuid, which reads as
 /// corruption rather than as a person somebody chose to block, and gives no way
 /// to tell two of them apart.
-class _BlockedRow extends ConsumerWidget {
+class _BlockedRow extends ConsumerStatefulWidget {
   const _BlockedRow({required this.userId});
 
   final String userId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(userProfileProvider(userId));
+  ConsumerState<_BlockedRow> createState() => _BlockedRowState();
+}
+
+class _BlockedRowState extends ConsumerState<_BlockedRow>
+    with GuardedActionState<_BlockedRow> {
+  Future<void> _unblock() async {
+    await guard(
+      whatFailed: 'unblock that user',
+      action: () => ref.read(blocksProvider.notifier).unblock(widget.userId),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = ref.watch(userProfileProvider(widget.userId));
     // A deleted account resolves to null, and its id is all there is left of it.
     final name =
         profile.valueOrNull?.displayName ?? profile.valueOrNull?.username;
 
-    return AppListRow(
-      leading: const Icon(AppIcons.account),
-      label: name ?? 'Deleted account',
-      meta: name == null ? userId : null,
-      trailing: TextButton(
-        onPressed: () => _unblock(context, ref),
-        child: const Text('Unblock'),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppListRow(
+          leading: const Icon(AppIcons.account),
+          label: name ?? 'Deleted account',
+          meta: name == null ? widget.userId : null,
+          trailing: TextButton(
+            onPressed: _unblock,
+            child: const Text('Unblock'),
+          ),
+        ),
+        if (actionError != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s16,
+              0,
+              AppSpacing.s16,
+              AppSpacing.s8,
+            ),
+            child: AppErrorState(
+              message: actionError!,
+              onDismiss: clearActionError,
+            ),
+          ),
+      ],
     );
-  }
-
-  Future<void> _unblock(BuildContext context, WidgetRef ref) async {
-    try {
-      await ref.read(blocksProvider.notifier).unblock(userId);
-    } on api.ApiException catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(describeApiFailure('unblock that user', e))),
-      );
-    }
   }
 }
 
