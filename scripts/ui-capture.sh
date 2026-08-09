@@ -35,6 +35,12 @@ JOBS=(
   "screens|screens|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_snapshot_test.dart"
   "overlays|overlays|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_overlay_snapshot_test.dart"
   "overlay-menus|overlays|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_overlay_snapshot_menus_test.dart"
+  "overlay-confirm|overlays|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_overlay_snapshot_confirm_test.dart"
+  "overlay-onboarding|overlays|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_overlay_snapshot_onboarding_test.dart"
+  "overlay-signin|overlays|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_overlay_snapshot_signin_test.dart"
+  "overlay-moderation|overlays|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_overlay_snapshot_moderation_test.dart"
+  "overlay-blocking|overlays|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_overlay_snapshot_blocking_test.dart"
+  "overlay-reports|overlays|client/packages/app|SLIMM_UI_SNAPSHOTS|build/ui-snapshots|test/ui_overlay_snapshot_reports_test.dart"
   "canvas-assembled|canvas-assembled|client/packages/app|SLIMM_CANVAS_ASSEMBLED|build/canvas-assembled-snapshots|test/visual/canvas_assembled_snapshot_test.dart"
   "canvas-painters|canvas-painters|client/packages/voice_canvas|SLIMM_CANVAS_VISUAL|build/canvas-visual|test/visual/canvas_visual_render.dart"
 )
