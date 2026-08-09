@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.35.1](https://github.com/NC1107/slim-m/compare/client-v0.35.0...client-v0.35.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* **client:** a snackbar could cover the leave-call button, and both new gates had holes ([#501](https://github.com/NC1107/slim-m/issues/501)) ([88a1931](https://github.com/NC1107/slim-m/commit/88a1931715effde01fe6b12137aaefb50041c6b1))
+* **client:** a SnackBar ignored the in-app motion setting, the same gap showAppSheet already closed ([#496](https://github.com/NC1107/slim-m/issues/496)) ([0669245](https://github.com/NC1107/slim-m/commit/0669245b4e7ee4e66a5b72905896239027b6a885))
+* **client:** a snackbar shown before the call dock appears stayed stranded on top of it, and two more gate holes ([#502](https://github.com/NC1107/slim-m/issues/502)) ([7889dd4](https://github.com/NC1107/slim-m/commit/7889dd4e5e2743266838a89364e8aec43a0c4609))
+* **client:** a thread's composer showed a dangling "Message #" hint ([#495](https://github.com/NC1107/slim-m/issues/495)) ([18d1c02](https://github.com/NC1107/slim-m/commit/18d1c02b5ba49bb35afe8cdfaa298b96e0cb7da7))
+* **client:** three Flutter-owned entrances ignored the in-app motion setting ([#492](https://github.com/NC1107/slim-m/issues/492)) ([864fd5d](https://github.com/NC1107/slim-m/commit/864fd5dd57a42dac0920c49042a052589b4db8b7))
+* **client:** three picker failures go inline, and the error gate had no real coverage ([#498](https://github.com/NC1107/slim-m/issues/498)) ([810f2e3](https://github.com/NC1107/slim-m/commit/810f2e3cfd70754822cfa6824cdd6eed15e8be4e))
+* **client:** Unblock stopped sharing Block's ban glyph, and icon sizes reached for a name ([#497](https://github.com/NC1107/slim-m/issues/497)) ([8c1ef35](https://github.com/NC1107/slim-m/commit/8c1ef35a944ab891915e6ab6a2a691f8293f7696))
+
+
+### Performance Improvements
+
+* **client:** starting one edit re-parsed every visible message's markdown ([#499](https://github.com/NC1107/slim-m/issues/499)) ([091dac0](https://github.com/NC1107/slim-m/commit/091dac0cb2ab25b2278f51b37ecbf7e5e3f63873))
+
 ## [0.35.0](https://github.com/NC1107/slim-m/compare/client-v0.34.0...client-v0.35.0) (2026-08-09)
 
 
