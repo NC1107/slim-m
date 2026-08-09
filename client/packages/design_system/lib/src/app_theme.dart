@@ -44,12 +44,35 @@ TextStyle _familyNamed(TextStyle style) => style.copyWith(
 /// next style below it when this one's own resolved value is null, so an
 /// unfocused button still resolves to whatever its own default border is
 /// (none, for all three): this is additive, never a replacement.
+///
+/// Value equality is load-bearing rather than tidy. `MaterialApp` wraps its
+/// theme in an `AnimatedTheme`, so a `ThemeData` that never compares equal to
+/// the last one makes every rebuild animate - and `AnimatedTheme` does not
+/// consult reduce-motion, so it animates there too. `resolveWith`'s own
+/// closure compares by identity, which is exactly that trap, so this is a
+/// named class holding only the colour it varies on.
+@immutable
+class _FocusRingSide implements WidgetStateProperty<BorderSide?> {
+  const _FocusRingSide(this.color);
+
+  final Color color;
+
+  @override
+  BorderSide? resolve(Set<WidgetState> states) =>
+      states.contains(WidgetState.focused)
+          ? BorderSide(color: color, width: 2)
+          : null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _FocusRingSide && other.color == color;
+
+  @override
+  int get hashCode => color.hashCode;
+}
+
 WidgetStateProperty<BorderSide?> _focusRingSide(AppTokens tokens) =>
-    WidgetStateProperty.resolveWith(
-      (states) => states.contains(WidgetState.focused)
-          ? BorderSide(color: tokens.focusRing, width: 2)
-          : null,
-    );
+    _FocusRingSide(tokens.focusRing);
 
 /// Builds a theme from the token set, so widgets read colours from tokens and
 /// never from raw literals. Shared by the app and the golden tests, which is
