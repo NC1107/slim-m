@@ -235,6 +235,7 @@ Widget composerHarness({
   required Sends sends,
   required TargetPlatform platform,
   String channelId = 'c1',
+  String channelName = 'general',
   List<api.CustomEmoji>? customEmoji,
   FakeClipboardPaste? clipboardPaste,
   api.SlimmApi Function(Ref)? apiBuilder,
@@ -260,7 +261,7 @@ Widget composerHarness({
             Composer(
               controller: controller,
               channelId: channelId,
-              channelName: 'general',
+              channelName: channelName,
               onSend: sends.call,
               clipboardPasteStart:
                   clipboardPaste?.start ?? startClipboardImagePaste,
