@@ -22,11 +22,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../ui_snapshot_support.dart' show loadRealFonts;
+import 'canvas_assembled_gap_scenarios.dart';
 import 'canvas_assembled_scene.dart';
 import 'canvas_assembled_snapshot_support.dart';
 
 void main() {
   setUpAll(loadRealFonts);
+
+  // States the scenes below never reach: registered from canvas_assembled_gap_scenarios.dart.
+  registerCanvasErrorBanners();
+  registerCanvasLoading();
+  registerCanvasToolSelection();
+  registerCanvasOverflowMenuOpen();
+  registerCanvasActivityLogOpen();
+  registerCanvasClearConfirm();
 
   group(
     'busy: a live call, a busy canvas, a sixth silent cursor-only reader',

@@ -328,7 +328,7 @@ const fixtureChannels = [
     createdAt: 0,
     parentMessageId: 'm-1',
   ),
-  // An ordinary DM, not the self-DM personal space: the rail's DM section and a DM transcript both need one.
+  // An ordinary DM: the rail's DM section, a DM transcript, and dm-call.
   api.Channel(
     id: 'c-dm-ada',
     name: 'Ada Lovelace',
@@ -336,7 +336,7 @@ const fixtureChannels = [
     createdAt: 0,
     dmParticipantId: 'user-ada',
   ),
-  // Empty and uncategorised: the transcript's offline/catching-up/genuinely-empty states all need a channel with nothing in it.
+  // Empty and uncategorised: the transcript's three empty-ish states need it.
   api.Channel(id: 'c-empty', name: 'empty', kind: 'text', createdAt: 0),
 ];
 

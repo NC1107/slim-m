@@ -14,7 +14,6 @@
 /// Write them with `scripts/ui-snapshots.sh`.
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart'
@@ -24,10 +23,11 @@ import 'package:slimm_app/src/screens/canvas/canvas_pane.dart'
     show canvasOpenProvider;
 import 'package:slimm_app/src/widgets/channel_rail.dart'
     show channelRailVisibleProvider;
-import 'package:slimm_rtc/rtc.dart';
 
 import 'ui_snapshot_support.dart';
-import 'voice_controller_harness.dart' show FakeSession;
+import 'voice_snapshot_fixtures.dart'
+    show SnapshotVoiceController, connectedCallState, dmChannelId;
+import 'voice_snapshot_scenarios.dart';
 
 /// The surfaces worth a picture: the route, and which viewports to render.
 ///
@@ -145,6 +145,8 @@ const _surfaces = <String, ({String route, List<String> viewports})>{
       'expanded-1000',
     ],
   ),
+  // No call open: dm-call-button-idle; -active-lit needs dmCallActivityProvider reporting a ring, which nothing here drives.
+  'dm': (route: '/channels/$dmChannelId', viewports: phoneAndDesktop),
 };
 
 /// Shell states reachable only by overriding a provider the plain [_surfaces]
@@ -204,17 +206,35 @@ final _shellStateSurfaces =
 /// app bar there is a second widget entirely (`HomeShell`'s own `Scaffold`,
 /// not `ConversationPane`), so no other breakpoint proves it stays
 /// suppressed.
+///
+/// `withVoice` is what makes `canvas-voice` actually live up to its name:
+/// until this was added it forced the canvas open on `c-main` but applied
+/// no `voiceControllerProvider` override, so `callDockDataFor` read the
+/// call as not-connected and the combined call-and-canvas dock, plus every
+/// camera-bubble state `_callParticipants()` gates on a live call in this
+/// exact channel, never rendered here despite the name. See
+/// `docs/reports/screen-inventory-canvas.md`'s "single highest-value gap".
 const _canvasSurfaces =
-    <String, ({String route, String channelId, List<String> viewports})>{
+    <
+      String,
+      ({String route, String channelId, List<String> viewports, bool withVoice})
+    >{
       'canvas': (
         route: '/channels/c-general',
         channelId: 'c-general',
         viewports: [...phoneAndDesktop, ...compactBracket],
+        withVoice: false,
       ),
       'canvas-voice': (
         route: '/channels/c-main',
         channelId: 'c-main',
-        viewports: [...compactBracket, 'expanded-999', 'expanded-1000'],
+        viewports: [
+          'phone-portrait',
+          ...compactBracket,
+          'expanded-999',
+          'expanded-1000',
+        ],
+        withVoice: true,
       ),
     };
 
@@ -237,75 +257,6 @@ const _voiceCallSurfaces = <String, ({String route, List<String> viewports})>{
     ],
   ),
 };
-
-/// A visible stand-in for a live camera or screen-share track: a real
-/// deployment has actual pixels to show, and this box only exists to prove
-/// the *layout* holds one, so a flat colour and a label are enough.
-class _VisibleSnapshotSession extends FakeSession {
-  @override
-  Widget cameraViewFor(String identity) => const ColoredBox(
-    color: Color(0xFF2D5F7C),
-    child: Center(
-      child: Text('camera', style: TextStyle(color: Colors.white)),
-    ),
-  );
-
-  @override
-  Widget screenShareViewFor(String identity) => const ColoredBox(
-    color: Color(0xFF39633B),
-    child: Center(
-      child: Text('screen share', style: TextStyle(color: Colors.white)),
-    ),
-  );
-}
-
-/// Pinned to a fixed [VoiceState] rather than driven through a real join,
-/// the same shape `voice_controller_harness.dart`'s own `FixedVoiceController`
-/// uses - kept local since that one is hardcoded to a non-visible session.
-class _SnapshotVoiceController extends VoiceController {
-  _SnapshotVoiceController(super.ref, VoiceState fixed)
-    : super(session: _VisibleSnapshotSession()) {
-    state = fixed;
-  }
-}
-
-/// Fixed rather than read from a real call, so the render is deterministic:
-/// a caller with the camera off, a sharer whose camera is also on (the
-/// owner's exact report), and a third, camera-only participant to prove the
-/// filmstrip actually scrolls rather than merely fitting two tiles.
-final _voiceCallState = VoiceState(
-  channelId: 'c-main',
-  state: VoiceSessionState.connected,
-  connectedAt: DateTime(2026, 8, 6, 12),
-  participants: const [
-    VoiceParticipant(
-      identity: 'user-nick',
-      name: 'Nick',
-      isLocal: true,
-      isSpeaking: false,
-      isMuted: false,
-      isScreenSharing: false,
-    ),
-    VoiceParticipant(
-      identity: 'user-ada',
-      name: 'Ada',
-      isLocal: false,
-      isSpeaking: true,
-      isMuted: false,
-      isScreenSharing: true,
-      isCameraOn: true,
-    ),
-    VoiceParticipant(
-      identity: 'user-bob',
-      name: 'Bob',
-      isLocal: false,
-      isSpeaking: false,
-      isMuted: true,
-      isScreenSharing: false,
-      isCameraOn: true,
-    ),
-  ],
-);
 
 void main() {
   setUpAll(loadRealFonts);
@@ -361,6 +312,10 @@ void main() {
                 canvasOpenProvider.overrideWith(
                   (ref) => surface.value.channelId,
                 ),
+                if (surface.value.withVoice)
+                  voiceControllerProvider.overrideWith(
+                    (ref) => SnapshotVoiceController(ref, connectedCallState),
+                  ),
               ],
             );
           },
@@ -381,7 +336,7 @@ void main() {
               '${surface.key}-$viewportName-$theme',
               overrides: [
                 voiceControllerProvider.overrideWith(
-                  (ref) => _SnapshotVoiceController(ref, _voiceCallState),
+                  (ref) => SnapshotVoiceController(ref, connectedCallState),
                 ),
               ],
             );
@@ -389,5 +344,13 @@ void main() {
         );
       }
     }
+
+    // Every other voice and DM-call state: registered from voice_snapshot_scenarios.dart, for this file's own line budget.
+    registerVoiceCallVariants(theme, renderSurface);
+    registerVoiceJoinPreview(theme, renderSurface);
+    registerVoiceRejoin(theme, renderSurface);
+    registerWhoIsHere(theme, renderSurface);
+    registerWhoIsHereUnknown(theme, renderSurface);
+    registerDmCall(theme, renderSurface);
   }
 }
