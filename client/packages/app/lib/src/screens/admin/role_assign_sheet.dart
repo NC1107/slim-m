@@ -12,11 +12,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../../api_failure.dart';
 import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/member_presence.dart' show membersProvider;
 import '../../providers/providers.dart';
+import '../../widgets/run_guarded.dart';
 
 Future<void> showRoleAssignSheet(BuildContext context, api.Role role) {
   return showAppSheet<void>(
@@ -26,40 +26,35 @@ Future<void> showRoleAssignSheet(BuildContext context, api.Role role) {
   );
 }
 
-class _RoleAssignSheet extends ConsumerWidget {
+class _RoleAssignSheet extends ConsumerStatefulWidget {
   const _RoleAssignSheet({required this.role});
 
   final api.Role role;
 
-  Future<void> _toggle(
-    WidgetRef ref,
-    BuildContext context,
-    api.UserProfile member,
-    bool value,
-  ) async {
+  @override
+  ConsumerState<_RoleAssignSheet> createState() => _RoleAssignSheetState();
+}
+
+class _RoleAssignSheetState extends ConsumerState<_RoleAssignSheet>
+    with GuardedActionState<_RoleAssignSheet> {
+  Future<void> _toggle(api.UserProfile member, bool value) async {
     final client = ref.read(apiProvider);
-    try {
-      if (value) {
-        await client.assignRole(userId: member.id, roleId: role.id);
-      } else {
-        await client.unassignRole(userId: member.id, roleId: role.id);
-      }
-      if (context.mounted) ref.invalidate(membersProvider);
-    } on api.ApiException catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(describeApiFailure('update the assignment', e))),
-      );
-    }
+    final ok = await guard(
+      whatFailed: 'update the assignment',
+      action: () => value
+          ? client.assignRole(userId: member.id, roleId: widget.role.id)
+          : client.unassignRole(userId: member.id, roleId: widget.role.id),
+    );
+    if (ok && mounted) ref.invalidate(membersProvider);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final members = ref.watch(membersProvider);
     final mine = ref.watch(myPermissionsProvider);
     // Mirrors the server's refusal, so the toggle cannot spring back.
-    final grantable = mine.hasPermission(role.permissions);
+    final grantable = mine.hasPermission(widget.role.permissions);
 
     return SizedBox(
       height: MediaQuery.of(context).size.height * 0.7,
@@ -75,7 +70,7 @@ class _RoleAssignSheet extends ConsumerWidget {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Assign "${role.name}"',
+                'Assign "${widget.role.name}"',
                 style: AppText.heading.copyWith(
                   color: tokens.textPrimary,
                   fontWeight: AppWeights.semi,
@@ -83,6 +78,16 @@ class _RoleAssignSheet extends ConsumerWidget {
               ),
             ),
           ),
+          if (actionError case final error?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s16,
+                0,
+                AppSpacing.s16,
+                AppSpacing.s8,
+              ),
+              child: AppErrorState(message: error, onDismiss: clearActionError),
+            ),
           Expanded(
             child: members.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -96,7 +101,7 @@ class _RoleAssignSheet extends ConsumerWidget {
                 itemCount: list.length,
                 itemBuilder: (context, i) {
                   final member = list[i];
-                  final has = member.roleIds.contains(role.id);
+                  final has = member.roleIds.contains(widget.role.id);
                   return AppListRow(
                     leading: const Icon(AppIcons.account),
                     label: member.displayName,
@@ -105,11 +110,9 @@ class _RoleAssignSheet extends ConsumerWidget {
                         : 'Needs permissions you do not hold',
                     trailing: AppToggle(
                       value: has,
-                      onChanged: grantable
-                          ? (v) => _toggle(ref, context, member, v)
-                          : null,
+                      onChanged: grantable ? (v) => _toggle(member, v) : null,
                       semanticLabel:
-                          'Assign ${role.name} to ${member.displayName}',
+                          'Assign ${widget.role.name} to ${member.displayName}',
                     ),
                   );
                 },

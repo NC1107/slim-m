@@ -242,4 +242,54 @@ void main() {
       expect(putCount, 1);
     },
   );
+
+  /// This screen used to catch its own `ApiException` and show it with a
+  /// `SnackBar`; see `check-error-surface.py` for the gate that now catches
+  /// that shape reappearing here or anywhere else in the app package.
+  testWidgets(
+    'a refused overwrite shows a safe sentence inline, not a SnackBar',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await pumpToTargetPicker(
+        tester,
+        handler: (request) {
+          if (request.url.path == '/roles') {
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 'r1',
+                  'name': 'Moderators',
+                  'permissions': 0,
+                  'is_everyone': false,
+                  'created_at': 0,
+                },
+              ]),
+              200,
+            );
+          }
+          if (request.method == 'PUT' &&
+              request.url.path == '/channels/c1/overwrites/role/r1') {
+            return http.Response(jsonEncode({'error': 'not authorized'}), 403);
+          }
+          return http.Response('{}', 200);
+        },
+      );
+
+      await tester.tap(find.text('Choose a role'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Moderators'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(AppButton, 'Set overwrite'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(AppButton, 'Set overwrite').last);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byType(AppErrorState), findsOneWidget);
+    },
+  );
 }
