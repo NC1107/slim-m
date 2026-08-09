@@ -5,8 +5,14 @@
 /// It is handed bytes rather than an attachment id, so it cannot start a
 /// second fetch. `attachmentBytesProvider` is `autoDispose`, the only way in
 /// is a tap on an image already showing those exact bytes, and passing them
-/// down is what makes "still loading" and "failed" unreachable states here
-/// rather than a black screen with nothing on it.
+/// down is what makes "still loading" and "a fetch failed" unreachable states
+/// here rather than a black screen with nothing on it.
+///
+/// A decode failure is reachable, though: `AttachmentView`'s own inline
+/// thumbnail offers this route as its only tap target even once its bytes
+/// have already failed to decode there, so the same bytes are tried again
+/// here rather than assuming they will now succeed - [_DecodeFailure] is
+/// what stops that retry from surfacing as an uncaught exception.
 ///
 /// No `Hero`. An attachment is content-addressed, so one id legitimately
 /// rides on more than one message (`models_attachments.dart`), and two rows
@@ -156,6 +162,9 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                           widget.bytes,
                           fit: BoxFit.contain,
                           semanticLabel: widget.filename,
+                          // The inline thumbnail already tried and failed to decode these same bytes; see this widget's own doc comment.
+                          errorBuilder: (context, error, stackTrace) =>
+                              _DecodeFailure(filename: widget.filename),
                         ),
                       ),
                     ),
@@ -164,6 +173,29 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What renders in place of the image when the bytes this viewer was handed
+/// fail to decode, on the dark theme [FullscreenImageViewer] always applies.
+class _DecodeFailure extends StatelessWidget {
+  const _DecodeFailure({required this.filename});
+
+  final String filename;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.s24),
+        child: Text(
+          'Could not open $filename.',
+          textAlign: TextAlign.center,
+          style: AppText.body.copyWith(color: tokens.textSecondary),
         ),
       ),
     );
