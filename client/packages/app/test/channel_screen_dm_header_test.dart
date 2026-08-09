@@ -93,8 +93,7 @@ void main() {
                   headers: {'content-type': 'application/json'},
                 );
               }
-              // Members, pins, and the extras-hydration fetch: none of
-              // them are what this test is about, so all answer empty.
+              // Members, pins and extras-hydration are not what this test is about, so all answer empty.
               return _emptyJsonList();
             }),
           );
@@ -115,9 +114,7 @@ void main() {
       ),
     );
 
-    // Not pumpAndSettle: AppIconButton's ripple/hover machinery keeps
-    // requesting a frame in this environment, the same reason
-    // channel_screen_test.dart uses a bounded pump count.
+    // Not pumpAndSettle: see channel_screen_test.dart's own note on why.
     for (var i = 0; i < 10; i++) {
       await tester.pump(const Duration(milliseconds: 20));
     }

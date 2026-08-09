@@ -83,8 +83,7 @@ void main() {
     final db = SlimmDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     final store = MessageStore(db);
-    // No upsertChannels call: this channel is unknown to the local store,
-    // the shape a fresh fetch or a race with catch-up produces.
+    // No upsertChannels: unknown to the local store, a fresh-fetch race.
 
     final container = ProviderContainer(
       overrides: [
