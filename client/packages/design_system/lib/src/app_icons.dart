@@ -191,6 +191,11 @@ abstract final class AppIcons {
 
   static const IconData delete = LucideIcons.trash2300;
   static const IconData revoke = LucideIcons.ban300;
+
+  /// Undoing a block. Distinct from [revoke]: "Block" and "Unblock" are
+  /// opposite actions that used to share [revoke]'s glyph, which drew the
+  /// same icon for both ends of the same toggle in one menu.
+  static const IconData restoreAccess = LucideIcons.userCheck300;
   static const IconData dismiss = LucideIcons.x300;
   static const IconData assignRole = LucideIcons.userCog300;
   static const IconData permissions = LucideIcons.lock300;

@@ -65,7 +65,7 @@ class InviteRoleGrantPicker extends ConsumerWidget {
             label: 'Role granted',
             meta: chosen?.name ?? 'None',
             semanticLabel: 'Role granted, currently ${chosen?.name ?? 'none'}',
-            trailing: const Icon(AppIcons.chevronRight, size: 16),
+            trailing: const Icon(AppIcons.chevronRight, size: AppSizes.icon16),
             onTap: () => _open(context, grantable),
           ),
         );

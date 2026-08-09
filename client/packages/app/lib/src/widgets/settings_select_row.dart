@@ -110,7 +110,7 @@ class SettingsSelectRow<T> extends StatelessWidget {
       semanticLabel: '$label, currently $_currentLabel',
       trailing: Icon(
         AppIcons.chevronRight,
-        size: 16,
+        size: AppSizes.icon16,
         color: tokens.textSecondary,
       ),
       onTap: () => _open(context),

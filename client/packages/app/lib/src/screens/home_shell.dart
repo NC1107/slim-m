@@ -359,7 +359,7 @@ class _ChannelTitle extends ConsumerWidget {
             children: [
               Icon(
                 channel?.kind == 'voice' ? AppIcons.voice : AppIcons.hash,
-                size: 16,
+                size: AppSizes.icon16,
               ),
               const SizedBox(width: AppSpacing.s8),
               Text(

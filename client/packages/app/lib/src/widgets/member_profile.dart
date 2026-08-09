@@ -428,7 +428,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
         if (ref.watch(blocksProvider).contains(profile.id))
           AppMenuItem(
             label: 'Unblock',
-            leading: AppIcons.revoke,
+            leading: AppIcons.restoreAccess,
             onTap: () =>
                 run((container) => unblockMember(host, container, profile)),
           )

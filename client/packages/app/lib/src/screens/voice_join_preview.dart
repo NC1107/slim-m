@@ -63,7 +63,11 @@ class VoiceSwitchPrompt extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(AppIcons.voice, size: 32, color: tokens.textSecondary),
+              Icon(
+                AppIcons.voice,
+                size: AppSizes.icon32,
+                color: tokens.textSecondary,
+              ),
               const SizedBox(height: AppSpacing.s16),
               Text(
                 'Already in a call',
@@ -143,7 +147,7 @@ class VoiceRejoinScreen extends StatelessWidget {
                   children: [
                     Icon(
                       isDm ? AppIcons.startCall : AppIcons.voice,
-                      size: 32,
+                      size: AppSizes.icon32,
                       color: tokens.textSecondary,
                     ),
                     const SizedBox(height: AppSpacing.s16),
