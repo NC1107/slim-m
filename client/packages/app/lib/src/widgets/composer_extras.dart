@@ -195,12 +195,20 @@ class _ComposerFieldState extends State<ComposerField> {
                     // textSecondary, matching AppInput's hint: this input is
                     // active, and textDisabled's AA exemption does not apply.
                     style: AppText.body.copyWith(color: tokens.textSecondary),
+                    // A thread's own channel row carries no name (see
+                    // ChannelScreen's channelName), so an unconditional
+                    // "#$channelName" left a dangling hash with nothing
+                    // after it; a blank name drops the `#name` clause
+                    // entirely rather than rendering one with nothing in it.
                     children: [
-                      const TextSpan(text: 'Message '),
-                      TextSpan(
-                        text: '#${widget.channelName}',
-                        style: const TextStyle(fontFamily: AppFonts.mono),
-                      ),
+                      const TextSpan(text: 'Message'),
+                      if (widget.channelName.isNotEmpty) ...[
+                        const TextSpan(text: ' '),
+                        TextSpan(
+                          text: '#${widget.channelName}',
+                          style: const TextStyle(fontFamily: AppFonts.mono),
+                        ),
+                      ],
                     ],
                   ),
                 ),
