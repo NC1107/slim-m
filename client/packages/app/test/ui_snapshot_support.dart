@@ -46,6 +46,8 @@ import 'package:slimm_platform/platform.dart';
 
 import 'ui_snapshot_fixture_data.dart';
 
+export 'ui_snapshot_fonts.dart'
+    show emojiFontPath, loadEmojiFont, loadFontFamily, loadRealFonts;
 export 'ui_snapshot_fixture_data.dart'
     show
         fixtureAnalyticsEnabled,
@@ -107,82 +109,6 @@ const fixtureTokens = api.TokenPair(
   refreshToken: 'refresh',
   accessExpiresAt: 0,
 );
-
-/// The real faces, loaded by hand.
-///
-/// Without this the test binding draws every glyph as a filled box and every
-/// icon as an empty square, which reads as a layout bug in the PNG rather
-/// than as a missing font.
-///
-/// [pubCacheOverride] exists only so a test can point the Lucide lookup at a
-/// directory that cannot resolve, without touching the real `PUB_CACHE`.
-Future<void> loadRealFonts({String? pubCacheOverride}) async {
-  const design = '../design_system';
-  await loadFontFamily('packages/slimm_design_system/IBM Plex Sans', [
-    '$design/fonts/IBMPlexSans-Regular.ttf',
-    '$design/fonts/IBMPlexSans-Medium.ttf',
-    '$design/fonts/IBMPlexSans-SemiBold.ttf',
-  ]);
-  await loadFontFamily('packages/slimm_design_system/IBM Plex Mono', [
-    '$design/fonts/IBMPlexMono-Regular.ttf',
-    '$design/fonts/IBMPlexMono-Medium.ttf',
-  ]);
-
-  final cache = pubCacheOverride ?? _pubCache();
-  final lucideDir = '$cache/lucide_icons_flutter-${_lucideVersion()}';
-  await loadFontFamily('packages/lucide_icons_flutter/Lucide', [
-    '$lucideDir/assets/lucide.ttf',
-  ]);
-  // AppIcons uses the 1.5-stroke variants, which live on their own family.
-  await loadFontFamily('packages/lucide_icons_flutter/Lucide300', [
-    '$lucideDir/assets/build_font/LucideVariable-w300.ttf',
-  ]);
-  // A bare Scaffold's default BackButton reaches Icons.arrow_back, not AppIcons.
-  await loadFontFamily('MaterialIcons', [
-    'build/unit_test_assets/fonts/MaterialIcons-Regular.otf',
-  ]);
-}
-
-/// Loads one font family, letting a missing asset throw rather than
-/// rendering that family's glyphs as boxes with nothing in the run saying so.
-Future<void> loadFontFamily(String family, List<String> paths) async {
-  final loader = FontLoader(family);
-  for (final path in paths) {
-    loader.addFont(File(path).readAsBytes().then(ByteData.sublistView));
-  }
-  await loader.load();
-}
-
-/// `PUB_CACHE`, when set, names the cache root, not the `hosted/pub.dev`
-/// package directory beneath it, so both branches resolve to that same depth.
-String _pubCache() {
-  final override = Platform.environment['PUB_CACHE'];
-  if (override != null) return '$override/hosted/pub.dev';
-  final home = Platform.environment['HOME'] ?? '';
-  return '$home/.pub-cache/hosted/pub.dev';
-}
-
-/// Read from the lockfile rather than pinned here, so a bump does not
-/// silently drop back to square icons.
-///
-/// Throws rather than returning an empty version on a miss: a silent '' used
-/// to resolve to a directory named `lucide_icons_flutter-` that never exists,
-/// which read as a missing-font failure with no hint the version scan failed.
-String _lucideVersion() {
-  final lock = File('../../pubspec.lock');
-  final lines = lock.readAsLinesSync();
-  for (var i = 0; i < lines.length; i++) {
-    if (lines[i].trim() != 'lucide_icons_flutter:') continue;
-    for (var j = i + 1; j < lines.length && lines[j].startsWith('    '); j++) {
-      final match = RegExp(r'version:\s*"?([^"\s]+)"?').firstMatch(lines[j]);
-      if (match != null) return match.group(1)!;
-    }
-    break;
-  }
-  throw StateError(
-    'lucide_icons_flutter has no version line in ../../pubspec.lock',
-  );
-}
 
 /// Real [SyncController] opens a socket to a server that is not there.
 class _NoopSyncController extends SyncController {
