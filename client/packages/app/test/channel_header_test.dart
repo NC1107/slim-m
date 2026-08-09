@@ -163,4 +163,46 @@ void main() {
     expect(find.bySemanticsLabel('Toggle channel list'), findsNothing);
     expect(find.byIcon(AppIcons.sidebar), findsNothing);
   });
+
+  testWidgets('isDm withholds the member-list toggle, at a width that would '
+      'otherwise show it', (tester) async {
+    // Comfortably past fitsMemberPane's threshold, so isDm is the only variable.
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final container = _containerWithPins([]);
+    addTearDown(container.dispose);
+
+    Future<void> pump({required bool isDm}) => tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: ChannelHeader(
+              channelId: 'c1',
+              name: 'Alice',
+              isVoice: false,
+              isDm: isDm,
+              searchOpen: false,
+              onToggleSearch: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await pump(isDm: false);
+    await tester.pumpAndSettle();
+    expect(
+      find.bySemanticsLabel('Toggle member list'),
+      findsOneWidget,
+      reason: 'the control: an ordinary channel keeps its toggle here',
+    );
+
+    await pump(isDm: true);
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Toggle member list'), findsNothing);
+  });
 }
