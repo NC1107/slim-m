@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.35.0](https://github.com/NC1107/slim-m/compare/client-v0.34.0...client-v0.35.0) (2026-08-09)
+
+
+### Features
+
+* **canvas:** media tile placement is shared and persists between calls ([#471](https://github.com/NC1107/slim-m/issues/471)) ([a16267b](https://github.com/NC1107/slim-m/commit/a16267bb47cc7a7a6c2997f207619ce11f2fc738))
+
+
+### Bug Fixes
+
+* **canvas:** a reconnect while the canvas stayed open never refetched shared media-slot positions ([#474](https://github.com/NC1107/slim-m/issues/474)) ([d3612d0](https://github.com/NC1107/slim-m/commit/d3612d02d7aa09f79d5b7a22d5405983ca95e9ce))
+* **client:** a channel switch mid-join could corrupt a different call's state ([#487](https://github.com/NC1107/slim-m/issues/487)) ([53e73f0](https://github.com/NC1107/slim-m/commit/53e73f0cc608f0e9e11f378b0ee646cd6ed2fb2a))
+* **client:** a failed background refresh threw away data the app still had ([#483](https://github.com/NC1107/slim-m/issues/483)) ([2a5c090](https://github.com/NC1107/slim-m/commit/2a5c090f5b4c5450a2bbed064b773abbaf7975c3))
+* **client:** a join and a share hand-off both remounted the call stage ([#479](https://github.com/NC1107/slim-m/issues/479)) ([48dd630](https://github.com/NC1107/slim-m/commit/48dd630472a774c0d2488f8cf9db34a7beed0589))
+* **client:** a poll, a spoiler and an author name could not be reached by keyboard ([#486](https://github.com/NC1107/slim-m/issues/486)) ([89be465](https://github.com/NC1107/slim-m/commit/89be4654133c3fa60fc5e5466d2cb8de00feb906))
+* **client:** Escape did nothing in three popovers, and two source sheets used the wrong row ([#482](https://github.com/NC1107/slim-m/issues/482)) ([2a0063c](https://github.com/NC1107/slim-m/commit/2a0063c0968ed682649682fdbe430bc7c6d36084))
+* **client:** five ways an overlay disagreed with every other overlay ([#481](https://github.com/NC1107/slim-m/issues/481)) ([b6925bc](https://github.com/NC1107/slim-m/commit/b6925bc5f206553e83e767195513da6f837cc3c7))
+* **client:** five ways the transcript overflowed or misrendered real content ([#478](https://github.com/NC1107/slim-m/issues/478)) ([f657b98](https://github.com/NC1107/slim-m/commit/f657b98cc5a205ce5e314aff6bb5b5b3322a0a5f))
+* **client:** sweep design-system token literals and add a regression gate ([#485](https://github.com/NC1107/slim-m/issues/485)) ([8235219](https://github.com/NC1107/slim-m/commit/8235219269d1d6f022c1274d59953fea3610cf54))
+* **client:** the admin picker sheets and account rows used a bare ListTile ([#484](https://github.com/NC1107/slim-m/issues/484)) ([354d5e9](https://github.com/NC1107/slim-m/commit/354d5e965825bad38dd2aacf5e58007f3e403234))
+* **client:** three settings surfaces still showed a failed write as a vanishing toast ([#489](https://github.com/NC1107/slim-m/issues/489)) ([2064a36](https://github.com/NC1107/slim-m/commit/2064a36d76366fdaa10a1cc657012a9b1627feed))
+* **design_system:** a bare ListTile lost the product's own font ([#477](https://github.com/NC1107/slim-m/issues/477)) ([56fa541](https://github.com/NC1107/slim-m/commit/56fa541532132b44b8396f75532fbdf2973efb6f))
+* **design_system:** every focusable control draws the app's own focus ring ([#488](https://github.com/NC1107/slim-m/issues/488)) ([509b86b](https://github.com/NC1107/slim-m/commit/509b86bbcb01ae10c0a2a3d5fe6aece8bfe0c219))
+
 ## [0.34.0](https://github.com/NC1107/slim-m/compare/client-v0.33.0...client-v0.34.0) (2026-08-08)
 
 
