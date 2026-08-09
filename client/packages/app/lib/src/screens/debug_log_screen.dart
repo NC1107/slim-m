@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../diagnostics/debug_log.dart';
+import '../widgets/app_snackbar.dart';
 
 class DebugLogScreen extends ConsumerWidget {
   const DebugLogScreen({super.key});
@@ -32,9 +33,7 @@ class DebugLogScreen extends ConsumerWidget {
                       ClipboardData(text: log.asReport()),
                     );
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Debug log copied')),
-                    );
+                    showAppSnackbar(context, 'Debug log copied');
                   },
           ),
           IconButton(

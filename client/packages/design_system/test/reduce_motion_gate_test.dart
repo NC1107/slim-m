@@ -20,6 +20,16 @@
 /// undetected. That trade is the one `type_scale_literal_test.dart` already
 /// made for the same reason - a real parser is a second thing to maintain
 /// and drift from the grammar it parses.
+///
+/// The `ScaffoldMessenger.showSnackBar` rule closes the same gap for a
+/// SnackBar, one layer later: `app_snackbar.dart`'s own `showAppSnackbar` is
+/// the one place fourteen call sites used to reach `ScaffoldMessenger`
+/// directly, each dropping the override on its own. This rule does not by
+/// itself force a caller through that one function - a raw call anywhere
+/// carrying `snackBarAnimationStyle:` still passes - but it does mean a
+/// future call site cannot reintroduce the original bug (no override at
+/// all) without either using `showAppSnackbar` or writing the override out
+/// by hand and losing the whole point of a shared helper.
 library;
 
 import 'dart:io';
@@ -53,6 +63,11 @@ final _rules = [
   ),
   _Rule('ExpansionTile', RegExp(r'\bExpansionTile\('),
       'expansionAnimationStyle:'),
+  _Rule(
+    'ScaffoldMessenger.showSnackBar',
+    RegExp(r'\.showSnackBar\('),
+    'snackBarAnimationStyle:',
+  ),
 ];
 
 /// A short, named allowlist rather than a growing one: each entry would

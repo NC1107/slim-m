@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/personal_space_visibility.dart';
+import 'app_snackbar.dart';
 import 'context_menu_focus.dart';
 
 /// The message shown when the row is hidden, naming the one way back:
@@ -49,9 +50,12 @@ class _PersonalSpaceKebabState extends ConsumerState<PersonalSpaceKebab> {
   Future<void> _remove() async {
     _controller.hide();
     final messenger = ScaffoldMessenger.maybeOf(context);
+    final reduceMotion = AppMotion.isReduced(context);
     await ref.read(personalSpaceVisibilityProvider.notifier).hide();
-    messenger?.showSnackBar(
-      const SnackBar(content: Text(personalSpaceHiddenNotice)),
+    showResolvedSnackbar(
+      messenger,
+      reduceMotion: reduceMotion,
+      message: personalSpaceHiddenNotice,
     );
   }
 

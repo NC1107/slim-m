@@ -17,6 +17,7 @@ import '../providers/composer_focus.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/typing_controller.dart';
+import 'app_snackbar.dart';
 import 'attachment_picker.dart';
 import 'composer_action_bar.dart';
 import 'composer_attachments.dart';
@@ -373,9 +374,8 @@ class _ComposerState extends ConsumerState<Composer> {
     pick: ref.read(attachmentPickerProvider(source)),
     focus: _focus,
     isMounted: () => mounted,
-    onPickerFailed: () => ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not open the file picker.')),
-    ),
+    onPickerFailed: () =>
+        showAppSnackbar(context, 'Could not open the file picker.'),
     stage: _stageAttachment,
   );
 

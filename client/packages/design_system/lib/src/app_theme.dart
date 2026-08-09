@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'app_metrics.dart';
 import 'app_tokens.dart';
 import 'app_typography.dart';
+import 'components/surfaces/sheet.dart' show kSheetMaxWidth;
 
 /// Names [AppFonts.sans] on [style] explicitly, for a style handed straight
 /// to a Material component theme that resolves it with `??` rather than
@@ -229,6 +230,27 @@ ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
       ),
       subtitleTextStyle: _familyNamed(
         AppText.caption.copyWith(color: tokens.textSecondary),
+      ),
+    ),
+    // Rendered and found stock: a plain light-grey bar full-bleed across a
+    // wide desktop window, in a dark app whose every other surface is
+    // border-first. `AppCard`'s own fill/border/radius, `floating` and
+    // `kSheetMaxWidth` so it reads as a panel rather than spanning the window.
+    // `SnackBar` builds its content under a bare `DefaultTextStyle`, never a
+    // `.merge`, the same trap `_familyNamed`'s own doc comment already names
+    // for `ListTileThemeData` - so this needs it too or the family is lost.
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: tokens.surfaceRaised,
+      contentTextStyle: _familyNamed(
+        AppText.body.copyWith(color: tokens.textPrimary),
+      ),
+      actionTextColor: tokens.accentFill,
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      width: kSheetMaxWidth,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        side: BorderSide(color: tokens.borderSubtle),
       ),
     ),
   );
