@@ -26,6 +26,7 @@ import '../providers/channel_search_controller.dart';
 import '../providers/emoji_catalog_provider.dart';
 import '../providers/member_presence.dart';
 import '../providers/message_actions.dart';
+import '../providers/message_editing.dart';
 import '../providers/message_extras.dart';
 import '../providers/message_jump.dart';
 import '../providers/pins_controller.dart';
@@ -81,10 +82,6 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// The query text only; the search itself (open, hits, failure) lives in
   /// [channelSearchProvider], which the compact app bar drives too.
   final _searchController = TextEditingController();
-
-  /// The message currently swapped into its inline edit field, if any. At
-  /// most one at a time: starting a new edit implicitly cancels another.
-  String? _editingId;
 
   /// The message the next send will reply to, if any. Cleared by sending,
   /// by an explicit cancel, and by switching channels - a reply is scoped to
@@ -195,12 +192,20 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   Future<void> _toggleReaction(Message message, api.ReactionSummary reaction) =>
       setReaction(ref, message.id, reaction.emoji, wasActive: reaction.reacted);
 
-  void _startEdit(Message message) => setState(() => _editingId = message.id);
+  /// Writes only: nothing here watches [editingMessageIdProvider], so
+  /// starting, cancelling or submitting an edit never rebuilds this screen.
+  /// Each row resolves its own `editing` flag with `.select`; see that
+  /// provider's own doc comment.
+  void _startEdit(Message message) =>
+      ref.read(editingMessageIdProvider(widget.channelId).notifier).state =
+          message.id;
 
-  void _cancelEdit() => setState(() => _editingId = null);
+  void _cancelEdit() =>
+      ref.read(editingMessageIdProvider(widget.channelId).notifier).state =
+          null;
 
   void _submitEdit(Message message, String content) {
-    setState(() => _editingId = null);
+    ref.read(editingMessageIdProvider(widget.channelId).notifier).state = null;
     unawaited(submitMessageEdit(ref, context, message, content));
   }
 
@@ -368,6 +373,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   );
                                 }
                                 return MessageTranscript(
+                                  channelId: widget.channelId,
                                   selfId: ref
                                       .read(sessionProvider)
                                       .tokens
@@ -383,7 +389,6 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   channelTopic: channel?.topic,
                                   scrollController: _scrollTracker.controller,
                                   lastReadSeq: lastReadSeq,
-                                  editingId: _editingId,
                                   knownUsernames: knownUsernames,
                                   customEmoji: customEmoji,
                                   // A channel with nothing delivered has no history to page, so its oldest loaded row is vacuously its first.

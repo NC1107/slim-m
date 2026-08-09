@@ -31,6 +31,7 @@ typedef MessageActionsFor = MessageActions Function(Message message);
 class MessageTranscript extends StatefulWidget {
   const MessageTranscript({
     super.key,
+    required this.channelId,
     required this.messages,
     required this.syncStatus,
     required this.historyKnown,
@@ -40,7 +41,6 @@ class MessageTranscript extends StatefulWidget {
     required this.scrollController,
     required this.lastReadSeq,
     required this.selfId,
-    required this.editingId,
     required this.knownUsernames,
     required this.customEmoji,
     required this.history,
@@ -60,6 +60,11 @@ class MessageTranscript extends StatefulWidget {
     this.jumpToken,
     this.onJumpArrived,
   });
+
+  /// Only used to scope [editingMessageIdProvider] per row; nothing here
+  /// otherwise reaches the network or the store, per this file's own doc
+  /// comment above.
+  final String channelId;
 
   final List<Message> messages;
 
@@ -88,9 +93,6 @@ class MessageTranscript extends StatefulWidget {
   /// This account's own user id, so a message it wrote never counts as
   /// unread to it. Null before a session exists, which matches nothing.
   final String? selfId;
-
-  /// The message swapped into its inline edit field, if any.
-  final String? editingId;
 
   final Set<String> knownUsernames;
   final Map<String, String> customEmoji;
@@ -340,7 +342,8 @@ class _MessageTranscriptState extends State<MessageTranscript> {
             // By message, not by slot: an arrival shifts every index by one.
             key: ValueKey(message.id),
             messageId: message.id,
-            builder: (extras) => MessageRow(
+            channelId: widget.channelId,
+            builder: (extras, editing) => MessageRow(
               message: message,
               // A new day breaks a group so a continuation across midnight regains its avatar and header.
               grouped: isGrouped(message, previous) && !newDay,
@@ -375,7 +378,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
                 final String id => () => widget.onJumpToReply(id),
                 null => null,
               },
-              editing: message.id == widget.editingId,
+              editing: editing,
               onSubmitEdit: (content) => widget.onSubmitEdit(message, content),
               onCancelEdit: widget.onCancelEdit,
               actions: widget.actionsFor(message),

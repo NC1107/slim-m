@@ -84,6 +84,7 @@ Widget _app(Widget transcript, Stream<ServerEvent> events) => ProviderScope(
 
 MessageTranscript _transcript({required List<Message> messages}) =>
     MessageTranscript(
+      channelId: 'c1',
       messages: messages,
       syncStatus: SyncStatus.live,
       historyKnown: true,
@@ -91,7 +92,6 @@ MessageTranscript _transcript({required List<Message> messages}) =>
       scrollController: ScrollController(),
       lastReadSeq: 999999,
       selfId: 'self',
-      editingId: null,
       knownUsernames: const {},
       customEmoji: const {},
       history: const ChannelHistory(atStart: true),
