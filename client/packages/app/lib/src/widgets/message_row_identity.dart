@@ -228,7 +228,7 @@ class MessageRowHeader extends ConsumerWidget {
           ),
           if (isWebhook) ...[
             const SizedBox(width: AppSpacing.s8),
-            const AppBadge(variant: AppBadgeVariant.tag, label: 'webhook'),
+            const AppBadge(variant: AppBadgeVariant.tag, label: 'Webhook'),
           ],
           const SizedBox(width: AppSpacing.s8),
           MessageTimeMark(message: message),

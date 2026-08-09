@@ -15,13 +15,13 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../../api_failure.dart';
 import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/run_guarded.dart';
 import 'overwrite_target_picker_sheets.dart';
 import 'permission_overwrite_row.dart';
 
@@ -34,7 +34,8 @@ class ChannelOverwritesScreen extends ConsumerStatefulWidget {
 }
 
 class _ChannelOverwritesScreenState
-    extends ConsumerState<ChannelOverwritesScreen> {
+    extends ConsumerState<ChannelOverwritesScreen>
+    with GuardedActionState<ChannelOverwritesScreen> {
   Channel? _channel;
   api.OverwriteTarget _kind = api.OverwriteTarget.role;
   String? _targetId;
@@ -119,8 +120,9 @@ class _ChannelOverwritesScreenState
     if (!confirmed || !mounted) return;
 
     setState(() => _busy = true);
-    try {
-      await ref
+    final ok = await guard(
+      whatFailed: 'set the overwrite',
+      action: () => ref
           .read(apiProvider)
           .setChannelOverwrite(
             channelId: _channel!.id,
@@ -128,18 +130,14 @@ class _ChannelOverwritesScreenState
             id: _targetId!,
             allow: allow,
             deny: deny,
-          );
-      if (!mounted) return;
+          ),
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Overwrite set for $_targetLabel.')),
       );
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(describeApiFailure('set the overwrite', e))),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -155,15 +153,19 @@ class _ChannelOverwritesScreenState
     if (!confirmed || !mounted) return;
 
     setState(() => _busy = true);
-    try {
-      await ref
+    final ok = await guard(
+      whatFailed: 'clear the overwrite',
+      action: () => ref
           .read(apiProvider)
           .deleteChannelOverwrite(
             channelId: _channel!.id,
             kind: _kind,
             id: _targetId!,
-          );
-      if (!mounted) return;
+          ),
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) {
       setState(_resetState);
       // States the result the idempotent DELETE guarantees, not a "cleared" this screen can never know happened.
       ScaffoldMessenger.of(context).showSnackBar(
@@ -174,13 +176,6 @@ class _ChannelOverwritesScreenState
           ),
         ),
       );
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(describeApiFailure('clear the overwrite', e))),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -295,6 +290,10 @@ class _ChannelOverwritesScreenState
                 ),
               ],
             ),
+            if (actionError != null) ...[
+              const SizedBox(height: AppSpacing.s8),
+              AppErrorState(message: actionError!, onDismiss: clearActionError),
+            ],
           ],
           const SizedBox(height: AppSpacing.s16),
         ],

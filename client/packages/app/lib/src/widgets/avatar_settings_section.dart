@@ -14,13 +14,13 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_api/api.dart' show SlimmApiUsers;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../api_failure.dart';
 import '../providers/providers.dart';
 import 'attachment_picker.dart';
 import 'avatar_crop_sheet.dart';
+import 'run_guarded.dart';
 import 'settings_section_header.dart';
 import 'user_avatar.dart';
 
@@ -38,7 +38,8 @@ class AvatarSettingsSection extends ConsumerStatefulWidget {
       _AvatarSettingsSectionState();
 }
 
-class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
+class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
+    with GuardedActionState<AvatarSettingsSection> {
   bool _busy = false;
 
   Future<AttachmentSource?> _pickSource() {
@@ -113,32 +114,24 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
     if (bytes == null || !mounted) return;
 
     setState(() => _busy = true);
-    try {
-      await ref.read(apiProvider).uploadAvatar(bytes);
-      if (context.mounted) ref.invalidate(meProvider);
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(describeApiFailure('upload the avatar', e))),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final ok = await guard(
+      whatFailed: 'upload the avatar',
+      action: () => ref.read(apiProvider).uploadAvatar(bytes),
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) ref.invalidate(meProvider);
   }
 
   Future<void> _remove() async {
     setState(() => _busy = true);
-    try {
-      await ref.read(apiProvider).deleteAvatar();
-      if (context.mounted) ref.invalidate(meProvider);
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(describeApiFailure('remove the avatar', e))),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final ok = await guard(
+      whatFailed: 'remove the avatar',
+      action: () => ref.read(apiProvider).deleteAvatar(),
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) ref.invalidate(meProvider);
   }
 
   @override
@@ -236,6 +229,13 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
                   variant: AppButtonVariant.ghost,
                   size: AppButtonSize.sm,
                   onPressed: enabled ? _remove : null,
+                ),
+              ],
+              if (actionError != null) ...[
+                const SizedBox(height: AppSpacing.s8),
+                AppErrorState(
+                  message: actionError!,
+                  onDismiss: clearActionError,
                 ),
               ],
             ],
