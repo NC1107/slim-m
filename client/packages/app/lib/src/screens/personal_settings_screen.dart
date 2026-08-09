@@ -15,37 +15,37 @@
 /// Voice is folded in here rather than living on its own screen, so mic level,
 /// sensitivity, push-to-talk and share quality sit beside the account they
 /// belong to instead of behind a second route nothing linked to twice.
+///
+/// Who you are, and the rename affordance for it, used to float above the nav
+/// as its own unlabelled block - editable, yet outside every named section,
+/// so "rename yourself" read as belonging to nothing. It lives inside
+/// [AvatarSettingsSection]'s own "Profile" card now, which is what the
+/// "Account & presence" pane opens onto, and each pane in the nav carries a
+/// leading icon the way [SpaceSettingsSection]'s rows already do.
 library;
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import '../providers/providers.dart';
 import '../routing/routes.dart';
 import '../widgets/app_info_section.dart';
 import '../widgets/appearance_settings_section.dart';
 import '../widgets/avatar_settings_section.dart';
-import '../widgets/edit_display_name_sheet.dart';
 import '../widgets/personal_account_sections.dart';
 import '../widgets/personal_status_sections.dart';
 import '../widgets/settings_panes.dart';
 import 'voice_settings_screen.dart';
-import '../widgets/user_avatar.dart';
 
-class PersonalSettingsScreen extends ConsumerWidget {
+class PersonalSettingsScreen extends StatelessWidget {
   const PersonalSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return SettingsPanesScaffold(
       title: 'Settings',
       // Reached with go(), which replaces, so there is no stack to pop.
       backTooltip: 'Back to channels',
       backFallback: Routes.channels,
-      header: const _WhoYouAre(),
       footer: const SignOutRow(),
       groups: [
         SettingsPaneGroup(
@@ -54,6 +54,7 @@ class PersonalSettingsScreen extends ConsumerWidget {
             SettingsPane(
               id: 'account',
               label: 'Account & presence',
+              icon: AppIcons.account,
               builder: (context) => const Column(
                 children: [AvatarSettingsSection(), PresenceSection()],
               ),
@@ -61,11 +62,13 @@ class PersonalSettingsScreen extends ConsumerWidget {
             SettingsPane(
               id: 'appearance',
               label: 'Appearance',
+              icon: AppIcons.appearance,
               builder: (context) => const AppearanceSettingsSection(),
             ),
             SettingsPane(
               id: 'notifications',
               label: 'Notifications',
+              icon: AppIcons.notificationsOn,
               builder: (context) => const NotificationsSection(),
             ),
           ],
@@ -76,6 +79,7 @@ class PersonalSettingsScreen extends ConsumerWidget {
             SettingsPane(
               id: 'voice',
               label: 'Voice & screen share',
+              icon: AppIcons.voice,
               builder: (context) => const VoiceSettingsBody(),
             ),
           ],
@@ -86,11 +90,13 @@ class PersonalSettingsScreen extends ConsumerWidget {
             SettingsPane(
               id: 'devices',
               label: 'Devices',
+              icon: AppIcons.devices,
               builder: (context) => const DevicesSection(),
             ),
             SettingsPane(
               id: 'blocked',
               label: 'Blocked',
+              icon: AppIcons.revoke,
               builder: (context) => const BlockedSection(),
             ),
           ],
@@ -101,72 +107,11 @@ class PersonalSettingsScreen extends ConsumerWidget {
             SettingsPane(
               id: 'about',
               label: 'About slim-m',
+              icon: AppIcons.info,
               builder: (context) =>
                   const Column(children: [AppInfoSection(), AccountSection()]),
             ),
           ],
-        ),
-      ],
-    );
-  }
-}
-
-/// Who is signed in, above the nav. The one piece of identity that belongs on
-/// the frame rather than in a pane: it says whose settings these are.
-class _WhoYouAre extends ConsumerWidget {
-  const _WhoYouAre();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final me = ref.watch(meProvider).valueOrNull;
-    if (me == null) return const SizedBox.shrink();
-
-    return Row(
-      children: [
-        UserAvatar(
-          userId: me.id,
-          avatarUpdatedAt: me.avatarUpdatedAt,
-          name: me.displayName,
-          size: 32,
-        ),
-        const SizedBox(width: AppSpacing.s12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      me.displayName,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.ui.copyWith(
-                        color: tokens.textPrimary,
-                        fontWeight: AppWeights.medium,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.s4),
-                  AppIconButton(
-                    icon: AppIcons.edit,
-                    semanticLabel: 'Edit display name',
-                    tooltip: 'Edit display name',
-                    size: AppIconButtonSize.sm,
-                    onPressed: () => unawaited(
-                      showEditDisplayNameSheet(context, me.displayName),
-                    ),
-                  ),
-                ],
-              ),
-              Text(
-                '@${me.username}',
-                overflow: TextOverflow.ellipsis,
-                style: AppText.caption.copyWith(color: tokens.textSecondary),
-              ),
-            ],
-          ),
         ),
       ],
     );

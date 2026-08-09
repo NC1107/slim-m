@@ -156,6 +156,12 @@ abstract final class AppIcons {
   /// The personal space: your own notes, not another person's avatar.
   static const IconData notebook = LucideIcons.notebookPen300;
 
+  /// The personal settings nav: theme and type, and the devices a session
+  /// lives on. Distinct from [camera]/[avatarCamera], which are about a
+  /// picture rather than a screen.
+  static const IconData appearance = LucideIcons.palette300;
+  static const IconData devices = LucideIcons.monitorSmartphone300;
+
   /// The settings avatar's "tap to change" badge. Distinct from [camera]
   /// above, which is a video camera for call controls; this is a still one.
   static const IconData avatarCamera = LucideIcons.camera300;

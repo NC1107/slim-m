@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Tests for the settings avatar section: the camera badge is a real,
-/// touch-sized affordance that reaches the composer's two-source choice
-/// (pinning #284's behaviour rather than letting this pass regress it),
-/// "Remove" only offers itself when there is something to remove, and
-/// removing it round-trips through the real endpoint and clears the preview
-/// once `Me` is refetched.
+/// Tests for the settings profile card: the camera badge is a real,
+/// touch-sized affordance, the name and `@handle` render with their own
+/// rename affordance, "Remove" only offers itself when there is something to
+/// remove, and removing it round-trips through the real endpoint and clears
+/// the preview once `Me` is refetched.
+///
+/// The camera badge's own two-source picker sheet has its own file,
+/// `avatar_settings_section_picker_test.dart`, split out to stay under the
+/// 300-line review budget.
 library;
 
 import 'dart:convert';
@@ -82,6 +85,49 @@ void main() {
 
     expect(find.bySemanticsLabel(_cameraLabel), findsOneWidget);
     expect(find.text('Remove'), findsNothing);
+  });
+
+  /// The name and handle used to sit above the settings nav as their own
+  /// unlabelled block, outside every named section; they are part of this
+  /// card now. See the file's own doc comment.
+  testWidgets('shows the display name with its own rename affordance, and the '
+      '@handle beneath it', (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((request) async {
+              if (request.url.path == '/me') {
+                return http.Response(
+                  jsonEncode(_meJson(null)),
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
+              return http.Response('', 404);
+            }),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_harness(container));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Self'), findsOneWidget);
+    expect(find.text('@self'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Edit display name'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit display name'), findsOneWidget);
   });
 
   testWidgets('the camera badge meets the 44pt touch-target minimum', (
@@ -291,117 +337,4 @@ void main() {
       findsOneWidget,
     );
   });
-
-  testWidgets('tapping the camera badge opens both sources, still selectable', (
-    tester,
-  ) async {
-    final container = ProviderContainer(
-      overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-        apiProvider.overrideWith((ref) {
-          final api = SlimmApi(
-            baseUrl: Uri.parse('http://localhost:8080'),
-            session: ref.watch(sessionProvider),
-            httpClient: MockClient((request) async {
-              if (request.url.path == '/me') {
-                return http.Response(
-                  jsonEncode(_meJson(null)),
-                  200,
-                  headers: {'content-type': 'application/json'},
-                );
-              }
-              return http.Response('', 404);
-            }),
-          );
-          ref.onDispose(api.close);
-          return api;
-        }),
-      ],
-    );
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(_harness(container));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.bySemanticsLabel(_cameraLabel));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Photo library'), findsOneWidget);
-    expect(find.text('Browse files'), findsOneWidget);
-  });
-
-  /// Mocked directly, rather than left unregistered like the rest of this
-  /// file's picks, so each row is pinned to the real plugin request its
-  /// source names: a routing bug (the wrong source popped, or the sheet's
-  /// choice never reaching `attachmentPickerProvider` at all) changes what
-  /// the plugin is asked for, where an unregistered channel would not tell
-  /// the two apart. Mirrors `attachment_picker_test.dart`'s own proof.
-  const filePickerChannel = MethodChannel(
-    'miguelruivo.flutter.plugins.filepicker',
-  );
-
-  for (final (label, expectedMethod) in [
-    ('Photo library', 'image'),
-    ('Browse files', 'any'),
-  ]) {
-    testWidgets(
-      'choosing $label routes to the plugin request that source names',
-      (tester) async {
-        MethodCall? seen;
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(filePickerChannel, (call) async {
-              seen = call;
-              return null; // no selection, the same shape a cancelled pick returns
-            });
-        addTearDown(
-          () => TestDefaultBinaryMessengerBinding
-              .instance
-              .defaultBinaryMessenger
-              .setMockMethodCallHandler(filePickerChannel, null),
-        );
-
-        final requests = <String>[];
-        final container = ProviderContainer(
-          overrides: [
-            keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-            sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
-            apiProvider.overrideWith((ref) {
-              final api = SlimmApi(
-                baseUrl: Uri.parse('http://localhost:8080'),
-                session: ref.watch(sessionProvider),
-                httpClient: MockClient((request) async {
-                  requests.add('${request.method} ${request.url.path}');
-                  if (request.url.path == '/me') {
-                    return http.Response(
-                      jsonEncode(_meJson(null)),
-                      200,
-                      headers: {'content-type': 'application/json'},
-                    );
-                  }
-                  return http.Response('', 404);
-                }),
-              );
-              ref.onDispose(api.close);
-              return api;
-            }),
-          ],
-        );
-        addTearDown(container.dispose);
-
-        await tester.pumpWidget(_harness(container));
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.bySemanticsLabel(_cameraLabel));
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.text(label));
-        await tester.pumpAndSettle();
-
-        expect(seen, isNotNull, reason: 'the picker was never invoked');
-        expect(seen!.method, expectedMethod);
-        expect(requests, isNot(contains('POST /me/avatar')));
-      },
-    );
-  }
 }
