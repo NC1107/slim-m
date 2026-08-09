@@ -144,10 +144,85 @@ const _fixtureReportMaps = [
   },
 ];
 
+/// One removal with a stated reason and one without, the two shapes
+/// `RemovedMembersScreen`'s own card renders differently.
+const _fixtureRemovalMaps = [
+  {
+    'user_id': 'user-removed-1',
+    'username': 'grace',
+    'display_name': 'Grace Hopper',
+    'removed_at': 1753600500000,
+    'reason': 'Posted an invite link to another, unrelated Space.',
+    'removed_by': 'user-nick',
+  },
+  {
+    'user_id': 'user-removed-2',
+    'username': 'alan',
+    'display_name': 'Alan Turing',
+    'removed_at': 1753600600000,
+    'reason': null,
+    'removed_by': 'user-nick',
+  },
+];
+
+/// A day, an active hour and a memory sample, enough for the analytics
+/// screen's three charts to each render their populated shape rather than
+/// their empty one, when a caller explicitly asks for the enabled answer.
+const fixtureAnalyticsEnabled = {
+  'enabled': true,
+  'stats': {
+    'total_messages': 812,
+    'member_count': 3,
+    'channel_count': 4,
+    'attachment_bytes': 15728640,
+    'messages_by_day': [
+      {'date': '2026-08-06', 'count': 40},
+      {'date': '2026-08-07', 'count': 12},
+      {'date': '2026-08-08', 'count': 65},
+    ],
+    'active_hours': [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      3,
+      8,
+      12,
+      15,
+      20,
+      22,
+      18,
+      14,
+      10,
+      9,
+      11,
+      14,
+      16,
+      10,
+      5,
+      2,
+      1,
+    ],
+    'memory_samples': [
+      {'sampled_at': 1753600000000, 'rss_bytes': 9216000},
+      {'sampled_at': 1753603600000, 'rss_bytes': 12400000},
+      {'sampled_at': 1753607200000, 'rss_bytes': 11800000},
+    ],
+  },
+};
+
 /// Answers the reads the shell makes on its way up: the caller, the member
 /// list, pins and a window of messages, plus the administration screens'
 /// own lists.
-MockClient fixtureClient() => MockClient((request) async {
+///
+/// A plain top-level function rather than only a [MockClient] closure, so a
+/// surface needing one bespoke answer can build its own client that checks
+/// its own path first and falls back to this for everything else, rather
+/// than re-deriving the whole switch.
+Future<http.Response> fixtureResponse(http.Request request) async {
   final path = request.url.path;
   // 404 like a real server: the catch-all `[]` renders as a blank disc.
   if (path.endsWith('/avatar')) return http.Response('', 404);
@@ -163,6 +238,7 @@ MockClient fixtureClient() => MockClient((request) async {
     // The batch profile fetch a report card resolves its names through.
     '/users' => _fixtureMemberMaps,
     _ when path.endsWith('/members') => _fixtureMemberMaps,
+    '/members/removed' => _fixtureRemovalMaps,
     '/roles' => _fixtureRoleMaps,
     '/invites' => _fixtureInviteMaps,
     '/reports' => _fixtureReportMaps,
@@ -193,6 +269,8 @@ MockClient fixtureClient() => MockClient((request) async {
       'updated_at': 0,
     },
     '/space/settings' => const {'join_policy': 'invite'},
+    // Off is this feature's real default; see docs/decisions/0008-space-analytics.md.
+    '/space/analytics' => const {'enabled': false},
     _ => const <Object>[],
   };
   return http.Response(
@@ -200,7 +278,9 @@ MockClient fixtureClient() => MockClient((request) async {
     200,
     headers: {'content-type': 'application/json'},
   );
-});
+}
+
+MockClient fixtureClient() => MockClient(fixtureResponse);
 
 /// The two categories the backfill (migration 0031) would have created for
 /// any pre-existing deployment: see docs/decisions/0006-channel-categories.md.
@@ -248,6 +328,16 @@ const fixtureChannels = [
     createdAt: 0,
     parentMessageId: 'm-1',
   ),
+  // An ordinary DM, not the self-DM personal space: the rail's DM section and a DM transcript both need one.
+  api.Channel(
+    id: 'c-dm-ada',
+    name: 'Ada Lovelace',
+    kind: 'dm',
+    createdAt: 0,
+    dmParticipantId: 'user-ada',
+  ),
+  // Empty and uncategorised: the transcript's offline/catching-up/genuinely-empty states all need a channel with nothing in it.
+  api.Channel(id: 'c-empty', name: 'empty', kind: 'text', createdAt: 0),
 ];
 
 api.Message _message(
@@ -280,6 +370,18 @@ api.Message _threadMessage(int seq, String author, String content) =>
       editedAt: null,
     );
 
+/// A message inside `c-dm-ada`, the ordinary (non-personal-space) DM.
+api.Message _dmMessage(int seq, String author, String content) => api.Message(
+  id: 'mdm-$seq',
+  channelId: 'c-dm-ada',
+  authorId: author,
+  authorDisplayName: author == 'user-nick' ? 'Nick' : 'Ada Lovelace',
+  seq: seq,
+  content: content,
+  createdAt: 1753600000000 + (200 + seq) * 60000,
+  editedAt: null,
+);
+
 final fixtureMessages = [
   _message(1, 'user-ada', 'The rail rows line up again at every width.'),
   _message(
@@ -299,4 +401,6 @@ final fixtureMessages = [
   ),
   _threadMessage(1, 'user-ada', 'Good catch - filed as #341.'),
   _threadMessage(2, 'user-nick', 'Thanks, verifying the fix now.'),
+  _dmMessage(1, 'user-ada', 'Got a minute to look at the overwrites screen?'),
+  _dmMessage(2, 'user-nick', 'Yeah, pulling it up now.'),
 ];

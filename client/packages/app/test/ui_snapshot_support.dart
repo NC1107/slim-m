@@ -5,6 +5,7 @@
 /// Kept out of the test file so the matrix there stays a list of sizes.
 library;
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -17,30 +18,81 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/main.dart' show appChromeBuilder;
 import 'package:slimm_app/src/providers/message_extras.dart';
 import 'package:slimm_app/src/audio/notification_sound.dart';
 import 'package:slimm_app/src/providers/notification_sound_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/routing/modal_page.dart';
+import 'package:slimm_app/src/screens/admin/analytics_screen.dart';
+import 'package:slimm_app/src/screens/admin/categories_screen.dart';
 import 'package:slimm_app/src/screens/admin/channel_overwrites_screen.dart';
 import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
 import 'package:slimm_app/src/screens/admin/invites_screen.dart';
+import 'package:slimm_app/src/screens/admin/removed_members_screen.dart';
 import 'package:slimm_app/src/screens/admin/reports_screen.dart';
 import 'package:slimm_app/src/screens/admin/roles_screen.dart';
+import 'package:slimm_app/src/screens/debug_log_screen.dart';
 import 'package:slimm_app/src/screens/home_shell.dart';
 import 'package:slimm_app/src/screens/onboarding_screen.dart';
 import 'package:slimm_app/src/screens/personal_settings_screen.dart';
 import 'package:slimm_app/src/screens/sign_in_screen.dart';
 import 'package:slimm_app/src/screens/space_settings_screen.dart';
 import 'package:slimm_app/src/screens/thread_screen.dart';
+import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
 
 import 'ui_snapshot_fixture_data.dart';
 
 export 'ui_snapshot_fixture_data.dart'
-    show fixtureCategories, fixtureChannels, fixtureClient, fixtureMessages;
+    show
+        fixtureAnalyticsEnabled,
+        fixtureCategories,
+        fixtureChannels,
+        fixtureClient,
+        fixtureResponse,
+        fixtureMessages;
+
+/// The widths that take a different branch, not a catalogue of devices.
+///
+/// The five named ones are device shapes, kept for general coverage.
+/// The rest are pairs straddling one specific pixel a real layout branches
+/// on - `kCompactWidth`, `LayoutClass`'s own second boundary, and three more
+/// local to `onboarding_shell.dart` and `settings_panes.dart` - a width one
+/// round number away from a boundary can sit entirely on one side of it and
+/// never prove the other side renders at all.
+const viewports = <String, Size>{
+  'phone-portrait': Size(390, 844),
+  'phone-landscape': Size(844, 390),
+  'tablet-portrait': Size(834, 1194),
+  'desktop-narrow': Size(900, 600),
+  'desktop': Size(1400, 880),
+  // kCompactWidth (design_system/app_metrics.dart): touch density and modal presentation.
+  'compact-599': Size(599, 844),
+  'compact-600': Size(600, 844),
+  // LayoutClass.medium/expanded (routing/breakpoints.dart): the member pane.
+  'expanded-999': Size(999, 844),
+  'expanded-1000': Size(1000, 844),
+  // onboarding_shell's brand-panel floor (900).
+  'onboarding-899': Size(899, 844),
+  'onboarding-900': Size(900, 844),
+  // onboarding_shell's stepper label threshold (420 of content width, window less padding).
+  'stepper-467': Size(467, 844),
+  'stepper-468': Size(468, 844),
+  // settings_panes's two-pane floor (800).
+  'settings-799': Size(799, 844),
+  'settings-800': Size(800, 844),
+};
+
+/// A phone and a desktop render: the pair every standalone screen samples by
+/// default, adding only the breakpoint pair its own layout actually owns.
+const phoneAndDesktop = ['phone-portrait', 'desktop'];
+
+/// Straddles `kCompactWidth`, the touch-density and modal-presentation
+/// boundary every settings and admin screen shares.
+const compactBracket = ['compact-599', 'compact-600'];
 
 /// Where PNGs land. Gitignored: these are for looking at, not for diffing.
 const snapshotDir = 'build/ui-snapshots';
@@ -84,6 +136,10 @@ Future<void> loadRealFonts({String? pubCacheOverride}) async {
   // AppIcons uses the 1.5-stroke variants, which live on their own family.
   await loadFontFamily('packages/lucide_icons_flutter/Lucide300', [
     '$lucideDir/assets/build_font/LucideVariable-w300.ttf',
+  ]);
+  // A bare Scaffold's default BackButton reaches Icons.arrow_back, not AppIcons.
+  await loadFontFamily('MaterialIcons', [
+    'build/unit_test_assets/fonts/MaterialIcons-Regular.otf',
   ]);
 }
 
@@ -131,6 +187,18 @@ String _lucideVersion() {
 /// Real [SyncController] opens a socket to a server that is not there.
 class _NoopSyncController extends SyncController {
   _NoopSyncController(super.ref);
+
+  @override
+  Future<void> start() async {}
+}
+
+/// [_NoopSyncController] pinned to a chosen [SyncStatus] rather than left at
+/// the constructor's own offline default, for a surface that needs to prove
+/// the connecting/live transcript states rather than the offline one.
+class FixedSyncController extends SyncController {
+  FixedSyncController(super.ref, SyncStatus status) {
+    state = status;
+  }
 
   @override
   Future<void> start() async {}
@@ -258,6 +326,26 @@ GoRouter fixtureRouter(String location) => GoRouter(
       pageBuilder: (context, state) => modalPage(context, const EmojiScreen()),
     ),
     GoRoute(
+      path: '/settings/removed-members',
+      pageBuilder: (context, state) =>
+          modalPage(context, const RemovedMembersScreen()),
+    ),
+    GoRoute(
+      path: '/settings/categories',
+      pageBuilder: (context, state) =>
+          modalPage(context, const CategoriesScreen()),
+    ),
+    GoRoute(
+      path: '/settings/analytics',
+      pageBuilder: (context, state) =>
+          modalPage(context, const AnalyticsScreen()),
+    ),
+    GoRoute(
+      path: '/settings/debug-log',
+      pageBuilder: (context, state) =>
+          modalPage(context, const DebugLogScreen()),
+    ),
+    GoRoute(
       path: '/thread/:channelId',
       pageBuilder: (context, state) => modalPage(
         context,
@@ -269,7 +357,8 @@ GoRouter fixtureRouter(String location) => GoRouter(
       routes: [
         GoRoute(
           path: '/channels',
-          builder: (context, state) => const SizedBox.shrink(),
+          // The real route renders NoChannelSelected here, not a placeholder.
+          builder: (context, state) => const NoChannelSelected(),
           routes: [
             GoRoute(
               path: ':channelId',
@@ -316,6 +405,58 @@ Future<void> teardownFixture(
   await tester.pumpWidget(const SizedBox());
   await tester.pump(const Duration(seconds: 1));
   await db.close();
+}
+
+/// Builds the router at [route], pumps two frames to settle on-mount
+/// animations, writes the snapshot and asserts no overflow. Shared by every
+/// surface table across every `ui_snapshot_*_test.dart` file, so a surface
+/// added in one file renders exactly the way the rest of the matrix does.
+Future<void> renderSurface(
+  WidgetTester tester,
+  String route,
+  String viewportName,
+  String theme,
+  String snapshotName, {
+  List<Override> overrides = const [],
+}) async {
+  tester.view.physicalSize = viewports[viewportName]!;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+
+  final fixture = await fixtureContainer(extraOverrides: overrides);
+  final router = fixtureRouter(route);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: fixture.container,
+      child: RepaintBoundary(
+        key: snapshotBoundary,
+        child: MaterialApp.router(
+          debugShowCheckedModeBanner: false,
+          theme: theme == 'dark'
+              ? buildTheme(Brightness.dark, AppTokens.dark)
+              : buildTheme(Brightness.light, AppTokens.light),
+          routerConfig: router,
+          // The same wrapper main.dart ships, so density matches the app.
+          builder: appChromeBuilder,
+        ),
+      ),
+    ),
+  );
+  if (isModalFixtureRoute(route)) {
+    // Settle at the base first, then push: see isModalFixtureRoute's doc.
+    await tester.pump();
+    unawaited(router.push(route));
+  }
+  // Two pumps settle on-mount entrance animations (a ticker's first frame is its own t=0) without pumpAndSettle, which would hang on the states that show a perpetual spinner.
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 350));
+
+  await writeSnapshot(tester, snapshotName);
+
+  // pumpWidget already rethrows an overflow, so reaching here is the assertion.
+  expect(tester.takeException(), isNull);
+
+  await teardownFixture(tester, fixture.container, fixture.db);
 }
 
 /// Plays nothing: a snapshot render is about pixels, and the real player
