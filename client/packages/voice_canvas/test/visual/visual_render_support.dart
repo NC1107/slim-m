@@ -12,6 +12,14 @@
 /// a low effective pixel width even when the geometry is correct - see
 /// `dpi_probe_test.dart`'s own finding on `zoom_stress_0.25x.png` before
 /// reading that one as a real gap in the ink.
+///
+/// **The same rasteriser does not blur or alpha-blend a `BoxShadow` either**,
+/// so a soft translucent shadow paints as flat opaque black with a hard edge
+/// in every PNG written here and by the app package's own snapshot tests.
+/// A sign-off pass took the floating dock's shadow for a real defect on that
+/// evidence, then disproved it with a standalone probe and against a live
+/// browser, where the same shadow blurs correctly. Check a shadow in a real
+/// browser before believing a snapshot about one.
 library;
 
 import 'dart:io';
