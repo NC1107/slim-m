@@ -69,6 +69,8 @@ class CompactChannelAppBar extends ConsumerWidget
   // `ChannelHeader` and the wide voice header draw this hairline on a `Container`; a Material `AppBar` needs its own.
   AppBar _bar(Channel? channel, AppTokens tokens) {
     final isVoice = channel?.kind == 'voice';
+    // See `ChannelHeader.isDm`'s own doc comment for why.
+    final isDm = channel?.kind == 'dm';
     return AppBar(
       toolbarHeight: height,
       shape: Border(bottom: BorderSide(color: tokens.borderSubtle)),
@@ -90,7 +92,7 @@ class CompactChannelAppBar extends ConsumerWidget
         if (!isVoice) _PinsAction(channelId: channelId),
         DmCallButton(channelId: channelId),
         CanvasOpenButton(channelId: channelId),
-        const _MembersAction(),
+        if (!isDm) const _MembersAction(),
         const SizedBox(width: AppSpacing.s8),
       ],
     );

@@ -111,36 +111,7 @@ class HomeShell extends ConsumerWidget {
             // exactly that - so the exit is the gap closing over the panel
             // duration while the entrance gets the full slide.
             if (membersFit)
-              ClipRect(
-                child: AnimatedContainer(
-                  duration: AppMotion.reduced(context, AppMotion.base),
-                  curve: AppMotion.entrance,
-                  width: showMembers ? AppMemberPane.width : 0,
-                  child: showMembers
-                      ? OverflowBox(
-                          minWidth: AppMemberPane.width,
-                          maxWidth: AppMemberPane.width,
-                          alignment: Alignment.centerLeft,
-                          child: TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0, end: 1),
-                            duration: AppMotion.reduced(
-                              context,
-                              AppMotion.base,
-                            ),
-                            curve: AppMotion.entrance,
-                            builder: (context, t, child) => Opacity(
-                              opacity: t,
-                              child: Transform.translate(
-                                offset: Offset(16 * (1 - t), 0),
-                                child: child,
-                              ),
-                            ),
-                            child: const AppMemberPane(),
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ),
+              _MemberPaneSlot(channelId: selected, requested: showMembers),
           ],
         ),
       );
@@ -152,23 +123,27 @@ class HomeShell extends ConsumerWidget {
           voice.channelId != selected;
       // Compact: the conversation replaces the list, with a way back.
       final replacesHeader = canvasOpen || dmCallOpen;
-      scaffold = Scaffold(
+      final channelId = selected;
+      // Withheld, not just its own button - a Drawer's default edge-swipe would still reach it.
+      Widget compactScaffold(bool isDm) => Scaffold(
         appBar: replacesHeader
             ? null
             : CompactChannelAppBar(
-                channelId: selected,
+                channelId: channelId,
                 onBack: () => context.go(Routes.channels),
               ),
         // Withheld with the back button above: the open pane claims the edge.
         drawer: replacesHeader
             ? null
-            : CompactChannelRailDrawer(selectedChannelId: selected),
+            : CompactChannelRailDrawer(selectedChannelId: channelId),
         // The roster slides in from the right instead of docking beside the
         // conversation, which is the only pane there is at this width.
-        endDrawer: const Drawer(
-          width: AppMemberPane.width,
-          child: SafeArea(child: AppMemberPane()),
-        ),
+        endDrawer: isDm
+            ? null
+            : const Drawer(
+                width: AppMemberPane.width,
+                child: SafeArea(child: AppMemberPane()),
+              ),
         // No rail here, so the connection bar mounts under the app bar; one SafeArea wraps the whole column, so no child insets itself and opens a gap or a dead band.
         body: SafeArea(
           child: Column(
@@ -178,6 +153,15 @@ class HomeShell extends ConsumerWidget {
               if (showVoiceStrip) const VoiceStripIndicator(),
             ],
           ),
+        ),
+      );
+      final storeAsync = ref.watch(storeProvider);
+      scaffold = storeAsync.maybeWhen(
+        orElse: () => compactScaffold(false),
+        data: (store) => StreamBuilder<Channel?>(
+          stream: store.watchChannelRow(channelId),
+          builder: (context, snapshot) =>
+              compactScaffold(snapshot.data?.kind == 'dm'),
         ),
       );
     } else {
@@ -233,6 +217,64 @@ class HomeShell extends ConsumerWidget {
         : ordered[(index + direction) % ordered.length];
     context.go(Routes.channel(target.id));
   }
+}
+
+/// The wide-layout member pane's slot: width-animated, and withheld for a
+/// DM regardless of [requested] (the header toggle's own answer, already
+/// `memberPaneVisibleProvider`-gated) - that provider defaults open, so
+/// hiding only the toggle would still leave the deployment roster showing
+/// by default for a two-person conversation, the exact bug `ChannelHeader.isDm`
+/// exists to name. [channelId] null (nothing selected) or a store not yet
+/// resolved both read as "show": only a confirmed DM withholds it.
+class _MemberPaneSlot extends ConsumerWidget {
+  const _MemberPaneSlot({required this.channelId, required this.requested});
+
+  final String? channelId;
+  final bool requested;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!requested) return _animated(context, false);
+    final channelId = this.channelId;
+    if (channelId == null) return _animated(context, true);
+    final storeAsync = ref.watch(storeProvider);
+    return storeAsync.maybeWhen(
+      orElse: () => _animated(context, true),
+      data: (store) => StreamBuilder<Channel?>(
+        stream: store.watchChannelRow(channelId),
+        builder: (context, snapshot) =>
+            _animated(context, snapshot.data?.kind != 'dm'),
+      ),
+    );
+  }
+
+  Widget _animated(BuildContext context, bool show) => ClipRect(
+    child: AnimatedContainer(
+      duration: AppMotion.reduced(context, AppMotion.base),
+      curve: AppMotion.entrance,
+      width: show ? AppMemberPane.width : 0,
+      child: show
+          ? OverflowBox(
+              minWidth: AppMemberPane.width,
+              maxWidth: AppMemberPane.width,
+              alignment: Alignment.centerLeft,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: AppMotion.reduced(context, AppMotion.base),
+                curve: AppMotion.entrance,
+                builder: (context, t, child) => Opacity(
+                  opacity: t,
+                  child: Transform.translate(
+                    offset: Offset(16 * (1 - t), 0),
+                    child: child,
+                  ),
+                ),
+                child: const AppMemberPane(),
+              ),
+            )
+          : const SizedBox.shrink(),
+    ),
+  );
 }
 
 /// Shown in the conversation pane when nothing is open.

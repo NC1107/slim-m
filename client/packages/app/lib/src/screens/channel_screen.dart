@@ -298,6 +298,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               dmPartnerId != null && blocked.contains(dmPartnerId);
           // Ored with the store's own answer; see isThread's doc comment.
           final isThread = widget.isThread || channel?.parentMessageId != null;
+          // Only a real named channel gets "#name"; shared so the transcript and composer cannot drift.
+          final hashChannelName = channel?.kind == 'text' ? channelName : null;
+          final isDm = channel?.kind == 'dm';
 
           return Column(
             children: [
@@ -308,6 +311,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                   name: channelName,
                   topic: channel?.topic,
                   isVoice: false,
+                  isDm: isDm,
                   searchOpen: search.open,
                   onToggleSearch: _toggleSearch,
                 ),
@@ -381,10 +385,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   messages: transcript.messages,
                                   syncStatus: syncStatus,
                                   historyKnown: historyKnown,
-                                  // Only a real named channel gets the header; a DM's name is a person, and voice never reaches here.
-                                  channelName: channel?.kind == 'text'
-                                      ? channelName
-                                      : null,
+                                  channelName: hashChannelName,
                                   channelIsThread: isThread,
                                   channelTopic: channel?.topic,
                                   scrollController: _scrollTracker.controller,
@@ -471,7 +472,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                 Composer(
                   controller: _composer,
                   channelId: widget.channelId,
-                  channelName: channelName,
+                  channelName: hashChannelName ?? '',
                   onSend: _send,
                 ),
               ],

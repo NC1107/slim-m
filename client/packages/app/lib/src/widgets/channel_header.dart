@@ -19,6 +19,7 @@ class ChannelHeader extends ConsumerWidget {
     required this.channelId,
     required this.name,
     required this.isVoice,
+    this.isDm = false,
     this.topic,
     required this.searchOpen,
     required this.onToggleSearch,
@@ -27,6 +28,13 @@ class ChannelHeader extends ConsumerWidget {
   final String channelId;
   final String name;
   final bool isVoice;
+
+  /// A DM has exactly two participants by construction, never the
+  /// deployment's roster `membersProvider` answers with, so the toggle for
+  /// it hides here rather than opening a pane that implies random Space
+  /// members can see a private conversation. Defaults false so every
+  /// existing caller (none of them a DM) keeps its toggle.
+  final bool isDm;
 
   /// Null for no topic; the server never stores a blank one.
   final String? topic;
@@ -39,9 +47,11 @@ class ChannelHeader extends ConsumerWidget {
     final membersVisible = ref.watch(memberPaneVisibleProvider);
     // The pane only docks where LayoutClass.fitsMemberPane says there is
     // room; a toggle shown past that would sit lit over a pane that never appears.
-    final canToggleMembers = LayoutClass.of(
-      context,
-    ).fitsMemberPane(MediaQuery.sizeOf(context).width);
+    final canToggleMembers =
+        !isDm &&
+        LayoutClass.of(
+          context,
+        ).fitsMemberPane(MediaQuery.sizeOf(context).width);
 
     return Container(
       height: 52,

@@ -11,6 +11,15 @@
 /// A member's first role becomes a badge. `@everyone` is excluded server-side,
 /// so an empty list means no badge rather than no data. There is still no
 /// in-voice flag on a profile, so the design's speaker glyph is left off.
+///
+/// `membersProvider` is deliberately deployment-wide, never filtered to who
+/// can see whichever channel is open (`GET /members`'s own doc comment: any
+/// authenticated caller may read it, since the list is not scoped to one
+/// channel). Nothing here is a new information leak - the same roster is
+/// already readable directly by any authenticated caller - but it means this
+/// pane must never be offered for a DM, whose two participants are never
+/// this list; `home_shell.dart`'s `_MemberPaneSlot` and
+/// `channel_header.dart`'s `ChannelHeader.isDm` are what withhold it there.
 library;
 
 import 'dart:async';
