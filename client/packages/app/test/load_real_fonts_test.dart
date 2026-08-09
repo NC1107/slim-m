@@ -18,4 +18,23 @@ void main() {
       throwsA(anything),
     );
   });
+
+  test('a colour emoji face that cannot be found warns rather than failing '
+      'the whole render, since it is a system font and not ours to ship', () {
+    expect(
+      loadEmojiFont(pathsOverride: const ['/definitely/not/an/emoji/font']),
+      completes,
+    );
+  });
+
+  test('the machine writing snapshots has a colour emoji face, so a reaction '
+      'in a captured render is the real glyph rather than a tofu box', () {
+    expect(
+      emojiFontPath(),
+      isNotNull,
+      reason:
+          'without one, every emoji in every captured screenshot is a box, '
+          'and emoji here are user content rather than chrome',
+    );
+  }, skip: writingSnapshots ? false : 'only a capture run needs real pixels');
 }
