@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/// A `||spoiler||` span: a filled bar that swaps for its text on tap.
+/// A `||spoiler||` span: a filled bar that swaps for its text on tap or on
+/// Enter/Space once tabbed to - it used to be a bare `GestureDetector`,
+/// which Flutter never makes a tab stop, so a spoiler could not be revealed
+/// from the keyboard at all.
 library;
 
 import 'package:flutter/material.dart';
@@ -19,35 +22,64 @@ class MessageSpoiler extends StatefulWidget {
 
 class _MessageSpoilerState extends State<MessageSpoiler> {
   bool _revealed = false;
+  bool _focused = false;
+
+  void _toggle() => setState(() => _revealed = !_revealed);
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return GestureDetector(
-      onTap: () => setState(() => _revealed = !_revealed),
-      child: Stack(
-        alignment: Alignment.centerLeft,
-        children: [
-          // Kept in the tree (sizes the bar) but hidden from assistive tech until shown.
-          ExcludeSemantics(
-            excluding: !_revealed,
-            child: Opacity(
-              opacity: _revealed ? 1 : 0,
-              child: Text.rich(
-                TextSpan(style: widget.style, children: widget.spans),
-              ),
-            ),
+    return Semantics(
+      button: true,
+      toggled: _revealed,
+      label: _revealed ? null : 'Hidden spoiler',
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowFocusHighlight: (v) => setState(() => _focused = v),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) => _toggle(),
           ),
-          if (!_revealed)
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: tokens.textPrimary,
-                  borderRadius: BorderRadius.circular(AppRadii.control),
+        },
+        child: GestureDetector(
+          onTap: _toggle,
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              // Kept in the tree (sizes the bar) but hidden from assistive tech until shown.
+              ExcludeSemantics(
+                excluding: !_revealed,
+                child: Opacity(
+                  opacity: _revealed ? 1 : 0,
+                  child: Text.rich(
+                    TextSpan(style: widget.style, children: widget.spans),
+                  ),
                 ),
               ),
-            ),
-        ],
+              if (!_revealed)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: tokens.textPrimary,
+                      borderRadius: BorderRadius.circular(AppRadii.control),
+                    ),
+                  ),
+                ),
+              // Only mounted while focus-highlighted, so a tap-driven run sees no extra DecoratedBox.
+              if (_focused)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: tokens.focusRing, width: 2),
+                        borderRadius: BorderRadius.circular(AppRadii.control),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

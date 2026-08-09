@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/message_markdown_blocks.dart';
 import 'package:slimm_app/src/widgets/message_spoiler.dart';
@@ -130,6 +131,81 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  group('a spoiler is reachable and revealable from the keyboard', () {
+    setUp(() {
+      FocusManager.instance.highlightStrategy =
+          FocusHighlightStrategy.alwaysTraditional;
+    });
+    tearDown(() {
+      FocusManager.instance.highlightStrategy =
+          FocusHighlightStrategy.automatic;
+    });
+
+    testWidgets('Tab lands on it and Enter reveals it', (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          const MessageBody(content: 'it was ||him||', knownUsernames: {}),
+        ),
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(MessageSpoiler),
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is DecoratedBox &&
+                (w.decoration as BoxDecoration).border?.top.color ==
+                    AppTokens.light.focusRing,
+          ),
+        ),
+        findsOneWidget,
+        reason:
+            'a spoiler a keyboard cannot land on has no route to revealing '
+            'it, and one that takes focus silently is a route nobody can see',
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      expect(
+        find.descendant(
+          of: find.byType(MessageSpoiler),
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is DecoratedBox &&
+                (w.decoration as BoxDecoration).color ==
+                    AppTokens.light.textPrimary,
+          ),
+        ),
+        findsNothing,
+        reason: 'the hiding bar is gone once revealed',
+      );
+    });
+
+    testWidgets('Space also reveals it', (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          const MessageBody(content: 'it was ||him||', knownUsernames: {}),
+        ),
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump();
+
+      final opacity = tester.widget<Opacity>(
+        find.descendant(
+          of: find.byType(MessageSpoiler),
+          matching: find.byType(Opacity),
+        ),
+      );
+      expect(opacity.opacity, 1);
+    });
   });
 
   testWidgets('a heading renders at a larger type size than a paragraph', (

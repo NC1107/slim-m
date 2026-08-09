@@ -8,6 +8,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/member_presence.dart' show presenceOf;
 import '../providers/presence_controller.dart';
@@ -33,7 +34,7 @@ import 'member_profile.dart';
 /// (removing it alone changes nothing observable), kept anyway to match that
 /// same entry's established shape: the recognizer should not describe itself
 /// at all once an ancestor already owns the whole node.
-class AuthorProfileTapTarget extends ConsumerWidget {
+class AuthorProfileTapTarget extends ConsumerStatefulWidget {
   const AuthorProfileTapTarget({
     super.key,
     required this.authorId,
@@ -55,14 +56,27 @@ class AuthorProfileTapTarget extends ConsumerWidget {
   final bool decorativeWhenUnresolved;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final id = authorId;
+  ConsumerState<AuthorProfileTapTarget> createState() =>
+      _AuthorProfileTapTargetState();
+}
+
+class _AuthorProfileTapTargetState
+    extends ConsumerState<AuthorProfileTapTarget> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final id = widget.authorId;
     final profile = id == null
         ? null
         : ref.watch(userProfileProvider(id)).valueOrNull;
     if (profile == null) {
-      return decorativeWhenUnresolved ? ExcludeSemantics(child: child) : child;
+      return widget.decorativeWhenUnresolved
+          ? ExcludeSemantics(child: widget.child)
+          : widget.child;
     }
+
+    final tokens = Theme.of(context).extension<AppTokens>()!;
 
     void open() => unawaited(
       showMemberProfile(
@@ -75,15 +89,38 @@ class AuthorProfileTapTarget extends ConsumerWidget {
 
     return Semantics(
       button: true,
-      label: semanticLabel,
+      label: widget.semanticLabel,
       excludeSemantics: true,
       onTap: open,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowFocusHighlight: (v) => setState(() => _focused = v),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) => open(),
+          ),
+        },
         child: GestureDetector(
           onTap: open,
           excludeFromSemantics: true,
-          child: child,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              widget.child,
+              // Only mounted while focus-highlighted, so a pointer-only run draws nothing extra.
+              if (_focused)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: tokens.focusRing, width: 2),
+                        borderRadius: BorderRadius.circular(AppRadii.control),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
