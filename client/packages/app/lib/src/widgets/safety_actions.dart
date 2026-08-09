@@ -21,11 +21,9 @@ import 'package:slimm_api/api.dart' as api;
 
 import '../providers/blocks_controller.dart';
 import '../providers/providers.dart';
+import 'app_snackbar.dart';
 import 'report_dialog.dart';
 import 'run_guarded.dart';
-
-void _say(BuildContext context, String text) =>
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
 /// Runs [action]; on success shows [succeeded], on failure the sentence
 /// [runGuarded] turns the exception into for [whatFailed].
@@ -37,7 +35,7 @@ Future<void> _tell(
 ) async {
   final failure = await runGuarded(whatFailed: whatFailed, action: action);
   if (!context.mounted) return;
-  _say(context, failure ?? succeeded);
+  showAppSnackbar(context, failure ?? succeeded);
 }
 
 /// Files a report about [subjectId], once the reporter has given a reason.

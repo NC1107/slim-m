@@ -20,6 +20,7 @@ import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
+import '../../widgets/app_snackbar.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/run_guarded.dart';
 import 'overwrite_target_picker_sheets.dart';
@@ -135,9 +136,7 @@ class _ChannelOverwritesScreenState
     if (!mounted) return;
     setState(() => _busy = false);
     if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Overwrite set for $_targetLabel.')),
-      );
+      showAppSnackbar(context, 'Overwrite set for $_targetLabel.');
     }
   }
 
@@ -168,13 +167,10 @@ class _ChannelOverwritesScreenState
     if (ok) {
       setState(_resetState);
       // States the result the idempotent DELETE guarantees, not a "cleared" this screen can never know happened.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '$_targetLabel now inherits every permission in '
-            '"${_channel!.name}" from their roles.',
-          ),
-        ),
+      showAppSnackbar(
+        context,
+        '$_targetLabel now inherits every permission in '
+        '"${_channel!.name}" from their roles.',
       );
     }
   }

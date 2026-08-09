@@ -34,6 +34,7 @@ import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
+import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
 import 'member_actions.dart';
 import 'member_profile_popover.dart';
@@ -244,7 +245,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
           .kickVoiceParticipant(channelId, widget.profile.id),
     );
     if (failure != null && host.mounted) {
-      ScaffoldMessenger.of(host).showSnackBar(SnackBar(content: Text(failure)));
+      showAppSnackbar(host, failure);
     }
   }
 
@@ -273,9 +274,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
       if (failure == null) {
         container.invalidate(membersProvider);
       } else if (host.mounted) {
-        ScaffoldMessenger.of(
-          host,
-        ).showSnackBar(SnackBar(content: Text(failure)));
+        showAppSnackbar(host, failure);
       }
     });
   }

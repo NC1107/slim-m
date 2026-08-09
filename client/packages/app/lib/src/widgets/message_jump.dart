@@ -14,6 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/message_jump.dart';
 import '../providers/message_search.dart' show ProviderReader;
 import '../routing/routes.dart';
+import 'app_snackbar.dart';
 
 /// Switches to [channelId] if [currentChannelId] says it is not already
 /// open, then asks [MessageJumpController] to bring [messageId] into view
@@ -52,9 +53,7 @@ void jumpToMessage(
       channelId: final c,
       :final token,
     ) when c == channelId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not find that message.')),
-      );
+      showAppSnackbar(context, 'Could not find that message.');
       ref.read(messageJumpProvider.notifier).dismissUnreachable(token);
     }
   });

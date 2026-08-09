@@ -28,6 +28,7 @@ import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
 import '../providers/threads.dart';
 import '../routing/routes.dart';
+import '../widgets/app_snackbar.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/message_context_menu.dart';
 import '../widgets/run_guarded.dart';
@@ -44,11 +45,8 @@ Future<void> _reporting(
   Future<void> Function() action,
 ) async {
   final failure = await runGuarded(whatFailed: whatFailed, action: action);
-  if (failure != null && context.mounted) _say(context, failure);
+  if (failure != null && context.mounted) showAppSnackbar(context, failure);
 }
-
-void _say(BuildContext context, String text) =>
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
 /// Puts a message on screen before the network has answered, then reconciles
 /// with the server's copy.

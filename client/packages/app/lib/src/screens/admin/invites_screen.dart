@@ -15,6 +15,7 @@ import '../../providers/admin_providers.dart';
 import '../../providers/display_preferences.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
+import '../../widgets/app_snackbar.dart';
 import '../../widgets/run_guarded.dart';
 import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
@@ -217,9 +218,7 @@ class _CreatedInviteCallout extends StatelessWidget {
             size: AppIconButtonSize.sm,
             onPressed: () {
               Clipboard.setData(ClipboardData(text: invite.code));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Invite code copied.')),
-              );
+              showAppSnackbar(context, 'Invite code copied.');
             },
           ),
           AppIconButton(
@@ -375,9 +374,7 @@ class _InviteRowState extends ConsumerState<_InviteRow>
                 semanticLabel: 'Copy invite code',
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: invite.code));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Invite code copied.')),
-                  );
+                  showAppSnackbar(context, 'Invite code copied.');
                 },
               ),
               if (!invite.revoked)
