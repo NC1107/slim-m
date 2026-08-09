@@ -9,11 +9,21 @@
 ///
 /// So the same call gives a sheet on a phone and a centred dialog on anything
 /// wider, and the caller does not choose: the window does.
+///
+/// [showModalBottomSheet] and [showDialog] each drive their own entrance and
+/// exit with a plain [AnimationController] Flutter creates internally, keyed
+/// to the platform's own reduce-motion accessibility feature - never to this
+/// app's [MotionOverride], which only ever reaches [MediaQuery] and cannot
+/// touch a controller Flutter owns. [AnimationStyle.noAnimation] is the
+/// documented escape hatch for exactly this case, so every sheet and dialog
+/// this function opens honours the in-app setting rather than only the OS
+/// one it happens to inherit for free.
 library;
 
 import 'package:flutter/material.dart';
 
 import '../../app_metrics.dart';
+import '../../app_motion.dart';
 import '../../app_tokens.dart';
 
 /// How wide a dialog is allowed to get, when it is one.
@@ -45,16 +55,21 @@ Future<T?> showAppSheet<T>(
   bool scrolls = false,
   bool bare = false,
 }) {
+  // Only overridden when reduced, so a full-motion viewer keeps Flutter's own stock timing rather than this app's own scale.
+  final noAnimation =
+      AppMotion.isReduced(context) ? AnimationStyle.noAnimation : null;
   if (MediaQuery.sizeOf(context).width < kCompactWidth) {
     return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      sheetAnimationStyle: noAnimation,
       builder: (context) => SafeArea(top: false, child: builder(context)),
     );
   }
   return showDialog<T>(
     context: context,
+    animationStyle: noAnimation,
     builder: (context) => _SheetDialog(
       maxWidth: maxWidth,
       scrolls: scrolls,

@@ -140,6 +140,10 @@ class _EntryTile extends StatelessWidget {
     }
 
     return ExpansionTile(
+      // Its own controller reads the platform's own reduce-motion feature, never this app's MotionOverride; see sheet.dart's library doc.
+      expansionAnimationStyle: AppMotion.isReduced(context)
+          ? AnimationStyle.noAnimation
+          : null,
       tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
