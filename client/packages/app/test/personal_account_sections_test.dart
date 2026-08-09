@@ -14,12 +14,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
+import 'package:slimm_app/src/providers/blocks_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/push_controller.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/widgets/personal_account_sections.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+
+/// A fixed block set with no real fetch, the same shape
+/// `personal_account_sections_list_row_test.dart` already uses.
+class _FixedBlocks extends BlocksController {
+  _FixedBlocks(super.ref, BlocksState fixed) {
+    state = fixed;
+  }
+
+  @override
+  Future<void> refresh() async {}
+}
 
 /// Stands in for the real socket connection [SyncController.start] would
 /// otherwise attempt: a widget test has no server at the other end, so the
@@ -156,6 +168,80 @@ void main() {
       );
     },
   );
+
+  /// `_BlockedRow` used to catch the failure itself and show it as a
+  /// `SnackBar`, the one shape `run_guarded.dart`'s own doc comment does not
+  /// offer: this row never closes before its request answers, so it always
+  /// has room for `AppErrorState` the way `DevicesSection`'s row above it
+  /// already does.
+  testWidgets('a failed unblock shows a safe sentence inline, not a SnackBar', (
+    tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((request) async {
+              if (request.url.path == '/users/user-blocked') {
+                return http.Response(
+                  jsonEncode({
+                    'id': 'user-blocked',
+                    'username': 'kit',
+                    'display_name': 'Kit',
+                    'created_at': 0,
+                  }),
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
+              if (request.method == 'DELETE' &&
+                  request.url.path == '/blocks/user-blocked') {
+                throw const SocketException('connection refused');
+              }
+              return http.Response('{}', 404);
+            }),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+        blocksProvider.overrideWith(
+          (ref) => _FixedBlocks(
+            ref,
+            const BlocksState(ids: {'user-blocked'}, settled: true),
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(body: BlockedSection()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Unblock'));
+    await tester.pumpAndSettle();
+
+    // Still listed: the optimistic change reverted rather than sticking.
+    expect(find.text('Kit'), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(AppErrorState), findsOneWidget);
+    expect(find.textContaining('SocketException'), findsNothing);
+    expect(
+      find.textContaining('the server could not be reached'),
+      findsOneWidget,
+    );
+  });
 
   group('AccountSection deletion', () {
     /// Sync and push are stopped ahead of the delete request (see the class

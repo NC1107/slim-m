@@ -12,6 +12,24 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## A vanished SnackBar came back three times, and now there is a gate (2026-08-08)
+
+The nine-specialist audit (2026-07-29) replaced 27 vanishing `SnackBar`s with persistent `AppErrorState`, on the grounds that a failure which disappears on its own is a failure nobody saw.
+A later copy pass found three of them back: the channel overwrites screen, avatar upload and removal, and the blocked-row unblock, each catching its own `ApiException` and showing it with a `SnackBar` sitting beside a sibling doing it properly - `personal_account_sections.dart`'s `_DeviceRow` and `_BlockedRow` were two rows in the same file, one migrated and one not.
+Read this before touching `run_guarded.dart`, or before adding a new `catch` around an API call anywhere in `client/packages/app`.
+
+**The gate is not "is there a `SnackBar`," which would be wrong: `run_guarded.dart`'s own doc comment already draws the real line.**
+A surface that has already closed by the time its request answers - a popover dismissed on tap, `safety_actions.dart`'s report and block, `member_profile.dart`'s eject and remove - has nowhere to put an inline state, and a `SnackBar` is genuinely the only option left.
+Every one of those reaches it through `runGuarded`'s own returned sentence, never by catching `ApiException` itself, so `scripts/check-error-surface.py` looks for the narrower, sharper shape the three regressions actually had: a widget that catches `on api.*Exception` directly and hands the message to `ScaffoldMessenger`/`SnackBar` rather than to `GuardedActionState`/`AppErrorState`.
+That shape and the legitimate-popover shape are structurally different, not just conventionally different, which is what makes a mechanical gate on it safe rather than a nag.
+
+**It reads the `on api.*Exception catch { ... }` blocks straight out of each file's own text, the same principle the type-scale gate a few hours earlier already established: a case the gate cannot see is a case that was never written the wrong way, so nothing here can go stale.**
+A short `EXCEPTIONS` dict at the top of the script is the allowlist, each entry carrying its own one-line why beside it - `type_scale_literal_test.dart`'s own `_exceptions` shape.
+It is empty: the sweep that built this gate found every legitimate `SnackBar` already routes around a raw catch entirely, so there was no real case to seed it with.
+
+**Wired into `hygiene`, not a new workflow, as a plain Python step - hygiene has no Flutter toolchain and this needed none, only text.**
+Mutation-tested twice, once per direction: reverting `avatar_settings_section.dart`'s `_remove` to a raw catch-and-`SnackBar` fails the gate naming that exact file and line, and reverting `channel_overwrites_screen.dart`'s `_set` the same way fails both the gate and a new widget test in the same motion.
+A fourth site the copy pass had not named, `role_assign_sheet.dart`'s per-member role toggle, turned up in the same sweep and is fixed the same way, converted to `GuardedActionState` with the sheet's own banner rather than a `SnackBar` firing into a list that stays open under it.
 ## The e2e harness after thirteen-plus polish PRs: still green, and the join race stays a unit test (2026-08-08)
 
 Asked to check whether `scripts/e2e.sh` still passed after the picker-row, sheet, keyboard-activation, focus-ring, stale-data and join-race polish pass (PRs #468 through #488, three more than the task named having landed while this ran).

@@ -171,6 +171,59 @@ void main() {
     },
   );
 
+  /// This section used to catch its own `ApiException` and show it with a
+  /// `SnackBar`; see `check-error-surface.py` for the gate that now catches
+  /// that shape reappearing here or anywhere else in the app package.
+  testWidgets(
+    'a refused removal shows a safe sentence inline, not a SnackBar',
+    (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+          apiProvider.overrideWith((ref) {
+            final api = SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient((request) async {
+                if (request.url.path == '/me') {
+                  return http.Response(
+                    jsonEncode(_meJson(555)),
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }
+                if (request.method == 'DELETE' &&
+                    request.url.path == '/me/avatar') {
+                  return http.Response(
+                    jsonEncode({'error': 'server unavailable'}),
+                    500,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }
+                return http.Response('', 404);
+              }),
+            );
+            ref.onDispose(api.close);
+            return api;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_harness(container));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+
+      // Still offering removal: the failed request changed nothing.
+      expect(find.text('Remove'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byType(AppErrorState), findsOneWidget);
+    },
+  );
+
   testWidgets('tapping the camera badge opens both sources, still selectable', (
     tester,
   ) async {

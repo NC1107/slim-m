@@ -267,6 +267,14 @@ class _ChannelOverwritesScreenState
                 onChanged: (v) => setState(() => _state[bit] = v),
               ),
             const SizedBox(height: AppSpacing.s8),
+            if (actionError case final error?)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                child: AppErrorState(
+                  message: error,
+                  onDismiss: clearActionError,
+                ),
+              ),
             Row(
               children: [
                 Expanded(

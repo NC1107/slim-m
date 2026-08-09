@@ -303,3 +303,8 @@ jobs:
       # the pre-existing ones are listed at their count. See the script header.
       - name: comment cap
         run: bash scripts/check-comment-cap.sh
+
+      # An API failure caught and shown with a SnackBar regressed back three
+      # times over a persistent AppErrorState. See the script header.
+      - name: no API failure is caught and shown with a SnackBar
+        run: python3 scripts/check-error-surface.py
