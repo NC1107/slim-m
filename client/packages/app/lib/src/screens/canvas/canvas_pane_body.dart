@@ -358,6 +358,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     ),
     child: Stack(
       children: [
+        // Below everything, including CanvasPresenceBackdrop - a grid line must never paint over a sent-to-back tile's own video, the bug this ordering fixes.
+        CanvasGridLayer(document: widget.document, line: tokens.borderSubtle),
         // Before CanvasSurface, so a sent-to-back tile's own pixels sit under real ink - see canvas_presence_layer.dart's own doc for why its controls stay in the layer below regardless.
         CanvasPresenceBackdrop(
           document: widget.document,
@@ -370,7 +372,6 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
         CanvasSurface(
           document: widget.document,
           ink: AppCanvasColors.annotation,
-          gridLine: tokens.borderSubtle,
           // AppTokens.stripe: its own doc reserves it for exactly this state.
           placeholderFill: tokens.stripe,
           placeholderIcon: tokens.textDisabled,

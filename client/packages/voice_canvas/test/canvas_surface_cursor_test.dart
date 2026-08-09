@@ -20,7 +20,6 @@ Future<MouseCursor?> _cursorAfter(
       home: CanvasSurface(
         document: document,
         ink: const Color(0xFFE86A5C),
-        gridLine: const Color(0xFF303030),
         onStroke: (_) {},
         tool: tool,
         enabled: enabled,

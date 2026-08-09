@@ -4,6 +4,14 @@
 /// the one exception: starting or ending one rebuilds a single
 /// `ValueListenableBuilder` around `MouseRegion` so its cursor can change,
 /// never the painters or gesture layers it wraps - see `_panning`'s own doc.
+///
+/// The background lattice is `CanvasGridLayer`, a sibling widget mounted by
+/// the caller rather than a layer of this widget's own stack - see that
+/// file's own doc for why: this stack's opaque `MouseRegion` claims every
+/// pointer within its bounds, so anything a caller mounts *behind* it (a
+/// sent-to-back presence tile's own video, in the app layer) is painted
+/// under this surface but never hit-tested again, and the grid used to sit
+/// at the bottom of this same stack, drawing over exactly that content.
 library;
 
 import 'package:flutter/gestures.dart';
@@ -62,7 +70,6 @@ class CanvasSurface extends StatefulWidget {
     super.key,
     required this.document,
     required this.ink,
-    required this.gridLine,
     required this.onStroke,
     this.onErase,
     this.onEraseEnd,
@@ -94,7 +101,6 @@ class CanvasSurface extends StatefulWidget {
 
   final CanvasDocument document;
   final Color ink;
-  final Color gridLine;
 
   /// A note's own fill/border colour, and a shape's own outline colour.
   /// Null falls all the way back to [ink] - see [StrokePainter]'s own doc.
@@ -220,10 +226,6 @@ class CanvasSurface extends StatefulWidget {
 
 class _CanvasSurfaceState extends State<CanvasSurface> {
   final DraftStroke _draft = DraftStroke();
-  late final GridPainter _grid = GridPainter(
-    document: widget.document,
-    line: widget.gridLine,
-  );
   late final StrokePainter _strokes = StrokePainter(
     document: widget.document,
     ink: widget.ink,
@@ -341,7 +343,6 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  RepaintBoundary(child: CustomPaint(painter: _grid)),
                   RepaintBoundary(child: CustomPaint(painter: _strokes)),
                   if (_remoteDraftPainter case final remoteDraftPainter?)
                     RepaintBoundary(

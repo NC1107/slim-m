@@ -23,7 +23,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           tool: CanvasTool.eraser,
           onStroke: (_) => strokes++,
           onErase: erased.add,
@@ -54,7 +53,6 @@ void main() {
           home: CanvasSurface(
             document: document,
             ink: const Color(0xFFE86A5C),
-            gridLine: const Color(0xFF303030),
             tool: CanvasTool.eraser,
             onStroke: (_) {},
             onErase: (_) {},
@@ -84,7 +82,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           tool: CanvasTool.eraser,
           enabled: false,
           onStroke: (_) {},
@@ -113,7 +110,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           tool: CanvasTool.eraser,
           onStroke: (_) {},
           onErase: erased.add,
@@ -144,7 +140,6 @@ void main() {
           home: CanvasSurface(
             document: document,
             ink: const Color(0xFFE86A5C),
-            gridLine: const Color(0xFF303030),
             tool: CanvasTool.eraser,
             onStroke: (_) {},
             onErase: erased.add,
@@ -176,7 +171,6 @@ void main() {
           home: CanvasSurface(
             document: document,
             ink: const Color(0xFFE86A5C),
-            gridLine: const Color(0xFF303030),
             tool: CanvasTool.eraser,
             onStroke: (_) {},
             onErase: erased.add,
@@ -216,7 +210,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           tool: CanvasTool.select,
           onStroke: (_) => strokes++,
           onSelectStart: starts.add,
@@ -254,7 +247,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           tool: CanvasTool.note,
           onStroke: (_) {},
           onNotePlace: notes.add,
@@ -292,7 +284,6 @@ void main() {
             home: CanvasSurface(
               document: document,
               ink: const Color(0xFFE86A5C),
-              gridLine: const Color(0xFF303030),
               tool: tool,
               onStroke: (_) {},
               onNotePlace: notes.add,
@@ -326,7 +317,6 @@ void main() {
           home: CanvasSurface(
             document: document,
             ink: const Color(0xFFE86A5C),
-            gridLine: const Color(0xFF303030),
             tool: CanvasTool.note,
             onStroke: (_) {},
             onNotePlace: notes.add,

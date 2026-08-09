@@ -20,7 +20,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           onStroke: (_) {},
           onDraftPoint: reported.add,
         ),
@@ -48,7 +47,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           onStroke: (_) {},
           onDraftEnded: () => ended++,
         ),
@@ -77,7 +75,6 @@ void main() {
           home: CanvasSurface(
             document: document,
             ink: const Color(0xFFE86A5C),
-            gridLine: const Color(0xFF303030),
             onStroke: (_) => strokes++,
             onDraftEnded: () => ended++,
           ),
@@ -110,7 +107,6 @@ void main() {
           home: CanvasSurface(
             document: document,
             ink: const Color(0xFFE86A5C),
-            gridLine: const Color(0xFF303030),
             onStroke: (_) => strokes++,
             onDraftEnded: () => ended++,
           ),
@@ -155,7 +151,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           tool: CanvasTool.eraser,
           onStroke: (_) {},
           onDraftPoint: (_) => points++,
@@ -192,7 +187,6 @@ void main() {
             home: CanvasSurface(
               document: document,
               ink: const Color(0xFFE86A5C),
-              gridLine: const Color(0xFF303030),
               tool: tool,
               onStroke: (_) {},
               onDraftPoint: (_) => points++,

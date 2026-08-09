@@ -22,7 +22,6 @@ void main() {
           home: CanvasSurface(
             document: document,
             ink: const Color(0xFFE86A5C),
-            gridLine: const Color(0xFF303030),
             onStroke: (_) {},
           ),
         ),
@@ -49,7 +48,6 @@ void main() {
           home: CanvasSurface(
             document: document,
             ink: const Color(0xFFE86A5C),
-            gridLine: const Color(0xFF303030),
             onStroke: (_) {},
           ),
         ),
@@ -76,7 +74,6 @@ void main() {
         home: CanvasSurface(
           document: document,
           ink: const Color(0xFFE86A5C),
-          gridLine: const Color(0xFF303030),
           onStroke: (_) {},
         ),
       ),
@@ -119,7 +116,6 @@ void main() {
             home: CanvasSurface(
               document: document,
               ink: const Color(0xFFE86A5C),
-              gridLine: const Color(0xFF303030),
               onStroke: (_) {},
             ),
           ),

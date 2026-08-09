@@ -248,6 +248,15 @@ class CanvasPaneFixture {
                 'updated_at': 0,
               });
             }
+            if (request.url.path == '/attachments' &&
+                request.method == 'POST') {
+              return jsonResponse({
+                'id': 'sha-pasted',
+                'filename': 'pasted-image.png',
+                'content_type': 'image/png',
+                'size': canvasPngFixture.length,
+              });
+            }
             if (request.url.path.startsWith('/attachments/')) {
               attachmentFetches++;
               if (attachmentFetchStatus != 200) {
@@ -272,6 +281,7 @@ class CanvasPaneFixture {
               return http.Response(
                 jsonEncode({
                   ...canvasObjectJson(body['id'] as String),
+                  'kind': body['kind'],
                   'x': body['x'],
                   'y': body['y'],
                   'w': body['w'],

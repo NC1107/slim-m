@@ -22,9 +22,10 @@ const longNoteText =
     'a note sized for three lines or whether it just runs off the bottom '
     'with nothing telling you it did.';
 
-/// Every layer `CanvasSurface` stacks, in the same order, over the surface
-/// colour the real pane wraps everything in (`CanvasPaneBody`'s own
-/// `Container(color: tokens.surfaceBase, ...)`).
+/// Every ink layer the real pane paints, in the same order - the grid via
+/// `CanvasGridLayer`, the rest via `CanvasSurface`'s own stack - over the
+/// surface colour `CanvasPaneBody`'s own `Container(color: tokens
+/// .surfaceBase, ...)` wraps everything in.
 void paintCanvasComposite(
   Canvas canvas,
   CanvasDocument document,
