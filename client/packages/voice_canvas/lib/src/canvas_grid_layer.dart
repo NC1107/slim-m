@@ -16,6 +16,15 @@
 /// and drawing, this widget carries no gesture or pointer handling of its
 /// own, so mounting it anywhere in a `Stack` costs nothing beyond the paint
 /// itself and never competes for a hit test.
+///
+/// `Positioned.fill` is what fills the `Stack` it is mounted in, rather than
+/// relying on that `Stack`'s own `fit`: a bare `CustomPaint` with no child
+/// sizes itself to `Size.zero` under the loose constraints a plain `Stack`
+/// hands a non-positioned child, so a caller who forgets `fit: StackFit
+/// .expand` gets a grid that silently never paints - the regression this
+/// widget shipped with once it was pulled out of `CanvasSurface`'s own
+/// `Stack(fit: StackFit.expand)`. `Positioned.fill` needs no cooperation
+/// from the parent `Stack` at all, so no caller can get this wrong again.
 library;
 
 import 'package:flutter/widgets.dart';
@@ -23,7 +32,7 @@ import 'package:flutter/widgets.dart';
 import 'canvas_document.dart';
 import 'canvas_painters.dart';
 
-/// The grid alone, sized to fill whatever space its parent gives it.
+/// The grid alone, sized to fill whatever space its parent `Stack` gives it.
 class CanvasGridLayer extends StatelessWidget {
   const CanvasGridLayer(
       {super.key, required this.document, required this.line});
@@ -32,8 +41,10 @@ class CanvasGridLayer extends StatelessWidget {
   final Color line;
 
   @override
-  Widget build(BuildContext context) => RepaintBoundary(
-        child:
-            CustomPaint(painter: GridPainter(document: document, line: line)),
+  Widget build(BuildContext context) => Positioned.fill(
+        child: RepaintBoundary(
+          child:
+              CustomPaint(painter: GridPainter(document: document, line: line)),
+        ),
       );
 }
