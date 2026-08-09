@@ -202,10 +202,16 @@ class ThreadReplySummary extends ConsumerWidget {
       button: enabled,
       label: enabled ? '$text. Open thread.' : text,
       child: enabled
-          ? InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(AppRadii.control),
-              child: padded,
+          ? AppFocusRing(
+              radius: AppRadii.control,
+              builder: (context, onFocusChange) => InkWell(
+                onTap: onTap,
+                // AppFocusRing replaces this overlay; see its own doc comment.
+                focusColor: Colors.transparent,
+                onFocusChange: onFocusChange,
+                borderRadius: BorderRadius.circular(AppRadii.control),
+                child: padded,
+              ),
             )
           : padded,
     );

@@ -34,6 +34,46 @@ TextStyle _familyNamed(TextStyle style) => style.copyWith(
       fontFamilyFallback: AppFonts.emoji,
     );
 
+/// The focus ring every `App*` component already draws, applied here so a
+/// raw `TextButton`/`FilledButton`/`IconButton` (the handful of call sites
+/// that never reached for `AppButton`/`AppIconButton`) gets it too, instead
+/// of falling back to Material's own translucent focus overlay.
+///
+/// `ButtonStyleButton.resolve` (Flutter's shared build path for all three
+/// widgets) resolves `style?.side` per-state and only falls through to the
+/// next style below it when this one's own resolved value is null, so an
+/// unfocused button still resolves to whatever its own default border is
+/// (none, for all three): this is additive, never a replacement.
+///
+/// Value equality is load-bearing rather than tidy. `MaterialApp` wraps its
+/// theme in an `AnimatedTheme`, so a `ThemeData` that never compares equal to
+/// the last one makes every rebuild animate - and `AnimatedTheme` does not
+/// consult reduce-motion, so it animates there too. `resolveWith`'s own
+/// closure compares by identity, which is exactly that trap, so this is a
+/// named class holding only the colour it varies on.
+@immutable
+class _FocusRingSide implements WidgetStateProperty<BorderSide?> {
+  const _FocusRingSide(this.color);
+
+  final Color color;
+
+  @override
+  BorderSide? resolve(Set<WidgetState> states) =>
+      states.contains(WidgetState.focused)
+          ? BorderSide(color: color, width: 2)
+          : null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _FocusRingSide && other.color == color;
+
+  @override
+  int get hashCode => color.hashCode;
+}
+
+WidgetStateProperty<BorderSide?> _focusRingSide(AppTokens tokens) =>
+    _FocusRingSide(tokens.focusRing);
+
 /// Builds a theme from the token set, so widgets read colours from tokens and
 /// never from raw literals. Shared by the app and the golden tests, which is
 /// what keeps goldens representative of what ships.
@@ -118,22 +158,31 @@ ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(shape: controlShape).copyWith(
         textStyle: WidgetStatePropertyAll(buttonLabel),
+        side: _focusRingSide(tokens),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(shape: controlShape).copyWith(
         textStyle: WidgetStatePropertyAll(buttonLabel),
+        side: _focusRingSide(tokens),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(shape: controlShape).copyWith(
         textStyle: WidgetStatePropertyAll(buttonLabel),
+        side: _focusRingSide(tokens),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(shape: controlShape).copyWith(
         textStyle: WidgetStatePropertyAll(buttonLabel),
+        side: _focusRingSide(tokens),
       ),
+    ),
+    // No raw call site sets its own `side`, so this is purely additive; see
+    // `_focusRingSide`'s own doc comment.
+    iconButtonTheme: IconButtonThemeData(
+      style: ButtonStyle(side: _focusRingSide(tokens)),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

@@ -4,6 +4,8 @@
 library;
 
 export 'forms/chip.dart';
+export 'forms/focus_ring.dart';
+export 'forms/focusable_tap_target.dart';
 export 'forms/input.dart';
 export 'forms/segmented_control.dart';
 export 'forms/slider.dart';

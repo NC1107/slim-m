@@ -160,66 +160,72 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection> {
                 button: true,
                 enabled: enabled,
                 label: 'Change profile picture',
-                child: InkWell(
-                  onTap: enabled ? _onTapChange : null,
-                  customBorder: const CircleBorder(),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      ExcludeSemantics(
-                        child: UserAvatar(
-                          userId: me?.id,
-                          avatarUpdatedAt: me?.avatarUpdatedAt,
-                          name: me?.displayName ?? '',
-                          size: _avatarSize,
+                child: AppFocusRing(
+                  radius: _avatarSize / 2,
+                  builder: (context, onFocusChange) => InkWell(
+                    onTap: enabled ? _onTapChange : null,
+                    // AppFocusRing replaces this overlay; see its own doc comment.
+                    focusColor: Colors.transparent,
+                    onFocusChange: onFocusChange,
+                    customBorder: const CircleBorder(),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ExcludeSemantics(
+                          child: UserAvatar(
+                            userId: me?.id,
+                            avatarUpdatedAt: me?.avatarUpdatedAt,
+                            name: me?.displayName ?? '',
+                            size: _avatarSize,
+                          ),
                         ),
-                      ),
-                      if (_busy)
-                        Positioned.fill(
-                          child: ExcludeSemantics(
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: tokens.surfaceBase.withValues(
-                                  alpha: 0.6,
+                        if (_busy)
+                          Positioned.fill(
+                            child: ExcludeSemantics(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: tokens.surfaceBase.withValues(
+                                    alpha: 0.6,
+                                  ),
+                                  shape: BoxShape.circle,
                                 ),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      Positioned(
-                        right: -2,
-                        bottom: -2,
-                        child: ExcludeSemantics(
-                          child: Container(
-                            width: _badgeSize,
-                            height: _badgeSize,
-                            decoration: BoxDecoration(
-                              color: tokens.accentFill,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: tokens.surfaceBase,
-                                width: 2,
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: ExcludeSemantics(
+                            child: Container(
+                              width: _badgeSize,
+                              height: _badgeSize,
+                              decoration: BoxDecoration(
+                                color: tokens.accentFill,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: tokens.surfaceBase,
+                                  width: 2,
+                                ),
                               ),
-                            ),
-                            child: Icon(
-                              AppIcons.avatarCamera,
-                              size: AppSizes.icon16,
-                              color: tokens.accentOn,
+                              child: Icon(
+                                AppIcons.avatarCamera,
+                                size: AppSizes.icon16,
+                                color: tokens.accentOn,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

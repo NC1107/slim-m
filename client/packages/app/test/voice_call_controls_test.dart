@@ -9,239 +9,26 @@
 /// published until the user starts the broadcast there. A control that lights
 /// up on the request is describing something nobody can see, which is what the
 /// owner reported as screen share doing nothing.
+///
+/// `voice_call_controls_focus_test.dart` covers keyboard-focus reachability,
+/// split out to keep this file under the review budget.
 library;
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
-import 'package:slimm_app/src/screens/voice_call_controls.dart';
 import 'package:slimm_app/src/screens/voice_settings_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
-import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
-/// Mirrors `voice_settings_screen.dart`'s own private key: that screen's
-/// `VoiceSettingsController` is the real one under test here too, loaded from
-/// [SharedPreferences] exactly as it is in the app, rather than swapped for a
-/// fake - the bug this covers is that a saved value was never read back.
-const _qualityKey = 'slimm.voice.screen_share_quality';
-
-/// The controls take their [VoiceState] as a parameter, so the session behind
-/// the controller never has to reach any of these states itself.
-class _InertSession implements VoiceSession {
-  _InertSession({
-    bool needsSource = false,
-    Future<List<ScreenShareSource>>? sources,
-    ScreenShareOutcome outcome = ScreenShareOutcome.started,
-    bool sourcePickerUseful = true,
-  }) : _needsSource = needsSource,
-       _sources = sources ?? Future.value(const []),
-       _outcome = outcome,
-       screenShareSourcePickerUseful = sourcePickerUseful;
-
-  final bool _needsSource;
-  final Future<List<ScreenShareSource>> _sources;
-
-  @override
-  final bool screenShareSourcePickerUseful;
-
-  /// Desktop starts sharing outright; `pendingBroadcast` is the iOS-only
-  /// shape and is what would arm `VoiceController`'s 30-second broadcast
-  /// deadline timer, which a test tapping share has to either not trigger or
-  /// clean up before its own body ends.
-  final ScreenShareOutcome _outcome;
-
-  /// How many times a source list was actually requested, so a test can
-  /// assert a fast double-tap only enumerated once.
-  int sourceFetchCount = 0;
-
-  /// Every call `setScreenShareEnabled` received, in order, so a test can
-  /// assert on the quality it was actually given rather than only on the
-  /// outcome.
-  final List<({bool enabled, ScreenShareQuality quality, String? sourceId})>
-  screenShareCalls = [];
-
-  @override
-  bool get supportsParticipantVolume => true;
-
-  final Map<String, double> _volumes = {};
-
-  @override
-  double volumeFor(String identity) => _volumes[identity] ?? 1.0;
-
-  @override
-  Future<void> setVolumeFor(String identity, double volume) async {
-    _volumes[identity] = volume.clamp(0.0, 2.0);
-  }
-
-  final _states = StreamController<VoiceSessionState>.broadcast();
-  final _participants = StreamController<List<VoiceParticipant>>.broadcast();
-
-  @override
-  bool deafened = false;
-
-  @override
-  VoiceSessionState get state => VoiceSessionState.connected;
-
-  @override
-  Stream<VoiceSessionState> get states => _states.stream;
-
-  @override
-  List<VoiceParticipant> get participants => const [];
-
-  @override
-  Stream<List<VoiceParticipant>> get participantChanges => _participants.stream;
-
-  @override
-  Object? get lastError => null;
-
-  @override
-  VoiceDisconnect? get lastDisconnect => null;
-
-  @override
-  bool get screenShareNeedsSource => _needsSource;
-
-  @override
-  Future<List<ScreenShareSource>> screenShareSources() {
-    sourceFetchCount += 1;
-    return _sources;
-  }
-
-  final Set<String> _locallyMuted = {};
-
-  @override
-  bool isLocallyMuted(String identity) => _locallyMuted.contains(identity);
-
-  @override
-  Future<void> setLocallyMuted(String identity, bool muted) async {
-    muted ? _locallyMuted.add(identity) : _locallyMuted.remove(identity);
-  }
-
-  @override
-  Widget screenShareViewFor(String identity) =>
-      SizedBox.shrink(key: Key('fake-share-view-$identity'));
-
-  @override
-  Widget cameraViewFor(String identity) =>
-      SizedBox.shrink(key: Key('fake-camera-view-$identity'));
-
-  /// Every camera-switching call this session received, in order, so a test
-  /// can assert on how the control chose between flipping and picking.
-  final List<String> cameraSwitchCalls = [];
-
-  @override
-  bool canFlipCamera = false;
-
-  @override
-  bool cameraNeedsSelection = false;
-
-  List<CameraDevice> cameraDeviceList = const [];
-
-  @override
-  Future<List<CameraDevice>> cameraDevices() async => cameraDeviceList;
-
-  @override
-  Future<bool> flipCamera() async {
-    cameraSwitchCalls.add('flip');
-    return true;
-  }
-
-  @override
-  Future<bool> selectCameraDevice(CameraDevice device) async {
-    cameraSwitchCalls.add('select:${device.id}');
-    return true;
-  }
-
-  @override
-  Future<void> join({
-    required String url,
-    required String token,
-    bool microphoneEnabled = true,
-    bool cameraEnabled = false,
-  }) async {}
-
-  @override
-  Future<void> leave() async {}
-
-  @override
-  Future<bool> setMicrophoneEnabled(bool enabled) async => true;
-
-  /// Every call `setCameraEnabled` received, so a test can assert the
-  /// toggle button actually reached the session.
-  final List<bool> setCameraCalls = [];
-
-  @override
-  Future<bool> setCameraEnabled(bool enabled) async {
-    setCameraCalls.add(enabled);
-    return true;
-  }
-
-  @override
-  Future<bool> setDeafened(bool value) async => true;
-
-  @override
-  Future<ScreenShareOutcome> setScreenShareEnabled(
-    bool enabled, {
-    ScreenShareQuality quality = ScreenShareQuality.balanced,
-    String? sourceId,
-  }) async {
-    screenShareCalls.add((
-      enabled: enabled,
-      quality: quality,
-      sourceId: sourceId,
-    ));
-    return _outcome;
-  }
-
-  @override
-  Future<void> dispose() async {
-    await _states.close();
-    await _participants.close();
-  }
-}
+import 'voice_call_controls_harness.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
-
-  Future<ProviderContainer> pumpControls(
-    WidgetTester tester,
-    VoiceState voice, {
-    _InertSession? session,
-  }) async {
-    final container = ProviderContainer(
-      overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        voiceControllerProvider.overrideWith(
-          (ref) => VoiceController(ref, session: session ?? _InertSession()),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: Scaffold(
-            body: CallControls(
-              controller: container.read(voiceControllerProvider.notifier),
-              voice: voice,
-            ),
-          ),
-        ),
-      ),
-    );
-    // pump, not pumpAndSettle: the pending state runs a progress indicator,
-    // which never settles.
-    await tester.pump();
-    return container;
-  }
 
   testWidgets('a share awaiting a broadcast reads as waiting, not as on', (
     tester,
@@ -279,9 +66,9 @@ void main() {
     'sharing applies the quality already saved in Voice settings, asking nothing',
     (tester) async {
       SharedPreferences.setMockInitialValues({
-        _qualityKey: ScreenShareQuality.crisp.name,
+        qualityKey: ScreenShareQuality.crisp.name,
       });
-      final session = _InertSession();
+      final session = InertSession();
       final container = await pumpControls(
         tester,
         const VoiceState(state: VoiceSessionState.connected),
@@ -312,7 +99,7 @@ void main() {
     tester,
   ) async {
     final sourcesCompleter = Completer<List<ScreenShareSource>>();
-    final session = _InertSession(
+    final session = InertSession(
       needsSource: true,
       sources: sourcesCompleter.future,
     );
@@ -346,7 +133,7 @@ void main() {
   testWidgets(
     'on Linux the portal picks, so this app never opens a second picker',
     (tester) async {
-      final session = _InertSession(
+      final session = InertSession(
         needsSource: true,
         sources: Future.value(const [
           ScreenShareSource(id: '1', name: 'Screen 1'),
@@ -378,7 +165,7 @@ void main() {
   testWidgets('the camera button is on the same row as hang up', (
     tester,
   ) async {
-    final session = _InertSession();
+    final session = InertSession();
     await pumpControls(
       tester,
       const VoiceState(state: VoiceSessionState.connected),
@@ -413,7 +200,7 @@ void main() {
   testWidgets('switching cameras flips directly on a platform with no picker', (
     tester,
   ) async {
-    final session = _InertSession()..canFlipCamera = true;
+    final session = InertSession()..canFlipCamera = true;
     await pumpControls(
       tester,
       const VoiceState(state: VoiceSessionState.connected, cameraEnabled: true),
@@ -431,7 +218,7 @@ void main() {
   testWidgets('switching cameras opens a picker on a platform that needs one', (
     tester,
   ) async {
-    final session = _InertSession()
+    final session = InertSession()
       ..cameraNeedsSelection = true
       ..cameraDeviceList = const [
         CameraDevice(id: 'cam-1', label: 'Built-in webcam'),

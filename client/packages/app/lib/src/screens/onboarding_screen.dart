@@ -130,43 +130,49 @@ class _Entry extends StatelessWidget {
     return Semantics(
       button: true,
       label: '$title. $description',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        child: Container(
-          // Comfortably past the 48dp minimum target.
-          constraints: const BoxConstraints(minHeight: 72),
-          padding: const EdgeInsets.all(AppSpacing.s16),
-          decoration: BoxDecoration(
-            border: Border.all(color: tokens.borderSubtle),
-            borderRadius: BorderRadius.circular(AppRadii.card),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: tokens.accent),
-              const SizedBox(width: AppSpacing.s16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: tokens.textPrimary,
-                        fontWeight: AppWeights.semi,
+      child: AppFocusRing(
+        radius: AppRadii.card,
+        builder: (context, onFocusChange) => InkWell(
+          onTap: onTap,
+          // AppFocusRing replaces this overlay; see its own doc comment.
+          focusColor: Colors.transparent,
+          onFocusChange: onFocusChange,
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          child: Container(
+            // Comfortably past the 48dp minimum target.
+            constraints: const BoxConstraints(minHeight: 72),
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            decoration: BoxDecoration(
+              border: Border.all(color: tokens.borderSubtle),
+              borderRadius: BorderRadius.circular(AppRadii.card),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: tokens.accent),
+                const SizedBox(width: AppSpacing.s16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: tokens.textPrimary,
+                          fontWeight: AppWeights.semi,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.s4),
-                    Text(
-                      description,
-                      style: AppText.caption.copyWith(
-                        color: tokens.textSecondary,
+                      const SizedBox(height: AppSpacing.s4),
+                      Text(
+                        description,
+                        style: AppText.caption.copyWith(
+                          color: tokens.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
