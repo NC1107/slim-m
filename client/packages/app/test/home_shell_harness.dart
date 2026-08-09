@@ -100,9 +100,14 @@ const tokens = api.TokenPair(
 /// already degrades to an honest loading/error state rather than crashing)
 /// and the database swapped for an in-memory one this test closes itself, on
 /// the same clock the test binding uses; see [teardown] for why that matters.
+///
+/// [extraOverrides] append after the fixed list above, so a caller needing
+/// something like `voiceControllerProvider` pinned to a particular state can
+/// add it without rebuilding this whole wiring by hand.
 ({ProviderContainer container, SlimmDatabase db}) setup({
   MockClient? httpClient,
   bool signedIn = false,
+  List<Override> extraOverrides = const [],
 }) {
   final db = SlimmDatabase(NativeDatabase.memory());
   final container = ProviderContainer(
@@ -129,6 +134,7 @@ const tokens = api.TokenPair(
         return client;
       }),
       databaseProvider.overrideWith((ref) => db),
+      ...extraOverrides,
     ],
   );
   return (container: container, db: db);

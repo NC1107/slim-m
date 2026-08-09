@@ -369,14 +369,20 @@ class _ComposerState extends ConsumerState<Composer> {
   void _pickFileFromButton() =>
       unawaited(_pickAttachment(AttachmentSource.fileBrowser));
 
-  Future<void> _pickAttachment(AttachmentSource source) => runAttachmentPick(
-    pick: ref.read(attachmentPickerProvider(source)),
-    focus: _focus,
-    isMounted: () => mounted,
-    onPickerFailed: () =>
-        _setAttachmentError('Could not open the file picker.'),
-    stage: _stageAttachment,
-  );
+  /// Cleared up front, the same precedent `pasteClipboardImage`'s own doc
+  /// comment names: a retry that succeeds must not leave a stale failure on
+  /// screen above the attachment it just staged.
+  Future<void> _pickAttachment(AttachmentSource source) {
+    _setAttachmentError(null);
+    return runAttachmentPick(
+      pick: ref.read(attachmentPickerProvider(source)),
+      focus: _focus,
+      isMounted: () => mounted,
+      onPickerFailed: () =>
+          _setAttachmentError('Could not open the file picker.'),
+      stage: _stageAttachment,
+    );
+  }
 
   /// Stages bytes from wherever they came from: visible immediately (see
   /// [AttachmentStagingController.stage]), with the upload itself running in

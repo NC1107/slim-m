@@ -121,6 +121,45 @@ class Foo {
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("0 offender(s)", result.stdout)
 
+    def test_a_catcherror_callback_showing_a_snackbar_is_caught(self):
+        """A Future's own `.catchError((e) { ... })`, not a `catch` block at
+        all - reproduced by an adversarial pass, which found the gate said
+        nothing while this exact shape sat in a tracked file."""
+        self._write("bad_catcherror.dart", """
+class Foo {
+  void go() {
+    api.thing().catchError((e) {
+      showAppSnackbar(context, e.toString());
+    });
+  }
+}
+""")
+        result = self._run()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "file=client/packages/app/lib/bad_catcherror.dart,line=4",
+            result.stdout + result.stderr)
+
+    def test_a_catcherror_callback_that_swallows_silently_is_fine(self):
+        """The idiom this codebase already uses elsewhere
+        (sync_controller.dart, providers.dart) to drop a failure on the
+        floor on purpose - must not become an offender just for existing.
+        Multi-line on purpose: a one-line `.catchError((_) {});` closes on
+        the header's own line and is never recognised as a block at all,
+        which would make this test pass for the wrong reason."""
+        self._write("ok_catcherror.dart", """
+class Foo {
+  void go() {
+    api.thing().catchError((_) {
+      // nothing useful to do
+    });
+  }
+}
+""")
+        result = self._run()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("0 offender(s)", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

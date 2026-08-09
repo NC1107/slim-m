@@ -17,6 +17,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
+import '../../widgets/dock_height_reporter.dart';
 import 'canvas_activity_log.dart';
 import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
@@ -252,11 +253,13 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.s12),
                       // The dock's own hidden-tiles list has to notice a hide or show landing in tileOverrides, which nothing else here rebuilds this widget for.
-                      child: ListenableBuilder(
-                        listenable: widget.tileOverrides,
-                        builder: (context, _) => CanvasCallDock(
-                          call: widget.callDock,
-                          canvas: _dockData(),
+                      child: DockHeightReporter(
+                        child: ListenableBuilder(
+                          listenable: widget.tileOverrides,
+                          builder: (context, _) => CanvasCallDock(
+                            call: widget.callDock,
+                            canvas: _dockData(),
+                          ),
                         ),
                       ),
                     ),

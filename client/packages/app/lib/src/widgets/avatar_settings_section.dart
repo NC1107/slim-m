@@ -91,6 +91,8 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
     final source = await _pickSource();
     if (source == null || !mounted) return;
 
+    // Cleared up front, same precedent as composer.dart's own _pickAttachment: a retry must not keep showing an earlier failure.
+    clearActionError();
     final FilePickerResult? result;
     try {
       result = await ref.read(attachmentPickerProvider(source))();
