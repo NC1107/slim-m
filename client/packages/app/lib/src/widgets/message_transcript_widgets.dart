@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/message_editing.dart';
 import '../providers/message_extras.dart';
 import '../providers/sync_controller.dart';
 import '../routing/breakpoints.dart';
@@ -288,22 +289,29 @@ class EmptyMessages extends StatelessWidget {
   }
 }
 
-/// One row's reactions, attachments and poll, watched for that message id
-/// alone.
+/// One row's reactions, attachments, poll and edit-in-progress flag, watched
+/// for that message id alone.
 ///
 /// The screen used to watch [messageExtrasProvider] whole and hand the map
 /// down, so one reaction anywhere rebuilt the entire transcript, and opening a
 /// channel did that once per hydrated message. Selecting by id means a change
 /// reaches the one row it is about.
+///
+/// [editing] joined the same selector rather than staying a `MessageTranscript`
+/// constructor parameter for the identical reason: that used to be a plain
+/// field on `_ChannelScreenState`, so starting or cancelling an edit rebuilt
+/// every visible row's markdown, not only the one whose flag actually flipped.
 class MessageRowExtras extends ConsumerWidget {
   const MessageRowExtras({
     super.key,
     required this.messageId,
+    required this.channelId,
     required this.builder,
   });
 
   final String messageId;
-  final Widget Function(MessageExtras extras) builder;
+  final String channelId;
+  final Widget Function(MessageExtras extras, bool editing) builder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => builder(
@@ -311,6 +319,9 @@ class MessageRowExtras extends ConsumerWidget {
       messageExtrasProvider.select(
         (extras) => extras[messageId] ?? MessageExtras.empty,
       ),
+    ),
+    ref.watch(
+      editingMessageIdProvider(channelId).select((id) => id == messageId),
     ),
   );
 }

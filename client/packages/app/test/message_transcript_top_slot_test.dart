@@ -57,6 +57,7 @@ Widget _app(Widget transcript) => ProviderScope(
 
 MessageTranscript _transcript({required String? channelName}) =>
     MessageTranscript(
+      channelId: 'c1',
       messages: [
         message(id: 'm1', createdAt: 1700000000000, content: 'first'),
         message(id: 'm2', createdAt: 1700000005000, content: 'second'),
@@ -67,7 +68,6 @@ MessageTranscript _transcript({required String? channelName}) =>
       scrollController: ScrollController(),
       lastReadSeq: 999999,
       selfId: 'self',
-      editingId: null,
       knownUsernames: const {},
       customEmoji: const {},
       history: const ChannelHistory(atStart: true),

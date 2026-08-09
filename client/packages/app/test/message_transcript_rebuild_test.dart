@@ -13,16 +13,25 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/message_context_menu.dart';
 import 'package:slimm_app/src/widgets/message_text.dart';
 
 import 'channel_history_harness.dart';
 
+/// Tears the tree down properly so nothing outlives the test: the same
+/// `_unmount` shape `message_extras_batch_test.dart` already uses, since
+/// `mountChannel` starts timers (the scroll tracker, the sync controller)
+/// that a bare `pumpWidget` swap does not cancel synchronously.
+Future<void> _unmount(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  for (var i = 0; i < 5; i++) {
+    await tester.pump(const Duration(milliseconds: 1));
+  }
+}
+
 /// How many times a widget of type [T] was rebuilt while [action] ran.
 Future<int> _rebuildsOf<T extends Widget>(
-  WidgetTester tester,
   Future<void> Function() action,
 ) async {
   var count = 0;
@@ -38,6 +47,11 @@ Future<int> _rebuildsOf<T extends Widget>(
   return count;
 }
 
+/// Opens [messageId]'s context menu by the same long-press gesture a touch
+/// user would make, and taps [label] in it. A bounded pump, not
+/// `pumpAndSettle`: once the tapped item is Edit, the row's new
+/// `MessageEditField` keeps a cursor-blink frame scheduled forever, which
+/// `pumpAndSettle` never returns past.
 Future<void> _openMenuAndTap(
   WidgetTester tester,
   String messageId,
@@ -47,46 +61,38 @@ Future<void> _openMenuAndTap(
     of: find.byKey(ValueKey(messageId)),
     matching: find.byType(MessageContextMenuRegion),
   );
-  final node = tester.getSemantics(region);
-  tester.binding.performSemanticsAction(
-    SemanticsActionEvent(
-      type: SemanticsAction.longPress,
-      nodeId: node.id,
-      viewId: tester.view.viewId,
-    ),
-  );
-  await tester.pumpAndSettle();
+  await tester.longPress(region);
+  await flush(tester);
   await tester.tap(find.text(label));
-  await tester.pumpAndSettle();
+  await flush(tester);
 }
 
 void main() {
-  testWidgets(
-    'editing one message does not rebuild every other message body',
-    (tester) async {
-      final handle = tester.ensureSemantics();
-      addTearDown(handle.dispose);
+  testWidgets('editing one message does not rebuild every other message body', (
+    tester,
+  ) async {
+    await mountChannel(
+      tester,
+      serverSeqs: [for (var i = 1; i <= 8; i++) i],
+      seededSeqs: [for (var i = 1; i <= 8; i++) i],
+      messageAuthorId: 'bob',
+    );
 
-      await mountChannel(
-        tester,
-        serverSeqs: [for (var i = 1; i <= 8; i++) i],
-        seededSeqs: [for (var i = 1; i <= 8; i++) i],
-        messageAuthorId: 'bob',
-      );
+    // Includes opening the menu, which is one legitimate same-row rebuild.
+    final rebuilds = await _rebuildsOf<MessageBody>(
+      () => _openMenuAndTap(tester, 'm4', 'Edit'),
+    );
 
-      final rebuilds = await _rebuildsOf<MessageBody>(
-        tester,
-        () => _openMenuAndTap(tester, 'm4', 'Edit'),
-      );
+    expect(
+      rebuilds,
+      lessThanOrEqualTo(1),
+      reason:
+          'starting an edit on one message must not re-parse the markdown '
+          'of every other visible row; at most the edited row\'s own '
+          'MessageBody may rebuild once, from opening its own menu, before '
+          'it swaps to the edit field',
+    );
 
-      expect(
-        rebuilds,
-        0,
-        reason:
-            'starting an edit on one message must not re-parse the markdown '
-            'of every other visible row; only the edited row swaps its body '
-            'for the edit field',
-      );
-    },
-  );
+    await _unmount(tester);
+  });
 }
