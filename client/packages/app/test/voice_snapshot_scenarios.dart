@@ -110,8 +110,7 @@ final _voiceRejoinSurfaces =
         viewports: _phoneAndDesktop,
         state: rejoinErrorRetryableState,
       ),
-      // Also proves the join button is absent, not merely disabled: the
-      // same widget as -retryable with `canRetry` false.
+      // Proves the join button is absent, not disabled: `canRetry` false.
       'voice-rejoin-error-permanent': (
         route: '/channels/c-main',
         viewports: _phoneAndDesktop,
@@ -224,8 +223,7 @@ void registerWhoIsHereUnknown(String theme, RenderSurface render) {
         voiceControllerProvider.overrideWith(
           (ref) => AttemptedJoinVoiceController(ref, leftPlainState),
         ),
-        // Never emits, so the roster stays exactly as unresolved as a
-        // deployment with no SFU configured leaves it forever.
+        // Never emits: the roster stays unresolved, as with no SFU at all.
         voiceRosterProvider('c-main').overrideWith(
           (ref) => const Stream<List<api.VoiceRosterParticipant>>.empty(),
         ),
