@@ -74,9 +74,7 @@ void main() {
       await tester.pumpWidget(_harness(container, show: true));
       await tester.pump();
 
-      // The exact race a real app teardown or a test's own teardown can
-      // produce: the container disposes before the deferred reset's
-      // microtask runs.
+      // The exact race a real teardown can produce: the container disposes before the deferred reset's microtask runs.
       await tester.pumpWidget(_harness(container, show: false));
       container.dispose();
       await tester.pump();
@@ -96,8 +94,7 @@ void main() {
     expect(container.read(bottomDockReservationProvider), 40);
 
     await tester.pumpWidget(_harness(container, show: false));
-    // Two pumps: the reset is a deferred microtask, and the first pump's own
-    // flush point can land before Flutter schedules it.
+    // Two pumps: the first pump's own flush point can land before the deferred microtask is scheduled.
     await tester.pump();
     await tester.pump();
 
