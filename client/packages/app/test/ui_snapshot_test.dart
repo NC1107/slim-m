@@ -26,32 +26,28 @@ import 'package:slimm_app/src/widgets/channel_rail.dart'
 
 import 'ui_snapshot_support.dart';
 import 'voice_snapshot_fixtures.dart'
-    show SnapshotVoiceController, connectedCallState, dmChannelId;
+    show
+        SnapshotVoiceController,
+        connectedCallState,
+        connectingState,
+        dmChannelId;
 import 'voice_snapshot_scenarios.dart';
 
 /// The surfaces worth a picture: the route, and which viewports to render.
 ///
-/// The two shell surfaces straddle every breakpoint they own because width
-/// changes their structure. Each standalone screen adds the pair that
-/// brackets its *own* breakpoint to a phone and a desktop render, rather than
-/// every screen sampling every boundary: a screen with no 800px floor of its
-/// own gains nothing from being rendered at 799 and 800.
+/// `channel` straddles every breakpoint it owns because width changes its
+/// structure. A voice channel needs the identical breakpoint treatment - it
+/// is the same shell, just a different `kind` - but it also needs its
+/// controller pinned, or the body shows a real, unmocked auto-join that
+/// settles into a blank frame long before this matrix pumps far enough to
+/// see it fail; see `_shellStateSurfaces`'s own `voice` entry for that.
+/// Each standalone screen adds the pair that brackets its *own* breakpoint
+/// to a phone and a desktop render, rather than every screen sampling every
+/// boundary: a screen with no 800px floor of its own gains nothing from
+/// being rendered at 799 and 800.
 const _surfaces = <String, ({String route, List<String> viewports})>{
   'channel': (
     route: '/channels/c-general',
-    viewports: [
-      'phone-portrait',
-      'phone-landscape',
-      'tablet-portrait',
-      'desktop-narrow',
-      'desktop',
-      ...compactBracket,
-      'expanded-999',
-      'expanded-1000',
-    ],
-  ),
-  'voice': (
-    route: '/channels/c-main',
     viewports: [
       'phone-portrait',
       'phone-landscape',
@@ -151,8 +147,10 @@ const _surfaces = <String, ({String route, List<String> viewports})>{
 
 /// Shell states reachable only by overriding a provider the plain [_surfaces]
 /// table has no way to reach: a collapsed rail, a day divider forced to show,
-/// and the transcript's connecting/genuinely-empty states, which the default
-/// fixture's offline `SyncController` can never produce on its own.
+/// the transcript's connecting/genuinely-empty states (which the default
+/// fixture's offline `SyncController` can never produce on its own), and a
+/// voice channel pinned to its connecting state rather than left to a real,
+/// unmocked auto-join.
 final _shellStateSurfaces =
     <
       String,
@@ -193,6 +191,25 @@ final _shellStateSurfaces =
             (ref) => FixedSyncController(ref, SyncStatus.live),
           ),
           initialSyncCompleteProvider.overrideWith((ref) => true),
+        ],
+      ),
+      // Pinned to the connecting state: what every voice channel arrival truthfully shows first, at every breakpoint the shell itself owns.
+      'voice': (
+        route: '/channels/c-main',
+        viewports: [
+          'phone-portrait',
+          'phone-landscape',
+          'tablet-portrait',
+          'desktop-narrow',
+          'desktop',
+          ...compactBracket,
+          'expanded-999',
+          'expanded-1000',
+        ],
+        overrides: () => [
+          voiceControllerProvider.overrideWith(
+            (ref) => SnapshotVoiceController(ref, connectingState),
+          ),
         ],
       ),
     };
@@ -240,8 +257,8 @@ const _canvasSurfaces =
 
 /// The connected in-call surface, forced through `voiceControllerProvider`
 /// the same way the canvas surfaces above force `canvasOpenProvider` - the
-/// ordinary `voice` entry in [_surfaces] only ever reaches the join preview,
-/// since nothing there drives a real join. One person sharing their screen
+/// `voice` entry in [_shellStateSurfaces] only ever reaches the connecting
+/// state, since nothing there drives a real join. One person sharing their screen
 /// with their camera on, plus a second camera-only participant, is the
 /// shape the owner reported as three boxes that did not fit a phone;
 /// `phone-portrait` is tall and narrow on purpose, the case that report
