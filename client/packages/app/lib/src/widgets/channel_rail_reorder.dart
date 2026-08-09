@@ -18,6 +18,35 @@
 /// channel wrapped in a drag listener at all) reports the right semantics
 /// but hit-tests a tap on it to the wrong render object, gone the moment a
 /// second item is present.
+///
+/// **A held drag's own settle animation does not honour `AppMotion` or the
+/// real OS reduce-motion toggle, and this is a closed, verified Flutter
+/// limitation rather than an open item.** Read against the pinned SDK's own
+/// source (`packages/flutter/lib/src/widgets/reorderable_list.dart` and
+/// `.../material/reorderable_list.dart`, Flutter 3.44.8) before touching this
+/// again: neither `ReorderableListView` nor `SliverReorderableList` exposes
+/// an `AnimationStyle` parameter at all, unlike roughly a dozen sibling
+/// Material widgets in the same SDK (`Chip`, `Dialog`, `BottomSheet`,
+/// `ExpansionTile`, `PopupMenuButton`, `Scaffold`, among others). The 250ms
+/// ease-in-out an item takes to slide out of a dragged item's way
+/// (`_ReorderableItemState.updateForGap`) is called with `animate: true` from
+/// exactly one private, hardcoded call site with no callback or theme
+/// extension reaching it, and the drag proxy's own 250ms elevation fade
+/// (`_DragInfo.startDrag`) is the same shape. Neither reads
+/// `MediaQuery.disableAnimationsOf` or `accessibleNavigationOf` anywhere, so
+/// the "self-reduces under real OS-level reduce motion" claim an earlier pass
+/// made about this widget does not hold under the source - what actually is
+/// accessibility-aware is a different path entirely: a screen reader in use
+/// (`accessibleNavigation`) makes Flutter attach custom semantic actions
+/// (move to start/before/after/end) that call `onReorderItem` directly with
+/// no drag and no animation at all, which is a real and correct fallback but
+/// is gated on a screen reader being active, not on the reduce-motion toggle
+/// a sighted low-motion user would set. A global `package:flutter/scheduler`
+/// `timeDilation` override was considered and rejected: it would reach the
+/// same result for this one widget only by scaling every animation in the
+/// whole app, including the busy-spinner exception `app_motion.dart`'s own
+/// doc comment already carves out on purpose. Closing this for real needs a
+/// vendored or forked reorder implementation, which this pass does not do.
 library;
 
 import 'package:flutter/material.dart';

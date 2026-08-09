@@ -20,7 +20,6 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../api_failure.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
-import '../../widgets/app_snackbar.dart';
 import '../../widgets/image_decode.dart';
 import 'emoji_name.dart';
 
@@ -79,8 +78,7 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
     try {
       bytes = await ref.read(emojiImagePickerProvider)();
     } catch (e) {
-      if (!mounted) return;
-      showAppSnackbar(context, 'Could not open the file picker.');
+      _refuse('Could not open the file picker.');
       return;
     }
     if (bytes == null || !mounted) return;

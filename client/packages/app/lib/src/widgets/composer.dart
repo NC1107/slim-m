@@ -17,7 +17,6 @@ import '../providers/composer_focus.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/typing_controller.dart';
-import 'app_snackbar.dart';
 import 'attachment_picker.dart';
 import 'composer_action_bar.dart';
 import 'composer_attachments.dart';
@@ -78,7 +77,11 @@ class _ComposerState extends ConsumerState<Composer> {
   bool _hasText = false;
   bool _hasSendableText = false;
   late final AttachmentStagingController _attachments;
-  String? _clipboardPasteError;
+
+  /// Shown inline above the action bar: a picker that would not open, or a
+  /// clipboard paste that failed. Both are "could not get you an
+  /// attachment", the one band `ComposerBanners` reserves for it.
+  String? _attachmentError;
   late final FocusNode _focus = FocusNode(onKeyEvent: _onKey);
 
   /// The composed text's own length and how far over [kMessageMaxChars] it
@@ -146,7 +149,7 @@ class _ComposerState extends ConsumerState<Composer> {
     // See [AttachmentStagingController.resetForChannelSwitch]'s own doc comment.
     if (oldWidget.channelId != widget.channelId) {
       _attachments.resetForChannelSwitch();
-      if (mounted) setState(() => _clipboardPasteError = null);
+      if (mounted) setState(() => _attachmentError = null);
     }
   }
 
@@ -270,10 +273,7 @@ class _ComposerState extends ConsumerState<Composer> {
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (isClipboardPasteChord(event)) {
       unawaited(
-        pasteClipboardImageFromKeystroke(
-          _stageAttachment,
-          _setClipboardPasteError,
-        ),
+        pasteClipboardImageFromKeystroke(_stageAttachment, _setAttachmentError),
       );
     }
     if (_query == null || _suggestions.isEmpty) return KeyEventResult.ignored;
@@ -350,9 +350,8 @@ class _ComposerState extends ConsumerState<Composer> {
       onBrowseFiles: () =>
           unawaited(_pickAttachment(AttachmentSource.fileBrowser)),
       canPasteImage: composerClipboardPasteAvailable(),
-      onPasteImage: () => unawaited(
-        pasteClipboardImage(_stageAttachment, _setClipboardPasteError),
-      ),
+      onPasteImage: () =>
+          unawaited(pasteClipboardImage(_stageAttachment, _setAttachmentError)),
       onPoll: () => showPollComposerSheet(context, widget.channelId),
       onCode: _insertCodeFence,
     ),
@@ -375,7 +374,7 @@ class _ComposerState extends ConsumerState<Composer> {
     focus: _focus,
     isMounted: () => mounted,
     onPickerFailed: () =>
-        showAppSnackbar(context, 'Could not open the file picker.'),
+        _setAttachmentError('Could not open the file picker.'),
     stage: _stageAttachment,
   );
 
@@ -392,8 +391,8 @@ class _ComposerState extends ConsumerState<Composer> {
   void _handlePastedImage(Uint8List bytes, String filename) =>
       unawaited(_stageAttachment(bytes, filename));
 
-  void _setClipboardPasteError(String? message) {
-    if (mounted) setState(() => _clipboardPasteError = message);
+  void _setAttachmentError(String? message) {
+    if (mounted) setState(() => _attachmentError = message);
   }
 
   void _removeAttachment(String localId) => _attachments.remove(localId);
@@ -433,9 +432,9 @@ class _ComposerState extends ConsumerState<Composer> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ComposerBanners(
-              clipboardPasteError: _clipboardPasteError,
-              onDismissClipboardPasteError: () =>
-                  setState(() => _clipboardPasteError = null),
+              attachmentError: _attachmentError,
+              onDismissAttachmentError: () =>
+                  setState(() => _attachmentError = null),
               overLimitBy: _overBy,
               stagedAttachments: _attachments.items,
               onRemoveAttachment: _removeAttachment,

@@ -43,6 +43,31 @@ around a raw catch entirely, through `runGuarded`'s own returned sentence, so
 there was no real case to seed it with. Add an entry only for a genuinely new
 case of the same shape a popover already gets away with: a surface gone by the
 time the request answers, never to silence an actual regression.
+
+A bare `catch (e) { ... }` is checked too, added when three file-picker-open
+failures (the emoji upload card, the avatar section, the composer) turned out
+to carry this exact shape on a bare catch rather than `on api.*Exception`: a
+native picker throwing is not an `ApiException` at all, so the narrower
+pattern above could never have seen it. The two patterns cannot overlap - `on
+Type catch (e) {` never starts with the literal word `catch`, since `on Type`
+sits before it - so this is strictly a wider net, not a replacement.
+
+`SHOWS_SNACKBAR` had never matched a single real call in this codebase: every
+site (including the three above) calls `showAppSnackbar`, not the raw
+`ScaffoldMessenger`/`SnackBar(` this pattern watched for, so the gate reported
+zero offenders whether or not one existed - confirmed by mutating a fixed site
+back to its old shape and finding the gate said nothing. `showAppSnackbar` is
+now in the pattern too; the two raw shapes stay in it for whatever still
+calls them directly, `personal_space_menu.dart`'s success-notice path among
+them, which is not itself in scope since it sits outside any catch block.
+
+Not caught, and not a defect in the fix: `composer.dart`'s own picker failure
+runs through `attachment_picker.dart`'s shared `runAttachmentPick`, whose
+catch block calls back a plain `onPickerFailed()` parameter rather than
+naming `showAppSnackbar` in its own body - the call is one file away, at the
+composer's own call site. A regex reading one function at a time cannot see
+across that indirection; `composer_affordances_test.dart`'s own regression
+test is what actually guards that site, mutation-tested the same way.
 """
 
 import re
@@ -53,21 +78,27 @@ from pathlib import Path
 EXCEPTIONS: dict[tuple[str, int], str] = {}
 
 CATCH_HEADER = re.compile(
-    r"^(?P<indent>\s*)\}?\s*on\s+api\.\w*Exception(\s+catch\b[^{]*)?\s*\{\s*$"
+    r"^(?P<indent>[ \t]*)(?:\}[ \t]*)?on[ \t]+api\.\w*Exception"
+    r"(?:[ \t]+catch\b[^{]*)?[ \t]*\{[ \t]*$"
 )
-SHOWS_SNACKBAR = re.compile(r"ScaffoldMessenger|SnackBar\(")
+BARE_CATCH_HEADER = re.compile(
+    r"^(?P<indent>[ \t]*)(?:\}[ \t]*)?catch[ \t]*\([^)]*\)[ \t]*\{[ \t]*$"
+)
+SHOWS_SNACKBAR = re.compile(r"ScaffoldMessenger|SnackBar\(|showAppSnackbar\(")
 
 
 def catch_blocks(lines: list[str]):
-    """Yields (1-based header line, body lines) for each `on api.*Exception catch { ... }`.
+    """Yields (1-based header line, body lines) for each caught-exception block.
 
-    The block's end is the next line, at the header's indentation or less,
-    that opens with `}` - the same section-by-indentation technique
-    `hygiene.yml`'s own `section()` helper already uses for a Dart brace this
-    project has no AST tool handy for in a plain hygiene step.
+    Either an `on api.*Exception catch { ... }` or a bare `catch (e) { ... }`
+    header; see this file's own module doc for why both are in scope. The
+    block's end is the next line, at the header's indentation or less, that
+    opens with `}` - the same section-by-indentation technique `hygiene.yml`'s
+    own `section()` helper already uses for a Dart brace this project has no
+    AST tool handy for in a plain hygiene step.
     """
     for i, line in enumerate(lines):
-        header = CATCH_HEADER.match(line)
+        header = CATCH_HEADER.match(line) or BARE_CATCH_HEADER.match(line)
         if not header:
             continue
         indent = header.group("indent")
@@ -112,14 +143,14 @@ def main() -> int:
             offenders.append(f"{rel}:{lineno}")
 
     if checked == 0:
-        print("::error::no `on api.*Exception catch` blocks found anywhere; the gate is not reading anything")
+        print("::error::no caught-exception blocks found anywhere; the gate is not reading anything")
         return 1
 
     for offender in offenders:
         path, _, lineno = offender.partition(":")
         entry = f'("{path}", {lineno}): "why",'
         print(
-            f"::error file={path},line={lineno}::an API failure is shown with a "
+            f"::error file={path},line={lineno}::a caught failure is shown with a "
             "SnackBar here; use GuardedActionState/AppErrorState instead (see "
             "run_guarded.dart's own doc comment), or if this surface has "
             "genuinely already closed by the time the request answers, add "

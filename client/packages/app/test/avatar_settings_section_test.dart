@@ -224,6 +224,74 @@ void main() {
     },
   );
 
+  /// The badge's own file-picker-open failure used to show a `SnackBar`, the
+  /// same shape the removal failure above was already fixed away from; see
+  /// `check-error-surface.py`'s doc comment for why a raw catch showing one
+  /// is the gate's whole target, and `run_guarded.dart`'s `setActionError`
+  /// for the seam this needed since a picker throwing carries no
+  /// `ApiException` for `guard` to catch.
+  testWidgets('a picker that throws is refused inline, not with a SnackBar', (
+    tester,
+  ) async {
+    // Phone width: the inline band takes space a SnackBar never claimed.
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    const filePickerChannel = MethodChannel(
+      'miguelruivo.flutter.plugins.filepicker',
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(filePickerChannel, (call) async {
+          throw PlatformException(code: 'no_portal', message: 'no portal');
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(filePickerChannel, null),
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((request) async {
+              if (request.url.path == '/me') {
+                return http.Response(
+                  jsonEncode(_meJson(null)),
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
+              return http.Response('', 404);
+            }),
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_harness(container));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel(_cameraLabel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Photo library'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(AppErrorState), findsOneWidget);
+    expect(
+      find.textContaining('Could not open the file picker'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('tapping the camera badge opens both sources, still selectable', (
     tester,
   ) async {
