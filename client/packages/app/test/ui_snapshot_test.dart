@@ -14,7 +14,6 @@
 /// Write them with `scripts/ui-snapshots.sh`.
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart'
@@ -24,7 +23,6 @@ import 'package:slimm_app/src/screens/canvas/canvas_pane.dart'
     show canvasOpenProvider;
 import 'package:slimm_app/src/widgets/channel_rail.dart'
     show channelRailVisibleProvider;
-import 'package:slimm_rtc/rtc.dart';
 
 import 'ui_snapshot_support.dart';
 import 'voice_snapshot_fixtures.dart'
