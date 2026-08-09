@@ -28,6 +28,7 @@ class SettingsPane {
     required this.id,
     required this.label,
     required this.builder,
+    this.icon,
     this.badge,
   });
 
@@ -38,6 +39,11 @@ class SettingsPane {
   /// Built lazily: a pane that fetches does not fetch until it is looked at,
   /// which is the other half of why this is not one long scroll.
   final WidgetBuilder builder;
+
+  /// Drawn plain, matching every other settings row in this app
+  /// ([SpaceSettingsSection], `DevicesSection`, `BlockedSection`): the nav
+  /// list is what read as text-and-a-chevron with nothing else beside it.
+  final IconData? icon;
 
   /// A count shown at the trailing edge, for a pane whose interest is how
   /// many things are in it.
@@ -62,7 +68,6 @@ class SettingsPanesScaffold extends StatefulWidget {
     required this.groups,
     required this.backTooltip,
     required this.backFallback,
-    this.header,
     this.footer,
   });
 
@@ -73,10 +78,9 @@ class SettingsPanesScaffold extends StatefulWidget {
   final String backTooltip;
   final String backFallback;
 
-  /// Above the nav: who you are, on the personal screen.
-  final Widget? header;
-
-  /// Below it, pinned: sign out.
+  /// Below the nav, pinned: sign out. Who-you-are lives inside the "Account &
+  /// presence" pane itself now, not above the nav as a second, editable copy
+  /// of the same identity - see that pane's own doc comment.
   final Widget? footer;
 
   @override
@@ -124,7 +128,6 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
       selectedId: selected?.id,
       // Wide only: on compact no lit row is ever visible beside its pane.
       showSelection: wide,
-      header: widget.header,
       footer: widget.footer,
       onSelect: (id) => setState(() => _selectedId = id),
     );
@@ -206,7 +209,6 @@ class _Nav extends StatelessWidget {
     required this.selectedId,
     required this.showSelection,
     required this.onSelect,
-    this.header,
     this.footer,
   });
 
@@ -214,7 +216,6 @@ class _Nav extends StatelessWidget {
   final String? selectedId;
   final bool showSelection;
   final void Function(String) onSelect;
-  final Widget? header;
   final Widget? footer;
 
   @override
@@ -229,17 +230,6 @@ class _Nav extends StatelessWidget {
               vertical: AppSpacing.s12,
             ),
             children: [
-              if (header != null) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.s8,
-                    0,
-                    AppSpacing.s8,
-                    AppSpacing.s16,
-                  ),
-                  child: header!,
-                ),
-              ],
               for (final group in groups) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(10, AppSpacing.s12, 10, 6),
@@ -256,6 +246,7 @@ class _Nav extends StatelessWidget {
                 for (final pane in group.panes)
                   AppListRow(
                     label: pane.label,
+                    leading: pane.icon == null ? null : Icon(pane.icon),
                     meta: pane.badge,
                     selected: showSelection && pane.id == selectedId,
                     // A chevron only where the row actually goes somewhere.

@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Settings' avatar section: a centred preview of the caller's own picture
-/// with a camera badge that reads as "tap to change", plus a way to remove
-/// an existing one.
+/// Settings' profile card: a centred preview of the caller's own picture with
+/// a camera badge that reads as "tap to change", the display name beside its
+/// own rename affordance, and the `@handle` underneath.
 ///
 /// The badge opens the same two-source choice the composer's attach action
 /// already offers, rather than one picker directly: a Photos-only pick
 /// cannot reach a picture that arrived by download or AirDrop. See
 /// `attachment_picker.dart`.
+///
+/// The name and handle used to sit above the settings nav, outside every
+/// named section - editable, yet nowhere a caller would think to look for
+/// "rename yourself". They live in this card now, which is what the
+/// "Account & presence" pane opens onto, so renaming sits beside the picture
+/// it is next to on every other profile in this app.
 library;
 
 import 'dart:async';
@@ -20,6 +26,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/providers.dart';
 import 'attachment_picker.dart';
 import 'avatar_crop_sheet.dart';
+import 'edit_display_name_sheet.dart';
 import 'run_guarded.dart';
 import 'settings_section_header.dart';
 import 'user_avatar.dart';
@@ -141,7 +148,7 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
     final enabled = me != null && !_busy;
 
     return SettingsSectionCard(
-      title: 'Avatar',
+      title: 'Profile',
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Padding(
@@ -221,6 +228,39 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
                   ),
                 ),
               ),
+              if (me != null) ...[
+                const SizedBox(height: AppSpacing.s12),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        me.displayName,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.ui.copyWith(
+                          color: tokens.textPrimary,
+                          fontWeight: AppWeights.medium,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s4),
+                    AppIconButton(
+                      icon: AppIcons.edit,
+                      semanticLabel: 'Edit display name',
+                      tooltip: 'Edit display name',
+                      size: AppIconButtonSize.sm,
+                      onPressed: () => unawaited(
+                        showEditDisplayNameSheet(context, me.displayName),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '@${me.username}',
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption.copyWith(color: tokens.textSecondary),
+                ),
+              ],
               if (hasAvatar) ...[
                 const SizedBox(height: AppSpacing.s8),
                 AppButton(
