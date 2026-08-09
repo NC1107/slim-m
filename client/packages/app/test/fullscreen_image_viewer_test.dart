@@ -271,4 +271,31 @@ void main() {
     expect(_viewer(), findsNothing);
     expect(attempts, 2, reason: 'the tap retries the fetch');
   });
+
+  testWidgets(
+    'bytes that fetch but fail to decode open the viewer anyway, since '
+    'AttachmentView offers no other tap target - it must show its own '
+    'failure message rather than throw or blank the screen',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(_image, [
+          attachmentBytesProvider.overrideWith(
+            (ref, id) async => Uint8List.fromList(const [1, 2, 3, 4]),
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Could not open holiday.png.'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(_viewer(), findsOneWidget);
+      expect(
+        find.text('Could not open holiday.png.'),
+        findsWidgets,
+        reason: 'both the thumbnail and the viewer show the same message',
+      );
+    },
+  );
 }

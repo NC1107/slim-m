@@ -111,6 +111,11 @@ class VoiceController extends StateNotifier<VoiceState> {
   late final StreamSubscription<void> _endCallRequests;
   Timer? _broadcastDeadline;
 
+  /// Bumped by every [join] and [leave], so a stale call's continuation can
+  /// tell it has been superseded; see [join]'s own comment on why this
+  /// exists.
+  int _callGeneration = 0;
+
   /// Sets the microphone preference before joining. Has no effect on a live
   /// call; use [toggleMicrophone] for that.
   void setMicrophonePreference(bool enabled) {
@@ -124,9 +129,17 @@ class VoiceController extends StateNotifier<VoiceState> {
     state = state.copyWith(cameraEnabled: enabled);
   }
 
+  /// A channel switch (or a [leave]) mid-join starts or ends a newer call on
+  /// this same instance, so every write below is guarded by [superseded]:
+  /// reproduced without it, an abandoned join's belated failure landed as
+  /// the *current* (different) channel's error, hiding a call that had
+  /// actually connected - see `voice_controller_join_race_test.dart`.
   Future<void> join(String channelId) async {
     // A recap belongs to the call that just ended, never to this new one.
     _activity.reset();
+    // See this method's own doc comment for what generation/superseded guard.
+    final generation = ++_callGeneration;
+    bool superseded() => generation != _callGeneration;
     // Set before the first await, so an arrival elsewhere reads this as busy; see VoiceState.joining.
     state = state.copyWith(
       channelId: channelId,
@@ -136,6 +149,7 @@ class VoiceController extends StateNotifier<VoiceState> {
     );
     try {
       final token = await _ref.read(apiProvider).voiceToken(channelId);
+      if (superseded()) return;
       final insecureReason = insecureSfuReason(token.url);
       if (insecureReason != null) {
         state = state.copyWith(
@@ -154,6 +168,7 @@ class VoiceController extends StateNotifier<VoiceState> {
         microphoneEnabled: state.microphoneEnabled && token.canPublish,
         cameraEnabled: state.cameraEnabled && token.canPublish,
       );
+      if (superseded()) return;
       if (_session.state == VoiceSessionState.failed) {
         state = state.copyWith(
           error: 'Could not connect to the call. ${_session.lastError ?? ''}'
@@ -161,18 +176,21 @@ class VoiceController extends StateNotifier<VoiceState> {
         );
       }
     } on api.NotConfiguredException {
+      if (superseded()) return;
       state = state.copyWith(
         state: VoiceSessionState.failed,
         error: 'This Space has no voice configured.',
         retryable: false,
       );
     } on api.ForbiddenException {
+      if (superseded()) return;
       state = state.copyWith(
         state: VoiceSessionState.failed,
         error: 'You do not have permission to join this channel.',
         retryable: false,
       );
     } on api.ApiException catch (e) {
+      if (superseded()) return;
       state = state.copyWith(
         state: VoiceSessionState.failed,
         error: describeApiFailure('join the call', e),
@@ -180,6 +198,7 @@ class VoiceController extends StateNotifier<VoiceState> {
       );
     } catch (e) {
       // Joining is automatic now, so nothing asks first; an exception no other clause names must still fail cleanly.
+      if (superseded()) return;
       _log('Join failed with an unexpected error', detail: e);
       state = state.copyWith(
         state: VoiceSessionState.failed,
@@ -187,11 +206,13 @@ class VoiceController extends StateNotifier<VoiceState> {
         retryable: true,
       );
     } finally {
-      state = state.copyWith(joining: false);
+      if (!superseded()) state = state.copyWith(joining: false);
     }
   }
 
+  /// Also supersedes any in-flight [join]; see its own doc comment.
   Future<void> leave() async {
+    _callGeneration++;
     _cancelBroadcastDeadline();
     final channelId = state.channelId;
     final startedAt = state.connectedAt;
