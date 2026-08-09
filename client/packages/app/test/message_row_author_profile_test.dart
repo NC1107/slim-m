@@ -55,10 +55,7 @@ List<Override> _resolvedProfile() => [
 
 /// The [AuthorProfileTapTarget] keyboard focus currently sits inside, by its
 /// own semantic label - null when focus is elsewhere entirely.
-String? _focusedTapTargetLabel() => FocusManager
-    .instance
-    .primaryFocus
-    ?.context
+String? _focusedTapTargetLabel() => FocusManager.instance.primaryFocus?.context
     ?.findAncestorWidgetOfExactType<AuthorProfileTapTarget>()
     ?.semanticLabel;
 

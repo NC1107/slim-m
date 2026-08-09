@@ -196,9 +196,7 @@ class _PollOptionRowState extends State<_PollOptionRow> {
                           textAlign: TextAlign.right,
                           style: AppText.caption.copyWith(
                             color: tokens.textSecondary,
-                            fontFeatures: const [
-                              FontFeature.tabularFigures(),
-                            ],
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                       ),

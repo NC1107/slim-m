@@ -236,70 +236,61 @@ void main() {
     });
 
     testWidgets('Enter casts a vote for the focused option', (tester) async {
-      int? voted;
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: Scaffold(
-            body: PollView(poll: _poll(), onVote: (i) => voted = i),
-          ),
-        ),
+      final voted = await _tabAndPress(
+        tester,
+        LogicalKeyboardKey.enter,
+        poll: _poll(),
       );
-
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.pumpAndSettle();
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await tester.pumpAndSettle();
-
       expect(voted, 0, reason: 'Enter was reachable but never runnable');
     });
 
     testWidgets('Space also casts a vote', (tester) async {
-      int? voted;
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: Scaffold(
-            body: PollView(poll: _poll(), onVote: (i) => voted = i),
-          ),
-        ),
+      final voted = await _tabAndPress(
+        tester,
+        LogicalKeyboardKey.space,
+        poll: _poll(),
       );
-
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.pumpAndSettle();
-      await tester.sendKeyEvent(LogicalKeyboardKey.space);
-      await tester.pumpAndSettle();
-
       expect(voted, 0);
     });
 
     testWidgets('a closed poll never takes keyboard focus at all', (
       tester,
     ) async {
-      int? voted;
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: Scaffold(
-            body: PollView(
-              poll: _poll(closed: true),
-              onVote: (i) => voted = i,
-            ),
-          ),
-        ),
+      final voted = await _tabAndPress(
+        tester,
+        LogicalKeyboardKey.enter,
+        poll: _poll(closed: true),
       );
-
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.pumpAndSettle();
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await tester.pumpAndSettle();
-
       expect(
         voted,
         isNull,
-        reason: 'a closed poll refuses the vote server-side regardless; a '
+        reason:
+            'a closed poll refuses the vote server-side regardless; a '
             'focusable, activatable row here would just be a false promise',
       );
     });
   });
+}
+
+/// Tabs to the first option and presses [key], returning whatever option
+/// [PollView.onVote] was called with, if any.
+Future<int?> _tabAndPress(
+  WidgetTester tester,
+  LogicalKeyboardKey key, {
+  required api.Poll poll,
+}) async {
+  int? voted;
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: buildTheme(Brightness.light, AppTokens.light),
+      home: Scaffold(
+        body: PollView(poll: poll, onVote: (i) => voted = i),
+      ),
+    ),
+  );
+  await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+  await tester.pumpAndSettle();
+  await tester.sendKeyEvent(key);
+  await tester.pumpAndSettle();
+  return voted;
 }
