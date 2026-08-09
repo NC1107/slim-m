@@ -71,10 +71,15 @@ Future<void> showMemberProfile(
   final memberPaneScaffold = Scaffold.maybeOf(anchor);
 
   if (compact) {
+    // Its own controller reads the platform's own reduce-motion feature, never this app's MotionOverride; see sheet.dart's library doc.
+    final noAnimation = AppMotion.isReduced(anchor)
+        ? AnimationStyle.noAnimation
+        : null;
     return showModalBottomSheet<void>(
       context: anchor,
       isScrollControlled: true,
       showDragHandle: true,
+      sheetAnimationStyle: noAnimation,
       builder: (context) => SafeArea(
         top: false,
         child: MemberProfileBody(

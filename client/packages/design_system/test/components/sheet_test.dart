@@ -7,6 +7,16 @@
 /// the bottom of a monitor, offers a handle a mouse cannot usefully drag, and
 /// gets cut off by an edge it cannot see. The avatar crop sheet was cut off
 /// exactly that way and could not be completed at all.
+///
+/// The `reduce motion` group below covers a gap of its own: `showDialog` and
+/// `showModalBottomSheet` each drive their own entrance with a plain
+/// `AnimationController` Flutter owns, keyed to the platform's own
+/// reduce-motion feature rather than this app's `MediaQuery` override - the
+/// one `MotionOverride` cannot reach unless `showAppSheet` hands Flutter an
+/// `AnimationStyle` itself. Asserted from both sides, the same shape
+/// `reduce_motion_test.dart` already uses: a reduce-motion branch that is
+/// always taken would pass a one-sided test while quietly losing the sheet's
+/// own entrance for everybody.
 library;
 
 import 'package:flutter/material.dart';
@@ -22,11 +32,21 @@ Finder get _panel => find
     .descendant(of: find.byType(Dialog), matching: find.byType(Material))
     .first;
 
-Future<void> _open(
+/// Pumps a screen with one button that opens [showAppSheet], and taps it.
+///
+/// [reduceMotion] is applied with `copyWith` on the ambient `MediaQuery`
+/// `WidgetsApp` already resolved from `window`, not a bare replacement: a
+/// bare [MediaQueryData] defaults its own `size` to [Size.zero], which would
+/// send every case here down the compact branch regardless of `window`. The
+/// second [Builder] is what makes that override reach `showAppSheet` at
+/// all - the outer one's own `context` sits above it, not below.
+Future<void> _pumpOpener(
   WidgetTester tester,
   Size window, {
   double maxWidth = kSheetMaxWidth,
   bool bare = false,
+  bool reduceMotion = false,
+  Widget body = const Text('sheet body'),
 }) async {
   tester.view.physicalSize = window;
   tester.view.devicePixelRatio = 1.0;
@@ -36,22 +56,24 @@ Future<void> _open(
     MaterialApp(
       theme: buildTheme(Brightness.dark, AppTokens.dark),
       home: Builder(
-        builder: (context) => Scaffold(
-          body: Center(
-            child: TextButton(
-              onPressed: () => showAppSheet<void>(
-                context,
-                maxWidth: maxWidth,
-                bare: bare,
-                // Greedy on purpose: content that asks for more width than
-                // the cap is the only thing that proves the cap binds.
-                builder: (_) => const SizedBox(
-                  width: 2000,
-                  height: 120,
-                  child: Center(child: Text('sheet body')),
+        builder: (context) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(disableAnimations: reduceMotion),
+          child: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                // A plain tap target, not TextButton: its own ink-splash animation is a second one the assertions below would trip over.
+                child: GestureDetector(
+                  onTap: () => showAppSheet<void>(
+                    context,
+                    maxWidth: maxWidth,
+                    bare: bare,
+                    builder: (_) => body,
+                  ),
+                  child: const Text('open'),
                 ),
               ),
-              child: const Text('open'),
             ),
           ),
         ),
@@ -59,6 +81,29 @@ Future<void> _open(
     ),
   );
   await tester.tap(find.text('open'));
+}
+
+/// [_pumpOpener] plus settling all the way, for every test that only cares
+/// about the sheet's final, resting shape.
+Future<void> _open(
+  WidgetTester tester,
+  Size window, {
+  double maxWidth = kSheetMaxWidth,
+  bool bare = false,
+}) async {
+  await _pumpOpener(
+    tester,
+    window,
+    maxWidth: maxWidth,
+    bare: bare,
+    // Greedy on purpose: content that asks for more width than the cap is
+    // the only thing that proves the cap binds.
+    body: const SizedBox(
+      width: 2000,
+      height: 120,
+      child: Center(child: Text('sheet body')),
+    ),
+  );
   await tester.pumpAndSettle();
 }
 
@@ -143,5 +188,60 @@ void main() {
     final dialog = tester.widget<Dialog>(find.byType(Dialog));
     expect(dialog.backgroundColor, Colors.transparent);
     expect(dialog.shape, isNull);
+  });
+
+  group('reduce motion', () {
+    // See this file's own library doc for why this group exists at all.
+    testWidgets('the bottom sheet opens with no running animation', (
+      tester,
+    ) async {
+      await _pumpOpener(tester, _phone, reduceMotion: true);
+      await tester.pump();
+
+      expect(find.text('sheet body'), findsOneWidget);
+      expect(
+        tester.hasRunningAnimations,
+        isFalse,
+        reason: 'nothing may keep ticking once the viewer has asked it not to',
+      );
+    });
+
+    testWidgets('the bottom sheet still animates by default', (tester) async {
+      await _pumpOpener(tester, _phone);
+      await tester.pump();
+
+      expect(
+        tester.hasRunningAnimations,
+        isTrue,
+        reason: "a viewer who asked for nothing keeps the sheet's own stock "
+            "entrance rather than this app's override collapsing it",
+      );
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('the dialog opens with no running animation', (tester) async {
+      await _pumpOpener(tester, _desktop, reduceMotion: true);
+      await tester.pump();
+
+      expect(find.text('sheet body'), findsOneWidget);
+      expect(
+        tester.hasRunningAnimations,
+        isFalse,
+        reason: 'nothing may keep ticking once the viewer has asked it not to',
+      );
+    });
+
+    testWidgets('the dialog still animates by default', (tester) async {
+      await _pumpOpener(tester, _desktop);
+      await tester.pump();
+
+      expect(
+        tester.hasRunningAnimations,
+        isTrue,
+        reason: "a viewer who asked for nothing keeps the dialog's own stock "
+            "entrance rather than this app's override collapsing it",
+      );
+      await tester.pumpAndSettle();
+    });
   });
 }
