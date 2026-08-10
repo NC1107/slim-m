@@ -12,6 +12,44 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The client asked one permission question and the server answered a different one, in eight places (2026-08-10)
+
+A per-screen review of every rendered screen found one missing abstraction sitting under eight separate bugs, and the design that closed it is [docs/decisions/0011-per-channel-permissions.md](docs/decisions/0011-per-channel-permissions.md).
+Read that record before touching a permission gate in the client.
+
+**The client gated actions on the caller's deployment-wide base permissions while the server authorized the same actions per channel.**
+`GET /me` answers a flat bitmask, and its own schema description already called it "a UI nicety only," which is the honest reason every one of the eight sites existed: nothing better was ever built for the client to ask.
+Meanwhile `permissions_in_channel` folds in channel overwrites, resolves a thread to its parent, subtracts a timeout, and for a DM runs an entirely different evaluator that never grants a moderation bit to anybody, administrator included.
+Three separate reviewers rediscovered the same gap independently in five areas, which is what turned it from a list of bugs into one design.
+
+**The sharpest instance is worth remembering on its own: a report card offered "Delete message" on a DM harassment report, and for a DM the server can never grant `MANAGE_MESSAGES` to anyone.**
+It was a guaranteed dead button on exactly the report class the moderation queue goes out of its way to surface.
+None of the eight was a security hole, since the server re-authorizes every write regardless; the cost was offering actions guaranteed to fail, and, in the other direction, hiding actions a channel overwrite would have honoured.
+
+**`GET /channels/{channel_id}/permissions` masks its whole answer to zero whenever `VIEW_CHANNEL` is absent, and that rule is load-bearing rather than cautious.**
+`permissions_in_channel` forces `NONE` for a channel that does not exist, but a real channel the caller cannot view passes their base bits straight through wherever no overwrite touches them, and `@everyone` usually grants something.
+Unmasked, those two answers differ, and the difference confirms a hidden channel exists - the same oracle `http/sync.rs` already avoids deliberately.
+`mask_unless_viewable` is one shared function so the rule cannot drift between the route and the batched path.
+
+**Two of the three surfaces cost almost nothing, and finding that out is why the design came before the code.**
+`channels_where` already computed the full per-channel bitmask for every visible channel and discarded it inside its filter closure, so `ChannelDto.permissions` was a change to what one closure returns rather than a new query.
+`ReportDto.channel_permissions` needed a genuinely new batched function, because `channels_where` only ever walks `list_channels()`, which excludes DMs and deleted channels by construction - precisely the two cases the flagship bug is about.
+
+**Not every site converted, and converting them all would have been its own bug.**
+Timeout, removal, role CRUD, role assignment and invite creation are deployment-wide and the server enforces them that way.
+In `member_profile.dart` and `report_card.dart` the split runs per action rather than per file, so a test that only proves the conversion would pass if somebody wrongly converted the siblings too; both files have a test asserting both halves.
+
+**A mutation that kills nothing is the signal, and it fired four times on this one change.**
+A thread-resolution test passed vacuously because the fixture's parent had no overwrite, so a naive base-only evaluation happened to equal the parent's real answer.
+Two invalidation tests passed vacuously because **Riverpod invalidates lazily**: nothing refetches until something asks again, so a test that counts fetches after emitting an event never observes whether the invalidation happened at all, and every such test has to force a read afterward.
+A DM report test passed vacuously because `Perm.administrator` alone does not set the `manageMessages` bit at the raw bitmask level, where an administrator's real base set has every bit resolved into it.
+In each case the fixture made the old and new answers identical by accident; the fix is to build the fixture so they genuinely disagree, and the way to find out is to apply the mutation rather than to read the test.
+
+**One residual, stated rather than smoothed.**
+A timeout lapses by arithmetic at read time, with nothing running and no event published, so no cache invalidated by events can ever be told it ended.
+That is an accepted staleness window bounded by the next natural refetch, never a security gap, and it is the same move `OverwriteChanged`'s own doc comment already makes about its own known gap.
+Also left open: a caller holding *no* deployment-wide bit at all, only a channel-scoped `MANAGE_ROLES`, still cannot reach Space settings, because the outer section gate stays on base permissions by design.
+
 ## A vanished SnackBar came back three times, and now there is a gate (2026-08-08)
 
 The nine-specialist audit (2026-07-29) replaced 27 vanishing `SnackBar`s with persistent `AppErrorState`, on the grounds that a failure which disappears on its own is a failure nobody saw.
