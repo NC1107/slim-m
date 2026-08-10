@@ -316,16 +316,24 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
     );
   }
 
-  void _zoomAbout(Offset focal, double zoom) {
+  /// Solves directly for the camera that leaves the world point under
+  /// [focal] exactly where it was, at the new zoom - one [setCamera] call
+  /// rather than a set-then-correct pair, so a camera already near a world
+  /// edge cannot have its own clamp shift x/y before the correction reads
+  /// it. [zoomTarget] is clamped here rather than inside [setCamera], since
+  /// the offset needs the zoom that will actually land; the no-op guard
+  /// spares a wheel notch already parked at a bound the cost of a recull.
+  void _zoomAbout(Offset focal, double zoomTarget) {
     final document = widget.document;
-    final before = _toWorld(focal);
-    document.setCamera(document.camera.copyWith(zoom: zoom));
-    final after = _toWorld(focal);
     final camera = document.camera;
+    final zoom = zoomTarget.clamp(minZoom, maxZoom);
+    if (zoom == camera.zoom) return;
+    final worldFocal = _toWorld(focal);
     document.setCamera(
       camera.copyWith(
-        x: camera.x + (before.dx - after.dx),
-        y: camera.y + (before.dy - after.dy),
+        x: worldFocal.dx - focal.dx / zoom,
+        y: worldFocal.dy - focal.dy / zoom,
+        zoom: zoom,
       ),
     );
   }
