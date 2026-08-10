@@ -16,7 +16,7 @@ import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../permissions.dart';
-import '../../providers/admin_providers.dart';
+import '../../providers/channel_permissions.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
@@ -175,15 +175,19 @@ class _ChannelOverwritesScreenState
     }
   }
 
-  /// [myPermissionsProvider] is a floor here, not the exact figure. The server
-  /// checks "allow" against the caller's effective permissions in this specific
-  /// channel, which a per-channel overwrite of the caller's own can raise above
-  /// their base set. There is no endpoint to read that per-channel figure, so
-  /// this uses the base (deployment-level) set from `/me` as a safe, possibly
-  /// stricter, stand-in.
+  /// The server checks "allow" against the caller's effective permissions in
+  /// the channel actually picked, which a per-channel overwrite of the
+  /// caller's own can raise above their base set - so this reads
+  /// [myChannelPermissionsProvider] for that channel rather than `/me`'s
+  /// base set, closing the gap the old doc comment here used to name before
+  /// `GET /channels/{channelId}/permissions` existed. See
+  /// docs/decisions/0011-per-channel-permissions.md. Zero (nothing enabled)
+  /// before a channel is chosen, since there is nothing to check yet.
   @override
   Widget build(BuildContext context) {
-    final myPermissions = ref.watch(myPermissionsProvider);
+    final myPermissions = _channel != null
+        ? ref.watch(myChannelPermissionsProvider(_channel!.id))
+        : 0;
 
     return SettingsScreenScaffold(
       title: 'Channel permissions',

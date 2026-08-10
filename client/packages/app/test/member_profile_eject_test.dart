@@ -78,6 +78,14 @@ _wire({int permissions = 0, api.Me? selfProfile}) {
                 headers: {'content-type': 'application/json'},
               );
             }
+            // Eject reads this channel's own answer, not `/me`'s base set - see channel_permissions.dart.
+            if (request.url.path == '/channels/$_channelId/permissions') {
+              return http.Response(
+                jsonEncode({'permissions': permissions}),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
             return http.Response('', 204);
           }),
         );
@@ -114,6 +122,8 @@ Future<void> _joinShared(
       isScreenSharing: false,
     ),
   ]);
+  await tester.pump();
+  // A second pump for channelPermissionsProvider's own mocked round trip.
   await tester.pump();
 }
 

@@ -38,6 +38,7 @@ String reportJson({
   String? snapshot,
   String? subjectAuthorId,
   String reason = 'this is not okay',
+  int? channelPermissions,
 }) => jsonEncode({
   'id': id,
   'reporter_id': reporterId,
@@ -48,6 +49,7 @@ String reportJson({
   'snapshot': snapshot,
   'subject_author_id': subjectAuthorId,
   'created_at': 0,
+  'channel_permissions': channelPermissions,
 });
 
 String profileJson(String id, String displayName) => jsonEncode({

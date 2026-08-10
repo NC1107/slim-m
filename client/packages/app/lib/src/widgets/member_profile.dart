@@ -29,6 +29,7 @@ import 'package:slimm_rtc/rtc.dart';
 import '../permissions.dart';
 import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
+import '../providers/channel_permissions.dart';
 import '../providers/dms.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
@@ -297,12 +298,16 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     final canTimeOut = !isSelf && mine.hasPermission(Perm.kickMembers);
     final canRemove = !isSelf && mine.hasPermission(Perm.banMembers);
     final canManageRoles = !isSelf && mine.hasPermission(Perm.manageRoles);
+    // The voice kick handler checks KICK_MEMBERS in this call's own channel, since an overwrite may grant it there alone.
+    final voiceChannelPermissions = voice.channelId != null
+        ? ref.watch(myChannelPermissionsProvider(voice.channelId!))
+        : 0;
     // Needs a room to evict them from, not just the bit; the call section above already answers that.
     final canEject =
         !isSelf &&
         inCallTogether &&
         voice.channelId != null &&
-        mine.hasPermission(Perm.kickMembers);
+        voiceChannelPermissions.hasPermission(Perm.kickMembers);
     final showModeration =
         canTimeOut || canRemove || canManageRoles || canEject;
 

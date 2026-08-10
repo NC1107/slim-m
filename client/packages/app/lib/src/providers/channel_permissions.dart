@@ -36,3 +36,14 @@ final myChannelPermissionsProvider = Provider.family<int, String>(
   (ref, channelId) =>
       ref.watch(channelPermissionsProvider(channelId)).valueOrNull ?? 0,
 );
+
+/// Every channel the caller can currently see, each carrying its own
+/// [Channel.permissions] - the list-wide sibling of
+/// [channelPermissionsProvider]'s single-channel question, for "which of my
+/// channels can I do X in" rather than "what can I do in this one open
+/// channel". Fetched fresh through `GET /channels` on every watch, matching
+/// `rolesProvider`/`invitesProvider`; excludes DMs and threads, which never
+/// appear in that response. Empty while loading or on error.
+final myVisibleChannelsProvider = FutureProvider.autoDispose<List<Channel>>(
+  (ref) => ref.watch(apiProvider).listChannels(),
+);

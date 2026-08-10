@@ -21,6 +21,7 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/admin_providers.dart';
+import 'package:slimm_app/src/providers/channel_permissions.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/space_settings_section.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -124,6 +125,57 @@ void main() {
         reason: 'Roles, permissions, categories and emoji are all hidden',
       );
       expect(find.byType(AppCard), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Channel permissions alone opens for MANAGE_ROLES held only through one '
+    "visible channel's overwrite, with Roles itself staying hidden",
+    (tester) async {
+      // Base is CREATE_INVITE alone, so only the channel can explain the row.
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+          myPermissionsProvider.overrideWithValue(Perm.createInvite),
+          myVisibleChannelsProvider.overrideWith(
+            (ref) async => const [
+              api.Channel(
+                id: 'c1',
+                name: 'general',
+                kind: 'text',
+                createdAt: 0,
+                permissions: Perm.manageRoles,
+              ),
+            ],
+          ),
+          apiProvider.overrideWith((ref) {
+            final client = api.SlimmApi(
+              baseUrl: Uri.parse('http://localhost:8080'),
+              session: ref.watch(sessionProvider),
+              httpClient: MockClient(
+                (request) async => http.Response(
+                  jsonEncode({'join_policy': 'invite'}),
+                  200,
+                  headers: {'content-type': 'application/json'},
+                ),
+              ),
+            );
+            ref.onDispose(client.close);
+            return client;
+          }),
+        ],
+      );
+      await _pump(tester, container);
+
+      expect(find.text('Channel permissions'), findsOneWidget);
+      expect(
+        find.text('Roles'),
+        findsNothing,
+        reason:
+            'role CRUD is deployment-wide; a channel overwrite grants '
+            'nothing towards it',
+      );
     },
   );
 }

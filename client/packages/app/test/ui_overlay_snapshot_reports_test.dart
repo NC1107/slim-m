@@ -45,6 +45,7 @@ api.Report _messageReport({
   String? subjectAuthorId = 'user-ada',
   String? snapshot =
       'Ok so hear me out, everyone should just go knock on their door.',
+  int? channelPermissions,
 }) => api.Report(
   id: 'report-1',
   reporterId: 'user-maya',
@@ -55,6 +56,7 @@ api.Report _messageReport({
   snapshot: snapshot,
   subjectAuthorId: subjectAuthorId,
   createdAt: 1753600400000,
+  channelPermissions: channelPermissions,
 );
 
 /// A fixed answer, the shape `member_profile_block_test.dart`'s
@@ -147,7 +149,7 @@ void main() {
   ) async {
     await _pumpReportCard(
       tester,
-      _messageReport(),
+      _messageReport(channelPermissions: Perm.manageMessages),
       permissions: Perm.manageMessages | Perm.kickMembers | Perm.banMembers,
       profiles: const {
         'user-maya': api.UserProfile(
@@ -174,12 +176,43 @@ void main() {
     await _finish(tester, 'report-card-no-quick-actions-desktop');
   });
 
+  testWidgets(
+    "a DM's own channel_permissions never carries MANAGE_MESSAGES, so Delete "
+    'is absent for an administrator too',
+    (tester) async {
+      await _pumpReportCard(
+        tester,
+        _messageReport(
+          // DM_BASE minus manageMessages - no one is ever granted it in a DM.
+          channelPermissions: Perm.viewChannel | Perm.sendMessages,
+        ),
+        // Every base bit, the real shape an administrator's base set holds.
+        permissions: -1,
+        profiles: const {
+          'user-maya': api.UserProfile(
+            id: 'user-maya',
+            username: 'maya',
+            displayName: 'Maya',
+            createdAt: 0,
+          ),
+          'user-ada': api.UserProfile(
+            id: 'user-ada',
+            username: 'ada',
+            displayName: 'Ada Lovelace',
+            createdAt: 0,
+          ),
+        },
+      );
+      await _finish(tester, 'report-card-dm-administrator-desktop');
+    },
+  );
+
   testWidgets('Jump renders disabled, not absent, for an unreached channel', (
     tester,
   ) async {
     await _pumpReportCard(
       tester,
-      _messageReport(),
+      _messageReport(channelPermissions: Perm.manageMessages),
       permissions: Perm.manageMessages,
       channelKnown: false,
     );
@@ -218,7 +251,13 @@ void main() {
   });
 
   testWidgets('the reporter has not been resolved yet', (tester) async {
-    await _pumpReportCard(tester, _messageReport(), profiles: const {});
+    // Distinct from report-card-no-quick-actions-desktop: this carries live actions.
+    await _pumpReportCard(
+      tester,
+      _messageReport(channelPermissions: Perm.manageMessages),
+      permissions: Perm.manageMessages,
+      profiles: const {},
+    );
     await _finish(tester, 'report-card-reporter-resolving-desktop');
   });
 

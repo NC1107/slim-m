@@ -146,6 +146,57 @@ void main() {
   );
 
   testWidgets(
+    "Allow reads this channel's own answer, not the caller's base set - "
+    'denied here even though the base set (see channelOverwritesMe) grants '
+    'everything',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await pumpToTargetPicker(
+        tester,
+        channelPermissions: 0,
+        handler: (request) => request.url.path == '/roles'
+            ? http.Response(
+                jsonEncode([
+                  {
+                    'id': 'r1',
+                    'name': 'Moderators',
+                    'permissions': 0,
+                    'is_everyone': false,
+                    'created_at': 0,
+                  },
+                ]),
+                200,
+              )
+            : http.Response('{}', 200),
+      );
+
+      await tester.tap(find.text('Choose a role'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Moderators'));
+      await tester.pumpAndSettle();
+
+      final row = tester.widget<AppSegmentedControl>(
+        find
+            .ancestor(
+              of: find.text('Allow'),
+              matching: find.byType(AppSegmentedControl),
+            )
+            .first,
+      );
+      expect(
+        row.options.firstWhere((o) => o.label == 'Allow').disabled,
+        isTrue,
+        reason:
+            'the base set (channelOverwritesMe) grants everything; only '
+            'this channel\'s own denial explains Allow staying off',
+      );
+    },
+  );
+
+  testWidgets(
     'Administrator is not offered: it bypasses channel overwrites entirely',
     (tester) async {
       tester.view.physicalSize = const Size(800, 2400);
