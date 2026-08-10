@@ -19,6 +19,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../permissions.dart';
 import '../providers/admin_providers.dart';
+import '../providers/channel_permissions.dart';
 import '../routing/routes.dart';
 import 'join_policy_row.dart';
 import 'settings_section_header.dart';
@@ -58,6 +59,14 @@ class SpaceSettingsSection extends ConsumerWidget {
     final canManageServer = permissions.hasPermission(Perm.manageServer);
     final canManageChannels = permissions.hasPermission(Perm.manageChannels);
     final canBan = permissions.hasPermission(Perm.banMembers);
+    // Unlike Roles (deployment-wide), this row also opens via one overwrite.
+    final visibleChannels =
+        ref.watch(myVisibleChannelsProvider).valueOrNull ?? const [];
+    final canManageRolesAnywhere =
+        canManageRoles ||
+        visibleChannels.any(
+          (c) => (c.permissions ?? 0).hasPermission(Perm.manageRoles),
+        );
 
     final tokens = Theme.of(context).extension<AppTokens>()!;
     Widget chevron() => Icon(
@@ -103,20 +112,20 @@ class SpaceSettingsSection extends ConsumerWidget {
       (
         'Configuration',
         [
-          if (canManageRoles) ...[
+          if (canManageRoles)
             AppListRow(
               label: 'Roles',
               leading: const Icon(AppIcons.shield),
               trailing: chevron(),
               onTap: () => context.push(Routes.adminRoles),
             ),
+          if (canManageRolesAnywhere)
             AppListRow(
               label: 'Channel permissions',
               leading: const Icon(AppIcons.permissions),
               trailing: chevron(),
               onTap: () => context.push(Routes.adminOverwrites),
             ),
-          ],
           if (canManageChannels)
             AppListRow(
               label: 'Channel categories',

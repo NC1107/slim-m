@@ -6,6 +6,8 @@
 /// it on its own.
 library;
 
+import 'dart:convert';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,12 +29,15 @@ const channelOverwritesTokens = TokenPair(
   accessExpiresAt: 0,
 );
 
+// A field access on a const instance is not itself a Dart constant expression.
+const channelOverwritesMePermissions = -1;
+
 const channelOverwritesMe = Me(
   id: 'user-1',
   username: 'admin',
   displayName: 'Admin',
   createdAt: 0,
-  permissions: -1,
+  permissions: channelOverwritesMePermissions,
 );
 
 /// [WidgetTester.pumpAndSettle] pumps frames, not real time, so it cannot be
@@ -55,9 +60,15 @@ Future<void> settleUntilFound(WidgetTester tester, Finder finder) async {
 /// chosen. Picking a channel reads the local store's real (native) sqlite
 /// stream, which needs [WidgetTester.runAsync] to resolve inside a widget
 /// test: the fake test clock never advances it otherwise.
+///
+/// [channelPermissions] answers `GET /channels/c1/permissions` - the "Allow"
+/// gate's real source since docs/decisions/0011-per-channel-permissions.md -
+/// defaulting to [channelOverwritesMe]'s own base set so a test naming
+/// neither still reads as "this caller can do anything".
 Future<void> pumpToTargetPicker(
   WidgetTester tester, {
   required http.Response Function(http.Request) handler,
+  int channelPermissions = channelOverwritesMePermissions,
 }) async {
   final db = SlimmDatabase(NativeDatabase.memory());
   await MessageStore(db).upsertChannels(const [
@@ -77,7 +88,18 @@ Future<void> pumpToTargetPicker(
             final api = SlimmApi(
               baseUrl: Uri.parse('http://localhost:8080'),
               session: ref.watch(sessionProvider),
-              httpClient: MockClient((request) async => handler(request)),
+              httpClient: MockClient((request) async {
+                // Answered here rather than by each test's own handler.
+                if (request.method == 'GET' &&
+                    request.url.path == '/channels/c1/permissions') {
+                  return http.Response(
+                    jsonEncode({'permissions': channelPermissions}),
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }
+                return handler(request);
+              }),
             );
             ref.onDispose(api.close);
             return api;

@@ -128,6 +128,76 @@ void main() {
       expect(find.widgetWithText(AppButton, 'Delete message'), findsNothing);
     });
 
+    testWidgets(
+      'is absent when this report\'s own channel lacks MANAGE_MESSAGES, '
+      'even though the base (deployment-wide) set has it',
+      (tester) async {
+        await pumpReports(
+          tester,
+          reports: [
+            reportJson(
+              id: 'r1',
+              subjectKind: 'message',
+              subjectId: 'm1',
+              channelId: 'c1',
+              channelPermissions: 0,
+            ),
+          ],
+          permissions: Perm.manageMessages,
+        );
+
+        expect(find.widgetWithText(AppButton, 'Delete message'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'is present when this report\'s own channel carries MANAGE_MESSAGES, '
+      'even though the base (deployment-wide) set does not',
+      (tester) async {
+        await pumpReports(
+          tester,
+          reports: [
+            reportJson(
+              id: 'r1',
+              subjectKind: 'message',
+              subjectId: 'm1',
+              channelId: 'c1',
+              channelPermissions: Perm.manageMessages,
+            ),
+          ],
+        );
+
+        expect(
+          find.widgetWithText(AppButton, 'Delete message'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'is absent on a DM report even for an administrator, since the DM '
+      "evaluator never grants MANAGE_MESSAGES to anyone",
+      (tester) async {
+        await pumpReports(
+          tester,
+          reports: [
+            reportJson(
+              id: 'r1',
+              subjectKind: 'message',
+              subjectId: 'm1',
+              channelId: 'dm-1',
+              // DM_BASE minus manageMessages - no one holds it in a DM.
+              channelPermissions: Perm.viewChannel | Perm.sendMessages,
+            ),
+          ],
+          // Every base bit, the real shape an administrator's base set holds.
+          permissions: -1,
+        );
+
+        expect(find.widgetWithText(AppButton, 'Delete message'), findsNothing);
+      },
+    );
+
     testWidgets('confirms, then deletes the message and closes the report', (
       tester,
     ) async {
@@ -141,6 +211,7 @@ void main() {
             subjectKind: 'message',
             subjectId: 'm1',
             channelId: 'c1',
+            channelPermissions: Perm.manageMessages,
           ),
         ],
         db: db,

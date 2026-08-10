@@ -177,8 +177,11 @@ class _ReportCardState extends ConsumerState<ReportCard>
 
     final canJump = isMessageReport && report.channelId != null;
     final jumpEnabled = canJump && (_channelReachable ?? false);
+    // This report's own channel figure, never mine - a DM's never carries it.
     final canDeleteMessage =
-        isMessageReport && mine.hasPermission(Perm.manageMessages);
+        isMessageReport &&
+        (report.channelPermissions?.hasPermission(Perm.manageMessages) ??
+            false);
     final canTimeOut =
         targetUserId != null && !isSelf && mine.hasPermission(Perm.kickMembers);
     final canRemove =
