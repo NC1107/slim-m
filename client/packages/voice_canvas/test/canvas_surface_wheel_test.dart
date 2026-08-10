@@ -64,9 +64,16 @@ void main() {
     },
   );
 
-  testWidgets('Ctrl+wheel zooms about the pointer rather than panning', (
-    tester,
-  ) async {
+  /// The camera starts away from the origin and the focal point is off
+  /// [Offset.zero] too, so this cannot pass the way a same-point-as-origin
+  /// version of this test once did: the world point under the pointer is
+  /// the origin either way in that case, with or without any correction at
+  /// all, and mutating `_zoomAbout` to drop its own recentring left that
+  /// version green. Asserting the transform, not just that `zoom` moved, is
+  /// what a value-only assertion cannot catch.
+  testWidgets(
+      'Ctrl+wheel zooms in about the pointer, not the viewport '
+      'centre', (tester) async {
     final document = CanvasDocument();
     addTearDown(document.dispose);
     await tester.pumpWidget(
@@ -79,22 +86,61 @@ void main() {
       ),
     );
     await tester.pump();
+    document.setCamera(const Camera(x: 137, y: -52, zoom: 1));
+    const focal = Offset(210, 340);
+    Offset worldUnder(Camera camera) => Offset(
+          camera.x + focal.dx / camera.zoom,
+          camera.y + focal.dy / camera.zoom,
+        );
+    final before = worldUnder(document.camera);
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     final mouse = TestPointer(1, PointerDeviceKind.mouse);
-    await tester.sendEventToBinding(mouse.hover(Offset.zero));
+    await tester.sendEventToBinding(mouse.hover(focal));
     await tester.sendEventToBinding(mouse.scroll(const Offset(0, -40)));
     await tester.pump();
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
 
     expect(document.camera.zoom, greaterThan(1));
-    expect(
-      document.camera.x,
-      0,
-      reason: 'zooming about the same point the camera already reads at '
-          'the world origin moves nothing, unlike a pan',
+    final after = worldUnder(document.camera);
+    expect(after.dx, closeTo(before.dx, 1e-9));
+    expect(after.dy, closeTo(before.dy, 1e-9));
+  });
+
+  testWidgets(
+      'Ctrl+wheel zooms out about the pointer, not the viewport '
+      'centre', (tester) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          onStroke: (_) {},
+        ),
+      ),
     );
-    expect(document.camera.y, 0);
+    await tester.pump();
+    document.setCamera(const Camera(x: -410, y: 88, zoom: 2));
+    const focal = Offset(60, 480);
+    Offset worldUnder(Camera camera) => Offset(
+          camera.x + focal.dx / camera.zoom,
+          camera.y + focal.dy / camera.zoom,
+        );
+    final before = worldUnder(document.camera);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    final mouse = TestPointer(1, PointerDeviceKind.mouse);
+    await tester.sendEventToBinding(mouse.hover(focal));
+    await tester.sendEventToBinding(mouse.scroll(const Offset(0, 40)));
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+
+    expect(document.camera.zoom, lessThan(2));
+    final after = worldUnder(document.camera);
+    expect(after.dx, closeTo(before.dx, 1e-9));
+    expect(after.dy, closeTo(before.dy, 1e-9));
   });
 
   /// The regression this whole file exists for: a real mouse wheel never
