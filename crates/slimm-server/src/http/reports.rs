@@ -58,6 +58,18 @@ struct ReportDto {
     /// message since hard-deleted, and once the author is anonymized.
     subject_author_id: Option<String>,
     created_at: i64,
+    /// The caller's effective permissions in `channel_id`, or null exactly
+    /// when `channel_id` itself is null. A report's channel does not by
+    /// itself say whether the caller can currently manage it - it could be
+    /// a DM (never manageable, by design), a deleted channel (nothing left
+    /// to manage), or a live channel the caller already holds
+    /// MANAGE_MESSAGES in (or the report would have been filtered out
+    /// before it reached this page). Populated once per page in `list`,
+    /// batched through `Store::permissions_in_channels`, and masked the
+    /// same way `GET /channels/{channelId}/permissions` masks its own
+    /// answer - a DM report's own bitmask structurally never carries
+    /// MANAGE_MESSAGES, since a DM has no such permission for anyone.
+    channel_permissions: Option<i64>,
 }
 
 impl From<Report> for ReportDto {
@@ -72,6 +84,7 @@ impl From<Report> for ReportDto {
             snapshot: report.snapshot,
             subject_author_id: report.subject_author_id.map(|id| id.to_string()),
             created_at: report.created_at,
+            channel_permissions: None,
         }
     }
 }
@@ -131,7 +144,30 @@ async fn list(
 
     let hidden = hidden_channels(&state, ctx.user_id).await?;
     let reports = state.store.list_open_reports(after, &hidden, limit).await?;
-    Ok(Json(reports.into_iter().map(ReportDto::from).collect()))
+
+    let channel_ids: Vec<ChannelId> = reports.iter().filter_map(|r| r.channel_id).collect();
+    let channel_permissions = state
+        .store
+        .permissions_in_channels(ctx.user_id, &channel_ids)
+        .await?;
+
+    let dtos = reports
+        .into_iter()
+        .map(|report| {
+            let permissions = report.channel_id.map(|id| {
+                channel_permissions
+                    .get(&id)
+                    .copied()
+                    .unwrap_or(Permissions::NONE)
+                    .bits()
+            });
+            ReportDto {
+                channel_permissions: permissions,
+                ..ReportDto::from(report)
+            }
+        })
+        .collect();
+    Ok(Json(dtos))
 }
 
 /// The channels this caller may not read reports from: every live non-DM

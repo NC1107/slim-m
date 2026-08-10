@@ -16,7 +16,7 @@ use super::error::ApiError;
 use super::extract::{AuthedLimited, Json, READ};
 use super::messages::parse_uuid;
 use crate::ids::ChannelId;
-use crate::permissions::Permissions;
+use crate::permissions::mask_unless_viewable;
 
 /// The channel-permission route, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
@@ -30,8 +30,8 @@ struct ChannelPermissionsDto {
 
 /// Calls [`crate::store::Store::permissions_in_channel`] - which already
 /// resolves a thread to its parent, branches to the DM evaluator, and
-/// subtracts a timeout - then masks the whole answer to zero whenever the
-/// result lacks VIEW_CHANNEL.
+/// subtracts a timeout - then masks the whole answer with
+/// [`mask_unless_viewable`] whenever the result lacks VIEW_CHANNEL.
 ///
 /// That masking is not caution for its own sake. `permissions_in_channel`
 /// forces `NONE` for a channel that does not exist, but a real channel the
@@ -52,12 +52,7 @@ async fn get_permissions(
         .store
         .permissions_in_channel(ctx.user_id, channel_id)
         .await?;
-    let permissions = if permissions.contains(Permissions::VIEW_CHANNEL) {
-        permissions
-    } else {
-        Permissions::NONE
-    };
     Ok(Json(ChannelPermissionsDto {
-        permissions: permissions.bits(),
+        permissions: mask_unless_viewable(permissions).bits(),
     }))
 }

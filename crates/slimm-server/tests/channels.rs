@@ -359,6 +359,69 @@ async fn deleting_a_channel_id_that_was_never_real_is_not_found() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
+/// `GET /channels` carries the caller's own effective permission bitmask on
+/// every row, free from `visible_channels_with_permissions`'s already-computed
+/// bitmask; `POST /channels` does not, since a create response has no one
+/// caller's *channel* bitmask to embed - the channel is brand new.
+#[tokio::test]
+async fn listing_channels_includes_the_callers_own_permissions() {
+    let (store, _guard) = new_store().await;
+    let everyone = store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL
+                .union(Permissions::SEND_MESSAGES)
+                .union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    store
+        .set_role_overwrite(
+            channel.id,
+            everyone,
+            Permissions::NONE,
+            Permissions::SEND_MESSAGES,
+        )
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let listed = json_body(
+        app.clone()
+            .oneshot(request("GET", "/channels", Some(&token), None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let row = &listed.as_array().unwrap()[0];
+    let bits = Permissions::from_bits(row["permissions"].as_i64().unwrap());
+    assert!(bits.contains(Permissions::VIEW_CHANNEL));
+    assert!(
+        !bits.contains(Permissions::SEND_MESSAGES),
+        "the channel overwrite denying SEND_MESSAGES must show up here"
+    );
+
+    let created = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/channels",
+                Some(&token),
+                Some(json!({ "name": "second" })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        created.get("permissions").is_none(),
+        "create has no one caller whose channel bitmask belongs on the response"
+    );
+}
+
 #[tokio::test]
 async fn deleting_without_manage_channels_is_forbidden() {
     let (store, _guard) = new_store().await;

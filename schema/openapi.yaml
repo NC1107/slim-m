@@ -4056,6 +4056,19 @@ components:
           type: integer
           format: int64
           description: Unix milliseconds.
+        channel_permissions:
+          type: [integer, "null"]
+          format: int64
+          description: >
+            The caller's effective permission bitmask in `channel_id`, null
+            exactly when `channel_id` is null. Batched per page rather than
+            per report; masked to zero whenever the caller lacks
+            VIEW_CHANNEL, the same rule `getChannelPermissions` applies -
+            see docs/decisions/0011-per-channel-permissions.md. A DM
+            report's bitmask structurally never carries MANAGE_MESSAGES,
+            since no one holds that permission in a DM. Absent on servers
+            older than this field, which a client must treat as unknown
+            rather than assuming zero.
 
     ResolveReportRequest:
       type: object
@@ -4208,6 +4221,20 @@ components:
           type: integer
           format: int64
           description: Unix milliseconds.
+        permissions:
+          type: integer
+          format: int64
+          description: >
+            The caller's effective permission bitmask in this channel,
+            already resolved through thread and DM handling with any
+            timeout subtracted - the batched sibling of
+            `getChannelPermissions`. Present only on `listChannels`, where
+            every row already carries VIEW_CHANNEL by construction, so
+            unlike that dedicated route this is never masked to zero;
+            absent from `createChannel`, `updateChannel`, `reorderChannels`,
+            `openThread` and the live `channel.created`/`channel.updated`
+            frames, none of which have one caller whose bitmask would be
+            right to embed.
 
     ChannelCategory:
       type: object

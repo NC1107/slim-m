@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! The batched permission read paths: many candidates against one channel
-//! (push fan-out) and many channels against one caller (the rail listing).
+//! (push fan-out), many channels against one caller (the rail listing and
+//! `GET /channels`'s own bitmask), and many arbitrary channel ids against
+//! one caller (the report queue's `channel_permissions` field).
 //!
 //! Split from `permissions.rs` when the batching pushed that file past the
-//! 500-line ceiling. Both load a role context and a set of overwrites with a
-//! bounded number of queries, then run the same pure
-//! [`crate::permissions::evaluate`] the per-user path runs, and both carry an
-//! equivalence test in `tests/permissions.rs` proving the answers identical.
+//! 500-line ceiling. All three load a role context and a set of overwrites
+//! with a bounded number of queries, then run the same pure
+//! [`crate::permissions::evaluate`] the per-user path runs, and each carries
+//! an equivalence test in `tests/permissions.rs` proving the answers
+//! identical to asking the per-user path once per candidate.
 
 use uuid::Uuid;
 
 use super::Store;
 use super::timeouts::TIMEOUT_DENY;
 use crate::ids::{ChannelId, RoleId, UserId};
-use crate::permissions::{Overwrite, Permissions, evaluate};
+use crate::permissions::{Overwrite, Permissions, evaluate, mask_unless_viewable};
 
 impl Store {
     /// Which of `candidates` hold VIEW_CHANNEL in `channel_id`, answered with
@@ -184,6 +187,27 @@ impl Store {
             .await
     }
 
+    /// [`Self::visible_channels`], paired with each channel's own full
+    /// effective bitmask - what `GET /channels`'s `permissions` field is
+    /// populated from. Every row here already carries VIEW_CHANNEL by
+    /// construction (this filters on exactly that bit, and every row came
+    /// from [`Self::list_channels`] in the first place), so unlike the
+    /// dedicated per-channel route and [`Self::permissions_in_channels`]
+    /// below, there is no "channel does not exist" case a raw answer could
+    /// be confused with, and nothing here needs
+    /// [`crate::permissions::mask_unless_viewable`].
+    pub async fn visible_channels_with_permissions(
+        &self,
+        user_id: UserId,
+    ) -> anyhow::Result<Vec<(super::Channel, Permissions)>> {
+        Ok(self
+            .channel_permissions_all(user_id)
+            .await?
+            .into_iter()
+            .filter(|(_, perms)| perms.contains(Permissions::VIEW_CHANNEL))
+            .collect())
+    }
+
     /// [`Store::list_channels`] filtered by `needed`, with the caller's role
     /// context loaded once. DMs and deleted channels are outside it, because
     /// they are outside `list_channels`.
@@ -200,12 +224,33 @@ impl Store {
         user_id: UserId,
         needed: Permissions,
     ) -> anyhow::Result<Vec<super::Channel>> {
+        Ok(self
+            .channel_permissions_all(user_id)
+            .await?
+            .into_iter()
+            .filter(|(_, perms)| perms.contains(needed))
+            .map(|(channel, _)| channel)
+            .collect())
+    }
+
+    /// The shared load-and-evaluate behind [`Self::channels_where`] and
+    /// [`Self::visible_channels_with_permissions`]: every live channel's row
+    /// paired with the caller's full effective bitmask in it, unfiltered.
+    /// Both callers trim this to their own shape, so the query cost - one
+    /// `load_roles` call and one batched overwrite fetch for however many
+    /// channels exist - is paid once regardless of which is asked; this used
+    /// to be `channels_where`'s own body before a second caller needed the
+    /// bitmask itself rather than only a bool.
+    async fn channel_permissions_all(
+        &self,
+        user_id: UserId,
+    ) -> anyhow::Result<Vec<(super::Channel, Permissions)>> {
         let channels = self.list_channels().await?;
         if channels.is_empty() {
-            return Ok(channels);
+            return Ok(Vec::new());
         }
         let roles = self.load_roles(user_id).await?;
-        // Hoisted: the filter closure below is synchronous and cannot await.
+        // Hoisted: the map closure below is synchronous and cannot await.
         let timeout_deny = self.timeout_deny(user_id).await?;
 
         // One built query for every listed channel's overwrites (no array binding in SQLite).
@@ -246,7 +291,7 @@ impl Store {
         let empty = Vec::new();
         Ok(channels
             .into_iter()
-            .filter(|channel| {
+            .map(|channel| {
                 let mut everyone_overwrite = None;
                 let mut role_overwrites = Vec::new();
                 let mut member_overwrite = None;
@@ -264,16 +309,159 @@ impl Store {
                         _ => {}
                     }
                 }
-                evaluate(
+                let perms = evaluate(
                     roles.everyone_perms,
                     &roles.role_perms,
                     everyone_overwrite,
                     &role_overwrites,
                     member_overwrite,
                 )
-                .remove(timeout_deny)
-                .contains(needed)
+                .remove(timeout_deny);
+                (channel, perms)
             })
             .collect())
+    }
+
+    /// The caller's effective permissions in each of `channel_ids`, batched
+    /// so a report page costs one shared query rather than one
+    /// [`Self::permissions_in_channel`] call per report.
+    ///
+    /// Unlike [`Self::channels_where`], this does not start from
+    /// [`Self::list_channels`] - it answers for exactly the ids it is asked
+    /// about, which is what lets it reach a DM or a deleted channel:
+    /// `list_channels` excludes both by construction (see
+    /// docs/decisions/0005-threads.md), and those are precisely the two
+    /// report cases docs/decisions/0011-per-channel-permissions.md names as
+    /// needing this. Each id resolves independently: a thread through
+    /// [`Self::permission_channel`], a DM through [`Self::dm_permissions`], a
+    /// dead or nonexistent id to [`Permissions::NONE`], and everything else
+    /// through the ordinary evaluator - sharing one [`Self::load_roles`] call
+    /// and one `IN`-batched overwrite fetch across however many ordinary
+    /// channels the page names. Masked with
+    /// [`crate::permissions::mask_unless_viewable`], the same guard
+    /// `http::channel_permissions` applies to its own answer and for the
+    /// identical existence-probe reason.
+    ///
+    /// Query cost is this doc comment, not a test: this suite has no
+    /// query-counting harness (checked; see docs/decisions/0011). Per call:
+    /// one `timeout_deny`, one `load_roles`, one `channel` fetch per
+    /// distinct requested id (a thread's parent needs a live read to find,
+    /// so this cannot be pre-batched the way the overwrite fetch is), one
+    /// `dm_permissions` call per distinct DM id in the page, and one batched
+    /// overwrite query for the rest.
+    pub async fn permissions_in_channels(
+        &self,
+        user_id: UserId,
+        channel_ids: &[ChannelId],
+    ) -> anyhow::Result<std::collections::HashMap<ChannelId, Permissions>> {
+        use std::collections::HashMap;
+
+        let mut result: HashMap<ChannelId, Permissions> = HashMap::new();
+        if channel_ids.is_empty() {
+            return Ok(result);
+        }
+
+        let timeout_deny = self.timeout_deny(user_id).await?;
+        let roles = self.load_roles(user_id).await?;
+
+        // The DM and dead/nonexistent branches are answered here, before the shared batched fetch below.
+        let mut ordinary: Vec<(ChannelId, super::Channel)> = Vec::new();
+        for &channel_id in channel_ids {
+            if result.contains_key(&channel_id) {
+                continue;
+            }
+            let Some(channel) = self.channel(channel_id).await? else {
+                result.insert(channel_id, Permissions::NONE);
+                continue;
+            };
+            // A thread has no overwrites of its own; see `permission_channel`.
+            let Some(resolved) = self.permission_channel(channel).await? else {
+                result.insert(channel_id, Permissions::NONE);
+                continue;
+            };
+            if resolved.kind == super::dms::DM_CHANNEL_KIND {
+                let permissions = self
+                    .dm_permissions(user_id, resolved.id)
+                    .await?
+                    .remove(timeout_deny);
+                result.insert(channel_id, mask_unless_viewable(permissions));
+                continue;
+            }
+            ordinary.push((channel_id, resolved));
+        }
+
+        if ordinary.is_empty() {
+            return Ok(result);
+        }
+
+        // One built query for the still-live channels' overwrites, deduplicated since several ids can share one.
+        let mut resolved_ids: Vec<ChannelId> = ordinary.iter().map(|(_, c)| c.id).collect();
+        resolved_ids.sort_by_key(|id| id.0);
+        resolved_ids.dedup();
+
+        let mut builder = sqlx::QueryBuilder::new(
+            "SELECT channel_id, target_type, target_id, allow, deny \
+             FROM channel_overwrites WHERE channel_id IN (",
+        );
+        let mut separated = builder.separated(", ");
+        for id in &resolved_ids {
+            separated.push_bind(*id);
+        }
+        builder.push(")");
+        let rows = builder.build().fetch_all(&self.pool).await?;
+
+        use sqlx::Row;
+        struct RawOverwrite {
+            target_type: String,
+            target_id: Uuid,
+            overwrite: Overwrite,
+        }
+        let mut by_channel: HashMap<Uuid, Vec<RawOverwrite>> = HashMap::new();
+        for row in rows {
+            let channel_id: Uuid = row.try_get("channel_id")?;
+            by_channel
+                .entry(channel_id)
+                .or_default()
+                .push(RawOverwrite {
+                    target_type: row.try_get("target_type")?,
+                    target_id: row.try_get("target_id")?,
+                    overwrite: Overwrite {
+                        allow: row.try_get("allow")?,
+                        deny: row.try_get("deny")?,
+                    },
+                });
+        }
+
+        let empty = Vec::new();
+        for (requested_id, channel) in ordinary {
+            let mut everyone_overwrite = None;
+            let mut role_overwrites = Vec::new();
+            let mut member_overwrite = None;
+            for raw in by_channel.get(&channel.id.0).unwrap_or(&empty) {
+                match raw.target_type.as_str() {
+                    "role" if Some(raw.target_id) == roles.everyone_id => {
+                        everyone_overwrite = Some(raw.overwrite);
+                    }
+                    "role" if roles.role_ids.contains(&raw.target_id) => {
+                        role_overwrites.push(raw.overwrite);
+                    }
+                    "member" if raw.target_id == user_id.0 => {
+                        member_overwrite = Some(raw.overwrite);
+                    }
+                    _ => {}
+                }
+            }
+            let perms = evaluate(
+                roles.everyone_perms,
+                &roles.role_perms,
+                everyone_overwrite,
+                &role_overwrites,
+                member_overwrite,
+            )
+            .remove(timeout_deny);
+            result.insert(requested_id, mask_unless_viewable(perms));
+        }
+
+        Ok(result)
     }
 }

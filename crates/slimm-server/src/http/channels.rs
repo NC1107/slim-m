@@ -77,6 +77,20 @@ pub(crate) struct ChannelDto {
     /// assuming uncategorised.
     category_id: Option<String>,
     created_at: i64,
+    /// The caller's own effective permission bitmask in this channel,
+    /// already resolved through thread and DM handling with any timeout
+    /// subtracted - the batched sibling of `GET
+    /// /channels/{channelId}/permissions`. Present only on `listChannels`:
+    /// every row there already carries VIEW_CHANNEL by construction, so
+    /// unlike the dedicated route this needs no existence-probe mask, and
+    /// it costs no extra query since `Store::visible_channels_with_permissions`
+    /// already computes it. Absent (not `Some(0)`) from create, update,
+    /// reorder, and the live `channel.created`/`channel.updated` frames:
+    /// none of those has one single caller whose bitmask would be right to
+    /// embed, and a live frame in particular fans out to many receivers
+    /// holding different permissions.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    permissions: Option<i64>,
 }
 
 impl From<Channel> for ChannelDto {
@@ -90,6 +104,7 @@ impl From<Channel> for ChannelDto {
             parent_message_id: channel.parent_message_id.map(|id| id.to_string()),
             category_id: channel.category_id.map(|id| id.to_string()),
             created_at: channel.created_at,
+            permissions: None,
         }
     }
 }
@@ -124,16 +139,24 @@ struct UpdateChannelRequest {
 /// this response would break every client that has not updated yet. Every
 /// live category is at `GET /categories` instead - a new route is additive,
 /// folding the list into this one's body is not.
+///
+/// Each row's `permissions` rides along free: `visible_channels_with_permissions`
+/// already evaluates the full bitmask to decide VIEW_CHANNEL membership, so
+/// carrying it into the response is a change to what gets kept, not a new
+/// query.
 async fn list(
     AuthedLimited(ctx): AuthedLimited<READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ChannelDto>>, ApiError> {
     let visible = state
         .store
-        .visible_channels(ctx.user_id)
+        .visible_channels_with_permissions(ctx.user_id)
         .await?
         .into_iter()
-        .map(ChannelDto::from)
+        .map(|(channel, permissions)| ChannelDto {
+            permissions: Some(permissions.bits()),
+            ..ChannelDto::from(channel)
+        })
         .collect();
     Ok(Json(visible))
 }

@@ -292,3 +292,117 @@ async fn visible_channels_matches_the_per_channel_check() {
         }
     }
 }
+
+/// The report queue's batched lookup must be indistinguishable, id by id,
+/// from calling [`Store::permissions_in_channel`] once per id - including
+/// the two cases `channels_where` structurally cannot reach, a DM and a
+/// deleted channel, which are exactly what the report queue needs this
+/// function for. See docs/decisions/0011-per-channel-permissions.md.
+#[tokio::test]
+async fn permissions_in_channels_matches_the_per_channel_check() {
+    let (s, _guard) = store().await;
+    let everyone_role = s
+        .create_role("everyone", VIEW.union(SEND), true)
+        .await
+        .unwrap();
+    let mods = s
+        .create_role("mods", Permissions::MANAGE_MESSAGES, false)
+        .await
+        .unwrap();
+
+    let alice = s.create_user("alice", "Alice").await.unwrap();
+    let bob = s.create_user("bob", "Bob").await.unwrap();
+    s.assign_role(alice.id, mods).await.unwrap();
+
+    let ordinary = s.create_channel("general", "text").await.unwrap();
+    let to_delete = s.create_channel("gone", "text").await.unwrap();
+    s.delete_channel(to_delete.id).await.unwrap();
+    // A real overwrite on the parent, so a thread that skipped resolving to it would answer differently.
+    s.set_role_overwrite(ordinary.id, everyone_role, NONE, SEND)
+        .await
+        .unwrap();
+
+    let parent_message = s
+        .send_message(
+            ordinary.id,
+            alice.id,
+            slimm_server::ids::MessageId::generate(),
+            "start a thread here",
+            &[],
+            None,
+        )
+        .await
+        .unwrap()
+        .message;
+    let thread = s.open_thread(ordinary.id, parent_message.id).await.unwrap();
+
+    let dm = s.open_dm(alice.id, bob.id).await.unwrap();
+
+    let ids = vec![ordinary.id, to_delete.id, thread.channel.id, dm.id];
+    let batched = s.permissions_in_channels(alice.id, &ids).await.unwrap();
+
+    for &id in &ids {
+        let single = s.permissions_in_channel(alice.id, id).await.unwrap();
+        let masked = slimm_server::permissions::mask_unless_viewable(single);
+        assert_eq!(
+            batched.get(&id).copied().unwrap_or(NONE),
+            masked,
+            "batched and per-channel answers diverged for {id:?}"
+        );
+    }
+    assert_eq!(
+        batched[&to_delete.id], NONE,
+        "a deleted channel must answer NONE, same as the per-channel check"
+    );
+
+    // A fabricated id, never asked about above, answers the same way.
+    let ghost = slimm_server::ids::ChannelId::generate();
+    let ghost_batch = s.permissions_in_channels(alice.id, &[ghost]).await.unwrap();
+    assert_eq!(ghost_batch[&ghost], NONE);
+
+    // A repeated id in one request is resolved once and answers once.
+    let doubled = s
+        .permissions_in_channels(alice.id, &[ordinary.id, ordinary.id])
+        .await
+        .unwrap();
+    assert_eq!(doubled.len(), 1);
+}
+
+/// The batch function's own existence-probe mask must actually fire, not
+/// merely happen to agree with an unmasked answer that was already zero: a
+/// channel that denies VIEW_CHANNEL to everyone still leaves this member's
+/// MANAGE_MESSAGES role grant untouched right up until the mask is applied.
+#[tokio::test]
+async fn permissions_in_channels_masks_a_channel_the_caller_cannot_view() {
+    let (s, _guard) = store().await;
+    let everyone = s.create_role("everyone", NONE, true).await.unwrap();
+    let mods = s
+        .create_role("mods", Permissions::MANAGE_MESSAGES, false)
+        .await
+        .unwrap();
+    let carol = s.create_user("carol", "Carol").await.unwrap();
+    s.assign_role(carol.id, mods).await.unwrap();
+
+    let hidden = s.create_channel("hidden", "text").await.unwrap();
+    s.set_role_overwrite(hidden.id, everyone, NONE, VIEW)
+        .await
+        .unwrap();
+
+    let unmasked = s
+        .granted_permissions_in_channel(carol.id, hidden.id)
+        .await
+        .unwrap();
+    assert!(
+        unmasked.contains(Permissions::MANAGE_MESSAGES),
+        "the role grant must still be there before masking, or this test proves nothing"
+    );
+
+    let batched = s
+        .permissions_in_channels(carol.id, &[hidden.id])
+        .await
+        .unwrap();
+    assert_eq!(
+        batched[&hidden.id], NONE,
+        "lacking VIEW_CHANNEL must mask away every other bit too"
+    );
+}
