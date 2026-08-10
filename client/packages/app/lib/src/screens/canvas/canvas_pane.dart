@@ -31,6 +31,7 @@ import '../../ids.dart';
 import '../../permissions.dart';
 import '../../providers/blocks_controller.dart';
 import '../../providers/canvas_self_presence.dart';
+import '../../providers/channel_permissions.dart';
 import '../../providers/providers.dart';
 import '../../providers/live_events.dart';
 import '../../providers/sync_controller.dart';
@@ -337,11 +338,11 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
 
   void _onErase(Offset world) {
     final me = ref.read(meProvider).valueOrNull;
-    _ops.onErasePoint(
-      world,
-      manageCanvas: me?.permissions.hasPermission(Perm.manageCanvas) ?? false,
-      selfId: me?.id,
-    );
+    // A safe read, not a cold one: build() already watches this same family instance every frame.
+    final manageCanvas = ref
+        .read(myChannelPermissionsProvider(widget.channelId))
+        .hasPermission(Perm.manageCanvas);
+    _ops.onErasePoint(world, manageCanvas: manageCanvas, selfId: me?.id);
   }
 
   Future<void> _onEraseEnd() async {
@@ -366,8 +367,10 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   @override
   Widget build(BuildContext context) {
     final me = ref.watch(meProvider).valueOrNull;
-    final manageCanvas =
-        me?.permissions.hasPermission(Perm.manageCanvas) ?? false;
+    // Per-channel, not deployment-wide: docs/decisions/0011-per-channel-permissions.md, site 5.
+    final manageCanvas = ref
+        .watch(myChannelPermissionsProvider(widget.channelId))
+        .hasPermission(Perm.manageCanvas);
     final selfPresence = ref.watch(canvasSelfPresenceProvider);
     return CallbackShortcuts(
       bindings: {

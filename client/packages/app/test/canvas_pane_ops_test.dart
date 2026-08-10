@@ -126,12 +126,66 @@ void main() {
     expect(surfaceDocument(tester).objectCount.value, 0);
   });
 
+  /// docs/decisions/0011-per-channel-permissions.md, site 5's third call
+  /// site: `_onErase`'s own local gate, not just the context menu's.
+  testWidgets('the eraser leaves another member\'s stroke alone when only the '
+      'deployment-wide bit grants MANAGE_CANVAS, not the per-channel answer', (
+    tester,
+  ) async {
+    final fixture = CanvasPaneFixture(
+      mePermissions: Perm.manageCanvas,
+      channelPermissions: 0,
+    )..objects = [canvasObjectJson('foreign', x: 0, authorId: 'someone-else')];
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+    await pumpCanvasPane(tester, container);
+    await tester.pumpAndSettle();
+    expect(surfaceDocument(tester).objectCount.value, 1);
+
+    await tester.tap(find.bySemanticsLabel('Eraser'));
+    await tester.pump();
+
+    final point = screenFor(tester, const Offset(10, 20));
+    final gesture = await tester.startGesture(point);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(fixture.postedOps, isEmpty);
+    expect(surfaceDocument(tester).objectCount.value, 1);
+  });
+
   /// The clear control is gated on MANAGE_CANVAS and hidden entirely below
   /// it, matching every other moderation control in this client.
   testWidgets(
     'the overflow offers no Clear canvas item without MANAGE_CANVAS',
     (tester) async {
       final fixture = CanvasPaneFixture()..objects = [canvasObjectJson('a')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Clear canvas'), findsNothing);
+    },
+  );
+
+  /// docs/decisions/0011-per-channel-permissions.md, site 5: the deployment-
+  /// wide bit is not the one that governs a channel-scoped bit like
+  /// MANAGE_CANVAS. A caller whose base grants it but whose per-channel
+  /// answer does not must see the same absence a caller with neither does.
+  testWidgets(
+    'the overflow offers no Clear canvas item when only the deployment-wide '
+    'bit grants MANAGE_CANVAS, not the per-channel answer',
+    (tester) async {
+      final fixture = CanvasPaneFixture(
+        mePermissions: Perm.manageCanvas,
+        channelPermissions: 0,
+      )..objects = [canvasObjectJson('a')];
       final container = fixture.container();
       addTearDown(container.dispose);
       addTearDown(fixture.events.close);

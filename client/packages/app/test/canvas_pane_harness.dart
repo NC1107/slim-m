@@ -124,9 +124,10 @@ class CanvasPaneFixture {
     this.viewportStatus = 200,
     this.hasMore = false,
     this.mePermissions = 0,
+    int? channelPermissions,
     this.opsPostStatus = 201,
     this.attachmentFetchStatus = 200,
-  });
+  }) : channelPermissions = channelPermissions ?? mePermissions;
 
   final StreamController<api.ServerEvent> events =
       StreamController<api.ServerEvent>.broadcast();
@@ -149,6 +150,12 @@ class CanvasPaneFixture {
 
   /// The signed-in member's own permission bitmask, as `GET /me` answers it.
   final int mePermissions;
+
+  /// What `GET /channels/{channelId}/permissions` answers - defaults to
+  /// [mePermissions], but a test proving the per-channel gate (rather than
+  /// the deployment-wide one) drives the canvas menu passes a different
+  /// value here to make the two genuinely disagree.
+  final int channelPermissions;
   final List<Map<String, dynamic>> posted = [];
   List<Map<String, dynamic>> objects = [];
 
@@ -190,6 +197,9 @@ class CanvasPaneFixture {
                 'created_at': 0,
                 'permissions': mePermissions,
               });
+            }
+            if (request.url.path.endsWith('/permissions')) {
+              return jsonResponse({'permissions': channelPermissions});
             }
             if (request.url.path.endsWith('/canvas/ops') &&
                 request.method == 'POST') {

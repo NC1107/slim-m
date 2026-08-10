@@ -18,10 +18,10 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../ids.dart';
-import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/channel_drafts.dart';
 import '../providers/channel_history.dart';
+import '../providers/channel_permissions.dart';
 import '../providers/channel_search_controller.dart';
 import '../providers/emoji_catalog_provider.dart';
 import '../providers/member_presence.dart';
@@ -275,7 +275,10 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     final syncStatus = ref.watch(syncControllerProvider);
     final historyKnown = ref.watch(initialSyncCompleteProvider);
     final myId = ref.watch(meProvider).valueOrNull?.id;
-    final myPermissions = ref.watch(myPermissionsProvider);
+    // Per-channel, not deployment-wide: docs/decisions/0011-per-channel-permissions.md, site 1.
+    final myPermissions = ref.watch(
+      myChannelPermissionsProvider(widget.channelId),
+    );
     final pinnedIds = <String>{
       for (final p
           in ref.watch(pinsControllerProvider(widget.channelId)).pinned ??
