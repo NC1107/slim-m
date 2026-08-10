@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.36.0](https://github.com/NC1107/slim-m/compare/client-v0.35.1...client-v0.36.0) (2026-08-10)
+
+
+### Features
+
+* **client:** add channelPermissionsProvider, unused by any call site yet ([#521](https://github.com/NC1107/slim-m/issues/521)) ([e4f3d12](https://github.com/NC1107/slim-m/commit/e4f3d1236e0378cb1f9917e3339ebe0a4319105f))
+
+
+### Bug Fixes
+
+* **canvas:** a presence tile's opaque hit test silently ate every wheel event ([#529](https://github.com/NC1107/slim-m/issues/529)) ([a9692ca](https://github.com/NC1107/slim-m/commit/a9692ca98f1e3bc2734e3aa42d72ebf96d9f492c))
+* **canvas:** reveal tile controls on focus too, and prove depth by pixel ([#526](https://github.com/NC1107/slim-m/issues/526)) ([62d16e6](https://github.com/NC1107/slim-m/commit/62d16e6d38835fc13fa102dca1f2d64603a4ffdc))
+* **canvas:** the background grid was mounted childless in a Stack with no fit, so it never painted ([#515](https://github.com/NC1107/slim-m/issues/515)) ([7a328d9](https://github.com/NC1107/slim-m/commit/7a328d93a0108e817d3b5907c19eaaa2ba1f46da))
+* **canvas:** the ctrl+wheel zoom test could not tell a real fix from a broken one ([#525](https://github.com/NC1107/slim-m/issues/525)) ([7ddb0b2](https://github.com/NC1107/slim-m/commit/7ddb0b227a31276c19f6292a15d5ff12a12ebba3))
+* **canvas:** the grid painted over a sent-back tile, and a small object could not be dragged ([#505](https://github.com/NC1107/slim-m/issues/505)) ([1283670](https://github.com/NC1107/slim-m/commit/128367092ea6e9676d2dc6a7f900f83a08e5618a))
+* **client:** a DM offered a member pane, a canvas button and a channel hash ([#504](https://github.com/NC1107/slim-m/issues/504)) ([b5f4d65](https://github.com/NC1107/slim-m/commit/b5f4d652c1550dc3d5bdb1f148d9f99ab43c30ef))
+* **client:** draw one ring for a reacted reaction chip, not two ([#531](https://github.com/NC1107/slim-m/issues/531)) ([496cf8e](https://github.com/NC1107/slim-m/commit/496cf8ef488765d38a7e421bdef6e66d060bbc04))
+* **client:** gate the transcript and canvas on per-channel permissions ([#522](https://github.com/NC1107/slim-m/issues/522)) ([0e73d25](https://github.com/NC1107/slim-m/commit/0e73d251ccc8105e87c1848b8c0726745a7152ab))
+* **client:** pin the voice snapshot to its connecting state instead of a blank auto-join ([#513](https://github.com/NC1107/slim-m/issues/513)) ([1f80ad2](https://github.com/NC1107/slim-m/commit/1f80ad2e16d60a8e49d001ba38ac70c5fc33af38))
+* **client:** read per-channel permissions in moderation and settings sites ([#523](https://github.com/NC1107/slim-m/issues/523)) ([220d30f](https://github.com/NC1107/slim-m/commit/220d30fdd312a223e9da3b17c7337fe84010e246))
+* **client:** redesign the poll composer and the rendered poll card ([#530](https://github.com/NC1107/slim-m/issues/530)) ([0fb7853](https://github.com/NC1107/slim-m/commit/0fb785342a00d513f841243431d426a406abfb02))
+* **client:** rename yourself lives in Account & presence, and the nav gets icons ([#503](https://github.com/NC1107/slim-m/issues/503)) ([d6ca9a5](https://github.com/NC1107/slim-m/commit/d6ca9a5af2ad5d61da5dfe282a983dfebc67104c))
+* **client:** stop the screen capture when a call ends, not just the publish ([#528](https://github.com/NC1107/slim-m/issues/528)) ([7afd03e](https://github.com/NC1107/slim-m/commit/7afd03e0d17f7bb9c7f65c10b66312ea28855252))
+
 ## [0.35.1](https://github.com/NC1107/slim-m/compare/client-v0.35.0...client-v0.35.1) (2026-08-09)
 
 
