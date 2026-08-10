@@ -19,6 +19,7 @@ class Report {
     required this.snapshot,
     required this.subjectAuthorId,
     required this.createdAt,
+    this.channelPermissions,
   });
 
   final String id;
@@ -45,6 +46,15 @@ class Report {
   /// Unix milliseconds.
   final int createdAt;
 
+  /// The caller's effective bitmask in [channelId], null exactly when
+  /// [channelId] is null. Batched per page, masked to zero whenever the
+  /// caller lacks VIEW_CHANNEL - the same rule
+  /// [SlimmApiChannelAdmin.getChannelPermissions] applies. A DM report's
+  /// bitmask structurally never carries `manageMessages`, since no one holds
+  /// that permission in a DM. Absent on a server too old to send it, which a
+  /// caller must treat as unknown rather than as zero permissions.
+  final int? channelPermissions;
+
   factory Report.fromJson(Map<String, dynamic> json) => Report(
         id: json['id'] as String,
         reporterId: json['reporter_id'] as String?,
@@ -55,6 +65,7 @@ class Report {
         snapshot: json['snapshot'] as String?,
         subjectAuthorId: json['subject_author_id'] as String?,
         createdAt: json['created_at'] as int,
+        channelPermissions: json['channel_permissions'] as int?,
       );
 }
 

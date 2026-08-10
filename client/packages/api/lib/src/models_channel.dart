@@ -15,6 +15,7 @@ class Channel {
     this.dmParticipantId,
     this.parentMessageId,
     this.categoryId,
+    this.permissions,
   });
 
   final String id;
@@ -64,6 +65,15 @@ class Channel {
   /// there is nothing older to distinguish it from.
   final String? categoryId;
 
+  /// The caller's effective bitmask in this channel, already resolved
+  /// through thread and DM handling with any timeout subtracted - the
+  /// batched sibling of [SlimmApiChannelAdmin.getChannelPermissions]. Present
+  /// only on [SlimmApi.listChannels], where every row already carries
+  /// VIEW_CHANNEL by construction, so unlike that dedicated route this is
+  /// never masked to zero; null everywhere else this model appears, which a
+  /// caller must treat as unknown rather than as zero permissions.
+  final int? permissions;
+
   bool get isVoice => kind == 'voice';
 
   /// Whether this row is a thread rather than an ordinary channel - see
@@ -79,6 +89,7 @@ class Channel {
         position: json['position'] as int? ?? 0,
         parentMessageId: json['parent_message_id'] as String?,
         categoryId: json['category_id'] as String?,
+        permissions: json['permissions'] as int?,
       );
 }
 

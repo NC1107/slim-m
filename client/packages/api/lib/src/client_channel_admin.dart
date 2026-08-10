@@ -33,6 +33,17 @@ extension SlimmApiChannelAdmin on SlimmApi {
   Future<void> deleteChannel(String channelId) =>
       _send('DELETE', '/channels/$channelId', expectNoContent: true);
 
+  /// The caller's effective permission bitmask in this one channel: the
+  /// per-channel sibling of `Me.permissions`. Already resolved through
+  /// thread and DM handling with any timeout subtracted, and masked to zero
+  /// whenever the caller lacks VIEW_CHANNEL here - including for a channel
+  /// that does not exist at all, so this can never be used to probe for a
+  /// channel's existence. See docs/decisions/0011-per-channel-permissions.md.
+  Future<int> getChannelPermissions(String channelId) async {
+    final json = await _send('GET', '/channels/$channelId/permissions');
+    return (json as Map<String, dynamic>)['permissions'] as int;
+  }
+
   /// Sets the deployment's channel order and category placement. Requires
   /// MANAGE_CHANNELS. [groups] must, flattened, name exactly the live,
   /// non-DM, non-thread channel ids - no more, no fewer, no repeats - and
