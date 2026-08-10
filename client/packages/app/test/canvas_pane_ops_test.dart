@@ -145,6 +145,31 @@ void main() {
     },
   );
 
+  /// docs/decisions/0011-per-channel-permissions.md, site 5: the deployment-
+  /// wide bit is not the one that governs a channel-scoped bit like
+  /// MANAGE_CANVAS. A caller whose base grants it but whose per-channel
+  /// answer does not must see the same absence a caller with neither does.
+  testWidgets(
+    'the overflow offers no Clear canvas item when only the deployment-wide '
+    'bit grants MANAGE_CANVAS, not the per-channel answer',
+    (tester) async {
+      final fixture = CanvasPaneFixture(
+        mePermissions: Perm.manageCanvas,
+        channelPermissions: 0,
+      )..objects = [canvasObjectJson('a')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Clear canvas'), findsNothing);
+    },
+  );
+
   testWidgets(
     'the clear control reaches the canvas: confirm, then one clear op',
     (tester) async {
