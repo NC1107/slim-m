@@ -40,6 +40,11 @@ abstract final class AppIcons {
   static const IconData pending = LucideIcons.clock300;
   static const IconData failed = LucideIcons.circleAlert300;
   static const IconData poll = LucideIcons.barChart2300;
+
+  /// The poll option strictly ahead of every other, drawn in `textSecondary`
+  /// rather than the accent: "this is winning" is not one of the seven
+  /// closed accent roles. Never shown for a tie at the top.
+  static const IconData pollLeading = LucideIcons.trendingUp300;
   static const IconData code = LucideIcons.code300;
   static const IconData smile = LucideIcons.smile300;
 
