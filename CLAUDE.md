@@ -12,6 +12,41 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## A screen share outliving its call, and how far the platform's own stop mechanism actually reaches (2026-08-10)
+
+Reported from real device use: hanging up did not stop screen sharing.
+On iOS the ReplayKit broadcast kept recording after the call ended, later surfacing as a "recording interrupted" error rather than anything obviously tied to the call.
+On Linux the desktop's own recording indicator stayed lit after leaving.
+Read this before touching `screen_share_control.dart`, `voice_session.dart`'s teardown paths, or `desktop_sources.dart`'s Linux doc comment.
+
+**The iOS half was a real, concrete gap in this client, not the platform.**
+`ScreenShareControl` already had `requestStop()`, the call that tells the ReplayKit extension to actually stop recording rather than merely dropping the LiveKit track - its own doc comment already said so, in these words: "Nothing else can."
+It was only ever reached from the explicit "stop sharing" button.
+Every other way a call ends - the hang-up button itself, being removed by the SFU, a dropped connection, sign-out, account deletion - tore the room down without ever calling it.
+`_onDisconnected` (the forced-disconnect path) had the worse version of this: it never called anything screen-share related at all, and what it did call elsewhere in the file was fire-and-forgotten with `unawaited`, not awaited.
+`ScreenShareControl.stopActiveBroadcast()` is now the one thing every call-ending path awaits, explicitly, before anything that could be read as "the call is ending" - `VoiceSession._teardown()` calls it before `room.disconnect()`, and `_onDisconnected` calls it before updating any of its own state, both proven by tests that assert *order* (a log of which happened first, and a gated fake bridge proving the await is real) rather than only "both things happened," which would have passed even with the old, wrong ordering.
+`ScreenShareControl.dispose()` keeps calling it too, as a backstop for any future path that reaches disposal without going through the ordered call first; the redundancy on the two paths that already do both is deliberate, not an oversight, and the tests assert the resulting count precisely rather than loosely.
+
+**The Linux finding needed correcting mid-task, and the correction is worth keeping.**
+The first pass here claimed flutter_webrtc's Linux plugin never stops a `getDisplayMedia` capturer at all.
+That was too strong.
+Reading `webrtc-sdk/libwebrtc` (the prebuilt SDK flutter_webrtc's desktop build downloads, pinned via `third_party/libwebrtc_version.ini` to `libwebrtc.m144.7559.09`) found `ScreenCapturerTrackSource::~ScreenCapturerTrackSource()` calls `capturer->Stop()`, and `RTCDesktopCapturerImpl::~RTCDesktopCapturerImpl()` calls `thread_->Stop(); capturer_.reset();` - a real stop-and-teardown path, triggered by C++ refcounting once every reference the flutter_webrtc plugin holds (the stream, its own `local_tracks_`/`local_streams_` maps, the peer connection's sender) is dropped, all of which `VoiceSession`'s existing teardown already causes on every call-ending path.
+What is real, confirmed by reading `flutter_media_stream.cc` and `flutter_screen_capture.cc` directly: `MediaStreamTrackDispose`/`MediaStreamDispose` only call `StopCapture()` explicitly on a capturer found in `video_capturers_`, and `GetDisplayMedia` never registers a screen-share capturer into that map - only the camera path does - so a screen-share track gets no *immediate, explicit* stop the way a camera track does, only the implicit one once refcounting finishes.
+
+**Checked properly rather than assumed, per the owner's own instruction to research this before accepting "upstream only."**
+flutter_webrtc 1.6.0 is the latest release (nothing merged to `main` past it besides one unrelated iOS fix), so a version bump buys nothing.
+Grepped the entire native tree (`common/cpp`, `linux/`, `windows/`, `macos/`) for every call to `StopCapture(`: exactly the two sites already named, both gated on `video_capturers_`, nothing else.
+Searched both `flutter-webrtc/flutter-webrtc` and `webrtc-sdk/libwebrtc`'s issues and pull requests for this exact symptom (getDisplayMedia, desktop capturer, stop, leak, recording indicator, in several phrasings): nothing open or closed describes it.
+This project has contributed to `flutter-webrtc` before for a different Linux capture bug (`#2133`, "guard texture proxy and harden desktop source enumeration," in the same file this finding touches), so filing here is a precedented option, not a novel one.
+
+**The recommendation: propose a small patch upstream, do not fork.**
+The smallest correct fix is a second map, `desktop_capturers_: std::map<std::string, scoped_refptr<RTCDesktopCapturer>>` alongside the existing `video_capturers_` (they cannot share one map - `RTCVideoCapturer` and `RTCDesktopCapturer` are unrelated interfaces, both only extending `RefCountInterface`), populated in `flutter_screen_capture.cc`'s `GetDisplayMedia` and consulted by `MediaStreamTrackDispose`/`MediaStreamDispose` in `flutter_media_stream.cc` to call the already-public `RTCDesktopCapturer::Stop()` explicitly, the same shape the camera path already has.
+This is real, defensible hardening regardless of whether it is the actual cause of the reported symptom: it makes the frame-capture loop and its CPU/encoding work stop immediately and explicitly rather than depending on refcounting timing, closing the one asymmetry between the camera and desktop-capture paths that source-reading actually found.
+A `dependency_overrides` fork pin was considered and rejected for now: it is not proven to fix the visible symptom (the refcounting path already looks architecturally sound from source alone), and this project has a recorded scar about the ongoing cost of carrying a patched native plugin - not worth taking on for an unverified payoff when the upstream route costs nothing and this project has already used it once.
+Not filed live in this pass; the patch and the reasoning are written down here for whoever picks it up, including the owner if they want it opened under their own account rather than an agent's.
+
+**What genuinely cannot be verified from here, either way.** Whether the Linux fix (either the refcounting path alone, or with the proposed patch) actually clears the recording indicator on a real desktop, and whether the iOS fix actually stops a real ReplayKit broadcast on a real iPhone. Neither this box (which must not be used to open a live screen-recording session against the owner's own desktop) nor this environment (no Mac, no iPhone) can produce that evidence; both are reasoned from source and covered by unit tests only, the same evidentiary bar this client's other untested-on-device screen-share work already carries.
+
 ## The client asked one permission question and the server answered a different one, in eight places (2026-08-10)
 
 A per-screen review of every rendered screen found one missing abstraction sitting under eight separate bugs, and the design that closed it is [docs/decisions/0011-per-channel-permissions.md](docs/decisions/0011-per-channel-permissions.md).

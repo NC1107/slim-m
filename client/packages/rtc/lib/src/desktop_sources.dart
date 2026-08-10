@@ -6,6 +6,30 @@
 /// `getSources` is called, so asking to share without enumerating first fails
 /// with `source not found!` no matter what else is right. That was the whole
 /// Fedora screen-share bug.
+///
+/// A second, narrower Linux/desktop gap lives one layer below this file, in
+/// flutter_webrtc 1.6.0's own `common/cpp` plugin, and is not closeable from
+/// here. `MediaStreamTrackDispose`/`MediaStreamDispose`
+/// (`flutter_media_stream.cc`) only call `StopCapture()` on a capturer found
+/// in `video_capturers_`, and `GetDisplayMedia` (`flutter_screen_capture.cc`)
+/// never registers its `desktop_capturer` into that map - only the camera
+/// path (`getUserMedia`) does, so a screen-share track gets no *explicit,
+/// immediate* stop call on disposal the way a camera track does.
+///
+/// That is not the same as "nothing ever stops it": `webrtc-sdk/libwebrtc`'s
+/// own `ScreenCapturerTrackSource::~ScreenCapturerTrackSource()` calls
+/// `capturer->Stop()`, and its destructor tears down the underlying platform
+/// capturer, once every reference the flutter_webrtc plugin itself holds is
+/// dropped - which `VoiceSession` already causes on every call-ending path
+/// (unpublish, `trackDispose`, `streamDispose`, all reached from
+/// `_teardown`/`_onDisconnected`). Whether that reference-counted path is
+/// what is actually failing in practice, versus the platform's own recording
+/// indicator lagging the capture stopping, is not something this package can
+/// tell apart without a real Linux desktop capture session. A small patch to
+/// register the desktop capturer the same way the camera path does, closing
+/// the gap explicitly rather than leaning on refcounting alone, is proposed
+/// upstream rather than carried as a fork - see CLAUDE.md's entry on this
+/// fix for the reasoning and the patch itself.
 library;
 
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;

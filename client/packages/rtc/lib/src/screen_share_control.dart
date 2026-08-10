@@ -188,11 +188,31 @@ class ScreenShareControl {
     _broadcast.autoPublishEnabled = true;
   }
 
-  /// Releases a hand-off still waiting on the picker. Called from
-  /// [VoiceSession]'s own teardown so leaving a call mid-request cannot leave
-  /// a listener running, or `autoPublishEnabled` stuck false, past the call
-  /// that set it.
-  Future<void> dispose() => _cancelHandoff();
+  /// Ends a running platform broadcast outright. Unpublishing the LiveKit
+  /// track (which [VoiceSession]'s own room teardown already does on every
+  /// path) only removes it from the call - it does not tell iOS's ReplayKit
+  /// extension to stop recording; see [BroadcastBridge.requestStop]'s own
+  /// doc comment, which already named this as the one thing nothing else can
+  /// do. Safe to call whether or not a share was ever active: off iOS, and
+  /// with nothing broadcasting, the request reaches nobody.
+  ///
+  /// [VoiceSession] awaits this explicitly, first, before it does anything
+  /// that could be read as "the call is ending" - the room disconnecting has
+  /// no bearing on whether iOS is still recording, so this can never be an
+  /// afterthought folded into a later cleanup step.
+  Future<void> stopActiveBroadcast() => _broadcast.requestStop();
+
+  /// Called from [VoiceSession]'s own teardown as a backstop, after
+  /// [stopActiveBroadcast] has already run on every path this package knows
+  /// about. Cancels a hand-off still waiting on the picker, so leaving
+  /// mid-request cannot leave a listener running or `autoPublishEnabled`
+  /// stuck false past the call that set it, and asks the platform to stop
+  /// again in case some future call-ending path is added that reaches
+  /// disposal without going through the ordered call first.
+  Future<void> dispose() async {
+    await _cancelHandoff();
+    await stopActiveBroadcast();
+  }
 
   /// The capture options a share is published with.
   ///

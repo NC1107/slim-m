@@ -399,24 +399,37 @@ class VoiceSession {
     _cancelEvents?.call();
     _cancelEvents = room.events.listen((event) {
       if (event is lk.RoomDisconnectedEvent) {
-        _onDisconnected(event.reason);
-        return;
+        return _onDisconnected(event.reason);
       }
       _refreshParticipants();
     });
   }
 
-  /// A disconnect this client did not ask for. [_teardown] cancels this
-  /// listener before it disconnects, so a `leave()` never lands here.
-  void _onDisconnected(lk.DisconnectReason? reason) {
+  /// A disconnect this client did not ask for: the SFU removed this
+  /// participant, the room was deleted, or the connection was lost for good.
+  /// [_teardown] cancels this listener before it disconnects, so a `leave()`
+  /// never lands here.
+  ///
+  /// LiveKit's own engine already unpublishes and stops every local track for
+  /// this case (`Room`'s internal cleanup runs on any engine disconnect, not
+  /// only a client-initiated one), but that stops at the WebRTC track: it
+  /// never asks iOS to end a running broadcast, which is a platform-level
+  /// concept LiveKit has no reason to know about. By the time this fires the
+  /// SFU has already disconnected, so this is the only remaining chance to
+  /// tell iOS to stop, and it is awaited before anything else this handler
+  /// does rather than fired into the background: a member removed or timed
+  /// out mid-share must not keep recording with no call left to publish to.
+  Future<void> _onDisconnected(lk.DisconnectReason? reason) async {
     if (_disposed) return;
     if (reason == lk.DisconnectReason.clientInitiated) return;
+    await _screenShare.stopActiveBroadcast();
     _lastDisconnect = mapDisconnectReason(reason);
     _participants = const [];
     if (!_participantsController.isClosed) {
       _participantsController.add(_participants);
     }
     _setState(VoiceSessionState.failed);
+    await _screenShare.dispose();
   }
 
   void _refreshParticipants() {
@@ -445,6 +458,8 @@ class VoiceSession {
     _room = null;
     _cancelEvents?.call();
     _cancelEvents = null;
+    // Awaited before the room disconnects below: the SFU has no bearing on iOS.
+    await _screenShare.stopActiveBroadcast();
     await _screenShare.dispose();
     if (room != null) {
       try {

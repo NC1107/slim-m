@@ -226,6 +226,36 @@ void main() {
       expect(calls, isEmpty);
     });
 
+    test(
+        'disposing mid-request cancels the hand-off and still asks the '
+        'platform to stop, in case the picker was answered just before',
+        () async {
+      await start();
+      expect(bridge.stopRequests, 0);
+
+      await control.dispose();
+
+      expect(bridge.stopRequests, 1,
+          reason: 'a call ending must not leave the phone still recording, '
+              'whether or not this hand-off ever reached a real broadcast');
+      expect(bridge.autoPublishWrites.last, isTrue,
+          reason: 'disposing must not leave the flag disarmed past this call');
+
+      // The picker being answered after disposal must reach nothing.
+      calls.clear();
+      bridge.startBroadcasting();
+      await pumpEventQueue();
+      expect(calls, isEmpty);
+    });
+
+    test('disposing with no share ever requested is still safe', () async {
+      final idle = ScreenShareControl(bridge);
+      await idle.dispose();
+      expect(bridge.stopRequests, 1,
+          reason: 'requestStop is unconditional; a call with no share at all '
+              'reaches nobody on the other end of it');
+    });
+
     test('a second request cancels the first hand-off rather than stacking',
         () async {
       await start();
