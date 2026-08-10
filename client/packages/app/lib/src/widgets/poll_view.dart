@@ -63,7 +63,9 @@ class PollView extends StatelessWidget {
         border: Border.all(color: tokens.borderSubtle),
         borderRadius: BorderRadius.circular(AppRadii.card),
       ),
+      // min: a poll card must hug its own content, not fill a bounded parent.
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -138,6 +140,17 @@ String _footerText(api.Poll poll) {
   }
   final count = poll.totalVotes;
   return '$count vote${count == 1 ? '' : 's'}';
+}
+
+/// The fill under an option's own label. [tokens.textSecondary], reused
+/// here as a fill rather than its usual text role, gives a leading bar more
+/// visual weight within the neutral ramp alone - no new colour, and the
+/// accent still spent nowhere near "winning". Selection wins when both are
+/// true: accentSoft already carries "this is yours" on its own.
+Color _fillColor(AppTokens tokens, bool selected, bool leading) {
+  if (selected) return tokens.accentSoft;
+  if (leading) return tokens.textSecondary;
+  return tokens.borderStrong;
 }
 
 class _PollOptionRow extends StatefulWidget {
@@ -226,9 +239,7 @@ class _PollOptionRowState extends State<_PollOptionRow> {
                   Positioned.fill(child: Container(color: tokens.borderSubtle)),
                   FractionallySizedBox(
                     widthFactor: fraction.clamp(0, 1),
-                    child: Container(
-                      color: selected ? tokens.accentSoft : tokens.borderStrong,
-                    ),
+                    child: Container(color: _fillColor(tokens, selected, leading)),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(

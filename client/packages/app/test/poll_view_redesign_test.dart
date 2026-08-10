@@ -41,6 +41,15 @@ Finder _optionRow(String label) => find.ancestor(
   ),
 );
 
+/// The track and fill layers inside one option's row; see
+/// `poll_view_test.dart`'s own copy of this finder for why.
+List<Container> _fillLayers(WidgetTester tester, String label) => tester
+    .widgetList<Container>(
+      find.descendant(of: _optionRow(label), matching: find.byType(Container)),
+    )
+    .where((c) => c.color != null)
+    .toList();
+
 void main() {
   group('the option strictly ahead of every other', () {
     testWidgets('carries the leading icon and a semibold label', (
@@ -52,6 +61,29 @@ void main() {
       final label = tester.widget<Text>(find.text('Option 1'));
       expect(label.style!.fontWeight, AppWeights.semi);
     });
+
+    testWidgets(
+      "carries a fill with more visual weight than an ordinary option's, "
+      'not the identical grey a plain bar gets',
+      (tester) async {
+        await tester.pumpWidget(_app(_poll(votes: const [1, 3])));
+
+        final leading = _fillLayers(tester, 'Option 1')
+            .map((c) => c.color)
+            .toSet();
+        final ordinary = _fillLayers(tester, 'Option 0')
+            .map((c) => c.color)
+            .toSet();
+        expect(
+          leading.difference(ordinary),
+          contains(AppTokens.light.textSecondary),
+          reason:
+              'the leading bar reuses textSecondary as a fill so it reads '
+              'heavier than an ordinary option within the neutral ramp, '
+              'never the accent, which is reserved for "this concerns you"',
+        );
+      },
+    );
 
     testWidgets('is never marked on a tie for first place', (tester) async {
       await tester.pumpWidget(_app(_poll(votes: const [2, 2])));
@@ -104,6 +136,38 @@ void main() {
 
       expect(find.text('1 vote'), findsOneWidget);
     });
+  });
+
+  group('the card hugs its own content', () {
+    testWidgets(
+      'and does not stretch to fill a bounded-but-loose parent height',
+      (tester) async {
+        // Align's own bounded height is what a scrollable list's unbounded one had hidden.
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: Scaffold(
+              body: SizedBox(
+                height: 800,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: PollView(poll: _poll(), onVote: (_) {}),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final size = tester.getSize(find.byType(PollView));
+        expect(
+          size.height,
+          lessThan(300),
+          reason:
+              'a three-option card has no business anywhere near the 800px '
+              'the parent offered; it must size to its own content',
+        );
+      },
+    );
   });
 
   group('touch targets', () {
