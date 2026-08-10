@@ -34,6 +34,7 @@ mod canvas_write;
 pub mod capability;
 mod categories;
 mod channel_order;
+mod channel_permissions;
 mod channels;
 mod dms;
 mod emoji;
@@ -120,6 +121,7 @@ pub fn router(state: AppState) -> Router {
         .merge(categories::routes())
         .merge(channels::routes())
         .merge(channel_order::routes())
+        .merge(channel_permissions::routes())
         .merge(emoji::routes())
         .merge(invites::routes())
         .merge(members::routes())

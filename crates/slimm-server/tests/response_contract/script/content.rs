@@ -33,6 +33,12 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         json!({ "name": "contract", "topic": "what the schema promises" }),
     )
     .await;
+    c.get(
+        "getChannelPermissions",
+        &format!("/channels/{channel}/permissions"),
+        root,
+    )
+    .await;
     let scratch = c
         .json(
             "createChannel",
