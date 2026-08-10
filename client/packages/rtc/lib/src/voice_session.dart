@@ -406,8 +406,19 @@ class VoiceSession {
     });
   }
 
-  /// A disconnect this client did not ask for. [_teardown] cancels this
-  /// listener before it disconnects, so a `leave()` never lands here.
+  /// A disconnect this client did not ask for: the SFU removed this
+  /// participant, the room was deleted, or the connection was lost for good.
+  /// [_teardown] cancels this listener before it disconnects, so a `leave()`
+  /// never lands here.
+  ///
+  /// LiveKit's own engine already unpublishes and stops every local track for
+  /// this case (`Room`'s internal cleanup runs on any engine disconnect, not
+  /// only a client-initiated one), but that stops at the WebRTC track: it
+  /// never asks iOS to end a running broadcast, which is a platform-level
+  /// concept LiveKit has no reason to know about. Without this, a member
+  /// removed or timed out mid-share keeps recording their screen with no call
+  /// left to publish to - the same privacy failure a deliberate hang-up
+  /// without this call would have.
   void _onDisconnected(lk.DisconnectReason? reason) {
     if (_disposed) return;
     if (reason == lk.DisconnectReason.clientInitiated) return;
@@ -417,6 +428,7 @@ class VoiceSession {
       _participantsController.add(_participants);
     }
     _setState(VoiceSessionState.failed);
+    unawaited(_screenShare.dispose());
   }
 
   void _refreshParticipants() {

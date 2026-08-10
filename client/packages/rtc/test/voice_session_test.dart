@@ -196,21 +196,8 @@ void main() {
       );
     });
 
-    test('stopping also ends the platform broadcast', () async {
-      // Dropping the track without this leaves the phone still recording,
-      // red status bar and all, with nothing being published.
-      final bridge = _FakeBridge();
-      final session =
-          VoiceSession(roomFactory: _EmptyRoom.new, broadcast: bridge);
-      addTearDown(session.dispose);
-
-      await session.join(url: 'wss://a.invalid', token: 't');
-      expect(
-        await session.setScreenShareEnabled(false),
-        ScreenShareOutcome.stopped,
-      );
-      expect(bridge.stopRequests, 1);
-    });
+    // Teardown coverage for every path a call can end lives in
+    // voice_session_screen_share_teardown_test.dart, split out for the budget.
   });
 
   group('deafen', () {

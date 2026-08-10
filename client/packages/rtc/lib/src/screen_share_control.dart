@@ -188,11 +188,24 @@ class ScreenShareControl {
     _broadcast.autoPublishEnabled = true;
   }
 
-  /// Releases a hand-off still waiting on the picker. Called from
-  /// [VoiceSession]'s own teardown so leaving a call mid-request cannot leave
-  /// a listener running, or `autoPublishEnabled` stuck false, past the call
-  /// that set it.
-  Future<void> dispose() => _cancelHandoff();
+  /// Called from [VoiceSession]'s own teardown, on every path a call can
+  /// end - an explicit leave, the SFU dropping the connection, sign-out and
+  /// account deletion all reach this.
+  ///
+  /// Cancels a hand-off still waiting on the picker, so leaving mid-request
+  /// cannot leave a listener running or `autoPublishEnabled` stuck false past
+  /// the call that set it. Then unconditionally asks the platform to stop an
+  /// active broadcast outright: unpublishing the LiveKit track (which
+  /// [VoiceSession]'s own room teardown already does) only removes it from
+  /// the call, it does not tell iOS's ReplayKit extension to stop recording -
+  /// see [BroadcastBridge.requestStop]'s own doc comment, which already named
+  /// this as the one thing nothing else can do. Safe to call whether or not a
+  /// share was ever active: off iOS, and with nothing broadcasting, the
+  /// request reaches nobody.
+  Future<void> dispose() async {
+    await _cancelHandoff();
+    await _broadcast.requestStop();
+  }
 
   /// The capture options a share is published with.
   ///

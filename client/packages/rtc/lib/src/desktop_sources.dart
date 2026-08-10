@@ -6,6 +6,21 @@
 /// `getSources` is called, so asking to share without enumerating first fails
 /// with `source not found!` no matter what else is right. That was the whole
 /// Fedora screen-share bug.
+///
+/// A second, unrelated Linux/desktop defect lives one layer below this file
+/// and is not fixable from here: flutter_webrtc 1.6.0's shared desktop
+/// (`common/cpp`) plugin never calls `StopCapture()` on a `getDisplayMedia`
+/// track when it is disposed. `MediaStreamTrackDispose`/`MediaStreamDispose`
+/// (`flutter_media_stream.cc`) only stop a capturer found in `video_capturers_`,
+/// and `GetDisplayMedia` (`flutter_screen_capture.cc`) never registers its
+/// `desktop_capturer` into that map - only the camera path (`getUserMedia`)
+/// does. There is no other method in the plugin's channel dispatch that stops
+/// one either. `VoiceSession` already asks LiveKit to unpublish and stop the
+/// local track on every call-ending path (see `_teardown`/`_onDisconnected`),
+/// which is everything this client can reach; whether the platform's own
+/// recording indicator actually clears after that is a native-plugin question
+/// this package has no API to answer or to force, confirmed by reading the
+/// pinned plugin's source rather than by a real Linux desktop capture session.
 library;
 
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
