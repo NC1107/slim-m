@@ -18,6 +18,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'canvas_camera_wheel.dart';
 import 'canvas_cursors.dart';
 import 'canvas_document.dart';
 import 'canvas_painters.dart';
