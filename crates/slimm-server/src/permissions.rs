@@ -162,6 +162,25 @@ pub fn evaluate(
     base
 }
 
+/// Masks a bitmask to all-zero unless it carries VIEW_CHANNEL.
+///
+/// A real channel the caller cannot view still passes its unrelated base
+/// bits straight through unless an overwrite happens to deny them, and
+/// `@everyone` usually grants something - so left unmasked, this would
+/// answer differently for "channel does not exist" (forced NONE) than for
+/// "channel exists, caller cannot view it, but nothing denies the bits
+/// their base already grants", turning a caller into a channel-existence
+/// oracle. Shared by `GET /channels/{channelId}/permissions` and
+/// `Store::permissions_in_channels`; see
+/// docs/decisions/0011-per-channel-permissions.md.
+pub fn mask_unless_viewable(permissions: Permissions) -> Permissions {
+    if permissions.contains(Permissions::VIEW_CHANNEL) {
+        permissions
+    } else {
+        Permissions::NONE
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
