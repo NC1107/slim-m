@@ -13,6 +13,14 @@
 /// invisible tappable margin around it instead, so a small chip on a touch
 /// layout gets a bigger tap area without a ring that floats away from what it is
 /// meant to outline.
+///
+/// The ring only paints for [FocusHighlightMode.traditional] (keyboard or a
+/// platform that reports it), the same distinction FocusableActionDetector
+/// already draws for AppListRow's own focus ring. A plain tap already
+/// requests real focus, for Enter/Space activation and screen-reader state,
+/// but painting a ring for that too would show one on every ordinary tap,
+/// floating outside a control that may have nothing but its own content's
+/// height to spare.
 library;
 
 import 'package:flutter/material.dart';
@@ -82,12 +90,19 @@ class _FocusableTapTargetState extends State<FocusableTapTarget> {
     super.initState();
     _ownsFocusNode = widget.focusNode == null;
     _focusNode = widget.focusNode ?? FocusNode();
+    FocusManager.instance.addHighlightModeListener(_onHighlightModeChange);
   }
 
   @override
   void dispose() {
+    FocusManager.instance.removeHighlightModeListener(_onHighlightModeChange);
     if (_ownsFocusNode) _focusNode.dispose();
     super.dispose();
+  }
+
+  // A mode change alone (no focus change) still needs a rebuild, so the ring catches up once input switches to a keyboard.
+  void _onHighlightModeChange(FocusHighlightMode _) {
+    if (mounted) setState(() {});
   }
 
   void _activate() {
@@ -99,6 +114,10 @@ class _FocusableTapTargetState extends State<FocusableTapTarget> {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final content = widget.builder(context, _focused, _hovered);
 
+    // Real focus (Enter/Space, screen readers) is unaffected; only the paint below reads the highlight mode.
+    final showRing = _focused &&
+        FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
+
     // The ring hugs the control tightly; the hit-target floor below grows the
     // invisible margin instead. See the library doc at the top of the file.
     final ring = Container(
@@ -106,7 +125,7 @@ class _FocusableTapTargetState extends State<FocusableTapTarget> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(widget.ringRadius + focusRingGap),
         border: Border.all(
-          color: _focused ? tokens.focusRing : Colors.transparent,
+          color: showRing ? tokens.focusRing : Colors.transparent,
           width: focusRingWidth,
         ),
       ),
