@@ -288,52 +288,27 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
   /// which switching the unmodified case to zoom would have broken; a
   /// middle-mouse grab-drag (see [_beginPan]) is what actually gives a
   /// plain mouse free motion in both axes, not the wheel.
+  ///
+  /// The actual arithmetic lives in [cameraAfterWheelScroll], a pure
+  /// function rather than a method here, because this surface is no longer
+  /// the only thing a wheel event can land on: a manipulable presence tile
+  /// in the app layer sits in front of it with its own opaque hit test, and
+  /// has to answer for that same gesture rather than silently swallowing it
+  /// - see that widget's own doc for why. Two independent copies of this
+  /// would drift the day only one changed; this is the one place either
+  /// caller reads it from.
   void _signal(PointerSignalEvent event) {
     if (event is! PointerScrollEvent) return;
     final document = widget.document;
-    final camera = document.camera;
     final keys = HardwareKeyboard.instance;
-    if (keys.isControlPressed || keys.isMetaPressed) {
-      final factor = event.scrollDelta.dy > 0 ? 0.9 : 1.1;
-      _zoomAbout(event.localPosition, camera.zoom * factor);
-      return;
-    }
-    if (keys.isShiftPressed) {
-      // Some platforms already swap a shifted wheel's delta into dx before Flutter sees it, some never do - so read whichever carries it.
-      final horizontal = event.scrollDelta.dx != 0
-          ? event.scrollDelta.dx
-          : event.scrollDelta.dy;
-      document.setCamera(
-        camera.copyWith(x: camera.x + horizontal / camera.zoom),
-      );
-      return;
-    }
     document.setCamera(
-      camera.copyWith(
-        x: camera.x + event.scrollDelta.dx / camera.zoom,
-        y: camera.y + event.scrollDelta.dy / camera.zoom,
-      ),
-    );
-  }
-
-  /// Solves directly for the camera that leaves the world point under
-  /// [focal] exactly where it was, at the new zoom - one [setCamera] call
-  /// rather than a set-then-correct pair, so a camera already near a world
-  /// edge cannot have its own clamp shift x/y before the correction reads
-  /// it. [zoomTarget] is clamped here rather than inside [setCamera], since
-  /// the offset needs the zoom that will actually land; the no-op guard
-  /// spares a wheel notch already parked at a bound the cost of a recull.
-  void _zoomAbout(Offset focal, double zoomTarget) {
-    final document = widget.document;
-    final camera = document.camera;
-    final zoom = zoomTarget.clamp(minZoom, maxZoom);
-    if (zoom == camera.zoom) return;
-    final worldFocal = _toWorld(focal);
-    document.setCamera(
-      camera.copyWith(
-        x: worldFocal.dx - focal.dx / zoom,
-        y: worldFocal.dy - focal.dy / zoom,
-        zoom: zoom,
+      cameraAfterWheelScroll(
+        document.camera,
+        focal: event.localPosition,
+        dx: event.scrollDelta.dx,
+        dy: event.scrollDelta.dy,
+        zoomModifier: keys.isControlPressed || keys.isMetaPressed,
+        horizontalModifier: keys.isShiftPressed,
       ),
     );
   }

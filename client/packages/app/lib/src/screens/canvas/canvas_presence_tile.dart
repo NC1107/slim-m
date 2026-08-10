@@ -57,26 +57,33 @@
 /// exactly where a person last saw them, whichever side of the drawing
 /// surface the tile's own pixels are currently painting on.
 ///
-/// An unlocked tile's opaque hit test also has to answer for two things it
-/// does not otherwise implement, both because `CanvasSurface` beneath it
-/// never receives a down event a tile has already absorbed - true
-/// regardless of [sentToBack], since this widget's own interactive shell
-/// stays in front of `CanvasSurface` at every depth. A middle-mouse
-/// grab-pan is one - `canvas_surface_gestures.dart` honours it everywhere
-/// else on the canvas, and Flutter's hit test cannot forward just that
-/// button selectively (opacity is decided once per pointer, before its
-/// buttons are read), so this widget replicates `_updatePan`'s own delta
-/// math directly against [document]. The other is simpler: every pointer
-/// this tile absorbs is reported to [CanvasDocument.externalPointers], or
-/// `CanvasSurface`'s own pinch-cancellation guard would only ever see one
-/// finger of a two-finger touch that happened to land partly on a tile, and
-/// place on it as though no second finger had come down at all.
+/// An unlocked tile's opaque hit test also has to answer for three things
+/// it does not otherwise implement, all because `CanvasSurface` beneath it
+/// never receives an event a tile has already absorbed - true regardless of
+/// [sentToBack], since this widget's own interactive shell stays in front
+/// of `CanvasSurface` at every depth. A middle-mouse grab-pan is one -
+/// `canvas_surface_gestures.dart` honours it everywhere else on the canvas,
+/// and Flutter's hit test cannot forward just that button selectively
+/// (opacity is decided once per pointer, before its buttons are read), so
+/// this widget replicates `_updatePan`'s own delta math directly against
+/// [document]. Every pointer this tile absorbs is reported to
+/// [CanvasDocument.externalPointers], or `CanvasSurface`'s own
+/// pinch-cancellation guard would only ever see one finger of a two-finger
+/// touch that happened to land partly on a tile, and place on it as though
+/// no second finger had come down at all. The third was a real bug rather
+/// than an anticipated gap: the outer `Listener` wires `onPointerSignal` to
+/// [cameraAfterWheelScroll] now, the same pure math `CanvasSurface` itself
+/// reads - without it a mouse wheel over any tile did nothing at all, ctrl
+/// held or not, which is indistinguishable in practice from "zoom is
+/// broken" to somebody drawing on a canvas with their own camera bubble on
+/// it, which is most of what this canvas is for.
 library;
 
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
@@ -273,6 +280,29 @@ class _CanvasPresenceManipulableTileState
     }
   }
 
+  /// A wheel notch landing inside this tile's own opaque bounds - see this
+  /// file's own library doc for why `CanvasSurface` never gets a chance to
+  /// answer for it otherwise. [event.localPosition] is relative to this
+  /// tile's own top-left, not the canvas viewport `cameraAfterWheelScroll`
+  /// expects, so it is re-based onto this tile's own on-screen origin
+  /// before being handed to the same pure math `CanvasSurface` reads.
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    final screen = presenceScreenRect(_rect, widget.camera);
+    final focal = screen.topLeft + event.localPosition;
+    final keys = HardwareKeyboard.instance;
+    widget.document.setCamera(
+      cameraAfterWheelScroll(
+        widget.document.camera,
+        focal: focal,
+        dx: event.scrollDelta.dx,
+        dy: event.scrollDelta.dy,
+        zoomModifier: keys.isControlPressed || keys.isMetaPressed,
+        horizontalModifier: keys.isShiftPressed,
+      ),
+    );
+  }
+
   @override
   void dispose() {
     for (final _ in _countedPointers) {
@@ -341,6 +371,7 @@ class _CanvasPresenceManipulableTileState
           onPointerMove: _pointerMove,
           onPointerUp: _pointerUp,
           onPointerCancel: _pointerUp,
+          onPointerSignal: _onPointerSignal,
           child: Semantics(
             container: true,
             label: widget.semanticLabel,
