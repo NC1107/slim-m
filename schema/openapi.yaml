@@ -1048,6 +1048,37 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
+  /channels/{channelId}/permissions:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: getChannelPermissions
+      tags: [channels]
+      summary: The caller's effective permission bitmask in this one channel.
+      description: >
+        The per-channel sibling of `Me.permissions`: calls the same
+        evaluator `permissions_in_channel` does, so a thread resolves to its
+        parent, a DM answers through the DM-specific rule, and a timeout is
+        already subtracted. Masked to an all-zero bitmask whenever the
+        caller lacks VIEW_CHANNEL, so a channel the caller cannot view
+        answers exactly like one that does not exist - see
+        `docs/decisions/0011-per-channel-permissions.md` for why a raw
+        pass-through would leak channel existence. There is accordingly no
+        403 or 404 here: an unreachable channel is a 200 of all zeros, the
+        same "refuse identically" precedent `setOverwrite` already
+        documents for this API.
+      responses:
+        "200":
+          description: The caller's effective bitmask in this channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelPermissions"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /channels/order:
     put:
       operationId: reorderChannels
@@ -5158,6 +5189,20 @@ components:
             preference existed. `mentions` is a direct `@`-mention plus every
             message in a DM. `nothing` is no push at all, ever, including a
             DM.
+
+    ChannelPermissions:
+      type: object
+      required: [permissions]
+      properties:
+        permissions:
+          type: integer
+          format: int64
+          description: >
+            The caller's effective permission bitmask in this one channel,
+            already resolved through thread and DM handling and with any
+            timeout subtracted - see `getChannelPermissions`. Zero whenever
+            the caller lacks VIEW_CHANNEL here, including for a channel that
+            does not exist at all.
 
     ReadState:
       type: object
