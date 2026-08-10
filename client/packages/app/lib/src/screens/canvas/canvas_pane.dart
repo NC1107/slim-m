@@ -338,11 +338,11 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
 
   void _onErase(Offset world) {
     final me = ref.read(meProvider).valueOrNull;
-    _ops.onErasePoint(
-      world,
-      manageCanvas: me?.permissions.hasPermission(Perm.manageCanvas) ?? false,
-      selfId: me?.id,
-    );
+    // A safe read, not a cold one: build() already watches this same family instance every frame.
+    final manageCanvas = ref
+        .read(myChannelPermissionsProvider(widget.channelId))
+        .hasPermission(Perm.manageCanvas);
+    _ops.onErasePoint(world, manageCanvas: manageCanvas, selfId: me?.id);
   }
 
   Future<void> _onEraseEnd() async {
