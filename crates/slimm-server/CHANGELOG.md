@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.35.0](https://github.com/NC1107/slim-m/compare/server-v0.34.0...server-v0.35.0) (2026-08-10)
+
+
+### Features
+
+* **server:** add GET /channels/{channel_id}/permissions ([#518](https://github.com/NC1107/slim-m/issues/518)) ([e84431c](https://github.com/NC1107/slim-m/commit/e84431c8af823913b285aa48b46ca8aabf0d554d))
+* **server:** carry the caller's permissions onto listChannels and listOpenReports ([#520](https://github.com/NC1107/slim-m/issues/520)) ([823ea67](https://github.com/NC1107/slim-m/commit/823ea674b060767c2112503ddc4ef1323d902c03))
+
 ## [0.34.0](https://github.com/NC1107/slim-m/compare/server-v0.33.2...server-v0.34.0) (2026-08-09)
 
 
