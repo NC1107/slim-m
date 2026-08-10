@@ -239,7 +239,9 @@ class _PollOptionRowState extends State<_PollOptionRow> {
                   Positioned.fill(child: Container(color: tokens.borderSubtle)),
                   FractionallySizedBox(
                     widthFactor: fraction.clamp(0, 1),
-                    child: Container(color: _fillColor(tokens, selected, leading)),
+                    child: Container(
+                      color: _fillColor(tokens, selected, leading),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(

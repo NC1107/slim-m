@@ -10,20 +10,18 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/widgets/poll_view.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-api.Poll _poll({
-  bool closed = false,
-  List<int> votes = const [1, 3],
-}) => api.Poll(
-  question: 'Favourite colour?',
-  options: [
-    for (var i = 0; i < votes.length; i++)
-      api.PollOption(position: i, label: 'Option $i', votes: votes[i]),
-  ],
-  totalVotes: votes.fold(0, (a, b) => a + b),
-  votedOption: null,
-  closeAt: null,
-  closed: closed,
-);
+api.Poll _poll({bool closed = false, List<int> votes = const [1, 3]}) =>
+    api.Poll(
+      question: 'Favourite colour?',
+      options: [
+        for (var i = 0; i < votes.length; i++)
+          api.PollOption(position: i, label: 'Option $i', votes: votes[i]),
+      ],
+      totalVotes: votes.fold(0, (a, b) => a + b),
+      votedOption: null,
+      closeAt: null,
+      closed: closed,
+    );
 
 Widget _app(api.Poll poll) => MaterialApp(
   theme: buildTheme(Brightness.light, AppTokens.light),
@@ -68,12 +66,14 @@ void main() {
       (tester) async {
         await tester.pumpWidget(_app(_poll(votes: const [1, 3])));
 
-        final leading = _fillLayers(tester, 'Option 1')
-            .map((c) => c.color)
-            .toSet();
-        final ordinary = _fillLayers(tester, 'Option 0')
-            .map((c) => c.color)
-            .toSet();
+        final leading = _fillLayers(
+          tester,
+          'Option 1',
+        ).map((c) => c.color).toSet();
+        final ordinary = _fillLayers(
+          tester,
+          'Option 0',
+        ).map((c) => c.color).toSet();
         expect(
           leading.difference(ordinary),
           contains(AppTokens.light.textSecondary),

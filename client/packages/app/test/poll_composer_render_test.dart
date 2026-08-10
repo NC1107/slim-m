@@ -18,8 +18,9 @@ Finder _questionField() => find.byWidgetPredicate(
   (w) => w is AppInput && w.placeholder == 'Ask a question',
 );
 
-Finder _optionField(int n) =>
-    find.byWidgetPredicate((w) => w is AppInput && w.placeholder == 'Option $n');
+Finder _optionField(int n) => find.byWidgetPredicate(
+  (w) => w is AppInput && w.placeholder == 'Option $n',
+);
 
 Finder _addOptionButton() => find.widgetWithText(AppButton, 'Add option');
 
