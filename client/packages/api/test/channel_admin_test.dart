@@ -137,4 +137,21 @@ void main() {
       );
     });
   });
+
+  group('getChannelPermissions', () {
+    test('requests the channel-scoped route and unwraps the bitmask', () async {
+      String? requestedPath;
+      final api = SlimmApi(
+        baseUrl: _base,
+        session: SessionStore(tokens: _tokens()),
+        httpClient: MockClient((request) async {
+          requestedPath = request.url.path;
+          return http.Response(jsonEncode({'permissions': 42}), 200);
+        }),
+      );
+      final permissions = await api.getChannelPermissions('chan-1');
+      expect(requestedPath, '/channels/chan-1/permissions');
+      expect(permissions, 42);
+    });
+  });
 }

@@ -91,6 +91,60 @@ void main() {
       expect(report.subjectKind, ReportSubject.user);
     });
 
+    test('a report carries its per-channel bitmask when the server sends one',
+        () {
+      final report = Report.fromJson({
+        'id': 'r1',
+        'reporter_id': 'user-1',
+        'subject_kind': 'message',
+        'subject_id': 'msg-1',
+        'channel_id': 'chan-1',
+        'reason': 'spam',
+        'snapshot': 'hi',
+        'subject_author_id': 'user-2',
+        'created_at': 1,
+        'channel_permissions': 8,
+      });
+      expect(report.channelPermissions, 8);
+    });
+
+    test('a report omitting channel_permissions reads as unknown, not zero',
+        () {
+      final report = Report.fromJson({
+        'id': 'r1',
+        'reporter_id': 'user-1',
+        'subject_kind': 'message',
+        'subject_id': 'msg-1',
+        'channel_id': 'chan-1',
+        'reason': 'spam',
+        'snapshot': 'hi',
+        'subject_author_id': 'user-2',
+        'created_at': 1,
+      });
+      expect(report.channelPermissions, isNull);
+    });
+
+    test('a channel carries its bitmask when the server sends one', () {
+      final channel = Channel.fromJson({
+        'id': 'chan-1',
+        'name': 'general',
+        'kind': 'text',
+        'created_at': 1,
+        'permissions': 16,
+      });
+      expect(channel.permissions, 16);
+    });
+
+    test('a channel omitting permissions reads as unknown, not zero', () {
+      final channel = Channel.fromJson({
+        'id': 'chan-1',
+        'name': 'general',
+        'kind': 'text',
+        'created_at': 1,
+      });
+      expect(channel.permissions, isNull);
+    });
+
     test('token and ticket toString never leak the secret', () {
       expect(_tokens(access: 'super-secret').toString(),
           isNot(contains('super-secret')));

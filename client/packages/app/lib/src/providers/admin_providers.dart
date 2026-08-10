@@ -19,6 +19,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import 'channel_permissions.dart';
 import 'live_events.dart';
 import 'providers.dart';
 
@@ -50,11 +51,27 @@ final rolesProvider = FutureProvider.autoDispose<List<api.Role>>(
 /// changes or a member's assignment does: either can change what a role
 /// means for whoever is looking at this screen right now, and the caller's
 /// own permissions besides. Watched by [RolesScreen] to stay live while open.
+///
+/// Also the one place [channelPermissionsProvider] is invalidated - see
+/// docs/decisions/0011-per-channel-permissions.md. A role or role-assignment
+/// change invalidates the whole family bare, since either can change what
+/// the caller can do in every channel at once; a self [api.MemberTimeoutChanged]
+/// does the same and additionally refreshes [meProvider], closing the gap
+/// where a moderator timed out mid-session kept a stale reading until some
+/// unrelated refetch; an [api.OverwriteChanged] invalidates only the one
+/// channel it names.
 final roleChangeWatcherProvider = Provider.autoDispose<void>((ref) {
+  final selfId = ref.read(sessionProvider).tokens?.userId;
   final sub = ref.read(liveEventsProvider).listen((event) {
     if (event is api.RoleChanged || event is api.MemberRoleChanged) {
       ref.invalidate(rolesProvider);
       ref.invalidate(meProvider);
+      ref.invalidate(channelPermissionsProvider);
+    } else if (event is api.MemberTimeoutChanged && event.userId == selfId) {
+      ref.invalidate(meProvider);
+      ref.invalidate(channelPermissionsProvider);
+    } else if (event is api.OverwriteChanged) {
+      ref.invalidate(channelPermissionsProvider(event.channelId));
     }
   });
   ref.onDispose(() => unawaited(sub.cancel()));
