@@ -11,6 +11,14 @@
 /// its own bounds and Flutter's Stack hit-testing never reaches past the
 /// first claimant. See `canvas_presence_layer.dart`'s own doc for the full
 /// account.
+///
+/// That structural test asserts `Stack.children` order alone, which - the
+/// same `canvas_grid_layer_test.dart` lesson - proves nothing about what
+/// actually paints. `canvas_presence_depth_paint_test.dart` is the
+/// pixel-level companion: it rasterises the real assembled pane and reads
+/// colours back, so a widget correctly ordered but silently painting
+/// nothing, or painting the wrong thing, fails there even when it passes
+/// here.
 library;
 
 import 'package:flutter/material.dart';

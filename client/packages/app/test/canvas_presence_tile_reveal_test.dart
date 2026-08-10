@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 /// A presence tile's own lock/depth/hide row and resize grip, hidden until
-/// hovered (desktop) or pressed once (touch) - report 3 in the backlog
-/// channel: "the buttons... don't ever go away and they are quite large".
+/// hovered (desktop), pressed once (touch, where there is no hover), or
+/// focused (keyboard) - report 3 in the backlog channel: "the buttons...
+/// don't ever go away and they are quite large", reported again after the
+/// hover/press reveal shipped because tabbing onto a control still operated
+/// it invisibly rather than showing it.
 ///
 /// `canvas_presence_depth_test.dart` already covers what these controls do
 /// once reached; this file covers whether they can be reached at all, and
@@ -48,6 +51,32 @@ Widget _layer(CanvasDocument document, CanvasPresenceTileOverrides overrides) =>
 
 const _lockLabel = 'Lock this tile in place';
 const _tileKey = ValueKey('camera:user-noor');
+
+/// Requests focus on the lock button's own [Focus] node, found from a
+/// descendant [Icon] rather than the outer [Semantics] the label finder
+/// matches - `Focus.of` only ever looks upward, so it has to start below
+/// `AppIconButton`'s own `FocusableActionDetector`, not above it.
+void _focusLockButton(WidgetTester tester) {
+  final icon = find
+      .descendant(
+        of: find.bySemanticsLabel(_lockLabel),
+        matching: find.byWidgetPredicate((w) => w is Icon),
+      )
+      .first;
+  Focus.of(tester.element(icon)).requestFocus();
+}
+
+/// The counterpart to [_focusLockButton]: reads the same node back out to
+/// drop focus from it, rather than guessing at an ancestor scope.
+void _unfocusLockButton(WidgetTester tester) {
+  final icon = find
+      .descendant(
+        of: find.bySemanticsLabel(_lockLabel),
+        matching: find.byWidgetPredicate((w) => w is Icon),
+      )
+      .first;
+  Focus.of(tester.element(icon)).unfocus();
+}
 
 void main() {
   testWidgets('the lock control does nothing to a bare tap before the tile '
@@ -218,6 +247,60 @@ void main() {
       reason:
           'a reveal must uncover the resize grip exactly as it does '
           'the lock/depth/hide row',
+    );
+  });
+
+  testWidgets(
+    'tabbing keyboard focus onto the lock button reveals the row, not just '
+    'lets a pointer tap that follows it operate an invisible control',
+    (tester) async {
+      final document = CanvasDocument()..setViewport(const Size(1000, 800));
+      addTearDown(document.dispose);
+      final overrides = CanvasPresenceTileOverrides();
+      addTearDown(overrides.dispose);
+
+      await tester.pumpWidget(_wrapLayer(_layer(document, overrides)));
+      await tester.pump();
+
+      _focusLockButton(tester);
+      await tester.pump(AppMotion.fast);
+
+      await tester.tap(find.bySemanticsLabel(_lockLabel));
+      await tester.pump();
+
+      expect(
+        overrides.stateFor('camera:user-noor').locked,
+        isTrue,
+        reason:
+            'focus must reveal the row the same way hover does, or a '
+            'sighted keyboard user operates a button they cannot see',
+      );
+    },
+  );
+
+  testWidgets('moving keyboard focus off the tile hides the row again', (
+    tester,
+  ) async {
+    final document = CanvasDocument()..setViewport(const Size(1000, 800));
+    addTearDown(document.dispose);
+    final overrides = CanvasPresenceTileOverrides();
+    addTearDown(overrides.dispose);
+
+    await tester.pumpWidget(_wrapLayer(_layer(document, overrides)));
+    await tester.pump();
+
+    _focusLockButton(tester);
+    await tester.pump(AppMotion.fast);
+    _unfocusLockButton(tester);
+    await tester.pump(AppMotion.fast);
+
+    await tester.tap(find.bySemanticsLabel(_lockLabel), warnIfMissed: false);
+    await tester.pump();
+
+    expect(
+      overrides.stateFor('camera:user-noor').locked,
+      isFalse,
+      reason: 'a focus reveal must not outlive the focus that started it',
     );
   });
 }

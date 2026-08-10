@@ -28,6 +28,27 @@
 /// or a first press, the same "never a dead end" guarantee [locked] itself
 /// already makes.
 ///
+/// The owner reported the same complaint a second time on 0.35.1, after the
+/// hover/press reveal above had already shipped, which is what closed the
+/// remaining gap: hover and a touch press are not the only ways a person
+/// reaches a control. [_focusedWithin] reveals the same row for a keyboard
+/// user tabbing onto it, on the owner's own instruction that hover is the
+/// desktop-pointer answer and focus has to be the desktop-keyboard one -
+/// [IgnorePointer] blocks a pointer tap, never focus traversal, so a hidden
+/// button was already Tab-then-Enter reachable, just invisible while it
+/// happened, which is worse than either fully hidden or fully shown. A
+/// touch press keeps the tap-to-reveal shape it already had (report 3's own
+/// fix): a tile is the thing being touched to begin with, so a tap on it
+/// costs nothing a drag or a resize was not already going to spend, and the
+/// three-second [canvasPresenceTileTouchRevealDuration] window is enough
+/// for the follow-up tap on a lock, depth or hide button that a real touch
+/// sequence needs. The participant name badge in `canvas_presence_bubble
+/// .dart` stays always-on rather than joining this same gate: it identifies
+/// whose tile this is for as long as the tile is up, the same job a name
+/// label does in every other call surface this app has, where the row of
+/// three action buttons and the resize grip are each a thing somebody does
+/// once and moves on from.
+///
 /// [CanvasPresenceManipulableTile.sentToBack] never touches this widget's
 /// own layout, gesture handling or paint position at all - see
 /// `canvas_presence_layer.dart`'s own doc for why. Only [child] differs
@@ -189,7 +210,14 @@ class _CanvasPresenceManipulableTileState
   bool _revealedForTouch = false;
   Timer? _hideTimer;
 
-  bool get _controlsVisible => _hovering || _revealedForTouch;
+  /// True while keyboard focus sits on the grip or on any control in the
+  /// row - a plain `Focus.hasFocus` on the wrapping node in [_revealable],
+  /// which Flutter already defines as true for the node itself or any of
+  /// its descendants, so one flag serves every button without tracking each
+  /// one separately.
+  bool _focusedWithin = false;
+
+  bool get _controlsVisible => _hovering || _revealedForTouch || _focusedWithin;
 
   void _onHoverEnter(PointerEnterEvent _) => setState(() => _hovering = true);
   void _onHoverExit(PointerExitEvent _) => setState(() => _hovering = false);
@@ -268,13 +296,29 @@ class _CanvasPresenceManipulableTileState
   /// than before this file ever hid anything. [IgnorePointer] still blocks
   /// an ordinary pointer tap while hidden; a screen reader's own activation
   /// reaches straight through it regardless, the same way it always could.
+  ///
+  /// The [Focus] wrapper is what stops a sighted keyboard user from tabbing
+  /// onto, and operating, a control they cannot see: [IgnorePointer] gates a
+  /// pointer only, never focus traversal, so without this a hidden
+  /// `AppIconButton` was already reachable and already activatable by Tab
+  /// then Enter, just invisible while it happened. `canRequestFocus: false`
+  /// keeps this node itself out of the tab order - only its real children
+  /// (the icon buttons) are stops - and Flutter's own `FocusNode.hasFocus`
+  /// is already true for a node whenever a descendant holds focus, so one
+  /// listener here answers for every button in [child] without wiring each
+  /// one separately.
   Widget _revealable(BuildContext context, Widget child) => IgnorePointer(
     ignoring: !_controlsVisible,
     child: AnimatedOpacity(
       opacity: _controlsVisible ? 1 : 0,
       duration: AppMotion.reduced(context, AppMotion.fast),
       alwaysIncludeSemantics: true,
-      child: child,
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: (hasFocus) => setState(() => _focusedWithin = hasFocus),
+        child: child,
+      ),
     ),
   );
 
