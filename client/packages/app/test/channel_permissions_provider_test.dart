@@ -4,6 +4,17 @@
 /// see docs/decisions/0011-per-channel-permissions.md. Mirrors
 /// `member_roster_paging_test.dart`'s shape for a live-event-driven
 /// invalidation test.
+///
+/// **Every invalidation case here forces a read after the event, and that is
+/// load-bearing rather than incidental.**
+/// Riverpod invalidates lazily: nothing refetches until something asks for
+/// the value again, so a test that only counts fetches after emitting an
+/// event cannot observe whether the invalidation happened at all.
+/// Two of these cases were written that way first and killed no mutation:
+/// dropping the `userId == selfId` guard, and widening the surgical
+/// per-channel invalidate to the whole family, both passed against fixtures
+/// that never re-read.
+/// The re-read is what turns each of them into a real assertion.
 library;
 
 import 'dart:async';
@@ -146,9 +157,7 @@ void main() {
         const api.MemberTimeoutChanged(userId: 'someone-else', until: 1),
       );
       await Future<void>.delayed(Duration.zero);
-      // Force a re-read: if the mutation this guards against ever landed
-      // (dropping the `userId == selfId` check), this is what would surface
-      // it as an extra fetch rather than passing on an unread invalidation.
+      // Re-read, or an unread invalidation passes; see the library doc.
       await container.read(meProvider.future);
       await container.read(channelPermissionsProvider('chan-1').future);
       expect(
@@ -207,10 +216,7 @@ void main() {
 
       events.add(const api.OverwriteChanged(channelId: 'chan-1'));
       await Future<void>.delayed(Duration.zero);
-      // Force a re-read of both: if the mutation this guards against ever
-      // landed (invalidating the whole family instead of just chan-1),
-      // this is what would surface chan-2 as an extra fetch rather than
-      // passing on an unread invalidation.
+      // Re-read both, or an unread invalidation passes; see the library doc.
       await container.read(channelPermissionsProvider('chan-1').future);
       await container.read(channelPermissionsProvider('chan-2').future);
 
