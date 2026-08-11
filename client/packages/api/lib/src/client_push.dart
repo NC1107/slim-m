@@ -10,11 +10,18 @@ extension SlimmApiPush on SlimmApi {
   /// Registers, or replaces, this device's push registration. The server seals
   /// a content-free envelope to [pushPublicKey]; only this device holds the
   /// matching private key, so a device that never registers one gets no push.
+  ///
+  /// [includeContent] asks the server to seal a short preview (sender,
+  /// channel, up to 160 characters of body) inside that same envelope, for a
+  /// device that can decrypt it and show it in a notification. Defaults to
+  /// false, matching the server's own default: a device that never asks gets
+  /// exactly the content-free envelope it always got.
   Future<void> registerPush({
     required String platform,
     required String pushToken,
     String? voipPushToken,
     required String pushPublicKey,
+    bool includeContent = false,
   }) =>
       _send(
         'PUT',
@@ -24,6 +31,7 @@ extension SlimmApiPush on SlimmApi {
           'push_token': pushToken,
           'voip_push_token': voipPushToken,
           'push_public_key': pushPublicKey,
+          'include_content': includeContent,
         },
         expectNoContent: true,
       );

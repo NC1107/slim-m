@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/push_controller.dart';
@@ -138,6 +139,8 @@ class _FakePermissionRequester implements AndroidPermissionRequester {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(registerAndroidLocalNotificationsPluginForTest);
+  // Every registration now reads the content-preview setting, which needs it.
+  setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('PushController construction', () {
     test('a token source whose rotation stream throws synchronously cannot '
