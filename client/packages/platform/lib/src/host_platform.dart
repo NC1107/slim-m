@@ -24,6 +24,21 @@ bool get isIOSHost => !kIsWeb && Platform.isIOS;
 /// True only for a native Android build.
 bool get isAndroidHost => !kIsWeb && Platform.isAndroid;
 
+/// True only for a native Linux desktop build.
+bool get isLinuxHost => !kIsWeb && Platform.isLinux;
+
+/// True only for a native macOS build.
+bool get isMacOSHost => !kIsWeb && Platform.isMacOS;
+
+/// True only for a native Windows build.
+bool get isWindowsHost => !kIsWeb && Platform.isWindows;
+
+/// Any of the three desktop targets, native builds only. A browser on a
+/// laptop is deliberately still false: this answers "does this build own a
+/// window it can move, resize and hide", and a tab in a browser owns none of
+/// that regardless of the hardware underneath it.
+bool get isDesktopHost => isLinuxHost || isMacOSHost || isWindowsHost;
+
 /// A short, human-recognisable name for this device, sent as `device_name`
 /// on sign-in and registration so the Devices list in settings can tell one
 /// session from another - the reason to revoke a session you don't recognise

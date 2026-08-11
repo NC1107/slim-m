@@ -39,8 +39,14 @@ dependencies:
   path: ^1.9.0
   path_provider: ^2.1.0
   shared_preferences: ^2.3.0
+  # Frameless/drag/resize/minimize-hide and off-screen-geometry validation;
+  # see docs/decisions/0012-desktop-window-shell.md and docs/dependencies.md.
+  screen_retriever: ^0.2.2
+  # The tray icon and its context menu; same publisher family as window_manager.
+  tray_manager: ^0.5.3
   # Already resolved transitively; direct so composer_clipboard_image_web.dart can import it.
   web: ^1.1.0
+  window_manager: ^0.5.2
 dev_dependencies:
   fake_async: ^1.3.3
   flutter_lints: ^5.0.0
@@ -60,3 +66,6 @@ flutter:
     - assets/audio/notifications/member_join.wav
     - assets/audio/notifications/member_leave.wav
     - assets/audio/notifications/mention.wav
+    # A symlink to packaging/linux/icons/, same reason and same shape as the
+    # audio symlink above: a `../../../` pubspec path bundles nothing.
+    - assets/icons/tray_icon.png
