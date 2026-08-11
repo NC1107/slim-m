@@ -26,6 +26,7 @@ import 'camera_devices.dart';
 import 'camera_switching.dart';
 import 'camera_view.dart';
 import 'desktop_sources.dart';
+import 'remote_video_publication.dart';
 import 'screen_share.dart';
 import 'screen_share_control.dart';
 import 'screen_share_view.dart';
