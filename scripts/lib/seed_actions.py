@@ -85,12 +85,16 @@ def choose_action(rng, actions=ACTIONS):
 
 
 def resolve_action(action, *, has_top_message, has_own_message, has_thread,
-                    has_other_account, is_privileged, has_poll):
+                    has_other_account, is_privileged, has_unvoted_poll):
     """The action actually performed, honouring what state allows.
 
     A pure decision so the fallback chain is unit-testable with no server:
     the caller supplies what it already knows about the shared state rather
-    than this function reaching for it.
+    than this function reaching for it. `has_unvoted_poll` is deliberately
+    per-caller rather than "does any poll exist": once every poll has this
+    account's vote, drawing `vote_poll` again would only fall back inside
+    the handler anyway, silently spending the turn as an uncounted short
+    message rather than the vote the run report would claim it as.
     """
     if action in _NEEDS_TOP_MESSAGE and not has_top_message:
         return FALLBACK
@@ -100,7 +104,7 @@ def resolve_action(action, *, has_top_message, has_own_message, has_thread,
         return FALLBACK
     if action == "reply_in_thread" and not has_thread:
         return FALLBACK
-    if action == "vote_poll" and not has_poll:
+    if action == "vote_poll" and not has_unvoted_poll:
         return FALLBACK
     if action in _OWN_MESSAGE_ACTIONS and not has_own_message:
         return FALLBACK

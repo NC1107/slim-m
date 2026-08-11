@@ -26,6 +26,7 @@ class SeedStateTest(unittest.TestCase):
         self.assertFalse(state.has_top_message())
         self.assertFalse(state.has_thread())
         self.assertFalse(state.has_poll())
+        self.assertFalse(state.has_unvoted_poll("alice"))
 
     def test_a_added_top_message_is_findable_by_anyone(self):
         state = seed_state.SeedState()
@@ -65,6 +66,23 @@ class SeedStateTest(unittest.TestCase):
         remaining = [state.random_top_message(rng) for _ in range(5)]
         self.assertTrue(all(m["id"] == "m2" for m in remaining))
         self.assertNotIn("m1", {m["id"] for m in state.newest_top_messages(10)})
+
+    def test_forgetting_a_deleted_poll_removes_it_from_the_poll_pools_too(self):
+        """A poll is a message too, so deleting one (delete_message draws
+        from the same author-scoped pool a poll's own send recorded it
+        into) must not leave it reachable to random_unvoted_poll or
+        newest_polls - every vote against a dangling entry like that 404s,
+        since the message behind it is really gone on the server."""
+        state = seed_state.SeedState()
+        state.add_top_message("p1", "c1", "alice")
+        state.add_poll("p1", "c1", 2)
+        state.record_poll_vote("p1", "bob")
+        state.forget_own_message("alice", "p1")
+        rng = random.Random(0)
+        self.assertIsNone(state.random_unvoted_poll(rng, "carol"))
+        self.assertEqual(state.newest_polls(10), [])
+        self.assertFalse(state.has_poll())
+        self.assertEqual(state.poll_voters("p1"), set())
 
     def test_a_thread_is_recorded_as_a_parent_and_channel_pair(self):
         state = seed_state.SeedState()
@@ -117,6 +135,25 @@ class SeedStateTest(unittest.TestCase):
         self.assertEqual(state.poll_voters("p1"), {"alice"})
         self.assertIsNone(state.random_unvoted_poll(rng, "alice"))
         self.assertEqual(state.random_unvoted_poll(rng, "bob")["id"], "p1")
+
+    def test_has_unvoted_poll_is_per_caller_not_deployment_wide(self):
+        """`has_poll` stays true forever once a poll has ever existed;
+        `has_unvoted_poll` is what `resolve_action` actually needs, since a
+        caller who has already voted on every poll has nothing left to vote
+        on even though a poll genuinely exists."""
+        state = seed_state.SeedState()
+        state.add_poll("p1", "c1", 2)
+        state.record_poll_vote("p1", "alice")
+        self.assertTrue(state.has_poll())
+        self.assertFalse(state.has_unvoted_poll("alice"))
+        self.assertTrue(state.has_unvoted_poll("bob"))
+
+    def test_has_unvoted_poll_is_true_if_any_poll_is_still_unvoted(self):
+        state = seed_state.SeedState()
+        state.add_poll("p1", "c1", 2)
+        state.add_poll("p2", "c1", 2)
+        state.record_poll_vote("p1", "alice")
+        self.assertTrue(state.has_unvoted_poll("alice"))
 
     def test_newest_polls_is_a_fixed_tail_slice(self):
         state = seed_state.SeedState()

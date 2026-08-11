@@ -261,7 +261,7 @@ def run_account(ctx, actions_count, pace_range, actions=None):
             has_thread=ctx.state.has_thread(),
             has_other_account=bool(ctx.other_usernames),
             is_privileged=ctx.is_privileged,
-            has_poll=ctx.state.has_poll())
+            has_unvoted_poll=ctx.state.has_unvoted_poll(ctx.username))
         try:
             HANDLERS[resolved](ctx)
             stats[resolved] += 1

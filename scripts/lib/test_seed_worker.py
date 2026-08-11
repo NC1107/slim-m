@@ -41,6 +41,22 @@ class RunAccountActionsOverrideTest(unittest.TestCase):
             ctx, 10, (0, 0), actions=(("message_short", 1),))
         self.assertEqual(set(stats), {"message_short"})
 
+    def test_an_already_voted_poll_falls_back_before_the_handler_runs(self):
+        """Once this account has voted on the only poll, drawing vote_poll
+        again must resolve to the fallback rather than reaching
+        handle_vote_poll and silently degrading inside it - the mismatch
+        between `has_poll` (deployment-wide) and what the handler actually
+        needs (unvoted, per-caller) that used to make the run report claim
+        a vote that never happened."""
+        ctx = _ctx()
+        ctx.rng = random.Random(0)
+        ctx.state.add_poll("p1", "c1", 2)
+        ctx.state.record_poll_vote("p1", ctx.username)
+        stats, _failures = seed_worker.run_account(
+            ctx, 5, (0, 0), actions=(("vote_poll", 1),))
+        self.assertEqual(set(stats), {"message_short"})
+        ctx.api.call.assert_not_called()
+
 
 def _ctx(corpus=None, api=None):
     fake_api = api or Mock()
