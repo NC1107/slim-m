@@ -112,6 +112,15 @@ class FakeSession implements VoiceSession {
   bool? askedForCameraOnJoin;
   int leaveCalls = 0;
 
+  /// Holds [leave] open until a test completes it, so a teardown that is
+  /// genuinely still unwinding can be raced against a fresh [join] the way a
+  /// real `room.disconnect()` round trip lets a person race it by hand.
+  Completer<void>? leaveGate;
+
+  /// The real session's own supersession counter, modelled here so a gated
+  /// [leave] behaves the way the thing it stands in for does.
+  int _generation = 0;
+
   @override
   bool deafened = false;
 
@@ -215,12 +224,17 @@ class FakeSession implements VoiceSession {
   }) async {
     askedForMicrophoneOnJoin = microphoneEnabled;
     askedForCameraOnJoin = cameraEnabled;
+    _generation++;
     _state = joinOutcome;
   }
 
   @override
   Future<void> leave() async {
     leaveCalls++;
+    final generation = ++_generation;
+    await leaveGate?.future;
+    // Mirrors the real `VoiceSession.leave`'s own supersession guard.
+    if (generation != _generation) return;
     _state = VoiceSessionState.idle;
     // The real session emits this transition too, and a fake that did not was untested here.
     _states.add(_state);

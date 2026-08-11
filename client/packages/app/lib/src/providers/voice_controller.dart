@@ -20,6 +20,7 @@ import 'call_recap.dart';
 import 'providers.dart';
 import 'voice_call_heartbeat.dart';
 import 'voice_call_lifecycle_report.dart';
+import 'voice_camera_failure.dart';
 import 'voice_settings_controller.dart';
 import 'voice_sfu_security.dart';
 import 'voice_state.dart';
@@ -224,8 +225,20 @@ class VoiceController extends StateNotifier<VoiceState> {
   }
 
   /// Also supersedes any in-flight [join]; see its own doc comment.
+  ///
+  /// And is superseded the same way, which is what the guard past the await
+  /// below is for: tearing a session down is a real round trip to the SFU
+  /// and nothing in the UI waits on it, so somebody who hangs up and taps a
+  /// channel again straight away can have a newer call already connected by
+  /// the time this resumes. Everything after that point belongs to the newer
+  /// call, so a superseded leave writes nothing at all - not the reset,
+  /// which left a live call with no [VoiceState.channelId] for every voice
+  /// surface to read as "not in this call", and not the heartbeat forget,
+  /// which the server turns into a hangup it broadcasts to everyone else.
+  /// The heartbeat entry the abandoned call leaves behind is exactly what
+  /// `voice/heartbeat.rs`'s staleness sweep exists to collect.
   Future<void> leave() async {
-    _callGeneration++;
+    final generation = ++_callGeneration;
     _cancelBroadcastDeadline();
     final channelId = state.channelId;
     final startedAt = state.connectedAt;
@@ -239,6 +252,7 @@ class VoiceController extends StateNotifier<VoiceState> {
         : null;
     _heartbeat.stop();
     await _session.leave();
+    if (generation != _callGeneration) return;
     // Best-effort and fire-and-forget: this client already disconnected.
     if (channelId != null) unawaited(_heartbeat.forget(channelId));
     // The mic/camera preference survives the reset: there is no lobby left to re-set them on.
@@ -270,7 +284,7 @@ class VoiceController extends StateNotifier<VoiceState> {
   ///
   /// The cause is included and logged rather than dropped, [setScreenShare]'s
   /// own reasoning: a bare "could not turn the camera on" gives whoever hits
-  /// this nothing to act on. [_cameraFailureMessage] says the specific thing
+  /// this nothing to act on. [cameraFailureMessage] says the specific thing
   /// where the platform actually distinguished it, and the raw cause
   /// otherwise, rather than inventing a distinction it did not give us.
   Future<void> toggleCamera() async {
@@ -282,27 +296,9 @@ class VoiceController extends StateNotifier<VoiceState> {
     }
     state = state.copyWith(
       cameraEnabled: got ? want : state.cameraEnabled,
-      error: got ? null : _cameraFailureMessage(want, cause),
+      error: got ? null : cameraFailureMessage(want, cause),
       clearError: got,
     );
-  }
-
-  /// [wantOn] is only ever asking "tried to turn on": a camera failing to
-  /// turn *off* was plainly already open, so [CameraFailureReason] has
-  /// nothing useful to say there and the raw cause is kept as before.
-  String _cameraFailureMessage(bool wantOn, Object? cause) {
-    final reason = wantOn && cause is CameraFailure ? cause.reason : null;
-    return switch (reason) {
-      CameraFailureReason.noCameraDetected =>
-        'No camera detected. Check that one is connected.',
-      CameraFailureReason.permissionDenied =>
-        'Camera access was denied. Check your camera permission for this app.',
-      CameraFailureReason.cameraUnavailable =>
-        'The camera could not be opened. It may be in use by another app.',
-      CameraFailureReason.unknown || null =>
-        'Could not turn the camera ${wantOn ? 'on' : 'off'}. ${cause ?? ''}'
-            .trim(),
-    };
   }
 
   /// Whether [identity] is silenced for this listener alone; see
