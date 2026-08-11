@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Tests for `ReorderableChannelRows`: no drag at all for an ordinary
-/// member, a completed drag within one section reporting the new order, and
-/// - the property backlog item #34 asked for - a drag across two category
-/// sections reassigning the dragged channel's category. See
-/// docs/decisions/0006-channel-categories.md.
+/// member, a completed drag within one section reporting the new order, -
+/// the property backlog item #34 asked for - a drag across two category
+/// sections reassigning the dragged channel's category, and that
+/// `rowBuilder`'s own `reorderable` flag matches which branch actually wraps
+/// a row in the drag listener. See docs/decisions/0006-channel-categories.md.
 library;
 
 import 'package:flutter/gestures.dart';
@@ -43,7 +44,10 @@ void main() {
           ],
           canManage: false,
           onReorder: (_) => fail('must not be reachable without canManage'),
-          rowBuilder: (channel) => Text(channel.id),
+          rowBuilder: (channel, reorderable) {
+            expect(reorderable, isFalse);
+            return Text(channel.id);
+          },
           headerBuilder: _header,
         ),
       ),
@@ -67,8 +71,10 @@ void main() {
           ],
           canManage: true,
           onReorder: (order) => reported = order,
-          rowBuilder: (channel) =>
-              SizedBox(height: 48, child: Text(channel.id)),
+          rowBuilder: (channel, reorderable) {
+            expect(reorderable, isTrue);
+            return SizedBox(height: 48, child: Text(channel.id));
+          },
           headerBuilder: _header,
         ),
       ),
@@ -115,8 +121,10 @@ void main() {
             ],
             canManage: true,
             onReorder: (order) => reported = order,
-            rowBuilder: (channel) =>
-                SizedBox(height: 48, child: Text(channel.id)),
+            rowBuilder: (channel, reorderable) {
+              expect(reorderable, isTrue);
+              return SizedBox(height: 48, child: Text(channel.id));
+            },
             headerBuilder: _header,
           ),
         ),

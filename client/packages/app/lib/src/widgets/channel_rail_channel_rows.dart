@@ -60,12 +60,21 @@ class ManagedChannelRow extends StatefulWidget {
   const ManagedChannelRow({
     super.key,
     required this.canManage,
+    required this.reorderable,
     required this.channel,
     required this.row,
   });
 
   final bool canManage;
   final Channel channel;
+
+  /// Whether this render actually wraps the row in
+  /// `ReorderableDelayedDragStartListener` - see `channel_rail_reorder.dart`'s
+  /// own doc comment. True withholds the context menu's own long press,
+  /// which would otherwise race the drag listener for the same held-press
+  /// gesture and win, leaving the drag unreachable; a right-click and the
+  /// keyboard route are both unaffected either way.
+  final bool reorderable;
 
   /// Builds the row given the kebab to place in its trailing slot, or null
   /// when [canManage] is false. Passed through unconditionally so the row
@@ -93,6 +102,7 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
         child: widget.row(null),
       );
     }
+    final enableLongPress = !widget.reorderable;
     // Mirrors _SectionLabel's own trailing inset so this glyph and the
     // section's add glyph share a right edge; both are AppIconButtonSize.sm.
     final touch = AppTouchTargets.of(context);
@@ -135,6 +145,7 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
     return ContextMenuRegion(
       itemsBuilder: _menuItems,
       ownsFocusNode: false,
+      enableLongPress: enableLongPress,
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),

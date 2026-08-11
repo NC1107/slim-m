@@ -48,6 +48,7 @@ class ContextMenuRegion extends StatefulWidget {
     this.onVisibilityChanged,
     this.onHoldChanged,
     this.ownsFocusNode = true,
+    this.enableLongPress = true,
   });
 
   /// Builds the menu's items given a callback that closes it. Called fresh
@@ -83,6 +84,14 @@ class ContextMenuRegion extends StatefulWidget {
   /// so the keyboard route rides that node instead of adding a second one.
   /// See [ContextMenuFocus.ownsFocusNode].
   final bool ownsFocusNode;
+
+  /// False when [child] hosts a competing long-press gesture of its own (a
+  /// held press that starts a drag, say) that must win the gesture arena
+  /// instead. A right-click and the keyboard route are both unaffected -
+  /// this only withholds the redundant long-press trigger, never the menu
+  /// itself. See `channel_rail_reorder.dart`'s own doc comment for the
+  /// concrete conflict this exists to resolve.
+  final bool enableLongPress;
 
   @override
   State<ContextMenuRegion> createState() => _ContextMenuRegionState();
@@ -211,22 +220,28 @@ class _ContextMenuRegionState extends State<ContextMenuRegion> {
           // Kept out of the semantics tree once the child owns its own node; see this file's own doc comment for why.
           excludeFromSemantics: !widget.ownsFocusNode,
           // GestureDetector, never a raw recognizer: it is what publishes SemanticsAction.longPress, which context_menu_reachability_test guards.
-          onLongPressDown: widget.onHoldChanged == null
+          onLongPressDown:
+              !widget.enableLongPress || widget.onHoldChanged == null
               ? null
               : (_) => widget.onHoldChanged!(true),
-          onLongPressCancel: widget.onHoldChanged == null
+          onLongPressCancel:
+              !widget.enableLongPress || widget.onHoldChanged == null
               ? null
               : () => widget.onHoldChanged!(false),
           // Carries the down position; bare onLongPress below fires right after it and carries none, kept only for its own SemanticsAction.longPress.
-          onLongPressStart: (details) {
-            widget.onHoldChanged?.call(false);
-            _setOpen(
-              true,
-              pinRow: false,
-              pointerGlobal: details.globalPosition,
-            );
-          },
-          onLongPress: () => _setOpen(true, pinRow: false),
+          onLongPressStart: !widget.enableLongPress
+              ? null
+              : (details) {
+                  widget.onHoldChanged?.call(false);
+                  _setOpen(
+                    true,
+                    pinRow: false,
+                    pointerGlobal: details.globalPosition,
+                  );
+                },
+          onLongPress: !widget.enableLongPress
+              ? null
+              : () => _setOpen(true, pinRow: false),
           child: widget.child,
         ),
       ),

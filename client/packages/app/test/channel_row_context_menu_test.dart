@@ -3,6 +3,13 @@
 /// managing it (the same sheet the kebab already opens) only for a caller
 /// who holds MANAGE_CHANNELS - the identical gate `ManagedChannelRow`'s own
 /// kebab already uses, reused rather than a second permission check.
+///
+/// The trailing group covers the regression `channel_rail_reorder.dart`'s
+/// own doc comment names: with two or more channels a manager's row is also
+/// wrapped in a drag-start listener racing this exact menu's long press for
+/// the same held gesture, and the menu used to win every time, making a
+/// reorder drag unreachable. A held press must now do nothing on such a
+/// row; a right-click must still reach the menu regardless.
 library;
 
 import 'package:flutter/gestures.dart';
@@ -46,6 +53,23 @@ GoRouter _router(Channel channel, {required bool canManage}) => GoRouter(
           Scaffold(body: Text('channel:${state.pathParameters['channelId']}')),
     ),
   ],
+);
+
+/// Two channels, so `ReorderableChannelRows` actually wraps each row in its
+/// drag-start listener - the shape a lone channel above never exercises.
+Widget _reorderableHarness({required bool canManage}) => ProviderScope(
+  child: MaterialApp(
+    theme: buildTheme(Brightness.light, AppTokens.light),
+    home: Scaffold(
+      body: ChannelCategorySections(
+        channels: [_channel('c1', 'general'), _channel('c2', 'design')],
+        categories: const [],
+        selectedId: null,
+        canManage: canManage,
+        onReorder: (_) {},
+      ),
+    ),
+  ),
 );
 
 Widget _harness(GoRouter router) => ProviderScope(
@@ -126,4 +150,70 @@ void main() {
 
     expect(find.text('channel:c1'), findsOneWidget);
   });
+
+  testWidgets(
+    'a held press on a reorderable row starts a drag rather than opening '
+    'the menu',
+    (tester) async {
+      await tester.pumpWidget(_reorderableHarness(canManage: true));
+      await tester.pump();
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('general')),
+      );
+      await tester.pump(kLongPressTimeout + kPressTimeout);
+
+      expect(
+        find.text('Open channel'),
+        findsNothing,
+        reason: 'the drag listener must win the arena, not the menu',
+      );
+
+      await gesture.moveBy(const Offset(0, 200));
+      await tester.pumpAndSettle();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Open channel'),
+        findsNothing,
+        reason: 'a completed drag must not leave the menu open either',
+      );
+    },
+  );
+
+  testWidgets('a right-click still reaches the menu on a reorderable row', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_reorderableHarness(canManage: true));
+    await tester.pump();
+
+    await tester.tapAt(
+      tester.getCenter(find.text('general')),
+      buttons: kSecondaryButton,
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Open channel'), findsOneWidget);
+    expect(find.text('Manage channel...'), findsOneWidget);
+  });
+
+  testWidgets(
+    'a held press still opens the menu when the row is not reorderable',
+    (tester) async {
+      // Not reorderable, so ReorderableChannelRows uses a plain column here.
+      await tester.pumpWidget(_reorderableHarness(canManage: false));
+      await tester.pump();
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('general')),
+      );
+      await tester.pump(kLongPressTimeout + kPressTimeout);
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Open channel'), findsOneWidget);
+    },
+  );
 }

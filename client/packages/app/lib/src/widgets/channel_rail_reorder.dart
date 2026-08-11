@@ -47,6 +47,23 @@
 /// whole app, including the busy-spinner exception `app_motion.dart`'s own
 /// doc comment already carves out on purpose. Closing this for real needs a
 /// vendored or forked reorder implementation, which this pass does not do.
+///
+/// **The drag could never actually start, on any platform, until the
+/// `reorderable` flag on [rowBuilder] existed.** `ManagedChannelRow` wraps
+/// every channel row in `ContextMenuRegion`, whose own long press
+/// (`Open channel`/`Manage channel...`) and `ReorderableDelayedDragStartListener`'s
+/// own held-press drag start are both a bare hold with no movement, timed
+/// against the same `kLongPressTimeout` window - two recognizers racing the
+/// identical gesture, and the context menu won every time this was driven
+/// through a real `startGesture`/`moveBy` sequence, on both a phone-width
+/// drawer and a docked desktop rail. Reported as "can't reorganize channels
+/// on mobile" because a phone has no fallback (no right-click); it was
+/// exactly as broken at desktop width, just harder to notice with a
+/// right-click sitting right there as an alternate route to the same menu.
+/// `rowBuilder`'s new second argument is what a caller uses to withhold the
+/// context menu's own long press exactly where, and only where, a row is
+/// actually wrapped in the drag listener that would otherwise lose to it -
+/// see `ManagedChannelRow`'s own `enableLongPress` wiring.
 library;
 
 import 'package:flutter/material.dart';
@@ -98,7 +115,13 @@ class ReorderableChannelRows extends StatelessWidget {
   /// Called with the whole rail's new arrangement, grouped by category, once
   /// a drag settles.
   final ValueChanged<List<ChannelOrderGroup>> onReorder;
-  final Widget Function(Channel channel) rowBuilder;
+
+  /// Builds one channel's row, told whether *this render* actually wraps it
+  /// in a drag listener - false in the plain-[Column] branch, true in the
+  /// [ReorderableListView] one - so a caller can withhold a competing
+  /// long-press gesture (a context menu, say) only where one would actually
+  /// compete for the arena.
+  final Widget Function(Channel channel, bool reorderable) rowBuilder;
   final Widget Function(ChannelCategoryRow? category) headerBuilder;
 
   List<_RailItem> get _items => [
@@ -119,7 +142,7 @@ class ReorderableChannelRows extends StatelessWidget {
           for (final item in items)
             switch (item) {
               _HeaderItem(:final category) => headerBuilder(category),
-              _ChannelItem(:final channel) => rowBuilder(channel),
+              _ChannelItem(:final channel) => rowBuilder(channel, false),
             },
         ],
       );
@@ -146,7 +169,7 @@ class ReorderableChannelRows extends StatelessWidget {
             _ChannelItem(:final channel) => ReorderableDelayedDragStartListener(
               key: ValueKey(channel.id),
               index: i,
-              child: rowBuilder(channel),
+              child: rowBuilder(channel, true),
             ),
           },
       ],

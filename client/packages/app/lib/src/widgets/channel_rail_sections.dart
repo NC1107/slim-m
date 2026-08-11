@@ -144,8 +144,9 @@ class ChannelCategorySections extends ConsumerWidget {
         (category, byCategory[category.id] ?? const []),
     ];
 
-    Widget row(Channel channel) => ManagedChannelRow(
+    Widget row(Channel channel, bool reorderable) => ManagedChannelRow(
       canManage: canManage,
+      reorderable: reorderable,
       channel: channel,
       row: (kebab) => channel.kind == 'voice'
           ? VoiceChannelRow(
