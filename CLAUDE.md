@@ -12,6 +12,51 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## A five-lens security review, and the two findings that were recurrences of shapes this file already names (2026-08-11)
+
+Asked, after the decrypted push preview was confirmed working on a real iPhone: "validate the content is secure and no leaks anywhere and it's safe for others to use."
+Five parallel read-only reviews - leaked secrets, the push crypto, authorization, cross-user privacy, self-host exposure - each told to verify against the code rather than this file's prose, and to separate what they confirmed from what they suspected.
+Read this before the next security pass, so nothing here is re-found, and read the PR bodies for #581 through #585 for the full reasoning on each fix.
+
+**The one real vulnerability: the moderation queue handed a moderator the contents of a channel they had been explicitly denied sight of.**
+The queue filters per channel because a report carries the reported message verbatim, and that filter asked only about `MANAGE_MESSAGES`.
+Deny somebody `VIEW_CHANNEL` on one channel by overwrite - the ordinary way to keep a channel private from moderators who still moderate everywhere else - and their deployment-wide `MANAGE_MESSAGES` still satisfied `perms.contains(needed)` there, so every report filed in that channel stayed in their queue: `snapshot` text, reporter id, subject author, and confirmation the channel exists.
+The cause is recorded in the code's own history: `channels_where` began as a `VIEW_CHANNEL` question and was generalised to take the permission as a parameter *for this queue's sake*, which dropped the view requirement instead of adding to it, and its doc comment still narrates that generalisation.
+Every other channel-scoped gate in the crate spells the pair out (`voice.rs`'s `VIEW_CHANNEL | CONNECT`, `canvas_write.rs`'s `VIEW_CHANNEL | USE_CANVAS`); this was the one that had drifted, and it is a named constant used by both the listing filter and the resolve check now.
+The tell was in the response the whole time: `ReportDto.channel_permissions` is masked to zero for a channel you cannot view, and its own doc comment reasons that such a report "would have been filtered out before it reached this page" - so a masked bitmask and unmasked report content arrived together, and the code's own author had already assumed the filter did something it did not.
+
+**Why nothing caught it, which is the part worth keeping.**
+`report_paging.rs` already had a hidden-channel test, and it denies `MANAGE_MESSAGES` directly - the one shape the filter did handle.
+All six existing report tests pass with the fix reverted, so the suite could not see this at all; the new tests deny only `VIEW_CHANNEL`, which is the case none of them covered.
+Mutation-tested: reverting the constant fails exactly the two vulnerability tests and leaves the control passing.
+
+**The second finding is a documented recurrence, and the fix is a gate rather than the fix.**
+Seventeen authenticated GET handlers took the plain `Authed` extractor and charged no rate limit, `GET /attachments/{sha256}` among them - whole files off disk, up to the operator's per-upload ceiling, with no backpressure.
+This file already records eight routes charging nothing, found by an audit rather than by CI, and `AuthedLimited` was built in response; its own doc comment says the extractor "makes 'no limit' a visible, reviewable choice instead of an absence."
+That was true and insufficient: a handler taking plain `Authed` still compiles and still charges nothing, so the convention was reviewable but never enforced, and the same bug came back on the read side.
+`tests/rate_limit_coverage.rs` enforces it now, reading the real source through `support::code_only` so a comment mentioning `enforce` cannot satisfy it, and carrying two tests that prove the detector can actually fail.
+
+**The reviewer's own recommendation would have broken the product, which is why a finding is a starting point rather than a patch.**
+It said to put every uncharged read on the existing `Read` class.
+`Read` is 20 burst / 2 per second, right for a handful of page-level fetches and wrong for the three routes that serve stored bytes: a member page resolves an avatar per member and a transcript of image posts resolves one per message, so that budget would have stalled a member list on any deployment past about twenty people.
+Those three take a new `Asset` class instead, sized for the largest honest burst a screen produces; its doc comment states plainly that it bounds request rate and not bytes, and names the byte-weighted charge `CanvasStrokePreview` already uses as the answer if that ever stops being theoretical.
+
+**What came back clean, stated because a negative result is only worth anything if it says what it covered.**
+No secrets in the tree or in 912 commits of history; the one real keypair in the repo is the known-answer test vector `push_envelope_fixture.rs` generates for itself, which structurally needs real keys.
+The hand-written Salsa20, Poly1305 and BLAKE2b in the Notification Service Extension were checked line by line against poly1305-donna, the Salsa20 spec and RFC 7693 - clamp masks, limb reduction, the branch-free final select, and the NaCl keystream layout where the Poly1305 key is bytes 0-31 and the message resumes at byte 32 - and no MAC-bypass path exists.
+The opt-in content toggle is sound end to end: `include_content` comes from the authenticated session's own `device_id`, never the request body, and sealing is gated per target, so one device opting in cannot widen another's envelope.
+All seven cross-user privacy promises hold as enforced code, and the three permission paths still agree.
+
+**Two reviewer claims that did not survive checking, recorded because both would have sent the next reader wrong.**
+The crypto lens reported `deny.toml`'s pointer to `docs/ci.md` as dangling, saying that file "never mentions advisories" - it does, at line 187, with real reasoning: a CVE would redden every unrelated pull request, so advisories "want a different trigger", and `cargo audit`/`osv-scanner` are named there for a job nobody had wired.
+So the substance stood (nothing scanned for advisories at all, while every crypto crate sealing a push is a `-pre`/`-rc` version) and the framing was wrong, which changed the fix from "close a gap somebody missed" to "build the thing the docs already specified": `advisory-watchdog.yml`, daily, reporting by deduplicated issue rather than by its own colour, `cargo deny check advisories` answering `advisories ok` against the real lockfile today.
+The other correction was mine: my first count of uncharged handlers was 11 against the reviewer's 17, because my pattern assumed a binding name; the reviewer was right.
+
+**Left for the owner rather than decided, both genuine judgement calls.**
+Any administrator can issue a password-reset code for another administrator and take over that account - impersonation, where every other admin-on-admin verb is removal or restriction, and the only one that skips the `escalation_guard` containment check every sibling runs.
+Whether that is acceptable trust under "one deployment is one community" is a product decision, but it is currently an omission rather than a decision.
+And the sealed envelope carries no timestamp or expiry, so a hostile relay can retain a payload and re-deliver it later; bounded (it is replay of content that device was already entitled to see) and newly meaningful now that a preview carries real message text, with the cheap mitigation being a `sent_at` inside the sealed plaintext and an NSE that refuses anything stale.
+
 ## The what's-new sheet was fixed twice and still never showed, because nobody was writing the entries (2026-08-11)
 
 The owner, from real device use: "on iOS I haven't seen the update log in a long time after I update the app, I open it and don't see update log."
