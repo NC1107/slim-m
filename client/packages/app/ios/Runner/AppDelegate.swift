@@ -8,7 +8,21 @@ import UserNotifications
   /// Shared with the Dart side; see `packages/platform/lib/src/apns_token_channel.dart`.
   private static let pushChannelName = "top.npcserver.slimm/push"
 
+  /// Deliberately its own channel rather than a second method on
+  /// `pushChannelName`: Dart's `setMethodCallHandler` replaces rather than
+  /// adds, so two Dart objects listening to one channel name would silently
+  /// leave the first one deaf. See
+  /// `packages/platform/lib/src/notification_tap_channel.dart`.
+  private static let tapChannelName = "top.npcserver.slimm/push_tap"
+
   private var pushChannel: FlutterMethodChannel?
+  private var tapChannel: FlutterMethodChannel?
+
+  // A tap is what launches the app from a killed state, so it routinely
+  // happens before Dart exists to be told about it. Held here until Dart
+  // asks, exactly as the device token above is.
+  private var pendingTapChannelId: String?
+  private var notificationTapObserver: NotificationTapObserver?
   private var broadcastChannel: FlutterMethodChannel?
   private var clipboardImageChannel: FlutterMethodChannel?
   private let voiceCallChannel = VoiceCallChannel()
@@ -39,6 +53,12 @@ import UserNotifications
     }
     pushChannel = channel
 
+    let tap = FlutterMethodChannel(name: AppDelegate.tapChannelName, binaryMessenger: messenger)
+    tap.setMethodCallHandler { [weak self] call, result in
+      self?.handleTapCall(call, result: result)
+    }
+    tapChannel = tap
+
     let broadcast = FlutterMethodChannel(name: BroadcastChannel.name, binaryMessenger: messenger)
     broadcast.setMethodCallHandler { call, result in
       BroadcastChannel.handle(call, result: result)
@@ -59,6 +79,33 @@ import UserNotifications
     }
 
     voiceCallChannel.attach(to: messenger)
+    installNotificationTapObserver()
+  }
+
+  /// Chains a tap observer in front of whatever already holds the notification
+  /// delegate, after plugin registration so that whoever claimed it is
+  /// captured and kept.
+  ///
+  /// Chained rather than overridden: `FlutterAppDelegate` implements this
+  /// callback but declares it in no public header, so Swift cannot see it to
+  /// override it and cannot reach `super` to forward it either. Shadowing it
+  /// would silently drop the plugin fan-out that firebase_messaging's own
+  /// notification handling rides on. `UNUserNotificationCenterDelegate` is
+  /// ordinary public API, so a chain needs none of that.
+  private func installNotificationTapObserver() {
+    let center = UNUserNotificationCenter.current()
+    let observer = NotificationTapObserver(next: center.delegate) { [weak self] channelId in
+      self?.deliverTap(channelId)
+    }
+    notificationTapObserver = observer
+    center.delegate = observer
+  }
+
+  /// Held as well as sent: on a cold launch the engine exists before Dart has
+  /// installed its handler, so the invoke alone would be dropped.
+  private func deliverTap(_ channelId: String) {
+    pendingTapChannelId = channelId
+    tapChannel?.invokeMethod("onNotificationTap", arguments: channelId)
   }
 
   private func handlePushCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -67,6 +114,21 @@ import UserNotifications
       result(cachedTokenHex)
     case "getRegistrationError":
       result(cachedError)
+    default:
+      result(FlutterMethodNotImplemented)
+    }
+  }
+
+  /// Answers with the channel a tap is waiting to open, and forgets it in the
+  /// same breath. Clearing on read is what stops one tap reopening its
+  /// channel again on every later launch, which would override wherever the
+  /// user had navigated since.
+  private func handleTapCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    switch call.method {
+    case "takeInitialTap":
+      let pending = pendingTapChannelId
+      pendingTapChannelId = nil
+      result(pending)
     default:
       result(FlutterMethodNotImplemented)
     }

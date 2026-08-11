@@ -17,6 +17,7 @@ import 'src/desktop/desktop_window_shell.dart';
 import 'src/desktop/startup_screen.dart';
 import 'src/diagnostics/debug_log.dart';
 import 'src/providers/display_preferences.dart';
+import 'src/providers/notification_tap_router.dart';
 import 'src/providers/providers.dart';
 import 'src/providers/push_controller.dart';
 import 'src/providers/sync_controller.dart';
@@ -144,6 +145,10 @@ class SlimMApp extends ConsumerWidget {
     final darkTokens = highContrast
         ? applyHighContrast(_darkTokensFor(choice))
         : _darkTokensFor(choice);
+
+    // Watched rather than read: this is what mounts the tap listener, and a
+    // notification tap has to reach the router from outside the widget tree.
+    ref.watch(notificationTapRouterProvider);
 
     return MaterialApp.router(
       title: 'slim-m',

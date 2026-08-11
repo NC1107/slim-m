@@ -17,11 +17,32 @@ struct PushEnvelope: Decodable {
   static let expectedDomain = "slim-m.push.v1"
   static let expectedVersion = 1
 
+  /// The keys iOS reads a tapped notification's routing back out of. Set by
+  /// [applied(to:)] on the decrypted copy, which never leaves this device -
+  /// the relay and APNs only ever saw the sealed blob these came out of.
+  static let channelIdKey = "slimm_channel_id"
+  static let messageIdKey = "slimm_message_id"
+
   let domain: String
   let version: Int
+  let channelId: String?
+  let messageId: String?
   let sender: String?
   let channel: String?
   let body: String?
+
+  /// Spelled out because two of these are snake_case on the wire. The
+  /// authority is the `PushEnvelope` struct in
+  /// crates/slimm-server/src/push/envelope.rs.
+  enum CodingKeys: String, CodingKey {
+    case domain
+    case version
+    case channelId = "channel_id"
+    case messageId = "message_id"
+    case sender
+    case channel
+    case body
+  }
 
   /// Decodes, or nil for anything this build should not act on. An unknown
   /// domain or version is refused rather than best-guessed: the generic
@@ -62,7 +83,13 @@ struct PushEnvelope: Decodable {
   /// sender off the screen. A DM and a thread reply both carry no channel
   /// name at all (the server sends none), so those show the sender alone,
   /// which is already the whole of where it came from.
+  ///
+  /// Routing is attached whether or not there is a preview, and that split
+  /// is deliberate: `channel_id` rides in every envelope, while a preview is
+  /// a per-device opt-in, so a device that shows the generic placeholder must
+  /// still open the right channel when somebody taps it.
   func applied(to content: UNMutableNotificationContent) -> UNMutableNotificationContent {
+    attachRouting(to: content)
     guard let sender = sender, let body = body else { return content }
     content.title = sender
     if let channel, !channel.isEmpty {
@@ -70,5 +97,16 @@ struct PushEnvelope: Decodable {
     }
     content.body = body
     return content
+  }
+
+  /// Copies the routing ids into `userInfo` so the app can read them when
+  /// this notification is tapped. `userInfo` is merged rather than replaced:
+  /// the sealed `payload` and the relay's `kind` both live there too, and
+  /// this must not be the thing that drops them.
+  private func attachRouting(to content: UNMutableNotificationContent) {
+    var info = content.userInfo
+    if let channelId, !channelId.isEmpty { info[Self.channelIdKey] = channelId }
+    if let messageId, !messageId.isEmpty { info[Self.messageIdKey] = messageId }
+    content.userInfo = info
   }
 }
