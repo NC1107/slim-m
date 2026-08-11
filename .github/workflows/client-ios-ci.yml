@@ -101,6 +101,10 @@ jobs:
           done
           [ "$fail" -eq 0 ] && echo "every Runner/NotificationService source is registered"
           exit $fail
+      - name: every object id in the project is unique
+        run: |
+          python3 scripts/check-pbxproj-ids.py \
+            client/packages/app/ios/Runner.xcodeproj/project.pbxproj
 
   # The CallKit synchronous-report invariant is a termination risk, not a style
   # rule, so it gets a macOS runner. Simulator only; see docs/ci.md.
