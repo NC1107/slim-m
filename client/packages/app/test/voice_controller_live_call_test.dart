@@ -389,7 +389,7 @@ void main() {
       },
     );
 
-    test('a call spent entirely alone is not worth showing', () async {
+    test('a call spent entirely alone still reports its duration', () async {
       var now = DateTime(2026, 1, 1, 12);
       final session = FakeSession();
       final controller = harness.controllerWith(
@@ -412,8 +412,10 @@ void main() {
       expect(recap!.wasAlone, isTrue);
       expect(
         recap.isWorthShowing,
-        isFalse,
-        reason: 'nobody joining an empty channel is not worth a summary',
+        isTrue,
+        reason:
+            'a solo test of the call itself, or of screen share or '
+            'camera, is still a real use worth reporting on',
       );
     });
 

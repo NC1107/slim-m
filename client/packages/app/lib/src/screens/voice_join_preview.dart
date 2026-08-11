@@ -125,8 +125,8 @@ class VoiceRejoinScreen extends StatelessWidget {
   /// The call that just ended here, already checked against this channel by
   /// the caller. Rendered only when [errorMessage] is null and
   /// [CallRecap.isWorthShowing] - a failed rejoin attempt keeps the error
-  /// as the one thing on screen, and a mis-click or a call spent alone gets
-  /// nothing, not a summary of noise.
+  /// as the one thing on screen, and a bare mis-click gets nothing, not a
+  /// summary of noise.
   final CallRecap? recap;
 
   @override

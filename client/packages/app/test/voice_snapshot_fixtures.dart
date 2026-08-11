@@ -253,6 +253,21 @@ final recapCallState = VoiceState(
   ),
 );
 
+/// A left call spent entirely alone, past the mis-click floor: no other
+/// participant, so [CallRecapCard] has only its own duration and activity
+/// to report, no "N other people" stat and no roster below it.
+final soloRecapCallState = VoiceState(
+  channelId: 'c-main',
+  recap: CallRecap(
+    channelId: 'c-main',
+    startedAt: DateTime(2026, 8, 6, 12),
+    endedAt: DateTime(2026, 8, 6, 12, 4),
+    others: const [],
+    sharedScreen: true,
+    usedCamera: false,
+  ),
+);
+
 /// A failure worth a retry: the SFU dropped mid-join, which is transient by
 /// its own nature.
 const rejoinErrorRetryableState = VoiceState(
