@@ -10,6 +10,14 @@
 /// rather than truncating. Geometry, not presence: `find.text` would keep
 /// finding the label even while its `RenderFlex` overflowed, so these read
 /// the label's real, laid-out rect instead.
+///
+/// The real fonts are loaded because this measures geometry, and the test
+/// binding's placeholder face is wider than the IBM Plex Sans that actually
+/// ships: against the placeholder the row's own fixed children ("Reporter"
+/// and the timestamp, either side of the `Expanded` name) overflow by 2.8px
+/// on their own, which is a font this app never renders rather than a real
+/// defect. See CLAUDE.md's note on the same trap under the design-alignment
+/// push, where an unloaded face read as a layout bug.
 library;
 
 import 'package:flutter/material.dart';
@@ -17,8 +25,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'report_card_harness.dart';
 import 'support/geometry.dart';
+import 'ui_snapshot_support.dart';
 
 void main() {
+  setUpAll(loadRealFonts);
+
   testWidgets(
     'a long reporter display name ellipsizes rather than overflowing at '
     'phone width',
