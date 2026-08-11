@@ -101,6 +101,7 @@ Future<void> renderCanvasAssembledPane(
   bool canManage = false,
   String? error,
   bool loading = false,
+  bool fullscreen = false,
   Future<void> Function(WidgetTester tester)? interact,
 }) async {
   tester.view.physicalSize = Size(width, height);
@@ -208,6 +209,8 @@ Future<void> renderCanvasAssembledPane(
               onVideoInterest: (_) {},
               selfBubbleHidden: false,
               onToggleSelfBubbleHidden: () {},
+              fullscreen: fullscreen,
+              onToggleFullscreen: () {},
               callDock: controller == null
                   ? null
                   : CallDockData(

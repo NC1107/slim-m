@@ -70,6 +70,7 @@ CanvasToolsRow buildCanvasToolsRow({
   VoidCallback? onToggleSelfBubbleHidden,
   List<CanvasHiddenTile> hiddenTiles = const [],
   ValueChanged<String>? onShowTile,
+  VoidCallback? onToggleFullscreen,
   bool showTools = true,
 }) => CanvasToolsRow(
   tool: tool,
@@ -88,6 +89,7 @@ CanvasToolsRow buildCanvasToolsRow({
   onDeleteSelected: onDeleteSelected ?? (_) {},
   activityLogOpen: activityLogOpen,
   onToggleActivityLog: onToggleActivityLog ?? () {},
+  onToggleFullscreen: onToggleFullscreen ?? () {},
   shapeKind: shapeKind,
   onShapeKindChanged: onShapeKindChanged ?? (_) {},
   onClose: onClose ?? () {},

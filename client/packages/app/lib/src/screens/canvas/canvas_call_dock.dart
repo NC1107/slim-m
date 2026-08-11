@@ -90,6 +90,8 @@ class CanvasDockData {
     required this.onToggleSelfBubbleHidden,
     required this.hiddenTiles,
     required this.onShowTile,
+    required this.fullscreen,
+    required this.onToggleFullscreen,
   });
 
   final CanvasTool tool;
@@ -130,6 +132,13 @@ class CanvasDockData {
   /// reversible without leaving the call.
   final List<CanvasHiddenTile> hiddenTiles;
   final ValueChanged<String> onShowTile;
+
+  /// Whether the pane has dropped its chrome, and the control that flips it.
+  /// While true this dock draws its canvas half as one button - the way back
+  /// - instead of the tool strip; the call half is untouched, for the reason
+  /// this file's own doc gives about a call nobody can leave.
+  final bool fullscreen;
+  final VoidCallback onToggleFullscreen;
 }
 
 /// [call] whenever this device is actually connected to a call in
@@ -203,37 +212,49 @@ class CanvasCallDock extends StatelessWidget {
   }
 }
 
+/// The canvas half of the dock: the full tool strip normally, or the single
+/// way back out of fullscreen while the chrome is dropped.
 class _ToolsRow extends StatelessWidget {
   const _ToolsRow({required this.canvas});
 
   final CanvasDockData canvas;
 
   @override
-  Widget build(BuildContext context) => CanvasToolsRow(
-    tool: canvas.tool,
-    onToolChanged: canvas.onToolChanged,
-    canDraw: canvas.canDraw,
-    canUndo: canvas.canUndo,
-    onUndo: canvas.onUndo,
-    canManage: canvas.canManage,
-    objectCount: canvas.objectCount,
-    onClear: canvas.onClear,
-    onPasteImage: canvas.onPasteImage,
-    onRecenter: canvas.onRecenter,
-    selection: canvas.selection,
-    onBringToFront: canvas.onBringToFront,
-    onSendToBack: canvas.onSendToBack,
-    onDeleteSelected: canvas.onDeleteSelected,
-    activityLogOpen: canvas.activityLogOpen,
-    onToggleActivityLog: canvas.onToggleActivityLog,
-    shapeKind: canvas.shapeKind,
-    onShapeKindChanged: canvas.onShapeKindChanged,
-    onClose: canvas.onClose,
-    hasSelfBubble: canvas.hasSelfBubble,
-    selfBubbleHidden: canvas.selfBubbleHidden,
-    onToggleSelfBubbleHidden: canvas.onToggleSelfBubbleHidden,
-    hiddenTiles: canvas.hiddenTiles,
-    onShowTile: canvas.onShowTile,
-    showTools: !canvas.activityLogOpen,
-  );
+  Widget build(BuildContext context) => canvas.fullscreen
+      ? AppIconButton(
+          icon: AppIcons.expand,
+          semanticLabel: 'Exit fullscreen',
+          tooltip: 'Exit fullscreen',
+          // The same glyph entering it carries, lit - AppIconButton's own selected-tool convention, and there is no shrink glyph in AppIcons to reach for instead.
+          active: true,
+          onPressed: canvas.onToggleFullscreen,
+        )
+      : CanvasToolsRow(
+          tool: canvas.tool,
+          onToolChanged: canvas.onToolChanged,
+          canDraw: canvas.canDraw,
+          canUndo: canvas.canUndo,
+          onUndo: canvas.onUndo,
+          canManage: canvas.canManage,
+          objectCount: canvas.objectCount,
+          onClear: canvas.onClear,
+          onPasteImage: canvas.onPasteImage,
+          onRecenter: canvas.onRecenter,
+          selection: canvas.selection,
+          onBringToFront: canvas.onBringToFront,
+          onSendToBack: canvas.onSendToBack,
+          onDeleteSelected: canvas.onDeleteSelected,
+          activityLogOpen: canvas.activityLogOpen,
+          onToggleActivityLog: canvas.onToggleActivityLog,
+          shapeKind: canvas.shapeKind,
+          onShapeKindChanged: canvas.onShapeKindChanged,
+          onClose: canvas.onClose,
+          hasSelfBubble: canvas.hasSelfBubble,
+          selfBubbleHidden: canvas.selfBubbleHidden,
+          onToggleSelfBubbleHidden: canvas.onToggleSelfBubbleHidden,
+          hiddenTiles: canvas.hiddenTiles,
+          onShowTile: canvas.onShowTile,
+          onToggleFullscreen: canvas.onToggleFullscreen,
+          showTools: !canvas.activityLogOpen,
+        );
 }

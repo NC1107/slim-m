@@ -120,6 +120,8 @@ Widget _pane(CanvasDocument document, CanvasPresenceTileOverrides overrides) =>
               onVideoInterest: (_) {},
               selfBubbleHidden: false,
               onToggleSelfBubbleHidden: () {},
+              fullscreen: false,
+              onToggleFullscreen: () {},
             ),
           ),
         ),

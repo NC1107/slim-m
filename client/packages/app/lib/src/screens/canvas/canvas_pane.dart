@@ -41,6 +41,7 @@ import 'canvas_activity_log.dart';
 import 'canvas_call_dock.dart';
 import 'canvas_commit_queue.dart';
 import 'canvas_cursor_relay.dart';
+import 'canvas_fullscreen.dart';
 import 'canvas_image_hydrator.dart';
 import 'canvas_image_paste.dart';
 import 'canvas_live_event_dispatch.dart';
@@ -52,6 +53,7 @@ import 'canvas_quick_placement.dart';
 import 'canvas_stroke_preview_relay.dart';
 import 'canvas_sync.dart';
 
+part 'canvas_pane_fullscreen.dart';
 part 'canvas_pane_gestures.dart';
 part 'canvas_pane_helpers.dart';
 part 'canvas_pane_self_presence.dart';
@@ -117,6 +119,11 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   bool _truncated = false;
   int _localZ = provisionalLocalZIndex;
   CanvasTool _tool = CanvasTool.pen;
+
+  /// What [_tool] was before fullscreen disarmed it, so leaving fullscreen
+  /// hands back the tool the person was actually using rather than the
+  /// [CanvasTool.select] the mode itself forced.
+  CanvasTool? _toolBeforeFullscreen;
   CanvasShapeKind _shapeKind = CanvasShapeKind.rectangle;
   CanvasImagePaste? _imagePasteHelper;
   CanvasQuickPlacement? _quickPlacementHelper;
@@ -378,8 +385,12 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
         .watch(myChannelPermissionsProvider(widget.channelId))
         .hasPermission(Perm.manageCanvas);
     final selfPresence = ref.watch(canvasSelfPresenceProvider);
+    final fullscreen = _fullscreen;
     return CallbackShortcuts(
       bindings: {
+        // Only bound while there is something to escape from, so Escape keeps reaching whatever else would have handled it.
+        if (fullscreen)
+          const SingleActivator(LogicalKeyboardKey.escape): _toggleFullscreen,
         const SingleActivator(LogicalKeyboardKey.keyZ, control: true): () =>
             unawaited(_onUndo()),
         const SingleActivator(LogicalKeyboardKey.keyZ, meta: true): () =>
@@ -395,7 +406,9 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
         autofocus: true,
         child: CanvasPaneBody(
           channelId: widget.channelId,
-          onClose: () => ref.read(canvasOpenProvider.notifier).state = null,
+          onClose: _closeCanvas,
+          fullscreen: fullscreen,
+          onToggleFullscreen: _toggleFullscreen,
           tool: _tool,
           onToolChanged: _onToolChanged,
           canUndo: _ops.canUndo,

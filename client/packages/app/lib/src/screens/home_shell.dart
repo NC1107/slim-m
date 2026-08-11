@@ -32,6 +32,7 @@ import '../widgets/member_pane.dart';
 import '../widgets/rail_drag_handle.dart';
 import '../widgets/voice_strip_indicator.dart';
 import '../widgets/whats_new_gate.dart';
+import 'canvas/canvas_fullscreen.dart';
 import 'canvas/canvas_open_button.dart';
 import 'canvas/canvas_pane.dart';
 import 'channel_screen.dart';
@@ -62,11 +63,15 @@ class HomeShell extends ConsumerWidget {
     // DmCallBar is the same: a DM's call pane replaces the header too.
     final dmCallOpen =
         selected != null && ref.watch(dmCallOpenProvider) == selected;
+    // The canvas asked for the whole pane; the rail and the roster are exactly the chrome it asked to be rid of, and both unmount rather than sitting at zero width, so neither keeps polling behind it.
+    final fullscreenChannel = ref.watch(canvasFullscreenProvider);
+    final canvasFullscreen = canvasOpen && fullscreenChannel == selected;
     // Whatever the header toggle says: it can only hide the pane, not summon
     // room for it that is not there (see LayoutClass.fitsMemberPane's doc).
     final membersFit = layout.fitsMemberPane(width);
-    final showMembers = membersFit && ref.watch(memberPaneVisibleProvider);
-    final showRail = ref.watch(channelRailVisibleProvider);
+    final showMembers =
+        membersFit && !canvasFullscreen && ref.watch(memberPaneVisibleProvider);
+    final showRail = !canvasFullscreen && ref.watch(channelRailVisibleProvider);
 
     final railWidth = layout == LayoutClass.expanded
         ? ChannelRail.expandedWidth
@@ -96,8 +101,8 @@ class HomeShell extends ConsumerWidget {
                     : const SizedBox.shrink(),
               ),
             ),
-            // Always present, even collapsed - it is the only way back.
-            const RailDragHandle(),
+            // Always present, even collapsed - it is the only way back; gone only in canvas fullscreen, where it would be a live control over a provider showRail is already overriding.
+            if (!canvasFullscreen) const RailDragHandle(),
             // Its own semantics node, or the modal barrier inside this pane's
             // navigator blocks everything painted before it, which is the
             // whole rail: no channel row, section or search field reached a
