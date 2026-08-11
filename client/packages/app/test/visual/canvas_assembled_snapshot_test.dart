@@ -36,6 +36,7 @@ void main() {
   registerCanvasOverflowMenuOpen();
   registerCanvasActivityLogOpen();
   registerCanvasClearConfirm();
+  registerCanvasTileControlsRevealed();
 
   group(
     'busy: a live call, a busy canvas, a sixth silent cursor-only reader',
