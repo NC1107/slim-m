@@ -16,17 +16,10 @@ CAVEATS = [
         "the test binding, not a defect in the app."
     ),
     (
-        "The software rasterizer used here does not blur or alpha-blend a "
-        "BoxShadow, so a soft translucent shadow paints as flat opaque black "
-        "with a hard edge. Confirmed against a live browser, where the same "
-        "shadow blurs correctly; see visual_render_support.dart's own doc "
-        "comment. Do not read a hard shadow edge here as a real defect."
-    ),
-    (
-        "The same rasterizer can also paint a thin diagonal stroke as "
-        "broken or dotted at a low effective pixel width, even when the "
-        "underlying geometry is correct; see visual_render_support.dart's "
-        "own doc comment for how this was disproved. Do not read a broken "
+        "A thin diagonal stroke can paint as broken or dotted at a low "
+        "effective pixel width, even when the underlying geometry is "
+        "correct; see visual_render_support.dart's own doc comment (voice_"
+        "canvas package) for how this was disproved. Do not read a broken "
         "hairline here as a real gap in the ink."
     ),
 ]
