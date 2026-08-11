@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.36.0](https://github.com/NC1107/slim-m/compare/server-v0.35.1...server-v0.36.0) (2026-08-11)
+
+
+### Features
+
+* **server:** seal an optional message preview inside the push envelope ([#569](https://github.com/NC1107/slim-m/issues/569)) ([1084f00](https://github.com/NC1107/slim-m/commit/1084f00cb55e638703ec31eef873c99a2b7ae5f5))
+
 ## [0.35.1](https://github.com/NC1107/slim-m/compare/server-v0.35.0...server-v0.35.1) (2026-08-11)
 
 
