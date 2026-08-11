@@ -44,7 +44,8 @@ Confirmed from `CLAUDE.md`'s "Moderating a member" section: Windows and Linux sh
 *The rule to keep*: never add a call path that reaches `Helper.setVolume` without going through this same platform gate.
 
 **Camera background blur has no native per-frame hook on Windows at all, and this is explicitly "absent," not "unwired."**
-Confirmed from `docs/research/background-blur-spike.md` (2026-08-01), which grepped the pinned `flutter_webrtc` 1.4.0 source tree directly: "Linux and Windows have no native per-frame hook at all in the WebRTC plugin this project depends on: not missing wiring, missing entirely."
+Confirmed from `docs/research/background-blur-spike.md` (2026-08-01), which grepped the pinned ~~`flutter_webrtc` 1.4.0~~ source tree directly: "Linux and Windows have no native per-frame hook at all in the WebRTC plugin this project depends on: not missing wiring, missing entirely."
+Version correction 2026-08-11: `client/pubspec.lock` resolves that package at **1.6.0** now; the finding was re-checked against the newer tree on 2026-08-10 and the native surface had not changed, so only the version number was stale.
 The only path that document identifies for Windows is a genuine upstream contribution to `flutter_webrtc`'s shared `common/cpp` layer, or a from-scratch capturer - both well outside this project's own timeline.
 The spike's own recommendation, worth carrying forward verbatim: ship blur where a real seam exists (iOS/macOS) and gate the camera toggle off, or clearly label it as unblurred, on platforms without one, rather than silently shipping raw camera everywhere or blocking camera indefinitely on a seam that will not exist uniformly for a long time. See [macos_backlog.md](macos_backlog.md) and [linux_backlog.md](linux_backlog.md) for the same finding on those platforms.
 
@@ -66,7 +67,10 @@ That is read from source, not observed running, so it is suspected rather than c
 `docs/research/background-blur-spike.md`'s survey table lists `tflite_flutter` as covering Windows "with manual native build" versus "automatic" on Android/iOS, and the document states directly: "I did not attempt to build `tflite_flutter`'s desktop path in this environment... Whether it actually links on this project's own Fedora KDE Wayland target is unverified," with the same uncertainty extended explicitly to "Windows/macOS CI runners" in the spike's own "what this spike did not settle" section.
 This only matters if camera blur is ever attempted on Windows via that specific library; the spike's own recommendation is not to build it there at all given the missing native hook (see the confirmed entry above), so this is recorded for completeness rather than as a near-term blocker.
 
-**A frameless, custom title bar would need Windows-specific chrome, and nothing has been built or spiked for it.**
+**A frameless, custom title bar would need Windows-specific chrome, and nothing has been built ~~or spiked~~ for it.**
+Half corrected 2026-08-11: it has now been spiked, in [decision 0012](../decisions/0012-desktop-window-shell.md), which designs the whole desktop window shell and was built for Linux in PR #533.
+Nothing Windows-specific was built, and that record says so about itself in its own words - every Windows statement in it "is a design intent to build against once a platform exists, not a tested fact," since this client still has no `windows/` directory.
+So the shape is decided and waiting rather than unconsidered.
 `docs/BACKLOG.md`'s "A frameless window with our own title bar" entry (deferred, not declined) names the shape directly: "Three platforms want three different things: macOS traffic lights top-left with specific insets, Windows controls top-right, Linux depending on the desktop environment.
 A single custom bar that ignores that feels foreign on at least two of them."
 Window dragging, double-click-to-maximise, edge snapping, the system menu, and keyboard/screen-reader reachability for window controls would all need reimplementing for Windows specifically if this is ever picked up; none of it exists today, and it is deferred rather than scheduled. See the same entry noted in [macos_backlog.md](macos_backlog.md) and [linux_backlog.md](linux_backlog.md).

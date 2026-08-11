@@ -19,7 +19,7 @@ This matters more than it normally would, because an iOS screen-share fix was re
 
 - **Screen share on iOS** (client 0.16.0 and later). Start a share from a call and confirm it survives past the first few seconds rather than raising "Screen Recording has stopped".
 - **CallKit background execution** ([#212](https://github.com/NC1107/slim-m/issues/212), merged in #231). Start a call from the app's own UI, background the app, and confirm the call keeps running and appears in the Dynamic Island.
-- **The camera pre-toggle** (#231). This box has no webcam, so the capture path itself has never run.
+- ~~**The camera pre-toggle** (#231).~~ **Joining a call with the camera on** (#231, then removed with the join lobby on 2026-08-03, then rebuilt as a persisted Voice Settings toggle in PR #546 on 2026-08-11 - so the thing to confirm is that toggle rather than the lobby control the original entry meant). This box has no webcam, so the capture path itself has never run.
 
 *What the run did instead:* covered each with unit tests against fakes, and said plainly in every PR body that device confirmation is outstanding rather than calling them done.
 
@@ -58,7 +58,8 @@ That was your explicit instruction and it is working, but it is worth stating on
 Carried forward from `CLAUDE.md`'s own owner list, unchanged by this run:
 
 - ~~Whether to keep release-please's standing release PR or move to manual tag-based releases.~~ Settled 2026-08-01 without needing to choose: see section 19. The standing PRs stayed; the conflict that made this question urgent was fixed at its source instead.
-- Where, if anywhere, a flatpak build should be published once the manifest exists.
+- Where, if anywhere, a flatpak build should be published ~~once the manifest exists~~ - the condition is met as of 2026-08-05, so this is a live question rather than a conditional one.
+  `packaging/flatpak/top.npcserver.slimm.yaml` exists, `release.yml` builds a bundle from it and attaches it to the GitHub release, and Flathub is still only noted as tracked future scope in Phase 9.
 
 ## 7. The next client build wipes its own message cache, once
 
@@ -77,14 +78,22 @@ Channels, read markers and unsent drafts are untouched; only the message cache g
 *Not a question, just something you should not have to diagnose in the moment.*
 If it looks like data loss rather than a refetch, that would be a real bug and worth reporting.
 
-## 8. Nothing verifies reconciliation on a real pair of devices
+## 8. ~~Nothing verifies reconciliation on a real pair of devices~~ (the harness half was built the same day; struck 2026-08-11)
 
-Every property of the op stream is covered by unit and integration tests, and the mutation tests confirm each one can fail.
-What none of that proves is the thing the feature exists for: edit a message on your phone while your desktop is closed, reopen the desktop, and see the new text.
+**The question at the bottom was answered by somebody building it, and this entry never said so.**
+It is also contradicted by section 10 further down this same file, which refers to "the new reconciliation scenario" as an existing thing on 2026-07-31 - a grep of this file against itself would have caught it.
 
-`scripts/e2e.sh` drives two browsers and would be the natural place for it, but it holds both clients open throughout, so it cannot currently express "one client is away while the other writes".
+`scripts/lib/e2e_reconcile.py` is that scenario, and it does exactly what this entry says the harness could not express: one client navigates away to a blank page while the other edits one message and deletes another, then comes back and is asserted to show the new text and not the deleted message, with nobody telling it to refresh.
+Navigating away rather than killing the browser is deliberate, so the profile and drift's IndexedDB survive holding the old text - there has to be something stale for catch-up to correct.
+It runs on every PR as part of the `e2e` workflow.
 
-*Question:* worth growing the e2e harness to close and reopen one client mid-run, or is confirming it by hand across your own two devices enough?
+~~Every property of the op stream is covered by unit and integration tests, and the mutation tests confirm each one can fail.~~
+~~What none of that proves is the thing the feature exists for: edit a message on your phone while your desktop is closed, reopen the desktop, and see the new text.~~
+~~`scripts/e2e.sh` drives two browsers and would be the natural place for it, but it holds both clients open throughout, so it cannot currently express "one client is away while the other writes".~~
+~~*Question:* worth growing the e2e harness to close and reopen one client mid-run, or is confirming it by hand across your own two devices enough?~~
+
+*What is genuinely still open,* and it is narrower than the original: this is two browser profiles on one box, not your phone and your desktop.
+Nothing here proves the same thing across two real devices on two networks, and no CI harness can.
 
 ## 9. ~~The client release PR is stuck~~ (closed 2026-08-01, and the diagnosis held exactly)
 
@@ -367,4 +376,7 @@ That was the right call *given the premise* - that release-please forces both pa
 
 **What this keeps that the manual-tag switch would have given up:** the generated changelog, the standing PRs (so nobody has to remember to hand-tag), and the existing `refs/tags/server-v*` / `refs/tags/client-v*` triggers in `release.yml`, which needed no change - a tag push still bypasses `release-please` entirely and resolves version strings from the ref name, exactly as before.
 
-**What still needs a real release to confirm**, since nothing short of GitHub actually running the action can prove it: that `release-please-action` produces the same `<path>--release_created` / `--tag_name` / `--version` output keys when a config file lists only one package as when it listed two (verified against the action's own README, not by triggering a run), and that merging a server-only release no longer touches anything on the client's standing PR's branch. The next server-only and client-only merges are the test.
+~~**What still needs a real release to confirm**, since nothing short of GitHub actually running the action can prove it: that `release-please-action` produces the same `<path>--release_created` / `--tag_name` / `--version` output keys when a config file lists only one package as when it listed two (verified against the action's own README, not by triggering a run), and that merging a server-only release no longer touches anything on the client's standing PR's branch. The next server-only and client-only merges are the test.~~
+
+**Confirmed by events, struck 2026-08-11.** The server has gone from 0.22.x to 0.35.0 and the client from 0.19.x to 0.36.0 since this landed, so both output-key sets and both directions of the conflict have been exercised many times over.
+No release-PR conflict of the kind sections 6 and 9 describe has recurred; the one release-PR problem since was a different mechanism entirely (a queued run cancelled out of its own concurrency group, keyed on the ref rather than the commit), recorded in CLAUDE.md rather than here.
