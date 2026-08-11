@@ -122,6 +122,8 @@ class InertSession implements VoiceSession {
   @override
   Widget cameraViewFor(String identity) =>
       SizedBox.shrink(key: Key('fake-camera-view-$identity'));
+  @override
+  void setVideoInterest(Set<String>? tileKeys) {}
 
   /// Every camera-switching call this session received, in order, so a test
   /// can assert on how the control chose between flipping and picking.

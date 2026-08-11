@@ -85,6 +85,8 @@ class _NoopSession implements VoiceSession {
   @override
   Widget cameraViewFor(String identity) =>
       SizedBox.shrink(key: Key('fake-camera-view-$identity'));
+  @override
+  void setVideoInterest(Set<String>? tileKeys) {}
 
   @override
   bool get canFlipCamera => false;

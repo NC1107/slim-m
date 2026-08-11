@@ -162,6 +162,7 @@ void main() {
                   screenShareViewFor: (_) => const SizedBox(),
                   tileOverrides: overrides,
                   onCommitTile: (_, __) {},
+                  onVideoInterest: (_) {},
                   selfBubbleHidden: false,
                   onToggleSelfBubbleHidden: () {},
                 ),

@@ -169,6 +169,13 @@ class FakeSession implements VoiceSession {
   Widget cameraViewFor(String identity) =>
       SizedBox.shrink(key: Key('fake-camera-view-$identity'));
 
+  /// Every interest set this session has been handed, newest last, so a test
+  /// can assert on the resulting set rather than only that a call happened.
+  final List<Set<String>?> videoInterests = [];
+
+  @override
+  void setVideoInterest(Set<String>? tileKeys) => videoInterests.add(tileKeys);
+
   @override
   Future<List<CameraDevice>> cameraDevices() async => cameraDeviceList;
 

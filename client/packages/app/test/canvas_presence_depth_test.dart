@@ -117,6 +117,7 @@ Widget _pane(CanvasDocument document, CanvasPresenceTileOverrides overrides) =>
               screenShareViewFor: (_) => const SizedBox(),
               tileOverrides: overrides,
               onCommitTile: (_, __) {},
+              onVideoInterest: (_) {},
               selfBubbleHidden: false,
               onToggleSelfBubbleHidden: () {},
             ),

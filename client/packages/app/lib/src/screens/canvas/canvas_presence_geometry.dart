@@ -20,11 +20,18 @@ const presenceScreenShareSize = Size(360, 203);
 
 /// Every tile key this call's roster has right now: one camera per
 /// participant, plus a screen tile for whoever is sharing.
+///
+/// Built through `videoSubscriptionKey` rather than by string interpolation
+/// here, because these same keys are what `VoiceSession.setVideoInterest`
+/// matches remote video publications against; see that function's own doc
+/// for why one shared builder beats two agreeing literals.
 Set<String> presenceTileKeys(List<VoiceParticipant> participants) {
   final keys = <String>{};
   for (final p in participants) {
-    keys.add('camera:${p.identity}');
-    if (p.isScreenSharing) keys.add('screen:${p.identity}');
+    keys.add(videoSubscriptionKey(identity: p.identity, screenShare: false));
+    if (p.isScreenSharing) {
+      keys.add(videoSubscriptionKey(identity: p.identity, screenShare: true));
+    }
   }
   return keys;
 }
@@ -32,15 +39,14 @@ Set<String> presenceTileKeys(List<VoiceParticipant> participants) {
 /// `'screen'` or `'camera'` - the same two strings the server's own
 /// `CanvasMediaSlot.kind` uses, so a key can be sent straight through with
 /// no translation.
-String presenceTileKind(String key) =>
-    key.startsWith('screen:') ? 'screen' : 'camera';
+String presenceTileKind(String key) => videoSubscriptionKind(key);
 
 /// The participant a tile key names, stripped of its `kind:` prefix.
 String presenceTileIdentity(String key) => key.substring(key.indexOf(':') + 1);
 
 Size presenceTileSize(String key, Map<String, VoiceParticipant> byIdentity) {
-  if (key.startsWith('screen:')) return presenceScreenShareSize;
-  final participant = byIdentity[key.substring('camera:'.length)];
+  if (presenceTileKind(key) == screenTrackKind) return presenceScreenShareSize;
+  final participant = byIdentity[presenceTileIdentity(key)];
   return (participant?.isCameraOn ?? false)
       ? presenceCameraOnSize
       : presenceCameraOffSize;
@@ -67,8 +73,8 @@ Map<String, Rect> presenceOnCanvasRects({
     final state = overrides.stateFor(key);
     if (state.hidden) continue;
     if (hideSelfCamera &&
-        key.startsWith('camera:') &&
-        byIdentity[key.substring('camera:'.length)]?.isLocal == true) {
+        presenceTileKind(key) == cameraTrackKind &&
+        byIdentity[presenceTileIdentity(key)]?.isLocal == true) {
       continue;
     }
     onCanvas[key] = state.rect ?? defaults[key]!;

@@ -48,8 +48,20 @@
 /// corner controls stay here, at the same screen position, regardless of
 /// depth - the same "never a dead end" guarantee `locked` already makes for
 /// its own unlock button.
+///
+/// **This widget is also the one place that decides which remote video the
+/// call is worth subscribing to at all**, through [onVideoInterest]. Not a
+/// second, parallel declaration of what is on screen: it reports exactly the
+/// set it just used to build its own children, so the thing that mounts a
+/// video widget and the thing that asks the SFU for that video can never
+/// disagree about which tiles those are. [CanvasPresenceBackdrop] needs no
+/// report of its own for the same reason - it runs the identical
+/// `CanvasPresenceVisibility` over the identical rects and then narrows to
+/// the sent-to-back subset, so the union of tiles carrying real video across
+/// both widgets is precisely this widget's own visible set.
 library;
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
@@ -76,6 +88,7 @@ class CanvasPresenceLayer extends StatefulWidget {
     required this.screenShareViewFor,
     required this.overrides,
     required this.onCommit,
+    this.onVideoInterest,
     this.hideSelfCamera = false,
     this.layout = const CanvasPresenceLayout(),
   });
@@ -93,6 +106,24 @@ class CanvasPresenceLayer extends StatefulWidget {
   /// [overrides.setHidden], which needs no commit at all.
   final void Function(String key, Rect rect) onCommit;
 
+  /// Reports which tile keys currently carry live video, so the rest can be
+  /// unsubscribed rather than merely paused - `VoiceController
+  /// .setVideoInterest` is what this closes over.
+  ///
+  /// Fired after the frame rather than during build, since it reaches out of
+  /// this widget into the live session, and only when the set actually
+  /// changes, which the spatial hysteresis band already makes rare during an
+  /// ordinary pan.
+  ///
+  /// Reports null - "no opinion, subscribe everything" - rather than an
+  /// empty set whenever this canvas has no call roster to speak for, and on
+  /// dispose. An empty set is a real answer meaning "nothing on this canvas
+  /// wants video", which is what a fully hidden or fully off-screen roster
+  /// genuinely is; having no roster at all is not that, and a canvas open on
+  /// one channel must not cull a call running in another it knows nothing
+  /// about.
+  final void Function(Set<String>? tileKeys)? onVideoInterest;
+
   /// The caller's own standing "never show my own camera" preference
   /// (`canvas_self_presence.dart`), layered on top of whatever
   /// [overrides] says for `camera:<selfId>` - distinct from a per-call hide,
@@ -108,6 +139,10 @@ class CanvasPresenceLayer extends StatefulWidget {
 
 class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
   final CanvasPresenceVisibility _visibility = CanvasPresenceVisibility();
+  Set<String>? _lastReported;
+  // Distinct from `_lastReported == null`, which is itself a real answer.
+  bool _reported = false;
+  bool _deliveryScheduled = false;
 
   @override
   void initState() {
@@ -139,6 +174,8 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
   void dispose() {
     widget.document.removeListener(_onChanged);
     widget.overrides.removeListener(_onChanged);
+    // Synchronously: there is no later frame of this widget's own to ride, and a stale interest set outliving it would keep culling a call nothing here is looking at.
+    widget.onVideoInterest?.call(null);
     super.dispose();
   }
 
@@ -149,7 +186,10 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
   @override
   Widget build(BuildContext context) {
     final keys = presenceTileKeys(widget.participants);
-    if (keys.isEmpty) return const SizedBox.shrink();
+    if (keys.isEmpty) {
+      _reportInterest(null);
+      return const SizedBox.shrink();
+    }
     final byIdentity = {for (final p in widget.participants) p.identity: p};
     final onCanvas = presenceOnCanvasRects(
       keys: keys,
@@ -158,8 +198,13 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
       byIdentity: byIdentity,
       hideSelfCamera: widget.hideSelfCamera,
     );
-    if (onCanvas.isEmpty) return const SizedBox.shrink();
+    // Ahead of _visibility.update, matching CanvasPresenceBackdrop's own early return exactly, or the two instances' mounted sets drift.
+    if (onCanvas.isEmpty) {
+      _reportInterest(const <String>{});
+      return const SizedBox.shrink();
+    }
     final visibleIds = _visibility.update(widget.document.worldView, onCanvas);
+    _reportInterest(visibleIds);
     if (visibleIds.isEmpty) return const SizedBox.shrink();
     final camera = widget.document.camera;
     final painted = presencePaintOrder(visibleIds, widget.overrides.zFor);
@@ -173,13 +218,38 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
     );
   }
 
+  /// Records what this build resolved and, if that differs from the last
+  /// answer delivered, schedules one post-frame delivery of it.
+  ///
+  /// The set is stored eagerly and read again inside the callback, so a
+  /// second build landing before the frame ends delivers the newer answer
+  /// once rather than two answers in order.
+  void _reportInterest(Set<String>? keys) {
+    if (_reported && _sameAsLast(keys)) return;
+    _reported = true;
+    _lastReported = keys == null ? null : Set<String>.unmodifiable(keys);
+    if (_deliveryScheduled) return;
+    _deliveryScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _deliveryScheduled = false;
+      if (mounted) widget.onVideoInterest?.call(_lastReported);
+    });
+  }
+
+  bool _sameAsLast(Set<String>? keys) {
+    if (keys == null || _lastReported == null) {
+      return keys == null && _lastReported == null;
+    }
+    return setEquals(keys, _lastReported);
+  }
+
   Widget? _tile(
     String key,
     Rect rect,
     Camera camera,
     Map<String, VoiceParticipant> byIdentity,
   ) {
-    final isScreen = presenceTileKind(key) == 'screen';
+    final isScreen = presenceTileKind(key) == screenTrackKind;
     final identity = presenceTileIdentity(key);
     final participant = byIdentity[identity];
     if (participant == null) return null;

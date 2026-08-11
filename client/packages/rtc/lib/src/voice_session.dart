@@ -30,10 +30,12 @@ import 'screen_share.dart';
 import 'screen_share_control.dart';
 import 'screen_share_view.dart';
 import 'voice_disconnect_reason.dart';
+import 'video_subscription_culler.dart';
 import 'voice_models.dart';
 import 'voice_roster_snapshot.dart';
 
 part 'voice_session_tracks.dart';
+part 'voice_session_video.dart';
 
 /// Builds the LiveKit room a session drives. The injection seam.
 typedef RoomFactory = lk.Room Function();
@@ -56,6 +58,7 @@ class VoiceSession {
         _cameraSwitching =
             CameraSwitching(cameraDevices ?? const HardwareCameraDevices()) {
     _screenShare = ScreenShareControl(_broadcast);
+    _videoCuller = VideoSubscriptionCuller(onDue: _applyVideoInterest);
   }
 
   static lk.Room _defaultRoomFactory() => lk.Room(
@@ -72,6 +75,7 @@ class VoiceSession {
   final DesktopSources _desktopSources;
   final CameraSwitching _cameraSwitching;
   late final ScreenShareControl _screenShare;
+  late final VideoSubscriptionCuller _videoCuller;
 
   lk.Room? _room;
   // room.events.listen returns a cancel function rather than a
@@ -233,6 +237,8 @@ class VoiceSession {
     _audio.muted.clear();
     // Gain deliberately survives: somebody you turned down stays turned down.
     _lastDisconnect = null;
+    // Whatever a canvas last asked for was about the call that just ended.
+    _videoCuller.setInterest(null);
     if (!_participantsController.isClosed) {
       _participantsController.add(_participants);
     }
@@ -331,6 +337,18 @@ class VoiceSession {
     return CameraView(room: room, identity: identity);
   }
 
+  /// Declares which presence tiles currently want video, by the same
+  /// `'<kind>:<identity>'` key the canvas already keys a tile with, so a
+  /// remote video track nothing is showing can be unsubscribed outright
+  /// rather than only paused; see [VideoSubscriptionCuller] for the timing
+  /// and for why audio is never in scope. Null means this caller has no
+  /// opinion and every track should stay subscribed, which is what a surface
+  /// says when it unmounts or when it cannot speak for the call at all.
+  void setVideoInterest(Set<String>? tileKeys) {
+    _videoCuller.setInterest(tileKeys);
+    _applyVideoInterest();
+  }
+
   /// Whether flipping needs no chosen device; see [CameraSwitching.canFlip].
   bool get canFlipCamera => _cameraSwitching.canFlip;
 
@@ -391,47 +409,6 @@ class VoiceSession {
     return true;
   }
 
-  /// One coarse listener rather than a subscription per event type. Every
-  /// event this cares about ends in the same place, "recompute who is in the
-  /// call and what they are doing", so an event LiveKit adds later is picked
-  /// up rather than silently ignored.
-  void _listen(lk.Room room) {
-    _cancelEvents?.call();
-    _cancelEvents = room.events.listen((event) {
-      if (event is lk.RoomDisconnectedEvent) {
-        return _onDisconnected(event.reason);
-      }
-      _refreshParticipants();
-    });
-  }
-
-  /// A disconnect this client did not ask for: the SFU removed this
-  /// participant, the room was deleted, or the connection was lost for good.
-  /// [_teardown] cancels this listener before it disconnects, so a `leave()`
-  /// never lands here.
-  ///
-  /// LiveKit's own engine already unpublishes and stops every local track for
-  /// this case (`Room`'s internal cleanup runs on any engine disconnect, not
-  /// only a client-initiated one), but that stops at the WebRTC track: it
-  /// never asks iOS to end a running broadcast, which is a platform-level
-  /// concept LiveKit has no reason to know about. By the time this fires the
-  /// SFU has already disconnected, so this is the only remaining chance to
-  /// tell iOS to stop, and it is awaited before anything else this handler
-  /// does rather than fired into the background: a member removed or timed
-  /// out mid-share must not keep recording with no call left to publish to.
-  Future<void> _onDisconnected(lk.DisconnectReason? reason) async {
-    if (_disposed) return;
-    if (reason == lk.DisconnectReason.clientInitiated) return;
-    await _screenShare.stopActiveBroadcast();
-    _lastDisconnect = mapDisconnectReason(reason);
-    _participants = const [];
-    if (!_participantsController.isClosed) {
-      _participantsController.add(_participants);
-    }
-    _setState(VoiceSessionState.failed);
-    await _screenShare.dispose();
-  }
-
   void _refreshParticipants() {
     final room = _room;
     if (room == null || _disposed) return;
@@ -439,6 +416,8 @@ class VoiceSession {
     // Reapplied on every refresh, not only on toggle, so a participant or
     // track appearing after deafening starts is silenced too.
     unawaited(_applyLocalAudioState(room));
+    // Ahead of the unchanged-roster early return below: a subscription can change with no visible roster change at all.
+    _applyVideoInterest();
 
     final next = snapshotParticipants(room);
     // Only emit on a real change: the events stream is chatty (audio levels
@@ -480,6 +459,7 @@ class VoiceSession {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _videoCuller.dispose();
     await _teardown();
     await _stateController.close();
     await _participantsController.close();
