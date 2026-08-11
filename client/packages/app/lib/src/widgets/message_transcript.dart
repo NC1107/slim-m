@@ -20,6 +20,7 @@ import '../providers/sync_controller.dart';
 import 'message_context_menu.dart';
 import 'message_jump.dart';
 import 'message_row.dart';
+import 'message_transcript_extent.dart';
 import 'transcript_selection.dart';
 import 'message_row_identity.dart';
 import 'message_transcript_widgets.dart';
@@ -152,6 +153,10 @@ class _MessageTranscriptState extends State<MessageTranscript> {
   final Set<String> _seen = {};
   bool _hydrated = false;
 
+  /// Kept across rebuilds on purpose; see its own doc comment for why living
+  /// on the per-build delegate would defeat it.
+  final TranscriptExtentEstimator _extent = TranscriptExtentEstimator();
+
   /// How close to the oldest end still counts as having reached it, so a page
   /// starts before the reader hits a hard stop.
   static const double _loadOlderSlop = 240;
@@ -220,6 +225,8 @@ class _MessageTranscriptState extends State<MessageTranscript> {
   @override
   void didUpdateWidget(MessageTranscript oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // A different channel's rows may be sized quite differently, so what settled against these ones stops being evidence about anything.
+    if (oldWidget.channelId != widget.channelId) _extent.reset();
     if (oldWidget.scrollController == widget.scrollController) return;
     oldWidget.scrollController.removeListener(_onScroll);
     widget.scrollController.addListener(_onScroll);
@@ -321,83 +328,89 @@ class _MessageTranscriptState extends State<MessageTranscript> {
 
     // Reversed so a short conversation sits against the composer; the start header rides one past the oldest message, which reverse puts at the top.
     return TranscriptSelection(
-      child: ListView.builder(
+      child: ListView.custom(
         controller: widget.scrollController,
         reverse: true,
         padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-        itemCount: messages.length + 1,
-        itemBuilder: (context, i) {
-          if (i == messages.length) return start;
-          // Index 0 is the newest; `previous` stays the row visually above,
-          // so grouping still reads right.
-          final index = messages.length - 1 - i;
-          final message = messages[index];
-          final previous = index == 0 ? null : messages[index - 1];
-          final newDay = isNewDay(
-            message,
-            previous,
-            historyKnown: widget.historyKnown,
-          );
-          final row = MessageRowExtras(
-            // By message, not by slot: an arrival shifts every index by one.
-            key: ValueKey(message.id),
-            messageId: message.id,
-            channelId: widget.channelId,
-            builder: (extras, editing) => MessageRow(
-              message: message,
-              // A new day breaks a group so a continuation across midnight regains its avatar and header.
-              grouped: isGrouped(message, previous) && !newDay,
-              showNewDivider: startsUnread(
-                message,
-                previous,
-                widget.lastReadSeq,
-                widget.selfId,
+        semanticChildCount: messages.length + 1,
+        childrenDelegate: TranscriptChildDelegate(
+          (context, i) {
+            if (i == messages.length) return start;
+            // Index 0 is the newest; `previous` stays the row visually above,
+            // so grouping still reads right.
+            final index = messages.length - 1 - i;
+            final message = messages[index];
+            final previous = index == 0 ? null : messages[index - 1];
+            final newDay = isNewDay(
+              message,
+              previous,
+              historyKnown: widget.historyKnown,
+            );
+            final row = MessageRowExtras(
+              // By message, not by slot: an arrival shifts every index by one.
+              key: ValueKey(message.id),
+              messageId: message.id,
+              channelId: widget.channelId,
+              builder: (extras, editing) => MessageRow(
+                message: message,
+                // A new day breaks a group so a continuation across midnight regains its avatar and header.
+                grouped: isGrouped(message, previous) && !newDay,
+                showNewDivider: startsUnread(
+                  message,
+                  previous,
+                  widget.lastReadSeq,
+                  widget.selfId,
+                ),
+                dayLabel: newDay ? formatMessageDay(message.createdAt) : null,
+                knownUsernames: widget.knownUsernames,
+                customEmoji: widget.customEmoji,
+                onRetry: () => widget.onRetry(message),
+                onDiscard: () => widget.onDiscard(message),
+                onEditFailed: widget.onEditFailed == null
+                    ? null
+                    : () => widget.onEditFailed!(message),
+                onPickReaction: (emoji) =>
+                    widget.onPickReaction(message, emoji),
+                onReactionTap: (reaction) =>
+                    widget.onReactionTap(message, reaction),
+                onVote: (option) => widget.onVote(message, option),
+                reactions: extras.reactions,
+                attachments: extras.attachments,
+                poll: extras.poll,
+                threadReplyCount: extras.threadReplyCount,
+                threadLastReplyAt: extras.threadLastReplyAt,
+                replyTo: switch (message.replyToId) {
+                  final String id => byId[id],
+                  null => null,
+                },
+                onReplyTap: switch (message.replyToId) {
+                  final String id => () => widget.onJumpToReply(id),
+                  null => null,
+                },
+                editing: editing,
+                onSubmitEdit: (content) =>
+                    widget.onSubmitEdit(message, content),
+                onCancelEdit: widget.onCancelEdit,
+                actions: widget.actionsFor(message),
               ),
-              dayLabel: newDay ? formatMessageDay(message.createdAt) : null,
-              knownUsernames: widget.knownUsernames,
-              customEmoji: widget.customEmoji,
-              onRetry: () => widget.onRetry(message),
-              onDiscard: () => widget.onDiscard(message),
-              onEditFailed: widget.onEditFailed == null
-                  ? null
-                  : () => widget.onEditFailed!(message),
-              onPickReaction: (emoji) => widget.onPickReaction(message, emoji),
-              onReactionTap: (reaction) =>
-                  widget.onReactionTap(message, reaction),
-              onVote: (option) => widget.onVote(message, option),
-              reactions: extras.reactions,
-              attachments: extras.attachments,
-              poll: extras.poll,
-              threadReplyCount: extras.threadReplyCount,
-              threadLastReplyAt: extras.threadLastReplyAt,
-              replyTo: switch (message.replyToId) {
-                final String id => byId[id],
-                null => null,
-              },
-              onReplyTap: switch (message.replyToId) {
-                final String id => () => widget.onJumpToReply(id),
-                null => null,
-              },
-              editing: editing,
-              onSubmitEdit: (content) => widget.onSubmitEdit(message, content),
-              onCancelEdit: widget.onCancelEdit,
-              actions: widget.actionsFor(message),
-            ),
-          );
-          final content = message.id == widget.jumpTargetId
-              ? MessageJumpHighlight(
-                  key: ValueKey('jump-${widget.jumpToken}'),
-                  onArrived: widget.onJumpArrived ?? () {},
-                  child: row,
-                )
-              : row;
-          if (i != 0) return content;
-          return MessageEntrance(
-            key: ValueKey('entrance-$newestId'),
-            animateOnMount: animateNewest,
-            child: content,
-          );
-        },
+            );
+            final content = message.id == widget.jumpTargetId
+                ? MessageJumpHighlight(
+                    key: ValueKey('jump-${widget.jumpToken}'),
+                    onArrived: widget.onJumpArrived ?? () {},
+                    child: row,
+                  )
+                : row;
+            if (i != 0) return content;
+            return MessageEntrance(
+              key: ValueKey('entrance-$newestId'),
+              animateOnMount: animateNewest,
+              child: content,
+            );
+          },
+          childCount: messages.length + 1,
+          estimator: _extent,
+        ),
       ),
     );
   }
