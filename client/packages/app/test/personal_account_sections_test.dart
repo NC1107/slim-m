@@ -162,9 +162,9 @@ void main() {
       // Recovers rather than staying stuck: sign-out can be tried again.
       expect(
         tester
-            .widget<TextButton>(find.widgetWithText(TextButton, 'Sign out'))
-            .onPressed,
-        isNotNull,
+            .widget<AppButton>(find.widgetWithText(AppButton, 'Sign out'))
+            .disabled,
+        isFalse,
       );
     },
   );
@@ -229,7 +229,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(TextButton, 'Unblock'));
+    await tester.tap(find.widgetWithText(AppButton, 'Unblock'));
     await tester.pumpAndSettle();
 
     // Still listed: the optimistic change reverted rather than sticking.

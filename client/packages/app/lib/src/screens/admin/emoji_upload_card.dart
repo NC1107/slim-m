@@ -21,6 +21,7 @@ import '../../api_failure.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../widgets/image_decode.dart';
+import '../../widgets/settings_section_header.dart';
 import 'emoji_name.dart';
 
 /// Picks an image and returns its bytes, or null if nothing was chosen.
@@ -136,55 +137,52 @@ class _EmojiUploadCardState extends ConsumerState<EmojiUploadCard> {
         usable && (existing?.any((e) => e.name == normalized) ?? false);
     final refusal = _refusal;
 
-    return AppCard(
+    return SettingsSectionCard(
       title: 'New emoji',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (refusal != null) ...[
-            AppCallout(tone: AppCalloutTone.warn, child: Text(refusal)),
-            const SizedBox(height: AppSpacing.s12),
-          ],
-          AppInput(
-            controller: _name,
-            placeholder: 'Name',
-            semanticLabel: 'Emoji name',
-            errorText: taken ? 'Already taken.' : null,
-            onChanged: (_) => setState(() {}),
+      children: [
+        if (refusal != null) ...[
+          AppCallout(tone: AppCalloutTone.warn, child: Text(refusal)),
+          const SizedBox(height: AppSpacing.s12),
+        ],
+        AppInput(
+          controller: _name,
+          placeholder: 'Name',
+          semanticLabel: 'Emoji name',
+          errorText: taken ? 'Already taken.' : null,
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: AppSpacing.s8),
+        _NamePreview(typed: _name.text, normalized: normalized, taken: taken),
+        const SizedBox(height: AppSpacing.s12),
+        if (_bytes case final bytes?) ...[
+          _EmojiImagePreview(
+            bytes: bytes,
+            onClear: () => setState(() => _bytes = null),
           ),
           const SizedBox(height: AppSpacing.s8),
-          _NamePreview(typed: _name.text, normalized: normalized, taken: taken),
-          const SizedBox(height: AppSpacing.s12),
-          if (_bytes case final bytes?) ...[
-            _EmojiImagePreview(
-              bytes: bytes,
-              onClear: () => setState(() => _bytes = null),
-            ),
-            const SizedBox(height: AppSpacing.s8),
-          ],
-          AppButton(
-            label: _bytes == null ? 'Choose image' : 'Choose a different image',
-            icon: _bytes == null ? AppIcons.add : AppIcons.image,
-            full: true,
-            disabled: _submitting,
-            onPressed: _pick,
-          ),
-          const SizedBox(height: AppSpacing.s4),
-          Text(
-            'PNG, JPEG, GIF or WEBP.',
-            style: AppText.caption.copyWith(color: tokens.textSecondary),
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          AppButton(
-            label: _submitting ? 'Adding...' : 'Add emoji',
-            icon: AppIcons.smile,
-            variant: AppButtonVariant.primary,
-            full: true,
-            disabled: _submitting || _bytes == null || !usable || taken,
-            onPressed: _submit,
-          ),
         ],
-      ),
+        AppButton(
+          label: _bytes == null ? 'Choose image' : 'Choose a different image',
+          icon: _bytes == null ? AppIcons.add : AppIcons.image,
+          full: true,
+          disabled: _submitting,
+          onPressed: _pick,
+        ),
+        const SizedBox(height: AppSpacing.s4),
+        Text(
+          'PNG, JPEG, GIF or WEBP.',
+          style: AppText.caption.copyWith(color: tokens.textSecondary),
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        AppButton(
+          label: _submitting ? 'Adding...' : 'Add emoji',
+          icon: AppIcons.smile,
+          variant: AppButtonVariant.primary,
+          full: true,
+          disabled: _submitting || _bytes == null || !usable || taken,
+          onPressed: _submit,
+        ),
+      ],
     );
   }
 }

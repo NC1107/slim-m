@@ -22,6 +22,8 @@ import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/custom_emoji_image.dart';
 import '../../widgets/run_guarded.dart';
+import '../../widgets/settings_entity_row.dart';
+import '../../widgets/settings_section_header.dart';
 import 'emoji_upload_card.dart';
 
 class EmojiScreen extends ConsumerWidget {
@@ -47,13 +49,9 @@ class EmojiScreen extends ConsumerWidget {
             onRetry: () => ref.invalidate(customEmojiProvider),
             isEmpty: (list) => list.isEmpty,
             emptyMessage: 'No emoji yet.',
-            data: (context, list) => Column(
-              children: [
-                for (final item in list) ...[
-                  _EmojiRow(emoji: item),
-                  const SizedBox(height: AppSpacing.s8),
-                ],
-              ],
+            data: (context, list) => SettingsSectionCard(
+              title: 'Emoji',
+              children: [for (final item in list) _EmojiRow(emoji: item)],
             ),
           ),
         ],
@@ -100,51 +98,28 @@ class _EmojiRowState extends ConsumerState<_EmojiRow>
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final emoji = widget.emoji;
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              // The same widget and the same cache a message row draws it
-              // through, so this list shows what a member will actually see.
-              CustomEmojiImage(emojiId: emoji.id, size: 32),
-              const SizedBox(width: AppSpacing.s12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      emoji.shortcode,
-                      style: const TextStyle(fontFamily: AppFonts.mono),
-                    ),
-                    const SizedBox(height: AppSpacing.s4),
-                    Text(
-                      'Added ${formatDateTime(emoji.createdAt, use24Hour: watchUse24Hour(ref, context))}',
-                      style: AppText.caption.copyWith(
-                        color: tokens.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              AppIconButton(
-                icon: AppIcons.delete,
-                semanticLabel: 'Remove ${emoji.shortcode}',
-                variant: AppIconButtonVariant.danger,
-                onPressed: _busy ? null : _delete,
-              ),
-            ],
-          ),
-          if (actionError != null) ...[
-            const SizedBox(height: AppSpacing.s8),
-            AppErrorState(message: actionError!, onDismiss: clearActionError),
-          ],
-        ],
-      ),
+    return SettingsEntityRow(
+      // The same widget and the same cache a message row draws it through, so this list shows what a member will actually see.
+      leading: CustomEmojiImage(emojiId: emoji.id, size: 32),
+      headline: emoji.shortcode,
+      headlineStyle: AppText.code,
+      details: [
+        SettingsEntityDetail(
+          'Added ${formatDateTime(emoji.createdAt, use24Hour: watchUse24Hour(ref, context))}',
+        ),
+      ],
+      actions: [
+        AppIconButton(
+          icon: AppIcons.delete,
+          semanticLabel: 'Remove ${emoji.shortcode}',
+          variant: AppIconButtonVariant.danger,
+          onPressed: _busy ? null : _delete,
+        ),
+      ],
+      error: actionError,
+      onErrorDismiss: clearActionError,
     );
   }
 }

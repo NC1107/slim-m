@@ -10,8 +10,11 @@
 /// makes it, rather than Space settings, the one guaranteed to still carry
 /// this along.
 ///
-/// It keeps its own group header even so, so it does not read as the tail of
-/// the account section above it.
+/// [SettingsSectionCard], its own bordered box with an "App" header, matching
+/// every other section on the screen: it used to be a bare [Column] under a
+/// now-deleted `SettingsGroupHeader`, the one personal-settings section with
+/// no card around it, drawing a plain line where every sibling above it drew
+/// a box.
 library;
 
 import 'package:flutter/material.dart';
@@ -32,11 +35,9 @@ class AppInfoSection extends ConsumerWidget {
     final info = ref.watch(appInfoProvider);
     final errors = ref.watch(debugLogProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SettingsSectionCard(
+      title: 'App',
       children: [
-        const SettingsGroupHeader('App'),
-        const SizedBox(height: AppSpacing.s8),
         AppListRow(
           leading: const Icon(AppIcons.info),
           label: 'Version',

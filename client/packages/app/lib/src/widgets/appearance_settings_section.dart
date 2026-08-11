@@ -16,6 +16,7 @@ import '../providers/display_preferences.dart';
 import '../providers/providers.dart';
 import 'settings_section_header.dart';
 import 'settings_select_row.dart';
+import 'settings_toggle_row.dart';
 
 /// A select row rather than segmented cards. Four cards on a phone wrap their
 /// labels mid-word, which is how "Online" rendered as "Onlin e" in the
@@ -102,14 +103,12 @@ class AppearanceSettingsSection extends ConsumerWidget {
   };
 }
 
-/// A toggle rather than a select row: there is no third choice to name, and
-/// [AppListRow]'s own `trailing` slot is where every other boolean setting in
-/// this system lives.
+/// A toggle rather than a select row: there is no third choice to name.
 ///
-/// No row-wide `onTap`, matching every other toggle-trailing row in this app
-/// (`role_assign_sheet.dart`, `member_roles_sheet.dart`): [AppToggle] is its
-/// own tap target, and adding a second one on the row fires both on a single
-/// tap, toggling the value and immediately toggling it back.
+/// This was the one boolean setting already built the right way, as an
+/// [AppListRow] with a trailing [AppToggle], while two others hand-rolled the
+/// same thing. It is a [SettingsToggleRow] now so all three agree; that
+/// widget carries this row's own "no row-wide onTap" reasoning forward.
 class _HighContrastRow extends StatelessWidget {
   const _HighContrastRow({required this.enabled, required this.onChanged});
 
@@ -117,13 +116,10 @@ class _HighContrastRow extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) => AppListRow(
+  Widget build(BuildContext context) => SettingsToggleRow(
     label: 'High contrast',
-    semanticLabel: 'High contrast, currently ${enabled ? 'on' : 'off'}',
-    trailing: AppToggle(
-      value: enabled,
-      onChanged: onChanged,
-      semanticLabel: 'High contrast',
-    ),
+    value: enabled,
+    onChanged: onChanged,
+    semanticLabel: 'High contrast',
   );
 }

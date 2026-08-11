@@ -199,7 +199,10 @@ class _ReportCardState extends ConsumerState<ReportCard>
             value: targetName,
           ),
           const SizedBox(height: AppSpacing.s8),
-          Text(report.reason, style: TextStyle(color: tokens.textPrimary)),
+          Text(
+            report.reason,
+            style: AppText.body.copyWith(color: tokens.textPrimary),
+          ),
           if (report.snapshot != null) ...[
             const SizedBox(height: AppSpacing.s8),
             Container(

@@ -1,88 +1,90 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The two headers settings is built from: a group header naming who a run of
-/// sections belongs to, and the section header each one opens with.
+/// The container vocabulary every settings and administration screen is built
+/// from: a group header naming who a run of sections belongs to, the section
+/// header each one opens with, and [SettingsSectionCard], which is *the* way
+/// this app expresses "a group of related settings".
 ///
-/// Pulled out of the original combined settings screen so a new section (the
-/// avatar one) could share it without that file growing past its line budget.
+/// See [docs/decisions/0013-settings-container-system.md] for the survey that
+/// made this the single idiom and the six competing ones it replaced. The
+/// short version: a screen in this area is a stack of [SettingsSectionCard]s
+/// and nothing else is a container, so a reader crossing from personal
+/// settings to a moderation screen meets one rhythm rather than six.
+///
+/// **Horizontal inset is owned by the screen frame, never by a section.**
+/// [SettingsScreenScaffold] and [SettingsPanesScaffold]'s own pane body each
+/// pad by [AppSpacing.s16] already, and this file used to add another
+/// [AppSpacing.s16] on top - so personal and Space settings sat at 32 while
+/// every admin screen sat at 16 and the debug log sat at 0. Three insets on
+/// sibling screens is exactly the incoherence this vocabulary exists to
+/// close, and one owner for the inset is what keeps it closed.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-/// Names who the sections under it belong to. Personal and Space settings
-/// are separate screens now, so the one caller left is [AppInfoSection],
-/// naming its "App" group against the personal sections above it on the
-/// same screen.
-///
-/// A step up the type scale from [SettingsSectionHeader] rather than a
-/// different colour, so the two levels stay apart for a reader who cannot
-/// tell the colours apart.
-class SettingsGroupHeader extends StatelessWidget {
-  const SettingsGroupHeader(this.title, {super.key});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.s16,
-        AppSpacing.s24,
-        AppSpacing.s16,
-        0,
-      ),
-      child: Semantics(
-        header: true,
-        child: Text(
-          title,
-          style: AppText.heading.copyWith(
-            color: tokens.textPrimary,
-            fontWeight: AppWeights.semi,
-            letterSpacing: AppText.heading.fontSize! * AppTracking.title,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
+/// `SettingsGroupHeader` used to live here, a step up the type scale from
+/// [SettingsSectionHeader], for naming a run of sections rather than one.
+/// Its last caller was `AppInfoSection`, which used it *instead of* a
+/// container rather than above several - the one personal-settings section
+/// with no bordered box at all. That section is a [SettingsSectionCard] now
+/// like every other, which left this with no callers, so it is deleted rather
+/// than kept as a second header level nothing reaches. A future screen that
+/// genuinely needs to name a run of sections should bring it back
+/// deliberately rather than inherit it as dead code.
 class SettingsSectionHeader extends StatelessWidget {
-  const SettingsSectionHeader(this.title, {super.key, this.description});
+  const SettingsSectionHeader(
+    this.title, {
+    super.key,
+    this.description,
+    this.action,
+  });
 
   final String title;
   final String? description;
 
+  /// A control pinned to the end of the title line: the one place a
+  /// section-level action (add, refresh) belongs, so it is never mistaken for
+  /// a row inside the group it acts on.
+  final Widget? action;
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.s16,
-        AppSpacing.s24,
-        AppSpacing.s16,
-        AppSpacing.s8,
+      padding: const EdgeInsets.only(
+        top: AppSpacing.s24,
+        bottom: AppSpacing.s8,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Semantics(
-            header: true,
-            child: Text(
-              title,
-              style: AppText.ui.copyWith(
-                color: tokens.textPrimary,
-                fontWeight: AppWeights.semi,
-              ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    title,
+                    style: AppText.ui.copyWith(
+                      color: tokens.textPrimary,
+                      fontWeight: AppWeights.semi,
+                    ),
+                  ),
+                ),
+                if (description != null) ...[
+                  const SizedBox(height: AppSpacing.s4),
+                  Text(
+                    description!,
+                    style: AppText.caption.copyWith(
+                      color: tokens.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (description != null) ...[
-            const SizedBox(height: AppSpacing.s4),
-            Text(
-              description!,
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
-            ),
-          ],
+          if (action != null) action!,
         ],
       ),
     );
@@ -109,14 +111,33 @@ class SettingsSectionHeader extends StatelessWidget {
 class SettingsSectionCard extends StatelessWidget {
   const SettingsSectionCard({
     super.key,
-    required this.title,
+    this.title,
     required this.children,
     this.description,
+    this.action,
     this.crossAxisAlignment = CrossAxisAlignment.start,
   });
 
-  final String title;
+  /// Null for a screen whose entire body is this one group, where a header
+  /// would only restate the app bar title above it.
+  ///
+  /// The header exists to tell several groups apart, so on a screen with one
+  /// group it is a hairline and 24dp of space carrying no information -
+  /// "Roles" under a screen titled "Roles". Applying "a screen body is a
+  /// stack of section cards" literally produced exactly that on four screens
+  /// before this was nullable, which is worth recording: a vocabulary rule
+  /// still needs the judgement about when a slot has nothing to say.
+  ///
+  /// A single-group screen that *can* say something useful should still pass
+  /// a title, or a [description]: "Invites" beside a "New invite" form earns
+  /// its header because there are two groups to separate.
+  final String? title;
   final String? description;
+
+  /// Passed through to [SettingsSectionHeader.action]: a section-level
+  /// control, outside the card, beside the name of what it acts on.
+  final Widget? action;
+
   final List<Widget> children;
 
   /// The card's own inner column, not `stretch`: a row widget (`AppListRow`,
@@ -131,18 +152,16 @@ class SettingsSectionCard extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      SettingsSectionHeader(title, description: description),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-        child: AppCard(
-          padding: const EdgeInsets.all(AppSpacing.s8),
-          child: Material(
-            type: MaterialType.transparency,
-            child: Column(
-              crossAxisAlignment: crossAxisAlignment,
-              mainAxisSize: MainAxisSize.min,
-              children: children,
-            ),
+      if (title != null)
+        SettingsSectionHeader(title!, description: description, action: action),
+      AppCard(
+        padding: const EdgeInsets.all(AppSpacing.s8),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            crossAxisAlignment: crossAxisAlignment,
+            mainAxisSize: MainAxisSize.min,
+            children: children,
           ),
         ),
       ),

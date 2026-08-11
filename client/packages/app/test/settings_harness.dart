@@ -7,6 +7,16 @@
 /// exists because every one of those suites needs the same signed-in session,
 /// the same `/me` permission answer and the same stubbed device and block
 /// lists, none of which any of them is actually about.
+///
+/// **`/space/settings` is answered for real rather than falling through to
+/// the catch-all 404, and that is load-bearing.** A 404 pushed
+/// `JoinPolicyRow` into its error branch, which used to render its own
+/// `AppListRow` labelled "Who can join" with a Retry beside it - so every
+/// gating assertion for that row passed against the *error* state's copy of
+/// the label rather than against the row the permission actually unlocks.
+/// Converting that branch to `AppErrorState` (decision 0013's raw-Material
+/// sweep) removed the label and failed two tests that had been green for the
+/// wrong reason the whole time.
 library;
 
 import 'dart:convert';
@@ -69,6 +79,14 @@ ProviderContainer _container(int permissions) {
                 request.url.path == '/blocks') {
               return http.Response(
                 '[]',
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            // Answered for real; see this library's doc for what a 404 hid.
+            if (request.url.path == '/space/settings') {
+              return http.Response(
+                jsonEncode({'join_policy': 'invite'}),
                 200,
                 headers: {'content-type': 'application/json'},
               );

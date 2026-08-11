@@ -22,6 +22,7 @@ import '../providers/admin_providers.dart';
 import '../providers/channel_permissions.dart';
 import '../routing/routes.dart';
 import 'join_policy_row.dart';
+import 'settings_notice.dart';
 import 'settings_section_header.dart';
 
 /// Whether [permissions] carries any of the four bits that gate a row on
@@ -40,10 +41,16 @@ bool spaceSettingsReachable(int permissions) =>
 /// base permissions, rather than shown and left to answer 403: a member
 /// without MANAGE_ROLES should not see role editing exists at all.
 ///
-/// Hidden entirely for a caller with none of the gating bits, so this screen
-/// holds nothing at all rather than an empty list under a bare app bar; the
-/// rail's Space menu hides its own entry point on the same condition, so this
-/// case is reachable only by a direct navigation, not by anything in the UI.
+/// A caller holding none of the gating bits gets a stated reason rather than
+/// nothing. This used to return `SizedBox.shrink()`, and since this widget is
+/// [SpaceSettingsScreen]'s entire body that rendered a bare app bar over a
+/// blank page. The old doc comment defended it on the grounds that the rail
+/// hides its own entry point on the same condition, so the state was
+/// "reachable only by a direct navigation" - but that misses the path that
+/// actually matters: this reads [myPermissionsProvider], so a member whose
+/// last gating permission is revoked *while the screen is open* (a live role
+/// edit, an overwrite change, a demotion) watches it collapse to that blank
+/// page with nothing saying why.
 class SpaceSettingsSection extends ConsumerWidget {
   const SpaceSettingsSection({super.key});
 
@@ -51,7 +58,12 @@ class SpaceSettingsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = ref.watch(myPermissionsProvider);
     if (!spaceSettingsReachable(permissions)) {
-      return const SizedBox.shrink();
+      return const SettingsNotice(
+        message: 'None of your roles grant access to anything here.',
+        detail:
+            'Space settings covers moderation, invites, roles and how this '
+            'Space is configured. An administrator can grant you one of those.',
+      );
     }
     final canModerate = permissions.hasPermission(Perm.manageMessages);
     final canInvite = permissions.hasPermission(Perm.createInvite);

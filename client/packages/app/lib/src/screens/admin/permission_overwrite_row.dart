@@ -46,7 +46,7 @@ class PermissionOverwriteRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: tokens.textPrimary)),
+          Text(label, style: AppText.ui.copyWith(color: tokens.textPrimary)),
           const SizedBox(height: AppSpacing.s4),
           AppSegmentedControl.inline(
             semanticLabel: label,

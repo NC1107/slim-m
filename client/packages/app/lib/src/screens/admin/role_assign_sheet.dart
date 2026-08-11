@@ -94,7 +94,7 @@ class _RoleAssignSheetState extends ConsumerState<_RoleAssignSheet>
               error: (e, _) => Center(
                 child: Text(
                   'Could not load members.',
-                  style: TextStyle(color: tokens.textSecondary),
+                  style: AppText.body.copyWith(color: tokens.textSecondary),
                 ),
               ),
               data: (list) => ListView.builder(
