@@ -19,6 +19,7 @@ import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/run_guarded.dart';
+import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
 
 class CategoriesScreen extends ConsumerWidget {
@@ -28,12 +29,11 @@ class CategoriesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final storeAsync = ref.watch(storeProvider);
 
+    // No padding override: the frame's own default is the inset here, matching every other admin screen.
     return SettingsScreenScaffold(
       title: 'Channel categories',
       backTooltip: 'Back to Space settings',
       backFallback: Routes.spaceSettings,
-      scrollable: false,
-      padding: EdgeInsets.zero,
       child: storeAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) =>
@@ -42,8 +42,8 @@ class CategoriesScreen extends ConsumerWidget {
           stream: store.watchCategories(),
           builder: (context, snapshot) {
             final categories = snapshot.data ?? const <ChannelCategoryRow>[];
-            return ListView(
-              padding: const EdgeInsets.all(AppSpacing.s16),
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const _CreateCategoryCard(),
                 const SizedBox(height: AppSpacing.s16),
@@ -58,10 +58,13 @@ class CategoriesScreen extends ConsumerWidget {
                     ),
                   )
                 else
-                  for (final category in categories) ...[
-                    _CategoryCard(category: category),
-                    const SizedBox(height: AppSpacing.s8),
-                  ],
+                  SettingsSectionCard(
+                    title: 'Categories',
+                    children: [
+                      for (final category in categories)
+                        _CategoryRow(category: category),
+                    ],
+                  ),
               ],
             );
           },
@@ -109,47 +112,42 @@ class _CreateCategoryCardState extends ConsumerState<_CreateCategoryCard>
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: AppInput(
-                  controller: _name,
-                  placeholder: 'New category name',
-                  onSubmitted: (_) => _submitting ? null : _create(),
-                ),
+    return SettingsSectionCard(
+      title: 'New category',
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: AppInput(
+                controller: _name,
+                placeholder: 'New category name',
+                onSubmitted: (_) => _submitting ? null : _create(),
               ),
-              const SizedBox(width: AppSpacing.s8),
-              AppButton(
-                label: 'Create',
-                onPressed: _submitting ? null : _create,
-              ),
-            ],
-          ),
-          if (actionError != null) ...[
-            const SizedBox(height: AppSpacing.s8),
-            AppErrorState(message: actionError!, onDismiss: clearActionError),
+            ),
+            const SizedBox(width: AppSpacing.s8),
+            AppButton(label: 'Create', onPressed: _submitting ? null : _create),
           ],
+        ),
+        if (actionError != null) ...[
+          const SizedBox(height: AppSpacing.s8),
+          AppErrorState(message: actionError!, onDismiss: clearActionError),
         ],
-      ),
+      ],
     );
   }
 }
 
-class _CategoryCard extends ConsumerStatefulWidget {
-  const _CategoryCard({required this.category});
+class _CategoryRow extends ConsumerStatefulWidget {
+  const _CategoryRow({required this.category});
 
   final ChannelCategoryRow category;
 
   @override
-  ConsumerState<_CategoryCard> createState() => _CategoryCardState();
+  ConsumerState<_CategoryRow> createState() => _CategoryRowState();
 }
 
-class _CategoryCardState extends ConsumerState<_CategoryCard>
-    with GuardedActionState<_CategoryCard> {
+class _CategoryRowState extends ConsumerState<_CategoryRow>
+    with GuardedActionState<_CategoryRow> {
   late final _name = TextEditingController(text: widget.category.name);
   bool _busy = false;
 
@@ -204,9 +202,15 @@ class _CategoryCardState extends ConsumerState<_CategoryCard>
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    // Padding matches SettingsEntityRow's own outer spacing; no headline/actions split fits an editable field.
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s8,
+        vertical: AppSpacing.s8,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [

@@ -56,7 +56,7 @@ class DevicesSection extends ConsumerWidget {
                   padding: const EdgeInsets.all(AppSpacing.s8),
                   child: Text(
                     'No devices signed in.',
-                    style: TextStyle(color: tokens.textSecondary),
+                    style: AppText.body.copyWith(color: tokens.textSecondary),
                   ),
                 )
               : Column(
@@ -110,9 +110,12 @@ class _DeviceRowState extends ConsumerState<_DeviceRow>
           meta: device.isCurrent ? 'This device' : 'Signed in',
           trailing: device.isCurrent
               ? null
-              : TextButton(
-                  onPressed: _busy ? null : _signOut,
-                  child: const Text('Sign out'),
+              : AppButton(
+                  label: 'Sign out',
+                  variant: AppButtonVariant.secondary,
+                  size: AppButtonSize.sm,
+                  disabled: _busy,
+                  onPressed: _signOut,
                 ),
         ),
         if (actionError != null)
@@ -175,7 +178,7 @@ class BlockedSection extends ConsumerWidget {
             ),
             child: Text(
               'Nobody is blocked.',
-              style: TextStyle(color: tokens.textSecondary),
+              style: AppText.body.copyWith(color: tokens.textSecondary),
             ),
           )
         else
@@ -227,9 +230,11 @@ class _BlockedRowState extends ConsumerState<_BlockedRow>
           leading: const Icon(AppIcons.account),
           label: name ?? 'Deleted account',
           meta: name == null ? widget.userId : null,
-          trailing: TextButton(
+          trailing: AppButton(
+            label: 'Unblock',
+            variant: AppButtonVariant.secondary,
+            size: AppButtonSize.sm,
             onPressed: _unblock,
-            child: const Text('Unblock'),
           ),
         ),
         if (actionError != null)

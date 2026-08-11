@@ -17,6 +17,8 @@ import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../../widgets/app_snackbar.dart';
 import '../../widgets/run_guarded.dart';
+import '../../widgets/settings_entity_row.dart';
+import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import 'invite_role_grant_picker.dart';
@@ -54,13 +56,9 @@ class InvitesScreen extends ConsumerWidget {
             onRetry: () => ref.invalidate(invitesProvider),
             isEmpty: (list) => list.isEmpty,
             emptyMessage: 'No invites yet.',
-            data: (context, list) => Column(
-              children: [
-                for (final invite in list) ...[
-                  _InviteRow(invite: invite),
-                  const SizedBox(height: AppSpacing.s8),
-                ],
-              ],
+            data: (context, list) => SettingsSectionCard(
+              title: 'Invites',
+              children: [for (final invite in list) _InviteRow(invite: invite)],
             ),
           ),
         ],
@@ -140,56 +138,53 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return SettingsSectionCard(
       title: 'New invite',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_created != null) ...[
-            _CreatedInviteCallout(
-              invite: _created!,
-              onDismiss: () => setState(() => _created = null),
-            ),
-            const SizedBox(height: AppSpacing.s12),
-          ],
-          AppInput(
-            controller: _maxUses,
-            placeholder: 'Uses allowed (blank for unlimited)',
-            semanticLabel: 'Uses allowed',
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            errorText: _maxUsesError,
-            onChanged: (_) => setState(() {}),
+      children: [
+        if (_created != null) ...[
+          _CreatedInviteCallout(
+            invite: _created!,
+            onDismiss: () => setState(() => _created = null),
           ),
           const SizedBox(height: AppSpacing.s12),
-          AppSegmentedControl.inline(
-            semanticLabel: 'Invite expiry',
-            options: [
-              for (final option in _expiryOptions)
-                AppSegmentedOption(label: option.$1),
-            ],
-            selectedIndex: _expiryIndex,
-            onSegmentSelected: (i) => setState(() => _expiryIndex = i),
-          ),
-          InviteRoleGrantPicker(
-            selected: _roleGrant,
-            onChanged: (id) => setState(() => _roleGrant = id),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: AppSpacing.s12),
-            AppErrorState(message: _error!),
-          ],
-          const SizedBox(height: AppSpacing.s12),
-          AppButton(
-            label: _submitting ? 'Creating...' : 'Create invite',
-            icon: AppIcons.invite,
-            variant: AppButtonVariant.primary,
-            full: true,
-            disabled: _submitting,
-            onPressed: _create,
-          ),
         ],
-      ),
+        AppInput(
+          controller: _maxUses,
+          placeholder: 'Uses allowed (blank for unlimited)',
+          semanticLabel: 'Uses allowed',
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          errorText: _maxUsesError,
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        AppSegmentedControl.inline(
+          semanticLabel: 'Invite expiry',
+          options: [
+            for (final option in _expiryOptions)
+              AppSegmentedOption(label: option.$1),
+          ],
+          selectedIndex: _expiryIndex,
+          onSegmentSelected: (i) => setState(() => _expiryIndex = i),
+        ),
+        InviteRoleGrantPicker(
+          selected: _roleGrant,
+          onChanged: (id) => setState(() => _roleGrant = id),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: AppSpacing.s12),
+          AppErrorState(message: _error!),
+        ],
+        const SizedBox(height: AppSpacing.s12),
+        AppButton(
+          label: _submitting ? 'Creating...' : 'Create invite',
+          icon: AppIcons.invite,
+          variant: AppButtonVariant.primary,
+          full: true,
+          disabled: _submitting,
+          onPressed: _create,
+        ),
+      ],
     );
   }
 }
@@ -206,12 +201,7 @@ class _CreatedInviteCallout extends StatelessWidget {
       tone: AppCalloutTone.accent,
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              invite.code,
-              style: const TextStyle(fontFamily: AppFonts.mono),
-            ),
-          ),
+          Expanded(child: Text(invite.code, style: AppText.code)),
           AppIconButton(
             icon: AppIcons.copy,
             semanticLabel: 'Copy invite code',
@@ -320,74 +310,40 @@ class _InviteRowState extends ConsumerState<_InviteRow>
         ? null
         : _roleGrantLabel(invite.roleGrant, ref.watch(rolesProvider));
 
-    // A failed revoke shows on the row it failed for and stays until dealt with.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (actionError case final error?)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-            child: AppErrorState(
-              message: error,
-              onRetry: _busy ? null : _revoke,
-              onDismiss: clearActionError,
-            ),
-          ),
-        AppCard(
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          invite.code,
-                          style: const TextStyle(fontFamily: AppFonts.mono),
-                        ),
-                        const SizedBox(width: AppSpacing.s8),
-                        if (badge case (final variant, final label)?)
-                          AppBadge(variant: variant, label: label),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.s4),
-                    Text(
-                      '$usesLabel · $expiryLabel',
-                      style: AppText.caption.copyWith(
-                        color: tokens.textSecondary,
-                      ),
-                    ),
-                    if (roleGrantLabel != null) ...[
-                      const SizedBox(height: AppSpacing.s4),
-                      Text(
-                        roleGrantLabel,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.caption.copyWith(color: tokens.accent),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              AppIconButton(
-                icon: AppIcons.copy,
-                semanticLabel: 'Copy invite code',
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: invite.code));
-                  showAppSnackbar(context, 'Invite code copied.');
-                },
-              ),
-              if (!invite.revoked)
-                AppIconButton(
-                  icon: AppIcons.revoke,
-                  semanticLabel: 'Revoke invite',
-                  variant: AppIconButtonVariant.danger,
-                  onPressed: _busy ? null : _revoke,
-                ),
-            ],
-          ),
-        ),
+    return SettingsEntityRow(
+      headline: invite.code,
+      headlineStyle: AppText.code,
+      badge: badge == null
+          ? null
+          : AppBadge(variant: badge.$1, label: badge.$2),
+      details: [
+        SettingsEntityDetail('$usesLabel · $expiryLabel'),
+        if (roleGrantLabel != null)
+          SettingsEntityDetail(roleGrantLabel, tone: tokens.accent),
       ],
+      // A revoked invite reserves the revoke slot rather than dropping it.
+      actions: [
+        AppIconButton(
+          icon: AppIcons.copy,
+          semanticLabel: 'Copy invite code',
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: invite.code));
+            showAppSnackbar(context, 'Invite code copied.');
+          },
+        ),
+        if (!invite.revoked)
+          AppIconButton(
+            icon: AppIcons.revoke,
+            semanticLabel: 'Revoke invite',
+            variant: AppIconButtonVariant.danger,
+            onPressed: _busy ? null : _revoke,
+          )
+        else
+          null,
+      ],
+      error: actionError,
+      onErrorRetry: _busy ? null : _revoke,
+      onErrorDismiss: clearActionError,
     );
   }
 }

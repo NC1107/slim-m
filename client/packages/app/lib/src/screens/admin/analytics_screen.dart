@@ -20,6 +20,8 @@ import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../../widgets/attachment_view.dart' show formatByteSize;
 import '../../widgets/run_guarded.dart';
+import '../../widgets/settings_section_header.dart';
+import '../../widgets/settings_toggle_row.dart';
 import '../settings_screen_scaffold.dart';
 import 'analytics_charts.dart';
 
@@ -97,46 +99,21 @@ class _ToggleCard extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return AppCard(
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Record Space analytics',
-                  style: AppText.body.copyWith(
-                    color: tokens.textPrimary,
-                    fontWeight: AppWeights.semi,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.s4),
-                Text(
-                  'Off by default. Counts messages and reads this server\'s '
-                  'own memory use; never a per-member activity log. Turning '
-                  'this off hides the numbers below but keeps whatever was '
-                  'already recorded.',
-                  style: AppText.caption.copyWith(color: tokens.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.s12),
-          AppToggle(
-            value: enabled,
-            onChanged: busy ? null : onChanged,
-            semanticLabel: enabled
-                ? 'Space analytics on'
-                : 'Space analytics off',
-          ),
-        ],
+  Widget build(BuildContext context) => SettingsSectionCard(
+    children: [
+      SettingsToggleRow(
+        label: 'Record Space analytics',
+        description:
+            'Off by default. Counts messages and reads this server\'s '
+            'own memory use; never a per-member activity log. Turning '
+            'this off hides the numbers below but keeps whatever was '
+            'already recorded.',
+        value: enabled,
+        onChanged: busy ? null : onChanged,
+        semanticLabel: enabled ? 'Space analytics on' : 'Space analytics off',
       ),
-    );
-  }
+    ],
+  );
 }
 
 class _OffNotice extends StatelessWidget {

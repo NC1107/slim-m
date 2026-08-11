@@ -2,6 +2,8 @@
 /// The slim-m client.
 library;
 
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +11,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'src/desktop/desktop_chrome.dart';
+import 'src/desktop/desktop_window_shell.dart';
+import 'src/desktop/startup_screen.dart';
 import 'src/diagnostics/debug_log.dart';
 import 'src/providers/display_preferences.dart';
 import 'src/providers/providers.dart';
@@ -17,46 +22,65 @@ import 'src/providers/sync_controller.dart';
 import 'src/push/android_push_messages.dart';
 import 'src/routing/router.dart';
 
-/// Entry point, with two ordering constraints that are not obvious from the
-/// statements themselves.
+/// Entry point.
 ///
-/// [restoreSession] runs before [runApp] because it is local-only and so cannot
-/// hang startup on a dead connection (see its own doc), and because doing it
-/// first is what lets the router's very first redirect already know the answer,
-/// instead of showing sign-in and then jumping to channels a frame later.
+/// [DesktopWindowShell.applyInitialGeometry] runs before [runApp] on purpose:
+/// it is the one step that has to land before the very first Flutter frame
+/// paints, or the startup screen below would flash at the OS default size
+/// and then visibly jump to the last known one - a no-op on every platform
+/// but a real desktop build.
 ///
-/// The sync and push controllers are read here rather than left to whichever
-/// screen happens to want them: they react to session changes for their whole
-/// lives (push retries on resume, sync starts and stops with the session), and
-/// a restored session never passes through the sign-in screen that would
-/// otherwise have touched them.
+/// Everything else that used to run here now runs inside [_bootstrapApp],
+/// off the critical path to the first frame: [SlimMApp] shows [StartupApp]
+/// while [appReadyProvider] is false and swaps to the real app once that
+/// future resolves, so [restoreSession] still finishes before the router
+/// ever builds - the same "no sign-in-then-jump" guarantee this file always
+/// carried, just realised by a watched provider instead of an await ahead
+/// of [runApp].
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _initAndroidPush();
+  await DesktopWindowShell.applyInitialGeometry();
 
   final container = ProviderContainer();
   // Before anything that can throw, so startup failures land in the log too.
   installDiagnostics(container);
-  // Before runApp so the router's first redirect knows the answer.
-  await restoreSession(container);
-  // Awaited for the same reason, and free: restoreSession has already
-  // resolved the preference store this reads from.
-  await container.read(themeControllerProvider.notifier).restore();
-  await container.read(timeFormatControllerProvider.notifier).restore();
-  await container.read(motionPreferenceControllerProvider.notifier).restore();
-  await container.read(highContrastControllerProvider.notifier).restore();
 
-  /// These react to session changes for their whole lives: push retries on
-  /// resume, sync starts and stops with the session. Reading them here keeps
-  /// that reaction alive for a restored session, which never passes through
-  /// the sign-in screen that would otherwise have touched them.
-  container.read(syncControllerProvider);
-  container.read(pushControllerProvider);
+  container.read(appReadyProvider.notifier).state = false;
+  unawaited(_bootstrapApp(container));
 
   runApp(
     UncontrolledProviderScope(container: container, child: const SlimMApp()),
   );
 }
+
+/// The async sequence [StartupApp] masks: session restore (so the router's
+/// first redirect already knows the answer instead of showing sign-in and
+/// jumping to channels a frame later), the four preference-controller
+/// restores, sync/push bring-up, and the desktop window shell's own
+/// listener/tray registration - a no-op on every platform but a real
+/// desktop build. The sync and push controllers are read here rather than
+/// left to whichever screen wants them first: they react to session changes
+/// for their whole lives, and a restored session never passes through the
+/// sign-in screen that would otherwise have touched them.
+Future<void> _bootstrapApp(ProviderContainer container) async {
+  await restoreSession(container);
+  await container.read(themeControllerProvider.notifier).restore();
+  await container.read(timeFormatControllerProvider.notifier).restore();
+  await container.read(motionPreferenceControllerProvider.notifier).restore();
+  await container.read(highContrastControllerProvider.notifier).restore();
+  container.read(syncControllerProvider);
+  container.read(pushControllerProvider);
+  await DesktopWindowShell.registerListenersAndTray(container);
+  container.read(appReadyProvider.notifier).state = true;
+}
+
+/// Whether [_bootstrapApp] has finished. Defaults to true rather than false:
+/// a test pumping `SlimMApp()` directly, with no call ever made into
+/// [_bootstrapApp], sees the real app immediately, matching every existing
+/// test's assumption - only the real entry point above ever sets it false
+/// first.
+final appReadyProvider = StateProvider<bool>((ref) => true);
 
 /// Wires Firebase and the FCM background message handler Android needs to
 /// ever show a notification while backgrounded or killed - the relay sends
@@ -97,6 +121,8 @@ class SlimMApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(appReadyProvider)) return const StartupApp();
+
     final choice = ref.watch(themeControllerProvider);
     final highContrast = ref.watch(highContrastControllerProvider);
     final lightTokens = highContrast
@@ -140,6 +166,11 @@ class SlimMApp extends ConsumerWidget {
 /// [MediaQuery] carrying [overrideMotion]'s answer, rather than a change to
 /// [AppMotion] itself, which stays a pure read of whatever `MediaQuery` it is
 /// given - the same choke point every animated widget already asks.
+///
+/// [DesktopChrome] is the outermost layer: the frameless title bar and the
+/// first-run tray notice, both no-ops unless [DesktopWindowShell.active] -
+/// never true in a plain `flutter test` run, which is what keeps this from
+/// changing the tree shape of every other test in this package.
 Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
   builder: (context, ref, _) {
     final densityWrapped = ListTileTheme.merge(
@@ -147,9 +178,11 @@ Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
       child: child ?? const SizedBox.shrink(),
     );
     final motionChoice = ref.watch(motionPreferenceControllerProvider);
-    return MediaQuery(
-      data: overrideMotion(MediaQuery.of(context), motionChoice),
-      child: densityWrapped,
+    return DesktopChrome(
+      child: MediaQuery(
+        data: overrideMotion(MediaQuery.of(context), motionChoice),
+        child: densityWrapped,
+      ),
     );
   },
 );

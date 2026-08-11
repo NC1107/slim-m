@@ -73,13 +73,11 @@ class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow>
           // A fixed sentence, never the exception itself: a raw parse error
           // was rendering Dart type names into this row, which reads as a
           // crash and tells nobody anything actionable.
-          error: (e, _) => AppListRow(
-            label: 'Who can join',
-            leading: const Icon(AppIcons.members),
-            meta: 'Could not load',
-            trailing: TextButton(
-              onPressed: () => ref.invalidate(joinPolicyProvider),
-              child: const Text('Retry'),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(AppSpacing.s8),
+            child: AppErrorState(
+              message: 'Could not load who can join.',
+              onRetry: () => ref.invalidate(joinPolicyProvider),
             ),
           ),
           data: (current) => AppListRow(

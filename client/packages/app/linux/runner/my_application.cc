@@ -7,6 +7,7 @@
 
 #include "clipboard_image_channel.h"
 #include "flutter/generated_plugin_registrant.h"
+#include "linux_tray_probe_channel.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -81,6 +82,11 @@ static void my_application_activate(GApplication* application) {
   clipboard_image_channel_register(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)));
 
+  // The desktop half of linux_tray_probe.dart's channel; see
+  // linux_tray_probe_channel.h.
+  linux_tray_probe_channel_register(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)));
+
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
 
@@ -148,6 +154,9 @@ MyApplication* my_application_new() {
   // the application to be recognized beyond its binary name.
   g_set_prgname(APPLICATION_ID);
 
+  // NON_UNIQUE means a second launch while already running in the tray
+  // spawns a second process instead of focusing the first - still open,
+  // named rather than fixed in decision 0012's own desktop shell pass.
   return MY_APPLICATION(g_object_new(my_application_get_type(),
                                      "application-id", APPLICATION_ID, "flags",
                                      G_APPLICATION_NON_UNIQUE, nullptr));

@@ -190,6 +190,8 @@ class _PickerLoading extends StatelessWidget {
   );
 }
 
+/// The shared [AppErrorState], padded to match [_PickerLoading] now that the
+/// sheet sizes to its content rather than to a fixed fraction of the window.
 class _PickerError extends StatelessWidget {
   const _PickerError({required this.message, required this.onRetry});
 
@@ -197,28 +199,10 @@ class _PickerError extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.s16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            message,
-            style: AppText.body.copyWith(color: tokens.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          AppButton(
-            label: 'Retry',
-            variant: AppButtonVariant.ghost,
-            onPressed: onRetry,
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(AppSpacing.s16),
+    child: AppErrorState(message: message, onRetry: onRetry),
+  );
 }
 
 class _PickerEmpty extends StatelessWidget {

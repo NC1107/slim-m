@@ -20,6 +20,8 @@ import 'package:slimm_rtc/rtc.dart';
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../widgets/media_capability_section.dart';
+import '../widgets/settings_section_header.dart';
+import '../widgets/settings_toggle_row.dart';
 
 const _soundsKey = 'slimm.voice.join_leave_sounds_enabled';
 const _callRingSoundKey = 'slimm.voice.call_ring_sound_enabled';
@@ -125,45 +127,6 @@ class VoiceSettingsBody extends StatelessWidget {
   );
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title, {this.description});
-
-  final String title;
-  final String? description;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.s16,
-        AppSpacing.s24,
-        AppSpacing.s16,
-        AppSpacing.s8,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: AppText.ui.copyWith(
-              color: tokens.textPrimary,
-              fontWeight: AppWeights.semi,
-            ),
-          ),
-          if (description != null) ...[
-            const SizedBox(height: AppSpacing.s4),
-            Text(
-              description!,
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 /// A live level for the local microphone, sourced from the one real signal
 /// `slimm_rtc` exposes: [VoiceParticipant.isSpeaking] on an active call's
 /// local participant. There is no continuous amplitude in the package's
@@ -191,44 +154,33 @@ class _MicrophoneSection extends ConsumerWidget {
     final speaking = inCall && (local?.isSpeaking ?? false);
     final muted = !inCall || (local?.isMuted ?? true);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SettingsSectionCard(
+      title: 'Microphone',
+      description: 'Your input level while you are in a call.',
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SectionHeader(
-          'Microphone',
-          description: 'Your input level while you are in a call.',
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(end: speaking ? _speakingLevel : _quietLevel),
-            duration: AppMotion.reduced(
-              context,
-              const Duration(milliseconds: 200),
-            ),
-            builder: (context, level, _) => AppSlider(
-              tall: true,
-              value: 0,
-              onChanged: null,
-              meter: level,
-              muted: muted,
-              semanticLabel: 'Microphone input level',
-            ),
+        TweenAnimationBuilder<double>(
+          tween: Tween(end: speaking ? _speakingLevel : _quietLevel),
+          duration: AppMotion.reduced(
+            context,
+            const Duration(milliseconds: 200),
+          ),
+          builder: (context, level, _) => AppSlider(
+            tall: true,
+            value: 0,
+            onChanged: null,
+            meter: level,
+            muted: muted,
+            semanticLabel: 'Microphone input level',
           ),
         ),
         if (!inCall) ...[
           const SizedBox(height: AppSpacing.s8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-            child: AppCallout(
-              tone: AppCalloutTone.info,
-              child: Text(
-                'Join a voice call to see your live input level here.',
-              ),
-            ),
+          const AppCallout(
+            tone: AppCalloutTone.info,
+            child: Text('Join a voice call to see your live input level here.'),
           ),
         ],
-        const SizedBox(height: AppSpacing.s16),
       ],
     );
   }
@@ -243,27 +195,17 @@ class _DeviceSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return const SettingsSectionCard(
+      title: 'Input and output devices',
+      description: 'Which microphone and speaker a call uses.',
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SectionHeader(
-          'Input and output devices',
-          description: "Which microphone and speaker a call uses.",
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s16,
-            0,
-            AppSpacing.s16,
-            AppSpacing.s16,
-          ),
-          child: AppCallout(
-            tone: AppCalloutTone.info,
-            icon: AppIcons.headphones,
-            child: Text(
-              'Device selection is not available in this build yet. Calls '
-              "use the operating system's default microphone and speaker.",
-            ),
+        AppCallout(
+          tone: AppCalloutTone.info,
+          icon: AppIcons.headphones,
+          child: Text(
+            'Device selection is not available in this build yet. Calls '
+            "use the operating system's default microphone and speaker.",
           ),
         ),
       ],
@@ -281,31 +223,25 @@ class _ScreenShareSection extends ConsumerWidget {
       settings.screenShareQuality,
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SettingsSectionCard(
+      title: 'Screen share quality',
+      description:
+          'A ceiling on resolution and frame rate, not a '
+          'preference: it keeps a share from starving the audio '
+          'alongside it.',
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SectionHeader(
-          'Screen share quality',
-          description:
-              'A ceiling on resolution and frame rate, not a '
-              'preference: it keeps a share from starving the audio '
-              'alongside it.',
+        AppSegmentedControl.inline(
+          semanticLabel: 'Screen share quality',
+          options: [
+            for (final quality in ScreenShareQuality.values)
+              AppSegmentedOption(label: _label(quality)),
+          ],
+          selectedIndex: index < 0 ? 1 : index,
+          onSegmentSelected: (i) => ref
+              .read(voiceSettingsControllerProvider.notifier)
+              .setScreenShareQuality(ScreenShareQuality.values[i]),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-          child: AppSegmentedControl.inline(
-            semanticLabel: 'Screen share quality',
-            options: [
-              for (final quality in ScreenShareQuality.values)
-                AppSegmentedOption(label: _label(quality)),
-            ],
-            selectedIndex: index < 0 ? 1 : index,
-            onSegmentSelected: (i) => ref
-                .read(voiceSettingsControllerProvider.notifier)
-                .setScreenShareQuality(ScreenShareQuality.values[i]),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.s16),
       ],
     );
   }
@@ -322,72 +258,37 @@ class _SoundsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final settings = ref.watch(voiceSettingsControllerProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SettingsSectionCard(
+      title: 'Sounds',
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SectionHeader('Sounds'),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s16,
-            vertical: AppSpacing.s8,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Play a sound when someone joins or leaves a call',
-                  style: TextStyle(color: tokens.textPrimary),
-                ),
-              ),
-              AppToggle(
-                value: settings.joinLeaveSoundsEnabled,
-                onChanged: (value) => ref
-                    .read(voiceSettingsControllerProvider.notifier)
-                    .setJoinLeaveSoundsEnabled(value),
-                semanticLabel: 'Play join and leave sounds',
-              ),
-            ],
+        SettingsToggleRow(
+          label: 'Play a sound when someone joins or leaves a call',
+          value: settings.joinLeaveSoundsEnabled,
+          semanticLabel: 'Play join and leave sounds',
+          onChanged: (value) => ref
+              .read(voiceSettingsControllerProvider.notifier)
+              .setJoinLeaveSoundsEnabled(value),
+        ),
+        const SizedBox(height: AppSpacing.s8),
+        const AppCallout(
+          tone: AppCalloutTone.info,
+          child: Text(
+            'These turn off on their own in a call above about 8 people, '
+            'so a busy channel does not turn into a wall of chimes.',
           ),
         ),
         const SizedBox(height: AppSpacing.s8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-          child: AppCallout(
-            tone: AppCalloutTone.info,
-            child: Text(
-              'These turn off on their own in a call above about 8 people, '
-              'so a busy channel does not turn into a wall of chimes.',
-            ),
-          ),
+        SettingsToggleRow(
+          label: 'Play a sound for an incoming call',
+          value: settings.callRingSoundEnabled,
+          semanticLabel: 'Play a sound for an incoming call',
+          onChanged: (value) => ref
+              .read(voiceSettingsControllerProvider.notifier)
+              .setCallRingSoundEnabled(value),
         ),
-        const SizedBox(height: AppSpacing.s16),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s16,
-            vertical: AppSpacing.s8,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Play a sound for an incoming call',
-                  style: TextStyle(color: tokens.textPrimary),
-                ),
-              ),
-              AppToggle(
-                value: settings.callRingSoundEnabled,
-                onChanged: (value) => ref
-                    .read(voiceSettingsControllerProvider.notifier)
-                    .setCallRingSoundEnabled(value),
-                semanticLabel: 'Play a sound for an incoming call',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.s16),
       ],
     );
   }

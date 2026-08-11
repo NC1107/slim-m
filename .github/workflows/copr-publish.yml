@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: copr-publish
+
+# Called from main-builds.yml's own copr job, pulled out into its own file
+# once that workflow reached the 500-line hard ceiling; see docs/ci.md.
+# A reusable workflow rather than a composite action, since this needs its
+# own container image (fedora:latest) a composite action cannot declare.
+on:
+  workflow_call:
+    secrets:
+      COPR_CONFIG:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Snapshot build submitted to the same COPR project `dnf upgrade` already tracks on the owner's Fedora desktop.
+  submit:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    permissions:
+      contents: read
+    env:
+      COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
+    steps:
+      - name: check secret
+        id: gate
+        run: |
+          if [ -n "$COPR_CONFIG" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::COPR_CONFIG is not configured. Add it to enable the Fedora COPR publish. Skipping."
+          fi
+
+      - name: install tooling
+        if: steps.gate.outputs.ready == 'true'
+        run: dnf -y install git copr-cli rpm-build rpmdevtools >/dev/null
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: steps.gate.outputs.ready == 'true'
+
+      - name: resolve version
+        if: steps.gate.outputs.ready == 'true'
+        id: ver
+        run: |
+          version="$(grep -m1 '^version:' client/pubspec.yaml | awk '{print $2}')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          name: slim-m-client-tarball
+          path: dist
+
+      # RPM compares Release segment by segment: 0.<run> sorts below the committed spec's 1, so a tagged release always supersedes a same-version snapshot.
+      - name: submit snapshot to COPR
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+          SNAPSHOT_RELEASE: 0.${{ github.run_number }}
+        run: |
+          set -uo pipefail
+          spec=packaging/rpm/slim-m-client.spec
+          if [ ! -f "$spec" ]; then
+            echo "::warning::${spec} does not exist, so there is nothing to submit to COPR. Skipping."
+            exit 0
+          fi
+          mkdir -p ~/.config
+          printf '%s\n' "$COPR_CONFIG" > ~/.config/copr
+          chmod 600 ~/.config/copr
+          rpmdev-setuptree
+          cp "$spec" ~/rpmbuild/SPECS/slim-m-client.spec
+          cp packaging/rpm/top.npcserver.slimm.desktop \
+            packaging/linux/icons/top.npcserver.slimm*.png \
+            packaging/linux/icons/top.npcserver.slimm.svg ~/rpmbuild/SOURCES/
+          cp "dist/slim-m-client-${VER}-linux-amd64.tar.gz" ~/rpmbuild/SOURCES/
+          sed -i "s/^Version:.*/Version:        ${VER}/" ~/rpmbuild/SPECS/slim-m-client.spec
+          sed -i "s/^Release:.*/Release:        ${SNAPSHOT_RELEASE}%{?dist}/" ~/rpmbuild/SPECS/slim-m-client.spec
+          rpmbuild -bs ~/rpmbuild/SPECS/slim-m-client.spec >/dev/null
+          srpm=$(ls ~/rpmbuild/SRPMS/slim-m-client-*.src.rpm)
+          if copr-cli build nc1107/slim-m "$srpm" --nowait; then
+            echo "submitted slim-m-client ${VER}-${SNAPSHOT_RELEASE} snapshot to COPR (nc1107/slim-m)"
+          else
+            echo "::warning::COPR submit failed for slim-m-client ${VER}-${SNAPSHOT_RELEASE}. TestFlight and the live server are unaffected; rebuild by hand with 'copr-cli build nc1107/slim-m <srpm>'."
+          fi

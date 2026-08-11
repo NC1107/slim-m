@@ -1586,7 +1586,9 @@ An open Space still accepts a code and still applies the role it grants.
 
 Two things the response contract test caught that nothing else would have: a `$ref` to `#/components/responses/RateLimited`, which does not exist (it is `TooManyRequests`), and both new operations having no case in `tests/response_contract/script.rs`. Adding a documented route means adding a case there as well as to `schema/openapi.yaml`.
 
-Found and left alone: **`POST /invites` exposes `max_uses` and `expires_at` only**, so a role-granting invite has no HTTP surface at all despite `Store::create_invite` taking one.
+~~Found and left alone: **`POST /invites` exposes `max_uses` and `expires_at` only**, so a role-granting invite has no HTTP surface at all despite `Store::create_invite` taking one.~~
+Stale, corrected 2026-08-10 by the settings-container review: `CreateRequest.role_grant` has existed since PR #87 (`25b10fb6`), `resolve_grant` enforces the same no-escalation rule role assignment uses, and the client's `InviteRoleGrantPicker` already matches the server's `grantable` shape one-for-one, offering only roles the caller could actually grant.
+The note outlived its own subject by a fortnight, which is the shape this file's own "date every entry and strike it through" rule exists to catch.
 
 ## Driving the client in a real browser (2026-07-27)
 

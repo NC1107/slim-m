@@ -36,6 +36,7 @@ import '../../widgets/confirm_dialog.dart';
 import '../../widgets/message_jump.dart';
 import '../../widgets/message_text.dart';
 import '../../widgets/run_guarded.dart';
+import '../../widgets/settings_section_header.dart';
 import 'report_card_actions.dart';
 import 'report_card_labels.dart';
 import 'report_card_quick_actions.dart';
@@ -189,136 +190,137 @@ class _ReportCardState extends ConsumerState<ReportCard>
     final hasQuickActions =
         canJump || canDeleteMessage || canTimeOut || canRemove;
 
-    return AppCard(
+    return SettingsSectionCard(
       title: isMessageReport ? 'Reported message' : 'Reported user',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ReportLabeledValue(
-            label: isMessageReport ? 'Reported author' : 'Reported user',
-            value: targetName,
-          ),
+      children: [
+        ReportLabeledValue(
+          // 'Subject' rather than repeating the card's own title, which AppCard(title:)'s uppercase used to hide.
+          label: isMessageReport ? 'Reported author' : 'Subject',
+          value: targetName,
+        ),
+        const SizedBox(height: AppSpacing.s8),
+        Text(
+          report.reason,
+          style: AppText.body.copyWith(color: tokens.textPrimary),
+        ),
+        if (report.snapshot != null) ...[
           const SizedBox(height: AppSpacing.s8),
-          Text(report.reason, style: TextStyle(color: tokens.textPrimary)),
-          if (report.snapshot != null) ...[
-            const SizedBox(height: AppSpacing.s8),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.s8),
-              decoration: BoxDecoration(
-                color: tokens.surfaceSunken,
-                borderRadius: BorderRadius.circular(AppRadii.control),
-              ),
-              // Bounded and scrolling, not clipped, so one long paste cannot grow past the rest.
-              constraints: const BoxConstraints(maxHeight: 160),
-              child: SingleChildScrollView(
-                child: MessageBody(
-                  content: report.snapshot!,
-                  knownUsernames: knownUsernames,
-                  customEmoji: customEmoji,
-                ),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.s8),
+            decoration: BoxDecoration(
+              color: tokens.surfaceSunken,
+              borderRadius: BorderRadius.circular(AppRadii.control),
+            ),
+            // Bounded and scrolling, not clipped, so one long paste cannot grow past the rest.
+            constraints: const BoxConstraints(maxHeight: 160),
+            child: SingleChildScrollView(
+              child: MessageBody(
+                content: report.snapshot!,
+                knownUsernames: knownUsernames,
+                customEmoji: customEmoji,
               ),
             ),
-          ],
-          const SizedBox(height: AppSpacing.s8),
-          Row(
-            children: [
-              Text(
-                'Reporter',
-                style: AppText.caption.copyWith(
-                  color: tokens.textSecondary,
-                  fontWeight: AppWeights.medium,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s4),
-              Text(
-                reporterLabel(report.reporterId, profiles),
-                style: AppText.caption.copyWith(color: tokens.textSecondary),
-              ),
-              const Spacer(),
-              Text(
-                formatDateTime(
-                  report.createdAt,
-                  use24Hour: watchUse24Hour(ref, context),
-                ),
-                style: AppText.caption.copyWith(color: tokens.textSecondary),
-              ),
-            ],
           ),
-          if (hasQuickActions) ...[
-            const SizedBox(height: AppSpacing.s12),
-            ReportQuickActions(
-              busy: _busy,
-              jumpEnabled: canJump ? jumpEnabled : null,
-              onJump: canJump ? _jump : null,
-              onDelete: canDeleteMessage
-                  ? () => unawaited(
-                      _runQuickAction(
-                        (g) => deleteReportedMessage(
-                          context,
-                          ref,
-                          g,
-                          channelId: report.channelId!,
-                          messageId: report.subjectId,
-                          reportId: report.id,
-                        ),
-                      ),
-                    )
-                  : null,
-              onRemove: canRemove
-                  ? () => unawaited(
-                      _runQuickAction(
-                        (g) => removeReportedAuthor(
-                          context,
-                          ref,
-                          g,
-                          userId: targetUserId,
-                          name: targetName,
-                          reportId: report.id,
-                        ),
-                      ),
-                    )
-                  : null,
-              onTimeOut: canTimeOut
-                  ? (d) => unawaited(
-                      _runQuickAction(
-                        (g) => timeOutReportedAuthor(
-                          ref,
-                          g,
-                          userId: targetUserId,
-                          duration: d,
-                          reportId: report.id,
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-          ],
-          const SizedBox(height: AppSpacing.s12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              AppButton(
-                label: 'Dismiss',
-                icon: AppIcons.dismiss,
-                disabled: _busy,
-                onPressed: () => _resolve(api.ReportResolution.dismissed),
-              ),
-              const SizedBox(width: AppSpacing.s8),
-              AppButton(
-                label: 'Resolve',
-                icon: AppIcons.check,
-                variant: AppButtonVariant.primary,
-                disabled: _busy,
-                onPressed: () => _resolve(api.ReportResolution.resolved),
-              ),
-            ],
-          ),
-          if (actionError != null) ...[
-            const SizedBox(height: AppSpacing.s8),
-            AppErrorState(message: actionError!, onDismiss: clearActionError),
-          ],
         ],
-      ),
+        const SizedBox(height: AppSpacing.s8),
+        Row(
+          children: [
+            Text(
+              'Reporter',
+              style: AppText.caption.copyWith(
+                color: tokens.textSecondary,
+                fontWeight: AppWeights.medium,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s4),
+            Text(
+              reporterLabel(report.reporterId, profiles),
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
+            const Spacer(),
+            Text(
+              formatDateTime(
+                report.createdAt,
+                use24Hour: watchUse24Hour(ref, context),
+              ),
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
+          ],
+        ),
+        if (hasQuickActions) ...[
+          const SizedBox(height: AppSpacing.s12),
+          ReportQuickActions(
+            busy: _busy,
+            jumpEnabled: canJump ? jumpEnabled : null,
+            onJump: canJump ? _jump : null,
+            onDelete: canDeleteMessage
+                ? () => unawaited(
+                    _runQuickAction(
+                      (g) => deleteReportedMessage(
+                        context,
+                        ref,
+                        g,
+                        channelId: report.channelId!,
+                        messageId: report.subjectId,
+                        reportId: report.id,
+                      ),
+                    ),
+                  )
+                : null,
+            onRemove: canRemove
+                ? () => unawaited(
+                    _runQuickAction(
+                      (g) => removeReportedAuthor(
+                        context,
+                        ref,
+                        g,
+                        userId: targetUserId,
+                        name: targetName,
+                        reportId: report.id,
+                      ),
+                    ),
+                  )
+                : null,
+            onTimeOut: canTimeOut
+                ? (d) => unawaited(
+                    _runQuickAction(
+                      (g) => timeOutReportedAuthor(
+                        ref,
+                        g,
+                        userId: targetUserId,
+                        duration: d,
+                        reportId: report.id,
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+        ],
+        const SizedBox(height: AppSpacing.s12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            AppButton(
+              label: 'Dismiss',
+              icon: AppIcons.dismiss,
+              disabled: _busy,
+              onPressed: () => _resolve(api.ReportResolution.dismissed),
+            ),
+            const SizedBox(width: AppSpacing.s8),
+            AppButton(
+              label: 'Resolve',
+              icon: AppIcons.check,
+              variant: AppButtonVariant.primary,
+              disabled: _busy,
+              onPressed: () => _resolve(api.ReportResolution.resolved),
+            ),
+          ],
+        ),
+        if (actionError != null) ...[
+          const SizedBox(height: AppSpacing.s8),
+          AppErrorState(message: actionError!, onDismiss: clearActionError),
+        ],
+      ],
     );
   }
 }

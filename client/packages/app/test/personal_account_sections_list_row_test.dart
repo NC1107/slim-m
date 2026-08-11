@@ -180,6 +180,6 @@ void main() {
     expect(find.byType(ListTile), findsNothing);
     expect(find.byType(AppListRow), findsOneWidget);
     expect(find.text('Kit'), findsOneWidget);
-    expect(find.widgetWithText(TextButton, 'Unblock'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Unblock'), findsOneWidget);
   });
 }

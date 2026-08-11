@@ -15,6 +15,8 @@ import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/run_guarded.dart';
+import '../../widgets/settings_entity_row.dart';
+import '../../widgets/settings_section_header.dart';
 import 'role_assign_sheet.dart';
 import 'role_editor_sheet.dart';
 
@@ -30,6 +32,7 @@ class RolesScreen extends ConsumerWidget {
       title: 'Roles',
       backTooltip: 'Back to Space settings',
       backFallback: Routes.spaceSettings,
+      // Stays a scaffold action: the card only renders once loaded, and creating a role must stay reachable meanwhile.
       actions: [
         IconButton(
           icon: const Icon(AppIcons.add),
@@ -37,36 +40,34 @@ class RolesScreen extends ConsumerWidget {
           onPressed: () => showRoleEditorSheet(context),
         ),
       ],
-      scrollable: false,
-      padding: EdgeInsets.zero,
       child: AppAsyncView<List<api.Role>>(
         value: AppAsyncState(data: roles.valueOrNull, error: roles.error),
+        center: false,
         errorMessage: 'Could not load roles.',
         onRetry: () => ref.invalidate(rolesProvider),
         isEmpty: (list) => list.isEmpty,
         emptyMessage: 'No roles yet. Create one with the + above.',
-        data: (context, list) => ListView.separated(
-          padding: const EdgeInsets.all(AppSpacing.s16),
-          itemCount: list.length,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s8),
-          itemBuilder: (context, i) => _RoleCard(role: list[i]),
+        // No section title: this screen is one group, so a header here would
+        // only restate the app bar above it.
+        data: (context, list) => SettingsSectionCard(
+          children: [for (final role in list) _RoleRow(role: role)],
         ),
       ),
     );
   }
 }
 
-class _RoleCard extends ConsumerStatefulWidget {
-  const _RoleCard({required this.role});
+class _RoleRow extends ConsumerStatefulWidget {
+  const _RoleRow({required this.role});
 
   final api.Role role;
 
   @override
-  ConsumerState<_RoleCard> createState() => _RoleCardState();
+  ConsumerState<_RoleRow> createState() => _RoleRowState();
 }
 
-class _RoleCardState extends ConsumerState<_RoleCard>
-    with GuardedActionState<_RoleCard> {
+class _RoleRowState extends ConsumerState<_RoleRow>
+    with GuardedActionState<_RoleRow> {
   bool _busy = false;
 
   Future<void> _delete() async {
@@ -92,98 +93,55 @@ class _RoleCardState extends ConsumerState<_RoleCard>
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final role = widget.role;
     final count = Perm.editable
         .where((e) => role.permissions.hasPermission(e.$1))
         .length;
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            role.name,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: tokens.textPrimary),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.s8),
-                        if (role.isEveryone)
-                          const AppBadge(
-                            variant: AppBadgeVariant.tag,
-                            label: 'Everyone',
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.s4),
-                    Text(
-                      // Named, not counted, for the two counts that read as bugs:
-                      // "1 permission" on the most powerful role, "0" on a fresh one.
-                      role.permissions.hasPermission(Perm.administrator)
-                          ? 'Administrator, full access'
-                          : count == 0
-                          ? 'No permissions yet, edit to add some'
-                          : count == 1
-                          ? '1 permission'
-                          : '$count permissions',
-                      style: AppText.caption.copyWith(
-                        color: tokens.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!role.isEveryone)
-                AppIconButton(
-                  icon: AppIcons.assignRole,
-                  semanticLabel: 'Assign ${role.name} to members',
-                  onPressed: () => showRoleAssignSheet(context, role),
-                )
-              else
-                // Everyone holds this role already; assigning it is a no-op.
-                SizedBox(
-                  width: AppTouchTargets.of(context)
-                      ? AppSizes.rowTouch
-                      : AppSizes.rowPointer,
-                ),
-              AppIconButton(
-                icon: AppIcons.edit,
-                semanticLabel: 'Edit ${role.name}',
-                onPressed: () => showRoleEditorSheet(context, role: role),
-              ),
-              if (!role.isEveryone)
-                AppIconButton(
-                  icon: AppIcons.delete,
-                  semanticLabel: 'Delete ${role.name}',
-                  variant: AppIconButtonVariant.danger,
-                  onPressed: _busy ? null : _delete,
-                )
-              else
-                // An empty slot the width of the button it stands in for, so
-                // the assign and edit columns land at the same x on every row.
-                SizedBox(
-                  width: AppTouchTargets.of(context)
-                      ? AppSizes.rowTouch
-                      : AppSizes.rowPointer,
-                ),
-            ],
-          ),
-          if (actionError != null) ...[
-            const SizedBox(height: AppSpacing.s8),
-            AppErrorState(message: actionError!, onDismiss: clearActionError),
-          ],
-        ],
-      ),
+    return SettingsEntityRow(
+      headline: role.name,
+      badge: role.isEveryone
+          ? const AppBadge(variant: AppBadgeVariant.tag, label: 'Everyone')
+          : null,
+      details: [
+        SettingsEntityDetail(
+          // Named, not counted: "1 permission"/"0" on the two counts that read as bugs otherwise.
+          role.permissions.hasPermission(Perm.administrator)
+              ? 'Administrator, full access'
+              : count == 0
+              ? 'No permissions yet, edit to add some'
+              : count == 1
+              ? '1 permission'
+              : '$count permissions',
+        ),
+      ],
+      // @everyone can't be assigned or deleted; nulls reserve those slots so edit still lands at a shared x.
+      actions: [
+        if (!role.isEveryone)
+          AppIconButton(
+            icon: AppIcons.assignRole,
+            semanticLabel: 'Assign ${role.name} to members',
+            onPressed: () => showRoleAssignSheet(context, role),
+          )
+        else
+          null,
+        AppIconButton(
+          icon: AppIcons.edit,
+          semanticLabel: 'Edit ${role.name}',
+          onPressed: () => showRoleEditorSheet(context, role: role),
+        ),
+        if (!role.isEveryone)
+          AppIconButton(
+            icon: AppIcons.delete,
+            semanticLabel: 'Delete ${role.name}',
+            variant: AppIconButtonVariant.danger,
+            onPressed: _busy ? null : _delete,
+          )
+        else
+          null,
+      ],
+      error: actionError,
+      onErrorDismiss: clearActionError,
     );
   }
 }

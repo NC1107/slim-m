@@ -268,7 +268,9 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
       message:
           'They will be signed out and cannot sign in again, and any '
           'invites they handed out stop working. Everything they wrote stays, '
-          'still shown as theirs. You can let them back in later.',
+          'still shown as theirs. You can let them back in later. '
+          'This does not stop them making a new account and rejoining, '
+          'especially if this Space is open to anyone with a link.',
       confirmLabel: 'Remove',
     );
     if (!confirmed) return;

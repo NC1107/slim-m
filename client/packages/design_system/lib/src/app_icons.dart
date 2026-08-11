@@ -222,4 +222,14 @@ abstract final class AppIcons {
   /// Leaving this surface to view something in its own context - the report
   /// queue's "Jump to message", not a link to another site.
   static const IconData jumpToMessage = LucideIcons.externalLink300;
+
+  /// The custom title bar's own three window controls, decision 0012.
+  /// [windowMaximize] shares [expand]'s glyph on purpose - one shape, two
+  /// call sites - and [windowRestore] is what the same button becomes once
+  /// already maximized, the two-overlapping-squares convention every native
+  /// title bar already uses for it.
+  static const IconData windowMinimize = LucideIcons.minus300;
+  static const IconData windowMaximize = LucideIcons.maximize2300;
+  static const IconData windowRestore = LucideIcons.copy300;
+  static const IconData windowClose = LucideIcons.x300;
 }
