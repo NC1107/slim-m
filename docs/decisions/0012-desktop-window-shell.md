@@ -1,7 +1,7 @@
 # 0012 - Desktop window shell
 
 Date: 2026-08-10.
-Status: designed, not built.
+Status: built (#533), with the no-tray quit gap below closed 2026-08-11.
 
 Three asks from the owner turn out to be one subject: a Discord-style startup animation into last-known geometry, closing to a tray instead of quitting, and a smaller custom title bar in place of the native one.
 All three require the app to own its own window lifecycle instead of the OS owning it, so this record designs that ownership as one shape rather than three features.
@@ -120,6 +120,24 @@ This check is Linux-only; Windows always has a notification area (an icon can si
 
 **Context menu contents, kept conservative since nothing else exists to hang a menu off yet:** Show/Hide slim-m, Quit slim-m, and - only once wired to `voiceControllerProvider`'s actual state - a Mute toggle and an "in a call" indicator while one is active.
 Anything richer (status picker, per-channel actions) is a product decision for later, not architecture this record needs to settle.
+
+## The no-tray fallback left no way out, found and fixed 2026-08-11
+
+The fallback above (`minimizeToTaskbar`) was designed, correctly, so a Linux desktop with no `org.kde.StatusNotifierWatcher` never leaves a hidden window with nothing to bring it back.
+It missed the other half of the same question: this whole record only ever specified one "Quit slim-m", in the tray menu, and that menu is never rendered at all without a tray host to display it.
+On exactly the desktop this fallback exists for - GNOME with no AppIndicator extension, named above as the well-known case - the X button and Alt+F4 both resolve to minimise, forever, and nothing in the running app's own interface could ever end the process.
+That is the trap this whole feature exists to avoid, reopened one level up: a window that always stays reachable, attached to a process that can never be asked to quit.
+
+Two independent routes close it now, neither gated on live tray availability at all.
+Gating either on the same probe `resolveCloseAction` already uses would only move the identical race that check already has to live with - a host can appear or disappear mid-session - onto a control's own visibility, and a quit control that can vanish out from under a keyboard user mid-navigation is its own bug, not a fix.
+
+**The title bar's own "Window menu"**, an unconditional fourth control beside minimize/maximize/close, opens the identical "Quit slim-m" the tray menu already offers - reachable by mouse, and by keyboard (Tab to it, Enter to open, Tab and Enter to the item, Escape to back out) exactly as every other title bar control already is.
+
+**A global Ctrl+Q**, bound through Flutter's `HardwareKeyboard.addHandler` rather than through the app's own remappable shortcut table (`platform/lib/src/shortcuts.dart`).
+That table's one binding site, `home_shell.dart`'s `CallbackShortcuts`, only fires for a focused descendant of the shell, and several screens - settings among them - are separate top-level routes in `router.dart` that unmount the shell entirely, so a binding there would carry the identical hole on exactly the screens a "quit from anywhere" guarantee cannot afford one on.
+
+`scripts/desktop-shell-smoke.sh` structurally takes the no-tray path on every run - fluxbox offers no `StatusNotifierWatcher` at all - which makes it the one CI job already exercising exactly the desktop this gap lived on.
+It now drives Ctrl+Q at the end of its run and asserts the process actually exits, closing the loop its own close-request group deliberately left open: that group proves the window stays reachable after a close, never that anything can end it.
 
 ## The title bar
 

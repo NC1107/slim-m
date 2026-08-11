@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
 import 'src/desktop/desktop_chrome.dart';
+import 'src/desktop/desktop_quit_shortcut.dart';
 import 'src/desktop/desktop_window_shell.dart';
 import 'src/desktop/startup_screen.dart';
 import 'src/diagnostics/debug_log.dart';
@@ -31,6 +32,10 @@ import 'src/routing/router.dart';
 /// but a real desktop build. [DesktopWindowShell.registerSecondInstanceHandler]
 /// runs right after it for the same reason: a launcher click racing this
 /// process's own startup has to find a listener already in place.
+/// [DesktopQuitShortcut.register] joins them here rather than waiting for
+/// [_bootstrapApp]'s own tray setup, since it needs no [ProviderContainer]
+/// and a quit combo pressed in the first instant the window is up should
+/// already work.
 ///
 /// Everything else that used to run here now runs inside [_bootstrapApp],
 /// off the critical path to the first frame: [SlimMApp] shows [StartupApp]
@@ -44,6 +49,7 @@ Future<void> main() async {
   await _initAndroidPush();
   await DesktopWindowShell.applyInitialGeometry();
   DesktopWindowShell.registerSecondInstanceHandler();
+  DesktopQuitShortcut.register(DesktopWindowShell.port);
 
   final container = ProviderContainer();
   // Before anything that can throw, so startup failures land in the log too.

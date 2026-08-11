@@ -17,6 +17,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import 'close_behavior.dart';
 import 'desktop_window_port.dart';
+import 'window_menu_button.dart';
 
 /// The proposed height, a step on the 4dp grid and a real reduction from a
 /// native GNOME header bar's roughly 46-48dp - not yet measured against the
@@ -139,6 +140,8 @@ class _WindowControlsState extends State<_WindowControls> {
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
+      WindowMenuButton(port: widget.port),
+      const SizedBox(width: AppSpacing.s4),
       AppIconButton(
         icon: AppIcons.windowMinimize,
         semanticLabel: 'Minimize',

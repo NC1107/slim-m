@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The custom title bar's own three controls: reachable by keyboard and a
-/// screen reader alike, and the close button routes through the same
-/// decision the native close/delete-event does rather than hiding the
-/// window unconditionally - decision 0012's own worst-failure-mode warning.
+/// The custom title bar's own controls: reachable by keyboard and a screen
+/// reader alike, and the close button routes through the same decision the
+/// native close/delete-event does rather than hiding the window
+/// unconditionally - decision 0012's own worst-failure-mode warning. See
+/// `window_menu_button_test.dart` for the fourth control's own coverage.
 library;
 
 import 'package:flutter/gestures.dart';
@@ -57,6 +58,7 @@ void main() {
         onRequestClose: () async {},
       );
 
+      expect(find.bySemanticsLabel('Window menu'), findsOneWidget);
       expect(find.bySemanticsLabel('Minimize'), findsOneWidget);
       expect(find.bySemanticsLabel('Maximize'), findsOneWidget);
       expect(find.bySemanticsLabel('Close'), findsOneWidget);
@@ -167,6 +169,7 @@ void main() {
           onRequestClose: () async {},
         );
 
+        expect(find.bySemanticsLabel('Window menu'), findsNothing);
         expect(find.bySemanticsLabel('Minimize'), findsNothing);
         expect(find.bySemanticsLabel('Maximize'), findsNothing);
         expect(find.bySemanticsLabel('Close'), findsNothing);
