@@ -94,4 +94,48 @@ void main() {
       expect(hint.textSpan!.toPlainText(), 'Message');
     },
   );
+
+  /// scripts/lib/e2e_labels.py's own `COMPOSER` used to match this hint
+  /// text directly, which broke the moment a thread or a DM (both a genuinely
+  /// empty channel name) stopped rendering the dangling "Message #" the hint
+  /// fix above closes - see CLAUDE.md's "e2e was red for a day, twice" entry.
+  /// The field carries its own stable name now, independent of the hint
+  /// text a channel name can empty out and that typing itself makes vanish.
+  testWidgets(
+    'the field carries a stable accessible name regardless of channel name',
+    (tester) async {
+      for (final name in ['general', '']) {
+        await tester.pumpWidget(
+          composerHarness(
+            controller: controller,
+            sends: sends,
+            platform: TargetPlatform.iOS,
+            channelName: name,
+          ),
+        );
+        final semantics = tester.getSemantics(find.byType(TextField));
+        expect(semantics.label, contains('Message composer'));
+      }
+    },
+  );
+
+  testWidgets(
+    'the accessible name survives once something is typed and the hint disappears',
+    (tester) async {
+      await tester.pumpWidget(
+        composerHarness(
+          controller: controller,
+          sends: sends,
+          platform: TargetPlatform.iOS,
+          channelName: '',
+        ),
+      );
+      await tester.enterText(find.byType(TextField), 'hello');
+      await tester.pump();
+
+      expect(find.byKey(_hintKey), findsNothing);
+      final semantics = tester.getSemantics(find.byType(TextField));
+      expect(semantics.label, contains('Message composer'));
+    },
+  );
 }

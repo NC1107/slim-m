@@ -215,32 +215,36 @@ class _ComposerFieldState extends State<ComposerField> {
                   ),
                 ),
               ),
-            TextField(
-              controller: widget.controller,
-              focusNode: widget.focusNode,
-              onChanged: widget.onTyping,
-              minLines: 1,
-              maxLines: 6,
-              keyboardType: TextInputType.multiline,
-              textInputAction: soft ? TextInputAction.send : null,
-              onSubmitted: soft ? (_) => _submit() : null,
-              style: AppText.body.copyWith(color: tokens.textPrimary),
-              cursorColor: tokens.accent,
-              contextMenuBuilder: (context, state) =>
-                  composerContextMenuBuilder(
-                    context,
-                    state,
-                    clipboardHasImage: _clipboardImageStatus.value,
-                  ),
-              decoration: const InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                // Opts out of the global boxed-input theme; the surrounding
-                // widget draws its own chrome.
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: false,
-                contentPadding: EdgeInsets.zero,
+            // A stable name, unlike the hint above: that text vanishes once typed, and is bare for a thread or DM.
+            Semantics(
+              label: 'Message composer',
+              child: TextField(
+                controller: widget.controller,
+                focusNode: widget.focusNode,
+                onChanged: widget.onTyping,
+                minLines: 1,
+                maxLines: 6,
+                keyboardType: TextInputType.multiline,
+                textInputAction: soft ? TextInputAction.send : null,
+                onSubmitted: soft ? (_) => _submit() : null,
+                style: AppText.body.copyWith(color: tokens.textPrimary),
+                cursorColor: tokens.accent,
+                contextMenuBuilder: (context, state) =>
+                    composerContextMenuBuilder(
+                      context,
+                      state,
+                      clipboardHasImage: _clipboardImageStatus.value,
+                    ),
+                decoration: const InputDecoration(
+                  isDense: true,
+                  border: InputBorder.none,
+                  // Opts out of the global boxed-input theme; the surrounding
+                  // widget draws its own chrome.
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
+                ),
               ),
             ),
           ],
