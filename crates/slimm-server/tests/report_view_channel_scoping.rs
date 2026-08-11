@@ -197,9 +197,7 @@ async fn a_moderator_denied_only_view_channel_cannot_resolve_that_channels_repor
         .await
         .unwrap();
 
-    // 404 rather than 403, deliberately: a refusal that says "forbidden" still
-    // confirms the report exists, which is the oracle the queue's own filtering
-    // exists to close. The handler answers not-found for both.
+    // Not-found rather than forbidden: saying "forbidden" would confirm it exists.
     assert_eq!(
         response.status(),
         StatusCode::NOT_FOUND,
