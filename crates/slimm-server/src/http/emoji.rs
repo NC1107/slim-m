@@ -29,7 +29,7 @@ use super::attachments::serve;
 use super::error::ApiError;
 use super::extract::Authed;
 use super::extract::enforce;
-use super::extract::{Bytes, Json, Query};
+use super::extract::{ASSET, AuthedLimited, Bytes, Json, Query, READ};
 use crate::emoji::{self, AddError};
 use crate::ids::EmojiId;
 use crate::media;
@@ -66,7 +66,7 @@ pub struct UploadParams {
 
 /// Every emoji in the deployment, for any authenticated caller.
 async fn list(
-    Authed(_ctx): Authed,
+    AuthedLimited(_ctx): AuthedLimited<READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<CustomEmojiDto>>, ApiError> {
     let emoji = state.store.list_custom_emoji().await?;
@@ -155,7 +155,7 @@ async fn remove(
 
 /// Serves an emoji's bytes to any authenticated caller.
 async fn image(
-    Authed(_ctx): Authed,
+    AuthedLimited(_ctx): AuthedLimited<ASSET>,
     Path(emoji_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Response, ApiError> {

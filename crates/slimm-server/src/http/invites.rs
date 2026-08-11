@@ -21,7 +21,9 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, AuthedLimited, INVITE_CHECK, Json, RateLimited, WRITE, enforce};
+use super::extract::{
+    Authed, AuthedLimited, INVITE_CHECK, Json, READ, RateLimited, WRITE, enforce,
+};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{Invite, InviteCheck, RedeemError};
@@ -174,7 +176,7 @@ async fn create(
 }
 
 async fn list(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<InviteDto>>, ApiError> {
     if !state

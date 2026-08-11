@@ -1,0 +1,165 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Every authenticated route charges a rate-limit class, proven against the
+//! router's own source rather than a list kept by hand.
+//!
+//! `http/extract.rs`'s own doc comment already says why the `AuthedLimited`
+//! extractor exists: declaring the class in the signature "makes 'no limit' a
+//! visible, reviewable choice instead of an absence". That made an omission
+//! reviewable; it never made one impossible, because a handler taking plain
+//! `Authed` still compiles and still charges nothing. This project has
+//! already paid for that gap once - CLAUDE.md records eight routes charging
+//! nothing, found by an audit rather than by CI - and it recurred on the read
+//! side, where seventeen authenticated GETs went uncharged, including one
+//! serving whole attachment files off disk.
+//!
+//! So the convention is enforced here instead of trusted. A handler is
+//! charged if it either takes an `AuthedLimited<C>` extractor or calls
+//! `enforce` itself; anything else fails this test by name.
+//!
+//! Reads the real source through `support::code_only`, so a comment or a
+//! string literal mentioning `enforce` cannot satisfy the gate - the exact
+//! defect PR #553 found in eleven other source-reading gates in this repo.
+//!
+//! The crate-level `dead_code` allow covers the shared `support` module: an
+//! integration test is its own crate, so every helper this binary does not
+//! call reads as unused, and this one wants only the scrubber.
+#![allow(dead_code)]
+
+use std::collections::BTreeSet;
+use std::path::Path;
+
+mod support;
+
+/// Handlers deliberately left uncharged, each with the reason it is safe.
+///
+/// Empty on purpose: the sweep that built this gate found no authenticated
+/// handler that genuinely should charge nothing. An entry here needs a real
+/// argument, not a note that adding the extractor was inconvenient.
+const EXEMPT: &[(&str, &str)] = &[];
+
+/// A handler's own source, from its `async fn` line to the start of the next
+/// one, with comments and string literals already blanked.
+fn handlers(scrubbed: &str) -> Vec<(String, String)> {
+    let mut found = Vec::new();
+    let mut starts: Vec<usize> = Vec::new();
+    for (idx, _) in scrubbed.match_indices("async fn ") {
+        starts.push(idx);
+    }
+    for (i, &start) in starts.iter().enumerate() {
+        let end = starts.get(i + 1).copied().unwrap_or(scrubbed.len());
+        let body = &scrubbed[start..end];
+        let name: String = body["async fn ".len()..]
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .collect();
+        if !name.is_empty() {
+            found.push((name, body.to_owned()));
+        }
+    }
+    found
+}
+
+/// Everything before the closing paren of the parameter list, which is where
+/// an extractor is declared; a body mentioning `Authed` in a local binding
+/// must not read as one.
+fn signature(body: &str) -> &str {
+    match body.find("\n) ") {
+        Some(end) => &body[..end],
+        None => body,
+    }
+}
+
+#[test]
+fn every_authenticated_handler_charges_a_rate_limit_class() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/http");
+    let exempt: BTreeSet<&str> = EXEMPT.iter().map(|(name, _)| *name).collect();
+    let mut uncharged = Vec::new();
+
+    for entry in std::fs::read_dir(&dir).expect("read src/http") {
+        let path = entry.expect("dir entry").path();
+        if path.extension().is_none_or(|ext| ext != "rs") {
+            continue;
+        }
+        let file = path.file_name().unwrap().to_string_lossy().into_owned();
+        let scrubbed = support::code_only(&std::fs::read_to_string(&path).expect("read source"));
+
+        for (name, body) in handlers(&scrubbed) {
+            let sig = signature(&body);
+            let takes_authed = sig.contains(": Authed,") || sig.contains(": Authed)");
+            let limited = sig.contains(": AuthedLimited<");
+            let charged = body.contains("enforce(");
+            let label = format!("{file}::{name}");
+            if takes_authed && !limited && !charged && !exempt.contains(label.as_str()) {
+                uncharged.push(label);
+            }
+        }
+    }
+
+    assert!(
+        uncharged.is_empty(),
+        "these authenticated handlers charge no rate limit; take an \
+         AuthedLimited<CLASS> extractor, call enforce, or add an EXEMPT entry \
+         saying why none is needed:\n  {}",
+        uncharged.join("\n  ")
+    );
+}
+
+/// The gate must be able to fail, or it proves nothing.
+///
+/// A gate over source text passes trivially if its own matching is broken -
+/// the failure mode CLAUDE.md records for the label guard, which went green
+/// while the thing it named was gone. This drives the detector over a handler
+/// that is genuinely uncharged and asserts it is seen.
+#[test]
+fn the_gate_sees_an_uncharged_handler() {
+    let sample = r#"
+async fn charged_by_extractor(
+    AuthedLimited(ctx): AuthedLimited<READ>,
+) -> Result<(), ApiError> { Ok(()) }
+
+async fn charged_by_enforce(
+    Authed(ctx): Authed,
+) -> Result<(), ApiError> { enforce(&state, &parts, Some(&ctx), Class::Write)?; Ok(()) }
+
+async fn charges_nothing(
+    Authed(ctx): Authed,
+) -> Result<(), ApiError> { Ok(()) }
+"#;
+    let scrubbed = support::code_only(sample);
+    let seen: Vec<String> = handlers(&scrubbed)
+        .into_iter()
+        .filter(|(_, body)| {
+            let sig = signature(body);
+            (sig.contains(": Authed,") || sig.contains(": Authed)"))
+                && !sig.contains(": AuthedLimited<")
+                && !body.contains("enforce(")
+        })
+        .map(|(name, _)| name)
+        .collect();
+    assert_eq!(
+        seen,
+        vec!["charges_nothing".to_owned()],
+        "the detector must catch exactly the uncharged handler"
+    );
+}
+
+/// A comment must not be able to satisfy the gate.
+///
+/// The defect PR #553 found in eleven gates at once: a doc comment describing
+/// the very call it claims to make satisfies a naive substring scan, so the
+/// gate goes green over a handler that charges nothing.
+#[test]
+fn a_comment_mentioning_enforce_does_not_satisfy_the_gate() {
+    let sample = r#"
+/// This handler would call enforce(...) if it charged anything, which it does not.
+async fn charges_nothing(
+    Authed(ctx): Authed,
+) -> Result<(), ApiError> { Ok(()) }
+"#;
+    let scrubbed = support::code_only(sample);
+    let (_, body) = handlers(&scrubbed).pop().expect("one handler");
+    assert!(
+        !body.contains("enforce("),
+        "a comment naming enforce must not read as a charge"
+    );
+}
