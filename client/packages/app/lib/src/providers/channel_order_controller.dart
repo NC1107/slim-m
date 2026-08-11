@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Setting the deployment's channel order and category placement from the
 /// rail: `PUT /channels/order` ([api.SlimmApiChannelAdmin.reorderChannels]).
+/// [CategoryOrderController] below is the category-reorder sibling, from the
+/// categories admin screen rather than the rail.
 ///
 /// Optimistic, the same shape `BlocksController.block` uses: the new
 /// arrangement renders the instant a drag completes, and the round trip only
@@ -12,6 +14,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_data/data.dart' show CategoryStore;
 
 import '../api_failure.dart';
 import 'providers.dart';
@@ -83,4 +86,100 @@ class ChannelOrderController extends StateNotifier<ChannelOrderState> {
 final channelOrderControllerProvider =
     StateNotifierProvider<ChannelOrderController, ChannelOrderState>(
       (ref) => ChannelOrderController(ref),
+    );
+
+/// What the categories screen should show while a category reorder is in
+/// flight or has failed.
+class CategoryOrderState {
+  const CategoryOrderState({this.pendingOrder, this.error});
+
+  /// Every live category's id, in the arrangement this client asked for and
+  /// has not yet heard back on for every one of them. Null once every
+  /// request in that attempt has settled, whether or not all of them
+  /// succeeded - see [CategoryOrderController.reorder]'s own doc comment for
+  /// why "settled" and "succeeded" are not the same thing here.
+  final List<String>? pendingOrder;
+
+  final String? error;
+}
+
+/// Setting the deployment's channel-category order: one `PATCH
+/// /categories/{id}` per category ([api.SlimmApiChannelAdmin.updateCategory]'s
+/// own `position` argument), never a bulk request - categories have no
+/// `PUT .../order` equivalent, only the single-row route `updateCategory`'s
+/// own doc comment already names.
+///
+/// Same optimistic shape as [ChannelOrderController] above, with one real
+/// difference: a channel reorder is one atomic request, so a refusal reverts
+/// cleanly to whatever the store already held. A category reorder is N
+/// independent requests, so a partial failure can leave some categories
+/// repositioned and others not - [reorder] applies every response that did
+/// succeed to the local store before `pendingOrder` clears, so what renders
+/// next is always what the server actually holds rather than either a full
+/// revert or a fiction that everything landed.
+class CategoryOrderController extends StateNotifier<CategoryOrderState> {
+  CategoryOrderController(this._ref) : super(const CategoryOrderState());
+
+  final Ref _ref;
+  List<String>? _lastAttempt;
+
+  /// See [ChannelOrderController._generation]'s own doc: the same
+  /// stale-response guard, one controller over.
+  int _generation = 0;
+
+  /// Submits [categoryIds] - every live category, in the arrangement a drag
+  /// produced - as sequential positions 0..N-1, one request per category,
+  /// run together rather than one at a time.
+  Future<void> reorder(List<String> categoryIds) async {
+    _lastAttempt = categoryIds;
+    final generation = ++_generation;
+    state = CategoryOrderState(pendingOrder: categoryIds);
+    final client = _ref.read(apiProvider);
+    final succeeded = <api.ChannelCategory>[];
+    api.ApiException? firstFailure;
+    await Future.wait(
+      categoryIds.asMap().entries.map((entry) async {
+        try {
+          succeeded.add(
+            await client.updateCategory(
+              categoryId: entry.value,
+              position: entry.key,
+            ),
+          );
+        } on api.ApiException catch (e) {
+          firstFailure ??= e;
+        }
+      }),
+    );
+    if (!mounted || generation != _generation) return;
+    if (succeeded.isNotEmpty) {
+      final store = await _ref.read(storeProvider.future);
+      if (!mounted || generation != _generation) return;
+      for (final category in succeeded) {
+        await store.upsertCategory(category);
+      }
+    }
+    if (!mounted || generation != _generation) return;
+    state = firstFailure == null
+        ? const CategoryOrderState()
+        : CategoryOrderState(
+            error: describeApiFailure('reorder categories', firstFailure!),
+          );
+  }
+
+  /// Retries the arrangement that last failed, or does nothing if none did.
+  Future<void> retry() {
+    final attempt = _lastAttempt;
+    return attempt == null ? Future<void>.value() : reorder(attempt);
+  }
+
+  /// Clears a failure without retrying, accepting whatever the store holds.
+  void dismiss() {
+    if (mounted) state = const CategoryOrderState();
+  }
+}
+
+final categoryOrderControllerProvider =
+    StateNotifierProvider<CategoryOrderController, CategoryOrderState>(
+      (ref) => CategoryOrderController(ref),
     );

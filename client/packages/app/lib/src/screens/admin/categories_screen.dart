@@ -7,7 +7,18 @@
 /// Reads the local store's own category stream rather than a fresh REST
 /// fetch: categories already sync there on every channel refresh
 /// (`ChannelRefresher.refresh`), the same list the rail itself renders.
+///
+/// Reordering categories themselves (not their channels, which the rail's
+/// own drag already covers - see `channel_rail_reorder.dart`) lives here
+/// rather than in the rail: dragging a category's whole header block through
+/// the rail's flat, single-list `ReorderableChannelRows` would risk silently
+/// reassigning the channels it passed over to the dragged category, since
+/// that widget attributes every channel to whichever header precedes it.
+/// This screen has no channels in it at all, so a drag here can only ever
+/// mean "these are the categories, in this order" - see `category_reorder.dart`.
 library;
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,12 +26,14 @@ import 'package:slimm_api/api.dart' show SlimmApiChannelAdmin;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../../providers/channel_order_controller.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
+import 'category_reorder.dart';
 
 class CategoriesScreen extends ConsumerWidget {
   const CategoriesScreen({super.key});
@@ -28,6 +41,8 @@ class CategoriesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final storeAsync = ref.watch(storeProvider);
+    final orderState = ref.watch(categoryOrderControllerProvider);
+    final orderController = ref.read(categoryOrderControllerProvider.notifier);
 
     // No padding override: the frame's own default is the inset here, matching every other admin screen.
     return SettingsScreenScaffold(
@@ -41,12 +56,23 @@ class CategoriesScreen extends ConsumerWidget {
         data: (store) => StreamBuilder<List<ChannelCategoryRow>>(
           stream: store.watchCategories(),
           builder: (context, snapshot) {
-            final categories = snapshot.data ?? const <ChannelCategoryRow>[];
+            final categories = withPendingCategoryOrder(
+              snapshot.data ?? const <ChannelCategoryRow>[],
+              orderState.pendingOrder,
+            );
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const _CreateCategoryCard(),
                 const SizedBox(height: AppSpacing.s16),
+                if (orderState.error != null) ...[
+                  AppErrorState(
+                    message: orderState.error!,
+                    onRetry: () => unawaited(orderController.retry()),
+                    onDismiss: orderController.dismiss,
+                  ),
+                  const SizedBox(height: AppSpacing.s16),
+                ],
                 if (categories.isEmpty)
                   Text(
                     'No categories yet. A channel with none sits in the '
@@ -61,8 +87,15 @@ class CategoriesScreen extends ConsumerWidget {
                   SettingsSectionCard(
                     title: 'Categories',
                     children: [
-                      for (final category in categories)
-                        _CategoryRow(category: category),
+                      CategoryList(
+                        categories: categories,
+                        onReorder: (ids) =>
+                            unawaited(orderController.reorder(ids)),
+                        rowBuilder: (category, dragIndex) => _CategoryRow(
+                          category: category,
+                          dragIndex: dragIndex,
+                        ),
+                      ),
                     ],
                   ),
               ],
@@ -138,9 +171,14 @@ class _CreateCategoryCardState extends ConsumerState<_CreateCategoryCard>
 }
 
 class _CategoryRow extends ConsumerStatefulWidget {
-  const _CategoryRow({required this.category});
+  const _CategoryRow({required this.category, this.dragIndex});
 
   final ChannelCategoryRow category;
+
+  /// This row's position in the enclosing `ReorderableListView`, or null
+  /// when there are fewer than two categories and so no handle to draw -
+  /// see `CategoryList`'s own bail-out in `category_reorder.dart`.
+  final int? dragIndex;
 
   @override
   ConsumerState<_CategoryRow> createState() => _CategoryRowState();
@@ -214,6 +252,10 @@ class _CategoryRowState extends ConsumerState<_CategoryRow>
         children: [
           Row(
             children: [
+              if (widget.dragIndex case final index?) ...[
+                CategoryDragHandle(index: index, name: widget.category.name),
+                const SizedBox(width: AppSpacing.s8),
+              ],
               Expanded(
                 child: AppInput(
                   controller: _name,

@@ -31,6 +31,13 @@ abstract final class AppIcons {
   /// The trigger for a per-row overflow menu (a channel's manage sheet).
   static const IconData moreVertical = LucideIcons.moreVertical300;
 
+  /// A dedicated grab zone for a row whose primary control is an editable
+  /// text field (the categories screen): unlike a channel row's held-press
+  /// drag, wrapping the whole row here would contest the field's own
+  /// long-press text selection for the same gesture, so this needs its own
+  /// glyph rather than reusing that pattern.
+  static const IconData dragHandle = LucideIcons.gripVertical300;
+
   // Messaging.
   static const IconData send = LucideIcons.send300;
   static const IconData reply = LucideIcons.reply300;
