@@ -145,6 +145,16 @@ const _surfaces = <String, ({String route, List<String> viewports})>{
   'dm': (route: '/channels/$dmChannelId', viewports: phoneAndDesktop),
 };
 
+/// `ReportCard`'s own nested resolve needs `renderSurface`'s
+/// `settleNestedResolve` pump, or `expectSettled` catches it as a
+/// mid-flight capture - see CLAUDE.md's "report card overflow" entry.
+const _nestedResolveSurfaces = {'admin-reports'};
+
+/// A real, benign difference between two valid loading states rather than
+/// a placeholder standing in for content - see `expectSettled`'s own doc
+/// comment for why `thread` is the one surface this is true of today.
+const _knownTransientSurfaces = {'thread'};
+
 /// Shell states reachable only by overriding a provider the plain [_surfaces]
 /// table has no way to reach: a collapsed rail, a day divider forced to show,
 /// the transcript's connecting/genuinely-empty states (which the default
@@ -290,6 +300,8 @@ void main() {
               viewportName,
               theme,
               '${surface.key}-$viewportName-$theme',
+              settleNestedResolve: _nestedResolveSurfaces.contains(surface.key),
+              knownTransient: _knownTransientSurfaces.contains(surface.key),
             );
           },
         );

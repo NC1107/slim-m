@@ -54,6 +54,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/mid_flight_capture.dart';
 import 'support/real_shadows.dart';
 import 'ui_snapshot_fixture_data.dart';
 
@@ -362,6 +363,20 @@ Future<void> teardownFixture(
 /// third pump to settle rather than the usual two. Confirmed by looking:
 /// without this, `voice-rejoin-*` and `who-is-here-*` rendered a fully
 /// blank body, not merely an unsettled fade.
+///
+/// [settleNestedResolve] is for a widget whose own `initState` fires a
+/// *second*, nested async resolve after it mounts - `ReportCard`'s own
+/// shape (see CLAUDE.md's "report card overflow" entry) - which the two
+/// pumps above do not reach: they settle the list that creates the widget,
+/// not what that widget goes on to do once it exists. One further bare
+/// pump is what [expectSettled] itself proved sufficient to let it land, so
+/// this is that same pump, run before anything is captured or asserted
+/// rather than after, so the capture shows the resolve rather than the
+/// placeholder ahead of it.
+/// [knownTransient] is for a surface where [expectSettled] finding a real
+/// difference is not a defect - two valid states along one loading
+/// sequence, never a placeholder standing in for content - see that
+/// function's own doc for the one surface this is true of today.
 Future<void> renderSurface(
   WidgetTester tester,
   String route,
@@ -370,6 +385,8 @@ Future<void> renderSurface(
   String snapshotName, {
   List<Override> overrides = const [],
   bool settleJoinTransition = false,
+  bool settleNestedResolve = false,
+  bool knownTransient = false,
 }) async {
   tester.view.physicalSize = viewports[viewportName]!;
   tester.view.devicePixelRatio = 1.0;
@@ -405,6 +422,12 @@ Future<void> renderSurface(
   if (settleJoinTransition) {
     await tester.pump(const Duration(milliseconds: 350));
   }
+  if (settleNestedResolve) {
+    await tester.pump();
+  }
+
+  // Before writeSnapshot: its own extra pumps could mask what this looks for.
+  await expectSettled(tester, snapshotName, knownTransient: knownTransient);
 
   await writeSnapshot(tester, snapshotName);
 
