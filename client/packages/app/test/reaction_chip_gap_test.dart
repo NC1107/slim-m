@@ -17,12 +17,14 @@
 ///
 /// It deliberately stops there rather than cancelling a ring margin too:
 /// each chip's invisible hit box is opaque to a tap regardless of what is
-/// painted under it, so pulling the boxes into overlapping (a negative
-/// spacing) would erase the dead zone that exists today between two chips -
-/// every point in the visible gap would then always resolve to reacting on
-/// one chip or the other, where today a tap there does nothing. The second
-/// test below is what actually proves that dead zone survives, not just
-/// that the pills look closer together.
+/// painted under it - `find.byType(AppChip)` reads exactly that box, since
+/// `AppChip` returns `FocusableTapTarget` directly with no render object of
+/// its own between them - so pulling the boxes into overlapping (a
+/// negative spacing) would erase the dead zone that exists today between
+/// two chips: every point in the visible gap would then always resolve to
+/// reacting on one chip or the other, where today a tap there does
+/// nothing. The second test below is what actually proves that dead zone
+/// survives, not just that the pills look closer together.
 ///
 /// This measures the true painted pill edges (the innermost `Container` in
 /// each chip's subtree, past the invisible hit-target and ring wrappers)
@@ -104,10 +106,7 @@ void main() {
       await tester.pumpWidget(_harness());
       await tester.pumpAndSettle();
 
-      // AppChip is what FocusableTapTarget's outer, opaque hit box paints
-      // as - a tap anywhere inside it reacts, regardless of the pill. If
-      // this gap ever goes to or past zero, this fails before a real tap
-      // between two chips could start silently reacting to one of them.
+      // See the library doc above: this reads the opaque hit box, not the pill.
       final chips = find.byType(AppChip);
       final firstHitBox = tester.getRect(chips.at(0));
       final secondHitBox = tester.getRect(chips.at(1));
@@ -125,8 +124,7 @@ void main() {
   testWidgets('wrapped reaction rows keep the same tightened gap vertically', (
     tester,
   ) async {
-    // Narrow enough that two distinct-emoji, distinct-count chips cannot
-    // share a line, forcing runSpacing (not spacing) to govern the gap.
+    // Narrow enough the two chips cannot share a line, so runSpacing governs.
     await tester.pumpWidget(_harness(width: 60));
     await tester.pumpAndSettle();
 

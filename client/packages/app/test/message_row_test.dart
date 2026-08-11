@@ -460,10 +460,7 @@ void main() {
       first.top,
       reason: 'two short reactions belong on one line',
     );
-    // Not greaterThan: ReactionsRow now abuts two chips' invisible hit
-    // boxes at zero gap on purpose (see reaction_chip_gap_test.dart), so an
-    // equal boundary still reads as "beside" - only a real overlap would
-    // mean the old full-width regression this test was written for is back.
+    // Not greaterThan: chips now abut at zero gap on purpose, see reaction_chip_gap_test.dart.
     expect(
       second.left,
       greaterThanOrEqualTo(first.right),
