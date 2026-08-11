@@ -12,11 +12,20 @@
 /// is what `route_reachability_test.dart` already does for the same shape of
 /// reason: this is a scoping property of which widget owns a `ref.watch`,
 /// not a rendered outcome a pixel-level assertion could see.
+///
+/// Both files are read through `support/code_only.dart` before either
+/// `contains` check runs: the "must appear" half is the vulnerable one,
+/// and reproduced directly - removing the real `ref.watch(...)` call and
+/// leaving `// used to be ref.watch(voiceControllerProvider) before a
+/// refactor` in its place still passed, since a bare substring search
+/// cannot tell a comment's prose from real code.
 library;
 
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/code_only.dart';
 
 void main() {
   test(
@@ -29,9 +38,9 @@ void main() {
         reason: 'run this from the app package root',
       );
 
-      final source = File(
-        'lib/src/widgets/channel_rail_sections.dart',
-      ).readAsStringSync();
+      final source = codeOnly(
+        File('lib/src/widgets/channel_rail_sections.dart').readAsStringSync(),
+      );
       expect(
         source.contains('voiceControllerProvider'),
         isFalse,
@@ -51,9 +60,9 @@ void main() {
       reason: 'run this from the app package root',
     );
 
-    final source = File(
-      'lib/src/widgets/channel_rail_channel_rows.dart',
-    ).readAsStringSync();
+    final source = codeOnly(
+      File('lib/src/widgets/channel_rail_channel_rows.dart').readAsStringSync(),
+    );
     expect(
       source.contains('ref.watch(voiceControllerProvider)'),
       isTrue,

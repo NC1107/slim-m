@@ -306,12 +306,13 @@ async fn thread_summaries_resolve_a_whole_page_of_messages_in_one_call() {
     }
 }
 
-/// Duplicates `canvas_index.rs`'s technique of reading a function's body out
-/// of its real source rather than a copy: proves the batch lookup issues
-/// exactly one `fetch_all` (a single round trip covering every id bound into
-/// its `IN (...)` list) and never a `fetch_one`/`fetch_optional`, which is
-/// what a per-message query would look like. This is the structural half of
-/// "one query for the page, never one per message"; the behavioural half is
+/// Uses `support::function_body`, the same shared helper `canvas_index.rs`
+/// reads a function's body out of its real source with rather than a copy:
+/// proves the batch lookup issues exactly one `fetch_all` (a single round
+/// trip covering every id bound into its `IN (...)` list) and never a
+/// `fetch_one`/`fetch_optional`, which is what a per-message query would
+/// look like. This is the structural half of "one query for the page,
+/// never one per message"; the behavioural half is
 /// `thread_summaries_resolve_a_whole_page_of_messages_in_one_call` above,
 /// which drives a page of a dozen messages through the one call this test
 /// proves is the only one the function makes.
@@ -320,29 +321,7 @@ fn thread_summaries_for_messages_is_exactly_one_query() {
     let source =
         fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/store/threads.rs"))
             .expect("read the threads store module");
-    let start = source
-        .find("pub async fn thread_summaries_for_messages(")
-        .expect("thread_summaries_for_messages no longer appears in the threads store module");
-    let mut depth = 0i32;
-    let mut opened = false;
-    let mut end = source.len();
-    for (i, ch) in source[start..].char_indices() {
-        match ch {
-            '{' => {
-                depth += 1;
-                opened = true;
-            }
-            '}' => {
-                depth -= 1;
-                if opened && depth == 0 {
-                    end = start + i + 1;
-                    break;
-                }
-            }
-            _ => {}
-        }
-    }
-    let body = &source[start..end];
+    let body = support::function_body(&source, "pub async fn thread_summaries_for_messages(");
     assert_eq!(
         body.matches(".fetch_all(").count(),
         1,

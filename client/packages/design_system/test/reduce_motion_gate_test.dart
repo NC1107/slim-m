@@ -30,11 +30,21 @@
 /// future call site cannot reintroduce the original bug (no override at
 /// all) without either using `showAppSnackbar` or writing the override out
 /// by hand and losing the whole point of a shared helper.
+///
+/// Counts run over `support/code_only.dart`'s comment/string-stripped text,
+/// not the raw file: a per-file count comparison is exactly the shape a
+/// comment can defeat by inflating one side without touching the other,
+/// and reproduced directly - a genuine `showDialog(...)` call with no real
+/// override, plus a `// TODO: this should carry animationStyle:
+/// AnimationStyle.noAnimation` comment anywhere else in the same file,
+/// passed silently before this existed.
 library;
 
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/code_only.dart';
 
 class _Rule {
   const _Rule(this.name, this.call, this.override);
@@ -98,7 +108,7 @@ void main() {
         for (final file in dir.listSync(recursive: true).whereType<File>()) {
           if (!file.path.endsWith('.dart')) continue;
           if (_exceptions.contains(file.path)) continue;
-          final source = file.readAsStringSync();
+          final source = codeOnly(file.readAsStringSync());
           for (final rule in _rules) {
             final calls = rule.call.allMatches(source).length;
             if (calls == 0) continue;

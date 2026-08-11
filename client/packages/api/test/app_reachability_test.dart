@@ -21,11 +21,18 @@
 /// longer exists fails too, so a rename cannot quietly retire an exemption.
 /// That is the shape `crates/slimm-server/tests/response_contract`'s
 /// `UNCOVERED` already uses on the server side.
+///
+/// `_concatDart` runs every file through `support/code_only.dart` before
+/// `_mentions` ever searches it: reproduced directly, replacing a method's
+/// only real call with a trailing `// used to call kickVoiceParticipant
+/// here` comment on that same line passed this gate before that existed.
 library;
 
 import 'dart:io';
 
 import 'package:test/test.dart';
+
+import 'support/code_only.dart';
 
 /// Methods with no caller in `packages/app/lib`, and why that is not drift.
 ///
@@ -180,7 +187,7 @@ String _concatDart(Directory dir) => dir
     .listSync(recursive: true)
     .whereType<File>()
     .where((f) => f.path.endsWith('.dart'))
-    .map((f) => f.readAsStringSync())
+    .map((f) => codeOnly(f.readAsStringSync()))
     .join('\n');
 
 /// Walks upward looking for schema/openapi.yaml, so this does not depend on

@@ -27,6 +27,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/code_only.dart';
+
 /// A named allowlist, each entry carrying its own one-line why - the
 /// `type_scale_literal_test.dart` shape. `reports_screen.dart` genuinely
 /// cannot use the frame's own `ListView`: its trailing load-more row needs a
@@ -75,6 +77,37 @@ String _topLevelOnly(String call) {
 }
 
 void main() {
+  test("codeOnly does not let a comment's own stray paren close "
+      'a call early, and leaves a string literal containing one alone too', () {
+    const withCommentParen =
+        "title: 'Roles', // matching parens here, ok :)\n"
+        '      padding: EdgeInsets.zero,';
+    final scanned = codeOnly(withCommentParen);
+    expect(
+      RegExp(r'\bpadding\s*:').hasMatch(scanned),
+      isTrue,
+      reason:
+          "a stray ')' inside a // comment must not end the balanced-"
+          'paren scan before the real padding: argument is reached',
+    );
+
+    const withStringParen = "title: 'Say :) here', padding: EdgeInsets.zero";
+    expect(
+      RegExp(r'\bpadding\s*:').hasMatch(codeOnly(withStringParen)),
+      isTrue,
+    );
+    final depth =
+        codeOnly(withStringParen).split('(').length -
+        codeOnly(withStringParen).split(')').length;
+    expect(
+      depth,
+      0,
+      reason:
+          "a ':)' inside a string literal must not read as a real "
+          'unmatched close paren either',
+    );
+  });
+
   test('_topLevelOnly keeps a top-level padding: and drops a nested one, so a '
       'screen that legitimately uses Padding somewhere inside its own content '
       'cannot false-positive this gate', () {
@@ -110,7 +143,7 @@ void main() {
       final relative = file.path.replaceFirst(RegExp(r'^\./'), '');
       if (relative == _declaringFile) continue;
 
-      final source = file.readAsStringSync();
+      final source = codeOnly(file.readAsStringSync());
       for (final match in callSite.allMatches(source)) {
         final call = _topLevelOnly(_balancedCall(source, match.end - 1));
         if (_exceptions.contains(relative)) continue;

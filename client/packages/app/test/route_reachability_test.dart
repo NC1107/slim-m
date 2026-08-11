@@ -12,11 +12,22 @@
 /// the route's own registration mentions it - by reading the source, the same
 /// way the server's OpenAPI contract test reads the router. A route is not a
 /// feature until something links to it.
+///
+/// Uses `support/code_only.dart` rather than the whole-line-only `//` strip
+/// this file used to carry: a *trailing* `// was Routes.adminAnalytics
+/// before a rename` comment, or any `/* */` block comment, was left able to
+/// satisfy detection the same way the whole-line case this file's own doc
+/// comment above already tells the story of once did. Reproduced directly
+/// before this existed - replacing a route's only real navigation call with
+/// a different route, then leaving that route's own name in a trailing
+/// comment on the same line, still passed.
 library;
 
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/code_only.dart';
 
 /// Registering a route says a path exists; it says nothing about a user ever
 /// arriving there. `path: Routes.x` is exactly the evidence this test must not
@@ -26,12 +37,6 @@ final _registration = RegExp(r'path:\s*Routes\.\w+');
 /// Likewise a redirect guard asking "are we already here" - true of a route
 /// nobody can reach.
 final _locationCheck = RegExp(r'location\s*==\s*Routes\.\w+');
-
-/// A whole-line comment. Prose naming a route is not a link to it, and this
-/// test caught itself passing on the comment above the very button it was
-/// written to protect. Only whole-line comments are stripped, so a `//` inside
-/// a url literal is left alone.
-final _comment = RegExp(r'^\s*//.*$', multiLine: true);
 
 void main() {
   test('every route is reachable from somewhere in the app', () {
@@ -56,9 +61,8 @@ void main() {
         .whereType<File>()
         .where((f) => f.path.endsWith('.dart'))
         .where((f) => f.absolute.path != routesFile.absolute.path)
-        .map((f) => f.readAsStringSync())
+        .map((f) => codeOnly(f.readAsStringSync()))
         .join('\n')
-        .replaceAll(_comment, '')
         .replaceAll(_registration, '')
         .replaceAll(_locationCheck, '');
 

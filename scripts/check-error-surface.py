@@ -44,6 +44,19 @@ there was no real case to seed it with. Add an entry only for a genuinely new
 case of the same shape a popover already gets away with: a surface gone by the
 time the request answers, never to silence an actual regression.
 
+A `/* ... */` block comment is blanked out before any of the above ever
+runs, because the body-boundary scan below reads "the next line starting
+with `}` at or above this indent" to find where a catch block ends, and a
+block comment can contain exactly that shape - a stray `}` at column 0, in
+a code sample or a note - and stop the scan before it ever reaches a real
+`showAppSnackbar(` sitting after it. Reproduced directly: planting a real
+violation behind a three-line `/* ... */` comment with a bare `}` in it
+made this gate report zero offenders. The stripper is string-aware (a
+single/double-quoted `'/*'` like `message_code_langs.dart`'s own
+`blockComment` tuple is left alone) so it does not trade that hole for a
+new one where a string literal's own `/*`/`*/` characters blank out real
+code between them.
+
 A bare `catch (e) { ... }` is checked too, added when three file-picker-open
 failures (the emoji upload card, the avatar section, the composer) turned out
 to carry this exact shape on a bare catch rather than `on api.*Exception`: a
@@ -95,6 +108,18 @@ Deliberately still scoped to that hierarchy rather than any typed exception -
 `ClipboardImageReadException` stay out of it, matching the module doc's own
 line above: this gate is about a failure caught *from the server* becoming a
 SnackBar, not every typed catch in the app becoming one.
+
+Left open rather than chased: a multi-line string literal (`'''...'''`)
+whose own content happens to include a bare `}` at column zero defeats the
+same body-boundary scan the block-comment fix above closed, for the same
+reason - `strip_block_comments` is string-aware for a `/*`/`*/` pair, but
+the boundary scan itself has no notion of "this line is string content,
+not code." Reproduced the same way as the block-comment case. Left alone:
+closing it needs a real Dart string-literal tokenizer (triple-quoted, raw,
+and interpolated forms all differ), for a shape nothing in this codebase
+writes inside a catch block today - the block-comment case was worth
+closing because Dart's own doc-comment convention makes `/* */` an
+ordinary thing to type; a stray `}`-led line inside a string literal is not.
 """
 
 import re
@@ -107,6 +132,52 @@ EXCEPTIONS: dict[tuple[str, int], str] = {}
 EXCEPTIONS_SOURCE = "client/packages/api/lib/src/exceptions.dart"
 # Falls back to this alone when EXCEPTIONS_SOURCE is unreadable, e.g. a test's own synthetic repo.
 FALLBACK_EXCEPTION_NAMES = ("ApiException",)
+
+def strip_block_comments(text: str) -> str:
+    """Blanks `/* ... */` regions to spaces, keeping every line and column
+    where it was so line numbers downstream stay accurate.
+
+    String-aware: a `/*` or `*/` inside a `'...'` or `"..."` literal (like
+    `message_code_langs.dart`'s own `blockComment: ('/*', '*/')` tuple) is
+    left alone rather than misread as a comment boundary, which would blank
+    real code sitting between two such string literals.
+    """
+    out: list[str] = []
+    i, n = 0, len(text)
+    quote: str | None = None
+    while i < n:
+        c = text[i]
+        if quote:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+            i += 1
+            continue
+        if c in "'\"":
+            quote = c
+            out.append(c)
+            i += 1
+            continue
+        if text[i : i + 2] == "//":
+            end = text.find("\n", i)
+            end = n if end == -1 else end
+            out.append(text[i:end])
+            i = end
+            continue
+        if text[i : i + 2] == "/*":
+            end = text.find("*/", i + 2)
+            end = n if end == -1 else end + 2
+            out.append("".join("\n" if ch == "\n" else " " for ch in text[i:end]))
+            i = end
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
 
 BARE_CATCH_HEADER = re.compile(
     r"^(?P<indent>[ \t]*)(?:\}[ \t]*)?catch[ \t]*\([^)]*\)[ \t]*\{[ \t]*$"
@@ -194,7 +265,7 @@ def main() -> int:
     checked = 0
     offenders: list[str] = []
     for rel in files:
-        lines = (root / rel).read_text().splitlines()
+        lines = strip_block_comments((root / rel).read_text()).splitlines()
         for lineno, body in catch_blocks(lines, catch_header):
             checked += 1
             if not any(SHOWS_SNACKBAR.search(candidate) for candidate in body):
