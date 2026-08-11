@@ -14,6 +14,7 @@ import 'dart:io' show SocketException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import 'voice_controller_harness.dart';
@@ -21,6 +22,7 @@ import 'voice_controller_harness.dart';
 void main() {
   final harness = VoiceHarness();
 
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   tearDown(harness.dispose);
 
   test('a listen-only token never asks for a microphone', () async {
@@ -68,6 +70,36 @@ void main() {
     expect(controller.state.cameraEnabled, isTrue);
     expect(session.askedForCameraOnJoin, isTrue);
   });
+
+  test(
+    'the persisted camera-on-join preference reaches the next join',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'slimm.voice.camera_on_join': true,
+      });
+      final session = FakeSession();
+      final controller = harness.controllerWith(session, voiceApi());
+
+      await controller.restoreCameraPreference();
+      await controller.join('channel-1');
+
+      expect(controller.state.cameraEnabled, isTrue);
+      expect(session.askedForCameraOnJoin, isTrue);
+    },
+  );
+
+  test(
+    'with no persisted preference, restoring leaves the camera off',
+    () async {
+      final session = FakeSession();
+      final controller = harness.controllerWith(session, voiceApi());
+
+      await controller.restoreCameraPreference();
+      await controller.join('channel-1');
+
+      expect(session.askedForCameraOnJoin, isFalse);
+    },
+  );
 
   test('a listen-only token never asks for a camera either', () async {
     final session = FakeSession();

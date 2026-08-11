@@ -2,8 +2,8 @@
 /// Whether a direct message, mention, group message or error chimes at all.
 ///
 /// A pure local device preference with no server truth, the same shape
-/// `voice_settings_screen.dart`'s [VoiceSettingsState] already documents for
-/// join/leave and call-ring sounds - those stay there, beside the call
+/// `voice_settings_controller.dart`'s `VoiceSettingsState` already documents
+/// for join/leave and call-ring sounds - those stay there, beside the call
 /// preferences they belong to, while this one lives in Personal >
 /// Notifications beside the push registration status it is the in-app
 /// counterpart of.

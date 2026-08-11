@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Voice call preferences: microphone level, screen share quality, and
-/// join/leave sounds.
+/// Voice call preferences: microphone level, camera-on-join, screen share
+/// quality, and join/leave sounds.
 ///
 /// Input and output device pickers are deliberately absent. `slimm_rtc`'s
 /// public surface ([MediaCapabilities], [VoiceSession]) has no device
@@ -10,6 +10,10 @@
 /// into `flutter_webrtc` directly (breaking the one-package rule
 /// `voice_session.dart` documents) or inventing a device list nothing
 /// backs, so this screen says so instead.
+///
+/// The state these widgets read and write lives in
+/// `providers/voice_settings_controller.dart`, split out once the
+/// camera-on-join preference joined the other three.
 library;
 
 import 'package:flutter/material.dart';
@@ -17,94 +21,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
-import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
+import '../providers/voice_settings_controller.dart';
+import '../widgets/camera_on_join_section.dart';
 import '../widgets/media_capability_section.dart';
 import '../widgets/settings_section_header.dart';
 import '../widgets/settings_toggle_row.dart';
-
-const _soundsKey = 'slimm.voice.join_leave_sounds_enabled';
-const _callRingSoundKey = 'slimm.voice.call_ring_sound_enabled';
-const _qualityKey = 'slimm.voice.screen_share_quality';
-
-/// What this screen shows and edits. All three fields are pure local device
-/// preferences with no server truth, unlike [presenceVisibilityDisplayProvider]'s
-/// session-only echo, so they are persisted in [preferencesProvider] and
-/// read back on the next launch.
-class VoiceSettingsState {
-  const VoiceSettingsState({
-    this.joinLeaveSoundsEnabled = true,
-    this.callRingSoundEnabled = true,
-    this.screenShareQuality = ScreenShareQuality.balanced,
-  });
-
-  final bool joinLeaveSoundsEnabled;
-
-  /// Whether a DM call becoming active while this device is not already on
-  /// it plays `call_ring` - a separate question from [joinLeaveSoundsEnabled],
-  /// since someone may want to hear an incoming call and not care about
-  /// roster chatter inside one already joined, or the other way round.
-  final bool callRingSoundEnabled;
-  final ScreenShareQuality screenShareQuality;
-
-  VoiceSettingsState copyWith({
-    bool? joinLeaveSoundsEnabled,
-    bool? callRingSoundEnabled,
-    ScreenShareQuality? screenShareQuality,
-  }) => VoiceSettingsState(
-    joinLeaveSoundsEnabled:
-        joinLeaveSoundsEnabled ?? this.joinLeaveSoundsEnabled,
-    callRingSoundEnabled: callRingSoundEnabled ?? this.callRingSoundEnabled,
-    screenShareQuality: screenShareQuality ?? this.screenShareQuality,
-  );
-}
-
-class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
-  VoiceSettingsController(this._ref) : super(const VoiceSettingsState()) {
-    _load();
-  }
-
-  final Ref _ref;
-
-  Future<void> _load() async {
-    final prefs = await _ref.read(preferencesProvider.future);
-    final storedQuality = prefs.getString(_qualityKey);
-    state = state.copyWith(
-      joinLeaveSoundsEnabled: prefs.getBool(_soundsKey) ?? true,
-      callRingSoundEnabled: prefs.getBool(_callRingSoundKey) ?? true,
-      screenShareQuality: ScreenShareQuality.values
-          .where((q) => q.name == storedQuality)
-          .firstOrDefault(ScreenShareQuality.balanced),
-    );
-  }
-
-  Future<void> setJoinLeaveSoundsEnabled(bool enabled) async {
-    state = state.copyWith(joinLeaveSoundsEnabled: enabled);
-    final prefs = await _ref.read(preferencesProvider.future);
-    await prefs.setBool(_soundsKey, enabled);
-  }
-
-  Future<void> setCallRingSoundEnabled(bool enabled) async {
-    state = state.copyWith(callRingSoundEnabled: enabled);
-    final prefs = await _ref.read(preferencesProvider.future);
-    await prefs.setBool(_callRingSoundKey, enabled);
-  }
-
-  Future<void> setScreenShareQuality(ScreenShareQuality quality) async {
-    state = state.copyWith(screenShareQuality: quality);
-    final prefs = await _ref.read(preferencesProvider.future);
-    await prefs.setString(_qualityKey, quality.name);
-  }
-}
-
-extension _FirstOrDefault<T> on Iterable<T> {
-  T firstOrDefault(T fallback) => isEmpty ? fallback : first;
-}
-
-final voiceSettingsControllerProvider =
-    StateNotifierProvider<VoiceSettingsController, VoiceSettingsState>(
-      (ref) => VoiceSettingsController(ref),
-    );
 
 /// Everything about a call this device controls, as a pane body.
 ///
@@ -119,6 +41,7 @@ class VoiceSettingsBody extends StatelessWidget {
   Widget build(BuildContext context) => const Column(
     children: [
       _MicrophoneSection(),
+      CameraOnJoinSection(),
       MediaCapabilitySection(),
       _DeviceSection(),
       _ScreenShareSection(),

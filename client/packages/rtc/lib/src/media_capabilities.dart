@@ -64,6 +64,23 @@ class MediaCapabilities {
     }
   }
 
+  /// Whether a camera can be opened. The track is closed again straight
+  /// away, [microphone]'s own reasoning: this asks a question, it does not
+  /// start a call.
+  Future<CapabilityResult> camera() async {
+    try {
+      final tracks = await _probe.countCameraTracks();
+      if (tracks == 0) {
+        return const CapabilityResult.unavailable(
+          'the platform granted a stream with no video track',
+        );
+      }
+      return CapabilityResult.available('$tracks video track(s)');
+    } catch (e) {
+      return CapabilityResult.unavailable('$e');
+    }
+  }
+
   /// Whether the desktop capture portal answers with something to capture.
   ///
   /// On Wayland this goes through the xdg-desktop-portal ScreenCast
@@ -88,6 +105,7 @@ class MediaCapabilities {
   /// Every capability at once, for a diagnostics view or a spike run.
   Future<Map<String, CapabilityResult>> probeAll() async => {
         'microphone': await microphone(),
+        'camera': await camera(),
         'screen_capture': await screenCapture(),
       };
 }
@@ -100,6 +118,9 @@ class MediaCapabilities {
 abstract class MediaDevicesProbe {
   /// Opens the default microphone, counts its audio tracks, and closes it.
   Future<int> countMicrophoneTracks();
+
+  /// Opens the default camera, counts its video tracks, and closes it.
+  Future<int> countCameraTracks();
 
   /// Asks the desktop portal how many screens and windows it will offer.
   Future<int> countScreenSources();
@@ -114,6 +135,20 @@ class _RealProbe implements MediaDevicesProbe {
         .getUserMedia({'audio': true, 'video': false});
     try {
       return stream.getAudioTracks().length;
+    } finally {
+      for (final track in stream.getTracks()) {
+        await track.stop();
+      }
+      await stream.dispose();
+    }
+  }
+
+  @override
+  Future<int> countCameraTracks() async {
+    final stream = await navigator.mediaDevices
+        .getUserMedia({'audio': false, 'video': true});
+    try {
+      return stream.getVideoTracks().length;
     } finally {
       for (final track in stream.getTracks()) {
         await track.stop();

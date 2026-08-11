@@ -16,13 +16,17 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 class _FakeProbe implements MediaDevicesProbe {
-  _FakeProbe({this.micTracks, this.screenSources});
+  _FakeProbe({this.micTracks, this.cameraTracks = 0, this.screenSources});
 
   final int? micTracks;
+  final int? cameraTracks;
   final int? screenSources;
 
   @override
   Future<int> countMicrophoneTracks() async => micTracks!;
+
+  @override
+  Future<int> countCameraTracks() async => cameraTracks!;
 
   @override
   Future<int> countScreenSources() async => screenSources!;
@@ -47,6 +51,9 @@ class _DelayedProbe implements MediaDevicesProbe {
 
   @override
   Future<int> countMicrophoneTracks() => micCompleter.future;
+
+  @override
+  Future<int> countCameraTracks() async => 1;
 
   @override
   Future<int> countScreenSources() async => 1;
@@ -78,6 +85,7 @@ void main() {
 
     expect(find.text('Check this device'), findsOneWidget);
     expect(find.text('Microphone'), findsNothing);
+    expect(find.text('Camera'), findsNothing);
     expect(find.text('Screen capture'), findsNothing);
     expect(find.textContaining('Could not tell'), findsNothing);
   });
@@ -88,7 +96,9 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         mediaCapabilitiesProvider.overrideWithValue(
-          MediaCapabilities(probe: _FakeProbe(micTracks: 2, screenSources: 0)),
+          MediaCapabilities(
+            probe: _FakeProbe(micTracks: 2, cameraTracks: 1, screenSources: 0),
+          ),
         ),
       ],
     );
@@ -100,6 +110,8 @@ void main() {
 
     expect(find.text('Microphone'), findsOneWidget);
     expect(find.textContaining('Available: 2 audio track'), findsOneWidget);
+    expect(find.text('Camera'), findsOneWidget);
+    expect(find.textContaining('Available: 1 video track'), findsOneWidget);
     expect(find.text('Screen capture'), findsOneWidget);
     expect(
       find.textContaining(

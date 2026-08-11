@@ -11,18 +11,32 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 class _FakeProbe implements MediaDevicesProbe {
-  _FakeProbe(
-      {this.micTracks, this.screenSources, this.micError, this.screenError});
+  _FakeProbe({
+    this.micTracks,
+    this.cameraTracks,
+    this.screenSources,
+    this.micError,
+    this.cameraError,
+    this.screenError,
+  });
 
   final int? micTracks;
+  final int? cameraTracks;
   final int? screenSources;
   final Object? micError;
+  final Object? cameraError;
   final Object? screenError;
 
   @override
   Future<int> countMicrophoneTracks() async {
     if (micError != null) throw micError!;
     return micTracks!;
+  }
+
+  @override
+  Future<int> countCameraTracks() async {
+    if (cameraError != null) throw cameraError!;
+    return cameraTracks!;
   }
 
   @override
@@ -60,6 +74,31 @@ void main() {
     });
   });
 
+  group('camera', () {
+    test('an open camera with tracks is available', () async {
+      final caps = MediaCapabilities(probe: _FakeProbe(cameraTracks: 1));
+      final result = await caps.camera();
+      expect(result.supported, isTrue);
+      expect(result.detail, contains('1 video track'));
+    });
+
+    test('a stream with no video track is not a working camera', () async {
+      final caps = MediaCapabilities(probe: _FakeProbe(cameraTracks: 0));
+      final result = await caps.camera();
+      expect(result.supported, isFalse);
+      expect(result.error, contains('no video track'));
+    });
+
+    test('a refusal is reported verbatim, not swallowed', () async {
+      final caps = MediaCapabilities(
+        probe: _FakeProbe(cameraError: StateError('NotAllowedError')),
+      );
+      final result = await caps.camera();
+      expect(result.supported, isFalse);
+      expect(result.error, contains('NotAllowedError'));
+    });
+  });
+
   group('screen capture', () {
     test('sources offered by the portal count as available', () async {
       final caps = MediaCapabilities(probe: _FakeProbe(screenSources: 3));
@@ -90,11 +129,15 @@ void main() {
   test('probeAll reports every capability, including the failing ones',
       () async {
     final caps = MediaCapabilities(
-      probe: _FakeProbe(micTracks: 1, screenSources: 0),
+      probe: _FakeProbe(micTracks: 1, cameraTracks: 0, screenSources: 0),
     );
     final all = await caps.probeAll();
-    expect(all.keys, containsAll(['microphone', 'screen_capture']));
+    expect(
+      all.keys,
+      containsAll(['microphone', 'camera', 'screen_capture']),
+    );
     expect(all['microphone']!.supported, isTrue);
+    expect(all['camera']!.supported, isFalse);
     expect(all['screen_capture']!.supported, isFalse,
         reason: 'one capability failing must not hide the others');
   });
