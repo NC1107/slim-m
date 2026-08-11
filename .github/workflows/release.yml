@@ -735,8 +735,7 @@ jobs:
           printf '%s' "$IOS_BROADCAST_PROVISIONING_PROFILE" \
             | base64 --decode > "$BROADCAST_PROFILE_PATH"
           NSE_PROFILE_PATH="${RUNNER_TEMP}/build_pp_nse.mobileprovision"
-          printf '%s' "$IOS_NSE_PROVISIONING_PROFILE" \
-            | base64 --decode > "$NSE_PROFILE_PATH"
+          printf '%s' "$IOS_NSE_PROVISIONING_PROFILE" | base64 --decode > "$NSE_PROFILE_PATH"
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
@@ -750,10 +749,9 @@ jobs:
 
           # xcodebuild finds a profile by its UUID under this directory, so the
           # file has to be named for the UUID embedded in its own signed plist.
-          # All three bundles need one: the app, its broadcast upload
-          # extension and its notification service extension are separately
-          # signed, and a missing extension profile fails the export naming
-          # only that bundle id.
+          # One per bundle: the app and both extensions are signed separately,
+          # and a missing extension profile fails the export naming only that
+          # bundle id.
           PROFILE_DIR="${HOME}/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
           INSTALLED=""
