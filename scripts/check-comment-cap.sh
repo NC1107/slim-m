@@ -36,15 +36,44 @@ if [[ -f $allowfile ]]; then
   done <"$allowfile"
 fi
 
-# Counts maximal runs of 2+ consecutive plain-comment lines in one file.
+# Counts maximal runs of 2+ consecutive plain-comment lines in one file,
+# including a /* ... */ block (not /** or /*!, both doc forms) that opens
+# its own line - a plain block comment could span any number of lines with
+# nothing here to see it, since // and # were the only two shapes checked.
+# Only a block that *opens* its own line counts, matching the // rule
+# above (a trailing // after real code is not stripped either), which is
+# also what keeps a same-line '/*' inside a string literal - like
+# message_code_langs.dart's own blockComment: ('/*', '*/') tuple - out of
+# this entirely. Nested block comments are not modelled; Dart and Rust both
+# allow nesting and this closes on the first '*/', which is wrong for a
+# nested one, but nothing in this tree nests one today.
 runs_in() {
   awk '
     # A plain comment is // followed by neither / nor ! (both are doc
     # comments), or # not followed by !.
     /^[[:space:]]*\/\/[^\/!]/ || /^[[:space:]]*\/\/$/ { streak++; next }
     /^[[:space:]]*#([^!]|$)/ { streak++; next }
+    in_block {
+      block_lines++
+      if ($0 ~ /\*\//) { if (block_lines > 1) runs++; in_block = 0; block_lines = 0 }
+      if (streak > 1) runs++
+      streak = 0
+      next
+    }
+    /^[[:space:]]*\/\*[^*!]/ || /^[[:space:]]*\/\*$/ {
+      if (streak > 1) runs++
+      streak = 0
+      if ($0 ~ /\*\//) next
+      in_block = 1
+      block_lines = 1
+      next
+    }
     { if (streak > 1) runs++; streak = 0 }
-    END { if (streak > 1) runs++; print runs + 0 }
+    END {
+      if (streak > 1) runs++
+      if (in_block && block_lines > 1) runs++
+      print runs + 0
+    }
   ' "$1"
 }
 

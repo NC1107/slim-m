@@ -97,6 +97,70 @@ struct RouterRoute {
 /// nothing).
 const MIN_ROUTE_FILES: usize = 10;
 
+/// Blanks `//` and `/* */` comments to spaces, keeping every byte's position
+/// and every string literal's own content untouched, so [matching_close_paren]
+/// never mistakes a comment's own `)` for the real end of a `.route(...)`
+/// call - and [parse_route_call] still gets the real path bytes back out,
+/// which blanking string content the way `tests/support::code_only` does
+/// for pure brace-matching elsewhere would have destroyed.
+///
+/// A stray `)` inside a `/* ... */` comment sitting between two chained
+/// methods - `get(list)/* also has a post handler ) */.post(create)` is
+/// enough - closed [matching_close_paren]'s scan right there, silently
+/// dropping every method after it from the extracted route while
+/// `parse_route_call` still returned `Some` for what was left: a subset of
+/// methods parses to a *wrong* answer, which this file's own found-vs-
+/// parsed self-check cannot see either, since a parse still succeeded.
+/// Reproduced directly: with `post: /categories` genuinely missing from
+/// schema/openapi.yaml (a real drift) and this comment planted in the
+/// route source, `openapi_matches_router` still passed.
+fn strip_comments(source: &str) -> String {
+    let bytes = source.as_bytes();
+    let mut out = bytes.to_vec();
+    let mut i = 0usize;
+    let mut in_string = false;
+    while i < bytes.len() {
+        if in_string {
+            if bytes[i] == b'\\' && i + 1 < bytes.len() {
+                i += 2;
+                continue;
+            }
+            if bytes[i] == b'"' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        if bytes[i] == b'"' {
+            in_string = true;
+            i += 1;
+            continue;
+        }
+        if bytes[i] == b'/' && bytes.get(i + 1) == Some(&b'/') {
+            while i < bytes.len() && bytes[i] != b'\n' {
+                out[i] = b' ';
+                i += 1;
+            }
+            continue;
+        }
+        if bytes[i] == b'/' && bytes.get(i + 1) == Some(&b'*') {
+            let mut k = i + 2;
+            while k < bytes.len() && bytes.get(k..k + 2) != Some(b"*/") {
+                k += 1;
+            }
+            let end = (k + 2).min(bytes.len());
+            for idx in i..end {
+                out[idx] = if bytes[idx] == b'\n' { b'\n' } else { b' ' };
+            }
+            i = end;
+            continue;
+        }
+        i += 1;
+    }
+    String::from_utf8(out)
+        .expect("comments were only ever replaced with ascii space/newline, so always valid utf-8")
+}
+
 fn matching_close_paren(bytes: &[u8], open: usize) -> Option<usize> {
     debug_assert_eq!(bytes[open], b'(');
     let mut depth = 0i32;
@@ -191,8 +255,9 @@ fn extract_router_routes() -> Vec<RouterRoute> {
     let mut files_with_routes = 0usize;
 
     for file in http_source_files(manifest_dir) {
-        let text = fs::read_to_string(&file)
+        let raw_source = fs::read_to_string(&file)
             .unwrap_or_else(|e| panic!("cannot read {}: {e}", file.display()));
+        let text = strip_comments(&raw_source);
         let raw_call_sites = text.matches(".route(").count();
         if raw_call_sites == 0 {
             continue;

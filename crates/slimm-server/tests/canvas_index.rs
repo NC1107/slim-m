@@ -97,34 +97,6 @@ fn viewport_sql() -> String {
     body[..end].to_owned()
 }
 
-/// A function's body, from its signature's marker to the matching closing
-/// brace, by depth counting. Used below to prove `viewport_snapshot` shares
-/// one transaction, the same way `viewport_sql` above proves a query's text
-/// rather than trusting a comment.
-fn function_body(source: &str, marker: &str) -> String {
-    let start = source
-        .find(marker)
-        .unwrap_or_else(|| panic!("{marker} no longer appears in the canvas store module"));
-    let mut depth = 0i32;
-    let mut opened = false;
-    for (i, ch) in source[start..].char_indices() {
-        match ch {
-            '{' => {
-                depth += 1;
-                opened = true;
-            }
-            '}' => {
-                depth -= 1;
-                if opened && depth == 0 {
-                    return source[start..start + i + 1].to_owned();
-                }
-            }
-            _ => {}
-        }
-    }
-    panic!("{marker}'s body has no matching closing brace")
-}
-
 /// The viewport read and its `latest_seq` cursor share one deferred
 /// transaction, so a write landing between them cannot produce a cursor the
 /// page does not cover. Read as source text rather than timed, for the same
@@ -135,7 +107,7 @@ fn the_viewport_snapshot_reads_only_through_one_transaction() {
     let source =
         fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/store/canvas.rs"))
             .expect("read the canvas store module");
-    let body = function_body(&source, "pub async fn viewport_snapshot(");
+    let body = support::function_body(&source, "pub async fn viewport_snapshot(");
     assert!(
         !body.contains("&self.pool"),
         "a direct pool read here would race the transaction the snapshot depends on: {body}"

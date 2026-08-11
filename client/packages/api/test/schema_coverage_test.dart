@@ -23,11 +23,22 @@
 ///   literal-led must equal the number that fully parse, so a call shape this
 ///   scanner cannot handle fails the test instead of silently disappearing
 ///   from the comparison.
+///
+/// Each file is run through `support/code_only.dart`'s `stripComments`
+/// before either regex ever sees it - blanking comments but, unlike that
+/// file's own `codeOnly`, leaving string content alone, since the path
+/// literal itself is what this file needs back out. Reproduced directly
+/// before that existed: a `// used to call _send('GET',
+/// '/space/analytics') here` comment satisfied both the literal-led and
+/// full-parse regex just as completely as the real call it replaced would
+/// have, so the self-check saw nothing wrong either.
 library;
 
 import 'dart:io';
 
 import 'package:test/test.dart';
+
+import 'support/code_only.dart';
 
 /// Routes reachable through something other than `_send`, so their absence
 /// from the scanned call set is not drift. Each key is `METHOD /normalized/path`.
@@ -227,7 +238,7 @@ Set<String> _extractClientRouteKeys(Directory srcDir) {
   );
 
   for (final file in files) {
-    final text = file.readAsStringSync();
+    final text = stripComments(file.readAsStringSync());
     final literalLedCount = _literalLedCall.allMatches(text).length;
     final parsed = _fullCall.allMatches(text).toList();
 
