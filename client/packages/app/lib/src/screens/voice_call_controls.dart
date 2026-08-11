@@ -26,6 +26,13 @@
 /// Its own file because `voice_screen.dart` was over this repo's hard file
 /// limit, and this row is the one part of that screen with no dependency on
 /// which channel is being looked at.
+///
+/// **`_ControlButton` used to draw a fixed 44dp chip at every width**, the
+/// single largest contributor to the owner's "way more compact" report.
+/// It now follows `AppIconButton`'s own already-tested split instead
+/// (`design_system/test/touch_targets_test.dart`): a fixed visible chip,
+/// with only the invisible tap area growing to `AppSizes.rowTouch` at
+/// touch density.
 library;
 
 import 'dart:async';
@@ -78,7 +85,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
           active: voice.microphoneEnabled,
           onPressed: widget.controller.toggleMicrophone,
         ),
-        const SizedBox(width: AppSpacing.s12),
+        const SizedBox(width: AppSpacing.s8),
         _ControlButton(
           icon: voice.cameraEnabled ? AppIcons.camera : AppIcons.cameraOff,
           tooltip: voice.cameraEnabled ? 'Turn off camera' : 'Turn on camera',
@@ -86,7 +93,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
           onPressed: () => unawaited(widget.controller.toggleCamera()),
         ),
         if (voice.cameraEnabled) ...[
-          const SizedBox(width: AppSpacing.s12),
+          const SizedBox(width: AppSpacing.s8),
           _ControlButton(
             icon: AppIcons.switchCamera,
             tooltip: 'Switch camera',
@@ -98,7 +105,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
             },
           ),
         ],
-        const SizedBox(width: AppSpacing.s12),
+        const SizedBox(width: AppSpacing.s8),
         _ControlButton(
           icon: AppIcons.screenShare,
           tooltip: _shareTooltip(voice),
@@ -111,7 +118,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
             unawaited(_share(context));
           },
         ),
-        const SizedBox(width: AppSpacing.s12),
+        const SizedBox(width: AppSpacing.s8),
         _ControlButton(
           icon: AppIcons.leaveCall,
           tooltip: 'Leave call',
@@ -235,6 +242,13 @@ class _ControlButton extends StatelessWidget {
         : tokens.textSecondary;
     final border = destructive ? tokens.dangerBorder : tokens.borderSubtle;
 
+    // AppIconButton's own split: a fixed visible chip, with the invisible
+    // tap area alone growing to AppSizes.rowTouch at touch density.
+    final touch = AppTouchTargets.of(context);
+    final hitTarget = touch ? AppSizes.rowTouch : AppSizes.rowPointer;
+    const visualSize = AppSizes.controlMd;
+    final outerSize = visualSize > hitTarget ? visualSize : hitTarget;
+
     return Tooltip(
       message: tooltip,
       child: Semantics(
@@ -248,29 +262,32 @@ class _ControlButton extends StatelessWidget {
             focusColor: Colors.transparent,
             onFocusChange: onFocusChange,
             borderRadius: BorderRadius.circular(AppRadii.control),
-            child: Container(
-              // AppSizes.rowTouch is the touch minimum; it does not shrink on
-              // desktop, because one control size across widths is what "one
-              // layout" has to mean.
-              width: AppSizes.rowTouch,
-              height: AppSizes.rowTouch,
-              decoration: BoxDecoration(
-                color: background,
-                borderRadius: BorderRadius.circular(AppRadii.control),
-                border: Border.all(color: border),
+            child: SizedBox(
+              width: outerSize,
+              height: outerSize,
+              child: Center(
+                child: Container(
+                  width: visualSize,
+                  height: visualSize,
+                  decoration: BoxDecoration(
+                    color: background,
+                    borderRadius: BorderRadius.circular(AppRadii.control),
+                    border: Border.all(color: border),
+                  ),
+                  child: pending
+                      ? Center(
+                          child: SizedBox(
+                            width: AppSizes.icon16,
+                            height: AppSizes.icon16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: tokens.textSecondary,
+                            ),
+                          ),
+                        )
+                      : Icon(icon, size: AppSizes.icon16, color: foreground),
+                ),
               ),
-              child: pending
-                  ? Center(
-                      child: SizedBox(
-                        width: AppSizes.icon16,
-                        height: AppSizes.icon16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: tokens.textSecondary,
-                        ),
-                      ),
-                    )
-                  : Icon(icon, size: 18, color: foreground),
             ),
           ),
         ),

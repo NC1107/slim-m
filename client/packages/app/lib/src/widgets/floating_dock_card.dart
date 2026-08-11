@@ -58,6 +58,13 @@
 /// here because a real mouse click and a screen-reader-style activation of
 /// the same button produced different, silent outcomes for one button and
 /// not its neighbour.
+///
+/// **The card's own inset shrank from [AppSpacing.s8] to [AppSpacing.s4]
+/// on every edge and around the inter-row divider**, alongside the call
+/// row's own control size (`voice_call_controls.dart`'s own doc comment):
+/// the owner reported the whole dock as needing to be "way more compact,"
+/// and neither inset ever bounded a touch target, so both were free to
+/// tighten without touching the 44dp floor `touch_targets_test.dart` gates.
 library;
 
 import 'package:flutter/material.dart';
@@ -87,7 +94,7 @@ class FloatingDockCard extends StatelessWidget {
       if (i > 0) {
         divided.add(
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s8),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
             child: Divider(height: 1, thickness: 1, color: tokens.borderSubtle),
           ),
         );
@@ -103,7 +110,7 @@ class FloatingDockCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s12,
-          vertical: AppSpacing.s8,
+          vertical: AppSpacing.s4,
         ),
         decoration: BoxDecoration(
           color: tokens.surfaceRaised,

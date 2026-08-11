@@ -33,6 +33,13 @@
 /// needs no new overflow handling - only a width past which there is room to
 /// sit side by side, taken from [kCompactWidth], the same touch/pointer line
 /// `AppTouchTargets` already draws.
+///
+/// **The gaps either side of the divider shrank from [AppSpacing.s12] to
+/// [AppSpacing.s8], the same compaction pass as `FloatingDockCard`'s own
+/// inset and `voice_call_controls.dart`'s control size.** Nothing here
+/// bounds a touch target - the row stays two rows below [kCompactWidth]
+/// regardless, so a phone never sees this branch at all - so there was
+/// nothing stopping the gap from tightening alongside everything else.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -168,16 +175,16 @@ class CanvasCallDock extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       callRow,
-                      const SizedBox(width: AppSpacing.s12),
+                      const SizedBox(width: AppSpacing.s8),
                       SizedBox(
-                        height: 32,
+                        height: AppSpacing.s24,
                         child: VerticalDivider(
                           width: 1,
                           thickness: 1,
                           color: tokens.borderSubtle,
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.s12),
+                      const SizedBox(width: AppSpacing.s8),
                       Flexible(child: _ToolsRow(canvas: canvas)),
                     ],
                   ),
