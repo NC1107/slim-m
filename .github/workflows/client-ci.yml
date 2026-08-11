@@ -138,19 +138,22 @@ jobs:
           path: bundle
 
       # linux-compiles builds with -dev packages on its own runner; this job only downloads the binary, so it needs the matching runtime libs named explicitly.
-      - name: xvfb, window-manipulation tools, and the binary's runtime libs
+      - name: xvfb, window-manipulation tools, dbus, and the binary's runtime libs
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             xvfb fluxbox wmctrl xdotool libgl1-mesa-dri mesa-utils \
-            libgtk-3-0 libsecret-1-0 libgstreamer1.0-0 \
+            libgtk-3-0 libsecret-1-0 libgstreamer1.0-0 dbus-daemon \
             libgstreamer-plugins-base1.0-0 libayatana-appindicator3-1
 
       - name: chmod the downloaded binary
         run: chmod +x bundle/slimm_app
 
-      - name: run the smoke script
-        run: scripts/desktop-shell-smoke.sh "$(pwd)/bundle"
+      # A private session bus, or GApplication's single-instance
+      # registration cannot happen and the second-launch check below would
+      # pass by accident rather than by exercising the real D-Bus path.
+      - name: run the smoke script under a private session bus
+        run: dbus-run-session -- scripts/desktop-shell-smoke.sh "$(pwd)/bundle"
 
   # The iOS half lives in client-ios-ci.yml. It costs 14 minutes on a macOS
   # runner against 5 for everything here, so it is gated on the paths that can

@@ -28,7 +28,9 @@ import 'src/routing/router.dart';
 /// it is the one step that has to land before the very first Flutter frame
 /// paints, or the startup screen below would flash at the OS default size
 /// and then visibly jump to the last known one - a no-op on every platform
-/// but a real desktop build.
+/// but a real desktop build. [DesktopWindowShell.registerSecondInstanceHandler]
+/// runs right after it for the same reason: a launcher click racing this
+/// process's own startup has to find a listener already in place.
 ///
 /// Everything else that used to run here now runs inside [_bootstrapApp],
 /// off the critical path to the first frame: [SlimMApp] shows [StartupApp]
@@ -41,6 +43,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _initAndroidPush();
   await DesktopWindowShell.applyInitialGeometry();
+  DesktopWindowShell.registerSecondInstanceHandler();
 
   final container = ProviderContainer();
   // Before anything that can throw, so startup failures land in the log too.
