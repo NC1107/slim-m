@@ -23,6 +23,7 @@ Each section below is named for its workflow file.
 | `push-relay-contract` | changes to the server's push path | a server-generated envelope through the relay repo's real HTTP handler |
 | `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline |
 | `release-tag-watchdog` | a 15-minute schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it |
+| `e2e-red-streak-watchdog` | an hourly schedule, and by hand | opens a GitHub issue once `e2e` has failed 3 consecutive completed runs on `main`, closes it once `e2e` is green again; does not gate anything |
 | `main-builds` | changes under `client/` or `crates/` on every push to `main`, excluding a release commit's own files | continuous TestFlight, a Fedora COPR snapshot, an Android artifact, and `latest` on the live server image; never a version bump, changelog or GitHub Release |
 
 ## server-ci
@@ -285,6 +286,23 @@ The browser's own console log goes up beside each failure screenshot, and the se
 That is not padding: the first real run on a runner (30565517095) failed nine scenarios and the screenshots could show only that a channel list was empty, while what settled it was a pair of 404s nothing was capturing. See `docs/e2e.md`.
 
 See `docs/e2e.md` for what the harness actually covers and what it does not.
+
+### e2e-red-streak-watchdog closes the "advisory and nobody is watching" gap this section already names
+
+`e2e` has been red for a day, then red for two days a second time, each time with a release shipping over the top of it and nothing anywhere saying so; see CLAUDE.md's two "e2e was red" entries for both incidents.
+Neither happened because `e2e` gates anything - it does not, on purpose, per this section above - they happened because nothing was watching a check that fails loudly in its own terms but reaches nobody.
+
+`e2e-red-streak-watchdog.yml` runs on an hourly schedule (plus `workflow_dispatch`) and asks `scripts/check-e2e-red-streak.sh` a plain question of `e2e`'s own run history on `main`: how many completed runs in a row, most recent first, have failed, treating a cancelled run as neither a failure nor a recovery since it never actually ran the harness (see `e2e.yml`'s own "queued, not cancelled" concurrency comment).
+Three in a row is the threshold - one is ordinary flake in a job driving a real browser and a real SFU, and firing on it would make this exactly the kind of check people learn to ignore, the same reasoning `e2e.yml`'s own header already gives for staying advisory in the first place.
+Replayed against the actual 2026-08-09 incident's run history, three in a row was reached about 1h20m after the regression started, not the two days it took a person to notice.
+
+**The signal is a GitHub issue, not this workflow's own colour.** A cancelled-while-pending run or a required check reading `cancelled` as failure are both already-documented ways a workflow's own status silently misses a problem (see "A release can succeed and still ship no store build" in CLAUDE.md); failing this workflow's job would only add a second thing nobody is watching. `scripts/check-e2e-red-streak.sh` opens an issue, labelled and deduplicated so an hourly run cannot open a second one, once the streak crosses the threshold, and closes it automatically the next time `e2e` succeeds on `main`. The label is created on first use rather than assumed to exist, since nothing else in this repository needs it.
+
+Pulled into a script for the same reason `check-release-tag-lag.sh` was: `scripts/lib/test_check_e2e_red_streak.py` drives it against a fixture run list (`E2E_RUNS_JSON`) and a faked `gh` on PATH, so the threshold and the dedup/close logic are both tested without a real red workflow. One fixture replays the real 2026-08-09 history up to its third failure and asserts the script would have fired; a second is a genuinely mixed history (one failure among real successes) rather than an all-failure fixture, since an all-failure fixture proves nothing about where the threshold actually falls.
+
+No concurrency group, the same reasoning `release-tag-watchdog.yml`'s own header gives for having none: an unconditional `cancel-in-progress: true` over a cron interval is what made that workflow fail three times within an hour of shipping (a run slower than its own 15-minute interval gets cancelled by the next one, and a cancelled run never asks the question), and this job is read-only and idempotent, so two of it overlapping costs nothing worth guarding against.
+
+**This does not promote `e2e` to a required check.** `verify-release-checks.yml`'s required-check lists are untouched, and `e2e` still does not run on pull requests. Whether to promote it is still the open question this section's own advisory-not-required paragraph leaves for the owner; this closes the separate problem of a red streak going unnoticed regardless of what the answer turns out to be.
 
 ## push-relay-contract
 

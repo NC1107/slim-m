@@ -12,6 +12,29 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## A red e2e now opens an issue, because a second red workflow was never going to be noticed either (2026-08-11)
+
+Two entries above already record `e2e` red for a day, then red for two days a second time, both times with a release shipping over the top of it and nothing anywhere saying so.
+`e2e` is deliberately advisory and does not run on `pull_request`; neither of those changes here.
+Read this before touching `scripts/check-e2e-red-streak.sh` or `.github/workflows/e2e-red-streak-watchdog.yml`, and read `release-tag-watchdog.yml`'s own header before assuming its shape is the whole answer.
+
+**The precedent's shape is right and its reporting is not, and copying only the first half would have reproduced the exact bug this closes.**
+`release-tag-watchdog.yml` asks a plain question of history on a schedule rather than depending on the push that broke a thing to also be the one that reports it, and this reuses that shape: a script pulled out of the workflow so it can be tested against a fixture, no `cancel-in-progress: true` over a cron interval (see below), read-only and idempotent so nothing is lost if two runs overlap.
+What it does not reuse is failing its own job as the signal - that is a second red workflow nobody opens, which is exactly as invisible as the first one.
+The real output here is a GitHub issue: opened once a real streak is found, closed automatically once main is green again, deduplicated on a label so an hourly run cannot open a second one.
+
+**The threshold is 3 consecutive completed runs, cancelled runs skipped rather than counted or treated as ending the streak.**
+`e2e.yml`'s own concurrency comment ("queued, not cancelled") already explains why: a cancelled run never asked the question, it was replaced in the queue by a newer push, so it is neither evidence of red nor of green.
+3 rather than 1 is the whole point of the brief this closes - a single failure is ordinary flake in a job that stands up a real browser and a real SFU, and firing on it would make this exactly the kind of check people learn to ignore.
+3 rather than something larger is what the real incident argues for: replayed against the actual `gh api .../actions/workflows/e2e.yml/runs` history from 2026-08-09, a streak of 3 was reached at 05:49:14, about 1h20m after the regression actually started at 04:26:42 - not the two days it took a person to notice by hand.
+`scripts/lib/test_check_e2e_red_streak.py`'s `test_the_real_2026_08_09_incident_would_have_fired_within_the_hour` replays that exact trimmed history and asserts the script would have opened an issue naming the right first commit; a second test, `test_a_single_flake_among_successes_does_not_fire`, is a genuinely mixed fixture (one failure sitting among real successes) rather than the all-failure fixture shape this file's own audits have flagged elsewhere as vacuous, since an all-failure fixture would pass at any threshold and prove nothing about the boundary.
+
+**Mutation-tested by hand, twice, each restored afterward without `git checkout --`**: changing the threshold comparison from `-ge` to `-gt` fails exactly the four tests that drive a streak of precisely 3 against a threshold of 3; removing the cancelled-run skip fails exactly the two tests that plant a cancelled run inside a real failure streak, because a cancelled run then gets counted as a failure and the reported streak length and starting commit both shift.
+
+**Verified once against the live repo with a real token, and that verification itself needed cleanup.** Replaying the real 2026-08-09 history through the finished script (not the fixture, the actual `gh api` output for that window) opened a real issue and label on `NC1107/slim-m`, since nothing in the script's own logic knows the difference between a live run and a researcher feeding it old history for proof. Both were deleted immediately after confirming the behaviour was correct. Worth remembering before running this script by hand again: it is not a dry-run tool, and feeding it stale history with a real `GH_TOKEN` has the exact side effects it would have in production.
+
+**This does not promote `e2e` to a required check and does not change what gates a release.** `verify-release-checks.yml`'s required-check lists are untouched, and `e2e.yml` still does not run on pull requests. What changes is that a sustained red streak on main is now impossible to not notice, because the signal is a persistent, deduplicated GitHub issue rather than a workflow's own colour in a tab nobody has open.
+
 ## The first deliberate sweep of this file, and what twenty-six stale claims had in common (2026-08-11)
 
 Five stale claims surfaced by accident in a single day - a flatpak manifest an agent was dispatched to build and found already there, a "the client cannot be analyzed locally" line that cost two red PRs, a contribution to `flutter-webrtc` this project never made, a `livekit_client` version two minors behind, and a missing camera pre-toggle on a screen deleted a week earlier.

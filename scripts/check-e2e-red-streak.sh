@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# e2e.yml is deliberately advisory and does not run on pull_request (see its
+# own header), so a red run there was never going to fail a PR or block a
+# release the way server-ci or client-ci would - and twice now that silence
+# has let a genuine multi-day regression ship underneath two releases with
+# nothing anywhere saying so (see CLAUDE.md's two "e2e was red" entries).
+# A second red workflow does not fix that: a workflow's own colour is
+# exactly the signal nobody was watching the first time. This script's
+# actual output is a GitHub issue, opened once a real streak is found and
+# closed automatically once a run on main succeeds again, deduplicated on
+# a label so it cannot spam one per run. A single failure never opens one;
+# see the FAILURE_THRESHOLD default below for why 3 was chosen over 1.
+#
+# Decision logic only touches run history, never the live repo, so
+# scripts/lib/test_check_e2e_red_streak.py drives it against a fixture run
+# list via E2E_RUNS_JSON rather than a real red workflow. Issue management
+# is driven through gh CLI porcelain (issue list/create/close, label
+# create) so the same tests can fake `gh` on PATH, the technique
+# scripts/lib/test_verify_release_checks.py already uses.
+
+set -euo pipefail
+
+: "${GITHUB_REPOSITORY:?}"
+FAILURE_THRESHOLD="${FAILURE_THRESHOLD:-3}"
+LOOKBACK_RUNS="${LOOKBACK_RUNS:-100}"
+LABEL="${WATCHDOG_LABEL:-e2e-red-streak}"
+
+if [ -n "${E2E_RUNS_JSON:-}" ]; then
+  runs_json="$(cat "$E2E_RUNS_JSON")"
+else
+  runs_json="$(gh api \
+    "repos/${GITHUB_REPOSITORY}/actions/workflows/e2e.yml/runs?branch=main&per_page=${LOOKBACK_RUNS}" \
+    --jq '.workflow_runs')"
+fi
+
+# The API already answers newest-first; a cancelled run is skipped rather
+# than counted or treated as ending the streak, since it never actually
+# asked the question (see e2e.yml's own "queued, not cancelled" comment).
+completed_json=$(jq -c '[.[] | select(.status=="completed")]' <<<"$runs_json")
+completed_count=$(jq 'length' <<<"$completed_json")
+
+streak_len=0
+oldest_in_streak=""
+i=0
+while [ "$i" -lt "$completed_count" ]; do
+  row=$(jq -c ".[$i]" <<<"$completed_json")
+  conclusion=$(jq -r '.conclusion' <<<"$row")
+  if [ "$conclusion" = "success" ]; then
+    break
+  fi
+  if [ "$conclusion" = "cancelled" ]; then
+    i=$((i + 1))
+    continue
+  fi
+  streak_len=$((streak_len + 1))
+  oldest_in_streak="$row"
+  i=$((i + 1))
+done
+
+existing_open() {
+  local list
+  list="$(gh issue list --repo "$GITHUB_REPOSITORY" --label "$LABEL" \
+    --state open --json number)"
+  jq -r '.[0].number // empty' <<<"$list"
+}
+
+if [ "$streak_len" -ge "$FAILURE_THRESHOLD" ]; then
+  latest_row=$(jq -c '.[0]' <<<"$completed_json")
+  latest_url=$(jq -r '.html_url' <<<"$latest_row")
+  first_url=$(jq -r '.html_url' <<<"$oldest_in_streak")
+  first_sha=$(jq -r '.head_sha' <<<"$oldest_in_streak")
+  echo "::error::e2e has failed ${streak_len} consecutive completed runs on main, starting at ${first_url} (commit ${first_sha}); latest ${latest_url}"
+  existing="$(existing_open)"
+  if [ -z "$existing" ]; then
+    gh label create "$LABEL" --repo "$GITHUB_REPOSITORY" --color B60205 \
+      --description "e2e has failed for several runs in a row on main" \
+      >/dev/null 2>&1 || true
+    body="e2e has failed ${streak_len} consecutive completed runs on main (cancelled runs excluded).
+
+First failing run: ${first_url}
+Started at commit: ${first_sha}
+Latest failing run: ${latest_url}
+
+scripts/e2e.sh, run by .github/workflows/e2e.yml, is advisory and does not
+gate a PR or a release, so nothing else notices this on its own; see
+docs/ci.md's e2e section.
+
+This issue closes itself the next time a run on main succeeds."
+    gh issue create --repo "$GITHUB_REPOSITORY" \
+      --title "e2e is stuck red on main" --label "$LABEL" --body "$body" \
+      >/dev/null
+    echo "opened a new issue"
+  else
+    echo "issue #${existing} is already open for this"
+  fi
+  exit 1
+fi
+
+if [ "$streak_len" -eq 0 ]; then
+  existing="$(existing_open)"
+  if [ -n "$existing" ]; then
+    gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
+      --comment "e2e passed again on main; closing." >/dev/null
+    echo "closed issue #${existing}"
+  fi
+fi
+
+echo "e2e streak: ${streak_len} consecutive completed failure(s) (threshold ${FAILURE_THRESHOLD})"
+exit 0
