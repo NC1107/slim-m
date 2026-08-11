@@ -52,7 +52,10 @@ This project already has real, working Apple code-signing infrastructure for iOS
 No macOS-specific certificate, notarization credential, or `codesign`/`notarytool` step exists anywhere in this repository or its workflows.
 This is inferred from the total absence of macOS build infrastructure rather than confirmed as a specific blocker, since nobody has attempted it; it is recorded because an unsigned or unnotarized macOS build is effectively unusable for most users (Gatekeeper blocks it by default), so this is not optional polish once a macOS target ships.
 
-**A frameless, custom title bar would need macOS-specific chrome (traffic-light window controls, top-left, with specific insets), and nothing has been built or spiked for it.**
+**A frameless, custom title bar would need macOS-specific chrome (traffic-light window controls, top-left, with specific insets), and nothing has been built ~~or spiked~~ for it.**
+Half corrected 2026-08-11: it has now been spiked, in [decision 0012](../decisions/0012-desktop-window-shell.md), built for Linux in PR #533.
+That record settles the macOS shape on the owner's own instruction ("I don't mind aligning by just having an if macos: give them mac styled bar") - frameless, drawing its own bar content, keeping the native traffic lights top-left rather than drawing close/minimise glyphs, with the red button hiding the window while the app stays in the Dock.
+Nothing macOS-specific was built, and the record says so about itself: every macOS statement in it is design intent, not a tested fact, since this client still has no `macos/` directory.
 `docs/BACKLOG.md`'s "A frameless window with our own title bar" entry names this directly, deferred rather than declined: "macOS traffic lights top-left with specific insets, Windows controls top-right, Linux depending on the desktop environment. A single custom bar that ignores that feels foreign on at least two of them."
 See the same entry noted in [windows_backlog.md](windows_backlog.md) and [linux_backlog.md](linux_backlog.md).
 

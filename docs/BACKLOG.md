@@ -1,6 +1,6 @@
 # Backlog
 
-Status: accepted into backlog, not yet scheduled.
+Status: accepted into backlog, ~~not yet scheduled~~ - several have shipped since; see the note below the table.
 Date: 2026-07-23.
 Source: the segment gap analysis in [design/feature-exploration.md](design/feature-exploration.md), approved by the owner.
 
@@ -29,6 +29,15 @@ Each item is a real backlog entry with the segments that asked for it and a roug
 | Color-blind-safe redundant cues and an adjustable UI density setting | Accessibility | S | Foundations, design system |
 | Webhooks, inbound and outbound, tightly scoped | Teams, power | M | Administration, extensibility |
 | Tap-to-add: bring two phones together to swap an invite or open a DM | Community, owner idea | M | Client, after invites settle |
+
+**Swept 2026-08-11, because "none are scheduled yet" above had stopped being true and a table of thirteen unbuilt features that is really a table of six is worse than no table.**
+Rows left as they are rather than deleted, since the segment and sizing reasoning is still what a future contributor wants; what follows is what the tree actually says today.
+
+Shipped, in whole or in the part that matters: pinned messages (the saved-items half is not built); in-chat polls; rich markdown and code blocks, hand-rolled rather than packaged, client 0.19.0; the command palette, on Ctrl/Cmd+K with the shortcut table bound into the shell; temporary member timeout with auto-expiry, which lapses by arithmetic at read time so nothing has to run on schedule; colour-blind-safe redundant cues (five presence states, five silhouettes, with a desaturation test proving it) and the density setting in `AppDensity`; the backup and restore half of the operator item, as `scripts/backup.py` and `scripts/restore-drill.py`; and the screen-share quality toggle, though not its audio capture.
+
+Partly shipped: message editing is built, edit *history* is not; per-user volume is built and works on three of six platforms for reasons `audio_gain.dart` records, while push-to-talk and voice-activity sensitivity are not.
+
+Not started, checked rather than assumed: low-bandwidth and data-saver mode, advanced search operators (`GET /search` takes a `before` cursor, which is paging rather than a `before:` operator), webhooks, and tap-to-add in any of its three shapes.
 
 ### Tap-to-add, in more detail
 
@@ -122,7 +131,10 @@ Grouped by what they are rather than by where they were said, because three of t
 
 ### Voice and canvas
 
-- **The voice lobby screen has no purpose.** Owner's standing view, repeated: the join-preview screen is not earning its place.
+- ~~**The voice lobby screen has no purpose.** Owner's standing view, repeated: the join-preview screen is not earning its place.~~
+  Acted on 2026-08-03 and struck here 2026-08-11: `d190a711` (PR #354) deleted the lobby, so clicking a voice channel joins directly.
+  The roster this entry worried about losing survived in the rail, where `voiceRosterProvider` was already polling for it.
+  [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md) section 16 is the same item and was struck the same day, which is worth noticing on its own: two documents carried this as open for over a week after it was done.
 - ~~**The pins button is styled differently from its neighbours**~~ Fixed in #242.
 - **No background blur or replacement on camera**, which Discord has and which the owner calls "kindve a required feature" rather than a nice-to-have. Worth treating as a camera-launch blocker rather than polish: people will not turn a camera on in their own home without it. Note this is a real engineering item, not a setting - it needs a segmentation model running per frame on the local track before publish, so it lands with the camera work rather than after it.
 
@@ -177,7 +189,15 @@ This is a product decision with real schema consequences - `canvas_objects` is c
 - ~~**Two channels overlay each other while switching.**~~ Fixed in #253: `fadeThroughPage` was a cross-fade, not a fade-through - it faded the incoming pane in while the outgoing sat at full opacity, so both were legible at once.
 - ~~**One image fills the desktop.**~~ Fixed in #253: the inline preview was capped at the full message column on width and had no height bound at all, so a tall image took the screen. `kInlineImageMax` is half the column on both axes.
 
-### A frameless window with our own title bar
+### ~~A frameless window with our own title bar~~ (built 2026-08-10, struck 2026-08-11)
+
+**Built, not deferred.** [decision 0012](decisions/0012-desktop-window-shell.md) is the design and PR #533 is the build, with a no-tray quit gap closed on 2026-08-11.
+It turned out to be one subject with two other owner asks - a startup animation into last-known geometry, and closing to a tray rather than quitting - because all three need the app to own its own window lifecycle rather than the OS owning it.
+`desktop_window_shell.dart`, `desktop_chrome.dart` and `desktop_window_port.dart` are the client side.
+The per-platform split this entry worried about is exactly what shipped: macOS runs frameless keeping the native traffic lights top-left, Windows and Linux draw their own controls and close to a tray.
+The tray entry is also what made the flatpak need `libayatana-appindicator3` vendored into it, which is a cost this entry did not foresee and PR #552 paid.
+
+The original entry follows, kept because the trade-offs it names are what the decision record had to answer.
 
 The owner asked whether the OS title bar can be replaced with a compact custom one the way Discord does.
 The answer is yes and it is worth doing, deliberately deferred rather than declined.
@@ -196,4 +216,6 @@ Note that on Wayland, which is this project's Linux target, client-side decorati
 The Linux window title read `slimm_app`, the binary name, rather than `slim-m`.
 iOS, Android and the web build all already show `slim-m` (`CFBundleDisplayName`, `android:label`, and the web `<title>`); only `client/packages/app/linux/runner/my_application.cc` had never been updated to match, in both the GNOME header-bar branch and the plain-titlebar branch.
 Fixed to `slim-m` in both places.
-Neither branch reads the current Space name: that would need a runtime Dart-to-native bridge that does not exist yet, so it is out of scope for a one-liner and belongs with the frameless-window work above if it is ever built.
+~~Neither branch reads the current Space name: that would need a runtime Dart-to-native bridge that does not exist yet, so it is out of scope for a one-liner and belongs with the frameless-window work above if it is ever built.~~
+Half stale, corrected 2026-08-11: the frameless-window work above did get built, and it brought `window_manager` with it, so the bridge this said does not exist is `desktop_window_port.dart` and a window title is one call away now.
+Still true is that nothing sets it to the Space name; the C++ default is what a native title bar would show, and on Windows and Linux the app hides that bar anyway.

@@ -31,7 +31,9 @@ Worth restating from `CLAUDE.md` directly, since it is easy to miss: "Fedora and
 
 **Camera background blur has no native per-frame hook on Linux at all, and this is explicitly "absent," not "unwired."**
 Confirmed from `docs/research/background-blur-spike.md`, identical finding and identical citation to the Windows entry: "Linux and Windows have no native per-frame hook at all in the WebRTC plugin this project depends on: not missing wiring, missing entirely."
-Grepping `common/cpp`, `linux/` and `elinux/` inside the pinned `flutter_webrtc` 1.4.0 source for `VideoFrame`, `VideoProcessor`, `VideoSink`, `addProcessing`/`addProcessor` returns zero matches; the only per-frame native code shared by Linux and Windows is a one-shot screenshot function and a decode-for-display-only renderer, neither of which has a path back into the encode pipeline.
+Grepping `common/cpp`, `linux/` and `elinux/` inside the pinned ~~`flutter_webrtc` 1.4.0~~ source for `VideoFrame`, `VideoProcessor`, `VideoSink`, `addProcessing`/`addProcessor` returns zero matches; the only per-frame native code shared by Linux and Windows is a one-shot screenshot function and a decode-for-display-only renderer, neither of which has a path back into the encode pipeline.
+Version correction 2026-08-11: `client/pubspec.lock` resolves `flutter_webrtc` at **1.6.0** now, not the 1.4.0 this paragraph names, and 1.6.0 is the latest release upstream.
+The finding itself was re-checked against that newer tree on 2026-08-10 for an unrelated screen-share question and the native surface had not changed, so the conclusion stands; only the version number was stale.
 The spike's own recommendation applies here as much as to Windows: gate the camera toggle off, or clearly label it unblurred, on Linux rather than silently shipping a raw camera or blocking camera indefinitely.
 See [windows_backlog.md](windows_backlog.md) and [macos_backlog.md](macos_backlog.md) for the same finding on those platforms.
 
@@ -59,10 +61,13 @@ Recorded here because it is exactly the kind of platform-rendering detail (icon 
 **On a database that has never been `ANALYZE`d, SQLite's rtree query planner silently chooses the slower plan, and this is a general finding rather than Linux-specific - recorded here because it was found and measured on this project's own Fedora hardware.**
 `docs/research/canvas-spike-server.md`, referenced from `CLAUDE.md`'s "The Phase 5 canvas spike": on an un-analyzed database, which every real slim-m deployment is, the natural join plans as the rtree module's rowid-equality strategy, reading every object and probing the index once per row for zero pruning, 7.1x slower than no index at all - and running `ANALYZE` while investigating makes the planner pick correctly on its own, which is exactly how this would ship broken without a test reading the real query plan. This affects the server, not the client, and is recorded here only because it was Linux-hardware work; the fix (`CROSS JOIN` pinning the plan, asserted by `tests/canvas_index.rs` reading the real SQL) is already shipped and is a server concern, not a per-client-OS one.
 
-**`flutter build linux` is not part of the per-PR client-ci gate; it only runs on push to main.**
-Confirmed by reading `client-ci.yml` (analyze, format, `flutter test`, and `flutter build web` only, all on `ubuntu-latest`) against `main-builds.yml`'s `linux-client` job, which is gated on `push: branches: [main]` with no `pull_request` trigger.
-This means a PR that breaks the Linux desktop compile is not caught before merge; it is only caught by the `main-builds.yml` run immediately after landing on `main`.
-*Worth flagging as a process gap, not a code bug*: the Linux build is real and gated, but later than a PR reviewer would likely assume from `client-ci.yml`'s green check alone.
+~~**`flutter build linux` is not part of the per-PR client-ci gate; it only runs on push to main.**~~
+~~Confirmed by reading `client-ci.yml` (analyze, format, `flutter test`, and `flutter build web` only, all on `ubuntu-latest`) against `main-builds.yml`'s `linux-client` job, which is gated on `push: branches: [main]` with no `pull_request` trigger.~~
+~~This means a PR that breaks the Linux desktop compile is not caught before merge; it is only caught by the `main-builds.yml` run immediately after landing on `main`.~~
+~~*Worth flagging as a process gap, not a code bug*: the Linux build is real and gated, but later than a PR reviewer would likely assume from `client-ci.yml`'s green check alone.~~
+**Closed, struck 2026-08-11: `client-ci.yml` carries a "linux compiles" step running `flutter build linux --release` on every pull request, and uploads the resulting bundle as an artifact.**
+So a PR that breaks the Linux desktop compile is now caught before merge rather than immediately after, and the process gap this entry named is gone.
+Its own apt list is the current authoritative one and has grown past the entry above it: `clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libayatana-appindicator3-dev`, where the gstreamer pair arrived with `audioplayers_linux` and the indicator package with the tray icon.
 
 ## Suspected
 
@@ -75,8 +80,14 @@ Every confirmed Linux finding in this project - the screen-share segfault, the e
 `docs/BACKLOG.md`'s frameless-title-bar entry notes in passing that Linux chrome expectations vary "depending on the desktop environment," and the X11 branch of `desktop_sources.dart`'s own doc comment notes, read from source, that "on X11 this branch was never reachable anyway: enumerating has only ever returned the one merged screen" - a claim about behaviour, not a tested one, since this project's target is Wayland.
 This does not mean other desktop environments are known broken; it means nothing here confirms they are known working, and any bug report from a GNOME or X11 user should not be assumed to also reproduce on the tested KDE Wayland target, or vice versa.
 
-**A frameless, custom title bar would need to detect and adapt to whichever Linux desktop environment is running, which is unbuilt.**
-`docs/BACKLOG.md`'s "A frameless window with our own title bar" entry, deferred rather than declined, notes this fits Wayland "since client-side decorations are already the norm" there, but does not resolve what a custom bar should look like across the many desktop environments Linux actually spans. See the same entry noted in [windows_backlog.md](windows_backlog.md) and [macos_backlog.md](macos_backlog.md).
+~~**A frameless, custom title bar would need to detect and adapt to whichever Linux desktop environment is running, which is unbuilt.**~~
+~~`docs/BACKLOG.md`'s "A frameless window with our own title bar" entry, deferred rather than declined, notes this fits Wayland "since client-side decorations are already the norm" there, but does not resolve what a custom bar should look like across the many desktop environments Linux actually spans.~~
+**Built 2026-08-10, so this moves out of "suspected" - struck 2026-08-11.**
+[decision 0012](../decisions/0012-desktop-window-shell.md) designed it and PR #533 built it: Linux hides the native bar and draws its own controls, closing to a tray rather than quitting.
+It did not resolve the cross-desktop question this entry raised so much as pick a side of it - the tray half depends on `StatusNotifierItem`, which KDE (the tested target) supports natively while GNOME needs the AppIndicator extension, and the decision record designs a runtime fallback rather than telling anyone to install it.
+So the desktop-environment variation this entry worried about is now a real, shipped dependency rather than a hypothetical, and it reached packaging too: the flatpak had to vendor `libayatana-appindicator3` and its four dependencies because the Freedesktop runtime carries none of that stack (PR #552).
+What stays genuinely unverified is the same thing as every other Linux entry here - none of it has been seen running on a non-KDE desktop.
+See the same entry noted in [windows_backlog.md](windows_backlog.md) and [macos_backlog.md](macos_backlog.md).
 
 **`tflite_flutter`'s Linux native build path (manual, per the package's own README) is unverified in this environment.**
 `docs/research/background-blur-spike.md`, same finding as the Windows and macOS entries: "I did not attempt to build `tflite_flutter`'s desktop path in this environment... Whether it actually links on this project's own Fedora KDE Wayland target is unverified." This is the one desktop-blur uncertainty that is specific to this project's actual dev machine rather than a hypothetical future target, and is the cheapest of the three to eventually check.
