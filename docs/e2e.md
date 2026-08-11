@@ -72,9 +72,18 @@ tile is not a published track.
 The run ends by reporting how many documented API paths it actually touched,
 counted from what the harness and both browsers requested rather than from a
 list kept by hand, since a hand-kept list overstates coverage the moment a
-scenario changes. A full run currently reaches **43 of 72** documented paths
+scenario changes. ~~A full run currently reaches **43 of 72** documented paths
 (confirmed against a live run rather than assumed; the schema has grown
-since this number was first written, the harness's own reach has grown with it).
+since this number was first written, the harness's own reach has grown with it).~~
+Stale as of 2026-08-11 by exactly the mechanism the parenthetical above already
+warned about: the schema grew two more paths (`/channels/{channelId}/permissions`
+and `/channels/{channelId}/thread-parent`, both from decision 0011) after this
+number was last written on 2026-08-08, and nobody re-ran the harness in between
+to catch it. A fresh full run today reaches **44 of 74** documented paths (59%),
+which is the number to trust; this line will drift again the next time the
+schema or the harness's own reach moves and nobody happens to rerun it, which
+is exactly why the run prints its own count rather than this doc being the
+record of it.
 
 What it does not reach divides into two: routes that need a second
 deployment or real hardware (push, the relay lifecycle, account recovery),
