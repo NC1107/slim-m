@@ -335,7 +335,11 @@ class VoiceSession {
   Widget cameraViewFor(String identity) {
     final room = _room;
     if (room == null) return const SizedBox.shrink();
-    return CameraView(room: room, identity: identity);
+    return CameraView(
+      room: room,
+      identity: identity,
+      facing: _cameraSwitching.facing,
+    );
   }
 
   /// Declares which presence tiles currently want video, by the same
@@ -438,6 +442,8 @@ class VoiceSession {
     _room = null;
     _cancelEvents?.call();
     _cancelEvents = null;
+    // Not every call-ending path resets it; this one covers all of them.
+    _cameraSwitching.resetFacing();
     // Awaited before the room disconnects below: the SFU has no bearing on iOS.
     await _screenShare.stopActiveBroadcast();
     await _screenShare.dispose();
@@ -461,7 +467,9 @@ class VoiceSession {
     if (_disposed) return;
     _disposed = true;
     _videoCuller.dispose();
+    // After `_teardown`, or its own `resetFacing()` writes past disposal.
     await _teardown();
+    _cameraSwitching.dispose();
     await _stateController.close();
     await _participantsController.close();
   }

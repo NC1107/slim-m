@@ -7,12 +7,46 @@
 /// with no LiveKit connection of its own to fake.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:livekit_client/livekit_client.dart' as lk;
 
 import 'camera_devices.dart';
 import 'camera_failure.dart';
 import 'voice_models.dart';
+
+/// Which physical camera a mobile flip landed on. Desktop's device picker
+/// has no such concept - a webcam is not "front" or "back" - so this is
+/// only ever moved by [CameraSwitching.flip], and defaults to [front] to
+/// match `CameraCaptureOptions`' own default for a fresh camera publish.
+enum CameraFacing { front, back }
+
+/// Whether [CameraView] should mirror a camera preview, the same rule an
+/// actual mirror follows: only ever the face looking into it. A local front
+/// camera mirrors; a local back one does not, since a rear camera already
+/// shows the world the way everyone else sees it; and a remote
+/// participant's camera is never mirrored regardless of [facing], because
+/// that value only ever describes this device's own camera.
+lk.VideoViewMirrorMode mirrorModeFor({
+  required bool isLocal,
+  required CameraFacing facing,
+}) {
+  if (!isLocal) return lk.VideoViewMirrorMode.off;
+  return facing == CameraFacing.front
+      ? lk.VideoViewMirrorMode.mirror
+      : lk.VideoViewMirrorMode.off;
+}
+
+/// The facing a completed [CameraSwitching.flip] landed on, from native
+/// `Helper.switchCamera`'s own answer. That bool is `isFrontCamera` *after*
+/// the swap, true only when the swap landed on the front camera - never a
+/// success flag, since a flip onto the back camera answers `false` on total
+/// success. Pulled out on its own because [CameraSwitching.flip] itself
+/// needs a real `lk.LocalParticipant` (privately constructed by
+/// livekit_client, unfakeable from here) to reach this line at all, so this
+/// mapping is the one piece of that method a test can actually drive.
+CameraFacing facingAfterSwitch(bool isFrontCamera) =>
+    isFrontCamera ? CameraFacing.front : CameraFacing.back;
 
 /// What came of a camera enable/disable attempt. [reason] is only ever set
 /// alongside a failed *enable* (see [CameraSwitching.setEnabled]), since
@@ -38,9 +72,29 @@ class CameraToggleResult {
 }
 
 class CameraSwitching {
-  const CameraSwitching(this._devices);
+  CameraSwitching(this._devices);
 
   final CameraDevices _devices;
+
+  final ValueNotifier<CameraFacing> _facing = ValueNotifier(
+    CameraFacing.front,
+  );
+
+  /// The facing this session's camera is assumed to show right now, moved
+  /// only by [flip] and reset by [resetFacing]. [CameraView] listens to
+  /// this directly rather than to any LiveKit room event, because [flip]'s
+  /// native call bypasses the room entirely and fires none.
+  ValueListenable<CameraFacing> get facing => _facing;
+
+  /// Resets the tracked facing to the platform default (front): a fresh
+  /// camera publish always requests the front camera (`CameraCaptureOptions`'
+  /// own default), so nothing here should keep remembering a flip from a
+  /// camera that has since gone away.
+  void resetFacing() => _facing.value = CameraFacing.front;
+
+  /// Releases [facing]'s listeners. Session-scoped, not a widget's, so
+  /// nothing but [VoiceSession.dispose] calls this.
+  void dispose() => _facing.dispose();
 
   /// Whether flipping between a front and back camera needs no chosen
   /// device: mobile only, where the OS - not a list - decides which camera
@@ -88,13 +142,22 @@ class CameraSwitching {
   /// Flips [local]'s published camera between front and back. Native
   /// `Helper.switchCamera` with no device id is the platform's own flip: it
   /// asks the OS which camera answers next rather than naming one.
+  ///
+  /// Success here is "the native call completed", never its own returned
+  /// bool: that value is `isFrontCamera` *after* the swap, true only when
+  /// the swap landed on the front camera - so a flip onto the back camera
+  /// reports `false` on total success. Reading that as a failure is exactly
+  /// the false "could not switch" error a real flip used to surface; the
+  /// bool is [facing] material now, never a success flag.
   Future<bool> flip(lk.LocalParticipant? local) async {
     if (local == null) return false;
     for (final pub in local.videoTrackPublications) {
       if (pub.source != lk.TrackSource.camera) continue;
       final track = pub.track;
       if (track == null) continue;
-      return webrtc.Helper.switchCamera(track.mediaStreamTrack);
+      final isFront = await webrtc.Helper.switchCamera(track.mediaStreamTrack);
+      _facing.value = facingAfterSwitch(isFront);
+      return true;
     }
     return false;
   }
