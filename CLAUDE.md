@@ -12,6 +12,39 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The label guard's own bug generalised: eleven more source-reading gates a comment could fool (2026-08-11)
+
+PR #551 (see below) fixed one gate that went green while the thing it named was gone, because a doc comment describing the deletion still carried the string.
+Asked to check whether that was a one-off or a shape, and audit every source-reading gate in the repo for it.
+It is a shape: 24 gates audited, 11 had it, all fixed in PR #553.
+Read this before adding a new source-reading gate, or trusting one that counts or brace-matches over raw file text.
+
+**The two vulnerable sub-shapes, both reproduced against a genuine violation before fixing, not just reasoned about.**
+A few gates find where a function or a call ends by counting `{`/`}` or `(`/`)` characters over raw text with no comment awareness: `canvas_index.rs`, `thread_reply_count.rs`, `openapi_contract.rs`, `settings_frame_inset_test.dart`, `scripts/check-error-surface.py`.
+A stray unmatched paren or brace inside a comment - a smiley face, "ok :)", is enough - closes the scan early and hides whatever real code sits after it.
+`openapi_contract.rs` is the sharpest instance: it is the gate that keeps `schema/openapi.yaml` honest about what the router actually serves, and a comment planted inside a `.route(...)` call hid a genuinely undocumented `POST /categories` from it until fixed.
+The other sub-shape is a plain substring search with zero comment stripping at all: `route_reachability_test.dart`, `app_reachability_test.dart`, `schema_coverage_test.dart`, `channel_rail_voice_watch_scope_test.dart`, `reduce_motion_gate_test.dart`.
+`route_reachability_test.dart` is the one worth remembering by name: its own doc comment already tells the story of catching itself passing on a comment once, and the fix that followed only stripped a *whole-line* `//` comment - a trailing `//` or any `/* */` block still satisfied it, the exact bug recurring through the one path its own first fix never covered.
+
+**`scripts/check-comment-cap.sh` had a different, structural version of the same class: it did not read `/* */` at all, ever.**
+Only `//` and `#` lines were counted, so a plain (non-doc) block comment of any length was invisible to the one gate whose entire job is capping comment length.
+Fixed alongside the others.
+
+**The fix is one small comment/string-aware scrubber, run over source text before any of these checks look at it.**
+A Dart package's `test/` directory cannot import a sibling package's, so it is duplicated once per package (`app`, `api`, `design_system`) rather than shared - the same shape this project already accepts elsewhere for the identical reason.
+The Rust side shares one real copy in `tests/support/mod.rs`; `canvas_index.rs` and `thread_reply_count.rs` had each independently written the same brace-counting helper, and both now call the shared one instead of carrying a third copy anywhere.
+
+**Checked and left alone, each for a stated reason rather than skipped.**
+`check-file-budget.sh` is a raw line count with nothing to defeat.
+`type_scale_literal_test.dart` was tried directly - a reassuring comment next to a genuine off-scale literal still got caught, confirming the narrower-than-it-sounds limitation this file already has on record is a documented trade, not a hole.
+`local_schema_reconciliation_test.dart` inspects the real compiled drift schema object via `db.allTables`, never source text at all.
+`scripts/commit-lint/check-parses.mjs` runs the actual pinned `@conventional-commits/parser` against real commit messages rather than approximating it, so there is no approximation gap to trick.
+A handful more (`icon_source_gate_test.dart`, `enum_parse_gate_test.dart`, `ws_frame_contract.rs`, `canvas_ops/feed.rs`, `canvas_ops/index_plan.rs`, `response_contract/openapi.rs`, `message_inline_mention_charset_test.dart`, `desktop_dependency_floor_test.dart`) are either presence-only checks a comment cannot hide real code from, or parse a real structured format instead of hand-rolling one.
+
+**One residual left open on purpose.**
+`settings_frame_inset_test.dart` still has a narrower version of the same issue if the stray unmatched paren sits inside a multi-line string literal rather than a comment.
+Closing that needs a real Dart string tokenizer (triple-quoted, raw, interpolated forms all differ) for a shape nothing in this codebase's catch/scaffold call sites actually writes; named in the file's own doc comment rather than chased.
+
 ## A flatpak manifest already existed, and it did not yet know about the tray icon (2026-08-11)
 
 Assigned as "`packaging/flatpak/*.yaml` does not exist, build it."
