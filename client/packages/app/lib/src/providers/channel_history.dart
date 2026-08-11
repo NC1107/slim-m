@@ -26,6 +26,14 @@
 /// proportion-of-everything gauge - see `message_transcript.dart`'s own note
 /// on `_topSlot` for the one place that answer used to lie by omission
 /// instead, which is now fixed.
+///
+/// Do not read that as covering a thumb that jitters, which is a different
+/// thing and was a real bug rather than this trade-off showing through. The
+/// extent stepping up by a page is one discrete move at the top of the list;
+/// the thumb sliding backwards several times a second while somebody scrolls
+/// steadily was `ListView`'s own extent estimate re-averaging the handful of
+/// rows on screen every frame, and is fixed in
+/// `widgets/message_transcript_extent.dart`.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
