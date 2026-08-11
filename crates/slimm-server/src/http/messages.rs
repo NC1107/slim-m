@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, Query, enforce};
+use super::extract::{Authed, AuthedLimited, Json, Query, READ, enforce};
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::media;
@@ -187,7 +187,7 @@ async fn send(
 }
 
 async fn list(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<READ>,
     Path(channel_id): Path<String>,
     Query(params): Query<ListParams>,
     State(state): State<AppState>,

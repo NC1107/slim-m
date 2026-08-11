@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 use super::AppState;
 use super::error::ApiError;
 use super::escalation::escalation_guard;
-use super::extract::{Authed, Json, enforce};
+use super::extract::{Authed, AuthedLimited, Json, READ, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{RoleId, UserId};
@@ -94,7 +94,7 @@ struct UpdateRoleRequest {
 // --- Handlers: role CRUD ---
 
 async fn list(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<RoleDto>>, ApiError> {
     require_manage_roles(&state, ctx.user_id).await?;

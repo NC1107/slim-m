@@ -25,7 +25,7 @@ use sha2::{Digest, Sha256};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, AuthedLimited, Bytes, Json, Query, UPLOAD};
+use super::extract::{ASSET, AuthedLimited, Bytes, Json, Query, UPLOAD};
 use crate::media;
 use crate::permissions::Permissions;
 
@@ -151,7 +151,7 @@ async fn upload(
 /// permission here exactly as it does for a channel or a message elsewhere in
 /// this API.
 async fn fetch(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<ASSET>,
     Path(attachment_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Response, ApiError> {

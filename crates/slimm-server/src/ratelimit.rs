@@ -96,6 +96,27 @@ pub enum Class {
     /// drawing at the client's own throttle interval (90ms) stays inside the
     /// refill with headroom to spare.
     CanvasStrokePreview,
+    /// Serving stored bytes back: an attachment, an avatar, a custom emoji
+    /// image.
+    ///
+    /// Its own class because these are the one read shape a single screen
+    /// legitimately fires dozens of at once - a member page resolves an
+    /// avatar per member, and a transcript of image posts resolves one per
+    /// message - so [`Class::Read`]'s budget, sized for a handful of
+    /// page-level fetches, would stall a member list on any deployment past
+    /// about twenty people. Sized instead for the largest honest burst a
+    /// screen produces, with a refill that still refuses a sustained loop.
+    ///
+    /// What this bounds is the request *rate*, not the bytes behind it: an
+    /// attachment may be megabytes where an avatar is kilobytes, and this
+    /// charges them the same. Byte cost is bounded elsewhere, by the
+    /// per-upload ceiling and the deployment-wide storage ceiling. If
+    /// large-attachment flooding ever becomes real rather than theoretical,
+    /// the answer is a byte-weighted charge through
+    /// [`RateLimiter::check_weighted`], the way
+    /// [`Class::CanvasStrokePreview`] already works - not a smaller budget
+    /// here, which would break the avatar case this exists to serve.
+    Asset,
 }
 
 impl Class {
@@ -115,6 +136,8 @@ impl Class {
             Class::CanvasCursor => (30.0, 15.0),
             // See this variant's own doc comment for how these were sized.
             Class::CanvasStrokePreview => (12_288.0, 6_144.0),
+            // A full member page plus a transcript's own avatars, at once.
+            Class::Asset => (150.0, 25.0),
         }
     }
 }

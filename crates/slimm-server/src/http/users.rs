@@ -22,7 +22,7 @@ use super::AppState;
 use super::attachments::serve;
 use super::auth::validate_label;
 use super::error::ApiError;
-use super::extract::{Authed, Bytes, Json, Query, enforce};
+use super::extract::{ASSET, Authed, AuthedLimited, Bytes, Json, Query, READ, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{RoleId, UserId};
@@ -186,7 +186,7 @@ struct ListMembersParams {
 // --- Handlers: /me ---
 
 async fn get_me(
-    Authed(ctx): Authed,
+    AuthedLimited(ctx): AuthedLimited<READ>,
     State(state): State<AppState>,
 ) -> Result<Json<MeDto>, ApiError> {
     let user = state
@@ -228,7 +228,7 @@ async fn update_me(
 // --- Handlers: /users ---
 
 async fn get_user(
-    Authed(_ctx): Authed,
+    AuthedLimited(_ctx): AuthedLimited<READ>,
     Path(user_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<UserDto>, ApiError> {
@@ -245,7 +245,7 @@ async fn get_user(
 /// absent from the result rather than reported, so the response may be
 /// shorter than the request; the caller matches by id.
 async fn list_users(
-    Authed(_ctx): Authed,
+    AuthedLimited(_ctx): AuthedLimited<READ>,
     Query(params): Query<ListUsersParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserDto>>, ApiError> {
@@ -272,7 +272,7 @@ async fn list_users(
 /// caller may read it: a member list is deployment-wide, not scoped to any
 /// one channel, so there is no channel permission to check it against.
 async fn list_members(
-    Authed(_ctx): Authed,
+    AuthedLimited(_ctx): AuthedLimited<READ>,
     Query(params): Query<ListMembersParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserDto>>, ApiError> {
@@ -364,7 +364,7 @@ async fn delete_avatar(
 /// the rest of a `UserProfile` is (authentication only, no channel
 /// permission), not a message attachment.
 async fn get_avatar(
-    Authed(_ctx): Authed,
+    AuthedLimited(_ctx): AuthedLimited<ASSET>,
     Path(user_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Response, ApiError> {
