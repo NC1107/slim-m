@@ -46,6 +46,7 @@ use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 
 mod heartbeat;
+mod room_lifecycle;
 mod roster;
 use heartbeat::{CallHeartbeats, STALE_AFTER as HEARTBEAT_STALE_AFTER};
 pub use roster::RoomParticipant;
