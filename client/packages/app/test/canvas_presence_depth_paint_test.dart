@@ -165,6 +165,8 @@ void main() {
                   onVideoInterest: (_) {},
                   selfBubbleHidden: false,
                   onToggleSelfBubbleHidden: () {},
+                  fullscreen: false,
+                  onToggleFullscreen: () {},
                 ),
               ),
             ),

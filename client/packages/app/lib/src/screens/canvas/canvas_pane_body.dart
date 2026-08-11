@@ -22,14 +22,12 @@ import 'canvas_activity_log.dart';
 import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
 import 'canvas_call_dock.dart';
+import 'canvas_hidden_tiles.dart';
 import 'canvas_object_context_menu.dart';
 import 'canvas_pane_hints.dart';
-import 'canvas_presence_geometry.dart'
-    show presenceTileIdentity, presenceTileKind;
 import 'canvas_presence_layer.dart';
 import 'canvas_presence_roster.dart';
 import 'canvas_selection_semantics.dart';
-import 'canvas_tools_row.dart' show CanvasHiddenTile;
 
 class CanvasPaneBody extends StatefulWidget {
   const CanvasPaneBody({
@@ -79,6 +77,8 @@ class CanvasPaneBody extends StatefulWidget {
     required this.onVideoInterest,
     required this.selfBubbleHidden,
     required this.onToggleSelfBubbleHidden,
+    required this.fullscreen,
+    required this.onToggleFullscreen,
     this.callDock,
   });
 
@@ -191,6 +191,13 @@ class CanvasPaneBody extends StatefulWidget {
   /// lives there rather than as a dedicated bar icon.
   final VoidCallback onToggleSelfBubbleHidden;
 
+  /// Whether this canvas has dropped its chrome to show nothing but the
+  /// surface, and the one control that flips it - see
+  /// `canvas_fullscreen.dart`'s own doc for exactly what goes and what
+  /// deliberately stays.
+  final bool fullscreen;
+  final VoidCallback onToggleFullscreen;
+
   /// Non-null exactly when this device is connected to a call in this
   /// channel right now - `canvas_pane.dart`'s own `callDockDataFor` decides.
   /// The dock renders a call section only then; it always renders a canvas
@@ -231,7 +238,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
         left: false,
         child: Column(
           children: [
-            const CanvasBar(),
+            // Identity only, never a control: fullscreen can drop it whole without taking an action with it.
+            if (!widget.fullscreen) const CanvasBar(),
             if (widget.error != null)
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.s12),
@@ -316,37 +324,14 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     hasSelfBubble: _hasSelfBubble,
     selfBubbleHidden: widget.selfBubbleHidden,
     onToggleSelfBubbleHidden: widget.onToggleSelfBubbleHidden,
-    hiddenTiles: _hiddenTiles(),
+    hiddenTiles: hiddenCanvasTiles(
+      participants: widget.callParticipants,
+      overrides: widget.tileOverrides,
+    ),
     onShowTile: (key) => widget.tileOverrides.setHidden(key, false),
+    fullscreen: widget.fullscreen,
+    onToggleFullscreen: widget.onToggleFullscreen,
   );
-
-  /// Every remote camera or screen-share tile this viewer has hidden on
-  /// their own canvas this call, named for the dock's own recovery list -
-  /// a hide must stay reversible without leaving the call, or it is a
-  /// delete wearing a softer name. This is a second route to hiding the
-  /// caller's own camera bubble too - its on-tile control works the same as
-  /// anyone else's - distinct from [selfBubbleHidden]'s own dedicated,
-  /// persisted toggle, so both need their own way back.
-  List<CanvasHiddenTile> _hiddenTiles() {
-    final byIdentity = {for (final p in widget.callParticipants) p.identity: p};
-    final tiles = <CanvasHiddenTile>[];
-    for (final key in widget.tileOverrides.hiddenKeys) {
-      final isScreen = presenceTileKind(key) == screenTrackKind;
-      final identity = presenceTileIdentity(key);
-      final participant = byIdentity[identity];
-      if (participant == null) continue;
-      final label = isScreen
-          ? (participant.isLocal
-                ? 'Your screen share'
-                : "${participant.name}'s screen share")
-          : (participant.isLocal
-                ? 'Your camera'
-                : "${participant.name}'s camera");
-      tiles.add(CanvasHiddenTile(key: key, label: label));
-    }
-    tiles.sort((a, b) => a.label.compareTo(b.label));
-    return tiles;
-  }
 
   /// `document.objectCount` is the same trigger `_surface` already listens
   /// to, since a placed or removed object is exactly what changes

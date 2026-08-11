@@ -59,6 +59,8 @@ Widget _pane(CanvasDocument document, {required bool loading}) => ProviderScope(
           onVideoInterest: (_) {},
           selfBubbleHidden: false,
           onToggleSelfBubbleHidden: () {},
+          fullscreen: false,
+          onToggleFullscreen: () {},
         ),
       ),
     ),

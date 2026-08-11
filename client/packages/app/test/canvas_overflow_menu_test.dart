@@ -54,6 +54,7 @@ void main() {
               onPasteImage: () {},
               canDraw: true,
               onRecenter: () {},
+              onToggleFullscreen: () {},
               canManage: false,
               objectCount: ValueNotifier(0),
               onClear: () async {},

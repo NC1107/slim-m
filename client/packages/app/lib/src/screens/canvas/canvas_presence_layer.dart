@@ -193,7 +193,8 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
     final byIdentity = {for (final p in widget.participants) p.identity: p};
     final onCanvas = presenceOnCanvasRects(
       keys: keys,
-      layout: widget.layout,
+      // The pane's real drawing area, in logical pixels and independent of zoom, so a default tile arrangement wraps to the screen a person is actually holding - see CanvasPresenceLayout.maxRowWidth's own doc for the trade.
+      layout: widget.layout.withMaxRowWidth(widget.document.viewport.width),
       overrides: widget.overrides,
       byIdentity: byIdentity,
       hideSelfCamera: widget.hideSelfCamera,

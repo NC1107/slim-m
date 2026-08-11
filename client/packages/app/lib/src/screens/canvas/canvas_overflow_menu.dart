@@ -49,6 +49,7 @@ class CanvasOverflowMenu extends StatefulWidget {
     required this.onDeleteSelected,
     required this.activityLogOpen,
     required this.onToggleActivityLog,
+    required this.onToggleFullscreen,
     required this.tool,
     required this.shapeKind,
     required this.onShapeKindChanged,
@@ -101,6 +102,11 @@ class CanvasOverflowMenu extends StatefulWidget {
   final bool activityLogOpen;
   final VoidCallback onToggleActivityLog;
 
+  /// Drops the pane's chrome. Only ever reached from here to *enter*: this
+  /// menu's own button is inside the strip fullscreen folds away, so the way
+  /// back is the dock's own always-visible button, plus Escape.
+  final VoidCallback onToggleFullscreen;
+
   /// Whether the caller has a camera bubble on this canvas at all right now
   /// - see `canvas_bar.dart`'s own doc on why the toggle below is absent
   /// rather than merely disabled when this is false.
@@ -135,6 +141,11 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
   void _toggleActivityLog() {
     _controller.hide();
     widget.onToggleActivityLog();
+  }
+
+  void _enterFullscreen() {
+    _controller.hide();
+    widget.onToggleFullscreen();
   }
 
   void _toggleSelfBubble() {
@@ -266,6 +277,12 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
                     label: 'Recenter view',
                     leading: AppIcons.recenter,
                     onTap: _recenter,
+                  ),
+                  // The way in only: the way out is the dock's own button, since this menu is part of the tool strip fullscreen folds away.
+                  AppMenuItem(
+                    label: 'Enter fullscreen',
+                    leading: AppIcons.expand,
+                    onTap: _enterFullscreen,
                   ),
                   const AppMenuDivider(),
                   AppMenuItem(

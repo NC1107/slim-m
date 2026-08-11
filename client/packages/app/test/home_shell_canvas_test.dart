@@ -9,8 +9,12 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/screens/canvas/canvas_fullscreen.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane.dart';
 import 'package:slimm_app/src/screens/home_shell.dart';
+import 'package:slimm_app/src/widgets/channel_rail.dart';
+import 'package:slimm_app/src/widgets/member_pane.dart';
+import 'package:slimm_app/src/widgets/rail_drag_handle.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
@@ -165,4 +169,51 @@ void main() {
       await teardown(tester, s.container, s.db);
     },
   );
+
+  /// Fullscreen's whole desktop win is here rather than in the pane: at
+  /// 1400 the rail and the roster are most of what surrounds the canvas, and
+  /// both unmount rather than sitting at zero width, so neither keeps
+  /// fetching behind a canvas that asked to be rid of them.
+  testWidgets(
+    'canvas fullscreen unmounts the rail, its handle and the member pane, '
+    'and gives every pixel of all three to the surface',
+    (tester) async {
+      final s = await _pumpCanvasOpen(tester, width: 1400, kind: 'text');
+      expect(find.byType(ChannelRail), findsOneWidget);
+      expect(find.byType(AppMemberPane), findsOneWidget);
+      final before = tester.getRect(find.byType(CanvasSurface)).width;
+
+      s.container.read(canvasFullscreenProvider.notifier).state = 'c1';
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ChannelRail), findsNothing);
+      expect(find.byType(AppMemberPane), findsNothing);
+      // A live control over a provider the shell is already overriding would read as broken rather than absent.
+      expect(find.byType(RailDragHandle), findsNothing);
+      expect(
+        tester.getRect(find.byType(CanvasSurface)).width,
+        greaterThan(before),
+        reason: 'the surface must actually take the space, not just vacate it',
+      );
+
+      await teardown(tester, s.container, s.db);
+    },
+  );
+
+  /// The provider is keyed on the channel for a reason, and this is it: a
+  /// bare bool would leave a second channel's canvas fullscreen because the
+  /// first one's was, with nothing to say why.
+  testWidgets('fullscreen set for one channel does not reach another', (
+    tester,
+  ) async {
+    final s = await _pumpCanvasOpen(tester, width: 1400, kind: 'text');
+
+    s.container.read(canvasFullscreenProvider.notifier).state = 'some-other';
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChannelRail), findsOneWidget);
+    expect(find.byType(AppMemberPane), findsOneWidget);
+
+    await teardown(tester, s.container, s.db);
+  });
 }

@@ -99,6 +99,8 @@ CanvasDockData buildCanvasDockData({
   VoidCallback? onUndo,
   bool canUndo = false,
   ValueChanged<CanvasTool>? onToolChanged,
+  bool fullscreen = false,
+  VoidCallback? onToggleFullscreen,
 }) {
   final row = buildCanvasToolsRow(
     onClose: onClose,
@@ -132,5 +134,7 @@ CanvasDockData buildCanvasDockData({
     onToggleSelfBubbleHidden: row.onToggleSelfBubbleHidden,
     hiddenTiles: row.hiddenTiles,
     onShowTile: row.onShowTile,
+    fullscreen: fullscreen,
+    onToggleFullscreen: onToggleFullscreen ?? () {},
   );
 }

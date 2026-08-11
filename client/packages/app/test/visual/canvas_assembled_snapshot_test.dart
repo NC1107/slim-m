@@ -201,6 +201,30 @@ void main() {
     },
   );
 
+  group('fullscreen: the chrome dropped, the call controls kept', () {
+    for (final width in const ['phone-390', 'desktop-1400']) {
+      testWidgets('$width (dark)', (tester) async {
+        final document = buildBusyDocument();
+        addTearDown(document.dispose);
+        final cursors = buildBusyCursors();
+        addTearDown(cursors.dispose);
+
+        await renderCanvasAssembledPane(
+          tester,
+          name: 'fullscreen-$width-dark',
+          width: canvasAssembledWidths[width] ?? 1400,
+          theme: 'dark',
+          document: document,
+          participants: busyParticipants,
+          cursors: cursors,
+          fullscreen: true,
+          // What entering actually arms, so the capture shows the real mode rather than a pen the dock no longer offers a way to change.
+          tool: CanvasTool.select,
+        );
+      });
+    }
+  });
+
   testWidgets('busy phone-390 with the truncation banner, dark', (
     tester,
   ) async {

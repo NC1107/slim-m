@@ -10,6 +10,8 @@
 /// every viewer compute the same answer with nothing sent over the wire.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/painting.dart';
 
 /// Deterministic placement for camera and screen-share tiles, purely a
@@ -27,6 +29,7 @@ class CanvasPresenceLayout {
     this.tileHeight = 160,
     this.gap = 24,
     this.margin = 24,
+    this.maxRowWidth,
   });
 
   final double tileWidth;
@@ -38,9 +41,43 @@ class CanvasPresenceLayout {
   /// in view rather than off past the edge of the initial viewport.
   final double margin;
 
-  /// One world-space [Rect] per key, in a single row ordered by sorted
-  /// key - not join order, which is never the same string twice in a row
-  /// across two clients that learned about a join at different times.
+  /// How wide a row of tiles may grow before the next one wraps onto a new
+  /// row, or null for the single unbounded row this class used to always
+  /// build.
+  ///
+  /// A phone held upright is the case this exists for. Five tiles in one row
+  /// span roughly 1220 world units, and a portrait pane is under 400 wide, so
+  /// on the arrangement this class shipped with a phone could see exactly one
+  /// bubble and had to pan sideways through empty world to reach the rest -
+  /// along the axis portrait has least of. Wrapping spends the axis portrait
+  /// actually has.
+  ///
+  /// The trade, stated rather than buried: this class's own promise that
+  /// "every viewer computes the same answer" now holds only for viewers whose
+  /// panes are the same width. That promise was always about the *fallback*
+  /// for a tile nobody has touched - a drag, resize or lock lands in
+  /// `CanvasPresenceTileOverrides` and is what actually persists - so what
+  /// diverges is where an untouched bubble starts, never where a placed one
+  /// stays. A default that puts a bubble somewhere a phone can never see it
+  /// is the worse of the two.
+  final double? maxRowWidth;
+
+  /// This layout with [maxRowWidth] set to [width], or unbounded when [width]
+  /// is not a usable one - `CanvasDocument.viewport` reads `Size.zero` for
+  /// the frame before `CanvasSurface` has laid out and reported its real
+  /// size, and a bound of zero would put every tile on its own row for that
+  /// frame.
+  CanvasPresenceLayout withMaxRowWidth(double width) => CanvasPresenceLayout(
+        tileWidth: tileWidth,
+        tileHeight: tileHeight,
+        gap: gap,
+        margin: margin,
+        maxRowWidth: width > 0 ? width : null,
+      );
+
+  /// One world-space [Rect] per key, in rows ordered by sorted key - not join
+  /// order, which is never the same string twice in a row across two clients
+  /// that learned about a join at different times.
   ///
   /// [sizeFor], when given, answers each key's own tile size (a screen
   /// share is wider than a camera tile); left null every key gets
@@ -51,11 +88,21 @@ class CanvasPresenceLayout {
   }) {
     final sorted = identities.toList()..sort();
     final placed = <String, Rect>{};
+    final limit = maxRowWidth;
     var left = margin;
+    var top = margin;
+    var rowHeight = 0.0;
     for (final key in sorted) {
       final size = sizeFor?.call(key) ?? Size(tileWidth, tileHeight);
-      placed[key] = Rect.fromLTWH(left, margin, size.width, size.height);
+      // Never wrapped when it would open an empty row: a tile wider than the whole limit still has to land somewhere.
+      if (limit != null && left > margin && left + size.width > limit) {
+        left = margin;
+        top += rowHeight + gap;
+        rowHeight = 0;
+      }
+      placed[key] = Rect.fromLTWH(left, top, size.width, size.height);
       left += size.width + gap;
+      rowHeight = math.max(rowHeight, size.height);
     }
     return placed;
   }

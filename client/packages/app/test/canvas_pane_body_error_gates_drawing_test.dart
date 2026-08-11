@@ -63,6 +63,8 @@ Widget _pane(CanvasDocument document, {required String? error}) =>
               onVideoInterest: (_) {},
               selfBubbleHidden: false,
               onToggleSelfBubbleHidden: () {},
+              fullscreen: false,
+              onToggleFullscreen: () {},
             ),
           ),
         ),
