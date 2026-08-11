@@ -51,9 +51,7 @@ class _WindowMenuButtonState extends State<WindowMenuButton> {
           child: CompositedTransformFollower(
             link: _link,
             showWhenUnlinked: false,
-            // Opens leftward, matching space_menu_button.dart's own right-
-            // edge trigger: this sits near the title bar's own right edge,
-            // and a rightward-opening menu would run off the window.
+            // A right-edge trigger opens leftward, or it runs off the window.
             targetAnchor: Alignment.bottomRight,
             followerAnchor: Alignment.topRight,
             offset: const Offset(0, 4),

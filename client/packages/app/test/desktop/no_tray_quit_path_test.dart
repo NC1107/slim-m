@@ -66,8 +66,7 @@ void main() {
       ),
     );
 
-    // The same routing a real close/delete-event or the title bar's own
-    // close button would trigger - see requestClose's own doc comment.
+    // The same routing a real delete-event or the close button would take.
     await controller.requestClose();
 
     expect(
