@@ -123,6 +123,26 @@ void main() {
     },
   );
 
+  test('a device re-baselined by that fix still gets the releases that came '
+      'after it', () async {
+    // 0.28.0 shipped that fix, so it is what the re-baseline above wrote.
+    SharedPreferences.setMockInitialValues({
+      lastSeenWhatsNewVersionKey: '0.28.0',
+    });
+    _mockVersion('0.38.0');
+    final container = _container(fresh: false);
+    await pumpEventQueue();
+
+    expect(
+      container.read(whatsNewControllerProvider),
+      isNotEmpty,
+      reason:
+          'the re-baseline is meant to skip a backlog nobody really saw, '
+          'once, not to leave the sheet silent for every release after it; '
+          'if this is empty the entries stopped being written again',
+    );
+  });
+
   test('marking seen before anything is shown is a no-op, so a stray call '
       'cannot advance the recorded version early', () async {
     _mockVersion('0.17.2');
