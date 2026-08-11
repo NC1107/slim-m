@@ -10,7 +10,7 @@ Confirmation copy was checked against its real call site and against server beha
 
 ## The short version
 
-- ~~Two more sites join the systemic permission-scope mismatch already found in `shell.md`, `settings.md` and `voice.md`: the message context menu gates Delete/Pin on deployment-wide permissions where the server checks per channel, and the canvas object menu plus "Clear canvas" do the same with `MANAGE_CANVAS` - five instances of one root cause across four reports now.~~ Already closed on main before this pass (PR #523); see Cross-cutting below.
+- ~~Two more sites join the systemic permission-scope mismatch already found in `shell.md`, `settings.md` and `voice.md`: the message context menu gates Delete/Pin on deployment-wide permissions where the server checks per channel, and the canvas object menu plus "Clear canvas" do the same with `MANAGE_CANVAS` - five instances of one root cause across four reports now.~~ Already closed on main before this pass (PR #522); see Cross-cutting below.
 - ~~`confirm-eject-from-call` independently reconfirms the third instance already documented in `voice.md`'s cross-cutting section: still live in current source, same file, same gate.~~ Already closed on main before this pass (PR #523).
 - ~~"Clear canvas" tells the user the action cannot be undone while the same client arms a working local undo for that exact act in the same breath.~~ Fixed 2026-08-10.
 - ~~The command palette is the one overlay in this set that never adopted the shared `showAppSheet` split, and it overflows sideways at phone width instead of collapsing to a sheet.~~ The overflow is fixed 2026-08-10; it still does not go through `showAppSheet`.
@@ -58,7 +58,7 @@ Already closed on main, not part of this change: see `voice.md`'s eject-button e
 ## message-context-menu
 
 ~~Verdict: gates Delete/Pin/Reply/"Reply in thread" on the wrong permission scope; menu organisation and copy are otherwise the best in the set.~~
-Already closed on main, not part of this change: `channel_screen.dart`'s `myPermissions` (fed into `messageActionsFor`) reads `myChannelPermissionsProvider(widget.channelId)` now ("site 1" per its own inline comment), part of the decision-0011 sweep, PR #523, landed before this pass started.
+Already closed on main, not part of this change: `channel_screen.dart`'s `myPermissions` (fed into `messageActionsFor`) reads `myChannelPermissionsProvider(widget.channelId)` now ("site 1" per its own inline comment), part of the decision-0011 sweep, PR #522, landed before this pass started.
 
 - ~~`messageActionsFor` (`channel_message_actions.dart:217-259`) computes `canDeleteMessage`, `canManageMessagePin` (MANAGE_MESSAGES) and `canReplyToMessage`/`canOpenThreadFor` (SEND_MESSAGES) from `myPermissionsProvider` - `GET /me` = `Store::base_permissions` (`http/users.rs:197`), deployment-wide, no channel overwrites.~~
 - Otherwise the best-organised menu in the set: three tiers separated by dividers (reactions/reply, then copy/edit/pin, then report/block tinted-not-filled, then delete alone at the bottom), and the phone sheet shows the message being acted on above the menu (UX).
@@ -67,7 +67,7 @@ Already closed on main, not part of this change: `channel_screen.dart`'s `myPerm
 ## canvas-object-context-menu / space-menu
 
 ~~Verdict: `canvas-object-context-menu` (and the canvas overflow's "Clear canvas" entry) has the same permission-scope bug as the message context menu; `space-menu` is clean.~~
-Already closed on main, not part of this change: `canvas_pane.dart`'s `manageCanvas` reads `myChannelPermissionsProvider(widget.channelId)` now ("site 5" per its own inline comment), same PR #523. A separate, nearby site the same sweep missed - `canvas_pane_gestures.dart`'s `_onSelectStart`, which gates starting a select-drag on another member's object rather than the context menu or overflow item this finding names - was found independently in this pass and fixed the same way.
+Already closed on main, not part of this change: `canvas_pane.dart`'s `manageCanvas` reads `myChannelPermissionsProvider(widget.channelId)` now ("site 5" per its own inline comment), same PR #522. A separate, nearby site the same sweep missed - `canvas_pane_gestures.dart`'s `_onSelectStart`, which gates starting a select-drag on another member's object rather than the context menu or overflow item this finding names - was found independently in this pass and fixed the same way.
 
 - ~~`canManage`, fed to `CanvasObjectContextMenu` and `CanvasOverflowMenu` from `canvas_pane.dart:369-370`, is `me?.permissions.hasPermission(Perm.manageCanvas)` - deployment-wide `base_permissions` again, same `meProvider`/`GET /me` source as above.~~
 - `space-menu` itself is compact and clear, verbs describe the result ("Add channel", "Add category"), and its own creation items are correctly gated on `Perm.manageChannels`, which is genuinely deployment-wide on both sides - no mismatch there (backend, UX).
@@ -181,7 +181,7 @@ Verdict: on phone, the palette does not collapse to a bottom sheet at all, and i
 ## Cross-cutting
 
 ~~**The permission-scope mismatch is now confirmed at five sites across four reports, not three.**~~
-Already closed on main, not part of this change: [docs/decisions/0011-per-channel-permissions.md](../../decisions/0011-per-channel-permissions.md) (PR #523, see CLAUDE.md's "The client asked one permission question and the server answered a different one, in eight places," 2026-08-10) landed before this pass started and converted every site named below to a per-channel read.
+Already closed on main, not part of this change: [docs/decisions/0011-per-channel-permissions.md](../../decisions/0011-per-channel-permissions.md) (PRs #522 and #523, see CLAUDE.md's "The client asked one permission question and the server answered a different one, in eight places," 2026-08-10) landed before this pass started and converted every site named below to a per-channel read.
 Checked directly against current source rather than assumed stale from the report text: `channel_screen.dart`, `canvas_pane.dart` and `member_profile.dart` all now read `myChannelPermissionsProvider`, each with an inline comment naming its own numbered site.
 One nearby site the same sweep missed - `canvas_pane_gestures.dart`'s `_onSelectStart`, gating a select-drag start on another member's object rather than a menu item - was found independently in this pass and fixed the same way; see canvas-object-context-menu above.
 `shell.md`, `settings.md` and `voice.md` each already found one instance: a UI-side gate reading the caller's deployment-wide `base_permissions`/`myPermissionsProvider` where the server authorizes the same action through `permissions_in_channel`, which folds in channel overwrites and (for a DM) an entirely different evaluator.
