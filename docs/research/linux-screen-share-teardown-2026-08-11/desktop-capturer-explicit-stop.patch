@@ -1,0 +1,72 @@
+diff --git a/common/cpp/include/flutter_webrtc_base.h b/common/cpp/include/flutter_webrtc_base.h
+index 1da75e3..531f125 100644
+--- a/common/cpp/include/flutter_webrtc_base.h
++++ b/common/cpp/include/flutter_webrtc_base.h
+@@ -121,6 +121,7 @@ class FlutterWebRTCBase {
+   std::map<std::string, scoped_refptr<RTCMediaStream>> local_streams_;
+   std::map<std::string, scoped_refptr<RTCMediaTrack>> local_tracks_;
+   std::map<std::string, scoped_refptr<RTCVideoCapturer>> video_capturers_;
++  std::map<std::string, scoped_refptr<RTCDesktopCapturer>> desktop_capturers_;
+   std::map<int64_t, std::shared_ptr<FlutterVideoRenderer>> renders_;
+   std::map<std::string, std::shared_ptr<FlutterRTCDataChannelObserver>>
+       data_channel_observers_;
+diff --git a/common/cpp/src/flutter_media_stream.cc b/common/cpp/src/flutter_media_stream.cc
+index 24e399f..9eea8db 100644
+--- a/common/cpp/src/flutter_media_stream.cc
++++ b/common/cpp/src/flutter_media_stream.cc
+@@ -1,6 +1,7 @@
+ #include "flutter_media_stream.h"
+ 
+ #include "flutter_utf8_sanitize.h"
++#include "rtc_desktop_capturer.h"
+ 
+ #define DEFAULT_WIDTH 1280
+ #define DEFAULT_HEIGHT 720
+@@ -607,6 +608,15 @@ void FlutterMediaStream::MediaStreamDispose(
+       }
+       base_->video_capturers_.erase(track->id().std_string());
+     }
++    if (base_->desktop_capturers_.find(track->id().std_string()) !=
++        base_->desktop_capturers_.end()) {
++      auto desktop_capture =
++          base_->desktop_capturers_[track->id().std_string()];
++      if (desktop_capture->IsRunning()) {
++        desktop_capture->Stop();
++      }
++      base_->desktop_capturers_.erase(track->id().std_string());
++    }
+   }
+ 
+   base_->RemoveStreamForId(stream_id);
+@@ -662,6 +672,14 @@ void FlutterMediaStream::MediaStreamTrackDispose(
+           }
+           base_->video_capturers_.erase(track_id);
+         }
++        if (base_->desktop_capturers_.find(track_id) !=
++            base_->desktop_capturers_.end()) {
++          auto desktop_capture = base_->desktop_capturers_[track_id];
++          if (desktop_capture->IsRunning()) {
++            desktop_capture->Stop();
++          }
++          base_->desktop_capturers_.erase(track_id);
++        }
+       }
+     }
+   }
+diff --git a/common/cpp/src/flutter_screen_capture.cc b/common/cpp/src/flutter_screen_capture.cc
+index 6490de3..1307847 100644
+--- a/common/cpp/src/flutter_screen_capture.cc
++++ b/common/cpp/src/flutter_screen_capture.cc
+@@ -353,6 +353,12 @@ void FlutterScreenCapture::GetDisplayMedia(
+ 
+   base_->local_streams_[uuid] = stream;
+ 
++  // Mirrors the camera path's video_capturers_ entry: without it, dispose
++  // only drops references and never asks the desktop capturer to stop
++  // explicitly, leaving the OS-level capture session alive until C++
++  // refcounting happens to reach zero on its own.
++  base_->desktop_capturers_[track->id().std_string()] = desktop_capturer;
++
+   desktop_capturer->Start(uint32_t(fps));
+ 
+   result->Success(EncodableValue(params));
