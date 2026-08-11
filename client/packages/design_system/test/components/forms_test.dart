@@ -71,12 +71,35 @@ void main() {
       expect(find.text('3'), findsOneWidget);
       expect(find.text('5'), findsOneWidget);
 
-      // Active state is not colour alone: it also carries a heavier weight and a marker dot.
+      // Active state is not colour alone: it also carries a heavier weight on the count.
       final activeCount = tester.widget<Text>(find.text('3'));
       final inactiveCount = tester.widget<Text>(find.text('5'));
       expect(activeCount.style?.fontWeight, AppWeights.semi);
       expect(inactiveCount.style?.fontWeight, AppWeights.regular);
-      expect(find.byKey(AppChip.reactedMarkerKey), findsOneWidget);
+    });
+
+    testWidgets(
+        'a reacted chip draws no separate marker widget: only its fill and '
+        'weight differ from an unreacted one', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppChip.reaction(
+                  emoji: '\u{1F44D}', count: 3, active: true, onTap: () {}),
+              AppChip.reaction(
+                  emoji: '\u{1F44D}', count: 5, active: false, onTap: () {}),
+            ],
+          ),
+        ),
+      );
+
+      // Same child count on both: nothing (a dot, an icon) is inserted ahead of the emoji for the active one.
+      final rows =
+          tester.widgetList<Row>(find.byType(Row)).toList(growable: false);
+      expect(rows, hasLength(2));
+      expect(rows[0].children.length, rows[1].children.length);
     });
 
     testWidgets('reaction glyph resolves a colour emoji fallback',
@@ -158,9 +181,8 @@ void main() {
       );
     });
 
-    testWidgets(
-        'a reacted chip draws no ring at all from an ordinary tap, only the '
-        'marker', (tester) async {
+    testWidgets('a reacted chip draws no ring at all from an ordinary tap',
+        (tester) async {
       await tester.pumpWidget(
         _wrap(AppChip.reaction(
             emoji: '\u{1F44D}', count: 2, active: true, onTap: () {})),

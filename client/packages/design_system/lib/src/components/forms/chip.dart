@@ -62,8 +62,11 @@ class AppChip extends StatelessWidget {
   final int count;
 
   /// Reaction-only: whether the current user is one of them, drawn as an
-  /// accent-soft fill plus a small filled dot, per decision 0004's "fill
-  /// plus a marker" - never an outline, which is reserved for real focus.
+  /// accent-soft fill plus a heavier weight on the count - never an
+  /// outline, which decision 0004 reserves for real focus, and never a
+  /// separate marker glyph: the fill and the weight are enough on their
+  /// own, the same "no accent border, weight already carries it" shape
+  /// [AppSegmentedControl.inline]'s own doc comment already uses.
   final bool active;
 
   final VoidCallback? onTap;
@@ -72,10 +75,6 @@ class AppChip extends StatelessWidget {
   /// AppSpacing (nearest is s8). The design gives an exact pixel value,
   /// used as a literal here and reported as a token gap.
   static const double _operatorPaddingH = 7;
-
-  /// Exposed so a test can find the reacted marker without depending on
-  /// colour, the same reasoning AppListRow's own unread dot key carries.
-  static const Key reactedMarkerKey = Key('app_chip_reacted_marker');
 
   @override
   Widget build(BuildContext context) {
@@ -133,18 +132,6 @@ class AppChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // The marker half of "fill plus a marker", not colour alone: see [active]'s own doc comment.
-              if (active) ...[
-                DecoratedBox(
-                  key: reactedMarkerKey,
-                  decoration: BoxDecoration(
-                    color: tokens.accentFill,
-                    borderRadius: BorderRadius.circular(AppRadii.full),
-                  ),
-                  child: const SizedBox(width: 6, height: 6),
-                ),
-                const SizedBox(width: AppSpacing.s4),
-              ],
               // 13px, lineHeight 1: the design's own literal, not on the
               // AppText scale (nearest steps are caption 12 and ui 14).
               glyph ??
