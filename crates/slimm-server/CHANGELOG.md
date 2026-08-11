@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.35.1](https://github.com/NC1107/slim-m/compare/server-v0.35.0...server-v0.35.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ci:** close comment-defeatable blind spots in source-reading gates ([#553](https://github.com/NC1107/slim-m/issues/553)) ([1b13496](https://github.com/NC1107/slim-m/commit/1b1349601f63a6b6694c2de1539e5171337eae50))
+* **client:** close the second-tier findings from the screen-review pass ([#542](https://github.com/NC1107/slim-m/issues/542)) ([2275fe9](https://github.com/NC1107/slim-m/commit/2275fe9d522d947f970e708ebb7cc28dce0e734d))
+* **client:** close the sharp findings from the screen-review pass ([#535](https://github.com/NC1107/slim-m/issues/535)) ([f5b1d13](https://github.com/NC1107/slim-m/commit/f5b1d13fa06c02b89daabc726f83146cdf676a0f))
+
 ## [0.35.0](https://github.com/NC1107/slim-m/compare/server-v0.34.0...server-v0.35.0) (2026-08-10)
 
 
