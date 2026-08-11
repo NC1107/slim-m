@@ -168,6 +168,7 @@ void main() {
         _voiceHarness(
           ManagedChannelRow(
             canManage: true,
+            reorderable: false,
             channel: channel,
             row: (kebab) => VoiceChannelRow(
               channel: channel,
