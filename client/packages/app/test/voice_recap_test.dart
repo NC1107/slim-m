@@ -22,7 +22,7 @@ import 'package:slimm_app/src/widgets/call_recap_card.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 /// A recap for [channelId]; [withAlice] false stands in for a call spent
-/// entirely alone, the case that must never be worth showing.
+/// entirely alone, which is still worth showing on its own duration.
 CallRecap _recap({
   required String channelId,
   Duration duration = const Duration(minutes: 3),
@@ -115,7 +115,10 @@ void main() {
     testWidgets('falls back to the plain notice for a call not worth showing', (
       tester,
     ) async {
-      final recap = _recap(channelId: 'channel-1', withAlice: false);
+      final recap = _recap(
+        channelId: 'channel-1',
+        duration: const Duration(seconds: 4),
+      );
 
       await tester.pumpWidget(
         _wrap(
@@ -133,9 +136,39 @@ void main() {
       expect(
         find.byType(CallRecapCard),
         findsNothing,
-        reason: 'a call spent entirely alone is noise, not a summary',
+        reason: 'a four-second mis-click is noise, not a summary',
       );
       expect(find.text('You left this call.'), findsOneWidget);
+    });
+
+    testWidgets('shows the recap for a real call spent entirely alone', (
+      tester,
+    ) async {
+      final recap = _recap(channelId: 'channel-1', withAlice: false);
+
+      await tester.pumpWidget(
+        _wrap(
+          VoiceRejoinScreen(
+            channelId: 'channel-1',
+            isDm: false,
+            canRetry: true,
+            onRetry: () {},
+            recap: recap,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byType(CallRecapCard),
+        findsOneWidget,
+        reason:
+            'testing a call, screen share or camera alone is still a real '
+            'use worth reporting on',
+      );
+      expect(find.text('3 min'), findsOneWidget);
+      expect(find.text('Nobody else joined.'), findsOneWidget);
+      expect(find.textContaining('other person'), findsNothing);
     });
 
     testWidgets('an error takes priority over a recap', (tester) async {

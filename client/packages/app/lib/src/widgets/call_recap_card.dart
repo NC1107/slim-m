@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 /// What the rejoin screen shows instead of nothing after a real call: how
 /// long it lasted, who else was in it, and whether a screen or camera was
-/// shared at any point. See `CallRecap` (`providers/call_recap.dart`) for
-/// what is tracked, and why it never reaches the server.
+/// shared at any point. A solo call renders the same card with just the
+/// duration and any activity, rather than nothing at all - see `CallRecap`
+/// (`providers/call_recap.dart`) for what is tracked, and why it never
+/// reaches the server.
 library;
 
 import 'package:flutter/material.dart';
@@ -52,16 +54,26 @@ class CallRecapCard extends StatelessWidget {
                 value: formatCallDuration(recap.duration),
                 label: 'in the call',
               ),
-              const SizedBox(width: AppSpacing.s24),
-              _RecapStat(
-                icon: AppIcons.members,
-                value: '${recap.others.length}',
-                label: recap.others.length == 1
-                    ? 'other person'
-                    : 'other people',
-              ),
+              if (recap.others.isNotEmpty) ...[
+                const SizedBox(width: AppSpacing.s24),
+                _RecapStat(
+                  icon: AppIcons.members,
+                  value: '${recap.others.length}',
+                  label: recap.others.length == 1
+                      ? 'other person'
+                      : 'other people',
+                ),
+              ],
             ],
           ),
+          if (recap.wasAlone) ...[
+            const SizedBox(height: AppSpacing.s8),
+            Text(
+              'Nobody else joined.',
+              textAlign: TextAlign.center,
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
+          ],
           if (recap.sharedScreen || recap.usedCamera) ...[
             const SizedBox(height: AppSpacing.s12),
             _ActivityLine(recap: recap),

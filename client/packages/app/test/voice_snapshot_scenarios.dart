@@ -105,6 +105,11 @@ final _voiceRejoinSurfaces =
         viewports: _phoneAndDesktop,
         state: recapCallState,
       ),
+      'voice-rejoin-recap-solo': (
+        route: '/channels/c-main',
+        viewports: _phoneAndDesktop,
+        state: soloRecapCallState,
+      ),
       'voice-rejoin-error-retryable': (
         route: '/channels/c-main',
         viewports: _phoneAndDesktop,

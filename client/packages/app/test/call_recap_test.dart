@@ -170,9 +170,20 @@ void main() {
       expect(recap.isWorthShowing, isFalse);
     });
 
-    test('a long call spent entirely alone is not worth showing', () {
-      final recap = recapOf(duration: const Duration(minutes: 10), alone: true);
+    test('a four-second solo mis-click is not worth showing either', () {
+      final recap = recapOf(duration: const Duration(seconds: 4), alone: true);
       expect(recap.isWorthShowing, isFalse);
+    });
+
+    test('a long call spent entirely alone is still worth showing', () {
+      final recap = recapOf(duration: const Duration(minutes: 10), alone: true);
+      expect(
+        recap.isWorthShowing,
+        isTrue,
+        reason:
+            'testing a screen share or camera alone is a real use of '
+            'the call, and its duration is worth reporting on its own',
+      );
     });
 
     test('exactly the minimum duration counts as worth showing', () {
