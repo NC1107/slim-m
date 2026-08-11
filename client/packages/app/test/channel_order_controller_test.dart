@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Tests for `ChannelOrderController`: the arrangement renders the instant a
 /// drag completes, and only the round trip decides whether it sticks.
+/// `category_order_controller_test.dart` is the sibling file covering
+/// `CategoryOrderController`, split out once this file crossed the
+/// 300-line review budget - its N-independent-requests shape needs its own
+/// partial-failure case this file's channel tests have no equivalent of.
 library;
 
 import 'dart:async';
