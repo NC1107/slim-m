@@ -10,7 +10,10 @@
 /// surfaces matrix.
 library;
 
+import 'package:flutter/gestures.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_assembled_scene.dart';
@@ -163,6 +166,56 @@ void registerCanvasClearConfirm() {
         await openCanvasOverflowMenu(tester);
         await tapCanvasMenuItem(tester, 'Clear canvas');
         await tester.pump(const Duration(milliseconds: 200));
+      },
+    );
+  });
+}
+
+/// One presence tile with its own control row revealed - the expand, lock,
+/// depth and hide buttons, plus the resize grip.
+///
+/// Every other canvas capture renders these tiles with the row hidden,
+/// because it only appears on hover, on a touch press, or on focus
+/// (`canvas_presence_tile.dart` owns that gate). So the controls a person
+/// actually reaches for were invisible to every visual review this project
+/// has run over the canvas - worth closing on its own, given the owner
+/// reported this same row's appearance twice and neither report could have
+/// been checked against a picture.
+///
+/// Hovered rather than pressed: a mouse enter needs no timer, so nothing
+/// here races `canvasPresenceTileTouchRevealDuration`'s own three-second
+/// window closing before the capture is taken.
+///
+/// **Two pumps, not one, and the second is the whole reason this capture
+/// shows anything.** The reveal gates hit-testing on a plain bool and
+/// opacity on an `AnimatedOpacity`, so one pump after the hover makes the
+/// row tappable while it is still painting at zero - which is exactly why
+/// `canvas_presence_tile_reveal_test.dart` can tap these controls without
+/// ever having proved they are visible, and why the first draft of this
+/// scenario wrote a picture of an empty tile.
+void registerCanvasTileControlsRevealed() {
+  testWidgets('canvas-tile-controls-revealed, dark', (tester) async {
+    final document = buildBusyDocument();
+    addTearDown(document.dispose);
+    await renderCanvasAssembledPane(
+      tester,
+      name: 'canvas-tile-controls-revealed-desktop-1400-dark',
+      width: 1400,
+      theme: 'dark',
+      document: document,
+      participants: busyParticipantsSharing,
+      interact: (tester) async {
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        addTearDown(gesture.removePointer);
+        await gesture.addPointer(
+          location: tester.getCenter(
+            find.byKey(const ValueKey('camera:user-avery')),
+          ),
+        );
+        await tester.pump(AppMotion.fast);
+        await tester.pump(AppMotion.fast);
       },
     );
   });

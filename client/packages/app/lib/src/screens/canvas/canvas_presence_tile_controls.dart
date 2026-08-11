@@ -50,9 +50,9 @@ class TileResizeGrip extends StatelessWidget {
   }
 }
 
-/// A tile's own lock, depth and hide buttons, pinned to its top-right
-/// corner regardless of whether the tile's content currently paints in
-/// front of or behind [CanvasSurface].
+/// A tile's own expand, lock, depth and hide buttons, pinned to its
+/// top-right corner regardless of whether the tile's content currently
+/// paints in front of or behind [CanvasSurface].
 class TileControls extends StatelessWidget {
   const TileControls({
     super.key,
@@ -61,6 +61,7 @@ class TileControls extends StatelessWidget {
     required this.onToggleLocked,
     required this.onToggleSentToBack,
     required this.onHide,
+    this.onExpand,
   });
 
   final bool locked;
@@ -69,11 +70,27 @@ class TileControls extends StatelessWidget {
   final VoidCallback onToggleSentToBack;
   final VoidCallback onHide;
 
+  /// Opens this tile's own live feed full screen. Null - and so no button at
+  /// all, rather than a disabled one - whenever there is no live feed to
+  /// open: a camera tile showing the avatar fallback has nothing to fill a
+  /// screen with, and `FullscreenVideoView` would pop itself the moment it
+  /// opened, the same "no handler rather than a control that cannot work"
+  /// treatment `AppSegmentedOption.disabled` already established.
+  final VoidCallback? onExpand;
+
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (onExpand case final onExpand?)
+          AppIconButton(
+            icon: AppIcons.expand,
+            semanticLabel: 'Show this tile full screen',
+            tooltip: 'Full screen',
+            size: AppIconButtonSize.sm,
+            onPressed: onExpand,
+          ),
         AppIconButton(
           icon: locked ? AppIcons.tileLocked : AppIcons.tileUnlocked,
           semanticLabel: locked

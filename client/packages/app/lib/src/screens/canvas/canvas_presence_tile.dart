@@ -116,6 +116,7 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
     required this.semanticLabel,
     required this.document,
     required this.child,
+    this.onExpand,
   });
 
   final Rect worldRect;
@@ -145,6 +146,10 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
   final VoidCallback onToggleLocked;
   final VoidCallback onToggleSentToBack;
   final VoidCallback onHide;
+
+  /// Forwarded straight to [TileControls.onExpand] - see its own doc for why
+  /// null renders no button rather than a disabled one.
+  final VoidCallback? onExpand;
   final String semanticLabel;
   final Widget child;
 
@@ -406,6 +411,7 @@ class _CanvasPresenceManipulableTileState
                     TileControls(
                       locked: widget.locked,
                       sentToBack: widget.sentToBack,
+                      onExpand: widget.onExpand,
                       onToggleLocked: widget.onToggleLocked,
                       onToggleSentToBack: widget.onToggleSentToBack,
                       onHide: widget.onHide,

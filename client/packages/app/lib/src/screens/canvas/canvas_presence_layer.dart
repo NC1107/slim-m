@@ -59,13 +59,35 @@
 /// `CanvasPresenceVisibility` over the identical rects and then narrows to
 /// the sent-to-back subset, so the union of tiles carrying real video across
 /// both widgets is precisely this widget's own visible set.
+///
+/// **Full screen is `showFullscreenVideo`'s existing route, never a second
+/// fullscreen of this pane's own.** A tile's expand control pushes the same
+/// root-navigator route the voice screen already pushes, so the close
+/// button, Escape, the platform back gesture and the self-closing "this feed
+/// stopped being live" guard all come with it. Being a *root*-navigator
+/// route is also what keeps it from colliding with `canvas_fullscreen.dart`:
+/// it sits above `CanvasPane` with its own autofocused `CallbackShortcuts`,
+/// so Escape closes the expanded tile and never reaches the pane's own
+/// binding underneath, and a canvas already in fullscreen still is when the
+/// tile closes.
+///
+/// What this widget does own is the subscription consequence, because it
+/// owns [onVideoInterest] and nothing else may: while a tile is expanded it
+/// reports that one key alone, so every other participant's video is
+/// unsubscribed for as long as nobody can see it, and restored on close by
+/// the ordinary report this widget was already making. Reporting it from
+/// inside the route instead would give one interest set two owners, and the
+/// one that unmounts first would win.
 library;
+
+import 'dart:async';
 
 import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
+import '../../widgets/fullscreen_video_overlay.dart';
 import 'canvas_presence_bubble.dart';
 import 'canvas_presence_geometry.dart';
 import 'canvas_presence_tile.dart';
@@ -144,6 +166,13 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
   bool _reported = false;
   bool _deliveryScheduled = false;
 
+  /// The tile key currently open full screen over this pane, or null. Local
+  /// to this widget rather than shared through [CanvasPresenceTileOverrides]
+  /// the way `hidden` is: nobody else on this canvas needs to know, and this
+  /// widget already owns the one consequence that matters - see the library
+  /// doc above on why interest has exactly one owner.
+  String? _expandedKey;
+
   @override
   void initState() {
     super.initState();
@@ -205,7 +234,12 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
       return const SizedBox.shrink();
     }
     final visibleIds = _visibility.update(widget.document.worldView, onCanvas);
-    _reportInterest(visibleIds);
+    // Checked against onCanvas rather than trusted: a participant who left, or a tile hidden from under the route, leaves a key nothing can subscribe to.
+    final expanded = _expandedKey;
+    final wantsVideo = expanded != null && onCanvas.containsKey(expanded)
+        ? {expanded}
+        : visibleIds;
+    _reportInterest(wantsVideo);
     if (visibleIds.isEmpty) return const SizedBox.shrink();
     final camera = widget.document.camera;
     final painted = presencePaintOrder(visibleIds, widget.overrides.zFor);
@@ -244,6 +278,37 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
     return setEquals(keys, _lastReported);
   }
 
+  /// Opens one tile's live feed full screen and narrows video interest to it
+  /// for as long as the route is up, restoring the ordinary answer on close.
+  ///
+  /// The restore rides `finally` rather than the route's own callback so it
+  /// still runs when the route is popped by something other than this
+  /// widget - Escape, the platform back gesture, or the view closing itself
+  /// because the feed stopped being live - none of which report back here.
+  Future<void> _expand(
+    String key,
+    VoiceParticipant participant,
+    bool isScreen,
+  ) async {
+    setState(() => _expandedKey = key);
+    try {
+      await showFullscreenVideo(
+        context,
+        identity: participant.identity,
+        label: isScreen
+            ? (participant.isLocal
+                  ? 'Your screen'
+                  : "${participant.name}'s screen")
+            : (participant.isLocal ? 'Your camera' : participant.name),
+        kind: isScreen
+            ? FullscreenVideoKind.screenShare
+            : FullscreenVideoKind.camera,
+      );
+    } finally {
+      if (mounted) setState(() => _expandedKey = null);
+    }
+  }
+
   Widget? _tile(
     String key,
     Rect rect,
@@ -278,6 +343,10 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
         commit();
       },
       onHide: () => widget.overrides.setHidden(key, true),
+      // A camera tile showing the avatar fallback has no feed to fill a screen with; a screen-share tile always does, since its key only exists while the share is up.
+      onExpand: isScreen || participant.isCameraOn
+          ? () => unawaited(_expand(key, participant, isScreen))
+          : null,
       semanticLabel: isScreen
           ? (participant.isLocal
                 ? "Your screen share, on this call's canvas"
