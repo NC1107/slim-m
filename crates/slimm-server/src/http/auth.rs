@@ -271,14 +271,18 @@ fn validate_username(username: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
+/// Cross-checked in this module's own tests against `tests/fixtures/
+/// onboarding_error_strings.json`, the fixture the client's onboarding
+/// snapshot tests also read, so this exact wording cannot drift from the
+/// fixture text a reviewer sees in a screenshot.
+const PASSWORD_LENGTH_MESSAGE: &str = "password must be 8 to 1024 characters";
+
 /// Shared with the reset-password consumption endpoint, so a reset cannot be
 /// used to set a weaker password than registration would ever allow.
 pub(crate) fn validate_password(password: &str) -> Result<(), ApiError> {
     let len = password.chars().count();
     if !(8..=1024).contains(&len) {
-        return Err(ApiError::BadRequest(
-            "password must be 8 to 1024 characters",
-        ));
+        return Err(ApiError::BadRequest(PASSWORD_LENGTH_MESSAGE));
     }
     Ok(())
 }
@@ -313,4 +317,34 @@ fn is_disallowed_label_char(c: char) -> bool {
             | '\u{2066}'..='\u{2069}' // bidi isolates
             | '\u{FEFF}'              // zero-width no-break space / BOM
         )
+}
+
+#[cfg(test)]
+mod tests {
+    /// Cross-checked against the same string in `client/packages/app/test/
+    /// support/onboarding_error_strings.dart`, both read from `tests/
+    /// fixtures/onboarding_error_strings.json` - editing the length rule's
+    /// wording on one side without the other fails whichever side the
+    /// fixture no longer matches.
+    #[test]
+    fn password_length_message_matches_the_shared_onboarding_fixture() {
+        let fixture = load_fixture();
+        assert_eq!(
+            super::PASSWORD_LENGTH_MESSAGE,
+            fixture.password_length_error
+        );
+    }
+
+    #[derive(serde::Deserialize)]
+    struct OnboardingErrorStrings {
+        password_length_error: String,
+    }
+
+    fn load_fixture() -> OnboardingErrorStrings {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/onboarding_error_strings.json");
+        let raw = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
+        serde_json::from_str(&raw).expect("onboarding_error_strings.json must be valid JSON")
+    }
 }

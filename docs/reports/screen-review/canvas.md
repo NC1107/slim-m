@@ -16,7 +16,7 @@ Copy was checked against its real call site and against server behaviour, not ju
 - ~~The overflow menu truncates "Paste image" to "Paste i…" and "Hide my camera bubble" to "Hide my camera bu…", found independently by the frontend and UX lenses.~~ Fixed 2026-08-10.
 - ~~The canvas loading state shows a sighted user nothing at all - no spinner, no skeleton - identical to a blank or broken canvas, while a screen reader gets a label.~~ Fixed 2026-08-10.
 - ~~A resize handle's hit target is 28px across, well under this product's own 44-48dp floor, and never grows for touch.~~ Fixed 2026-08-10.
-- Two forbidden-drawing error states (channel-wide refusal, timeout freeze) leave the empty-state hint and the pen tool inviting a repeat of a refusal the client already knows will fail again. **Partially fixed 2026-08-10**: the empty-state hint is gated and the timeout wording no longer overstates the freeze as a generic outage; the pen tool itself is still not gated by `widget.error`, and the timeout wording still does not name the actual timeout time. See the sections below.
+- ~~Two forbidden-drawing error states (channel-wide refusal, timeout freeze) leave the empty-state hint and the pen tool inviting a repeat of a refusal the client already knows will fail again.~~ **Fixed 2026-08-10/11**: the empty-state hint, the pen/note/shape tools and "Paste image" are all now gated on `widget.error`. The timeout wording still does not name the actual timeout time - that half needs new plumbing and is still open, see the sections below.
 
 ## Background grid lattice never paints in the assembled pane
 
@@ -81,12 +81,13 @@ Verdict: both messages match a real server refusal, but in both cases the rest o
 
 - `'The canvas is not available in this channel.'` fires only from `canvas_pane.dart:279-284` on `api.ForbiddenException` from the viewport load, and the server refuses on exactly one condition, `!permissions.contains(VIEW_CHANNEL | USE_CANVAS)` (`crates/slimm-server/src/http/canvas.rs:141-142`).
   Message and trigger line up.
-- Finding (medium): the pane keeps the full drawing surface live underneath the banner.
+~~Finding (medium): the pane keeps the full drawing surface live underneath the banner.
   `_error` is never consulted to gate the tool row, the dock, or the empty-state hint - `canvas_pane_body.dart:355` shows `_emptyHint` whenever `count == 0 && !widget.loading`, with no check of `widget.error`.
   So the pane simultaneously says "the canvas is not available in this channel" and invites the same person, in the same screen, to "Draw with the pen, drop a note or a shape, or paste an image" (`canvas_pane_body.dart:452-454`), pen tool shown active.
   Any attempt through that CTA hits the identical `VIEW_CHANNEL | USE_CANVAS` gate on the write route (`canvas_write.rs:132-133`) and fails the same way, since nothing about the permission state changed between the two calls.
   Evidence: `canvas-error-forbidden-desktop-1400-dark.png`.
-  Partially fixed 2026-08-10: the empty-state hint is now gated on `widget.error == null`, so it no longer invites drawing while this exact banner is up. The tool row and the dock are still not gated on `widget.error` - the pen tool remains selectable and would still hit the same refusal.
+  Partially fixed 2026-08-10: the empty-state hint is now gated on `widget.error == null`, so it no longer invites drawing while this exact banner is up. The tool row and the dock are still not gated on `widget.error` - the pen tool remains selectable and would still hit the same refusal.~~
+  Fully fixed 2026-08-11: `CanvasDockData`/`CanvasToolsRow` gained a `canDraw` field, threaded from `CanvasPaneBody._dockData()` as `widget.error == null`, and pen/note/shape (plus the overflow's "Paste image") now render with `onPressed: null` whenever an error banner is up, matching the `Undo` button's own disabled-when-nothing-to-do pattern rather than a new mechanism. Eraser and select are deliberately left alone - see `canvas_tools_row.dart`'s own doc comment on `canDraw` for why. `canvas_pane_body_error_gates_drawing_test.dart` drives `CanvasPaneBody` directly with a real error string and asserts both controls are disabled; `canvas_tools_row_test.dart` proves the row itself gates correctly given the flag.
 - ~~`'You cannot draw on this canvas right now.'` is the shared `ForbiddenException` mapping in `canvas_commit_queue.dart:182`, `canvas_quick_placement.dart:122` and `canvas_image_paste.dart:166`~~ - all three `place`-path callers, exactly the scope CLAUDE.md documents for the timeout freeze (`move`/`reorder` freeze the same way; `remove`/`clear`/`restore` never do).
   The wording never overstates the freeze to cover erase or undo.
 - ~~Finding (high, UX lens): the message gives no indication it is a timeout specifically.
@@ -95,11 +96,12 @@ Verdict: both messages match a real server refusal, but in both cases the rest o
   Minimum fix without new plumbing: reword to read unambiguously as a permission state rather than a transient outage, e.g. "You don't have permission to draw here right now."~~
   Minimum fix applied 2026-08-10, verbatim: all three call sites now read "You don't have permission to draw here right now."
   The better fix - naming the actual timeout time - is not built; it needs new plumbing to fetch `timedOutUntil` at this call site, which the report itself flags as the harder half.
-- Finding (medium, same root cause as canvas-error-forbidden): this error is set via `CanvasCommitQueue.onFailed` (`canvas_pane_helpers.dart:33-38`), which calls `_document.kill(id)` before setting `_error`.
-  ~~If the failed stroke was the only object drawn, `objectCount` returns to 0 and the empty-state hint reappears with the pen tool still selected, immediately after a banner saying the opposite.~~
-  The empty-state hint half is fixed 2026-08-10 (see Canvas loading state below: it is now gated on `widget.error == null`, alongside the loading-spinner fix).
+~~Finding (medium, same root cause as canvas-error-forbidden): this error is set via `CanvasCommitQueue.onFailed` (`canvas_pane_helpers.dart:33-38`), which calls `_document.kill(id)` before setting `_error`.
+  If the failed stroke was the only object drawn, `objectCount` returns to 0 and the empty-state hint reappears with the pen tool still selected, immediately after a banner saying the opposite.
   The pen tool itself is not gated by `widget.error` and stays selectable; a timed-out member who taps it still reaches the same 403 every time until the timeout expires, since there is no server-side signal in the response that would let the client disable the tool proactively (`timed_out_until` is only ever asked at write time).
-  Evidence: `canvas-error-draw-forbidden-timeout-freeze-desktop-1400-dark.png`.
+  Evidence: `canvas-error-draw-forbidden-timeout-freeze-desktop-1400-dark.png`.~~
+  The empty-state hint half was fixed 2026-08-10 (see Canvas loading state below).
+  The pen tool half is fixed 2026-08-11, by the same `canDraw` fix as canvas-error-forbidden above: this call site sets the identical `_error` field, so the pen tool is disabled here too, for as long as the banner is up - closing exactly the repeated-403 case this finding named, without needing the `timedOutUntil` plumbing the wording fix below still does.
 
 ## canvas-error-full-canvas / canvas-error-too-large
 

@@ -68,6 +68,7 @@ class CanvasDockData {
   const CanvasDockData({
     required this.tool,
     required this.onToolChanged,
+    required this.canDraw,
     required this.canUndo,
     required this.onUndo,
     required this.canManage,
@@ -93,6 +94,12 @@ class CanvasDockData {
 
   final CanvasTool tool;
   final ValueChanged<CanvasTool> onToolChanged;
+
+  /// False while an error banner is up (`CanvasPaneBody.error != null`), the
+  /// pane's own signal that a place would fail the identical way the banner
+  /// already explains - see `canvas_tools_row.dart`'s own doc for which
+  /// tools this disarms and why.
+  final bool canDraw;
   final bool canUndo;
   final VoidCallback onUndo;
   final bool canManage;
@@ -205,6 +212,7 @@ class _ToolsRow extends StatelessWidget {
   Widget build(BuildContext context) => CanvasToolsRow(
     tool: canvas.tool,
     onToolChanged: canvas.onToolChanged,
+    canDraw: canvas.canDraw,
     canUndo: canvas.canUndo,
     onUndo: canvas.onUndo,
     canManage: canvas.canManage,

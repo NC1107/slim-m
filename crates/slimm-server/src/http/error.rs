@@ -18,6 +18,14 @@ use serde::Serialize;
 use crate::auth::HashError;
 use crate::store::{OpenError, PushError, SendError};
 
+/// The fixed body a 500 always carries, never a stack trace or type path.
+///
+/// Named rather than inlined so a unit test can cross-check it against
+/// `tests/fixtures/onboarding_error_strings.json`, the fixture the client's
+/// own onboarding snapshot tests read so their fixture text cannot drift
+/// from what a real 500 actually sends.
+const INTERNAL_ERROR_MESSAGE: &str = "internal error";
+
 pub(crate) enum ApiError {
     BadRequest(&'static str),
     /// Like [`ApiError::BadRequest`], but the message names something only
@@ -77,7 +85,10 @@ impl IntoResponse for ApiError {
                 StatusCode::INSUFFICIENT_STORAGE,
                 "this deployment has no storage left for new uploads".into(),
             ),
-            ApiError::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal error".into()),
+            ApiError::Internal => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                INTERNAL_ERROR_MESSAGE.into(),
+            ),
         };
         (status, Json(ErrorBody { error })).into_response()
     }
@@ -186,5 +197,32 @@ impl From<OpenError> for ApiError {
                 ApiError::Internal
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Cross-checked against the same string in `client/packages/app/test/
+    /// support/onboarding_error_strings.dart`, both read from `tests/
+    /// fixtures/onboarding_error_strings.json` - editing the wire text
+    /// on one side without the other fails whichever side the fixture
+    /// no longer matches.
+    #[test]
+    fn internal_error_message_matches_the_shared_onboarding_fixture() {
+        let fixture = load_fixture();
+        assert_eq!(super::INTERNAL_ERROR_MESSAGE, fixture.internal_error);
+    }
+
+    #[derive(serde::Deserialize)]
+    struct OnboardingErrorStrings {
+        internal_error: String,
+    }
+
+    fn load_fixture() -> OnboardingErrorStrings {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/onboarding_error_strings.json");
+        let raw = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
+        serde_json::from_str(&raw).expect("onboarding_error_strings.json must be valid JSON")
     }
 }

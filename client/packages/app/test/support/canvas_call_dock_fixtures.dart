@@ -110,6 +110,7 @@ CanvasDockData buildCanvasDockData({
   return CanvasDockData(
     tool: row.tool,
     onToolChanged: row.onToolChanged,
+    canDraw: row.canDraw,
     canUndo: row.canUndo,
     onUndo: row.onUndo,
     canManage: row.canManage,

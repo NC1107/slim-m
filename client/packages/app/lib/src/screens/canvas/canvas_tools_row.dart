@@ -43,6 +43,7 @@ class CanvasToolsRow extends StatefulWidget {
     super.key,
     required this.tool,
     required this.onToolChanged,
+    required this.canDraw,
     required this.canUndo,
     required this.onUndo,
     required this.canManage,
@@ -73,6 +74,19 @@ class CanvasToolsRow extends StatefulWidget {
   /// there rather than placing a new one.
   final CanvasTool tool;
   final ValueChanged<CanvasTool> onToolChanged;
+
+  /// False while the pane's own error banner is up - an active refusal
+  /// (forbidden, or a timeout freeze) that would make placing a new object
+  /// fail the identical way again. Disarms pen, note and shape (and the
+  /// overflow's "Paste image"), the exact tools the empty-canvas CTA this
+  /// screen-review finding names invites - a still-selectable pen tool
+  /// underneath a banner reading "the canvas is not available" or "you
+  /// cannot draw right now" invites the same failure the banner already
+  /// described. Eraser and select are left alone: the finding is about
+  /// placing specifically, and disabling an edit tool needs knowing which
+  /// error is showing (a broad view denial reaches everything; a place-only
+  /// timeout freeze does not), which this row is not told.
+  final bool canDraw;
 
   /// The primitive the next tap with the shape tool places. Read only by
   /// [CanvasOverflowMenu]'s own picker, which appears while [tool] is
@@ -191,6 +205,7 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
         const SizedBox(width: AppSpacing.s4),
         CanvasOverflowMenu(
           onPasteImage: widget.onPasteImage,
+          canDraw: widget.canDraw,
           onRecenter: widget.onRecenter,
           canManage: widget.canManage,
           objectCount: widget.objectCount,
@@ -237,28 +252,35 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
                 AppIconButton(
                   icon: AppIcons.pen,
                   semanticLabel: 'Pen',
-                  tooltip: 'Pen',
+                  tooltip: widget.canDraw ? 'Pen' : "Can't draw right now",
                   active: widget.tool == CanvasTool.pen,
-                  onPressed: () => widget.onToolChanged(CanvasTool.pen),
+                  onPressed: widget.canDraw
+                      ? () => widget.onToolChanged(CanvasTool.pen)
+                      : null,
                 ),
                 const SizedBox(width: AppSpacing.s4),
                 AppIconButton(
                   icon: AppIcons.note,
                   semanticLabel: 'Note',
-                  tooltip: 'Note',
+                  tooltip: widget.canDraw ? 'Note' : "Can't draw right now",
                   active: widget.tool == CanvasTool.note,
-                  onPressed: () => widget.onToolChanged(CanvasTool.note),
+                  onPressed: widget.canDraw
+                      ? () => widget.onToolChanged(CanvasTool.note)
+                      : null,
                 ),
                 const SizedBox(width: AppSpacing.s4),
                 AppIconButton(
                   // The armed kind's own glyph, not a generic one - state must be visible, not just remembered.
                   icon: canvasShapeKindIcon(widget.shapeKind),
                   semanticLabel: 'Shape',
-                  tooltip:
-                      'Shape · ${canvasShapeKindLabel(widget.shapeKind)} armed, '
-                      'pick another from "More canvas actions"',
+                  tooltip: widget.canDraw
+                      ? 'Shape · ${canvasShapeKindLabel(widget.shapeKind)} armed, '
+                            'pick another from "More canvas actions"'
+                      : "Can't draw right now",
                   active: widget.tool == CanvasTool.shape,
-                  onPressed: () => widget.onToolChanged(CanvasTool.shape),
+                  onPressed: widget.canDraw
+                      ? () => widget.onToolChanged(CanvasTool.shape)
+                      : null,
                 ),
                 const SizedBox(width: AppSpacing.s4),
                 AppIconButton(

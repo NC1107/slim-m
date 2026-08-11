@@ -11,6 +11,15 @@ library;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+/// The shared confirmation copy for deleting a message, used identically by
+/// `channel_message_actions.dart` (a message's own actions menu) and
+/// `report_card_actions.dart` (a moderator deleting a reported message) - one
+/// constant rather than two call sites hand-typing the same words, so an
+/// edit to one cannot leave the other one word off without changing both.
+const String deleteMessageConfirmTitle = 'Delete message?';
+const String deleteMessageConfirmMessage =
+    'This removes it for everyone in the channel. This cannot be undone.';
+
 /// Asks before a destructive, hard-to-undo action. [message] must state what
 /// happens, not just ask "are you sure?".
 ///

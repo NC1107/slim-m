@@ -117,6 +117,60 @@ void main() {
     expect(pasted, 1);
   });
 
+  // screen-review canvas.md: the pen tool stayed selectable under an error banner, so a tap could pick a tool guaranteed to fail the identical write.
+  testWidgets(
+    'pen, note, shape and paste image are disabled while canDraw is false, '
+    'eraser and select stay live',
+    (tester) async {
+      var toolChanged = false;
+      var pasted = false;
+      await tester.pumpWidget(
+        wrapCanvasToolsRow(
+          buildCanvasToolsRow(
+            canDraw: false,
+            onToolChanged: (_) => toolChanged = true,
+            onPasteImage: () => pasted = true,
+          ),
+        ),
+      );
+
+      for (final label in ['Pen', 'Note', 'Shape']) {
+        final button = tester.widget<AppIconButton>(
+          find.ancestor(
+            of: find.bySemanticsLabel(label),
+            matching: find.byType(AppIconButton),
+          ),
+        );
+        expect(button.onPressed, isNull, reason: label);
+      }
+      await tester.tap(find.bySemanticsLabel('Pen'), warnIfMissed: false);
+      await tester.pump();
+      expect(toolChanged, isFalse);
+
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      final pasteItem = tester.widget<AppMenuItem>(
+        find.widgetWithText(AppMenuItem, 'Paste image'),
+      );
+      expect(pasteItem.onTap, isNull);
+      await tester.tap(find.text('Paste image'), warnIfMissed: false);
+      await tester.pump();
+      expect(pasted, isFalse);
+      await tester.tapAt(const Offset(1, 1));
+      await tester.pumpAndSettle();
+
+      for (final label in ['Eraser', 'Move']) {
+        final button = tester.widget<AppIconButton>(
+          find.ancestor(
+            of: find.bySemanticsLabel(label),
+            matching: find.byType(AppIconButton),
+          ),
+        );
+        expect(button.onPressed, isNotNull, reason: label);
+      }
+    },
+  );
+
   testWidgets('tapping recenter view in the overflow calls onRecenter', (
     tester,
   ) async {

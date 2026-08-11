@@ -52,6 +52,7 @@ void main() {
           home: Scaffold(
             body: CanvasOverflowMenu(
               onPasteImage: () {},
+              canDraw: true,
               onRecenter: () {},
               canManage: false,
               objectCount: ValueNotifier(0),

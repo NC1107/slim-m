@@ -124,12 +124,13 @@ Two real gaps sit on top of that: an unlabeled reason, and a wrong permission sc
   Fix: a distinct string for the anonymous case, e.g. "a member (identity withheld)."
   Severity: medium.
 
-- **A report naming the viewing moderator gives no reason for its missing actions.**
+~~**A report naming the viewing moderator gives no reason for its missing actions.**
   `report-card-self-target-desktop.png` was built with full `kickMembers | banMembers` and still shows only "Jump to message," visually identical to a moderator with zero permission bits (`report-card-no-quick-actions-desktop.png`, modulo the profile-resolution state below).
   `report_card.dart:176,182-185` gates `canTimeOut`/`canRemove` on `!isSelf` with no visible trace of why, matching the server's own self-check in `members::authorize` (`http/members.rs:272-274`) - the gate itself is correct, only the silence around it is the finding.
   A moderator who knows they hold these bits and sees them vanish on one specific card cannot tell "you can't act on yourself" from "something is broken."
   Fix: a small caption under the Reporter/timestamp row when `isSelf`, e.g. "This report names you - you can't time yourself out or remove yourself."
-  Severity: medium.
+  Severity: medium.~~
+  Fixed 2026-08-11, with that exact copy: a new `ModerationUnavailableCaption` widget (`widgets/moderation_unavailable_caption.dart`) renders under the Reporter/timestamp row whenever `isSelf` and the moderator holds `kickMembers` or `banMembers` - the shared "why this control isn't here" caption the report's own cross-cutting section below asks for, with the report card as its first caller rather than every one of the three sites at once. The member popover was checked and needs no equivalent: it already branches on `isSelf` to offer "Profile settings" instead of a moderation section, so it never renders a confusingly-empty one in the first place.
 
 - **The disabled "Jump to message" gives no reason either.**
   `report-card-jump-unreachable-desktop.png` correctly renders Jump as present-but-disabled rather than absent, matching the project's own `AppSegmentedOption.disabled` precedent and the server's `jumpEnabled != true` gate (`report_card_quick_actions.dart:61-66`), but there is no tooltip or caption saying why - a deleted channel, an unviewable channel, or something else all read identically.
@@ -196,6 +197,8 @@ No finding.
 - **The self-target, containment-gap, and jump-unreachable findings share one root cause worth fixing once.**
   A moderation action's absence or refusal reads identically today whether the cause is "no permission," "acting on yourself," "acting on someone your role doesn't cover," or "channel unreachable" - either the row is silently omitted or the refusal falls through to one generic 403 sentence.
   A single small "why this control isn't here" caption pattern, reused across the member popover, the report card, and any future moderation surface, would close all three with one shared component.
+  The self-target half is fixed 2026-08-11, with that shared component (`ModerationUnavailableCaption`) built and used - see the finding above.
+  The other two are deliberately left open, and each needs a real decision rather than a guess: the containment-gap message needs either a server-supplied reason on the 403 or a client-side re-derivation of `escalation_guard`'s granted-permission comparison, and getting that comparison subtly wrong would show a confident but false explanation, worse than the current silent generic one; the jump-tooltip needs `AppButton` to grow a `tooltip` parameter it does not have today, a design-system API change touching every caller of that component, not a report-card-local fix.
 - **Two process findings, not defects.**
   `member-popover-plain-desktop.png`/`member-popover-blockable-desktop.png` and `report-card-no-quick-actions-desktop.png`/`report-card-reporter-resolving-desktop.png` are each byte-identical pairs (confirmed by md5sum), produced by separately-named `testWidgets` blocks that happen to build the same harness twice.
   Concretely, the "denied by permission" report-card state has never actually been verified separately from "still loading," since both existing tests pass no `profiles` map at all - a follow-up fixture supplying resolved profiles alongside empty permissions would close the gap.
