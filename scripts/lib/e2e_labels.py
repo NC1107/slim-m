@@ -7,8 +7,8 @@ scenario that no longer matches says so rather than timing out on a name
 nobody remembered was duplicated across three files.
 """
 
-# Composer
-COMPOSER = "Message #"
+# Not the hint text: it vanishes once typed, and goes bare for a thread/DM, once colliding with "Pinned/Search messages".
+COMPOSER = "Message composer"
 SEND = "Send message"
 ATTACH = "Attach a file"
 ADD_REACTION = "Add a reaction"

@@ -12,6 +12,37 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## e2e was red for two days, again, and the naive fix would have been the same mistake twice (2026-08-11)
+
+`scripts/e2e.sh` failed on every completed run for about two days: 57 runs since PR #495 landed (2026-08-09T00:24), 46 of them a genuine failure and 11 cancelled (this workflow keeps an unconditional `cancel-in-progress`, since it is not a required check).
+Client 0.36.0 and server 0.35.0 both shipped over the top of it, the same silent-loss shape the earlier "A gate nobody is watching says nothing: e2e was red for a day" entry below already names.
+Read that entry first; this is its second recurrence, not a new failure mode.
+
+**The symptom was two scenarios, both `AssertionError: alice: never saw 'Message #'` - a thread's own composer and a DM's own composer, and nothing else.**
+Bisecting the run history (not guessing from the most recent commit; seventeen PRs had merged in the day before this pass started) found the real start at PR #495, "a thread's composer showed a dangling 'Message #' hint" - a genuine, well-tested fix.
+`ChannelScreen`'s `channelName` is `channel?.name ?? ''`, and both a thread and a DM carry a genuinely empty name by design, so the composer's hint used to render a bare "Message #" with nothing after the hash; the fix drops the `#$channelName` clause entirely when the name is empty, so the hint now reads plain "Message" for exactly those two channel kinds.
+`scripts/lib/e2e_labels.py`'s `COMPOSER = "Message #"` had been reading that same hint text as its accessible-name anchor for finding and typing into the composer, and it happened to work for every ordinary named channel ("Message #general" always contains "message #") without anybody having built it to be a stable identifier on purpose - PR #495's fix, entirely correctly, took away the one substring the harness leaned on.
+
+**The obvious fix - widen `COMPOSER` to bare "Message" - is exactly the mistake `e2e_dm_call.py`'s own module doc already warns about for a different label, and it would have reintroduced it here.**
+A DM's own header still shows "Pinned messages" and "Search messages" (real, tappable buttons, both containing "message"), and a thread's own bar keeps "Search messages" too.
+`e2e_js.py`'s `click()` prefers a tappable match over anything else, so a bare "message" query would have opened the pinned-messages sheet or the search bar instead of ever finding the composer, silently, on whichever channel happened to have one of those buttons on screen.
+This is not hypothetical: `e2e_dm_call.py`'s own doc comment already records the identical collision for `L.START_DM = "Message"` and names "Pinned messages" as the culprit.
+
+**The fix gives the field its own stable, permanent accessible name, independent of the hint text a channel name can empty out and typing itself makes vanish.**
+`composer_extras.dart`'s `TextField` is wrapped in `Semantics(label: 'Message composer', child: TextField(...))`, which Flutter merges into the field's own semantics node rather than adding a second one - confirmed with a widget test reading `tester.getSemantics(find.byType(TextField)).label` directly, not assumed.
+This is a real accessibility improvement on its own, not only a fix for the harness: before it, the hint's own `Text.rich` node was the *only* thing that ever named the field, and it unmounts the moment anything is typed (`if (!widget.hasText)`), so a screen-reader user tabbing to an already-written draft heard nothing identifying what field they were in.
+`e2e_labels.py`'s `COMPOSER` now reads `"Message composer"`, matching this stable name instead of the volatile hint; `python3 -m pytest scripts/lib/test_e2e_labels.py` confirms it appears verbatim in client source.
+
+**Reproduced before the fix, both scenarios pass after it, driven end to end rather than only unit-tested.**
+`E2E_REBUILD=1 E2E_ONLY="thread" bash scripts/e2e.sh` reproduced the exact reported assertion first; the same command after the fix, and a same-shape run scoped to `"calling in a dm"`, both reach `PASS`, the DM one checked against a real SFU room the same way `e2e_voice.py` already is.
+A full run passes end to end too, with clean teardown.
+Mutation-tested: reverting the `Semantics` label to any other string fails exactly the two new tests in `composer_hint_test.dart` (`the field carries a stable accessible name regardless of channel name`, `the accessible name survives once something is typed and the hint disappears`) and nothing else in a full `flutter test` of the whole `app` package.
+
+**The structural question from the first "e2e was red" entry is still open, and this is its second data point.**
+`e2e` is still not among the checks `verify-release-checks` gates on, so two releases shipped over a red harness this week with nothing failing loudly - the same shape this file already tracks for a cancelled required check and for a queued release run, on a check that is not required at all rather than one that was silently skipped.
+Making it required trades against its own real cost, unchanged from the first time this was written down: a full run stands up an SFU, a server and two browsers, and is the flakiest thing in the repo by nature, so every release would then wait on it.
+Left for the owner to weigh with the actual recurrence count now in front of him rather than decided here.
+
 ## The capture harness's shadow artifact fooled five review passes, so it is fixed rather than documented a sixth time (2026-08-11)
 
 The floating dock's `BoxShadow` painting as a hard-edged flat rectangle instead of blurring, in every screenshot the capture harness writes, had already misled the sign-off pass that first found and then disproved it (PR #500), a second pass PR #514's own commit message says "mistook it the same way" before that fix moved the caveat onto the generated gallery, and both the frontend and UX lenses of the screen-review pass, independently, per `docs/reports/screen-review/voice.md`'s own account - four rounds before today's fifth.
