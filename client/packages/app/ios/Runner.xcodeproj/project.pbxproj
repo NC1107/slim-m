@@ -30,6 +30,21 @@
 		7A11C0DE0002000000000016 /* BroadcastConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0002000000000006 /* BroadcastConstants.swift */; };
 		7A11C0DE0002000000000017 /* BroadcastExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0002000000000009 /* BroadcastExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		7A11C0DE0002000000000018 /* BroadcastChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000200000000000A /* BroadcastChannel.swift */; };
+		7A11C0DE0006000000000011 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000001 /* NotificationService.swift */; };
+		7A11C0DE0006000000000012 /* PushSealedBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000002 /* PushSealedBox.swift */; };
+		7A11C0DE0006000000000013 /* PushKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000003 /* PushKeychain.swift */; };
+		7A11C0DE0006000000000014 /* PushEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000004 /* PushEnvelope.swift */; };
+		7A11C0DE0006000000000015 /* Blake2b.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000005 /* Blake2b.swift */; };
+		7A11C0DE0006000000000016 /* Salsa20.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000006 /* Salsa20.swift */; };
+		7A11C0DE0006000000000017 /* Poly1305.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000007 /* Poly1305.swift */; };
+		7A11C0DE0006000000000018 /* NotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000600000000000A /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		7A11C0DE0006000000000021 /* PushSealedBoxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000600000000000B /* PushSealedBoxTests.swift */; };
+		7A11C0DE0006000000000022 /* PushSealedBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000002 /* PushSealedBox.swift */; };
+		7A11C0DE0006000000000023 /* PushEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000004 /* PushEnvelope.swift */; };
+		7A11C0DE0006000000000024 /* Blake2b.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000005 /* Blake2b.swift */; };
+		7A11C0DE0006000000000025 /* Salsa20.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000006 /* Salsa20.swift */; };
+		7A11C0DE0006000000000026 /* Poly1305.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000007 /* Poly1305.swift */; };
+		7A11C0DE0006000000000027 /* push_envelope_cases.json in Resources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000600000000000C /* push_envelope_cases.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,6 +61,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 7A11C0DE0002000000000041;
 			remoteInfo = BroadcastExtension;
+		};
+		7A11C0DE0006000000000051 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7A11C0DE0006000000000041;
+			remoteInfo = NotificationService;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -67,6 +89,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				7A11C0DE0002000000000017 /* BroadcastExtension.appex in Embed Foundation Extensions */,
+				7A11C0DE0006000000000018 /* NotificationService.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -109,6 +132,18 @@
 		7A11C0DE0002000000000008 /* BroadcastExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BroadcastExtension.entitlements; sourceTree = "<group>"; };
 		7A11C0DE0002000000000009 /* BroadcastExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BroadcastExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7A11C0DE000200000000000A /* BroadcastChannel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BroadcastChannel.swift; sourceTree = "<group>"; };
+		7A11C0DE0006000000000001 /* NotificationService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		7A11C0DE0006000000000002 /* PushSealedBox.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PushSealedBox.swift; sourceTree = "<group>"; };
+		7A11C0DE0006000000000003 /* PushKeychain.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PushKeychain.swift; sourceTree = "<group>"; };
+		7A11C0DE0006000000000004 /* PushEnvelope.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PushEnvelope.swift; sourceTree = "<group>"; };
+		7A11C0DE0006000000000005 /* Blake2b.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Blake2b.swift; sourceTree = "<group>"; };
+		7A11C0DE0006000000000006 /* Salsa20.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Salsa20.swift; sourceTree = "<group>"; };
+		7A11C0DE0006000000000007 /* Poly1305.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Poly1305.swift; sourceTree = "<group>"; };
+		7A11C0DE0006000000000008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7A11C0DE0006000000000009 /* NotificationService.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = NotificationService.entitlements; sourceTree = "<group>"; };
+		7A11C0DE000600000000000A /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		7A11C0DE000600000000000B /* PushSealedBoxTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PushSealedBoxTests.swift; sourceTree = "<group>"; };
+		7A11C0DE000600000000000C /* push_envelope_cases.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = push_envelope_cases.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -127,6 +162,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A11C0DE0006000000000033 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -136,6 +178,8 @@
 				331C807B294A618700263BE5 /* RunnerTests.swift */,
 				7A11C0DE0001000000000003 /* VoipCallHandlerTests.swift */,
 				7A11C0DE0003000000000003 /* VoiceCallReporterTests.swift */,
+				7A11C0DE000600000000000B /* PushSealedBoxTests.swift */,
+				7A11C0DE000600000000000C /* push_envelope_cases.json */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -153,6 +197,22 @@
 				7A11C0DE0002000000000008 /* BroadcastExtension.entitlements */,
 			);
 			path = BroadcastExtension;
+			sourceTree = "<group>";
+		};
+		7A11C0DE0006000000000031 /* NotificationService */ = {
+			isa = PBXGroup;
+			children = (
+				7A11C0DE0006000000000001 /* NotificationService.swift */,
+				7A11C0DE0006000000000004 /* PushEnvelope.swift */,
+				7A11C0DE0006000000000003 /* PushKeychain.swift */,
+				7A11C0DE0006000000000002 /* PushSealedBox.swift */,
+				7A11C0DE0006000000000005 /* Blake2b.swift */,
+				7A11C0DE0006000000000006 /* Salsa20.swift */,
+				7A11C0DE0006000000000007 /* Poly1305.swift */,
+				7A11C0DE0006000000000008 /* Info.plist */,
+				7A11C0DE0006000000000009 /* NotificationService.entitlements */,
+			);
+			path = NotificationService;
 			sourceTree = "<group>";
 		};
 		9740EEB11CF90186004384FC /* Flutter */ = {
@@ -175,6 +235,7 @@
 				97C146EF1CF9000F007C117D /* Products */,
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				7A11C0DE0002000000000021 /* BroadcastExtension */,
+				7A11C0DE0006000000000031 /* NotificationService */,
 			);
 			sourceTree = "<group>";
 		};
@@ -184,6 +245,7 @@
 				97C146EE1CF9000F007C117D /* Runner.app */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
 				7A11C0DE0002000000000009 /* BroadcastExtension.appex */,
+				7A11C0DE000600000000000A /* NotificationService.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -247,6 +309,7 @@
 			);
 			dependencies = (
 				7A11C0DE0002000000000052 /* PBXTargetDependency */,
+				7A11C0DE0006000000000052 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			packageProductDependencies = (
@@ -273,6 +336,23 @@
 			productReference = 7A11C0DE0002000000000009 /* BroadcastExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		7A11C0DE0006000000000041 /* NotificationService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A11C0DE0006000000000042 /* Build configuration list for PBXNativeTarget "NotificationService" */;
+			buildPhases = (
+				7A11C0DE0006000000000032 /* Sources */,
+				7A11C0DE0006000000000033 /* Frameworks */,
+				7A11C0DE0006000000000034 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NotificationService;
+			productName = NotificationService;
+			productReference = 7A11C0DE000600000000000A /* NotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -292,6 +372,9 @@
 						LastSwiftMigration = 1100;
 					};
 					7A11C0DE0002000000000041 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					7A11C0DE0006000000000041 = {
 						CreatedOnToolsVersion = 15.0;
 					};
 				};
@@ -315,6 +398,7 @@
 				97C146ED1CF9000F007C117D /* Runner */,
 				331C8080294A63A400263BE5 /* RunnerTests */,
 				7A11C0DE0002000000000041 /* BroadcastExtension */,
+				7A11C0DE0006000000000041 /* NotificationService */,
 			);
 		};
 /* End PBXProject section */
@@ -324,6 +408,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7A11C0DE0006000000000027 /* push_envelope_cases.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -339,6 +424,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		7A11C0DE0002000000000033 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A11C0DE0006000000000034 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -389,6 +481,12 @@
 				331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */,
 				7A11C0DE0001000000000004 /* VoipCallHandlerTests.swift in Sources */,
 				7A11C0DE0003000000000004 /* VoiceCallReporterTests.swift in Sources */,
+				7A11C0DE0006000000000021 /* PushSealedBoxTests.swift in Sources */,
+				7A11C0DE0006000000000022 /* PushSealedBox.swift in Sources */,
+				7A11C0DE0006000000000023 /* PushEnvelope.swift in Sources */,
+				7A11C0DE0006000000000024 /* Blake2b.swift in Sources */,
+				7A11C0DE0006000000000025 /* Salsa20.swift in Sources */,
+				7A11C0DE0006000000000026 /* Poly1305.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -420,6 +518,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A11C0DE0006000000000032 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7A11C0DE0006000000000011 /* NotificationService.swift in Sources */,
+				7A11C0DE0006000000000012 /* PushSealedBox.swift in Sources */,
+				7A11C0DE0006000000000013 /* PushKeychain.swift in Sources */,
+				7A11C0DE0006000000000014 /* PushEnvelope.swift in Sources */,
+				7A11C0DE0006000000000015 /* Blake2b.swift in Sources */,
+				7A11C0DE0006000000000016 /* Salsa20.swift in Sources */,
+				7A11C0DE0006000000000017 /* Poly1305.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -432,6 +544,11 @@
 			isa = PBXTargetDependency;
 			target = 7A11C0DE0002000000000041 /* BroadcastExtension */;
 			targetProxy = 7A11C0DE0002000000000051 /* PBXContainerItemProxy */;
+		};
+		7A11C0DE0006000000000052 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7A11C0DE0006000000000041 /* NotificationService */;
+			targetProxy = 7A11C0DE0006000000000051 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -821,6 +938,91 @@
 			};
 			name = Profile;
 		};
+		7A11C0DE0006000000000043 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug.xcconfig */;
+			buildSettings = {
+				/* An app extension must not carry a Frameworks directory: the
+				   store refuses the bundle with error 90206. The containing app
+				   embeds the Swift runtime for both. */
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				CODE_SIGN_ENTITLEMENTS = NotificationService/NotificationService.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 76S78SUWVM;
+				INFOPLIST_FILE = NotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = top.npcserver.slimm.NotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7A11C0DE0006000000000044 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
+			buildSettings = {
+				/* An app extension must not carry a Frameworks directory: the
+				   store refuses the bundle with error 90206. The containing app
+				   embeds the Swift runtime for both. */
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				CODE_SIGN_ENTITLEMENTS = NotificationService/NotificationService.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 76S78SUWVM;
+				INFOPLIST_FILE = NotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = top.npcserver.slimm.NotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "slim-m Notification Service App Store";
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		7A11C0DE0006000000000045 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
+			buildSettings = {
+				/* An app extension must not carry a Frameworks directory: the
+				   store refuses the bundle with error 90206. The containing app
+				   embeds the Swift runtime for both. */
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				CODE_SIGN_ENTITLEMENTS = NotificationService/NotificationService.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 76S78SUWVM;
+				INFOPLIST_FILE = NotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = top.npcserver.slimm.NotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Profile;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -860,6 +1062,16 @@
 				7A11C0DE0002000000000043 /* Debug */,
 				7A11C0DE0002000000000044 /* Release */,
 				7A11C0DE0002000000000045 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7A11C0DE0006000000000042 /* Build configuration list for PBXNativeTarget "NotificationService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A11C0DE0006000000000043 /* Debug */,
+				7A11C0DE0006000000000044 /* Release */,
+				7A11C0DE0006000000000045 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

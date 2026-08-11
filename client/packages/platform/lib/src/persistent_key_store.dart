@@ -44,6 +44,22 @@ import 'package:path_provider/path_provider.dart';
 import 'host_platform.dart';
 import 'key_store.dart';
 
+/// The keychain group the push private key lives in, shared with the
+/// Notification Service Extension so it can open a sealed push envelope while
+/// the app itself is not running.
+///
+/// Deliberately its own group rather than the app's default one
+/// (`76S78SUWVM.top.npcserver.slimm`, which is where every other secret this
+/// app stores still sits): the extension is a separate binary, and a group
+/// holding only the push key is one it can be given without also handing it
+/// the refresh token. Both binaries may claim it with no App Group and no
+/// portal capability, because the team-wide `76S78SUWVM.*` wildcard is
+/// already in both provisioning profiles.
+///
+/// The same string is duplicated in `ios/NotificationService/PushKeychain.swift`
+/// and in both entitlements files; `hygiene.yml` fails when they disagree.
+const pushKeychainAccessGroup = '76S78SUWVM.top.npcserver.slimm.push';
+
 /// The platform keychain, through flutter_secure_storage. Use on iOS and
 /// Android, where the OS itself guarantees a secure backend.
 ///
@@ -59,6 +75,34 @@ class SecureKeyStore implements KeyStore {
                 // Device-bound; the default would ride into iCloud and local
                 // backups. See the class doc comment.
                 accessibility: KeychainAccessibility.unlocked_this_device,
+              ),
+            );
+
+  /// The push private key's own store: [pushKeychainAccessGroup], and
+  /// readable once the phone has been unlocked at all rather than only while
+  /// it is unlocked right now.
+  ///
+  /// A push arriving on a locked phone is the entire point of a lock-screen
+  /// preview, and that is exactly when
+  /// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` refuses to hand the key
+  /// over, so the extension would fall back to the generic string every time
+  /// it mattered most.
+  ///
+  /// **The backup guarantee the default constructor's doc comment describes
+  /// is untouched.** `ThisDeviceOnly` is the half of that attribute that
+  /// excludes an item from iCloud and from local backups and stops it
+  /// migrating to a new device, and it is kept here. The only thing that
+  /// changes is readability while the screen is locked.
+  ///
+  /// Scoped to this one key on purpose: every other secret, the refresh token
+  /// above all, stays on the stricter default above, where nothing can read
+  /// it until the owner has unlocked the phone.
+  SecureKeyStore.forPushKey({FlutterSecureStorage? storage})
+      : _storage = storage ??
+            const FlutterSecureStorage(
+              iOptions: IOSOptions(
+                groupId: pushKeychainAccessGroup,
+                accessibility: KeychainAccessibility.first_unlock_this_device,
               ),
             );
 
@@ -216,3 +260,30 @@ KeyStore createPersistentKeyStore() {
   if (kIsWeb || isIOSHost || isAndroidHost) return SecureKeyStore();
   return FileKeyStore();
 }
+
+/// Whether the push private key lives somewhere other than where every other
+/// secret does, which is true on iOS and nowhere else.
+///
+/// The keychain group and the accessibility [SecureKeyStore.forPushKey]
+/// carries are iOS attributes that mean nothing to the Android keystore, the
+/// desktop file, or a browser, and no other platform has a second process
+/// that needs to read this key.
+///
+/// Callers must ask this rather than comparing stores: off iOS the push key
+/// has to use the *same instance* [createPersistentKeyStore] returned, not an
+/// equivalent one, because [FileKeyStore] serialises writes per instance and
+/// two of them over one file would reintroduce the lost-update race that
+/// queue exists to prevent.
+bool get pushKeyHasItsOwnStore => isIOSHost;
+
+/// The push key's own store. Only meaningful where [pushKeyHasItsOwnStore];
+/// everywhere else the answer is whatever [createPersistentKeyStore] already
+/// returned.
+///
+/// An item written with no access group and
+/// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` does not match a query
+/// naming a group and a different accessibility - both attributes are part of
+/// the search - so a key an earlier build wrote is invisible here, and
+/// `DevicePushKeys` does the one-time move rather than silently generating a
+/// second keypair and orphaning every envelope sealed to the first.
+KeyStore createPushKeyStore() => SecureKeyStore.forPushKey();

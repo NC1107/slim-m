@@ -205,6 +205,194 @@ jobs:
           fi
           exit $fail
 
+      # The lock-screen preview is a second process reading one key out of the
+      # keychain, and a keychain query is a search over attributes: any one of
+      # them differing between the two sides finds nothing at all, silently,
+      # and the notification quietly keeps saying "New message". None of these
+      # strings is checked by a compiler on either side, so they are checked
+      # here. Every value is read out of the file that owns it rather than
+      # written down twice in this script.
+      - name: ios notification service extension is wired up
+        run: |
+          ios=client/packages/app/ios
+          pbx=$ios/Runner.xcodeproj/project.pbxproj
+          ext=$ios/NotificationService
+          dart=client/packages/platform/lib/src
+          fail=0
+
+          value() {
+            awk -v k="$1" '$0 ~ "<key>"k"</key>" {
+              getline
+              gsub(/^[ \t]*<string>|<\/string>[ \t]*$/, "")
+              print
+              exit
+            }' "$2"
+          }
+          # The first string under a named key's array, which is where both
+          # entitlements files keep their keychain group.
+          keychain_group_in() {
+            awk '/<key>keychain-access-groups<\/key>/ {f=1; next}
+                 f && /<string>/ {
+                   gsub(/^[ \t]*<string>|<\/string>[ \t]*$/, "")
+                   print
+                   exit
+                 }' "$1"
+          }
+
+          point=$(value NSExtensionPointIdentifier "$ext/Info.plist")
+          [ "$point" = "com.apple.usernotifications.service" ] || {
+            echo "::error::$ext/Info.plist is not a notification service extension"
+            fail=1
+          }
+
+          # The Dart constant is the one a person edits; everything else has to
+          # agree with it, so it is the source rather than a value in this file.
+          group=$(sed -n "s/^const pushKeychainAccessGroup = '\(.*\)';$/\1/p" \
+            "$dart/persistent_key_store.dart")
+          [ -n "$group" ] || {
+            echo "::error::persistent_key_store.dart has no pushKeychainAccessGroup"
+            fail=1
+          }
+          if [ -n "$group" ]; then
+            ext_group=$(keychain_group_in "$ext/NotificationService.entitlements")
+            [ "$ext_group" = "$group" ] || {
+              echo "::error::the extension claims '$ext_group', not '$group'"
+              fail=1
+            }
+            # The app's own list is ordered: its first entry is the default
+            # group every other secret is already written to, and promoting the
+            # push group there would move them all. So the push group must be
+            # present and must not be first.
+            first=$(keychain_group_in "$ios/Runner/Runner.entitlements")
+            [ "$first" != "$group" ] || {
+              echo "::error::Runner.entitlements lists '$group' first, which would"
+              echo "::error::make it the default group every other secret is written to"
+              fail=1
+            }
+            grep -q "<string>$group</string>" "$ios/Runner/Runner.entitlements" || {
+              echo "::error::Runner.entitlements does not claim '$group'"
+              fail=1
+            }
+            grep -q "\"$group\"" "$ext/PushKeychain.swift" || {
+              echo "::error::PushKeychain.swift does not use '$group'"
+              fail=1
+            }
+            # Declaring the group is not the same as writing into it: without
+            # this the constant could stay correct everywhere while the store
+            # quietly wrote to the app's default group instead.
+            grep -q 'groupId: pushKeychainAccessGroup' \
+              "$dart/persistent_key_store.dart" || {
+              echo "::error::the push key store does not write into \$group"
+              fail=1
+            }
+          fi
+
+          # kSecAttrAccount: what the key is filed under on both sides.
+          handle=$(sed -n \
+            "s/^const devicePushKeyHandle = '\(.*\)';$/\1/p" "$dart/device_push_keys.dart")
+          [ -n "$handle" ] || {
+            echo "::error::device_push_keys.dart has no devicePushKeyHandle"
+            fail=1
+          }
+          if [ -n "$handle" ]; then
+            grep -q "\"$handle\"" "$ext/PushKeychain.swift" || {
+              echo "::error::PushKeychain.swift does not read '$handle'"
+              fail=1
+            }
+          fi
+
+          # kSecAttrService: flutter_secure_storage's own default, which the
+          # Swift side hardcodes because it has no way to ask. Setting
+          # accountName on the Dart side would change it and orphan the read.
+          grep -q '"flutter_secure_storage_service"' "$ext/PushKeychain.swift" || {
+            echo "::error::PushKeychain.swift does not use the default kSecAttrService"
+            fail=1
+          }
+          if grep -q 'accountName' "$dart/persistent_key_store.dart"; then
+            echo "::error::persistent_key_store.dart sets accountName, which changes"
+            echo "::error::kSecAttrService; PushKeychain.swift would then find nothing"
+            fail=1
+          fi
+
+          # kSecAttrAccessible: the two spellings of one attribute. Anything
+          # but after-first-unlock is unreadable on a locked screen, which is
+          # the only screen this extension exists for.
+          grep -q 'first_unlock_this_device' "$dart/persistent_key_store.dart" || {
+            echo "::error::the push key store is not first_unlock_this_device;"
+            echo "::error::it would be unreadable exactly when a push arrives locked"
+            fail=1
+          }
+          grep -q 'kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly' \
+            "$ext/PushKeychain.swift" || {
+            echo "::error::PushKeychain.swift queries a different accessibility"
+            fail=1
+          }
+
+          nse_id=$(sed -n \
+            's/^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = \(.*NotificationService\);$/\1/p' \
+            "$pbx" | head -n1)
+          if [ -n "$nse_id" ]; then
+            count=$(grep -c "PRODUCT_BUNDLE_IDENTIFIER = $nse_id;" "$pbx")
+            [ "$count" -ge 3 ] || {
+              echo "::error::$pbx does not build $nse_id in all three configs"
+              fail=1
+            }
+            grep -q "<key>$nse_id</key>" "$ios/ExportOptions.plist" || {
+              echo "::error::ExportOptions.plist has no profile for $nse_id"
+              fail=1
+            }
+            grep -q "slim-m Notification Service App Store" "$ios/ExportOptions.plist" || {
+              echo "::error::ExportOptions.plist does not name the extension's profile"
+              fail=1
+            }
+          else
+            echo "::error::$pbx builds no NotificationService bundle id"
+            fail=1
+          fi
+
+          # The appex has to be embedded or the extension ships nowhere.
+          copy_phases=$(awk '/Begin PBXCopyFilesBuildPhase section/{f=1}
+                             f{print}
+                             /End PBXCopyFilesBuildPhase section/{f=0}' "$pbx")
+          grep -q 'NotificationService.appex in Embed Foundation Extensions' \
+            <<<"$copy_phases" || {
+            echo "::error::$pbx does not embed NotificationService.appex"
+            fail=1
+          }
+
+          # Membership of *this* target, not of any target. The crypto sources
+          # are deliberately compiled into RunnerTests as well, so a check that
+          # only asked whether a file appears somewhere in a Sources phase
+          # would pass while the extension itself had lost it - and losing
+          # NotificationService.swift that way is silent, since an appex with
+          # no principal class still builds and only fails on a real device.
+          native=$(awk '/Begin PBXNativeTarget section/{f=1}
+                        f{print}
+                        /End PBXNativeTarget section/{f=0}' "$pbx")
+          sources_id=$(awk '/\/\* NotificationService \*\/ = \{/{f=1}
+                            f && /buildPhases = \(/{p=1; next}
+                            p && /\);/{exit}
+                            p && /\/\* Sources \*\//{print $1; exit}' <<<"$native")
+          if [ -z "$sources_id" ]; then
+            echo "::error::$pbx has no Sources phase on the NotificationService target"
+            fail=1
+          else
+            own=$(awk -v id="$sources_id" '$0 ~ "^\t\t"id" " {f=1}
+                                           f{print}
+                                           f && /^\t\t\};$/{exit}' "$pbx")
+            for f in "$ext"/*.swift; do
+              grep -qF "$(basename "$f") in Sources" <<<"$own" || {
+                echo "::error::$(basename "$f") is not in NotificationService's own Sources"
+                fail=1
+              }
+            done
+          fi
+
+          if [ $fail -eq 0 ]; then
+            echo "ios notification service extension wired: $nse_id in $group"
+          fi
+          exit $fail
+
       # Orientation is locked to portrait on phones only, and the two halves
       # fail in opposite directions if either is quietly edited: landscape
       # back in the iPhone array stretches the phone-sized shell across a

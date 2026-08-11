@@ -12,5 +12,17 @@
 	<array>
 		<string>group.top.npcserver.slimm</string>
 	</array>
+	<!-- The first entry is this app's own default group, named explicitly so
+	     it stays the default: declaring this key at all makes the first entry
+	     where an item with no group of its own is written, and every secret
+	     this app already stored is sitting in that group. The second is the
+	     push key's own group, which NotificationService also claims and
+	     nothing else does. No portal capability: both profiles already carry
+	     the team-wide 76S78SUWVM.* wildcard. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>76S78SUWVM.top.npcserver.slimm</string>
+		<string>76S78SUWVM.top.npcserver.slimm.push</string>
+	</array>
 </dict>
 </plist>

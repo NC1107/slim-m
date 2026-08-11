@@ -85,16 +85,21 @@ jobs:
                           f{print}
                           /End PBXSourcesBuildPhase section/{f=0}' "$pbx")
           fail=0
+          # NotificationService/ is here for the same reason Runner/ is: its
+          # sources compile nowhere if they are missing from the phase, and a
+          # notification would silently keep showing the generic string with
+          # nothing anywhere saying why.
           for f in client/packages/app/ios/Runner/*.swift \
-                   client/packages/app/ios/Runner/*.m; do
+                   client/packages/app/ios/Runner/*.m \
+                   client/packages/app/ios/NotificationService/*.swift; do
             [ -e "$f" ] || continue
             name=$(basename "$f")
             grep -qF "$name in Sources" <<<"$sources" || {
-              echo "::error file=$f::$name is not in Runner's Sources build phase"
+              echo "::error file=$f::$name is not in any target's Sources build phase"
               fail=1
             }
           done
-          [ "$fail" -eq 0 ] && echo "every Runner .swift/.m file is registered"
+          [ "$fail" -eq 0 ] && echo "every Runner/NotificationService source is registered"
           exit $fail
 
   # The CallKit synchronous-report invariant is a termination risk, not a style

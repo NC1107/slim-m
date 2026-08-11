@@ -154,5 +154,89 @@ void main() {
         throwsUnsupportedError,
       );
     });
+
+    /// The session and refresh tokens must stay where they are. Relaxing this
+    /// store instead of adding a second one would let anything running on a
+    /// locked phone read a 30-day refresh token, which is a real downgrade
+    /// and buys nothing: the extension has no use for that token.
+    test(
+        'the ordinary store is unchanged: no keychain group of its own, and '
+        'unreadable until the owner has unlocked the phone', () {
+      final options = SecureKeyStore().debugStorage.iOptions;
+      expect(options.groupId, isNull);
+      expect(options.accessibility, KeychainAccessibility.unlocked_this_device);
+    });
+  });
+
+  /// The push key alone, because the Notification Service Extension reads it
+  /// from a separate process while the phone is locked.
+  group('SecureKeyStore.forPushKey', () {
+    test(
+        'it is in the group the extension claims, and not the app default '
+        'group every other secret sits in', () {
+      final options = SecureKeyStore.forPushKey().debugStorage.iOptions;
+      expect(options.groupId, pushKeychainAccessGroup);
+      expect(options.groupId, isNot('76S78SUWVM.top.npcserver.slimm'));
+    });
+
+    /// The point of the whole change. `WhenUnlocked` hands nothing over on a
+    /// locked screen, which is the only screen a lock-screen preview is built
+    /// for, so the extension would fall back to "New message" every time it
+    /// mattered.
+    test('it is readable once the phone has been unlocked since boot', () {
+      expect(
+        SecureKeyStore.forPushKey().debugStorage.iOptions.accessibility,
+        KeychainAccessibility.first_unlock_this_device,
+      );
+    });
+
+    /// The backup guarantee is the other half of the attribute and is not
+    /// what changed. `ThisDeviceOnly` is what excludes an item from iCloud
+    /// and from local backups and stops it migrating to a new device, and
+    /// both accessibilities this app uses carry it.
+    test('it is still device-bound, so it rides into no backup', () {
+      for (final accessibility in [
+        SecureKeyStore().debugStorage.iOptions.accessibility,
+        SecureKeyStore.forPushKey().debugStorage.iOptions.accessibility,
+      ]) {
+        expect(accessibility?.name, endsWith('_this_device'));
+      }
+    });
+
+    /// A `deleteAll` on the ordinary store carries its own accessibility, so
+    /// it cannot reach an item stored under a different one. That is what
+    /// makes the migration's delete safe, and it stops being true the moment
+    /// the two stores are configured alike.
+    test(
+        'the two stores differ in the attributes their queries carry, which '
+        'is what keeps one from clearing the other', () {
+      final session = SecureKeyStore().debugStorage.iOptions;
+      final push = SecureKeyStore.forPushKey().debugStorage.iOptions;
+      expect(
+        push.accessibility != session.accessibility ||
+            push.groupId != session.groupId,
+        isTrue,
+      );
+    });
+
+    test('sign is unimplemented here too', () async {
+      await expectLater(
+        () => SecureKeyStore.forPushKey().sign('handle', const [1, 2, 3]),
+        throwsUnsupportedError,
+      );
+    });
+
+    /// The factory is what the app actually calls, and it could hand back an
+    /// ordinary store while every assertion above stayed true of a
+    /// constructor nothing used.
+    test('createPushKeyStore is this store, not the ordinary one', () {
+      final options =
+          (createPushKeyStore() as SecureKeyStore).debugStorage.iOptions;
+      expect(options.groupId, pushKeychainAccessGroup);
+      expect(
+        options.accessibility,
+        KeychainAccessibility.first_unlock_this_device,
+      );
+    });
   });
 }
