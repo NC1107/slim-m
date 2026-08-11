@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: Apache-2.0
+name: advisory-watchdog
+
+# Nothing in this repo watched for a security advisory against a dependency.
+# licenses.yml runs `cargo deny check licenses` and deliberately not
+# `check all`: docs/ci.md's own reasoning is that a CVE published upstream
+# would turn every unrelated pull request red through no fault of its own,
+# so it "wants a different trigger", and named cargo audit and osv-scanner
+# for a job that was never wired. This is that trigger.
+#
+# It does not gate a pull request or a release, and does not report by its
+# own colour - a scheduled workflow that only fails itself is a red tab
+# nobody opens, which is the failure e2e-red-streak-watchdog.yml already
+# exists to correct. The output is a deduplicated GitHub issue that closes
+# itself once the tree is clean again.
+#
+# Daily rather than hourly: the RustSec database is published on a human
+# schedule, and an advisory that lands overnight is not more actionable for
+# being found six hours sooner.
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+# No concurrency group, for the reason release-tag-watchdog.yml already
+# gives: this runs once a day, and the reporting half is idempotent (issue
+# dedup is by label), so two overlapping runs cost nothing worth guarding.
+
+jobs:
+  check:
+    name: no dependency has an open advisory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # continue-on-error, so a real advisory reaches the reporting step
+      # below rather than ending the job with nothing said anywhere.
+      - id: scan
+        continue-on-error: true
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check advisories
+
+      - name: open or close the advisory issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ADVISORY_STATUS: ${{ steps.scan.outcome == 'success' && 'clean' || 'found' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash scripts/report-advisory-issue.sh

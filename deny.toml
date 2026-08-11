@@ -46,6 +46,16 @@ allow = ["MPL-2.0"]
 name = "nm"
 allow = ["MPL-2.0"]
 
+# Checked on a schedule by advisory-watchdog.yml, never on a pull request.
+# docs/ci.md's licenses section explains the split: a CVE published upstream
+# would otherwise turn every unrelated pull request red through no fault of
+# its own, so this "wants a different trigger" - that trigger exists now, and
+# reports by opening an issue rather than by reddening anybody's branch.
+# An entry in `ignore` is a deliberate, dated decision about one advisory,
+# never a way to quiet the check.
+[advisories]
+ignore = []
+
 [bans]
 multiple-versions = "allow"
 
