@@ -16,8 +16,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/providers/push_content_preview_settings.dart';
 import 'package:slimm_app/src/providers/push_controller.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -138,6 +140,7 @@ class _FakePermissionRequester implements AndroidPermissionRequester {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(registerAndroidLocalNotificationsPluginForTest);
+  setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('PushController construction', () {
     test('a token source whose rotation stream throws synchronously cannot '
@@ -517,6 +520,108 @@ void main() {
             'current, leaving the loser\'s private half discarded locally '
             'while the server still holds its public half',
       );
+    });
+  });
+
+  group('push content preview', () {
+    test('registration sends include_content: false by default', () async {
+      Map<String, dynamic>? sentBody;
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => 'abcd1234',
+          _ => null,
+        },
+      );
+      addTearDown(() => _mock(null));
+
+      final session = SessionStore(tokens: _tokens);
+      final container = _container(
+        session: session,
+        httpClient: MockClient((request) async {
+          if (request.method == 'PUT' && request.url.path == '/push') {
+            sentBody = jsonDecode(request.body) as Map<String, dynamic>;
+          }
+          return http.Response('', 204);
+        }),
+        channel: ApnsTokenChannel(isIOS: true),
+      );
+      addTearDown(container.dispose);
+
+      await container.read(pushControllerProvider.notifier).register();
+
+      expect(sentBody, isNotNull);
+      expect(sentBody!['include_content'], isFalse);
+    });
+
+    test('turning the preview setting on before registering sends '
+        'include_content: true', () async {
+      Map<String, dynamic>? sentBody;
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => 'abcd1234',
+          _ => null,
+        },
+      );
+      addTearDown(() => _mock(null));
+
+      final session = SessionStore(tokens: _tokens);
+      final container = _container(
+        session: session,
+        httpClient: MockClient((request) async {
+          if (request.method == 'PUT' && request.url.path == '/push') {
+            sentBody = jsonDecode(request.body) as Map<String, dynamic>;
+          }
+          return http.Response('', 204);
+        }),
+        channel: ApnsTokenChannel(isIOS: true),
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(pushContentPreviewSettingsProvider.notifier)
+          .setEnabled(true);
+      await container.read(pushControllerProvider.notifier).register();
+
+      expect(sentBody, isNotNull);
+      expect(sentBody!['include_content'], isTrue);
+    });
+
+    test('flipping the setting after an initial registration reaches the '
+        'server on the next register() call, not the value it started '
+        'with', () async {
+      final requests = <Map<String, dynamic>>[];
+      _mock(
+        (call) async => switch (call.method) {
+          'getToken' => 'abcd1234',
+          _ => null,
+        },
+      );
+      addTearDown(() => _mock(null));
+
+      final session = SessionStore(tokens: _tokens);
+      final container = _container(
+        session: session,
+        httpClient: MockClient((request) async {
+          if (request.method == 'PUT' && request.url.path == '/push') {
+            requests.add(jsonDecode(request.body) as Map<String, dynamic>);
+          }
+          return http.Response('', 204);
+        }),
+        channel: ApnsTokenChannel(isIOS: true),
+      );
+      addTearDown(container.dispose);
+
+      await container.read(pushControllerProvider.notifier).register();
+      expect(requests, hasLength(1));
+      expect(requests[0]['include_content'], isFalse);
+
+      await container
+          .read(pushContentPreviewSettingsProvider.notifier)
+          .setEnabled(true);
+      await container.read(pushControllerProvider.notifier).register();
+
+      expect(requests, hasLength(2));
+      expect(requests[1]['include_content'], isTrue);
     });
   });
 

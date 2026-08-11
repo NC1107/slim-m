@@ -11,6 +11,7 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_platform/platform.dart';
 
 import 'providers.dart';
+import 'push_content_preview_settings.dart';
 
 /// The native bridge for this device's APNs token. A provider, rather than a
 /// field [PushController] constructs itself, so a test can substitute one
@@ -334,6 +335,12 @@ class PushController extends StateNotifier<PushStatus>
   /// Without that the app can sit freshly registered but never known to be
   /// foreground, so every message pushes a notification to the screen the user
   /// is already looking at.
+  ///
+  /// [PushContentPreviewController.currentValue] is read fresh on every call,
+  /// not cached on this controller: it is the one thing here a person can
+  /// change without signing out and back in, so a re-registration triggered
+  /// by flipping that setting has to reach the server with the new answer,
+  /// not the one this device registered with last.
   Future<void> _registerWithServer({
     required String platform,
     required String token,
@@ -343,6 +350,9 @@ class PushController extends StateNotifier<PushStatus>
         _ref.read(pushKeyStoreProvider),
         legacy: _ref.read(legacyPushKeyStoreProvider),
       ).publicKeyBase64();
+      final includeContent = await _ref
+          .read(pushContentPreviewSettingsProvider.notifier)
+          .currentValue();
 
       await _ref
           .read(apiProvider)
@@ -350,6 +360,7 @@ class PushController extends StateNotifier<PushStatus>
             platform: platform,
             pushToken: token,
             pushPublicKey: publicKey,
+            includeContent: includeContent,
           );
       state = PushStatus.registered;
       final current =

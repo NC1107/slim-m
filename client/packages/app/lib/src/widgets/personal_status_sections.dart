@@ -4,6 +4,9 @@
 /// voice preferences screen.
 library;
 
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
@@ -13,6 +16,7 @@ import '../providers/notification_preference_controller.dart';
 import '../providers/notification_sound_settings.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
+import '../providers/push_content_preview_settings.dart';
 import '../providers/push_controller.dart';
 import 'presence_menu.dart' show applyPresenceVisibility, presenceOptions;
 import 'run_guarded.dart';
@@ -107,8 +111,49 @@ class NotificationsSection extends ConsumerWidget {
               ref.read(messageSoundSettingsProvider.notifier).setEnabled(value),
           semanticLabel: 'Play a sound for messages, mentions and errors',
         ),
+        const _PushContentPreviewRow(),
         const _NotificationPreferenceRow(),
       ],
+    );
+  }
+}
+
+/// The "show message text on the lock screen" toggle.
+///
+/// Reachable only on iOS: that is the one platform with a Notification
+/// Service Extension able to decrypt the preview this asks the server to
+/// seal (`push/http/push.rs`'s own doc comment on `include_content`; see
+/// `ios/NotificationServiceExtension`). Asking for it on Android would carry
+/// a bigger envelope with nothing on that device able to open it - harmless,
+/// since the relay still cannot read it either way, but pointless, so the
+/// row is gated rather than offering a choice that changes nothing. Kept
+/// discoverable in source rather than merely absent: this doc comment is the
+/// record of why, the same treatment `pasteKeystrokeReadsClipboardImage`
+/// gives its own iOS exclusion.
+class _PushContentPreviewRow extends ConsumerWidget {
+  const _PushContentPreviewRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
+      return const SizedBox.shrink();
+    }
+    final enabled = ref.watch(pushContentPreviewSettingsProvider);
+
+    return SettingsToggleRow(
+      label: 'Show message text on your lock screen',
+      description:
+          'Off by default. When on, a locked iPhone shows who sent a '
+          'message and part of what it says - decrypted on this device, '
+          'never by the relay that delivers the push.',
+      value: enabled,
+      semanticLabel: 'Show message text on your lock screen',
+      onChanged: (value) async {
+        await ref
+            .read(pushContentPreviewSettingsProvider.notifier)
+            .setEnabled(value);
+        unawaited(ref.read(pushControllerProvider.notifier).register());
+      },
     );
   }
 }
