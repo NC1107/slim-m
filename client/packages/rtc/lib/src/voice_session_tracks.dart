@@ -3,7 +3,8 @@ part of 'voice_session.dart';
 
 /// [VoiceSession]'s private plumbing: the "try to change a published track"
 /// leaves behind its microphone, camera and deafen controls, plus the room
-/// event listener and the forced-disconnect handler that listener routes to.
+/// event listener, the forced-disconnect handler that listener routes to,
+/// and the teardown every other call-ending path runs.
 ///
 /// Split out for the file's 500-line hard ceiling. Everything here is
 /// entirely private, unlike the public callers, which stay declared on
@@ -54,6 +55,30 @@ extension VoiceSessionTracks on VoiceSession {
     await _screenShare.dispose();
   }
 
+  /// Drops this session's room, and everything holding it open, in the order
+  /// a call has to end in. Every path that ends a call runs this: [leave], a
+  /// [join] replacing a room that is still up, and [dispose].
+  ///
+  /// `_room` is cleared before anything else, and synchronously: a join
+  /// racing this teardown reads it to tell whether it is still the current
+  /// attempt, and that answer has to be final the instant a teardown starts.
+  Future<void> _teardown() async {
+    // Synchronously, and before anything else; see this method's own doc.
+    final room = _room;
+    _room = null;
+    _cancelEvents?.call();
+    _cancelEvents = null;
+    // Not every call-ending path resets it; this one covers all of them.
+    _cameraSwitching.resetFacing();
+    // Awaited before the room disconnects below: the SFU has no bearing on iOS.
+    await _step(_screenShare.stopActiveBroadcast);
+    await _step(_screenShare.dispose);
+    if (room != null) {
+      await _step(room.disconnect);
+      await _step(room.dispose);
+    }
+  }
+
   Future<bool> _trySetMicrophone(bool enabled) async {
     final room = _room;
     if (room == null) return false;
@@ -91,5 +116,28 @@ extension VoiceSessionTracks on VoiceSession {
   Future<void> _applyLocalAudioState(lk.Room room) async {
     final failure = await _audio.applyTo(room);
     if (failure != null) _lastError = failure;
+  }
+}
+
+/// Runs one teardown step, absorbing its failure so it cannot abandon the
+/// steps after it.
+///
+/// Hanging up has to reach the room disconnect whatever a platform said about
+/// a broadcast it was already asked to stop, and has to reach the room
+/// dispose whatever the disconnect said - a room already gone is the state
+/// this wanted anyway. Before this, only `disconnect` was guarded, so a throw
+/// from either step ahead of it left the room connected,
+/// [VoiceSession.leave] throwing rather than settling, and whatever the
+/// caller resets on a hang-up unreached - which reads on screen as a hang-up
+/// that did nothing.
+///
+/// Deliberately does not record the failure as [VoiceSession.lastError]: that
+/// field is what a join, camera or share failure turns into visible copy, and
+/// a teardown has no caller left that could act on one.
+Future<void> _step(Future<void> Function() run) async {
+  try {
+    await run();
+  } catch (_) {
+    // See this function's own doc comment for why nothing is kept.
   }
 }

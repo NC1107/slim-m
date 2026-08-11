@@ -152,6 +152,10 @@ class VoiceSession {
   /// The in-flight join, so a second call serializes behind it; see [join].
   Future<void>? _joining;
 
+  /// Bumped by every join and every leave, so a teardown still unwinding can
+  /// tell that a newer call has taken this session over; see [leave].
+  int _generation = 0;
+
   /// Joins a room with a token minted by the server.
   ///
   /// The token decides what this connection may do: a member without SPEAK gets
@@ -194,6 +198,8 @@ class VoiceSession {
   }) async {
     if (_disposed) return;
     if (_room != null) await leave();
+    // Claims the session past the leave above, whose own guard has run by now.
+    _generation++;
 
     _lastDisconnect = null;
     _setState(VoiceSessionState.connecting);
@@ -231,8 +237,17 @@ class VoiceSession {
   /// apply it to once this returns, and leaving it set internally would
   /// silently deafen the next call before anyone asked for that, with
   /// nothing in [VoiceState] (which does reset) around to say so.
+  ///
+  /// None of that happens for a leave a newer join has already superseded.
+  /// [_teardown] clears `_room` before it awaits anything, so a join
+  /// starting while a disconnect is still in flight builds its room
+  /// unobstructed - and would then have this call's trailing reset land on
+  /// top of it, reporting a connecting or connected call as idle and
+  /// clearing the audio state it had just been given.
   Future<void> leave() async {
+    final generation = ++_generation;
     await _teardown();
+    if (generation != _generation) return;
     _participants = const [];
     _audio.deafened = false;
     _audio.muted.clear();
@@ -431,29 +446,6 @@ class VoiceSession {
     _participants = List.unmodifiable(next);
     if (!_participantsController.isClosed) {
       _participantsController.add(_participants);
-    }
-  }
-
-  Future<void> _teardown() async {
-    // Cleared before anything else, and synchronously: a join racing this
-    // teardown reads `_room` to tell whether it is still the current
-    // attempt, and that answer must be final the instant teardown starts.
-    final room = _room;
-    _room = null;
-    _cancelEvents?.call();
-    _cancelEvents = null;
-    // Not every call-ending path resets it; this one covers all of them.
-    _cameraSwitching.resetFacing();
-    // Awaited before the room disconnects below: the SFU has no bearing on iOS.
-    await _screenShare.stopActiveBroadcast();
-    await _screenShare.dispose();
-    if (room != null) {
-      try {
-        await room.disconnect();
-      } catch (_) {
-        // Already gone, which is the state we wanted anyway.
-      }
-      await room.dispose();
     }
   }
 

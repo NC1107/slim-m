@@ -99,7 +99,8 @@ echo "::endgroup::"
 
 echo "::group::resize past the debounce, then kill mid-session"
 xdotool windowsize "$(window_id)" 900 650
-sleep 1
+# A 500ms debounce plus a disk write; 1s flaked on a loaded runner, see PR #580.
+sleep 3
 kill -9 "$APP_PID"
 wait "$APP_PID" 2>/dev/null || true
 echo "::endgroup::"
