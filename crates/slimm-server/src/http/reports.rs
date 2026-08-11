@@ -108,6 +108,26 @@ struct ResolveReportRequest {
     resolution: String,
 }
 
+/// What it takes to moderate one specific channel: the moderation bit and the
+/// right to see the channel at all.
+///
+/// The two are inseparable here and were not always conjoined. `channels_where`
+/// began life asking about `VIEW_CHANNEL` and was generalised to take the
+/// permission as a parameter for this queue's sake, which quietly dropped the
+/// view requirement rather than adding to it - its own doc comment still
+/// records the generalisation. A caller holding deployment-wide
+/// `MANAGE_MESSAGES` who is denied only `VIEW_CHANNEL` by a channel overwrite
+/// therefore still satisfied `perms.contains(MANAGE_MESSAGES)` in that
+/// channel, so its reports stayed in their queue - snapshot text and all -
+/// from a channel the deployment had specifically hidden from them.
+///
+/// Every other channel-scoped gate in this crate already spells the pair out
+/// (`voice.rs`'s `VIEW_CHANNEL | CONNECT`, `canvas_write.rs`'s
+/// `VIEW_CHANNEL | USE_CANVAS`); this is the one place that had drifted, so it
+/// is a named constant now rather than two call sites that must remember.
+const MODERATES_CHANNEL: Permissions =
+    Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_MESSAGES);
+
 /// Lists one page of the open moderation queue, oldest first.
 ///
 /// A report carries the reported content verbatim, so the queue is filtered
@@ -199,7 +219,7 @@ async fn hidden_channels(state: &AppState, user_id: UserId) -> Result<Vec<Channe
         .collect();
     let moderatable: std::collections::HashSet<ChannelId> = state
         .store
-        .channels_where(user_id, Permissions::MANAGE_MESSAGES)
+        .channels_where(user_id, MODERATES_CHANNEL)
         .await?
         .into_iter()
         .map(|channel| channel.id)
@@ -292,7 +312,7 @@ async fn report_visible_in(state: &AppState, user_id: UserId, channel_id: Channe
         Ok(false) => true,
         Ok(true) => state
             .store
-            .has_permission(user_id, channel_id, Permissions::MANAGE_MESSAGES)
+            .has_permission(user_id, channel_id, MODERATES_CHANNEL)
             .await
             .unwrap_or(false),
         Err(_) => false,
