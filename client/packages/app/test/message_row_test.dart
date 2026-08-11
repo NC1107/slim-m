@@ -460,9 +460,10 @@ void main() {
       first.top,
       reason: 'two short reactions belong on one line',
     );
+    // Not greaterThan: chips now abut at zero gap on purpose, see reaction_chip_gap_test.dart.
     expect(
       second.left,
-      greaterThan(first.right),
+      greaterThanOrEqualTo(first.right),
       reason: 'the second chip sits beside the first, not under it',
     );
   });

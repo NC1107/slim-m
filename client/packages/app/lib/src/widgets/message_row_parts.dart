@@ -20,6 +20,26 @@ import 'message_row_identity.dart' show formatMessageDay, formatMessageTime;
 /// face draws well inside its em box while an image fills whatever box it gets.
 const double _reactionEmojiSize = 16;
 
+/// Every chip in [ReactionsRow]'s [Wrap] is a [FocusableTapTarget], which
+/// reserves [focusRingGap] plus [focusRingWidth] of invisible margin on
+/// every side for its own focus ring - present whether or not the ring is
+/// ever drawn. A plain [AppSpacing.s4] step between two such chips therefore
+/// painted as three stacked reservations (one chip's margin, the spacing,
+/// the next chip's margin), not the one step it names.
+///
+/// This cancels only the spacing itself - the one value anyone actually
+/// chose - leaving the two chips' own ring margins as the entire visible
+/// gap. It deliberately stops at zero rather than going negative: a
+/// negative value would pull adjacent chips' invisible hit boxes into
+/// overlapping, and since each box is opaque to a tap regardless of what is
+/// painted under it, that would erase the dead zone that currently exists
+/// between two chips - every point in the visible gap would then resolve
+/// to reacting on one chip or the other, where today it does nothing.
+/// Zero keeps the boxes exactly abutting rather than overlapping, so that
+/// dead zone shrinks to nothing rather than being eliminated.
+const double _reactionChipSpacing =
+    AppSpacing.s4 - (focusRingGap + focusRingWidth);
+
 class EditedMarker extends StatelessWidget {
   const EditedMarker({super.key});
 
@@ -101,8 +121,8 @@ class ReactionsRow extends StatelessWidget {
     return Transform.translate(
       offset: const Offset(0, -AppSpacing.s4),
       child: Wrap(
-        spacing: AppSpacing.s4,
-        runSpacing: AppSpacing.s4,
+        spacing: _reactionChipSpacing,
+        runSpacing: _reactionChipSpacing,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           // Keyed by emoji and wrapped in a one-shot pop (scale .85 to 1 with
