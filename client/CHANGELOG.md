@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.37.0](https://github.com/NC1107/slim-m/compare/client-v0.36.0...client-v0.37.0) (2026-08-11)
+
+
+### Features
+
+* **client:** a camera-on-join preference, the last piece of the pre-toggle ([#546](https://github.com/NC1107/slim-m/issues/546)) ([b832162](https://github.com/NC1107/slim-m/commit/b83216222bd89c62258a0a884d05649f6116f6ba))
+* **client:** build the desktop window shell decision 0012 designed ([#533](https://github.com/NC1107/slim-m/issues/533)) ([506b82a](https://github.com/NC1107/slim-m/commit/506b82a71d855c6d1d913acc285d94d0d0f7feba))
+* **client:** one container system for settings and administration ([#532](https://github.com/NC1107/slim-m/issues/532)) ([076a6ed](https://github.com/NC1107/slim-m/commit/076a6ed868d75f118c59d5eed88d8dad6a44cd72))
+* **client:** unsubscribe canvas video for tiles outside the viewport ([#558](https://github.com/NC1107/slim-m/issues/558)) ([bd1d644](https://github.com/NC1107/slim-m/commit/bd1d64408d94ed60286217668212a2f890c6209c))
+
+
+### Bug Fixes
+
+* **ci:** close comment-defeatable blind spots in source-reading gates ([#553](https://github.com/NC1107/slim-m/issues/553)) ([1b13496](https://github.com/NC1107/slim-m/commit/1b1349601f63a6b6694c2de1539e5171337eae50))
+* **client:** a second launch focuses the running window instead of spawning a duplicate ([#539](https://github.com/NC1107/slim-m/issues/539)) ([397674e](https://github.com/NC1107/slim-m/commit/397674e3946bcd9ce598b3c40e7903d8d06e6221))
+* **client:** close the second-tier findings from the screen-review pass ([#542](https://github.com/NC1107/slim-m/issues/542)) ([2275fe9](https://github.com/NC1107/slim-m/commit/2275fe9d522d947f970e708ebb7cc28dce0e734d))
+* **client:** close the shadow artifact that fooled five review passes ([#543](https://github.com/NC1107/slim-m/issues/543)) ([deaba8e](https://github.com/NC1107/slim-m/commit/deaba8e99a137b4697d7df5cc93e3a26ab5b72cc))
+* **client:** close the sharp findings from the screen-review pass ([#535](https://github.com/NC1107/slim-m/issues/535)) ([f5b1d13](https://github.com/NC1107/slim-m/commit/f5b1d13fa06c02b89daabc726f83146cdf676a0f))
+* **client:** give a desktop with no tray a real way to quit ([#544](https://github.com/NC1107/slim-m/issues/544)) ([debb349](https://github.com/NC1107/slim-m/commit/debb3492b7cd5977092f6226f47cc03d07cac610))
+* **client:** give the composer field its own stable accessible name ([#550](https://github.com/NC1107/slim-m/issues/550)) ([37585e7](https://github.com/NC1107/slim-m/commit/37585e737a0fa23f8a4929c9925cf201c39fc845))
+* **client:** shrink the canvas call dock's call controls at pointer width ([#537](https://github.com/NC1107/slim-m/issues/537)) ([27947da](https://github.com/NC1107/slim-m/commit/27947dae7bb76b6718706e1ba112c1ed6b411540))
+* **client:** stop the canvas image hydrator eviction test from flaking under load ([#534](https://github.com/NC1107/slim-m/issues/534)) ([308bc58](https://github.com/NC1107/slim-m/commit/308bc588f77af85367d2ec97368ef8d98a1eac19))
+* **client:** tell the true story on the no-tray minimise fallback ([#541](https://github.com/NC1107/slim-m/issues/541)) ([7e4cd0d](https://github.com/NC1107/slim-m/commit/7e4cd0dc95a35aef96825c8858329c4fcb5365a4))
+* **client:** the report card's reporter row overflows a long name at phone width ([#545](https://github.com/NC1107/slim-m/issues/545)) ([4a637d2](https://github.com/NC1107/slim-m/commit/4a637d225bbab93404295ee7688645d441db140e))
+
 ## [0.36.0](https://github.com/NC1107/slim-m/compare/client-v0.35.1...client-v0.36.0) (2026-08-10)
 
 
