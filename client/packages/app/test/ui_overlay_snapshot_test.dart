@@ -42,6 +42,7 @@ import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart' show CameraDevice, ScreenShareSource;
 
+import 'support/mid_flight_capture.dart';
 import 'ui_snapshot_support.dart';
 
 /// A 1x1 PNG, the same fixture `avatar_crop_sheet_test.dart` uses: all the
@@ -220,7 +221,9 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 350));
 
-        await writeSnapshot(tester, '${overlay.key}-${viewport.key}');
+        final snapshotName = '${overlay.key}-${viewport.key}';
+        await expectSettled(tester, snapshotName);
+        await writeSnapshot(tester, snapshotName);
 
         expect(tester.takeException(), isNull);
 

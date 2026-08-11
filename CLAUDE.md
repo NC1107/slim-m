@@ -100,7 +100,39 @@ Mutation-tested three ways, each failing exactly the test built for it and nothi
 **Does this close the class, or only narrow it?** Only narrows it.
 `expectSettled` is bounded at three extra pumps; a resolve chained deeper than that would still slip through unnoticed, the same way the original two-pump budget let this one through.
 It also only catches a *text* difference - a resolve that changes an image, a colour, or a layout with no textual signal (an avatar swapping from a placeholder to a real picture, say) is invisible to it, since `renderedText` reads `Text` widgets only.
-And it is wired into `ui_snapshot_test.dart`'s `renderSurface` alone; the sibling overlay harnesses (`ui_overlay_snapshot_*_test.dart`) and `design_system`'s own golden matrix have their own rendering paths and are not covered by this gate at all.
+~~And it is wired into `ui_snapshot_test.dart`'s `renderSurface` alone; the sibling overlay harnesses (`ui_overlay_snapshot_*_test.dart`) and `design_system`'s own golden matrix have their own rendering paths and are not covered by this gate at all.~~
+Closed for the overlay harnesses, checked and left for a stated reason on the golden matrix, and the other two bounds re-measured rather than re-argued; see "The three gaps this gate's own writeup left open, taken one at a time" below.
+
+## The three gaps this gate's own writeup left open, taken one at a time (2026-08-11)
+
+The entry above named three residuals in its own closing paragraph: one harness family left unwired, a text-only signal, and an unproven three-pump bound.
+Asked to close as much as earns its cost and say honestly what is left.
+Read this before touching any `ui_overlay_snapshot_*_test.dart`, `golden_matrix_test.dart`, or `mid_flight_capture.dart`'s `extraSettlePumps`.
+
+**Gap 3, the unguarded harnesses: closed for all eight `ui_overlay_snapshot_*_test.dart` files, and it found a real bug on the first run.**
+Each file's own `writeSnapshot` call site (a shared `_finish` helper in five of them, an inline call in the other three) now runs `expectSettled` first, preserving the same before-`writeSnapshot` ordering `renderSurface` already established and for the same reason: `writeSnapshot`'s own real-shadow repaint does real async work under `SLIMM_UI_SNAPSHOTS=1` and would resolve a genuine mid-flight state ahead of the read.
+Run cold across all 129 tests in the family, it found exactly one real defect, in `ui_overlay_snapshot_moderation_test.dart`'s own `_pumpInCall`: `_other`'s avatar has no cached bytes, so `UserAvatar` fetches one, the test's own catch-all `MockClient` answers with a 204 and an empty body, `FetchedBytes` reads any 2xx as "found, zero bytes" rather than "no avatar", and the resulting decode failure only reaches `AppAvatar`'s `Image.errorBuilder` (which paints the initials fallback, "MA") a frame or two after the harness's own settle budget already declared the popover done.
+Two tests captured this mid-flight - `member-popover-call-audio-only-desktop` and `member-popover-eject-desktop`, both routed through `_pumpInCall` - fixed with one targeted extra `tester.pump()` there, mutation-tested (reverting it fails exactly those two tests and nothing else, restored by hand and confirmed byte-identical against `git diff`).
+
+**Reading the PNG found something worth recording on its own: it does not change.**
+`admin-reports`'s own fix (the prior entry) proved itself by a visible PNG diff; this one does not have one, checked directly - the pre-fix and post-fix `member-popover-eject-desktop.png` are md5-identical.
+The reason is the same masking effect the prior entry already named for `admin-reports`, just working in the opposite direction here: `writeSnapshot`'s own real-shadow repaint gives the pending image decode enough extra turns of the event loop to fail and fall back to initials before the pixels are ever rasterised, so the artifact a person would actually look at was never wrong.
+What was wrong is the state a bare `flutter test` (no `SLIMM_UI_SNAPSHOTS`, where `writeSnapshot` no-ops and nothing repaints past the ordinary settle budget) would have handed to any caller that read the tree at the moment the harness calls done - which is exactly the shape `expectSettled` exists to catch, and exactly why this class needed a widget-tree gate rather than a habit of eyeballing screenshots: the bug was real and was invisible to every image anyone had ever looked at.
+
+**`design_system`'s own golden matrix is the second named harness, and it is not wired in, for a reason rather than an oversight.**
+Its `_sample` widget (`golden_matrix_test.dart`) carries no `ProviderScope`, no `FutureProvider`, and no network fixture of any kind - every string in it is a `const` literal, painted on the first frame and never touched again.
+There is structurally nothing in that file that can resolve after the frame that painted it, so wiring `expectSettled` in would be pure overhead asserting a tautology forever.
+Noted in the file's own doc comment rather than left to be rediscovered.
+
+**Gap 2, text-only: the one avatar-decode case this pass actually found manifested as text and was already caught, and the deliberate "does this happen anywhere else" check found nothing that would need a second signal.**
+The named worry - an avatar resolving from a placeholder to a real picture with no textual cue - does not exist anywhere in the matrix today: every avatar fetch the shared fixture answers (`fixtureResponse`, `ui_snapshot_fixture_data.dart`) is a 404, so `avatarBytesProvider` returns null immediately and `AppAvatar` renders straight to its initials `_Face` on the first frame, synchronously, with no `Image` widget ever built at all.
+The one place an `Image` *is* built with real bytes is `AvatarCropSheet`'s own preview (`Image.memory`, fed a real, valid, if 1x1, test PNG), and it was checked directly rather than assumed away: a throwaway probe captured raw RGBA pixels at the harness's own "declared done" point and again five pumps later, and they are **not** identical - a real, non-textual mid-flight difference exists there.
+Read as a screenshot, though, both states are a near-black square on a near-black background at 1x1-pixel resolution scaled to fill a crop viewport: the difference is real and is not one a person looking at the picture, or a reviewer diffing it, could ever tell apart.
+Building a pixel-comparison mechanism for a difference nobody could see would be exactly the flakiness risk this task's own brief warned against, for a case with no real instance to justify it; left alone, and named here rather than quietly dropped.
+
+**Gap 1, the three-pump bound: raised to twenty and reran the whole matrix - all 443 tests across `ui_snapshot_test.dart`, `ui_snapshot_settings_test.dart` and all eight overlay files still pass, with no new failures past what three already caught.**
+That is real evidence the bound is adequate for every surface this client renders today, not merely unfalsified: a resolve chained deeper than three pumps would have shown up as a new failure at twenty and did not, on the same total test count `expectSettled`'s own writeup already cites (314 in the core matrix, 129 more across the newly-wired overlay family).
+Left at three, unraised - recorded as measured rather than assumed, so the next surface that genuinely does chain deeper has a real baseline to compare against rather than a guess.
 
 ## A screen share outliving its call, and how far the platform's own stop mechanism actually reaches (2026-08-10)
 

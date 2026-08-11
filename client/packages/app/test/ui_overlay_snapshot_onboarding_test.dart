@@ -28,6 +28,7 @@ import 'package:slimm_app/src/screens/onboarding_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/mid_flight_capture.dart';
 import 'support/onboarding_error_strings.dart';
 import 'ui_snapshot_support.dart';
 
@@ -144,6 +145,7 @@ Future<void> _openManualDialog(WidgetTester tester) async {
 }
 
 Future<void> _finish(WidgetTester tester, String name) async {
+  await expectSettled(tester, name);
   await writeSnapshot(tester, name);
   expect(tester.takeException(), isNull);
 }

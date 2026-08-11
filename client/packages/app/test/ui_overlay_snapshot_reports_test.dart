@@ -29,6 +29,7 @@ import 'package:slimm_app/src/screens/admin/report_card.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'support/mid_flight_capture.dart';
 import 'ui_snapshot_support.dart';
 
 const _viewport = Size(1400, 880);
@@ -137,6 +138,7 @@ Future<void> _pumpReportCard(
 }
 
 Future<void> _finish(WidgetTester tester, String name) async {
+  await expectSettled(tester, name);
   await writeSnapshot(tester, name);
   expect(tester.takeException(), isNull);
 }

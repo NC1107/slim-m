@@ -21,6 +21,12 @@
 /// overflowing its container. A layout that looks right at 100% and clips at
 /// 200% is a real accessibility failure, and only a rendered comparison catches
 /// it.
+///
+/// Not wired into `expectSettled` (`packages/app/test/support/mid_flight_
+/// capture.dart`), and deliberately: [_sample] has no `ProviderScope`, no
+/// `FutureProvider`, and no network fixture of any kind, so nothing in this
+/// file can resolve after the frame that painted it. There is no mid-flight
+/// state here to catch.
 library;
 
 import 'package:flutter/material.dart';

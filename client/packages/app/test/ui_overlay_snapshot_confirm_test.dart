@@ -28,6 +28,7 @@ import 'package:go_router/go_router.dart';
 import 'package:slimm_app/src/widgets/confirm_dialog.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'support/mid_flight_capture.dart';
 import 'ui_snapshot_support.dart';
 
 /// One dialog per call site, keyed by this file's own state id.
@@ -203,7 +204,9 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 350));
 
-        await writeSnapshot(tester, '${confirm.key}-${viewport.key}');
+        final snapshotName = '${confirm.key}-${viewport.key}';
+        await expectSettled(tester, snapshotName);
+        await writeSnapshot(tester, snapshotName);
 
         expect(tester.takeException(), isNull);
       });
