@@ -162,8 +162,7 @@ final class PushSealedBoxTests: XCTestCase {
     let envelope = try decodeEnvelope(sender: "Nick", body: "hello")
     XCTAssertTrue(
       envelope.hasPreview,
-      "a message with real text must still be previewed, or this guard has \
-       turned the feature off")
+      "a real body must still be previewed, or this guard turned it off")
   }
 
   /// Field names match `push/envelope.rs`'s own serialization, which carries
