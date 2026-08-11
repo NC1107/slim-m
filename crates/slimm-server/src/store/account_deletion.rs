@@ -54,6 +54,14 @@ impl Store {
     /// further writes follow. Closing that last-write window fully would need a
     /// liveness check inside every write verb, left for later.
     ///
+    /// Every authorship column is cleared here by hand, including
+    /// `reports.reporter_id` and `reports.resolved_by`. Those two carry
+    /// `ON DELETE SET NULL` in `0005_safety.sql` and it never fires: deletion
+    /// here is a tombstone `UPDATE`, never a `DELETE FROM users`, so the
+    /// constraint has nothing to trigger on. `ReportDto.reporter_id`'s own doc
+    /// comment already promised "null once the reporter's account has been
+    /// anonymized", which was not true of any code path until this cleared it.
+    ///
     /// Group-ownership transfer is a no-op until an ownership model exists; the
     /// current schema has no owner column, so nothing can be orphaned.
     ///
@@ -126,6 +134,18 @@ impl Store {
         .await?;
         sqlx::query!(
             "UPDATE password_reset_codes SET issued_by = NULL WHERE issued_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE reports SET reporter_id = NULL WHERE reporter_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE reports SET resolved_by = NULL WHERE resolved_by = ?",
             user_id
         )
         .execute(&mut *tx)

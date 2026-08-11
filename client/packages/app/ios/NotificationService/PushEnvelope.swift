@@ -44,9 +44,14 @@ struct PushEnvelope: Decodable {
   /// A content-free envelope carries the routing fields alone, and rewriting
   /// "New message" into an empty title would be strictly worse than leaving
   /// it be.
+  /// An empty body is held to the same bar as an empty sender, and for the
+  /// same reason: a message carrying only an attachment has no text at all,
+  /// so a preview built from it would replace "New message" with a sender's
+  /// name above nothing - less than the placeholder said, not more.
   var hasPreview: Bool {
     guard let sender = sender, !sender.isEmpty else { return false }
-    return body != nil
+    guard let body = body, !body.isEmpty else { return false }
+    return true
   }
 
   /// Rewrites the placeholder in place, leaving everything the relay set -
