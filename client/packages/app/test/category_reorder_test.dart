@@ -4,6 +4,18 @@
 /// right order, and the handle carries a real accessible name - see
 /// `categories_screen.dart`'s own doc comment for why this is a second,
 /// separate reorderable list rather than the rail's `ReorderableChannelRows`.
+///
+/// The accessible-name test reads `find.bySemanticsLabel` rather than
+/// `tester.getSemantics(find.byType(CategoryDragHandle))`, because the two
+/// are not equivalent here: `WidgetTester.getSemantics` walks upward from
+/// the found element's own render object toward the root looking for a
+/// `debugSemantics` answer, it never descends into a child. The element
+/// `find.byType(CategoryDragHandle)` locates resolves to `Listener` (from
+/// `ReorderableDragStartListener`), which owns no semantics node of its
+/// own and sits *above* the `Semantics(label: ...)` wrapping the handle's
+/// `SizedBox` in the real widget tree - a descendant `getSemantics` cannot
+/// reach by walking up. `find.bySemanticsLabel` reads the compiled tree
+/// directly instead and has no such blind spot.
 library;
 
 import 'package:flutter/material.dart';
@@ -93,8 +105,7 @@ void main() {
         ),
       );
 
-      // The handle starts the drag immediately - no held-press wait, unlike
-      // the rail's whole-row delayed listener (channel_rail_reorder.dart).
+      // Immediate, not delayed like the rail's whole-row listener - no held-press wait.
       final gesture = await tester.startGesture(
         tester.getCenter(find.byType(CategoryDragHandle).first),
       );
@@ -124,10 +135,7 @@ void main() {
       _harness(CategoryDragHandle(index: 0, name: 'Announcements')),
     );
 
-    // Read off the compiled semantics tree, not the widget: `getSemantics`
-    // walks a render object's own ancestors, and `CategoryDragHandle`'s own
-    // findable render object (`Listener`, from `ReorderableDragStartListener`)
-    // sits above its `Semantics` child rather than below it.
+    // See this file's own library doc comment for why not tester.getSemantics.
     expect(find.bySemanticsLabel('Reorder Announcements'), findsOneWidget);
     handle.dispose();
   });
