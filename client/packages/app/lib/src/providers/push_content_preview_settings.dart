@@ -28,11 +28,19 @@ class PushContentPreviewController extends StateNotifier<bool> {
   /// writes the in-memory default ahead of the real, persisted value - a
   /// registration racing app startup must not silently send `false` for a
   /// device that actually has this turned on.
+  ///
+  /// Never throws: [currentValue] is on every registration's path, and a
+  /// device whose local storage briefly fails still deserves a real
+  /// registration rather than [PushController] reading it as a server error.
   late final Future<void> _ready;
 
   Future<void> _load() async {
-    final prefs = await _ref.read(preferencesProvider.future);
-    state = prefs.getBool(pushIncludeContentKey) ?? false;
+    try {
+      final prefs = await _ref.read(preferencesProvider.future);
+      state = prefs.getBool(pushIncludeContentKey) ?? false;
+    } catch (_) {
+      // state already holds this class's own false default; see above.
+    }
   }
 
   /// The persisted value, for a caller (registration) that needs the real

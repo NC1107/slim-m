@@ -11,6 +11,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/push_content_preview_settings.dart';
 
 void main() {
@@ -53,5 +54,22 @@ void main() {
         .read(pushContentPreviewSettingsProvider.notifier)
         .currentValue();
     expect(value, isTrue);
+  });
+
+  test('a failed local-storage read still answers false rather than hanging '
+      'PushController.register() forever', () async {
+    final container = ProviderContainer(
+      overrides: [
+        preferencesProvider.overrideWith((ref) async {
+          throw StateError('local storage unavailable');
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final value = await container
+        .read(pushContentPreviewSettingsProvider.notifier)
+        .currentValue();
+    expect(value, isFalse);
   });
 }
