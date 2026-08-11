@@ -10,9 +10,11 @@
 /// guard itself.
 library;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../diagnostics/debug_log.dart';
 import '../providers/providers.dart';
 import 'close_behavior.dart';
 import 'desktop_window_controller.dart';
@@ -30,13 +32,40 @@ class DesktopWindowShell {
   /// Shared across [applyInitialGeometry] and [registerListenersAndTray]:
   /// the native listener must be registered exactly once, which is what
   /// [WindowManagerDesktopWindowPort.ensureInitialized]'s own idempotence
-  /// guards, and both steps need the one real window either way.
-  static final DesktopWindowPort _port = WindowManagerDesktopWindowPort();
+  /// guards, and both steps need the one real window either way. Not
+  /// `final`: [debugPort] is the test-only seam that swaps it for a fake.
+  static DesktopWindowPort _port = WindowManagerDesktopWindowPort();
+
+  /// How long [registerListenersAndTray] waits on the native window/tray
+  /// calls before giving up and letting startup proceed regardless - a
+  /// hang here (a D-Bus call with nothing answering it, say) would
+  /// otherwise never resolve, which is the same silent-forever startup
+  /// screen a thrown exception used to cause before this file caught one.
+  static const _setupTimeout = Duration(seconds: 5);
 
   static DesktopWindowController? _controller;
   static DesktopTrayController? _trayController;
   static bool _active = false;
   static bool _framelessApplied = false;
+
+  /// Test-only seam: a real desktop-shell test still runs on real Linux
+  /// (`dart:io`'s `Platform` cannot tell a CI runner from a launch), so
+  /// this is what lets a test drive [registerListenersAndTray] against a
+  /// fake port rather than the real plugin.
+  @visibleForTesting
+  static set debugPort(DesktopWindowPort port) => _port = port;
+
+  /// Restores every static field to its never-started state, for a test
+  /// that wants a clean slate rather than whatever an earlier test in the
+  /// same file left behind.
+  @visibleForTesting
+  static void debugReset() {
+    _port = WindowManagerDesktopWindowPort();
+    _controller = null;
+    _trayController = null;
+    _active = false;
+    _framelessApplied = false;
+  }
 
   /// The one port [TitleBar] drags, minimizes and maximizes through.
   static DesktopWindowPort get port => _port;
@@ -104,12 +133,37 @@ class DesktopWindowShell {
   /// itself - everything that needs [container] to reach a running call's
   /// state, so it runs after the container exists rather than before
   /// `runApp` the way [applyInitialGeometry] does.
+  ///
+  /// Never throws and never hangs past [_setupTimeout]: `main.dart` awaits
+  /// this before flipping the app ready, and a startup screen with no
+  /// timeout and no error state of its own must not be the thing a failure
+  /// here leaves the user staring at forever. A failure - thrown or timed
+  /// out - is logged and swallowed, matching [restoreSession]'s own
+  /// precedent; the app reaches a usable window with no tray, no custom
+  /// title bar and no geometry persistence rather than no window at all.
   static Future<void> registerListenersAndTray(
     ProviderContainer container,
   ) async {
     final platform = currentDesktopPlatform();
     if (platform == null) return;
     _active = true;
+    try {
+      await _bringUpWindowAndTray(container, platform).timeout(_setupTimeout);
+    } catch (error, stack) {
+      container
+          .read(debugLogProvider.notifier)
+          .record(
+            'desktop',
+            'window shell setup failed: $error',
+            detail: stack,
+          );
+    }
+  }
+
+  static Future<void> _bringUpWindowAndTray(
+    ProviderContainer container,
+    DesktopPlatform platform,
+  ) async {
     await _port.ensureInitialized();
 
     final prefs = await container.read(preferencesProvider.future);
