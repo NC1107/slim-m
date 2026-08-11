@@ -234,11 +234,16 @@ class _ReportCardState extends ConsumerState<ReportCard>
               ),
             ),
             const SizedBox(width: AppSpacing.s4),
-            Text(
-              reporterLabel(report.reporterId, profiles),
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            // Expanded, not a bare Text: a long real display name would otherwise overflow the row.
+            Expanded(
+              child: Text(
+                reporterLabel(report.reporterId, profiles),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
             ),
-            const Spacer(),
+            const SizedBox(width: AppSpacing.s8),
             Text(
               formatDateTime(
                 report.createdAt,
