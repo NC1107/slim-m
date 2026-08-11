@@ -36,6 +36,10 @@ The linked sonames come from rpm's ELF scan for free, so the spec declares only 
 | `libpulse.so.0`, `libasound.so.2` | `libwebrtc`'s audio device module | the two sonames sit adjacent in `libwebrtc.so`, next to `AudioDeviceBufferTimer` |
 | `libpipewire-0.3.so.0` | `libwebrtc`'s screencast path | same file, immediately beside `org.freedesktop.portal.Desktop` |
 
+One more is declared for a different reason: `libayatana-appindicator3.so.1` is a real link, not a dlopen, but `libtray_manager_plugin.so` is one of the `lib*_plugin.so` files `__requires_exclude` hides from the scan entirely (found 2026-08-11, alongside the flatpak manifest needing the same library built from source; see `packaging/flatpak/README.md`).
+Not confirmed against the actual Ubuntu-built tarball `release.yml` publishes, only reasoned from its parts: `libayatana-appindicator3-dev` is the package that workflow installs, Ubuntu's own file listing for it ships `ayatana-appindicator3-0.1.pc` and no `appindicator3-0.1.pc`, and `tray_manager`'s CMake links whichever of those two pkg-config names it finds first.
+Building the same tarball locally on Fedora, where `appindicator3-0.1.pc` exists but `ayatana-appindicator3-0.1.pc` does not, linked the older `libappindicator3.so.1` instead, confirmed with `readelf -d` - which is the concrete evidence the soname genuinely depends on which pkg-config name the build host offers, not a guess about Ubuntu specifically.
+
 `xdg-desktop-portal` and `gnome-keyring` are `Recommends`, not `Requires`.
 They are services rather than libraries, each backs one feature rather than the app, and the Secret Service the client needs has several providers - KWallet and KeePassXC among them - with no virtual `Provides` shared between them to require instead.
 

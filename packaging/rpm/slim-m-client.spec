@@ -64,6 +64,8 @@ Requires:       libGL.so.1()(64bit)
 Requires:       libasound.so.2()(64bit)
 Requires:       libpulse.so.0()(64bit)
 Requires:       libpipewire-0.3.so.0()(64bit)
+# tray_manager_plugin.so links this directly, but its own file is excluded above.
+Requires:       libayatana-appindicator3.so.1()(64bit)
 
 # Services rather than libraries, and each backs one feature rather than the app:
 # no portal means no screen share, no secret service means no remembered sign-in.
