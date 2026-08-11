@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.38.0](https://github.com/NC1107/slim-m/compare/client-v0.37.0...client-v0.38.0) (2026-08-11)
+
+
+### Features
+
+* **client:** reorder channel categories from the categories screen ([#570](https://github.com/NC1107/slim-m/issues/570)) ([59d2f99](https://github.com/NC1107/slim-m/commit/59d2f993fe702392e8693590ce43c4807cb19d69))
+* **client:** wrap canvas presence tiles to the pane, and a fullscreen mode ([#568](https://github.com/NC1107/slim-m/issues/568)) ([af6df78](https://github.com/NC1107/slim-m/commit/af6df78382ce2df49d73239390cf14323c33e97a))
+
+
+### Bug Fixes
+
+* **client:** a call recap now covers a solo call, not just an accompanied one ([#567](https://github.com/NC1107/slim-m/issues/567)) ([e111432](https://github.com/NC1107/slim-m/commit/e1114320ac0d1d4b81fe4f4262b203a10bff6b17))
+* **client:** a channel row's context menu was stealing every reorder drag ([#564](https://github.com/NC1107/slim-m/issues/564)) ([68fc897](https://github.com/NC1107/slim-m/commit/68fc897bf19fe4f16d21e92dba983d646a9e23aa))
+* **client:** a false camera-switch error, and an unmirrored front preview ([#562](https://github.com/NC1107/slim-m/issues/562)) ([cb82560](https://github.com/NC1107/slim-m/commit/cb82560c53546e561b89055b66cc7126314ce29a))
+* **client:** compact the gap between reaction chips ([#565](https://github.com/NC1107/slim-m/issues/565)) ([4f4b721](https://github.com/NC1107/slim-m/commit/4f4b7211fb460e5dd7dda5f24681be757234b622))
+* **client:** steady the transcript scrollbar ([#571](https://github.com/NC1107/slim-m/issues/571)) ([3e6cd84](https://github.com/NC1107/slim-m/commit/3e6cd847cb4ba71c00bd2e9be3b276cc96901d72))
+
 ## [0.37.0](https://github.com/NC1107/slim-m/compare/client-v0.36.0...client-v0.37.0) (2026-08-11)
 
 
