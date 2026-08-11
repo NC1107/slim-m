@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 /// This device's push-encryption keypair.
 ///
-/// The server seals a content-free push envelope to the device's public key;
-/// the private key never leaves the device. Nothing on it can open that
-/// envelope yet (the Notification Service Extension is a later piece of
-/// work), so today's whole job is generating the pair once and making it
-/// survive restarts: a device that registered a new key on every launch would
-/// orphan every envelope already sealed to the one before it.
+/// The server seals a push envelope to the device's public key; the private
+/// key never leaves the device. On iOS the Notification Service Extension
+/// opens that envelope in its own process, reading this same key out of the
+/// shared keychain group; everywhere else nothing opens one yet.
+///
+/// The job here either way is generating the pair once and making it survive
+/// restarts: a device that registered a new key on every launch would orphan
+/// every envelope already sealed to the one before it.
 library;
 
 import 'dart:convert';
@@ -21,10 +23,20 @@ const devicePushKeyHandle = 'push_x25519_private_key';
 
 /// Generates, persists, and reuses this device's X25519 keypair.
 class DevicePushKeys {
-  DevicePushKeys(this._keyStore, {String handle = devicePushKeyHandle})
-      : _handle = handle;
+  DevicePushKeys(
+    this._keyStore, {
+    KeyStore? legacy,
+    String handle = devicePushKeyHandle,
+  })  : _legacy = legacy,
+        _handle = handle;
 
   final KeyStore _keyStore;
+
+  /// A store an earlier build of this app kept the key in, moved out of on
+  /// first read; null when nothing ever moved, which is every platform where
+  /// `pushKeyHasItsOwnStore` is false.
+  final KeyStore? _legacy;
+
   final String _handle;
   static final _algorithm = X25519();
 
@@ -43,9 +55,40 @@ class DevicePushKeys {
       return _algorithm.newKeyPairFromSeed(base64Decode(stored));
     }
 
+    final moved = await _moveFromLegacy();
+    if (moved != null) {
+      return _algorithm.newKeyPairFromSeed(base64Decode(moved));
+    }
+
     final keyPair = await _algorithm.newKeyPair();
     final seed = await keyPair.extractPrivateKeyBytes();
     await _keyStore.put(_handle, base64Encode(seed));
     return keyPair;
+  }
+
+  /// Moves a key an earlier build wrote elsewhere, returning it, or null when
+  /// there is nothing to move.
+  ///
+  /// Generating a fresh key instead would be recoverable - the next
+  /// `PUT /push` re-registers it - but only for envelopes sealed after that
+  /// registration lands, and every one already in flight to this device would
+  /// be undecryptable. A one-time read costs a keychain lookup on the first
+  /// launch after upgrade and nothing after that.
+  ///
+  /// The old copy is deleted rather than left behind: a private key sitting
+  /// in a second, less protected slot forever is worse than a downgrade
+  /// having to re-register. That delete is safe only because the two stores
+  /// differ in the attributes their queries carry, so it cannot match the
+  /// copy just written - the two must never be configured identically.
+  Future<String?> _moveFromLegacy() async {
+    final legacy = _legacy;
+    if (legacy == null) return null;
+
+    final stored = await legacy.read(_handle);
+    if (stored == null) return null;
+
+    await _keyStore.put(_handle, stored);
+    await legacy.delete(_handle);
+    return stored;
   }
 }

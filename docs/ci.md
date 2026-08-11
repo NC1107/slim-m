@@ -513,14 +513,20 @@ Emitting only the tag left `--build-name=` empty on every run before that was fi
 Builds the signed ipa and uploads it to TestFlight, under a reviewer-gated environment.
 It is intentionally inert until the signing and App Store Connect secrets exist, and warns and stops rather than faking an upload.
 
-All six secrets must be present for the job to do real work:
+All eight secrets must be present for the job to do real work.
+The list said six and named six until 2026-08-11, having never been updated when the broadcast extension gained a profile of its own:
 
 - `APP_STORE_CONNECT_KEY_ID` - App Store Connect API key id.
 - `APP_STORE_CONNECT_ISSUER_ID` - App Store Connect issuer id.
 - `APP_STORE_CONNECT_PRIVATE_KEY` - the contents of the `.p8` API private key.
 - `IOS_SIGNING_CERTIFICATE_P12` - base64 of the distribution certificate (`.p12`).
 - `IOS_SIGNING_CERTIFICATE_PASSWORD` - the password for that `.p12`.
-- `IOS_PROVISIONING_PROFILE` - base64 of the `.mobileprovision` profile.
+- `IOS_PROVISIONING_PROFILE` - base64 of the app's own `.mobileprovision` profile.
+- `IOS_BROADCAST_PROVISIONING_PROFILE` - the same for the broadcast upload extension.
+- `IOS_NSE_PROVISIONING_PROFILE` - the same for the notification service extension.
+
+The app and both extensions are separately signed bundles, so each needs its own profile.
+A missing one fails the export naming only that bundle id, which sends you looking at the wrong thing, so the gate checks all three before the build rather than at export time.
 
 The signing identity goes into a throwaway keychain rather than the login one.
 The runner is ephemeral, and a dedicated keychain keeps the private key out of any shared default that later steps touch.

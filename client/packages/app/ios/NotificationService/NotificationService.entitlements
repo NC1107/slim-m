@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The one thing this extension is given. The app's own default group,
+	     where the session and refresh tokens live, is deliberately absent:
+	     this process only ever needs the push private key, and a group holding
+	     just that key is one it can be handed without handing it the rest.
+	     Must match Runner/Runner.entitlements' second entry and
+	     PushKeychain.swift's accessGroup; the hygiene workflow gates all three.
+	     No App Group and no portal capability are involved. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>76S78SUWVM.top.npcserver.slimm.push</string>
+	</array>
+</dict>
+</plist>

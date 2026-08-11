@@ -177,9 +177,16 @@ Future<void> restoreSession(ProviderContainer container) async {
     /// a reinstall over one that was supposedly wiped). Whatever is already in
     /// the keychain at that point belongs to the account signed in before,
     /// not to this install, and must not come back as if nothing happened.
+    ///
+    /// That reaches the push key too, and on iOS it takes a second call: a
+    /// keychain query carries its own access group and accessibility, so the
+    /// wipe below cannot see an item stored under different ones.
     final prefs = await container.read(preferencesProvider.future);
     if (prefs.getBool(hasLaunchedBeforeKey) != true) {
       await keyStore.clear();
+      // A second store on iOS; see [pushKeyStoreProvider].
+      final pushKeys = container.read(pushKeyStoreProvider);
+      if (!identical(pushKeys, keyStore)) await pushKeys.clear();
       await prefs.setBool(hasLaunchedBeforeKey, true);
       container.read(isFreshInstallProvider.notifier).state = true;
       return;
@@ -347,6 +354,30 @@ final mediaCapabilitiesProvider = Provider<MediaCapabilities>(
 /// backend.
 final keyStoreProvider = Provider<KeyStore>(
   (ref) => createPersistentKeyStore(),
+);
+
+/// Where the push private key lives, which on iOS is deliberately not
+/// [keyStoreProvider]: the Notification Service Extension has to read that one
+/// key from its own process while the phone is locked, and giving it the
+/// group every other secret sits in would give it the refresh token too.
+///
+/// Everywhere else this is [keyStoreProvider] itself rather than a second
+/// store over the same storage - see `pushKeyHasItsOwnStore` for why that has
+/// to be the same instance - which also means anything overriding the one
+/// store in a test still describes the whole picture.
+final pushKeyStoreProvider = Provider<KeyStore>(
+  (ref) => pushKeyHasItsOwnStore
+      ? createPushKeyStore()
+      : ref.watch(keyStoreProvider),
+);
+
+/// Where a push key an earlier build wrote is still sitting, so the first read
+/// after an upgrade moves it rather than orphaning every envelope already
+/// sealed to it. Null wherever the key never moved, which is everywhere but
+/// iOS; where it did move, the place it moved *from* is exactly the ordinary
+/// store.
+final legacyPushKeyStoreProvider = Provider<KeyStore?>(
+  (ref) => pushKeyHasItsOwnStore ? ref.watch(keyStoreProvider) : null,
 );
 
 /// A username the composer should insert as a mention, set by the member

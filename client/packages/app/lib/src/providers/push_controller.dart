@@ -339,8 +339,10 @@ class PushController extends StateNotifier<PushStatus>
     required String token,
   }) async {
     try {
-      final keyStore = _ref.read(keyStoreProvider);
-      final publicKey = await DevicePushKeys(keyStore).publicKeyBase64();
+      final publicKey = await DevicePushKeys(
+        _ref.read(pushKeyStoreProvider),
+        legacy: _ref.read(legacyPushKeyStoreProvider),
+      ).publicKeyBase64();
 
       await _ref
           .read(apiProvider)
@@ -395,16 +397,28 @@ class PushController extends StateNotifier<PushStatus>
   /// store must not abort sign-out mid-way and strand the user on the settings
   /// screen with sync already stopped; the server-side registration is cleared
   /// on session revocation anyway.
+  ///
+  /// Both key stores are cleared, not just the one this build writes to. On
+  /// iOS a device that has not registered since upgrading still has the old
+  /// copy sitting where an earlier build left it (see
+  /// [legacyPushKeyStoreProvider]), and clearing only the new location would
+  /// leave the outgoing account's key behind for the next account to inherit.
   Future<void> unregister() async {
     try {
       await _ref.read(apiProvider).unregisterPush();
     } catch (_) {
       // Must not strand the user mid-sign-out; see the doc above.
     }
-    try {
-      await _ref.read(keyStoreProvider).delete(devicePushKeyHandle);
-    } catch (_) {
-      // Same reasoning as above.
+    final legacy = _ref.read(legacyPushKeyStoreProvider);
+    for (final store in [
+      _ref.read(pushKeyStoreProvider),
+      if (legacy != null) legacy,
+    ]) {
+      try {
+        await store.delete(devicePushKeyHandle);
+      } catch (_) {
+        // Same reasoning as above.
+      }
     }
     _stopForegroundHeartbeat();
     state = PushStatus.notSignedIn;

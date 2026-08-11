@@ -12,15 +12,17 @@
 	<key>teamID</key>
 	<string>76S78SUWVM</string>
 	<!-- Every embedded bundle needs its own entry under manual signing, and
-	     the broadcast upload extension is a separate bundle with its own id.
-	     Its profile has to exist in the portal and be installed on the runner
-	     alongside the app's, or the export fails naming this id. -->
+	     both extensions are separate bundles with their own ids. Each profile
+	     has to exist in the portal and be installed on the runner alongside
+	     the app's, or the export fails naming that id. -->
 	<key>provisioningProfiles</key>
 	<dict>
 		<key>top.npcserver.slimm</key>
 		<string>slim-m App Store Distribution</string>
 		<key>top.npcserver.slimm.BroadcastExtension</key>
 		<string>slim-m Broadcast Extension App Store</string>
+		<key>top.npcserver.slimm.NotificationService</key>
+		<string>slim-m Notification Service App Store</string>
 	</dict>
 	<key>signingCertificate</key>
 	<string>Apple Distribution</string>
