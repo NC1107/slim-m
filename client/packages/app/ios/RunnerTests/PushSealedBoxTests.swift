@@ -142,6 +142,41 @@ final class PushSealedBoxTests: XCTestCase {
     XCTAssertNotEqual(short, Array(long[0..<24]))
   }
 
+  /// A message carrying only an attachment has no text, so a preview built
+  /// from it would put a sender's name above an empty body - strictly less
+  /// than the "New message" placeholder it replaced.
+  ///
+  /// `hasPreview` already held the sender to this bar and checked only that
+  /// the body was present, so an empty one passed. Lives in this file rather
+  /// than its own because `PushEnvelope.swift` is already compiled into this
+  /// test target; a new file means editing `project.pbxproj`, which cannot be
+  /// verified anywhere but a macOS runner.
+  func testAnAttachmentOnlyMessageKeepsThePlaceholder() throws {
+    let envelope = try decodeEnvelope(sender: "Nick", body: "")
+    XCTAssertFalse(
+      envelope.hasPreview,
+      "an empty body must not replace the generic alert")
+  }
+
+  func testARealBodyIsStillPreviewed() throws {
+    let envelope = try decodeEnvelope(sender: "Nick", body: "hello")
+    XCTAssertTrue(
+      envelope.hasPreview,
+      "a message with real text must still be previewed, or this guard has \
+       turned the feature off")
+  }
+
+  /// Field names match `push/envelope.rs`'s own serialization, which carries
+  /// no serde rename - so Swift's default `Decodable` keys are the property
+  /// names, and there are no `CodingKeys` to consult.
+  private func decodeEnvelope(sender: String, body: String) throws -> PushEnvelope {
+    let json = """
+      {"domain":"slim-m.push.v1","version":1,\
+      "sender":"\(sender)","body":"\(body)"}
+      """
+    return try JSONDecoder().decode(PushEnvelope.self, from: Data(json.utf8))
+  }
+
   private func hex(_ bytes: [UInt8]) -> String {
     bytes.map { String(format: "%02x", $0) }.joined()
   }
