@@ -188,7 +188,8 @@ impl Store {
         let affected = match (name, topic) {
             (Some(name), Some(topic)) => sqlx::query!(
                 "UPDATE channels SET name = ?, topic = ? \
-                 WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'",
+                 WHERE id = ? AND deleted_at IS NULL AND kind != 'dm' \
+                 AND parent_message_id IS NULL",
                 name,
                 topic,
                 id
@@ -198,7 +199,8 @@ impl Store {
             .rows_affected(),
             (Some(name), None) => sqlx::query!(
                 "UPDATE channels SET name = ? \
-                 WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'",
+                 WHERE id = ? AND deleted_at IS NULL AND kind != 'dm' \
+                 AND parent_message_id IS NULL",
                 name,
                 id
             )
@@ -207,7 +209,8 @@ impl Store {
             .rows_affected(),
             (None, Some(topic)) => sqlx::query!(
                 "UPDATE channels SET topic = ? \
-                 WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'",
+                 WHERE id = ? AND deleted_at IS NULL AND kind != 'dm' \
+                 AND parent_message_id IS NULL",
                 topic,
                 id
             )
@@ -217,7 +220,8 @@ impl Store {
             (None, None) => {
                 let exists = sqlx::query_scalar!(
                     r#"SELECT 1 AS "one!: i64" FROM channels
-                       WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'"#,
+                       WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'
+                         AND parent_message_id IS NULL"#,
                     id
                 )
                 .fetch_optional(&self.pool)
@@ -244,6 +248,13 @@ impl Store {
     /// deployment could delete its final real channel as long as one DM existed,
     /// leaving members with nowhere to talk.
     ///
+    /// The guard is also skipped entirely when the row being deleted is itself
+    /// a thread. Excluding threads from the *count* was never enough: the guard
+    /// still applied to the thread's own deletion, so a deployment sitting on
+    /// one real channel could not delete any thread at all, having done nothing
+    /// wrong. Deleting a thread cannot reduce the number of real channels, so
+    /// there is nothing here for it to protect.
+    ///
     /// It excludes a thread's own channels from that same count for the
     /// identical reason: a thread is never where anyone lands, and without
     /// this a deployment holding a handful of threads on its one real channel
@@ -256,9 +267,10 @@ impl Store {
         let affected = sqlx::query!(
             "UPDATE channels SET deleted_at = ?
              WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'
-               AND (SELECT COUNT(*) FROM channels
-                    WHERE deleted_at IS NULL AND kind != 'dm'
-                      AND parent_message_id IS NULL) > 1",
+               AND (parent_message_id IS NOT NULL
+                    OR (SELECT COUNT(*) FROM channels
+                        WHERE deleted_at IS NULL AND kind != 'dm'
+                          AND parent_message_id IS NULL) > 1)",
             now,
             id
         )

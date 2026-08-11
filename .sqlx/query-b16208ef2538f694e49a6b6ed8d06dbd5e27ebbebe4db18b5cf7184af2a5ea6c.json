@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE channels SET topic = ? WHERE id = ? AND deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b16208ef2538f694e49a6b6ed8d06dbd5e27ebbebe4db18b5cf7184af2a5ea6c"
+}
