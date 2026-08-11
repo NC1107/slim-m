@@ -13,6 +13,11 @@
 /// menu instead of the menu itself, confirmed by looking: the first version
 /// wrapped only `CanvasPaneBody` and every `interact`-driven menu screenshot
 /// came back showing the resting scene with no menu in it at all.
+///
+/// This is the exact harness whose own images misled five review passes
+/// over the floating call dock's shadow (see CLAUDE.md); `_writePng` now
+/// captures through `support/real_shadows.dart`'s `withRealShadows`, which
+/// closes that at the source rather than only labelling it.
 library;
 
 import 'dart:io';
@@ -34,6 +39,7 @@ import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
+import '../support/real_shadows.dart';
 import '../voice_controller_harness.dart';
 
 const canvasAssembledOutDir = 'build/canvas-assembled-snapshots';
@@ -62,14 +68,16 @@ Future<void> _writePng(WidgetTester tester, String name) async {
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(_boundaryKey),
   );
-  await tester.runAsync(() async {
-    final image = await boundary.toImage(pixelRatio: 2);
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    image.dispose();
-    Directory(canvasAssembledOutDir).createSync(recursive: true);
-    File(
-      '$canvasAssembledOutDir/$name.png',
-    ).writeAsBytesSync(bytes!.buffer.asUint8List());
+  await withRealShadows(tester, boundary, () async {
+    await tester.runAsync(() async {
+      final image = await boundary.toImage(pixelRatio: 2);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      Directory(canvasAssembledOutDir).createSync(recursive: true);
+      File(
+        '$canvasAssembledOutDir/$name.png',
+      ).writeAsBytesSync(bytes!.buffer.asUint8List());
+    });
   });
 }
 

@@ -5,14 +5,14 @@
 /// Kept out of the test file so the matrix there stays a list of sizes.
 ///
 /// **Every PNG this writes is rasterised in software** (`flutter test` has
-/// no GPU), which lies about two things in a way that has already been
-/// mistaken for a real defect twice: a soft translucent `BoxShadow` paints
-/// as flat opaque black with a hard edge instead of blurring, and a thin
-/// diagonal stroke can appear broken or dotted even when the underlying
-/// geometry is correct. See `visual_render_support.dart`'s own doc comment
-/// in the voice_canvas package for the full write-up and how each was
-/// disproved against a live browser; do not read either as a real gap
-/// on the strength of one of these PNGs.
+/// no GPU), which used to lie about a `BoxShadow`: `support/real_shadows.
+/// dart`'s own doc comment tells the whole story, now closed here by
+/// [withRealShadows] after misleading five review passes into reading the
+/// floating dock's shadow as a hard-edged defect (see CLAUDE.md). A thin
+/// diagonal stroke can still appear broken or dotted even when the
+/// underlying geometry is correct - see `visual_render_support.dart`'s own
+/// doc comment in the voice_canvas package for that one, which is a real,
+/// unrelated antialiasing limit rather than a fixable framework flag.
 library;
 
 import 'dart:async';
@@ -54,6 +54,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/real_shadows.dart';
 import 'ui_snapshot_fixture_data.dart';
 
 export 'ui_snapshot_fonts.dart'
@@ -319,14 +320,16 @@ Future<void> writeSnapshot(WidgetTester tester, String name) async {
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(snapshotBoundary),
   );
-  await tester.runAsync(() async {
-    final image = await boundary.toImage(pixelRatio: 2);
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    image.dispose();
-    Directory(snapshotDir).createSync(recursive: true);
-    File(
-      '$snapshotDir/$name.png',
-    ).writeAsBytesSync(bytes!.buffer.asUint8List());
+  await withRealShadows(tester, boundary, () async {
+    await tester.runAsync(() async {
+      final image = await boundary.toImage(pixelRatio: 2);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      Directory(snapshotDir).createSync(recursive: true);
+      File(
+        '$snapshotDir/$name.png',
+      ).writeAsBytesSync(bytes!.buffer.asUint8List());
+    });
   });
 }
 

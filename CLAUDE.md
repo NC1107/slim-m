@@ -12,6 +12,37 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The capture harness's shadow artifact fooled five review passes, so it is fixed rather than documented a sixth time (2026-08-11)
+
+The floating dock's `BoxShadow` painting as a hard-edged flat rectangle instead of blurring, in every screenshot the capture harness writes, had already misled the sign-off pass that first found and then disproved it (PR #500), a second pass PR #514's own commit message says "mistook it the same way" before that fix moved the caveat onto the generated gallery, and both the frontend and UX lenses of the screen-review pass, independently, per `docs/reports/screen-review/voice.md`'s own account - four rounds before today's fifth.
+Asked to stop it happening a sixth time.
+Read this before touching `support/geometry.dart`, `support/real_shadows.dart`, `ui_snapshot_support.dart`, `canvas_assembled_snapshot_support.dart`, or `visual_render_support.dart` in the voice_canvas package.
+
+**The real cause, found by tracing rather than assumed: `flutter_test`'s own `AutomatedTestWidgetsFlutterBinding` sets `debugDisableShadows = true` for the whole process, specifically so golden-file tests are not flaky across platforms.**
+`BoxShadow.toPaint()` reads that flag and drops its `MaskFilter.blur` entirely when set, painting a flat, opaque, hard-edged rectangle instead - proven by sampling a rendered shadow's pixels with the flag on (a razor-sharp step between two values) and off (a genuine gradient), not assumed from the framework's own doc comment.
+None of these PNGs is ever diffed against a golden or asserted on pixel-for-pixel; they exist for a person to look at, so the determinism the framework's default protects buys this harness nothing, while the false "hard-edged bug" it produced cost real reviewer time five times over.
+
+**Fixed at the source rather than labelled a sixth time.**
+`client/packages/app/test/support/real_shadows.dart`'s `withRealShadows` flips the flag, forces the capture boundary to actually repaint under it (`markNeedsPaint` plus a real `pump` - flipping the flag alone does nothing, since a `RenderObject` only repaints when marked dirty, proven by probing that exact shape before trusting it), captures, then restores the flag and repaints again before returning.
+The restore has to finish before the test body's `Future` completes, never via `addTearDown`: `TestWidgetsFlutterBinding._verifyInvariants` runs `debugAssertAllPaintingVarsUnset` the instant a test body returns, strictly before any `tearDown` callback runs - the same ordering trap this file already records for a pending `Timer.periodic` in the killed-app-ghost entry below.
+Wired into `ui_snapshot_support.dart`'s `writeSnapshot` and `canvas_assembled_snapshot_support.dart`'s `_writePng`, the two widget-tree capture paths `scripts/ui-capture.sh` runs; confirmed end to end by running the real harness and looking at `voice-in-call-desktop-dark.png` and `busy-desktop-1400-dark.png` - both now show a genuine soft radial shadow under the dock, not a flat bar.
+
+**`visual_render_support.dart`'s own doc comment (voice_canvas package) turned out to be wrong about its own file, and that is worth keeping as a lesson on its own.**
+It claimed the hard-edged shadow appeared "in every PNG written here", copying the app package's finding onto itself by inference rather than by checking.
+Rendering `elevation_note_light.png` and looking at it found the elevated note's shadow already blurs correctly there - a real gradient, not a hard edge - because that file's own `main()` never calls `testWidgets`, so `AutomatedTestWidgetsFlutterBinding` is never constructed and `debugDisableShadows` never flips.
+Corrected in place (struck through, dated) rather than silently rewritten, since the file other files pointed to as "the full write-up" was itself carrying an unverified claim - the same shape this project's own stale-doc problem always has, one level deeper.
+
+**A reusable geometry helper closes the gap that let this go five rounds: nobody had a cheap way to ask "is this real, or is this the rasteriser lying."**
+Today's reviewer had to hand-write a throwaway widget test reading `DockHeightReporter`'s own `RenderBox` position against the test viewport before it would stop suspecting the floating canvas dock's 12dp gap (`Padding(EdgeInsets.all(AppSpacing.s12))` in `canvas_pane_body.dart`) of being a real layout bug.
+`client/packages/app/test/support/geometry.dart`'s `edgeGap`/`expectEdgeGap`/`expectClearOfEdge` are that check, generalised: the gap between a widget's real, laid-out edge and the viewport's or another widget's matching edge, read via `tester.getRect` - the same primitive `screen_safe_area_test.dart`, `composer_safe_area_test.dart`, `rail_safe_area_test.dart` and `canvas_safe_area_shell_test.dart` had each already hand-rolled a version of, not converted here since a passing test does not need rewriting, but available now so a sixth hand-rolled copy does not have to happen either.
+`floating_dock_edge_gap_test.dart` reruns exactly the case that prompted this - the canvas dock's 12dp gap and `voice_screen.dart`'s `SafeArea(minimum: EdgeInsets.all(AppSpacing.s12))` - through the shared helper, and both pass against the real widget tree.
+Mutation-tested: reverting either `edgeGap`'s bottom-edge arithmetic or `withRealShadows`'s repaint-then-restore sequence by hand fails exactly the tests written for that line and nothing else, restored by hand afterward (never `git checkout --`, which would have destroyed the surrounding uncommitted work).
+
+**One real, previously-invisible product bug surfaced as a side effect, named here rather than fixed: the reported-message quote box in `report_card.dart` overflows its card at phone width once real content actually loads.**
+`admin-reports at phone-portrait` now fails `scripts/ui-capture.sh`'s own overflow assertion, and it is real: the harness's fixed settle-pump count previously never gave the report fetch enough frames to resolve before capturing, so every prior run of this scenario - in the writing path and in `client-ci`'s own gating "no overflow" check alike - was silently checking a not-yet-loaded screen.
+Confirmed by isolating the cause: a single bare extra `tester.pump()` with nothing to do with shadows reproduces the identical overflow, and the written PNG shows the real Flutter overflow hazard stripe cutting into the quoted message text.
+Left to the screen-review pass working through `docs/reports/screen-review/`; the fix here does not touch `report_card.dart`, `renderSurface`'s settle-pump count, or `ui_snapshot_test.dart`'s admin-reports scenario, since widening the pump count generally would newly fail `client-ci` itself rather than only this capture run.
+
 ## A screen share outliving its call, and how far the platform's own stop mechanism actually reaches (2026-08-10)
 
 Reported from real device use: hanging up did not stop screen sharing.
