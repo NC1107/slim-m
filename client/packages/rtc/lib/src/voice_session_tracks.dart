@@ -80,6 +80,8 @@ extension VoiceSessionTracks on VoiceSession {
       enabled,
     );
     if (result.error != null) _lastError = result.error;
+    // Off means the next enable republishes fresh, front-facing: reset now.
+    if (!enabled && result.ok) _cameraSwitching.resetFacing();
     _refreshParticipants();
     return result.ok;
   }
