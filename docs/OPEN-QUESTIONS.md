@@ -250,7 +250,15 @@ The user-facing impact is nil, since the what's-new screen carries the feature a
 *The rule this needs:* after merging anything that affects a component, its standing release PR has to be allowed to regenerate before being merged.
 `MERGEABLE` is not the signal - the PR was mergeable the whole time, it was just stale.
 
-## 16. Does the voice lobby screen earn its place?
+## 16. ~~Does the voice lobby screen earn its place?~~ (answered by shipping option 1, 2026-08-03)
+
+**Closed, struck 2026-08-11 by a sweep rather than by anybody answering it.**
+Option 1 was built: `d190a711` ("self camera/screen preview, live camera controls, and direct voice join", PR #354) deleted the lobby, and clicking a voice channel joins directly now.
+The roster did survive exactly as option 1 predicted, in the rail; `_WhoIsHere` also still renders inside `voice_join_preview.dart`, which kept its name but now holds only the non-connected states (connecting, confirming a switch between two calls, an explicit rejoin).
+The camera pre-toggle that option 3 was arguing for landed separately as a persisted Voice Settings preference in PR #546, so nothing this question was weighing is still outstanding.
+The recommendation here was option 2 and the owner effectively took option 1; recorded rather than quietly deleted, since a recommendation that was not followed is worth knowing about.
+
+The original question follows.
 
 You have said twice that the join-preview screen "has no purpose" and "is not earning its place", and `docs/BACKLOG.md` records it as a standing view rather than a passing remark.
 It is the last open entry in that backlog that is not the camera work, so it is worth settling rather than carrying.
@@ -310,7 +318,16 @@ Confirmed 2026-08-02: it does, by the owner's own report.
 
 Android's clipboard path (the "+" sheet's "Paste image" row, its only route there) remains unverified on a device; it is reasoned from source and covered by unit tests only.
 
-## 18. Threads: which shape, still undecided
+## 18. ~~Threads: which shape, still undecided~~ (built as option 1, 2026-08-01)
+
+**Closed, struck 2026-08-11 by a sweep rather than by an answer.**
+The record's own recommendation - a thread as a channel with a parent - was built on 2026-08-01 under a stated assumption, since it is additive and could be walked back.
+`channels.parent_message_id` (migration 0030) is the column, `Store::permission_channel` is the single place a thread resolves to its parent for permissions, and nesting is refused outright.
+The reply-count affordance and a live `ThreadUpdated` event followed on 2026-08-01 and 2026-08-02.
+See CLAUDE.md's "Threads, built from the option 0005 recommended" for what building it actually found.
+It is still fair to say the owner never explicitly picked the shape, so if the answer is "no, the cheap filtered view was good enough", saying so is still worth something - but nothing is blocked on it.
+
+The original question follows.
 
 Replies shipped (`crates/slimm-server/migrations/0029_message_replies.sql`, `messages.replyToId`): a message can point at another message, and the transcript shows a compact quote you can tap to jump to it.
 Threads, the "hidden sub-channel you click Reply in Thread to open" the owner described, did not, on purpose - see [docs/decisions/0005-threads.md](decisions/0005-threads.md) for the three ways to build it, what each costs in migrations and touched subsystems, and a recommendation.
