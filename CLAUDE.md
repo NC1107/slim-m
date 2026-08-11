@@ -12,6 +12,44 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The what's-new sheet was fixed twice and still never showed, because nobody was writing the entries (2026-08-11)
+
+The owner, from real device use: "on iOS I haven't seen the update log in a long time after I update the app, I open it and don't see update log."
+Read this before touching `whats_new_content.dart`, `whats_new_freshness_test.dart`, or `WhatsNewController._check()`.
+
+**The mechanism was fine. The content had stopped.**
+Backlog item 56 (below) fixed the frozen `0.1.0` version source, and `_check()`'s re-baseline guard correctly kept that fix from flooding every install with the whole backlog.
+Both were right, and neither was the reason nothing showed after them.
+The newest entry in `whatsNewEntries` was `0.26.0`, written 2026-08-03 in PR #346, and twelve releases shipped over the top of it (0.27.0 through 0.38.0, including the entire canvas build-out, notification sounds, Space analytics and the desktop window shell).
+`pendingWhatsNewEntries` returns entries `> lastSeen` and `<= currentVersion`, so with nothing past 0.26.0 it correctly answered empty on every single one of those updates.
+The sheet was working exactly as designed the whole time; there was simply nothing to show.
+So the honest answer to the report is that he has never seen it on a real build - not once, ever - and the reason changed halfway through without anybody noticing the handover.
+
+**The failure was predicted in writing, by the file it happened to, and naming a risk turned out not to be a mitigation.**
+`whats_new_content.dart`'s own module doc already said, before any of this: "nothing forces a contributor to add an entry here when they cut a release, so a version can ship with genuinely user-facing changes and nothing shows up," and closed with "the mitigation is naming the risk here rather than pretending automation covers it."
+That is the whole entry: the risk was named accurately, in the right file, and then happened anyway, for twelve releases, because a comment cannot fail a build.
+Worth keeping as a shape rather than as one bug - this file's own strike-through rule exists for the same reason, and a documented risk with no gate behind it is the same class of thing as a documented gap nobody rechecks.
+
+**Why nothing could have noticed, and why an empty list is the hard case.**
+A list nobody has added to is byte-for-byte indistinguishable from a list with nothing left to say, and the correct behaviour for both is to show nothing.
+Every existing test passed throughout, because they all drive `pendingWhatsNewEntries` against small fixtures rather than asking whether the real list has kept up with the real product.
+`whats_new_freshness_test.dart` is the gate: it parses the version out of `client/packages/app/pubspec.yaml` - the same file `PackageInfo` compiles into the build, and the one release-please writes, so there is no second number to keep in step - and fails when the newest entry falls more than `_allowedMinorLag` (2) minors behind it.
+Two is deliberate and is what keeps this from forcing a meaningless entry: a release with genuinely nothing user-visible can be skipped, and so can the one after it, and only a third silent release in a row trips it, at which point widening the constant with a stated reason is a better answer than inventing an entry.
+
+**A second check, for the failure mode the first one cannot see.**
+An entry dated past anything that will ship is never returned by `pendingWhatsNewEntries` *and* satisfies the lag check forever, so one typo would restore the exact silence this gate exists to end, with the gate green.
+`_allowedMinorLead` (1) bounds that: one minor ahead covers the ordinary case of writing an entry for the release the change is going into, which has not bumped the pubspec yet.
+Mutation-tested, both directions, each restored by hand afterward and confirmed byte-identical: dropping the twelve new entries fails exactly the lag test and the new controller test and nothing else, and mistyping the newest entry as `0.99.0` fails exactly the lead test **while the lag test passes**, which is the hole it was added for.
+
+**What an already-installed device actually sees, since this is a catch-up and looks like a bug if you do not expect it.**
+`markSeen()` only runs when a sheet is actually shown, so a device that has been silently updating never advanced its stored version past the re-baseline: real installs have been sitting at whatever version first carried the 0.28.0 fix.
+On the next update they get one sheet with up to twelve entries in it, newest first, scrolling, once - and nothing after that until a new entry is written.
+That is the feature working, not a flood bug; the alternative was one summary entry with a version label that lied about which release each thing shipped in.
+
+**Twelve entries also crossed the file budget, which is why the archive moved.**
+Everything up to and including 0.26.0 is in `whats_new_content_archive.dart` now (308 lines, past the 300 review budget and warning), and `whats_new_content.dart` holds 0.27.0 onward.
+The archive's own doc comment says the next person moving entries down should start a second era file rather than growing that one further.
+
 ## A red e2e now opens an issue, because a second red workflow was never going to be noticed either (2026-08-11)
 
 Two entries above already record `e2e` red for a day, then red for two days a second time, both times with a release shipping over the top of it and nothing anywhere saying so.
@@ -809,6 +847,8 @@ Fixing the version source alone would have then flooded every existing install w
 That is different from - and must not be conflated with - the existing, deliberately-tested case of a `null` last-seen value (a device that predates the whole feature), which `pendingWhatsNewEntries`'s own doc comment and `whats_new_controller_test.dart` already establish must keep showing the backlog.
 `_check()` now re-baselines a device silently (adopts the current version, shows nothing) when, and only when, `lastSeen` equals the exact frozen constant `'0.1.0'` - narrower than treating it like `null`, which would have broken the already-passing "an upgrade with no prior what's-new record shows the entries" test.
 Mutation-tested: removing the guard fails exactly the new regression test and nothing else.
+Still had not shown on a real build as of 2026-08-11, and this fix was not why: it worked, and then the entries stopped being written at 0.26.0 for the next twelve releases, so there was nothing for it to show.
+See "The what's-new sheet was fixed twice and still never showed" at the top of this file.
 
 ## Threads, built from the option [0005](docs/decisions/0005-threads.md) recommended (2026-08-01)
 

@@ -14,10 +14,19 @@
 /// to know what changed for them. Parsing it would give a sheet that always
 /// appears and never says anything worth reading, which is worse than one
 /// that sometimes says nothing at all because nobody wrote it yet. The
-/// mitigation is naming the risk here rather than pretending automation
+/// mitigation was naming the risk here rather than pretending automation
 /// covers it: add an entry in the same PR that ships something a user would
 /// notice, the way `docs/` entries already accompany a landed change in this
 /// repo.
+///
+/// That mitigation was not enough, and the failure mode it named happened
+/// exactly as written. The newest entry sat at 0.26.0 while twelve releases
+/// shipped, so the sheet correctly showed nothing every time and no one could
+/// tell that apart from there being nothing to say. Naming a risk is not a
+/// gate, so there is one now: `whats_new_freshness_test.dart` fails when the
+/// newest entry here falls too far behind the version the app reports. It
+/// still cannot know whether an entry is any *good*, only that somebody
+/// looked, which is the most a mechanical check can honestly claim here.
 library;
 
 import 'whats_new_content_archive.dart';
@@ -54,203 +63,189 @@ class WhatsNewEntry {
 const List<WhatsNewEntry> whatsNewEntries = [
   ...whatsNewArchiveEntries,
   WhatsNewEntry(
-    version: '0.20.2',
-    headline: 'Opening a DM with someone you have blocked now says so',
+    version: '0.27.0',
+    headline: 'Channels can be grouped into categories',
     points: [
       WhatsNewPoint(
-        'It used to look empty and silently fail to send. Now it explains '
-        'why and offers an Unblock button.',
+        'Any channel can be dragged into a category, and categories collapse.',
+      ),
+      WhatsNewPoint(
+        'Clicking a voice channel joins the call straight away. The lobby '
+        'screen that used to sit in between is gone.',
+      ),
+      WhatsNewPoint(
+        'Settings gained a 12 or 24 hour clock, a high contrast mode, and a '
+        'reduce-motion switch that does not depend on your system setting.',
       ),
     ],
   ),
   WhatsNewEntry(
-    version: '0.20.3',
-    headline: 'Attaching and pasting a photo on iPhone and Android',
+    version: '0.28.0',
+    headline: 'A direct message shows when a call is running in it',
     points: [
       WhatsNewPoint(
-        'The attach button on a phone now offers your photo library, not '
-        'just the Files browser.',
-      ),
-      WhatsNewPoint('Your profile picture picker got the same choice.'),
-      WhatsNewPoint(
-        'If you have copied an image, the attach button now offers Paste '
-        'image as well.',
+        'You no longer have to open the conversation to find out somebody is '
+        'waiting on a call in it.',
       ),
     ],
   ),
   WhatsNewEntry(
-    version: '0.21.1',
-    headline: 'Renaming yourself now reaches your old messages too',
+    version: '0.29.0',
+    headline: 'The channel list, and the version you are actually running',
     points: [
       WhatsNewPoint(
-        'Changing your display name now updates it on messages you have '
-        'already sent, not just new ones.',
+        'The channel area has a CHANNELS header to match DIRECT MESSAGES, and '
+        'creating a channel or a category moved into the Space menu.',
       ),
       WhatsNewPoint(
-        'The message box\'s placeholder text is now vertically centred '
-        'instead of stuck at the top.',
+        'The sidebar edge is a plain line you click to collapse, rather than a '
+        'wide bar you drag.',
+      ),
+      WhatsNewPoint(
+        'Settings shows this build\'s real version. It had been reporting '
+        '0.1.0 on every build since the first one.',
       ),
     ],
   ),
   WhatsNewEntry(
-    version: '0.21.3',
-    headline: 'Fixes from using the app on a phone',
+    version: '0.30.0',
+    headline: 'Notification sounds, and choosing what you hear about',
     points: [
       WhatsNewPoint(
-        'Save and Cancel no longer run off the edge of the screen while '
-        'editing a message.',
+        'The notification sounds play now. They had been generated and sitting '
+        'unused since July with nothing wired up to play them.',
       ),
       WhatsNewPoint(
-        'The message menu and a few settings sheets now use the full '
-        'width on a phone instead of a cramped floating card.',
+        'Notifications can be set per account, including mentions only.',
+      ),
+      WhatsNewPoint(
+        'Space settings gained a usage page - message totals, busiest hours - '
+        'which is off by default and computes nothing while it is off.',
       ),
     ],
   ),
   WhatsNewEntry(
-    version: '0.21.4',
-    headline: 'Paste image is back on iOS',
+    version: '0.31.0',
+    headline: 'Images on the canvas, camera bubbles, and a call recap',
     points: [
       WhatsNewPoint(
-        'Pasting an image on iOS briefly stopped working after the last '
-        'update. It is fixed - the Paste image button is back.',
-        warn: true,
+        'Paste an image onto the canvas, then drag it, resize it, or change '
+        'what sits on top of what.',
+      ),
+      WhatsNewPoint(
+        'A call puts each person\'s camera on the canvas as a bubble you can '
+        'move around.',
+      ),
+      WhatsNewPoint(
+        'Hanging up shows a short recap of who was there and how long, rather '
+        'than dropping you onto a blank screen.',
       ),
     ],
   ),
   WhatsNewEntry(
-    version: '0.22.0',
-    headline: 'Swipe from the left edge to open the channel list',
+    version: '0.32.0',
+    headline: 'The canvas got notes and shapes',
     points: [
+      WhatsNewPoint('There is more than a pen now: sticky notes and shapes.'),
       WhatsNewPoint(
-        'Moderators can now act on a report directly: jump to the '
-        'message, delete it, or time out or remove the author.',
-      ),
-      WhatsNewPoint(
-        'Your profile picture now shows a camera badge, so it is obvious '
-        'you can tap to change it.',
-      ),
-      WhatsNewPoint(
-        'The jump-to-latest button is less intrusive, and reactions sit '
-        'closer to their message.',
-      ),
-      WhatsNewPoint(
-        'On a phone, swipe in from the left edge to open the channel '
-        'list, the way most messaging apps work. Swipe or tap outside to '
-        'close it.',
-      ),
-      WhatsNewPoint(
-        'You can now reply to a specific message. Pick Reply from its '
-        'menu; tap the quote to jump to the original.',
+        'You watch somebody draw a stroke while they are drawing it, instead '
+        'of it appearing all at once when they let go.',
       ),
     ],
   ),
   WhatsNewEntry(
-    version: '0.23.0',
-    headline: 'Calling someone in a direct message',
+    version: '0.33.0',
+    headline: 'One floating dock, so a call keeps its controls while you draw',
     points: [
       WhatsNewPoint(
-        'A direct message now has a Call button in its header. Mic and '
-        'camera stay off until you join.',
+        'The canvas tools and the call controls used to be two separate bars '
+        'that fought for the same space. They are one dock now.',
       ),
       WhatsNewPoint(
-        'Stepping away to read messages does not hang up - the call keeps '
-        'running in a collapsed strip.',
-      ),
-      WhatsNewPoint(
-        'Blocking someone stops a call the same way it already stops a '
-        'message: neither of you can ring the other.',
-      ),
-      WhatsNewPoint(
-        'Opening the canvas now fades in smoothly instead of snapping '
-        'into view.',
-      ),
-      WhatsNewPoint(
-        'Two small animations were polished: the first-connection '
-        'identity screen and your sidebar status avatar.',
+        'Middle-click drags the canvas, shift-scroll pans it, and '
+        'right-clicking an object gives it its own menu.',
       ),
     ],
   ),
   WhatsNewEntry(
-    version: '0.24.0',
-    headline: 'Threads',
+    version: '0.34.0',
+    headline: 'Your camera and your screen are objects on the canvas',
     points: [
       WhatsNewPoint(
-        'A message\'s menu now offers Reply in thread: it opens a side '
-        'conversation attached to that message, keeping tangents out of '
-        'the main channel.',
+        'A camera or a screen share can be moved and resized like anything '
+        'else you have placed, rather than being stuck in a fixed tile.',
       ),
       WhatsNewPoint(
-        'A thread works just like a regular channel, and anyone who can '
-        'read the parent channel can read and post in it too.',
+        'The voice screen is one main stage with a filmstrip under it, in '
+        'place of the three separate boxes it used to show.',
       ),
     ],
   ),
   WhatsNewEntry(
-    version: '0.24.2',
-    headline: 'Pasting an image on iPhone works from the text box',
+    version: '0.35.0',
+    headline: 'Where you put a camera on the canvas is shared, and it stays',
     points: [
       WhatsNewPoint(
-        'Press and hold the message box and pick Paste. iOS no longer asks '
-        'for permission each time.',
+        'Moving somebody\'s camera or screen moves it for everybody, and the '
+        'arrangement survives the call ending.',
+      ),
+      WhatsNewPoint(
+        'Polls, spoilers and author names can be reached with the keyboard, '
+        'and every focusable control draws the same focus ring.',
       ),
     ],
   ),
   WhatsNewEntry(
-    version: '0.25.0',
-    headline: 'A reply count under threaded messages',
+    version: '0.36.0',
+    headline: 'Buttons now match what you can do in that channel',
     points: [
       WhatsNewPoint(
-        'A message with a thread now shows "N replies" underneath it - '
-        'tap to open.',
+        'Actions used to be offered based on your permissions across the whole '
+        'Space, while the server decided per channel. So a moderator denied '
+        'something in one channel was still shown actions there that could '
+        'only fail, and actions a channel allowed them were hidden.',
       ),
       WhatsNewPoint(
-        'When there has been a reply, it also says when the most recent '
-        'one landed.',
+        'The poll composer and the poll card were both redesigned.',
+      ),
+      WhatsNewPoint(
+        'A direct message no longer offers a member list, a canvas button or a '
+        'channel hash, none of which it ever had.',
       ),
     ],
   ),
   WhatsNewEntry(
-    version: '0.25.1',
-    headline: 'The jump-to-latest arrow no longer shows up unprompted',
+    version: '0.37.0',
+    headline: 'On desktop, closing the window keeps the app running',
     points: [
       WhatsNewPoint(
-        'It no longer appears just from switching channels - only after '
-        'you have actually scrolled away from the newest message.',
+        'Closing sends it to the tray. On a desktop with no tray it minimises '
+        'instead, and says so rather than pretending.',
+      ),
+      WhatsNewPoint(
+        'Launching it again focuses the window already open, instead of '
+        'starting a second copy.',
+      ),
+      WhatsNewPoint(
+        'Voice settings has a "join calls with your camera on" preference, '
+        'remembered between launches.',
       ),
     ],
   ),
   WhatsNewEntry(
-    version: '0.25.2',
-    headline: 'Threads no longer show two header bars stacked together',
+    version: '0.38.0',
+    headline: 'Reordering categories, and a canvas tile full screen',
     points: [
       WhatsNewPoint(
-        'Opening a thread used to show two header bars stacked on top of '
-        'each other, and some of those buttons acted on the wrong '
-        'conversation. It is one simple bar now: back, the title, and '
-        'search.',
-        warn: true,
-      ),
-    ],
-  ),
-  WhatsNewEntry(
-    version: '0.26.0',
-    headline: 'The composer remembers what you were typing',
-    points: [
-      WhatsNewPoint(
-        'Switching channels no longer loses what you were typing - each '
-        'channel keeps its own draft.',
+        'Categories can be dragged into order from the categories screen.',
       ),
       WhatsNewPoint(
-        'An attached file now shows up immediately instead of vanishing '
-        'until the upload finishes.',
+        'A camera or screen tile on the canvas opens full screen, and tiles '
+        'wrap to the pane rather than running off the edge of it.',
       ),
       WhatsNewPoint(
-        'A picked photo gets a small thumbnail preview, not just a '
-        'filename.',
-      ),
-      WhatsNewPoint(
-        'If an upload fails, you can now retry or remove it instead of it '
-        'disappearing silently.',
+        'A channel row\'s menu was swallowing every attempt to drag that row '
+        'into a new position.',
       ),
     ],
   ),
